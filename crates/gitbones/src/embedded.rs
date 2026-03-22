@@ -2,7 +2,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use rust_embed::Embed;
 
 #[derive(Embed)]
@@ -31,4 +31,12 @@ pub fn scaffold(bones_dir: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub fn read_asset(path: &str) -> Result<String> {
+    let asset = Kit::get(path);
+    match asset {
+        Some(file) => Ok(String::from_utf8_lossy(file.data.as_ref()).to_string()),
+        None => bail!("Embedded asset not found: {path}"),
+    }
 }

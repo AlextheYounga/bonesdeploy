@@ -1,7 +1,9 @@
+mod doctor;
 mod init;
+mod push;
 mod version;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -27,11 +29,11 @@ enum Command {
     Version,
 }
 
-pub fn run(cli: &Cli) -> Result<()> {
+pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init => init::run(),
-        Command::Doctor { .. } => bail!("doctor is not yet implemented"),
-        Command::Push => bail!("push is not yet implemented"),
+        Command::Init => init::run().await,
+        Command::Doctor { local } => doctor::run(*local).await,
+        Command::Push => push::run().await,
         Command::Version => {
             version::run();
             Ok(())
