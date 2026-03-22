@@ -11,7 +11,6 @@
 - [ ] Set up `rust-embed` pointing at `kit/` in `gitbones/src/embedded.rs`
 - [ ] Write scaffold extraction: create `.bones/` directory tree from embedded assets
 - [ ] Write the kit hook scripts (pre-push, pre-receive, pre-deploy, post-receive, deploy, post-deploy)
-- [ ] Write a starter deployment script for kit (`01_run_deployment_concerns.sh`)
 
 ## Phase 3: gitbones init
 - [ ] Implement `prompts.rs` using inquire (collect all bones.toml fields with defaults)
