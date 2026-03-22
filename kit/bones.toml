@@ -1,0 +1,37 @@
+[data]
+remote_name = "production"
+project_name = "lawsnipe"
+ssh_user = "git"
+git_dir = "/home/git/lawsnipe.git"
+worktree = "/var/www/lawsnipe"
+branch = "master"
+stack = "laravel"
+permissions = "laravel"
+owner = "applications"
+group = "www-data"
+server_alias = "debianbox"
+
+[permissions.defaults]
+dir_mode   = "750"
+dir_flags  = ["setgid"]
+file_mode  = "640"
+
+[[permissions.paths]]
+path      = "storage"
+mode      = "770"
+recursive = true
+
+[[permissions.paths]]
+path      = "bootstrap/cache"
+mode      = "770"
+recursive = true
+
+[[permissions.paths]]
+path      = "database"
+mode      = "770"
+type      = "dir"
+
+[[permissions.paths]]
+path      = "database/database.sqlite"
+mode      = "660"
+type      = "file"
