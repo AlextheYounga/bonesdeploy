@@ -1,6 +1,10 @@
+mod doctor;
+mod init;
+mod post_deploy;
+mod pre_deploy;
 mod version;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -34,10 +38,10 @@ enum Command {
 
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init => bail!("init is not yet implemented"),
-        Command::Doctor => bail!("doctor is not yet implemented"),
-        Command::PreDeploy { .. } => bail!("pre-deploy is not yet implemented"),
-        Command::PostDeploy { .. } => bail!("post-deploy is not yet implemented"),
+        Command::Init => init::run(),
+        Command::Doctor => doctor::run(),
+        Command::PreDeploy { config } => pre_deploy::run(config),
+        Command::PostDeploy { config } => post_deploy::run(config),
         Command::Version => {
             version::run();
             Ok(())

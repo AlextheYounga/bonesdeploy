@@ -1,4 +1,6 @@
 mod commands;
+mod config;
+mod permissions;
 
 use anyhow::Result;
 use clap::Parser;

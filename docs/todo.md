@@ -46,22 +46,22 @@
 - [x] Implement `--local` flag (pre-push hook uses this since remote is validated independently by gitbones-remote doctor)
 
 ## Phase 7: gitbones-remote init
-- [ ] Define `bones.toml` serde structs in `gitbones-remote/src/config.rs`
-- [ ] Check that command is run as root/sudo
-- [ ] Write `/etc/sudoers.d/gitbones` drop-in file
-- [ ] Validate with `visudo -c`
+- [x] Define `bones.toml` serde structs in `gitbones-remote/src/config.rs`
+- [x] Check that command is run as root/sudo
+- [x] Write `/etc/sudoers.d/gitbones` drop-in file
+- [x] Validate with `visudo -c`
 
 ## Phase 8: gitbones-remote doctor
-- [ ] Check `gitbones-remote` can run without password (sudo -n)
-- [ ] Check `gitbones-remote` is globally available (which/command -v)
+- [x] Check `gitbones-remote` can run without password (sudo -n)
+- [x] Check `gitbones-remote` is globally available (which/command -v)
 
 ## Phase 9: gitbones-remote pre-deploy & post-deploy
-- [ ] Implement `config.rs` for remote (discover `bones.toml` relative to bare repo)
-- [ ] `pre-deploy`: chown worktree to deploy user
-- [ ] `post-deploy`: implement `permissions.rs`
-  - [ ] Apply default ownership (service_user:service_group)
-  - [ ] Apply default dir_mode and file_mode
-  - [ ] Apply path overrides (recursive, type=dir, type=file)
+- [x] Implement `config.rs` for remote (discover `bones.toml` relative to bare repo)
+- [x] `pre-deploy`: chown worktree to deploy user
+- [x] `post-deploy`: implement `permissions.rs`
+  - [x] Apply default ownership (service_user:service_group)
+  - [x] Apply default dir_mode and file_mode
+  - [x] Apply path overrides (recursive, type=dir, type=file)
 
 ## Phase 10: End-to-end testing
 - [ ] Full flow: init -> push -> git push -> deploy cycle
