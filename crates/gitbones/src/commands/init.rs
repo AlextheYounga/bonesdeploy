@@ -11,18 +11,21 @@ use crate::config;
 use crate::embedded;
 use crate::git;
 use crate::prompts;
+use crate::ssh;
 
 const BONES_DIR: &str = ".bones";
 const BONES_TOML: &str = ".bones/bones.toml";
 
-pub fn run() -> Result<()> {
+pub async fn run() -> Result<()> {
     println!(
         "{}\n\n\
          This will:\n  \
          1. Create a .bones/ folder with hooks and deployment scripts\n  \
          2. Collect project configuration (remote, host, permissions)\n  \
          3. Update .gitignore\n  \
-         4. Symlink the pre-push hook into .git/hooks/\n\n\
+         4. Symlink the pre-push hook into .git/hooks/\n  \
+         5. Create a bare repo on the remote (if needed)\n  \
+         6. Upload the post-receive hook to the remote\n\n\
          A git remote URL must already be configured for the deployment remote.\n",
         style("gitbones init").bold()
     );
@@ -51,7 +54,7 @@ pub fn run() -> Result<()> {
 
     // Load existing config or collect via prompts
     let bones_toml = Path::new(BONES_TOML);
-    let config = if bones_toml.exists() {
+    let cfg = if bones_toml.exists() {
         println!("Loading existing config from .bones/bones.toml...");
         config::load(bones_toml)?
     } else {
@@ -60,14 +63,25 @@ pub fn run() -> Result<()> {
     };
 
     // Validate the remote exists
-    git::validate_remote_exists(&repo, &config.data.remote_name)?;
+    git::validate_remote_exists(&repo, &cfg.data.remote_name)?;
 
     // Save config
-    config::save(&config, bones_toml)?;
+    config::save(&cfg, bones_toml)?;
     println!("Saved config to .bones/bones.toml");
 
     // Symlink pre-push hook
     symlink_pre_push()?;
+
+    // Remote setup over SSH
+    println!("\nConnecting to remote...");
+    let session = ssh::connect(&cfg).await?;
+
+    ssh::create_bare_repo(&session, &cfg.data.git_dir).await?;
+
+    let post_receive = embedded::read_asset("hooks/post-receive")?;
+    ssh::upload_post_receive(&session, &cfg.data.git_dir, &post_receive).await?;
+
+    session.close().await?;
 
     println!(
         "\n{} Run {} to sync .bones/ to the remote.",
