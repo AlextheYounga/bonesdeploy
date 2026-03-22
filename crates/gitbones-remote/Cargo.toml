@@ -9,3 +9,8 @@ workspace = true
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
+console = "0.15"
+nix = { version = "0.30", features = ["user"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
+walkdir = "2"
