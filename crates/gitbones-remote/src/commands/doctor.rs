@@ -28,9 +28,7 @@ pub fn run() -> Result<()> {
 }
 
 fn check_globally_available(issues: &mut Vec<String>) {
-    let result = Command::new("command")
-        .args(["-v", "gitbones-remote"])
-        .output();
+    let result = Command::new("gitbones-remote").arg("version").output();
 
     match result {
         Ok(output) if output.status.success() => {}
