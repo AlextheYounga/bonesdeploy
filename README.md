@@ -1,5 +1,7 @@
 # GitBones
 
+## Git Deployments with a Spine
+
 A drop-in Rust deployment system for git-based deployments over SSH. GitBones scaffolds hook scripts and deployment configs into your repo, syncs them to a remote bare repository, and manages file ownership and permissions across deploys without forcing containers, a control plane, or a platform layer.
 
 It produces two binaries:
