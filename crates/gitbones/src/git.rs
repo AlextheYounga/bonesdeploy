@@ -1,10 +1,9 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use git2::Repository;
 
 pub fn open_repo() -> Result<Repository> {
     Repository::open(".").context("Not a git repository")
 }
-
 
 pub fn validate_remote_exists(repo: &Repository, remote_name: &str) -> Result<()> {
     let remotes = repo.remotes().context("Failed to list remotes")?;

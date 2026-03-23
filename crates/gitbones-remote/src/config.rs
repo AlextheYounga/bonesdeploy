@@ -73,18 +73,32 @@ pub struct PathOverride {
     pub path_type: Option<String>,
 }
 
-fn default_port() -> String { "22".into() }
-fn default_branch() -> String { "master".into() }
-fn default_deploy() -> String { "git".into() }
-fn default_owner() -> String { "applications".into() }
-fn default_group() -> String { "www-data".into() }
-fn default_dir_mode() -> String { "750".into() }
-fn default_file_mode() -> String { "640".into() }
+fn default_port() -> String {
+    "22".into()
+}
+fn default_branch() -> String {
+    "master".into()
+}
+fn default_deploy() -> String {
+    "git".into()
+}
+fn default_owner() -> String {
+    "applications".into()
+}
+fn default_group() -> String {
+    "www-data".into()
+}
+fn default_dir_mode() -> String {
+    "750".into()
+}
+fn default_file_mode() -> String {
+    "640".into()
+}
 
 pub fn load(path: &Path) -> Result<BonesConfig> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
-    let config: BonesConfig = toml::from_str(&content)
-        .with_context(|| format!("Failed to parse {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let config: BonesConfig =
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     Ok(config)
 }

@@ -30,9 +30,7 @@ pub async fn run() -> Result<()> {
         style("gitbones init").bold()
     );
 
-    let proceed = Confirm::new("Continue?")
-        .with_default(true)
-        .prompt()?;
+    let proceed = Confirm::new("Continue?").with_default(true).prompt()?;
     if !proceed {
         println!("Aborted.");
         return Ok(());

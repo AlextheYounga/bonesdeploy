@@ -17,9 +17,7 @@ pub fn collect(project_name_hint: &str) -> Result<BonesConfig> {
         .with_help_message("e.g. deploy.example.com")
         .prompt()?;
 
-    let port = Text::new("Port:")
-        .with_default("22")
-        .prompt()?;
+    let port = Text::new("Port:").with_default("22").prompt()?;
 
     let default_git_dir = format!("/home/git/{project_name}.git");
     let git_dir = Text::new("Git directory (bare repo path on remote):")
@@ -31,9 +29,7 @@ pub fn collect(project_name_hint: &str) -> Result<BonesConfig> {
         .with_default(&default_worktree)
         .prompt()?;
 
-    let branch = Text::new("Branch:")
-        .with_default("master")
-        .prompt()?;
+    let branch = Text::new("Branch:").with_default("master").prompt()?;
 
     let deploy_user = Text::new("Deploy user (SSH user):")
         .with_default("git")
