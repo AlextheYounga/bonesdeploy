@@ -12,6 +12,12 @@ pub fn chown_to_deploy_user(cfg: &BonesConfig) -> Result<()> {
     let user = &cfg.permissions.defaults.deploy;
     let worktree = &cfg.data.worktree;
 
+    if !Path::new(worktree).exists() {
+        fs::create_dir_all(worktree)
+            .with_context(|| format!("Failed to create worktree directory: {worktree}"))?;
+        println!("Created worktree directory: {worktree}");
+    }
+
     run_chown(&format!("{user}:{user}"), worktree, true)?;
     println!("Changed ownership of {worktree} to {user}");
     Ok(())
