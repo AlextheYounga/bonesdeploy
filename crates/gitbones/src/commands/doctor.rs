@@ -51,11 +51,7 @@ fn check_bones_structure(issues: &mut Vec<String>) {
         return;
     }
 
-    let expected = [
-        ".bones/bones.toml",
-        ".bones/hooks",
-        ".bones/deployment",
-    ];
+    let expected = [".bones/bones.toml", ".bones/hooks", ".bones/deployment"];
 
     for path in &expected {
         if !Path::new(path).exists() {
@@ -80,11 +76,7 @@ fn check_deployment_naming(issues: &mut Vec<String>) {
         let name = name.to_string_lossy();
 
         // Scripts must start with a numeric prefix like "01_"
-        let has_numeric_prefix = name
-            .chars()
-            .take_while(char::is_ascii_digit)
-            .count()
-            > 0;
+        let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
 
         if !has_numeric_prefix {
             issues.push(format!(
@@ -129,7 +121,10 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
     let git_dir = &cfg.data.git_dir;
 
     // Check gitbones-remote is globally available
-    if ssh::run_cmd(&session, "command -v gitbones-remote").await.is_err() {
+    if ssh::run_cmd(&session, "command -v gitbones-remote")
+        .await
+        .is_err()
+    {
         issues.push("gitbones-remote is not available on the remote".into());
     }
 

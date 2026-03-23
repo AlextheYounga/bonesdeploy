@@ -26,9 +26,8 @@ pub async fn run() -> Result<()> {
 
     // Delete sample hooks from bare repo
     println!("Cleaning sample hooks from remote...");
-    let cmd = format!(
-        "find {git_dir}/hooks/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true"
-    );
+    let cmd =
+        format!("find {git_dir}/hooks/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true");
     ssh::run_cmd(&session, &cmd).await?;
 
     // Symlink bones hooks into bare repo hooks

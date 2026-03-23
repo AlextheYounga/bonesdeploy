@@ -63,7 +63,11 @@ pub fn harden(cfg: &BonesConfig) -> Result<()> {
             "Applied mode {} to {}{}",
             override_entry.mode,
             override_entry.path,
-            if override_entry.recursive { " (recursive)" } else { "" }
+            if override_entry.recursive {
+                " (recursive)"
+            } else {
+                ""
+            }
         );
     }
 
@@ -88,17 +92,21 @@ fn run_chown(ownership: &str, path: &str, recursive: bool) -> Result<()> {
 }
 
 fn parse_mode(mode_str: &str) -> Result<u32> {
-    u32::from_str_radix(mode_str, 8)
-        .with_context(|| format!("Invalid mode: {mode_str}"))
+    u32::from_str_radix(mode_str, 8).with_context(|| format!("Invalid mode: {mode_str}"))
 }
 
 fn apply_default_modes(worktree: &str, dir_mode: u32, file_mode: u32) -> Result<()> {
     for entry in WalkDir::new(worktree) {
         let entry = entry.with_context(|| format!("Failed to walk {worktree}"))?;
-        let metadata = entry.metadata()
+        let metadata = entry
+            .metadata()
             .with_context(|| format!("Failed to read metadata for {}", entry.path().display()))?;
 
-        let mode = if metadata.is_dir() { dir_mode } else { file_mode };
+        let mode = if metadata.is_dir() {
+            dir_mode
+        } else {
+            file_mode
+        };
         set_permissions(entry.path(), mode)?;
     }
     Ok(())
@@ -106,8 +114,7 @@ fn apply_default_modes(worktree: &str, dir_mode: u32, file_mode: u32) -> Result<
 
 fn apply_recursive_mode(path: &Path, mode: u32) -> Result<()> {
     for entry in WalkDir::new(path) {
-        let entry = entry
-            .with_context(|| format!("Failed to walk {}", path.display()))?;
+        let entry = entry.with_context(|| format!("Failed to walk {}", path.display()))?;
         set_permissions(entry.path(), mode)?;
     }
     Ok(())
@@ -119,7 +126,10 @@ fn apply_single_mode(path: &Path, mode: u32) -> Result<()> {
 
 fn set_permissions(path: &Path, mode: u32) -> Result<()> {
     fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|e| {
-        io::Error::new(e.kind(), format!("chmod {:o} {}: {e}", mode, path.display()))
+        io::Error::new(
+            e.kind(),
+            format!("chmod {:o} {}: {e}", mode, path.display()),
+        )
     })?;
     Ok(())
 }
