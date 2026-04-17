@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
@@ -6,6 +5,10 @@ set -Eeuo pipefail
 [ -f artisan ] || { echo "artisan not found"; exit 1; }
 command -v php >/dev/null 2>&1 || { echo "php not found"; exit 1; }
 command -v composer >/dev/null 2>&1 || { echo "composer not found"; exit 1; }
+
+# Maintenance mode first — before anything destructive
+php artisan down
+trap 'php artisan up || true' EXIT
 
 # Install PHP dependencies
 composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
@@ -23,25 +26,25 @@ if [ -f "./.nvmrc" ]; then
   nvm install
 fi
 
-if [ -f "./yarn.lock" ]; then
-  command -v corepack >/dev/null 2>&1 && corepack enable || true
-  yarn install --frozen-lockfile
-  yarn build
-elif [ -f "./package-lock.json" ]; then
-  npm ci
-  npm run build
-fi
+command -v pnpm >/dev/null 2>&1 || {
+  echo "pnpm not found. Install it globally or enable it via corepack before deploy."
+  exit 1
+}
 
-# Enter maintenance mode only for critical section
-php artisan down
-trap 'php artisan up || true' EXIT
-
-php artisan migrate --force
+pnpm install --frozen-lockfile
+pnpm run build
 
 if php artisan list | grep -q 'wayfinder:generate'; then
   php artisan wayfinder:generate
 fi
 
+if [ ! -f .env ] || ! grep -Eq '^APP_KEY=base64:' .env; then
+  php artisan key:generate --force
+fi
+
+php artisan migrate --force
+
+# Clear old caches and rebuild them back-to-back
 php artisan optimize:clear
 php artisan config:cache
 php artisan route:cache
@@ -51,4 +54,3 @@ php artisan queue:restart || true
 
 php artisan up
 trap - EXIT
-```

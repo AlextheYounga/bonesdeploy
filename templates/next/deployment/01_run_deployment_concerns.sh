@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
@@ -20,7 +19,10 @@ fi
 rm -rf node_modules
 
 if [ -f "./pnpm-lock.yaml" ]; then
-  npm install -g pnpm
+  command -v pnpm >/dev/null 2>&1 || {
+    echo "pnpm not found. Install it globally or enable it via corepack before deploy."
+    exit 1
+  }
   pnpm install --frozen-lockfile
   pnpm build
 elif [ -f "./yarn.lock" ]; then
@@ -47,4 +49,3 @@ else
   echo "pm2 not found. Install it globally: npm install -g pm2"
   exit 1
 fi
-```
