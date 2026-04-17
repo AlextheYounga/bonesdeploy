@@ -2,9 +2,9 @@
 #
 # pre-deploy — Remote hook, called by pre-receive.
 #
-# Runs gitbones-remote pre-deploy, which changes ownership of
-# the worktree to the deploy (ssh) user so that deployment
-# scripts can write to it.
+# Runs gitbones-remote prepare-release, which creates a new
+# timestamped release directory, chowns it to the deploy user,
+# and writes the release name to a state file.
 #
 # GIT_DIR is set by git to the bare repo path.
 
@@ -15,9 +15,9 @@ GIT_DIR=$(cd "$GIT_DIR" && pwd)
 
 BONES_TOML="$GIT_DIR/bones/bones.toml"
 
-echo "[gitbones] Running pre-deploy (changing worktree ownership to deploy user)..."
+echo "[gitbones] Running pre-deploy (preparing release directory)..."
 
-if ! sudo gitbones-remote pre-deploy --config "$BONES_TOML"; then
+if ! sudo gitbones-remote prepare-release --config "$BONES_TOML"; then
     echo "[gitbones] pre-deploy failed."
     exit 1
 fi

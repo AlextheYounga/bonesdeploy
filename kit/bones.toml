@@ -4,9 +4,14 @@ port="22"
 branch="master"
 
 # Permissions for deployment
-[permissions.defaults]  
-deploy = "git"  
-owner = "applications"  
-group = "www-data"  
-dir_mode   = "750"  
-file_mode  = "640"  
+[permissions.defaults]
+deploy = "git"
+owner = "applications"
+group = "www-data"
+dir_mode   = "750"
+file_mode  = "640"
+
+# Release management
+[releases]
+keep = 5
+shared_paths = []

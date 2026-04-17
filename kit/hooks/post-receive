@@ -2,7 +2,8 @@
 #
 # post-receive — Remote hook, runs after refs are updated.
 #
-# Checks out the latest commit into the worktree, then calls
+# Reads the current release name from the state file and checks
+# out the latest commit into that release directory, then calls
 # the deploy hook to run deployment scripts.
 #
 # GIT_DIR is set by git to the bare repo path.
@@ -24,9 +25,17 @@ if [ -z "$WORKTREE" ] || [ -z "$BRANCH" ]; then
     exit 1
 fi
 
-echo "[gitbones] Checking out $BRANCH to $WORKTREE..."
-
-git --work-tree="$WORKTREE" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
+# Read current release from state file
+RELEASE_STATE="$GIT_DIR/bones/.current_release"
+if [ -f "$RELEASE_STATE" ]; then
+    RELEASE_DIR=$(cat "$RELEASE_STATE")
+    RELEASE_PATH="$WORKTREE/releases/$RELEASE_DIR"
+    echo "[gitbones] Checking out $BRANCH to $RELEASE_PATH..."
+    git --work-tree="$RELEASE_PATH" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
+else
+    echo "[gitbones] No release state file found, checking out to worktree directly..."
+    git --work-tree="$WORKTREE" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
+fi
 
 echo "[gitbones] Checkout complete. Running deploy..."
 

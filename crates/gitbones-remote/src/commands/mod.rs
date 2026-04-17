@@ -1,7 +1,10 @@
+mod activate_release;
 mod doctor;
 mod init;
 mod post_deploy;
 mod pre_deploy;
+mod prepare_release;
+mod rollback;
 mod version;
 
 use anyhow::Result;
@@ -32,6 +35,24 @@ enum Command {
         #[arg(long)]
         config: String,
     },
+    /// Create a new release directory and write state file
+    PrepareRelease {
+        /// Path to bones.toml config file
+        #[arg(long)]
+        config: String,
+    },
+    /// Symlink shared paths, swap current symlink, prune old releases
+    ActivateRelease {
+        /// Path to bones.toml config file
+        #[arg(long)]
+        config: String,
+    },
+    /// Roll back to the previous release
+    Rollback {
+        /// Path to bones.toml config file
+        #[arg(long)]
+        config: String,
+    },
     /// Print the version
     Version,
 }
@@ -42,6 +63,9 @@ pub fn run(cli: &Cli) -> Result<()> {
         Command::Doctor => doctor::run(),
         Command::PreDeploy { config } => pre_deploy::run(config),
         Command::PostDeploy { config } => post_deploy::run(config),
+        Command::PrepareRelease { config } => prepare_release::run(config),
+        Command::ActivateRelease { config } => activate_release::run(config),
+        Command::Rollback { config } => rollback::run(config),
         Command::Version => {
             version::run();
             Ok(())

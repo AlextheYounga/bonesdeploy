@@ -2,6 +2,7 @@ mod doctor;
 mod init;
 mod push;
 mod redeploy;
+mod rollback;
 mod version;
 
 use anyhow::Result;
@@ -28,6 +29,8 @@ enum Command {
     Push,
     /// Re-run the deployment hooks without pushing
     Redeploy,
+    /// Roll back to the previous release
+    Rollback,
     /// Print the version
     Version,
 }
@@ -38,6 +41,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,
         Command::Redeploy => redeploy::run().await,
+        Command::Rollback => rollback::run().await,
         Command::Version => {
             version::run();
             Ok(())

@@ -9,6 +9,8 @@ pub struct BonesConfig {
     pub data: Data,
     #[serde(default)]
     pub permissions: Permissions,
+    #[serde(default)]
+    pub releases: Option<Releases>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -71,6 +73,18 @@ pub struct PathOverride {
     pub recursive: bool,
     #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
     pub path_type: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Releases {
+    #[serde(default = "default_keep")]
+    pub keep: u32,
+    #[serde(default)]
+    pub shared_paths: Vec<String>,
+}
+
+fn default_keep() -> u32 {
+    5
 }
 
 fn default_port() -> String {

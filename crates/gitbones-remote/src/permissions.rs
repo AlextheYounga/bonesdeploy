@@ -23,19 +23,61 @@ pub fn chown_to_deploy_user(cfg: &BonesConfig) -> Result<()> {
     Ok(())
 }
 
+pub fn chown_paths(user: &str, paths: &[&str]) -> Result<()> {
+    let ownership = format!("{user}:{user}");
+    for path in paths {
+        if Path::new(path).exists() {
+            run_chown(&ownership, path, true)?;
+            println!("Changed ownership of {path} to {user}");
+        }
+    }
+    Ok(())
+}
+
 pub fn harden(cfg: &BonesConfig) -> Result<()> {
-    let defaults = &cfg.permissions.defaults;
+    harden_path(cfg, &cfg.data.worktree)
+}
+
+pub fn harden_release(cfg: &BonesConfig) -> Result<()> {
     let worktree = &cfg.data.worktree;
+    let current = Path::new(worktree).join("current");
+
+    if !current.is_symlink() {
+        bail!("No current release symlink found at {}", current.display());
+    }
+
+    let release_dir = fs::read_link(&current)
+        .with_context(|| format!("Failed to read symlink {}", current.display()))?;
+    let release_path = if release_dir.is_relative() {
+        current.parent().unwrap().join(&release_dir)
+    } else {
+        release_dir
+    };
+
+    // Harden the active release directory
+    harden_path(cfg, &release_path.to_string_lossy())?;
+
+    // Harden the shared directory
+    let shared_dir = Path::new(worktree).join("shared");
+    if shared_dir.exists() {
+        harden_path(cfg, &shared_dir.to_string_lossy())?;
+    }
+
+    Ok(())
+}
+
+fn harden_path(cfg: &BonesConfig, root: &str) -> Result<()> {
+    let defaults = &cfg.permissions.defaults;
 
     // Apply default ownership
     let ownership = format!("{}:{}", defaults.owner, defaults.group);
-    run_chown(&ownership, worktree, true)?;
-    println!("Set ownership of {worktree} to {ownership}");
+    run_chown(&ownership, root, true)?;
+    println!("Set ownership of {root} to {ownership}");
 
     // Apply default dir_mode and file_mode
     let dir_mode = parse_mode(&defaults.dir_mode)?;
     let file_mode = parse_mode(&defaults.file_mode)?;
-    apply_default_modes(worktree, dir_mode, file_mode)?;
+    apply_default_modes(root, dir_mode, file_mode)?;
     println!(
         "Applied default modes: dirs={}, files={}",
         defaults.dir_mode, defaults.file_mode
@@ -43,7 +85,7 @@ pub fn harden(cfg: &BonesConfig) -> Result<()> {
 
     // Apply path overrides
     for override_entry in &cfg.permissions.paths {
-        let target = Path::new(worktree).join(&override_entry.path);
+        let target = Path::new(root).join(&override_entry.path);
         if !target.exists() {
             println!(
                 "Warning: override path '{}' does not exist, skipping",

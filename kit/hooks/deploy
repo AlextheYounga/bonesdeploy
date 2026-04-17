@@ -6,6 +6,9 @@
 # sequentially in alphabetical order. Scripts must be named
 # with a numerical prefix (e.g., 01_install_deps.sh).
 #
+# If a release state file exists, cd into the release dir
+# and activate it after deployment scripts succeed.
+#
 # GIT_DIR is set by git to the bare repo path.
 
 set -euo pipefail
@@ -24,10 +27,19 @@ if [ -z "$WORKTREE" ]; then
     exit 1
 fi
 
+# Determine deploy directory (release dir or worktree)
+RELEASE_STATE="$GIT_DIR/bones/.current_release"
+if [ -f "$RELEASE_STATE" ]; then
+    RELEASE_DIR=$(cat "$RELEASE_STATE")
+    DEPLOY_DIR="$WORKTREE/releases/$RELEASE_DIR"
+else
+    DEPLOY_DIR="$WORKTREE"
+fi
+
 if [ ! -d "$DEPLOYMENT_DIR" ]; then
     echo "[gitbones] No deployment directory found. Skipping deploy scripts."
 else
-    cd "$WORKTREE"
+    cd "$DEPLOY_DIR"
 
     for script in "$DEPLOYMENT_DIR"/*; do
         [ -f "$script" ] || continue
@@ -41,6 +53,15 @@ else
     done
 
     echo "[gitbones] All deployment scripts completed."
+fi
+
+# Activate release if in release mode
+if [ -f "$RELEASE_STATE" ]; then
+    echo "[gitbones] Activating release..."
+    if ! sudo gitbones-remote activate-release --config "$BONES_TOML"; then
+        echo "[gitbones] activate-release failed."
+        exit 1
+    fi
 fi
 
 echo "[gitbones] Running post-deploy..."

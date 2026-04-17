@@ -1,7 +1,7 @@
 use anyhow::Result;
 use inquire::Text;
 
-use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions};
+use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases};
 
 pub fn collect(project_name_hint: &str) -> Result<BonesConfig> {
     let remote_name = Text::new("Remote name:")
@@ -51,6 +51,23 @@ pub fn collect(project_name_hint: &str) -> Result<BonesConfig> {
         .with_default("640")
         .prompt()?;
 
+    let keep: u32 = Text::new("Number of releases to keep:")
+        .with_default("5")
+        .prompt()?
+        .parse()
+        .unwrap_or(5);
+
+    let shared_paths_input = Text::new("Shared paths (comma-separated):")
+        .with_default("")
+        .with_help_message("e.g. .env,storage,node_modules — paths shared across releases")
+        .prompt()?;
+
+    let shared_paths: Vec<String> = shared_paths_input
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
     Ok(BonesConfig {
         data: Data {
             remote_name,
@@ -71,5 +88,9 @@ pub fn collect(project_name_hint: &str) -> Result<BonesConfig> {
             },
             paths: vec![],
         },
+        releases: Some(Releases {
+            keep,
+            shared_paths,
+        }),
     })
 }
