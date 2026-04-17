@@ -3,13 +3,14 @@ use std::path::Path;
 use std::process::Command;
 use std::{fs, io};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use walkdir::WalkDir;
 
 use crate::config::BonesConfig;
 
 pub fn chown_to_deploy_user(cfg: &BonesConfig) -> Result<()> {
-    let user = &cfg.permissions.defaults.deploy;
+    let deploy_user = &cfg.permissions.defaults.deploy;
+    let service_group = &cfg.permissions.defaults.group;
     let worktree = &cfg.data.worktree;
 
     if !Path::new(worktree).exists() {
@@ -18,8 +19,9 @@ pub fn chown_to_deploy_user(cfg: &BonesConfig) -> Result<()> {
         println!("Created worktree directory: {worktree}");
     }
 
-    run_chown(&format!("{user}:{user}"), worktree, true)?;
-    println!("Changed ownership of {worktree} to {user}");
+    let ownership = format!("{deploy_user}:{service_group}");
+    run_chown(&ownership, worktree, true)?;
+    println!("Changed ownership of {worktree} to {ownership}");
     Ok(())
 }
 
@@ -138,7 +140,6 @@ fn run_chown(ownership: &str, path: &str, recursive: bool) -> Result<()> {
     }
     Ok(())
 }
-
 
 fn parse_mode(mode_str: &str) -> Result<u32> {
     u32::from_str_radix(mode_str, 8).with_context(|| format!("Invalid mode: {mode_str}"))
