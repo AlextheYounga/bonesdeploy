@@ -1,4 +1,3 @@
-```bash
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
@@ -26,16 +25,17 @@ if bundle exec rails assets:precompile 2>/dev/null; then
 fi
 
 # Run database migrations
-bundle exec rails db:migrate RAILS_ENV=production
+RAILS_ENV=production bundle exec rails db:migrate
 
 # Restart puma via systemd
 # Adjust the service name to match your systemd unit
 SERVICE_NAME="${PROJECT_NAME:-puma}"
-if systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-  sudo systemctl restart "$SERVICE_NAME"
+if ! command -v systemctl >/dev/null 2>&1; then
+  echo "systemctl not found. Restart your app server manually."
+elif systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
+  systemctl restart "$SERVICE_NAME"
 elif systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
-  sudo systemctl start "$SERVICE_NAME"
+  systemctl start "$SERVICE_NAME"
 else
   echo "No systemd service found for $SERVICE_NAME. Restart your app server manually."
 fi
-```
