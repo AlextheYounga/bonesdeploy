@@ -46,7 +46,7 @@ cargo install --git https://github.com/AlextheYounga/gitbones.git gitbones
 ### Server (gitbones-remote)
 
 ```sh
-cargo install --git https://github.com/AlextheYounga/gitbones.git gitbones-remote
+sudo cargo install --root /usr/local --git https://github.com/AlextheYounga/gitbones.git gitbones-remote --force
 ```
 
 Then run the one-time server setup as root:
