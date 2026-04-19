@@ -4,14 +4,14 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BonesConfig {
     pub data: Data,
     #[serde(default)]
     pub permissions: Permissions,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Data {
     #[serde(default)]
     pub remote_name: String,
@@ -29,7 +29,7 @@ pub struct Data {
     pub branch: String,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Permissions {
     #[serde(default)]
     pub defaults: PermissionDefaults,
@@ -37,7 +37,7 @@ pub struct Permissions {
     pub paths: Vec<PathOverride>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PermissionDefaults {
     #[serde(default = "default_deploy")]
     pub deploy: String,
@@ -63,7 +63,7 @@ impl Default for PermissionDefaults {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PathOverride {
     pub path: String,
     pub mode: String,

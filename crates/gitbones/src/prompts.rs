@@ -1,55 +1,146 @@
 use anyhow::Result;
-use inquire::Text;
+use inquire::{Select, Text};
 
 use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions};
 
+pub fn choose_template(available_templates: &[String]) -> Result<Option<String>> {
+    let mut options = Vec::with_capacity(available_templates.len() + 1);
+    options.push(String::from("Build from scratch"));
+    options.extend(
+        available_templates
+            .iter()
+            .map(|name| format!("Use template: {name}")),
+    );
+
+    let choice = Select::new("How would you like to initialize this project?", options)
+        .with_help_message("Choose scratch for the current flow, or pick a template scaffold")
+        .prompt()?;
+
+    if choice == "Build from scratch" {
+        return Ok(None);
+    }
+
+    let template_name = choice
+        .strip_prefix("Use template: ")
+        .unwrap_or_default()
+        .to_string();
+
+    if template_name.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(template_name))
+}
+
 pub fn collect(project_name_hint: &str) -> Result<BonesConfig> {
+    collect_from_seed(project_name_hint, None)
+}
+
+pub fn collect_from_seed(
+    project_name_hint: &str,
+    seed: Option<&BonesConfig>,
+) -> Result<BonesConfig> {
+    let default_remote_name = seed
+        .map(|cfg| cfg.data.remote_name.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("production");
     let remote_name = Text::new("Remote name:")
-        .with_default("production")
+        .with_default(default_remote_name)
         .with_help_message("e.g. production, staging")
         .prompt()?;
 
+    let default_project_name = seed
+        .map(|cfg| cfg.data.project_name.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(project_name_hint);
     let project_name = Text::new("Project name:")
-        .with_default(project_name_hint)
+        .with_default(default_project_name)
         .prompt()?;
 
+    let default_host = seed
+        .map(|cfg| cfg.data.host.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("");
     let host = Text::new("Host:")
+        .with_default(default_host)
         .with_help_message("e.g. deploy.example.com")
         .prompt()?;
 
-    let port = Text::new("Port:").with_default("22").prompt()?;
+    let default_port = seed
+        .map(|cfg| cfg.data.port.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("22");
+    let port = Text::new("Port:").with_default(default_port).prompt()?;
 
-    let default_git_dir = format!("/home/git/{project_name}.git");
+    let default_git_dir = seed
+        .map(|cfg| cfg.data.git_dir.as_str())
+        .filter(|value| !value.is_empty())
+        .map_or_else(
+            || format!("/home/git/{project_name}.git"),
+            |value| value.replace("<project_name>", &project_name),
+        );
     let git_dir = Text::new("Git directory (bare repo path on remote):")
         .with_default(&default_git_dir)
         .prompt()?;
 
-    let default_worktree = format!("/var/www/{project_name}");
+    let default_worktree = seed
+        .map(|cfg| cfg.data.worktree.as_str())
+        .filter(|value| !value.is_empty())
+        .map_or_else(
+            || format!("/var/www/{project_name}"),
+            |value| value.replace("<project_name>", &project_name),
+        );
     let worktree = Text::new("Worktree path on remote:")
         .with_default(&default_worktree)
         .prompt()?;
 
-    let branch = Text::new("Branch:").with_default("master").prompt()?;
+    let default_branch = seed
+        .map(|cfg| cfg.data.branch.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("master");
+    let branch = Text::new("Branch:").with_default(default_branch).prompt()?;
 
+    let default_deploy_user = seed
+        .map(|cfg| cfg.permissions.defaults.deploy.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("git");
     let deploy_user = Text::new("Deploy user (SSH user):")
-        .with_default("git")
+        .with_default(default_deploy_user)
         .prompt()?;
 
+    let default_service_user = seed
+        .map(|cfg| cfg.permissions.defaults.owner.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("applications");
     let service_user = Text::new("Service user (final file owner):")
-        .with_default("applications")
+        .with_default(default_service_user)
         .prompt()?;
 
+    let default_service_group = seed
+        .map(|cfg| cfg.permissions.defaults.group.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("www-data");
     let service_group = Text::new("Service group:")
-        .with_default("www-data")
+        .with_default(default_service_group)
         .prompt()?;
 
+    let default_dir_mode = seed
+        .map(|cfg| cfg.permissions.defaults.dir_mode.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("750");
     let dir_mode = Text::new("Default directory mode:")
-        .with_default("750")
+        .with_default(default_dir_mode)
         .prompt()?;
 
+    let default_file_mode = seed
+        .map(|cfg| cfg.permissions.defaults.file_mode.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("640");
     let file_mode = Text::new("Default file mode:")
-        .with_default("640")
+        .with_default(default_file_mode)
         .prompt()?;
+
+    let path_overrides = seed.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
 
     Ok(BonesConfig {
         data: Data {
@@ -69,7 +160,7 @@ pub fn collect(project_name_hint: &str) -> Result<BonesConfig> {
                 dir_mode,
                 file_mode,
             },
-            paths: vec![],
+            paths: path_overrides,
         },
     })
 }

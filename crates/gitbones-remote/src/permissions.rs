@@ -3,7 +3,7 @@ use std::path::Path;
 use std::process::Command;
 use std::{fs, io};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use walkdir::WalkDir;
 
 use crate::config::BonesConfig;
