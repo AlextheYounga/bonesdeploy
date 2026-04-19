@@ -43,8 +43,18 @@ pub async fn run() -> Result<()> {
     if bones_dir.exists() {
         println!(".bones/ already exists, skipping scaffold extraction.");
     } else {
+        let available_templates = embedded::available_templates();
+        let selected_template = prompts::choose_template(&available_templates)?;
+
         println!("Creating .bones/ scaffold...");
         embedded::scaffold(bones_dir)?;
+
+        if let Some(template_name) = selected_template {
+            embedded::scaffold_template(&template_name, bones_dir)?;
+            println!("Applied template: {template_name}");
+        } else {
+            println!("Using build-from-scratch scaffold.");
+        }
     }
 
     // Update .gitignore
@@ -91,6 +101,8 @@ fn load_or_collect_config(bones_toml: &Path) -> Result<config::BonesConfig> {
             return Ok(existing);
         }
         println!("Config is incomplete, running prompts...");
+        let project_name = repo_directory_name()?;
+        return prompts::collect_from_seed(&project_name, Some(&existing));
     }
     let project_name = repo_directory_name()?;
     prompts::collect(&project_name)
