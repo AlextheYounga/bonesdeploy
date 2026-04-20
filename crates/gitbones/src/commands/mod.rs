@@ -1,7 +1,7 @@
 mod doctor;
 mod init;
 mod push;
-mod redeploy;
+mod rollback;
 mod version;
 
 use anyhow::Result;
@@ -26,8 +26,8 @@ enum Command {
     },
     /// Sync .bones/ folder to the remote bare repo
     Push,
-    /// Re-run the deployment hooks without pushing
-    Redeploy,
+    /// Roll back current release to the previous one
+    Rollback,
     /// Print the version
     Version,
 }
@@ -37,7 +37,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Init => init::run().await,
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,
-        Command::Redeploy => redeploy::run().await,
+        Command::Rollback => rollback::run().await,
         Command::Version => {
             version::run();
             Ok(())

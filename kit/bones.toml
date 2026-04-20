@@ -3,6 +3,16 @@
 port="22"
 branch="master"
 
+# live_root is the public path your web server points to.
+# It should remain a symlink to deploy_root/current.
+live_root="/var/www/<project_name>"
+
+# deploy_root stores release management data:
+# - releases/
+# - shared/
+# - current (symlink)
+deploy_root="/srv/deployments/<project_name>"
+
 # Permissions for deployment
 [permissions.defaults]  
 deploy = "git"  
@@ -10,3 +20,10 @@ owner = "applications"
 group = "www-data"  
 dir_mode   = "750"  
 file_mode  = "640"  
+
+[releases]
+# Number of old releases to keep after each successful activation.
+keep = 5
+
+# Paths that are persisted in deploy_root/shared and symlinked into each release.
+shared_paths = [".env", "storage"]

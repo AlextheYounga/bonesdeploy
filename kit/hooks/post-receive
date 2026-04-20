@@ -2,8 +2,8 @@
 #
 # post-receive — Remote hook, runs after refs are updated.
 #
-# Checks out the latest commit into the worktree, then calls
-# the deploy hook to run deployment scripts.
+# Checks out the latest commit into the pending release, then
+# primes shared paths and calls deploy scripts.
 #
 # GIT_DIR is set by git to the bare repo path.
 
@@ -14,19 +14,25 @@ GIT_DIR=$(cd "$GIT_DIR" && pwd)
 
 BONES_TOML="$GIT_DIR/bones/bones.toml"
 HOOKS_DIR="$GIT_DIR/hooks"
+PENDING_RELEASE_FILE="$GIT_DIR/bones/.pending_release"
 
-# Read worktree and branch from bones.toml
-WORKTREE=$(grep -E '^worktree\s*=' "$BONES_TOML" | head -1 | sed 's/.*=\s*"\(.*\)"/\1/')
+# Read deploy_root and branch from bones.toml
+DEPLOY_ROOT=$(grep -E '^deploy_root\s*=' "$BONES_TOML" | head -1 | sed 's/.*=\s*"\(.*\)"/\1/')
 BRANCH=$(grep -E '^branch\s*=' "$BONES_TOML" | head -1 | sed 's/.*=\s*"\(.*\)"/\1/')
+PENDING_RELEASE=$(tr -d '[:space:]' < "$PENDING_RELEASE_FILE")
+RELEASE_PATH="$DEPLOY_ROOT/releases/$PENDING_RELEASE"
 
-if [ -z "$WORKTREE" ] || [ -z "$BRANCH" ]; then
-    echo "[gitbones] Error: Could not read worktree or branch from $BONES_TOML"
+if [ -z "$DEPLOY_ROOT" ] || [ -z "$BRANCH" ] || [ -z "$PENDING_RELEASE" ]; then
+    echo "[gitbones] Error: Could not read deploy_root, branch, or pending release state"
     exit 1
 fi
 
-echo "[gitbones] Checking out $BRANCH to $WORKTREE..."
+echo "[gitbones] Checking out $BRANCH to $RELEASE_PATH..."
 
-git --work-tree="$WORKTREE" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
+git --work-tree="$RELEASE_PATH" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
+
+echo "[gitbones] Priming shared paths for pending release..."
+sudo gitbones-remote prime-release --config "$BONES_TOML"
 
 echo "[gitbones] Checkout complete. Running deploy..."
 

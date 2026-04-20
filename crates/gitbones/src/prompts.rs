@@ -1,7 +1,7 @@
 use anyhow::Result;
 use inquire::{Select, Text};
 
-use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions};
+use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases};
 
 pub fn choose_template(available_templates: &[String]) -> Result<Option<String>> {
     let mut options = Vec::with_capacity(available_templates.len() + 1);
@@ -83,15 +83,28 @@ pub fn collect_from_seed(
         .with_default(&default_git_dir)
         .prompt()?;
 
-    let default_worktree = seed
-        .map(|cfg| cfg.data.worktree.as_str())
+    let default_live_root = seed
+        .map(|cfg| cfg.data.live_root.as_str())
         .filter(|value| !value.is_empty())
         .map_or_else(
             || format!("/var/www/{project_name}"),
             |value| value.replace("<project_name>", &project_name),
         );
-    let worktree = Text::new("Worktree path on remote:")
-        .with_default(&default_worktree)
+    let live_root = Text::new("Live root on remote:")
+        .with_default(&default_live_root)
+        .with_help_message("Public path your web server points at")
+        .prompt()?;
+
+    let default_deploy_root = seed
+        .map(|cfg| cfg.data.deploy_root.as_str())
+        .filter(|value| !value.is_empty())
+        .map_or_else(
+            || format!("/srv/deployments/{project_name}"),
+            |value| value.replace("<project_name>", &project_name),
+        );
+    let deploy_root = Text::new("Deploy root on remote:")
+        .with_default(&default_deploy_root)
+        .with_help_message("Stores releases/, shared/, and current")
         .prompt()?;
 
     let default_branch = seed
@@ -140,6 +153,27 @@ pub fn collect_from_seed(
         .with_default(default_file_mode)
         .prompt()?;
 
+    let default_releases_keep = seed
+        .map(|cfg| cfg.releases.keep)
+        .filter(|value| *value > 0)
+        .unwrap_or(5)
+        .to_string();
+    let releases_keep_raw = Text::new("Releases to keep:")
+        .with_default(&default_releases_keep)
+        .with_help_message("Old releases beyond this count are pruned")
+        .prompt()?;
+    let releases_keep = releases_keep_raw.parse::<usize>()?;
+
+    let default_shared_paths = seed
+        .map(|cfg| cfg.releases.shared_paths.join(", "))
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| String::from(".env, storage"));
+    let shared_paths_raw = Text::new("Shared paths (comma-separated):")
+        .with_default(&default_shared_paths)
+        .with_help_message("These paths are symlinked from deploy_root/shared")
+        .prompt()?;
+    let shared_paths = parse_shared_paths(&shared_paths_raw);
+
     let path_overrides = seed.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
 
     Ok(BonesConfig {
@@ -149,7 +183,8 @@ pub fn collect_from_seed(
             host,
             port,
             git_dir,
-            worktree,
+            live_root,
+            deploy_root,
             branch,
         },
         permissions: Permissions {
@@ -162,5 +197,17 @@ pub fn collect_from_seed(
             },
             paths: path_overrides,
         },
+        releases: Releases {
+            keep: releases_keep,
+            shared_paths,
+        },
     })
+}
+
+fn parse_shared_paths(raw: &str) -> Vec<String> {
+    raw.split(',')
+        .map(str::trim)
+        .filter(|path| !path.is_empty())
+        .map(ToOwned::to_owned)
+        .collect()
 }

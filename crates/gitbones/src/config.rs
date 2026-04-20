@@ -9,6 +9,8 @@ pub struct BonesConfig {
     pub data: Data,
     #[serde(default)]
     pub permissions: Permissions,
+    #[serde(default)]
+    pub releases: Releases,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,9 +26,28 @@ pub struct Data {
     #[serde(default)]
     pub git_dir: String,
     #[serde(default)]
-    pub worktree: String,
+    pub live_root: String,
+    #[serde(default)]
+    pub deploy_root: String,
     #[serde(default = "default_branch")]
     pub branch: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Releases {
+    #[serde(default = "default_keep")]
+    pub keep: usize,
+    #[serde(default)]
+    pub shared_paths: Vec<String>,
+}
+
+impl Default for Releases {
+    fn default() -> Self {
+        Self {
+            keep: default_keep(),
+            shared_paths: Vec::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -79,6 +100,9 @@ fn default_port() -> String {
 fn default_branch() -> String {
     "master".into()
 }
+fn default_keep() -> usize {
+    5
+}
 fn default_deploy() -> String {
     "git".into()
 }
@@ -101,7 +125,8 @@ pub fn is_configured(config: &BonesConfig) -> bool {
         && !d.project_name.is_empty()
         && !d.host.is_empty()
         && !d.git_dir.is_empty()
-        && !d.worktree.is_empty()
+        && !d.live_root.is_empty()
+        && !d.deploy_root.is_empty()
 }
 
 pub fn load(path: &Path) -> Result<BonesConfig> {

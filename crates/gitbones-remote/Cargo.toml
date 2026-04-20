@@ -12,5 +12,6 @@ clap = { version = "4", features = ["derive"] }
 console = "0.15"
 nix = { version = "0.30", features = ["user"] }
 serde = { version = "1", features = ["derive"] }
+time = { version = "0.3", features = ["formatting", "macros"] }
 toml = "0.8"
 walkdir = "2"

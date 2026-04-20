@@ -3,7 +3,7 @@
 # pre-receive — Remote hook, runs before refs are updated.
 #
 # Runs gitbones-remote doctor to validate the server environment,
-# then calls pre-deploy to prepare the worktree for deployment.
+# then calls pre-deploy to prepare a pending release.
 #
 # GIT_DIR is set by git to the bare repo path.
 
