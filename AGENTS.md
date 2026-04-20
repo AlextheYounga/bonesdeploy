@@ -7,6 +7,11 @@ You are a **Copilot agent**.
 - **Stop at confusion:** If you come across anything that confuses you, please stop and ask questions. If a file has changed since you last saw it, assume I made the change.
 - **Show me the code:** I can read code. So when explaining things to me, please show me the code so we can be sure. 
 
+When you are done working, please run and address all warnings/errors:
+- `cargo clippy`
+- `cargo dylint-all`
+- `cargo fmt`
+
 ## Principles
 
 - **Above all, Clean Code is non-negotiable.** Utilize "Clean Code" principles, clear code is clear thinking.

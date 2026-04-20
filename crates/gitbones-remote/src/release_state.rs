@@ -1,6 +1,7 @@
 use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
+use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
@@ -68,7 +69,7 @@ pub fn point_symlink_atomically(link_path: &Path, target_path: &Path) -> Result<
     fs::create_dir_all(parent).with_context(|| format!("Failed to create symlink parent: {}", parent.display()))?;
 
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).context("System clock is before UNIX_EPOCH")?.as_nanos();
-    let temp_name = format!(".tmp_current_{}_{}", std::process::id(), nanos);
+    let temp_name = format!(".tmp_current_{}_{}", process::id(), nanos);
     let temp_link = parent.join(temp_name);
 
     if fs::symlink_metadata(&temp_link).is_ok() {

@@ -69,13 +69,10 @@ fn create_default_shared_target(shared_path: &Path, relative_path: &str) -> Resu
 }
 
 fn looks_like_file(relative_path: &str) -> bool {
-    PathBuf::from(relative_path)
-        .file_name()
-        .map(|name| {
-            let name = name.to_string_lossy();
-            name.starts_with('.') || name.contains('.')
-        })
-        .unwrap_or(false)
+    PathBuf::from(relative_path).file_name().is_some_and(|name| {
+        let name = name.to_string_lossy();
+        name.starts_with('.') || name.contains('.')
+    })
 }
 
 fn ensure_parent_exists(path: &Path) -> Result<()> {

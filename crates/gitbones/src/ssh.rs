@@ -48,8 +48,8 @@ pub async fn stream_cmd(session: &Session, cmd: &str) -> Result<()> {
         .await
         .with_context(|| format!("Failed to execute remote command: {cmd}"))?;
 
-    let stdout = child.stdout().take().expect("stdout was piped");
-    let stderr = child.stderr().take().expect("stderr was piped");
+    let stdout = child.stdout().take().ok_or_else(|| anyhow::anyhow!("stdout was not piped"))?;
+    let stderr = child.stderr().take().ok_or_else(|| anyhow::anyhow!("stderr was not piped"))?;
 
     let stdout_task = tokio::spawn(async move {
         let reader = BufReader::new(stdout);
