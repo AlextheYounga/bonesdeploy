@@ -135,12 +135,10 @@ fn symlink_pre_push() -> Result<()> {
     let target = Path::new("../../.bones/hooks/pre-push");
 
     if link.exists() || link.symlink_metadata().is_ok() {
-        fs::remove_file(&link)
-            .with_context(|| format!("Failed to remove existing {}", link.display()))?;
+        fs::remove_file(&link).with_context(|| format!("Failed to remove existing {}", link.display()))?;
     }
 
-    unix_fs::symlink(target, &link)
-        .with_context(|| format!("Failed to symlink {}", link.display()))?;
+    unix_fs::symlink(target, &link).with_context(|| format!("Failed to symlink {}", link.display()))?;
 
     println!("Symlinked .git/hooks/pre-push -> .bones/hooks/pre-push");
     Ok(())
@@ -148,8 +146,6 @@ fn symlink_pre_push() -> Result<()> {
 
 fn repo_directory_name() -> Result<String> {
     let cwd = env::current_dir()?;
-    let name = cwd
-        .file_name()
-        .map_or_else(|| "project".into(), |n| n.to_string_lossy().to_string());
+    let name = cwd.file_name().map_or_else(|| "project".into(), |n| n.to_string_lossy().to_string());
     Ok(name)
 }

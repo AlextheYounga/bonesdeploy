@@ -12,10 +12,7 @@ pub fn run(config_path: &str) -> Result<()> {
     let release_dir = release_state::release_dir(&cfg, &release_name);
 
     if !release_dir.exists() {
-        anyhow::bail!(
-            "Pending release directory does not exist: {}",
-            release_dir.display()
-        );
+        anyhow::bail!("Pending release directory does not exist: {}", release_dir.display());
     }
 
     let current_link = release_state::current_link(&cfg);
@@ -47,8 +44,7 @@ fn prune_old_releases(cfg: &config::BonesConfig, active_release: &str) -> Result
 
         let path = release_state::release_dir(cfg, &oldest);
         if path.exists() {
-            fs::remove_dir_all(&path)
-                .with_context(|| format!("Failed to prune old release {}", path.display()))?;
+            fs::remove_dir_all(&path).with_context(|| format!("Failed to prune old release {}", path.display()))?;
             pruned.push(oldest);
         }
     }

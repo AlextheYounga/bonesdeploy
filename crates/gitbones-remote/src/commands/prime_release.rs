@@ -46,18 +46,10 @@ fn prime_path(release_dir: &Path, shared_dir: &Path, relative_path: &str) -> Res
     }
 
     symlink(&shared_path, &release_path).with_context(|| {
-        format!(
-            "Failed to create shared symlink {} -> {}",
-            release_path.display(),
-            shared_path.display()
-        )
+        format!("Failed to create shared symlink {} -> {}", release_path.display(), shared_path.display())
     })?;
 
-    println!(
-        "Linked shared path: {} -> {}",
-        release_path.display(),
-        shared_path.display()
-    );
+    println!("Linked shared path: {} -> {}", release_path.display(), shared_path.display());
 
     Ok(())
 }
@@ -69,12 +61,8 @@ fn create_default_shared_target(shared_path: &Path, relative_path: &str) -> Resu
         fs::File::create(shared_path)
             .with_context(|| format!("Failed to create shared file: {}", shared_path.display()))?;
     } else {
-        fs::create_dir_all(shared_path).with_context(|| {
-            format!(
-                "Failed to create shared directory: {}",
-                shared_path.display()
-            )
-        })?;
+        fs::create_dir_all(shared_path)
+            .with_context(|| format!("Failed to create shared directory: {}", shared_path.display()))?;
     }
 
     Ok(())
@@ -103,11 +91,9 @@ fn remove_path(path: &Path) -> Result<()> {
         .with_context(|| format!("Failed to inspect path for removal: {}", path.display()))?;
 
     if metadata.file_type().is_symlink() || metadata.is_file() {
-        fs::remove_file(path)
-            .with_context(|| format!("Failed to remove path: {}", path.display()))?;
+        fs::remove_file(path).with_context(|| format!("Failed to remove path: {}", path.display()))?;
     } else if metadata.is_dir() {
-        fs::remove_dir_all(path)
-            .with_context(|| format!("Failed to remove directory: {}", path.display()))?;
+        fs::remove_dir_all(path).with_context(|| format!("Failed to remove directory: {}", path.display()))?;
     }
 
     Ok(())

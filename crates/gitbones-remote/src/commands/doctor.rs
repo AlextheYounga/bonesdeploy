@@ -19,11 +19,7 @@ pub fn run() -> Result<()> {
         for issue in &issues {
             println!("  {} {issue}", style("!").red().bold());
         }
-        anyhow::bail!(
-            "Doctor found {} issue{}",
-            issues.len(),
-            if issues.len() == 1 { "" } else { "s" }
-        );
+        anyhow::bail!("Doctor found {} issue{}", issues.len(), if issues.len() == 1 { "" } else { "s" });
     }
 }
 
@@ -37,9 +33,7 @@ fn check_globally_available(issues: &mut Vec<String>) {
 }
 
 fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let result = Command::new("sudo")
-        .args(["-n", "gitbones-remote", "version"])
-        .output();
+    let result = Command::new("sudo").args(["-n", "gitbones-remote", "version"]).output();
 
     match result {
         Ok(output) if output.status.success() => {}

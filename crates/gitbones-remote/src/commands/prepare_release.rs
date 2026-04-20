@@ -39,11 +39,9 @@ pub fn run(config_path: &str) -> Result<()> {
 }
 
 fn create_release_name() -> Result<String> {
-    static TIMESTAMP_FORMAT: &[FormatItem<'static>] =
-        format_description!("[year][month][day]_[hour][minute][second]");
+    static TIMESTAMP_FORMAT: &[FormatItem<'static>] = format_description!("[year][month][day]_[hour][minute][second]");
     let now = OffsetDateTime::now_utc();
-    now.format(TIMESTAMP_FORMAT)
-        .context("Failed to format release timestamp")
+    now.format(TIMESTAMP_FORMAT).context("Failed to format release timestamp")
 }
 
 fn ensure_live_root_symlink(cfg: &config::BonesConfig) -> Result<()> {
@@ -51,10 +49,7 @@ fn ensure_live_root_symlink(cfg: &config::BonesConfig) -> Result<()> {
     let current_link = release_state::current_link(cfg);
 
     if live_root.exists() && !live_root.is_symlink() {
-        bail!(
-            "live_root exists and is not a symlink: {}",
-            live_root.display()
-        );
+        bail!("live_root exists and is not a symlink: {}", live_root.display());
     }
 
     release_state::point_symlink_atomically(live_root, &current_link)

@@ -19,9 +19,8 @@ pub fn run(config_path: &str) -> Result<()> {
     let release_dir = release_state::release_dir(&cfg, &release_name);
 
     if release_dir.exists() {
-        fs::remove_dir_all(&release_dir).with_context(|| {
-            format!("Failed to remove failed release {}", release_dir.display())
-        })?;
+        fs::remove_dir_all(&release_dir)
+            .with_context(|| format!("Failed to remove failed release {}", release_dir.display()))?;
         println!("Removed failed release: {release_name}");
     }
 

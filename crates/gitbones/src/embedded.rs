@@ -76,8 +76,7 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
     let dest = bones_dir.join(relative_path);
 
     if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create {}", parent.display()))?;
+        fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
     }
 
     fs::write(&dest, bytes).with_context(|| format!("Failed to write {}", dest.display()))?;

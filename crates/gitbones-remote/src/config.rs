@@ -43,10 +43,7 @@ pub struct Releases {
 
 impl Default for Releases {
     fn default() -> Self {
-        Self {
-            keep: default_keep(),
-            shared_paths: Vec::new(),
-        }
+        Self { keep: default_keep(), shared_paths: Vec::new() }
     }
 }
 
@@ -120,8 +117,7 @@ fn default_file_mode() -> String {
 }
 
 pub fn load(path: &Path) -> Result<BonesConfig> {
-    let content =
-        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let config: BonesConfig =
         toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     Ok(config)

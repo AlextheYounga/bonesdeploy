@@ -40,21 +40,13 @@ fn resolve_current_release_name(cfg: &config::BonesConfig) -> Result<String> {
     let absolute_target = if target.is_absolute() {
         target
     } else {
-        current_link
-            .parent()
-            .unwrap_or_else(|| Path::new("/"))
-            .join(target)
+        current_link.parent().unwrap_or_else(|| Path::new("/")).join(target)
     };
 
     absolute_target
         .file_name()
         .map(|value| value.to_string_lossy().to_string())
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Failed to resolve current release name from {}",
-                absolute_target.display()
-            )
-        })
+        .ok_or_else(|| anyhow::anyhow!("Failed to resolve current release name from {}", absolute_target.display()))
 }
 
 fn list_releases_sorted(cfg: &config::BonesConfig) -> Result<Vec<String>> {

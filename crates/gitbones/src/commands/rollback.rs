@@ -14,11 +14,7 @@ pub async fn run() -> Result<()> {
 
     let remote_bones_toml = format!("{}/bones/bones.toml", cfg.data.git_dir);
 
-    println!(
-        "Rolling back {} on {}...",
-        style(&cfg.data.project_name).cyan().bold(),
-        style(&cfg.data.host).cyan()
-    );
+    println!("Rolling back {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
 
     let session = ssh::connect(&cfg).await?;
     let command = format!("sudo gitbones-remote rollback --config '{remote_bones_toml}'");

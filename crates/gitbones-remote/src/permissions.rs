@@ -56,16 +56,13 @@ pub fn harden_paths(cfg: &BonesConfig, paths: &[&Path]) -> Result<()> {
 
 pub fn harden_active_release(cfg: &BonesConfig) -> Result<()> {
     let current_link = release_state::current_link(cfg);
-    let active_target = fs::read_link(&current_link)
-        .with_context(|| format!("Failed to read {}", current_link.display()))?;
+    let active_target =
+        fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
 
     let active_release = if active_target.is_absolute() {
         active_target
     } else {
-        current_link
-            .parent()
-            .unwrap_or_else(|| Path::new("/"))
-            .join(active_target)
+        current_link.parent().unwrap_or_else(|| Path::new("/")).join(active_target)
     };
 
     let shared = release_state::shared_dir(cfg);
@@ -77,10 +74,7 @@ fn apply_path_overrides(cfg: &BonesConfig, root: &Path) -> Result<()> {
     for override_entry in &cfg.permissions.paths {
         let target = root.join(&override_entry.path);
         if !target.exists() {
-            println!(
-                "Warning: override path '{}' does not exist, skipping",
-                target.display()
-            );
+            println!("Warning: override path '{}' does not exist, skipping", target.display());
             continue;
         }
 
@@ -101,11 +95,7 @@ fn apply_path_overrides(cfg: &BonesConfig, root: &Path) -> Result<()> {
             "Applied mode {} to {}{}",
             override_entry.mode,
             override_entry.path,
-            if override_entry.recursive {
-                " (recursive)"
-            } else {
-                ""
-            }
+            if override_entry.recursive { " (recursive)" } else { "" }
         );
     }
 
@@ -119,9 +109,7 @@ fn run_chown(ownership: &str, path: &str, recursive: bool) -> Result<()> {
     }
     cmd.arg(ownership).arg(path);
 
-    let status = cmd
-        .status()
-        .with_context(|| format!("Failed to chown {path}"))?;
+    let status = cmd.status().with_context(|| format!("Failed to chown {path}"))?;
 
     if !status.success() {
         bail!("chown {ownership} {path} failed");
@@ -140,11 +128,7 @@ fn apply_default_modes(root: &Path, dir_mode: u32, file_mode: u32) -> Result<()>
         let metadata = fs::metadata(entry.path())
             .with_context(|| format!("Failed to read metadata for {}", entry.path().display()))?;
 
-        let mode = if metadata.is_dir() {
-            dir_mode
-        } else {
-            file_mode
-        };
+        let mode = if metadata.is_dir() { dir_mode } else { file_mode };
         set_permissions(entry.path(), mode)?;
     }
     Ok(())
@@ -163,11 +147,7 @@ fn apply_single_mode(path: &Path, mode: u32) -> Result<()> {
 }
 
 fn set_permissions(path: &Path, mode: u32) -> Result<()> {
-    fs::set_permissions(path, fs::Permissions::from_mode(mode)).map_err(|e| {
-        io::Error::new(
-            e.kind(),
-            format!("chmod {:o} {}: {e}", mode, path.display()),
-        )
-    })?;
+    fs::set_permissions(path, fs::Permissions::from_mode(mode))
+        .map_err(|e| io::Error::new(e.kind(), format!("chmod {:o} {}: {e}", mode, path.display())))?;
     Ok(())
 }

@@ -1,0 +1,2 @@
+[alias]
+dylint-all = "dylint --lib custom_lints --path .dylint/custom_lints"
