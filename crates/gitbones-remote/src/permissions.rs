@@ -1,5 +1,5 @@
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::process::Command;
 use std::{fs, io};
 
@@ -67,24 +67,34 @@ pub fn harden_active_release(cfg: &BonesConfig) -> Result<()> {
 
     let shared = release_state::shared_dir(cfg);
     harden_paths(cfg, &[active_release.as_path(), shared.as_path()])?;
-    apply_path_overrides(cfg, &active_release)
+    apply_path_overrides(cfg, &active_release, &shared)
 }
 
-fn apply_path_overrides(cfg: &BonesConfig, root: &Path) -> Result<()> {
+fn apply_path_overrides(cfg: &BonesConfig, active_release: &Path, shared_root: &Path) -> Result<()> {
     for override_entry in &cfg.permissions.paths {
-        let target = root.join(&override_entry.path);
-        if !target.exists() {
-            println!("Warning: override path '{}' does not exist, skipping", target.display());
+        let Some(target) = select_override_target(active_release, shared_root, &override_entry.path)? else {
+            let logical_path = active_release.join(&override_entry.path);
+            println!("Warning: override path '{}' does not exist, skipping", logical_path.display());
             continue;
-        }
+        };
 
         let mode = parse_mode(&override_entry.mode)?;
 
         if override_entry.recursive {
             apply_recursive_mode(&target, mode)?;
         } else if let Some(ref path_type) = override_entry.path_type {
+            let metadata = fs::metadata(&target)
+                .with_context(|| format!("Failed to read metadata for override target {}", target.display()))?;
+
             match path_type.as_str() {
-                "dir" | "file" => apply_single_mode(&target, mode)?,
+                "dir" if metadata.is_dir() => apply_single_mode(&target, mode)?,
+                "file" if metadata.is_file() => apply_single_mode(&target, mode)?,
+                "dir" => {
+                    bail!("Override '{}' expected a directory, got {}", override_entry.path, target.display())
+                }
+                "file" => {
+                    bail!("Override '{}' expected a file, got {}", override_entry.path, target.display())
+                }
                 other => bail!("Unknown path type: {other}"),
             }
         } else {
@@ -92,14 +102,59 @@ fn apply_path_overrides(cfg: &BonesConfig, root: &Path) -> Result<()> {
         }
 
         println!(
-            "Applied mode {} to {}{}",
+            "Applied mode {} to {} (target: {}){}",
             override_entry.mode,
             override_entry.path,
+            target.display(),
             if override_entry.recursive { " (recursive)" } else { "" }
         );
     }
 
     Ok(())
+}
+
+fn select_override_target(active_release: &Path, shared_root: &Path, override_path: &str) -> Result<Option<PathBuf>> {
+    let logical = active_release.join(override_path);
+
+    if fs::symlink_metadata(&logical).is_err() {
+        return Ok(None);
+    }
+
+    if has_symlink_in_override_path(active_release, override_path)? {
+        let shared_target = shared_root.join(override_path);
+        if fs::symlink_metadata(&shared_target).is_err() {
+            bail!(
+                "Override '{}' is symlinked in active release but missing in shared root at {}",
+                override_path,
+                shared_target.display()
+            );
+        }
+        return Ok(Some(shared_target));
+    }
+
+    Ok(Some(logical))
+}
+
+fn has_symlink_in_override_path(active_release: &Path, override_path: &str) -> Result<bool> {
+    let mut current = PathBuf::from(active_release);
+
+    for component in Path::new(override_path).components() {
+        match component {
+            Component::Normal(segment) => current.push(segment),
+            Component::CurDir => continue,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                bail!("Override path must be relative and not traverse parents: {override_path}");
+            }
+        }
+
+        let metadata = fs::symlink_metadata(&current)
+            .with_context(|| format!("Failed to inspect override path component {}", current.display()))?;
+        if metadata.file_type().is_symlink() {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 fn run_chown(ownership: &str, path: &str, recursive: bool) -> Result<()> {

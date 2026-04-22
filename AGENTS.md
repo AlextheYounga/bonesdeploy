@@ -35,6 +35,7 @@ When you are done working, please run and address all warnings/errors:
 - **Cohesion > Coupling.** Related things together; unrelated things apart.
 - **Transparency > Magic.** Explicit beats clever. No hidden behaviors.
 - **No hack solutions.** Don't patch poor designs—rethink them. Never wrangle strings if you don't have to.
+- **Defend yourself.** Do not be a sycophant. 
 
 ## Test-Driven Development
 
