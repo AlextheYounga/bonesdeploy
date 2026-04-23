@@ -129,7 +129,7 @@ bonesdeploy/
 │   │       │   └── version.rs
 │   │       ├── config.rs       # bones.toml structs + load/save + local file discovery
 │   │       ├── embedded.rs     # rust-embed from kit/, scaffold writing
-│   │       ├── git.rs          # git2 operations: read remote URLs, repo validation
+│   │       ├── git.rs          # git CLI operations: remote validation, repo checks
 │   │       ├── prompts.rs      # interactive user input collection, returns config
 │   │       └── ssh.rs          # openssh session management + rsync
 │   └── bonesremote/        # server-side binary
@@ -245,7 +245,6 @@ bonesdeploy/
 
 ## Cargo Dependencies
 - clap
-- git2
 - inquire
 - rust-embed
 - toml

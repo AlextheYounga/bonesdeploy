@@ -1,14 +1,22 @@
-use anyhow::{Context, Result, bail};
-use git2::Repository;
+use std::process::Command;
 
-pub fn open_repo() -> Result<Repository> {
-    Repository::open(".").context("Not a git repository")
+use anyhow::{Context, Result, bail};
+
+pub fn ensure_git_repository() -> Result<()> {
+    let output =
+        Command::new("git").args(["rev-parse", "--is-inside-work-tree"]).output().context("Failed to run git")?;
+
+    if !output.status.success() {
+        bail!("Not a git repository");
+    }
+
+    Ok(())
 }
 
-pub fn validate_remote_exists(repo: &Repository, remote_name: &str) -> Result<()> {
-    let remotes = repo.remotes().context("Failed to list remotes")?;
-    let exists = remotes.iter().any(|r| r == Some(remote_name));
-    if !exists {
+pub fn validate_remote_exists(remote_name: &str) -> Result<()> {
+    let status = Command::new("git").args(["remote", "get-url", remote_name]).status().context("Failed to run git")?;
+
+    if !status.success() {
         bail!(
             "No git remote '{remote_name}' found. \
              Please set one up before running bonesdeploy init:\n  \

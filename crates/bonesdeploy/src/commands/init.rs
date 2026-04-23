@@ -36,7 +36,7 @@ pub async fn run() -> Result<()> {
         return Ok(());
     }
 
-    let repo = git::open_repo()?;
+    git::ensure_git_repository()?;
 
     // Extract scaffold to .bones/
     let bones_dir = Path::new(BONES_DIR);
@@ -64,7 +64,7 @@ pub async fn run() -> Result<()> {
     let cfg = load_or_collect_config(bones_toml)?;
 
     // Validate the remote exists
-    git::validate_remote_exists(&repo, &cfg.data.remote_name)?;
+    git::validate_remote_exists(&cfg.data.remote_name)?;
 
     // Save config
     config::save(&cfg, bones_toml)?;

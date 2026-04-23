@@ -14,7 +14,7 @@
 
 ## Phase 3: bonesdeploy init
 - [x] Implement `prompts.rs` using inquire (collect all bones.toml fields with defaults)
-- [x] Implement `git.rs` (read remote URL from git2, validate repo state)
+- [x] Implement `git.rs` (validate repo state and remotes via git CLI)
 - [x] Implement init command orchestration:
   - [x] Inform user that a remote git URL must already be set, explain what will happen, confirm with user
   - [x] Fail if no git remote URL is set for the configured remote name
