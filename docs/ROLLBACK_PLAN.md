@@ -36,18 +36,18 @@ shared_paths = [".env", "storage", "node_modules"]
 ## New Deploy Flow
 
 1. **pre-receive**: `sudo gitbones-remote doctor` (unchanged), then calls `pre-deploy`
-2. **pre-deploy**: `sudo gitbones-remote prepare-release --config ...`
+2. **pre-deploy**: `sudo gitbones-remote release stage --config ...`
    - Creates `releases/` and `shared/` dirs if missing
    - Creates `releases/{YYYYMMDD_HHMMSS}/`
    - Chowns new release dir + shared dir to deploy user
    - Writes release name to `{git_dir}/bones/.current_release` (hook state file)
 3. **post-receive**: `git checkout -f` into `releases/{timestamp}/` (reads `.current_release`), then calls `deploy`
-4. **deploy**: `cd` into release dir, runs deployment scripts, then calls `sudo gitbones-remote activate-release --config ...`
+4. **deploy**: `cd` into release dir, runs deployment scripts, then calls `sudo gitbones-remote release activate --config ...`
    - Symlinks each shared_path from release dir → `shared/`
    - Atomically swaps `current` symlink (create tmp link, then `rename`)
    - Prunes old releases beyond `keep` count
    - Then calls `post-deploy`
-5. **post-deploy**: `sudo gitbones-remote post-deploy --config ...`
+5. **post-deploy**: `sudo gitbones-remote hooks post-deploy --config ...`
    - Hardens permissions on the release dir pointed to by `current` + `shared/`
 
 If a deployment script fails at step 4, `current` still points to the previous release. The site stays up.
@@ -58,7 +58,7 @@ If a deployment script fails at step 4, `current` still points to the previous r
 
 | Command | Description |
 |---------|-------------|
-| `prepare-release --config` | Create release dir, chown, write state file |
+| `stage-release --config` | Create release dir, chown, write state file |
 | `activate-release --config` | Symlink shared paths, swap `current`, prune old releases |
 | `rollback --config` | Re-point `current` to previous release |
 
@@ -66,7 +66,7 @@ If a deployment script fails at step 4, `current` still points to the previous r
 
 | Command | Description |
 |---------|-------------|
-| `rollback` | SSH in, run `sudo gitbones-remote rollback` |
+| `rollback` | SSH in, run `sudo gitbones-remote release rollback` |
 
 ## Implementation Order
 
@@ -106,13 +106,13 @@ Extract `harden` logic so it can accept an arbitrary root path instead of always
 
 ### Step 3: New remote commands
 **New files:**
-- `crates/gitbones-remote/src/commands/prepare_release.rs`
+- `crates/gitbones-remote/src/commands/stage_release.rs`
 - `crates/gitbones-remote/src/commands/activate_release.rs`
 - `crates/gitbones-remote/src/commands/rollback.rs`
 
 **Modified:** `crates/gitbones-remote/src/commands/mod.rs` — register new subcommands
 
-#### prepare_release.rs
+#### stage_release.rs
 1. Load config
 2. Create `{worktree}/releases/` and `{worktree}/shared/` if missing
 3. Generate timestamp: `chrono::Local::now().format("%Y%m%d_%H%M%S")`
@@ -143,7 +143,7 @@ The `--config` arg gives us `bones.toml` path. Derive `git_dir` as the parent of
 ### Step 4: Update hook templates
 **Files in `kit/hooks/`:**
 
-**pre-deploy** — replace `sudo gitbones-remote pre-deploy` with `sudo gitbones-remote prepare-release`
+**pre-deploy** — replace `sudo gitbones-remote pre-deploy` with `sudo gitbones-remote release stage`
 
 **post-receive** — read `.current_release`, checkout into that release dir:
 ```bash
@@ -158,7 +158,7 @@ RELEASE_DIR=$(cat "$GIT_DIR/bones/.current_release")
 RELEASE_PATH="$WORKTREE/releases/$RELEASE_DIR"
 cd "$RELEASE_PATH"
 # ... run deployment scripts ...
-sudo gitbones-remote activate-release --config "$BONES_TOML"
+sudo gitbones-remote release activate --config "$BONES_TOML"
 ```
 
 **post-deploy** — unchanged (the remote command internally resolves `current` → release dir)
@@ -166,7 +166,7 @@ sudo gitbones-remote activate-release --config "$BONES_TOML"
 ### Step 5: Local rollback command
 **New file:** `crates/gitbones/src/commands/rollback.rs`
 
-Same pattern as `redeploy.rs`: load config, SSH in, `stream_cmd` to run `sudo gitbones-remote rollback --config ...`.
+Same pattern as `redeploy.rs`: load config, SSH in, `stream_cmd` to run `sudo gitbones-remote release rollback --config ...`.
 
 **Modified:** `crates/gitbones/src/commands/mod.rs` — add `Rollback` variant
 

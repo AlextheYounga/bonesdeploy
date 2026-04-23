@@ -51,31 +51,31 @@ That means a failed deploy can leave the live directory partially updated.
 
 1. `pre-receive`
    - run `gitbones-remote doctor`
-   - run `gitbones-remote prepare-release --config ...`
-2. `prepare-release`
+   - run `gitbones-remote release stage --config ...`
+2. `stage-release`
    - create `deploy_root/releases/` and `deploy_root/shared/` if missing
    - create a new timestamped release directory
    - ensure `live_root` is a symlink to `deploy_root/current`
    - write the chosen release name to a state file under `git_dir/bones/`
 3. `post-receive`
-   - read the pending release name from the state file
+   - read the staged release name from the state file
    - `git checkout -f` into `deploy_root/releases/<release>/`
-   - run `gitbones-remote prime-release --config ...`
+   - run `gitbones-remote release wire --config ...`
    - call `deploy`
-4. `prime-release`
-   - seed and symlink configured shared paths into the pending release
+4. `wire-release`
+   - seed and symlink configured shared paths into the staged release
    - make the release ready for framework-specific build steps
 5. `deploy`
    - `cd` into the new release directory
    - run deployment scripts from `bones/deployment/`
-   - call `gitbones-remote activate-release --config ...`
+   - call `gitbones-remote release activate --config ...`
 6. `activate-release`
    - atomically update `deploy_root/current`
    - leave `live_root` pointing at `deploy_root/current`
    - prune old releases beyond the configured retention count
-   - clean up pending release state
+   - clean up staged release state
 7. `post-deploy`
-   - run `gitbones-remote post-deploy --config ...`
+   - run `gitbones-remote hooks post-deploy --config ...`
    - harden permissions on the active release and shared paths
 
 If deployment scripts fail before activation:
@@ -86,7 +86,7 @@ If deployment scripts fail before activation:
 
 ## Shared Paths
 
-Shared paths are not copied into each release. They are stored once in `deploy_root/shared/` and then symlinked into the pending release before deployment scripts run.
+Shared paths are not copied into each release. They are stored once in `deploy_root/shared/` and then symlinked into the staged release before deployment scripts run.
 
 Example:
 
@@ -97,7 +97,7 @@ Example:
 
 This keeps persistent files stable across deploys and rollbacks.
 
-First prime behavior:
+First wire behavior:
 
 - if the checked-out release contains a configured shared path and `shared/<path>` does not exist yet, move that path into `shared/`
 - if neither exists, create an empty target suitable for the path type
@@ -191,15 +191,15 @@ Current remote commands live in `crates/gitbones-remote/src/commands/` and only 
 
 Add these commands:
 
-- `prepare_release.rs`
-- `prime_release.rs`
+- `stage_release.rs`
+- `wire_release.rs`
 - `activate_release.rs`
 - `rollback.rs`
-- `cleanup_failed_release.rs`
+- `drop_failed_release.rs`
 
 Update `crates/gitbones-remote/src/commands/mod.rs` to register them.
 
-### prepare-release
+### stage-release
 
 Responsibilities:
 
@@ -209,25 +209,25 @@ Responsibilities:
 4. create that directory
 5. make sure `live_root` is a symlink to `deploy_root/current`
 6. chown the new release directory and `shared/` to the deploy user
-7. write the pending release name to `git_dir/bones/.pending_release`
+7. write the staged release name to `git_dir/bones/.staged_release`
 
 ### activate-release
 
 Responsibilities:
 
 1. load config
-2. read `.pending_release`
+2. read `.staged_release`
 3. resolve the release directory under `deploy_root/releases/`
 4. atomically switch `deploy_root/current` to the new release
 5. prune old releases, excluding the newly active one
-6. remove `.pending_release`
+6. remove `.staged_release`
 
-### prime-release
+### wire-release
 
 Responsibilities:
 
 1. load config
-2. read `.pending_release`
+2. read `.staged_release`
 3. resolve the release directory under `deploy_root/releases/`
 4. for each `shared_paths` entry:
    - if the release path exists and the shared path does not, move it into `shared/`
@@ -241,14 +241,14 @@ Atomic switch should use the standard pattern:
 1. create a temporary symlink
 2. rename it into place as `current`
 
-### cleanup-failed-release
+### drop-failed-release
 
 Responsibilities:
 
 1. load config
-2. read `.pending_release` if present
+2. read `.staged_release` if present
 3. delete the matching release directory
-4. remove `.pending_release`
+4. remove `.staged_release`
 
 This keeps failed release attempts from accumulating.
 
@@ -277,7 +277,7 @@ Suggested API split:
 
 Rules:
 
-- before deploy, ownership should be granted only where needed: pending release dir, `shared/`, and symlink management paths
+- before deploy, ownership should be granted only where needed: staged release dir, `shared/`, and symlink management paths
 - after deploy, harden the active release and shared paths, not the whole `deploy_root`
 - do not recursively chmod old releases during a normal deploy
 
@@ -290,7 +290,7 @@ Update the embedded hook templates in `kit/hooks/`.
 Replace the old call to `gitbones-remote pre-deploy` with:
 
 ```bash
-sudo gitbones-remote prepare-release --config "$BONES_TOML"
+sudo gitbones-remote release stage --config "$BONES_TOML"
 ```
 
 ### post-receive
@@ -298,25 +298,25 @@ sudo gitbones-remote prepare-release --config "$BONES_TOML"
 Stop checking out into `worktree`. Instead:
 
 1. read `deploy_root` and `branch` from `bones.toml`
-2. read `.pending_release`
+2. read `.staged_release`
 3. checkout into `deploy_root/releases/<release>`
-4. run `sudo gitbones-remote prime-release --config "$BONES_TOML"`
+4. run `sudo gitbones-remote release wire --config "$BONES_TOML"`
 
 ### deploy
 
-Change the working directory from `worktree` to the pending release path.
+Change the working directory from `worktree` to the staged release path.
 
 If deployment scripts succeed:
 
 ```bash
-sudo gitbones-remote activate-release --config "$BONES_TOML"
+sudo gitbones-remote release activate --config "$BONES_TOML"
 exec "$HOOKS_DIR/post-deploy"
 ```
 
 If a deployment script fails:
 
 ```bash
-sudo gitbones-remote cleanup-failed-release --config "$BONES_TOML"
+sudo gitbones-remote release drop-failed --config "$BONES_TOML"
 exit 1
 ```
 
@@ -338,7 +338,7 @@ The Laravel template fits this design, but it exposed one important correction t
 - `php artisan migrate --force`
 - cache rebuild commands
 
-That means `.env` and `storage/` cannot wait until final activation. They must be attached to the pending release immediately after checkout. That is why this plan now includes `prime-release`.
+That means `.env` and `storage/` cannot wait until final activation. They must be attached to the staged release immediately after checkout. That is why this plan now includes `wire-release`.
 
 ### Maintenance mode timing should move later
 
@@ -373,7 +373,7 @@ Remove `Redeploy` from:
 Add a local `rollback` command that SSHes to the remote and runs:
 
 ```bash
-sudo gitbones-remote rollback --config <remote bones.toml path>
+sudo gitbones-remote release rollback --config <remote bones.toml path>
 ```
 
 This should follow the same SSH execution pattern as the existing local commands.
@@ -399,7 +399,7 @@ Areas to update:
 2. update prompt collection and `kit/bones.toml`
 3. refactor remote permissions helpers to accept target paths
 4. add remote release-management commands
-5. update hook templates to use pending release flow
+5. update hook templates to use staged release flow
 6. remove `redeploy` and add local `rollback`
 7. update docs
 8. run `cargo check`

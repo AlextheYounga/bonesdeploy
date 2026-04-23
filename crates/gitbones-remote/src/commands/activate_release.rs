@@ -8,18 +8,18 @@ use crate::release_state;
 
 pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
-    let release_name = release_state::read_pending_release(&cfg)?;
+    let release_name = release_state::read_staged_release(&cfg)?;
     let release_dir = release_state::release_dir(&cfg, &release_name);
 
     if !release_dir.exists() {
-        anyhow::bail!("Pending release directory does not exist: {}", release_dir.display());
+        anyhow::bail!("Staged release directory does not exist: {}", release_dir.display());
     }
 
     let current_link = release_state::current_link(&cfg);
     release_state::point_symlink_atomically(&current_link, &release_dir)?;
 
     let pruned = prune_old_releases(&cfg, &release_name)?;
-    release_state::clear_pending_release(&cfg)?;
+    release_state::clear_staged_release(&cfg)?;
 
     println!("Activated release: {release_name}");
     if !pruned.is_empty() {

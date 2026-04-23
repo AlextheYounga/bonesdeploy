@@ -96,7 +96,7 @@ Hooks are static shell scripts embedded in the `gitbones` binary. They are writt
 - `pre-deploy` => This runs `gitbones-remote pre-deploy`, which changes the permissions of the worktree to be owned by the ssh_user, which is necessary in order to run deployment scripts from this user. `gitbones-remote` will be allowlisted in the sudoers file. 
 - `post-receive` => Update our git worktree to the latest commit (standard git deployment flow). Then it will call our custom git-hook, `deploy`.  
 - `deploy` => Our custom meta caller. This will scan our `{project_name}.git/bones/deployment` folder and run these scripts sequentially. 
-- `post-deploy` => Runs `gitbones-remote post-deploy`, which sets permissions back to our service user as detailed in bones.toml
+- `post-deploy` => Runs `gitbones-remote hooks post-deploy`, which sets permissions back to our service user as detailed in bones.toml
 
 ### Deployment Folder
 This folder stores deployment scripts to be called by `deploy`. Files in this folder must be ordered sequentially like `01_run_deployment_concerns.sh` and `02_lockup_permissions.sh`. They are named in numerical order and all of these scripts are always run.
@@ -202,7 +202,7 @@ gitbones/
 - The `pre-push` hook checks to see if we are pushing to our bones remote (in this example, `production`). If so, it runs `gitbones doctor` and fails on warnings/errors.
 - On remote: `pre-receive` runs `gitbones-remote doctor` (fails on issues), then calls `pre-deploy` (which runs `gitbones-remote pre-deploy` for ownership changes).
 - `post-receive` updates the worktree to the latest commit, then calls `deploy` (runs all `deployment/` scripts sequentially).
-- Finally, `post-deploy` calls `gitbones-remote post-deploy` to harden permissions based on bones.toml.
+- Finally, `post-deploy` calls `gitbones-remote hooks post-deploy` to harden permissions based on bones.toml.
 
 ## Cargo Dependencies
 - clap

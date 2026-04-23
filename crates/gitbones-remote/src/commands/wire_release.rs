@@ -9,19 +9,19 @@ use crate::release_state;
 
 pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
-    let release_name = release_state::read_pending_release(&cfg)?;
+    let release_name = release_state::read_staged_release(&cfg)?;
     let release_dir = release_state::release_dir(&cfg, &release_name);
     let shared_dir = release_state::shared_dir(&cfg);
 
     for shared_path in &cfg.releases.shared_paths {
-        prime_path(&release_dir, &shared_dir, shared_path)?;
+        wire_path(&release_dir, &shared_dir, shared_path)?;
     }
 
-    println!("Primed release: {release_name}");
+    println!("Wired release: {release_name}");
     Ok(())
 }
 
-fn prime_path(release_dir: &Path, shared_dir: &Path, relative_path: &str) -> Result<()> {
+fn wire_path(release_dir: &Path, shared_dir: &Path, relative_path: &str) -> Result<()> {
     let release_path = release_dir.join(relative_path);
     let shared_path = shared_dir.join(relative_path);
 

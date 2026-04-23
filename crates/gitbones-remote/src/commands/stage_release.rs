@@ -25,16 +25,16 @@ pub fn run(config_path: &str) -> Result<()> {
         .with_context(|| format!("Failed to create shared dir: {}", shared_dir.display()))?;
 
     let release_name = create_release_name()?;
-    let prepared_release_dir = release_state::release_dir(&cfg, &release_name);
-    fs::create_dir_all(&prepared_release_dir)
-        .with_context(|| format!("Failed to create release dir: {}", prepared_release_dir.display()))?;
+    let staged_release_dir = release_state::release_dir(&cfg, &release_name);
+    fs::create_dir_all(&staged_release_dir)
+        .with_context(|| format!("Failed to create release dir: {}", staged_release_dir.display()))?;
 
     ensure_live_root_symlink(&cfg)?;
 
-    permissions::chown_paths_to_deploy_user(&cfg, &[prepared_release_dir.as_path(), shared_dir.as_path()])?;
-    release_state::write_pending_release(&cfg, &release_name)?;
+    permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path(), shared_dir.as_path()])?;
+    release_state::write_staged_release(&cfg, &release_name)?;
 
-    println!("Prepared release: {release_name}");
+    println!("Staged release: {release_name}");
     Ok(())
 }
 

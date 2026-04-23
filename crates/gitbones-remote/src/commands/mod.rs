@@ -1,12 +1,12 @@
 mod activate_release;
-mod cleanup_failed_release;
 mod doctor;
+mod drop_failed_release;
 mod init;
 mod post_deploy;
-mod prepare_release;
-mod prime_release;
 mod rollback;
+mod stage_release;
 mod version;
+mod wire_release;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -24,26 +24,42 @@ enum Command {
     Init,
     /// Check server environment health
     Doctor,
-    /// Prepare a new pending release before checkout
-    PrepareRelease {
+    /// Release lifecycle operations
+    Release {
+        #[command(subcommand)]
+        command: ReleaseCommand,
+    },
+    /// Hook-oriented helper commands
+    Hooks {
+        #[command(subcommand)]
+        command: HookCommand,
+    },
+    /// Print the version
+    Version,
+}
+
+#[derive(Subcommand)]
+enum ReleaseCommand {
+    /// Stage a new release before checkout
+    Stage {
         /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
-    /// Prime shared paths into the pending release
-    PrimeRelease {
+    /// Wire shared paths into the staged release
+    Wire {
         /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
-    /// Atomically activate pending release and prune old releases
-    ActivateRelease {
+    /// Atomically activate staged release and prune old releases
+    Activate {
         /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
-    /// Remove pending failed release and clear state
-    CleanupFailedRelease {
+    /// Drop a failed staged release and clear state
+    DropFailed {
         /// Path to bones.toml config file
         #[arg(long)]
         config: String,
@@ -54,26 +70,32 @@ enum Command {
         #[arg(long)]
         config: String,
     },
+}
+
+#[derive(Subcommand)]
+enum HookCommand {
     /// Harden permissions back to service user after deployment
     PostDeploy {
         /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
-    /// Print the version
-    Version,
 }
 
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init => init::run(),
         Command::Doctor => doctor::run(),
-        Command::PrepareRelease { config } => prepare_release::run(config),
-        Command::PrimeRelease { config } => prime_release::run(config),
-        Command::ActivateRelease { config } => activate_release::run(config),
-        Command::CleanupFailedRelease { config } => cleanup_failed_release::run(config),
-        Command::Rollback { config } => rollback::run(config),
-        Command::PostDeploy { config } => post_deploy::run(config),
+        Command::Release { command } => match command {
+            ReleaseCommand::Stage { config } => stage_release::run(config),
+            ReleaseCommand::Wire { config } => wire_release::run(config),
+            ReleaseCommand::Activate { config } => activate_release::run(config),
+            ReleaseCommand::DropFailed { config } => drop_failed_release::run(config),
+            ReleaseCommand::Rollback { config } => rollback::run(config),
+        },
+        Command::Hooks { command } => match command {
+            HookCommand::PostDeploy { config } => post_deploy::run(config),
+        },
         Command::Version => {
             version::run();
             Ok(())

@@ -8,14 +8,14 @@ use crate::release_state;
 
 pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
-    let pending_path = release_state::pending_release_path(&cfg);
+    let staged_path = release_state::staged_release_path(&cfg);
 
-    if !pending_path.exists() {
-        println!("No pending release state found. Nothing to clean.");
+    if !staged_path.exists() {
+        println!("No staged release state found. Nothing to clean.");
         return Ok(());
     }
 
-    let release_name = release_state::read_pending_release(&cfg)?;
+    let release_name = release_state::read_staged_release(&cfg)?;
     let release_dir = release_state::release_dir(&cfg, &release_name);
 
     if release_dir.exists() {
@@ -24,7 +24,7 @@ pub fn run(config_path: &str) -> Result<()> {
         println!("Removed failed release: {release_name}");
     }
 
-    release_state::clear_pending_release(&cfg)?;
-    println!("Cleared pending release state.");
+    release_state::clear_staged_release(&cfg)?;
+    println!("Cleared staged release state.");
     Ok(())
 }

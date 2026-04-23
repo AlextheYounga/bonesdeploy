@@ -8,39 +8,38 @@ use anyhow::{Context, Result, bail};
 
 use crate::config::BonesConfig;
 
-pub fn pending_release_path(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.git_dir).join("bones").join(".pending_release")
+pub fn staged_release_path(cfg: &BonesConfig) -> PathBuf {
+    Path::new(&cfg.data.git_dir).join("bones").join(".staged_release")
 }
 
-pub fn read_pending_release(cfg: &BonesConfig) -> Result<String> {
-    let path = pending_release_path(cfg);
+pub fn read_staged_release(cfg: &BonesConfig) -> Result<String> {
+    let path = staged_release_path(cfg);
     let value = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read pending release state at {}", path.display()))?;
+        .with_context(|| format!("Failed to read staged release state at {}", path.display()))?;
     let release = value.trim().to_string();
 
     if release.is_empty() {
-        bail!("Pending release state file is empty: {}", path.display());
+        bail!("Staged release state file is empty: {}", path.display());
     }
 
     Ok(release)
 }
 
-pub fn write_pending_release(cfg: &BonesConfig, release: &str) -> Result<()> {
-    let path = pending_release_path(cfg);
+pub fn write_staged_release(cfg: &BonesConfig, release: &str) -> Result<()> {
+    let path = staged_release_path(cfg);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create pending release state dir: {}", parent.display()))?;
+            .with_context(|| format!("Failed to create staged release state dir: {}", parent.display()))?;
     }
 
     fs::write(&path, format!("{release}\n"))
-        .with_context(|| format!("Failed to write pending release state: {}", path.display()))
+        .with_context(|| format!("Failed to write staged release state: {}", path.display()))
 }
 
-pub fn clear_pending_release(cfg: &BonesConfig) -> Result<()> {
-    let path = pending_release_path(cfg);
+pub fn clear_staged_release(cfg: &BonesConfig) -> Result<()> {
+    let path = staged_release_path(cfg);
     if path.exists() {
-        fs::remove_file(&path)
-            .with_context(|| format!("Failed to remove pending release state: {}", path.display()))?;
+        fs::remove_file(&path).with_context(|| format!("Failed to remove staged release state: {}", path.display()))?;
     }
     Ok(())
 }
