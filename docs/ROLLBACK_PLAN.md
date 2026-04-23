@@ -160,7 +160,7 @@ sudo bonesremote hooks post-deploy --config "$BONES_TOML"
 ### Step 5: Local rollback command
 **New file:** `crates/bonesdeploy/src/commands/rollback.rs`
 
-Same pattern as `redeploy.rs`: load config, SSH in, `stream_cmd` to run `sudo bonesremote release rollback --config ...`.
+Same pattern as `deploy.rs`: load config, SSH in, `stream_cmd` to run `sudo bonesremote release rollback --config ...`.
 
 **Modified:** `crates/bonesdeploy/src/commands/mod.rs` — add `Rollback` variant
 
@@ -183,4 +183,4 @@ Same pattern as `redeploy.rs`: load config, SSH in, `stream_cmd` to run `sudo bo
    - Site works
 8. Push again — verify pruning keeps only `keep` releases
 9. `bonesdeploy rollback` — verify `current` swaps to previous release, site serves old code
-10. `bonesdeploy redeploy` — verify it works with the new release flow
+10. `bonesdeploy deploy` — verify it works with the new release flow

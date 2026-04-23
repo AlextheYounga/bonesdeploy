@@ -9,7 +9,7 @@ Replace the current in-place checkout flow with a release-based deployment flow:
 - allow rollbacks by repointing that symlink to an older release
 - keep persistent files in a shared location outside individual releases
 
-This plan intentionally does not include `redeploy`. That command belongs to the old deploy model and should be removed from scope.
+This plan keeps manual deployment as a first-class command (`bonesdeploy deploy`) so operators can deploy on demand.
 
 ## Target Layout
 
@@ -127,6 +127,7 @@ git_dir = "/home/git/lawsnipe.git"
 live_root = "/var/www/lawsnipe"
 deploy_root = "/srv/deployments/lawsnipe"
 branch = "master"
+deploy_on_push = true
 
 [permissions.defaults]
 deploy = "git"
@@ -340,9 +341,9 @@ When SQLite is used, this should also be configurable as shared:
 
 ## Local CLI Changes
 
-### Keep redeploy
+### Keep manual deploy command
 
-Keep `redeploy` as a helper that reruns the same remote hook pipeline without pushing commits.
+Keep `deploy` as a helper that reruns the same remote hook pipeline without pushing commits.
 
 ### Add rollback
 
@@ -376,7 +377,7 @@ Areas to update:
 3. refactor remote permissions helpers to accept target paths
 4. add remote release-management commands
 5. update hook templates to use staged release flow
-6. remove `redeploy` and add local `rollback`
+6. keep local `deploy` and add local `rollback`
 7. update docs
 8. run `cargo check`
 
