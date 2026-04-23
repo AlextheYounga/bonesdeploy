@@ -1,0 +1,22 @@
+---
+common_base_packages:
+  - build-essential
+  - ca-certificates
+  - curl
+  - git
+  - rsync
+  - sudo
+
+bonesremote_repo_url: https://github.com/AlextheYounga/bonesdeploy.git
+bonesremote_install_root: /usr/local
+bonesremote_binary_path: "{{ bonesremote_install_root }}/bin/bonesremote"
+rustup_install_script_url: https://sh.rustup.rs
+rustup_install_prefix: /root/.cargo/bin
+cargo_binary_path: "{{ rustup_install_prefix }}/cargo"
+
+nvm_version: v0.40.4
+nvm_install_script_url: "https://raw.githubusercontent.com/nvm-sh/nvm/{{ nvm_version }}/install.sh"
+nvm_dir: "/home/{{ deploy_user }}/.nvm"
+nvm_init_snippet:
+  - 'export NVM_DIR="$HOME/.nvm"'
+  - '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'

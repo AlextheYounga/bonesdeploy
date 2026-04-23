@@ -60,7 +60,7 @@
 - [x] `release stage|wire|activate|drop-failed|rollback`
 - [x] `hooks post-receive|deploy|post-deploy`
 - [x] `post-deploy`: implement `permissions.rs`
-  - [x] Apply default ownership (service_user:service_group)
+  - [x] Apply default ownership (service_user:group)
   - [x] Apply default dir_mode and file_mode
   - [x] Apply path overrides (recursive, type=dir, type=file)
 

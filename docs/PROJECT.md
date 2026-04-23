@@ -43,7 +43,7 @@ Collects the following project information from the user:
 Then we ask permissions questions:  
 - `deploy_user`: str (defaults to "git")  
 - `service_user`: str (defaults to "applications" - a service user who has final ownership of the site)  
-- `service_group`: str (defaults to www-data)  
+- `group`: str (defaults to www-data)  
 
 Example `bones.toml`:
 ```toml
@@ -61,8 +61,8 @@ deploy_on_push = true
 
 # These are the permissions that ultimately get applied to every file post-deployment.  
 [permissions.defaults]  
-deploy = "git"  
-owner = "applications"  
+deploy_user = "git"  
+service_user = "applications"  
 group = "www-data"  
 dir_mode   = "750"  
 file_mode  = "640"  

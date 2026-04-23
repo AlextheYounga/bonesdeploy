@@ -7,7 +7,7 @@ use crate::config::BonesConfig;
 pub async fn connect(config: &BonesConfig) -> Result<Session> {
     let host = &config.data.host;
     let port: u16 = config.data.port.parse().with_context(|| format!("Invalid port: {}", config.data.port))?;
-    let user = &config.permissions.defaults.deploy;
+    let user = &config.permissions.defaults.deploy_user;
 
     let session = SessionBuilder::default()
         .known_hosts_check(KnownHosts::Accept)

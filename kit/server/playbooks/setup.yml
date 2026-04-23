@@ -1,0 +1,21 @@
+---
+- name: Server setup for bonesdeploy
+  hosts: all
+  become: true
+
+  roles:
+    - role: users
+      tags: [users]
+
+    - role: common
+      tags: [common]
+
+  post_tasks:
+    - name: Display setup completion
+      ansible.builtin.debug:
+        msg: |
+          Bones server setup completed.
+          Deploy user: {{ deploy_user }}
+          Service user: {{ service_user }}
+          Group: {{ group }}
+      tags: always

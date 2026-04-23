@@ -1,0 +1,43 @@
+---
+# Users required for bonesdeploy deployments
+
+- name: Ensure deploy user exists
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    shell: /bin/bash
+    create_home: true
+    password_lock: true
+    state: present
+  tags: [users]
+
+- name: Ensure service user exists
+  ansible.builtin.user:
+    name: "{{ service_user }}"
+    system: true
+    create_home: false
+    home: /nonexistent
+    shell: /usr/sbin/nologin
+    state: present
+  tags: [users]
+
+- name: Ensure service group exists
+  ansible.builtin.group:
+    name: "{{ group }}"
+    state: present
+  tags: [users]
+
+- name: Ensure service user is in service group
+  ansible.builtin.user:
+    name: "{{ service_user }}"
+    groups: "{{ group }}"
+    append: true
+  tags: [users]
+
+- name: Ensure web root exists
+  ansible.builtin.file:
+    path: "{{ live_root_parent }}"
+    state: directory
+    owner: root
+    group: "{{ group }}"
+    mode: "2775"
+  tags: [users]

@@ -59,10 +59,10 @@ pub struct Permissions {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PermissionDefaults {
-    #[serde(default = "default_deploy")]
-    pub deploy: String,
-    #[serde(default = "default_owner")]
-    pub owner: String,
+    #[serde(default = "default_deploy_user")]
+    pub deploy_user: String,
+    #[serde(default = "default_service_user")]
+    pub service_user: String,
     #[serde(default = "default_group")]
     pub group: String,
     #[serde(default = "default_dir_mode")]
@@ -74,8 +74,8 @@ pub struct PermissionDefaults {
 impl Default for PermissionDefaults {
     fn default() -> Self {
         Self {
-            deploy: default_deploy(),
-            owner: default_owner(),
+            deploy_user: default_deploy_user(),
+            service_user: default_service_user(),
             group: default_group(),
             dir_mode: default_dir_mode(),
             file_mode: default_file_mode(),
@@ -105,10 +105,10 @@ fn default_deploy_on_push() -> bool {
 fn default_keep() -> usize {
     5
 }
-fn default_deploy() -> String {
+fn default_deploy_user() -> String {
     "git".into()
 }
-fn default_owner() -> String {
+fn default_service_user() -> String {
     "applications".into()
 }
 fn default_group() -> String {

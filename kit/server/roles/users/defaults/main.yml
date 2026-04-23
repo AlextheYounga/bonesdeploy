@@ -1,0 +1,5 @@
+---
+deploy_user: git
+service_user: applications
+group: www-data
+live_root_parent: /var/www
