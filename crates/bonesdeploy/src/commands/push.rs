@@ -26,8 +26,7 @@ pub async fn run() -> Result<()> {
 
     // Delete sample hooks from bare repo
     println!("Cleaning sample hooks from remote...");
-    let cmd =
-        format!("find {git_dir}/hooks/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true");
+    let cmd = format!("find {git_dir}/hooks/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true");
     ssh::run_cmd(&session, &cmd).await?;
 
     // Symlink bones hooks into bare repo hooks
@@ -42,10 +41,7 @@ pub async fn run() -> Result<()> {
 
     session.close().await?;
 
-    println!(
-        "\n{} .bones/ synced to remote.",
-        style("Done!").green().bold()
-    );
+    println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
 
     Ok(())
 }
@@ -58,14 +54,7 @@ fn rsync_bones(cfg: &config::BonesConfig) -> Result<()> {
     let dest = format!("{user}@{host}:{git_dir}/bones/");
 
     let status = Command::new("rsync")
-        .args([
-            "-av",
-            "--delete",
-            "-e",
-            &format!("ssh -p {port}"),
-            &format!("{BONES_DIR}/"),
-            &dest,
-        ])
+        .args(["-av", "--delete", "-e", &format!("ssh -p {port}"), &format!("{BONES_DIR}/"), &dest])
         .status()
         .context("Failed to run rsync — is it installed?")?;
 

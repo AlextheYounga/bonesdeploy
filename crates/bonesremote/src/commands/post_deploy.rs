@@ -7,5 +7,5 @@ use crate::permissions;
 
 pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
-    permissions::harden(&cfg)
+    permissions::harden_active_release(&cfg)
 }
