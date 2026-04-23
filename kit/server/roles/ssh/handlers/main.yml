@@ -1,0 +1,7 @@
+---
+# SSH role handlers
+
+- name: Restart ssh
+  ansible.builtin.systemd:
+    name: "{{ ssh_service_name }}"
+    state: restarted

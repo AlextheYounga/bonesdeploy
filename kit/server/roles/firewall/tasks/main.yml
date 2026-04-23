@@ -1,0 +1,68 @@
+---
+# Firewall role main tasks
+
+- name: Install UFW
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+  tags: [firewall, security, packages]
+
+- name: Allow SSH from all sources
+  community.general.ufw:
+    rule: "{{ 'limit' if firewall_ssh_rate_limit else 'allow' }}"
+    port: "{{ firewall_ssh_port }}"
+    proto: tcp
+  when: firewall_manage_ssh and (firewall_ssh_allowed_cidrs | length == 0)
+  tags: [firewall, security]
+
+- name: Allow SSH from configured CIDRs
+  community.general.ufw:
+    rule: "{{ 'limit' if firewall_ssh_rate_limit else 'allow' }}"
+    port: "{{ firewall_ssh_port }}"
+    proto: tcp
+    src: "{{ item }}"
+  loop: "{{ firewall_ssh_allowed_cidrs }}"
+  when: firewall_manage_ssh and (firewall_ssh_allowed_cidrs | length > 0)
+  tags: [firewall, security]
+
+- name: Allow configured firewall ports
+  community.general.ufw:
+    rule: allow
+    port: "{{ firewall_port_aliases[item] | default(item) }}"
+    proto: tcp
+  loop: "{{ firewall_allowed_ports | reject('equalto', 'ssh') | list }}"
+  when: firewall_allowed_ports | length > 0
+  tags: [firewall, security]
+
+- name: Set default incoming firewall policy
+  community.general.ufw:
+    direction: incoming
+    policy: "{{ firewall_default_incoming_policy }}"
+  when: firewall_enabled
+  tags: [firewall, security]
+
+- name: Set default outgoing firewall policy
+  community.general.ufw:
+    direction: outgoing
+    policy: "{{ firewall_default_outgoing_policy }}"
+  when: firewall_enabled
+  tags: [firewall, security]
+
+- name: Enable UFW
+  community.general.ufw:
+    state: enabled
+  when: firewall_enabled
+  tags: [firewall, security]
+
+- name: Check UFW status
+  ansible.builtin.command: ufw status verbose
+  register: firewall_ufw_status
+  changed_when: false
+  when: firewall_show_status
+  tags: [firewall, security]
+
+- name: Display UFW status
+  ansible.builtin.debug:
+    var: firewall_ufw_status.stdout_lines
+  when: firewall_show_status
+  tags: [firewall, security]

@@ -1,0 +1,108 @@
+---
+# Users role main tasks
+
+- name: Set default admin user if not defined
+  ansible.builtin.set_fact:
+    users_default_admin_user: "alex"
+  when: admin_user is not defined
+  tags: [users, admin]
+
+- name: Use defined admin_user or default
+  ansible.builtin.set_fact:
+    users_fallback_admin_user: "{{ admin_user | default('alex') }}"
+  tags: [users, admin]
+
+- name: Determine actual admin user (use ansible_user unless root)
+  ansible.builtin.set_fact:
+    users_actual_admin_user: "{{ users_fallback_admin_user if ansible_user == 'root' else ansible_user }}"
+    users_actual_admin_home: "/home/{{ users_fallback_admin_user if ansible_user == 'root' else ansible_user }}"
+    admin_home: "/home/{{ users_fallback_admin_user if ansible_user == 'root' else ansible_user }}" # noqa: var-naming
+  tags: [users, admin]
+
+- name: Create admin user ({{ users_actual_admin_user }})
+  ansible.builtin.user:
+    name: "{{ users_actual_admin_user }}"
+    shell: /bin/bash
+    groups: sudo
+    append: true
+    create_home: true
+    state: present
+  tags: [users, admin]
+
+- name: Create git user
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    shell: /bin/bash
+    create_home: true
+    password_lock: true
+    state: present
+  tags: [users, git]
+
+- name: Create applications system user
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    system: true
+    create_home: false
+    home: /nonexistent
+    shell: /usr/sbin/nologin
+    state: present
+  tags: [users, app]
+
+- name: Ensure www-data group exists
+  ansible.builtin.group:
+    name: "{{ web_group }}"
+    state: present
+  tags: [users, groups]
+
+- name: Add applications user to www-data group
+  ansible.builtin.user:
+    name: "{{ app_user }}"
+    groups: "{{ web_group }}"
+    append: true
+  tags: [users, groups]
+
+- name: Ensure /var/www exists with correct ownership
+  ansible.builtin.file:
+    path: "{{ web_root }}"
+    state: directory
+    owner: root
+    group: "{{ web_group }}"
+    mode: "2775"
+    recurse: true
+  tags: [users, web]
+
+- name: Deploy aliases file for admin user
+  ansible.builtin.template:
+    src: aliases.j2
+    dest: "{{ users_actual_admin_home }}/.aliases"
+    owner: "{{ users_actual_admin_user }}"
+    group: "{{ users_actual_admin_user }}"
+    mode: "0644"
+  tags: [users, config]
+
+- name: Deploy aliases file for git user
+  ansible.builtin.template:
+    src: aliases.j2
+    dest: "{{ deploy_home }}/.aliases"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+  tags: [users, config]
+
+- name: Add aliases to admin user bashrc
+  ansible.builtin.lineinfile:
+    path: "{{ users_actual_admin_home }}/.bashrc"
+    line: "source ~/.aliases"
+    state: present
+    create: true
+    mode: "0644"
+  tags: [users, config]
+
+- name: Add aliases to git user bashrc
+  ansible.builtin.lineinfile:
+    path: "{{ deploy_home }}/.bashrc"
+    line: "source ~/.aliases"
+    state: present
+    create: true
+    mode: "0644"
+  tags: [users, config]

@@ -1,0 +1,24 @@
+---
+# SSH role defaults
+
+ssh_enabled: true
+ssh_service_name: ssh
+
+# Default to current Ansible SSH port if set
+ssh_port: "{{ ansible_port | default(22) }}"
+
+ssh_password_authentication: false
+ssh_pubkey_authentication: true
+ssh_challenge_response_authentication: false
+ssh_use_pam: true
+
+# Root login is intentionally not managed by default
+ssh_manage_permit_root_login: false
+ssh_permit_root_login: "prohibit-password"
+
+ssh_allow_users: []
+ssh_allow_groups: []
+
+ssh_manage_authorized_keys: true
+ssh_admin_authorized_keys: []
+ssh_deploy_authorized_keys: []

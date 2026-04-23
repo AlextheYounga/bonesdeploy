@@ -1,0 +1,57 @@
+---
+# SSH role main tasks
+
+- name: Ensure SSH config drop-in directory exists
+  ansible.builtin.file:
+    path: /etc/ssh/sshd_config.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: ssh_enabled
+  tags: [ssh, security]
+
+- name: Deploy SSH hardening drop-in
+  ansible.builtin.template:
+    src: 99-hardening.conf.j2
+    dest: /etc/ssh/sshd_config.d/99-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ssh
+  when: ssh_enabled
+  tags: [ssh, security]
+
+- name: Validate SSH configuration
+  ansible.builtin.command: sshd -t
+  changed_when: false
+  when: ssh_enabled
+  tags: [ssh, security]
+
+- name: Ensure SSH service is enabled and started
+  ansible.builtin.systemd:
+    name: "{{ ssh_service_name }}"
+    enabled: true
+    state: started
+  when: ssh_enabled
+  tags: [ssh, security]
+
+- name: Configure admin authorized keys
+  ansible.posix.authorized_key:
+    user: "{{ users_actual_admin_user | default(admin_user) }}"
+    key: "{{ item }}"
+    state: present
+    manage_dir: true
+  loop: "{{ ssh_admin_authorized_keys }}"
+  when: ssh_enabled and ssh_manage_authorized_keys and (ssh_admin_authorized_keys | length > 0)
+  tags: [ssh, security]
+
+- name: Configure deploy authorized keys
+  ansible.posix.authorized_key:
+    user: "{{ deploy_user }}"
+    key: "{{ item }}"
+    state: present
+    manage_dir: true
+  loop: "{{ ssh_deploy_authorized_keys }}"
+  when: ssh_enabled and ssh_manage_authorized_keys and (ssh_deploy_authorized_keys | length > 0)
+  tags: [ssh, security]
