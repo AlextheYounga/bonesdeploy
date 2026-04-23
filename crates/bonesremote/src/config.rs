@@ -13,6 +13,13 @@ pub struct BonesConfig {
     pub releases: Releases,
 }
 
+pub struct Constants;
+
+impl Constants {
+    pub const BINARY_NAME: &str = "bonesremote";
+    pub const SUDOERS_PATH: &str = "/etc/sudoers.d/bonesdeploy";
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Data {
     #[serde(default)]

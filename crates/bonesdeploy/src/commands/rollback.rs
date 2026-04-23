@@ -6,13 +6,11 @@ use console::style;
 use crate::config;
 use crate::ssh;
 
-const BONES_TOML: &str = ".bones/bones.toml";
-
 pub async fn run() -> Result<()> {
-    let bones_toml = Path::new(BONES_TOML);
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
-    let remote_bones_toml = format!("{}/bones/bones.toml", cfg.data.git_dir);
+    let remote_bones_toml = format!("{}/{}/bones.toml", cfg.data.git_dir, config::Constants::REMOTE_BONES_DIR);
 
     println!("Rolling back {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
 

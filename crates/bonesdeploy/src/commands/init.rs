@@ -13,9 +13,6 @@ use crate::git;
 use crate::prompts;
 use crate::ssh;
 
-const BONES_DIR: &str = ".bones";
-const BONES_TOML: &str = ".bones/bones.toml";
-
 pub async fn run() -> Result<()> {
     println!(
         "{}\n\n\
@@ -39,7 +36,7 @@ pub async fn run() -> Result<()> {
     git::ensure_git_repository()?;
 
     // Extract scaffold to .bones/
-    let bones_dir = Path::new(BONES_DIR);
+    let bones_dir = Path::new(config::Constants::BONES_DIR);
     if bones_dir.exists() {
         println!(".bones/ already exists, skipping scaffold extraction.");
     } else {
@@ -60,7 +57,7 @@ pub async fn run() -> Result<()> {
     // Update .gitignore
     update_gitignore()?;
 
-    let bones_toml = Path::new(BONES_TOML);
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = load_or_collect_config(bones_toml)?;
 
     // Validate the remote exists
@@ -68,7 +65,7 @@ pub async fn run() -> Result<()> {
 
     // Save config
     config::save(&cfg, bones_toml)?;
-    println!("Saved config to .bones/bones.toml");
+    println!("Saved config to {}", config::Constants::BONES_TOML);
 
     // Symlink pre-push hook
     symlink_pre_push()?;
@@ -79,7 +76,7 @@ pub async fn run() -> Result<()> {
 
     ssh::create_bare_repo(&session, &cfg.data.git_dir).await?;
 
-    let post_receive = embedded::read_asset("hooks/post-receive")?;
+    let post_receive = embedded::read_asset(config::Constants::POST_RECEIVE_HOOK_ASSET)?;
     ssh::upload_post_receive(&session, &cfg.data.git_dir, &post_receive).await?;
 
     session.close().await?;
@@ -97,7 +94,7 @@ fn load_or_collect_config(bones_toml: &Path) -> Result<config::BonesConfig> {
     if bones_toml.exists() {
         let existing = config::load(bones_toml)?;
         if config::is_configured(&existing) {
-            println!("Loading existing config from .bones/bones.toml...");
+            println!("Loading existing config from {}...", config::Constants::BONES_TOML);
             return Ok(existing);
         }
         println!("Config is incomplete, running prompts...");
@@ -110,7 +107,7 @@ fn load_or_collect_config(bones_toml: &Path) -> Result<config::BonesConfig> {
 
 fn update_gitignore() -> Result<()> {
     let gitignore = Path::new(".gitignore");
-    let entry = ".bones";
+    let entry = config::Constants::BONES_DIR;
 
     if gitignore.exists() {
         let content = fs::read_to_string(gitignore)?;
@@ -128,11 +125,11 @@ fn update_gitignore() -> Result<()> {
 }
 
 fn symlink_pre_push() -> Result<()> {
-    let hooks_dir = Path::new(".git/hooks");
+    let hooks_dir = Path::new(config::Constants::GIT_HOOKS_DIR);
     fs::create_dir_all(hooks_dir)?;
 
-    let link = hooks_dir.join("pre-push");
-    let target = Path::new("../../.bones/hooks/pre-push");
+    let link = hooks_dir.join(config::Constants::PRE_PUSH_HOOK);
+    let target = Path::new(config::Constants::PRE_PUSH_HOOK_TARGET);
 
     if link.exists() || link.symlink_metadata().is_ok() {
         fs::remove_file(&link).with_context(|| format!("Failed to remove existing {}", link.display()))?;
@@ -140,7 +137,7 @@ fn symlink_pre_push() -> Result<()> {
 
     unix_fs::symlink(target, &link).with_context(|| format!("Failed to symlink {}", link.display()))?;
 
-    println!("Symlinked .git/hooks/pre-push -> .bones/hooks/pre-push");
+    println!("Symlinked {} -> {}", config::Constants::GIT_PRE_PUSH_HOOK_PATH, config::Constants::PRE_PUSH_HOOK_TARGET);
     Ok(())
 }
 

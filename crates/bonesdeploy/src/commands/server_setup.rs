@@ -6,14 +6,11 @@ use console::style;
 
 use crate::config;
 
-const BONES_TOML: &str = ".bones/bones.toml";
-const SERVER_SETUP_PLAYBOOK: &str = ".bones/server/playbooks/setup.yml";
-
 pub fn run() -> Result<()> {
-    let bones_toml = Path::new(BONES_TOML);
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
-    let playbook = Path::new(SERVER_SETUP_PLAYBOOK);
+    let playbook = Path::new(config::Constants::BONES_SERVER_SETUP_PLAYBOOK);
     if !playbook.is_file() {
         bail!("Missing server setup playbook: {}", playbook.display());
     }

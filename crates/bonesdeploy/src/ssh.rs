@@ -2,6 +2,7 @@ use anyhow::{Context, Result, bail};
 use openssh::{KnownHosts, Session, SessionBuilder, Stdio};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
+use crate::config;
 use crate::config::BonesConfig;
 
 pub async fn connect(config: &BonesConfig) -> Result<Session> {
@@ -92,7 +93,8 @@ pub async fn create_bare_repo(session: &Session, git_dir: &str) -> Result<()> {
 }
 
 pub async fn upload_post_receive(session: &Session, git_dir: &str, hook_content: &str) -> Result<()> {
-    let hook_path = format!("{git_dir}/hooks/post-receive");
+    let hook_path =
+        format!("{git_dir}/{}/{}", config::Constants::REMOTE_HOOKS_DIR, config::Constants::POST_RECEIVE_HOOK);
 
     // Write hook content via heredoc
     let cmd =

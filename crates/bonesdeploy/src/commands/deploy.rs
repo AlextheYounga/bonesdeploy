@@ -1,15 +1,12 @@
-use std::path::Path;
-
 use anyhow::Result;
 use console::style;
+use std::path::Path;
 
 use crate::config;
 use crate::ssh;
 
-const BONES_TOML: &str = ".bones/bones.toml";
-
 pub async fn run() -> Result<()> {
-    let bones_toml = Path::new(BONES_TOML);
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
     let git_dir = &cfg.data.git_dir;
@@ -21,14 +18,22 @@ pub async fn run() -> Result<()> {
     println!("Running pre-receive...");
     ssh::stream_cmd(
         &session,
-        &format!("BONES_FORCE_DEPLOY=1 GIT_DIR='{git_dir}' '{git_dir}/hooks/pre-receive' </dev/null"),
+        &format!(
+            "BONES_FORCE_DEPLOY=1 GIT_DIR='{git_dir}' '{git_dir}/{}/{}' </dev/null",
+            config::Constants::REMOTE_HOOKS_DIR,
+            config::Constants::PRE_RECEIVE_HOOK
+        ),
     )
     .await?;
 
     println!("Running post-receive...");
     ssh::stream_cmd(
         &session,
-        &format!("BONES_FORCE_DEPLOY=1 GIT_DIR='{git_dir}' '{git_dir}/hooks/post-receive' </dev/null"),
+        &format!(
+            "BONES_FORCE_DEPLOY=1 GIT_DIR='{git_dir}' '{git_dir}/{}/{}' </dev/null",
+            config::Constants::REMOTE_HOOKS_DIR,
+            config::Constants::POST_RECEIVE_HOOK
+        ),
     )
     .await?;
 
