@@ -1,9 +1,10 @@
-GIT_DIR="${GIT_DIR:-.}"
-GIT_DIR=$(cd "$GIT_DIR" && pwd)
-BONES_TOML="$GIT_DIR/bones/bones.toml"
-HOOKS_DIR="$GIT_DIR/hooks"
+bones_init_remote_context() {
+	local git_dir_input="${1:-${GIT_DIR:-.}}"
+	GIT_DIR=$(cd "$git_dir_input" && pwd)
+	BONES_TOML="$GIT_DIR/bones/bones.toml"
+}
 
-run_doctor_remote() {
+bones_run_doctor_remote() {
 	echo "[bonesdeploy] Running remote doctor..."
 
 	if ! sudo bonesremote doctor; then
@@ -14,7 +15,7 @@ run_doctor_remote() {
 	echo "[bonesdeploy] Doctor passed. Staging release..."
 }
 
-stage_release() {
+bones_stage_release() {
 	if ! sudo bonesremote release stage --config "$BONES_TOML"; then
 		echo "[bonesdeploy] release stage failed. Push rejected."
 		exit 1
@@ -23,7 +24,7 @@ stage_release() {
 	echo "[bonesdeploy] Release staged."
 }
 
-wire_release() {
+bones_wire_release() {
 	echo "[bonesdeploy] Running post-receive checkout + release wiring..."
 
 	if ! sudo bonesremote hooks post-receive --config "$BONES_TOML"; then
@@ -31,11 +32,11 @@ wire_release() {
 		exit 1
 	fi
 
-	echo "[bonesdeploy] Release wired. Waiting for checkout to complete..."
+	echo "[bonesdeploy] Release wired."
 }
 
-run_deployment() {
-	echo "[bonesdeploy] Checkout complete. Running deploy hook command..."
+bones_run_deployment() {
+	echo "[bonesdeploy] Running deploy hook command..."
 
 	if ! sudo bonesremote hooks deploy --config "$BONES_TOML"; then
 		echo "[bonesdeploy] deploy hook command failed."
@@ -45,7 +46,7 @@ run_deployment() {
 	echo "[bonesdeploy] Deploy hook command complete. Running post-deploy..."
 }
 
-post_deploy() {
+bones_post_deploy() {
 	echo "[bonesdeploy] Running post-deploy (hardening permissions)..."
 
 	if ! sudo bonesremote hooks post-deploy --config "$BONES_TOML"; then
@@ -54,4 +55,35 @@ post_deploy() {
 	fi
 
 	echo "[bonesdeploy] post-deploy complete. Deployment finished."
+}
+
+bones_read_local_remote_name() {
+	grep -E '^remote_name\s*=' .bones/bones.toml | head -1 | sed 's/.*=\s*"\(.*\)"/\1/'
+}
+
+bones_should_run_for_remote() {
+	local pushed_remote_name="$1"
+	BONES_REMOTE=$(bones_read_local_remote_name)
+
+	if [ -z "$BONES_REMOTE" ]; then
+		echo "[bonesdeploy] Warning: Could not read remote_name from .bones/bones.toml"
+		return 1
+	fi
+
+	if [ "$pushed_remote_name" != "$BONES_REMOTE" ]; then
+		return 1
+	fi
+
+	return 0
+}
+
+bones_run_doctor_local() {
+	echo "[bonesdeploy] Pushing to bones remote '$BONES_REMOTE', running doctor..."
+
+	if ! bonesdeploy doctor --local; then
+		echo "[bonesdeploy] Doctor reported issues. Push aborted."
+		exit 1
+	fi
+
+	echo "[bonesdeploy] Doctor passed."
 }

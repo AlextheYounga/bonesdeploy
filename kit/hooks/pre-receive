@@ -11,31 +11,20 @@ set -euo pipefail
 
 GIT_DIR="${GIT_DIR:-.}"
 GIT_DIR=$(cd "$GIT_DIR" && pwd)
-BONES_TOML="$GIT_DIR/bones/bones.toml"
+HOOKS_LIB="$GIT_DIR/bones/hooks.sh"
 
-run_doctor() {
-	echo "[bonesdeploy] Running remote doctor..."
+if [ ! -f "$HOOKS_LIB" ]; then
+    echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"
+    exit 1
+fi
 
-	if ! sudo bonesremote doctor; then
-		echo "[bonesdeploy] Remote doctor reported issues. Push rejected."
-		exit 1
-	fi
-
-	echo "[bonesdeploy] Doctor passed. Staging release..."
-}
-
-stage_release() {
-	if ! sudo bonesremote release stage --config "$BONES_TOML"; then
-		echo "[bonesdeploy] release stage failed. Push rejected."
-		exit 1
-	fi
-
-	echo "[bonesdeploy] Release staged."
-}
+# shellcheck source=/dev/null
+. "$HOOKS_LIB"
+bones_init_remote_context "$GIT_DIR"
 
 main() {
-	run_doctor
-	stage_release
+	bones_run_doctor_remote
+	bones_stage_release
 }
 
 main

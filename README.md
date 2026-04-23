@@ -158,6 +158,7 @@ Remote host and port are not stored separately in `bones.toml`. BonesDeploy read
 ```
 .bones/
 ├── bones.toml           # project configuration
+├── hooks.sh             # shared hook functions imported by hook entrypoints
 ├── deployment/
 │   └── 01_*.sh          # deployment scripts (run sequentially)
 └── hooks/
@@ -166,7 +167,7 @@ Remote host and port are not stored separately in `bones.toml`. BonesDeploy read
     └── post-receive
 ```
 
-Hooks are written to `.bones/hooks/` once during init. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
+Hooks are written to `.bones/hooks/` once during init and import shared functions from `.bones/hooks.sh`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
 
 ## Good Fit
 

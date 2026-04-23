@@ -16,6 +16,7 @@ We create a `bonesremote` executable that does not require a password and allows
 ## Bones Scaffolding
 .bones  
 ├── bones.toml  
+├── hooks.sh
 ├── deployment  
 │   ├── 01_run_deployment_concerns.sh
 │   └── 02_permissions_lockup.sh (example)  
@@ -94,7 +95,7 @@ shared_paths = [".env", "storage"]
 ```
 
 ### Hooks
-Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push`.
+Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor` and we fail if the doctor command expresses any warning or errors.  
 - `pre-receive` => Runs `bonesremote doctor` and fails on issues, then runs `bonesremote release stage --config ...` to create a staged release directory and write staged release state.

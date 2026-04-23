@@ -48,7 +48,7 @@ fn check_bones_structure(issues: &mut Vec<String>) {
         return;
     }
 
-    let expected = [".bones/bones.toml", ".bones/hooks", ".bones/deployment"];
+    let expected = [".bones/bones.toml", ".bones/hooks.sh", ".bones/hooks", ".bones/deployment"];
 
     for path in &expected {
         if !Path::new(path).exists() {

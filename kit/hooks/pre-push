@@ -11,33 +11,22 @@
 
 set -euo pipefail
 REMOTE_NAME="$1"
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+HOOKS_LIB="$REPO_ROOT/.bones/hooks.sh"
 
-check_remote_exists() {
-	# Read the bones remote name from .bones/bones.toml
-	BONES_REMOTE=$(grep -E '^remote_name\s*=' .bones/bones.toml | head -1 | sed 's/.*=\s*"\(.*\)"/\1/')
+if [ ! -f "$HOOKS_LIB" ]; then
+    echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"
+    exit 1
+fi
 
-	if [ -z "$BONES_REMOTE" ]; then
-		echo "[bonesdeploy] Warning: Could not read remote_name from .bones/bones.toml"
-		exit 0
-	fi
-
-	if [ "$REMOTE_NAME" != "$BONES_REMOTE" ]; then
-		exit 0
-	fi
-}
-
-run_doctor_local() {
-	echo "[bonesdeploy] Pushing to bones remote '$BONES_REMOTE', running doctor..."
-
-	if ! bonesdeploy doctor --local; then
-		echo "[bonesdeploy] Doctor reported issues. Push aborted."
-		exit 1
-	fi
-
-	echo "[bonesdeploy] Doctor passed."
-}
+# shellcheck source=/dev/null
+. "$HOOKS_LIB"
 
 main() {
-	check_remote_exists
-	run_doctor_local
+	if bones_should_run_for_remote "$REMOTE_NAME"; then
+		bones_run_doctor_local
+	fi
 }
+
+main
