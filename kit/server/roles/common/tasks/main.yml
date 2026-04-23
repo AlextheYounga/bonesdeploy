@@ -6,3 +6,116 @@
     update_cache: true
     cache_valid_time: 3600
   tags: [common, packages]
+
+- name: Check for rustup
+  ansible.builtin.stat:
+    path: "{{ rustup_install_prefix }}/rustup"
+  register: common_rustup_binary
+  tags: [common, bonesremote]
+
+- name: Install rustup and cargo
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl --proto '=https' --tlsv1.2 -sSf {{ rustup_install_script_url }} | sh -s -- -y --profile minimal
+  args:
+    creates: "{{ rustup_install_prefix }}/cargo"
+  when: not common_rustup_binary.stat.exists
+  tags: [common, bonesremote]
+
+- name: Verify cargo installation
+  ansible.builtin.command:
+    argv:
+      - "{{ cargo_binary_path }}"
+      - --version
+  changed_when: false
+  tags: [common, bonesremote]
+
+- name: Install nvm for deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -o- {{ nvm_install_script_url }} | bash
+  args:
+    executable: /bin/bash
+    creates: "{{ nvm_dir }}/nvm.sh"
+  environment:
+    HOME: "/home/{{ deploy_user }}"
+  tags: [common, nvm]
+
+- name: Ensure nvm initialization is present for deploy user
+  ansible.builtin.lineinfile:
+    path: "/home/{{ deploy_user }}/.bashrc"
+    line: "{{ item }}"
+    state: present
+    create: true
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+  loop: "{{ nvm_init_snippet }}"
+  tags: [common, nvm]
+
+- name: Verify nvm for deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_dir }}"
+    . "${NVM_DIR}/nvm.sh"
+    nvm --version
+  args:
+    executable: /bin/bash
+  environment:
+    HOME: "/home/{{ deploy_user }}"
+  changed_when: false
+  tags: [common, nvm]
+
+- name: Install latest LTS Node with nvm for deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_dir }}"
+    . "${NVM_DIR}/nvm.sh"
+    nvm install --lts
+  args:
+    executable: /bin/bash
+  environment:
+    HOME: "/home/{{ deploy_user }}"
+  tags: [common, nvm]
+
+- name: Check for bonesremote binary
+  ansible.builtin.stat:
+    path: "{{ bonesremote_binary_path }}"
+  register: common_bonesremote_binary
+  tags: [common, bonesremote]
+
+- name: Install bonesremote binary
+  ansible.builtin.command:
+    argv:
+      - "{{ cargo_binary_path }}"
+      - install
+      - --root
+      - "{{ bonesremote_install_root }}"
+      - --git
+      - "{{ bonesremote_repo_url }}"
+      - bonesremote
+  when: not common_bonesremote_binary.stat.exists
+  tags: [common, bonesremote]
+
+- name: Run bonesremote init
+  ansible.builtin.command:
+    argv:
+      - bonesremote
+      - init
+  environment:
+    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+  tags: [common, bonesremote]
+
+- name: Run bonesremote doctor as deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.command:
+    argv:
+      - bonesremote
+      - doctor
+  environment:
+    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+  changed_when: false
+  tags: [common, bonesremote]
