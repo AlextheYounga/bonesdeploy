@@ -143,7 +143,7 @@ bonesdeploy/
 └── docs/
 ```
 
-### Gitbones CLI Commands
+### BonesDeploy CLI Commands
 - **init**:
   - Informs the user that there should be a remote git url set up, explains what's going to happen, and then asks the user for permission to proceed.
   - Gets or creates the `.bones` folder with our default scaffolding.
@@ -174,7 +174,7 @@ bonesdeploy/
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
 
-### GitbonesRemote CLI Commands
+### BonesDeployRemote CLI Commands
 - **init**:
   - Must be run as sudo.
   - Installs a drop-in file at `/etc/sudoers.d/bonesdeploy` to allow `bonesremote` commands without requiring password.
