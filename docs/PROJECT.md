@@ -100,7 +100,7 @@ shared_paths = [".env", "storage"]
 Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor` and we fail if the doctor command expresses any warning or errors.  
-- `pre-receive` => Runs `bonesremote doctor` and fails on issues, then runs `bonesremote release stage --config ...` to create a staged release directory and write staged release state.
+- `pre-receive` => Runs `bonesremote doctor` and fails on issues, then runs `sudo bonesremote release stage --config ...` to create a staged release directory, hand ownership to the deploy user, and write staged release state.
 - `post-receive` => Runs the full deployment pipeline by calling, in order, `bonesremote hooks post-receive --config ...`, `bonesremote hooks deploy --config ...`, and `bonesremote hooks post-deploy --config ...`.
 
 ### Deployment Folder
@@ -198,7 +198,7 @@ bonesdeploy/
 - **Hook commands** live under `bonesremote hooks ...`
 - **init**:
   - Must be run as sudo.
-  - Installs a drop-in file at `/etc/sudoers.d/bonesdeploy` to allow `bonesremote` commands without requiring password.
+  - Installs a drop-in file at `/etc/sudoers.d/bonesdeploy` to allow only privileged `bonesremote` commands without requiring password.
 - **doctor**:
   - Checks to see if the server is set up properly:
     - `bonesremote` can be run without requiring password
@@ -208,7 +208,7 @@ bonesdeploy/
 - **release wire**
 	- Wires shared paths into the staged release after checkout.
 - **release activate**
-	- Atomically switches `current` to the staged release and prunes old releases.
+	- Atomically switches `current` to the staged release and clears staged release state.
 - **release drop-failed**
 	- Deletes a failed staged release and clears staged release state.
 - **release rollback**
@@ -216,14 +216,14 @@ bonesdeploy/
 - **hooks post-receive**
 	- Checks out the configured branch into the staged release and wires shared paths.
 - **hooks deploy**
-	- Runs deployment scripts in the staged release, drops failed staged releases on error, and activates release on success.
+	- Runs deployment scripts in the staged release as the deploy user, drops failed staged releases on error, and activates release on success.
 - **hooks post-deploy**
-	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.toml`, like for instance setting everything back to be owned by the service user. 
+	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.toml`, like for instance setting everything back to be owned by the service user, then prunes old releases. 
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
 
 ## Security Notes
-- Sudo access for the deployment user is strictly limited to passwordless execution of bonesremote commands via /etc/sudoers configuration.
+- Sudo access for the deployment user is strictly limited to passwordless execution of `bonesremote release stage` and `bonesremote hooks post-deploy` via /etc/sudoers configuration.
 - No broader sudo privileges are granted.
 - All operations are audited through system logs.
 
@@ -239,13 +239,13 @@ bonesdeploy/
 `pre-push -> pre-receive -> post-receive`
 
 1. Git receives pack data in the remote bare repo and runs `pre-receive`.
-2. If `deploy_on_push = true`, `pre-receive` runs `bonesremote doctor`, then `bonesremote release stage --config "$BONES_TOML"`.
+2. If `deploy_on_push = true`, `pre-receive` runs `bonesremote doctor`, then `sudo bonesremote release stage --config "$BONES_TOML"`.
    - If `deploy_on_push = false`, `pre-receive` exits early and no deploy steps run.
 3. If `pre-receive` exits successfully, Git updates refs.
 4. Git runs `post-receive`.
 5. `post-receive` runs `bonesremote hooks post-receive --config "$BONES_TOML"` (checkout + shared wiring).
 6. Then `post-receive` runs `bonesremote hooks deploy --config "$BONES_TOML"` (deployment scripts + activate/drop-failed).
-7. Finally `post-receive` runs `bonesremote hooks post-deploy --config "$BONES_TOML"` (permission hardening).
+7. Finally `post-receive` runs `sudo bonesremote hooks post-deploy --config "$BONES_TOML"` (permission hardening + pruning).
 
 ## Cargo Dependencies
 - clap

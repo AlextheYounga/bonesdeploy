@@ -4,11 +4,14 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 
 use crate::config;
+use crate::privileges;
 use crate::release_state;
 
 use super::wire_release;
 
 pub fn run(config_path: &str) -> Result<()> {
+    privileges::ensure_not_root("bonesremote hooks post-receive")?;
+
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
     let release_path = release_state::release_dir(&cfg, &release_name);

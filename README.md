@@ -55,7 +55,7 @@ Then run the one-time server setup as root:
 sudo bonesremote init
 ```
 
-This installs a sudoers drop-in at `/etc/sudoers.d/bonesdeploy` so the deploy user can run `bonesremote` without a password.
+This installs a sudoers drop-in at `/etc/sudoers.d/bonesdeploy` so the deploy user can run only the privileged `bonesremote` commands without a password.
 
 ## Usage
 
@@ -109,11 +109,11 @@ git push production master
 
 The hook chain handles the rest:
 1. **pre-push** (local) — runs `bonesdeploy doctor --local`
-2. **pre-receive** (remote) — runs `bonesremote doctor`, then `bonesremote release stage --config ...`
+2. **pre-receive** (remote) — runs `bonesremote doctor`, then `sudo bonesremote release stage --config ...`
 3. **post-receive** (remote) — runs the deployment pipeline:
-   - `bonesremote hooks post-receive --config ...` (checkout + wire shared paths)
-   - `bonesremote hooks deploy --config ...` (run deployment scripts + activate/drop-failed)
-   - `bonesremote hooks post-deploy --config ...` (permission hardening)
+    - `bonesremote hooks post-receive --config ...` (checkout + wire shared paths)
+    - `bonesremote hooks deploy --config ...` (run deployment scripts + activate/drop-failed)
+    - `sudo bonesremote hooks post-deploy --config ...` (permission hardening + pruning)
 
 `pre-push -> pre-receive -> post-receive`
 

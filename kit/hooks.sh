@@ -23,13 +23,13 @@ bones_should_deploy_on_push() {
 	return 0
 }
 
-bones_run_doctor_remote() {
-	echo "[bonesdeploy] Running remote doctor..."
+	bones_run_doctor_remote() {
+		echo "[bonesdeploy] Running remote doctor..."
 
-	if ! sudo bonesremote doctor; then
-		echo "[bonesdeploy] Remote doctor reported issues. Push rejected."
-		exit 1
-	fi
+		if ! bonesremote doctor; then
+			echo "[bonesdeploy] Remote doctor reported issues. Push rejected."
+			exit 1
+		fi
 
 	echo "[bonesdeploy] Doctor passed. Staging release..."
 }
@@ -43,24 +43,24 @@ bones_stage_release() {
 	echo "[bonesdeploy] Release staged."
 }
 
-bones_wire_release() {
-	echo "[bonesdeploy] Running post-receive checkout + release wiring..."
+	bones_wire_release() {
+		echo "[bonesdeploy] Running post-receive checkout + release wiring..."
 
-	if ! sudo bonesremote hooks post-receive --config "$BONES_TOML"; then
-		echo "[bonesdeploy] post-receive hook command failed."
-		exit 1
-	fi
+		if ! bonesremote hooks post-receive --config "$BONES_TOML"; then
+			echo "[bonesdeploy] post-receive hook command failed."
+			exit 1
+		fi
 
 	echo "[bonesdeploy] Release wired."
 }
 
-bones_run_deployment() {
-	echo "[bonesdeploy] Running deploy hook command..."
+	bones_run_deployment() {
+		echo "[bonesdeploy] Running deploy hook command..."
 
-	if ! sudo bonesremote hooks deploy --config "$BONES_TOML"; then
-		echo "[bonesdeploy] deploy hook command failed."
-		exit 1
-	fi
+		if ! bonesremote hooks deploy --config "$BONES_TOML"; then
+			echo "[bonesdeploy] deploy hook command failed."
+			exit 1
+		fi
 
 	echo "[bonesdeploy] Deploy hook command complete. Running post-deploy..."
 }

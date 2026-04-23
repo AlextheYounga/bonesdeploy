@@ -1,6 +1,7 @@
 mod commands;
 mod config;
 mod permissions;
+mod privileges;
 mod release_state;
 
 use anyhow::Result;

@@ -60,6 +60,46 @@ pub fn current_link(cfg: &BonesConfig) -> PathBuf {
     Path::new(&cfg.data.deploy_root).join("current")
 }
 
+pub fn current_release_dir(cfg: &BonesConfig) -> Result<PathBuf> {
+    let current_link = current_link(cfg);
+    let active_target =
+        fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
+
+    Ok(if active_target.is_absolute() {
+        active_target
+    } else {
+        current_link.parent().unwrap_or_else(|| Path::new("/")).join(active_target)
+    })
+}
+
+pub fn current_release_name(cfg: &BonesConfig) -> Result<String> {
+    let current_release = current_release_dir(cfg)?;
+    current_release
+        .file_name()
+        .map(|value| value.to_string_lossy().to_string())
+        .ok_or_else(|| anyhow::anyhow!("Failed to resolve current release name from {}", current_release.display()))
+}
+
+pub fn list_releases_sorted(cfg: &BonesConfig) -> Result<Vec<String>> {
+    let releases_dir = releases_dir(cfg);
+    if !releases_dir.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut names = Vec::new();
+    for entry in fs::read_dir(&releases_dir)
+        .with_context(|| format!("Failed to read releases dir: {}", releases_dir.display()))?
+    {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            names.push(entry.file_name().to_string_lossy().to_string());
+        }
+    }
+
+    names.sort();
+    Ok(names)
+}
+
 pub fn point_symlink_atomically(link_path: &Path, target_path: &Path) -> Result<()> {
     let Some(parent) = link_path.parent() else {
         bail!("Invalid symlink path: {}", link_path.display());

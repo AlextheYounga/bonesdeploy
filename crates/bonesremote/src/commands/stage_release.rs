@@ -8,9 +8,12 @@ use time::macros::format_description;
 
 use crate::config;
 use crate::permissions;
+use crate::privileges;
 use crate::release_state;
 
 pub fn run(config_path: &str) -> Result<()> {
+    privileges::ensure_root("bonesremote release stage")?;
+
     let cfg = config::load(Path::new(config_path))?;
 
     let deploy_root = Path::new(&cfg.data.deploy_root);
@@ -31,7 +34,8 @@ pub fn run(config_path: &str) -> Result<()> {
 
     ensure_live_root_symlink(&cfg)?;
 
-    permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path(), shared_dir.as_path()])?;
+    permissions::chown_paths_to_deploy_user(&cfg, &[deploy_root, releases_dir.as_path()], false)?;
+    permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path(), shared_dir.as_path()], true)?;
     release_state::write_staged_release(&cfg, &release_name)?;
 
     println!("Staged release: {release_name}");

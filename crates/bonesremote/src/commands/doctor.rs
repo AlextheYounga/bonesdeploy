@@ -35,15 +35,22 @@ fn check_globally_available(issues: &mut Vec<String>) {
 }
 
 fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let result = Command::new("sudo").args(["-n", config::Constants::BINARY_NAME, "version"]).output();
+    let privileged_commands = [
+        [config::Constants::BINARY_NAME, "release", "stage", "--config", "/nonexistent"],
+        [config::Constants::BINARY_NAME, "hooks", "post-deploy", "--config", "/nonexistent"],
+    ];
 
-    match result {
-        Ok(output) if output.status.success() => {}
-        _ => issues.push(format!(
-            "{} cannot run via sudo without a password \
-                 (run 'sudo {} init')",
-            config::Constants::BINARY_NAME,
-            config::Constants::BINARY_NAME
-        )),
+    for command in privileged_commands {
+        let result = Command::new("sudo").arg("-n").arg("-l").args(command).output();
+
+        match result {
+            Ok(output) if output.status.success() => {}
+            _ => issues.push(format!(
+                "{} is not allowed via passwordless sudo: {} (run 'sudo {} init')",
+                config::Constants::BINARY_NAME,
+                command.join(" "),
+                config::Constants::BINARY_NAME
+            )),
+        }
     }
 }

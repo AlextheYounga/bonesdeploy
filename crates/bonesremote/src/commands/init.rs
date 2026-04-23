@@ -3,25 +3,22 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use console::style;
-use nix::unistd::geteuid;
 
 use crate::config;
+use crate::privileges;
 
-pub fn run() -> Result<()> {
-    if !geteuid().is_root() {
-        bail!("{} init must be run as root (sudo)", config::Constants::BINARY_NAME);
-    }
+pub fn run(deploy_user: &str) -> Result<()> {
+    privileges::ensure_root("bonesremote init")?;
 
     println!("{}", style(format!("{} init", config::Constants::BINARY_NAME)).bold());
 
     let sudoers_path = config::Constants::SUDOERS_PATH;
     let bonesdeploy_path = which_bonesdeploy_remote()?;
 
-    // The sudoers rule allows the deploy user (git) to run
-    // bonesremote commands without a password.
+    // Only the commands that need ownership changes run via sudo.
     let sudoers_content = format!(
         "# Installed by bonesremote init\n\
-         git ALL=(ALL) NOPASSWD: {bonesdeploy_path} *\n"
+         {deploy_user} ALL=(root) NOPASSWD: {bonesdeploy_path} release stage --config *, {bonesdeploy_path} hooks post-deploy --config *\n"
     );
 
     fs::write(sudoers_path, &sudoers_content).with_context(|| format!("Failed to write {sudoers_path}"))?;

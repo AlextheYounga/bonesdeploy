@@ -105,6 +105,8 @@
     argv:
       - bonesremote
       - init
+      - --deploy-user
+      - "{{ deploy_user }}"
   environment:
     PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
   tags: [common, bonesremote]

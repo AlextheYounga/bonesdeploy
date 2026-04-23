@@ -9,7 +9,7 @@ use walkdir::WalkDir;
 use crate::config::BonesConfig;
 use crate::release_state;
 
-pub fn chown_paths_to_deploy_user(cfg: &BonesConfig, paths: &[&Path]) -> Result<()> {
+pub fn chown_paths_to_deploy_user(cfg: &BonesConfig, paths: &[&Path], recursive: bool) -> Result<()> {
     let deploy_user = &cfg.permissions.defaults.deploy_user;
     let group = &cfg.permissions.defaults.group;
     let ownership = format!("{deploy_user}:{group}");
@@ -20,7 +20,7 @@ pub fn chown_paths_to_deploy_user(cfg: &BonesConfig, paths: &[&Path]) -> Result<
         }
 
         let path_str = path.to_string_lossy();
-        run_chown(&ownership, &path_str, true)?;
+        run_chown(&ownership, &path_str, recursive)?;
         println!("Changed ownership of {} to {ownership}", path.display());
     }
 

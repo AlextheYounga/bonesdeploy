@@ -51,7 +51,7 @@ That means a failed deploy can leave the live directory partially updated.
 
 1. `pre-receive`
    - run `bonesremote doctor`
-   - run `bonesremote release stage --config ...`
+   - run `sudo bonesremote release stage --config ...`
 2. `release stage`
    - create `deploy_root/releases/` and `deploy_root/shared/` if missing
    - create a new timestamped release directory
@@ -60,7 +60,7 @@ That means a failed deploy can leave the live directory partially updated.
 3. `post-receive`
    - run `bonesremote hooks post-receive --config ...` (checkout + wire)
    - run `bonesremote hooks deploy --config ...` (scripts + activate/drop-failed)
-   - run `bonesremote hooks post-deploy --config ...` (permission hardening)
+   - run `sudo bonesremote hooks post-deploy --config ...` (permission hardening + pruning)
 4. `release wire`
    - seed and symlink configured shared paths into the staged release
    - make the release ready for framework-specific build steps
@@ -71,10 +71,10 @@ That means a failed deploy can leave the live directory partially updated.
 6. `release activate`
    - atomically update `deploy_root/current`
    - leave `live_root` pointing at `deploy_root/current`
-   - prune old releases beyond the configured retention count
    - clean up staged release state
 7. `post-deploy` (internalized in `bonesremote hooks post-deploy`)
    - harden permissions on the active release and shared paths
+   - prune old releases beyond the configured retention count
 
 If deployment scripts fail before activation:
 
@@ -208,7 +208,7 @@ Responsibilities:
 3. create a new release directory name, for example `YYYYMMDD_HHMMSS`
 4. create that directory
 5. make sure `live_root` is a symlink to `deploy_root/current`
-6. chown the new release directory and `shared/` to the deploy user
+6. chown `deploy_root`, `releases/`, the new release directory, and `shared/` to the deploy user where needed for unprivileged deploy execution
 7. write the staged release name to `git_dir/bones/.staged_release`
 
 ### release activate
@@ -219,8 +219,7 @@ Responsibilities:
 2. read `.staged_release`
 3. resolve the release directory under `deploy_root/releases/`
 4. atomically switch `deploy_root/current` to the new release
-5. prune old releases, excluding the newly active one
-6. remove `.staged_release`
+5. remove `.staged_release`
 
 ### release wire
 
@@ -290,7 +289,7 @@ Update the embedded hook templates so entrypoints stay thin and shared logic liv
 Run doctor and staging directly:
 
 ```bash
-sudo bonesremote doctor
+bonesremote doctor
 sudo bonesremote release stage --config "$BONES_TOML"
 ```
 
@@ -299,8 +298,8 @@ sudo bonesremote release stage --config "$BONES_TOML"
 Run the full pipeline in order:
 
 ```bash
-sudo bonesremote hooks post-receive --config "$BONES_TOML"
-sudo bonesremote hooks deploy --config "$BONES_TOML"
+bonesremote hooks post-receive --config "$BONES_TOML"
+bonesremote hooks deploy --config "$BONES_TOML"
 sudo bonesremote hooks post-deploy --config "$BONES_TOML"
 ```
 
