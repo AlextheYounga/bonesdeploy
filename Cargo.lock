@@ -80,6 +80,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonesdeploy"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "console",
+ "git2",
+ "inquire",
+ "openssh",
+ "rust-embed",
+ "serde",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "bonesremote"
+version = "0.1.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "console",
+ "nix",
+ "serde",
+ "toml",
+ "walkdir",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -341,35 +370,6 @@ dependencies = [
  "openssl-probe",
  "openssl-sys",
  "url",
-]
-
-[[package]]
-name = "gitbones"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "clap",
- "console",
- "git2",
- "inquire",
- "openssh",
- "rust-embed",
- "serde",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "gitbones-remote"
-version = "0.1.1"
-dependencies = [
- "anyhow",
- "clap",
- "console",
- "nix",
- "serde",
- "toml",
- "walkdir",
 ]
 
 [[package]]
