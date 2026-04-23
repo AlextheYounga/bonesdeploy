@@ -13,6 +13,31 @@ pub struct BonesConfig {
     pub releases: Releases,
 }
 
+pub struct Constants;
+
+impl Constants {
+    pub const BONES_DIR: &'static str = ".bones";
+    pub const BONES_TOML: &'static str = ".bones/bones.toml";
+    pub const BONES_HOOKS_SCRIPT: &'static str = ".bones/hooks.sh";
+    pub const BONES_HOOKS_DIR: &'static str = ".bones/hooks";
+    pub const BONES_DEPLOYMENT_DIR: &'static str = ".bones/deployment";
+    pub const BONES_SERVER_SETUP_PLAYBOOK: &'static str = ".bones/server/playbooks/setup.yml";
+
+    pub const GIT_HOOKS_DIR: &'static str = ".git/hooks";
+    pub const GIT_PRE_PUSH_HOOK_PATH: &'static str = ".git/hooks/pre-push";
+    pub const PRE_PUSH_HOOK: &'static str = "pre-push";
+    pub const PRE_PUSH_HOOK_TARGET: &'static str = "../../.bones/hooks/pre-push";
+
+    pub const REMOTE_BONES_DIR: &'static str = "bones";
+    pub const REMOTE_HOOKS_DIR: &'static str = "hooks";
+    pub const PRE_RECEIVE_HOOK: &'static str = "pre-receive";
+    pub const POST_RECEIVE_HOOK: &'static str = "post-receive";
+
+    pub const ASSET_HOOKS_DIR: &'static str = "hooks/";
+    pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
+    pub const POST_RECEIVE_HOOK_ASSET: &'static str = "hooks/post-receive";
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Data {
     #[serde(default)]

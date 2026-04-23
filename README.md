@@ -81,6 +81,14 @@ A git remote must already be configured for the deployment target:
 git remote add production git@deploy.example.com:/home/git/myproject.git
 ```
 
+Before first deploy, run server setup:
+
+```sh
+bonesdeploy server setup
+```
+
+This runs `.bones/server/playbooks/setup.yml` locally with Ansible against your configured remote host.
+
 ### Syncing Configuration
 
 After editing hooks or deployment scripts in `.bones/`:

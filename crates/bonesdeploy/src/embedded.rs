@@ -6,6 +6,8 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use rust_embed::Embed;
 
+use crate::config;
+
 #[derive(Embed)]
 #[folder = "../../kit/"]
 struct Kit;
@@ -81,7 +83,9 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
     fs::write(&dest, bytes).with_context(|| format!("Failed to write {}", dest.display()))?;
 
-    if relative_path.starts_with("hooks/") || relative_path.starts_with("deployment/") {
+    if relative_path.starts_with(config::Constants::ASSET_HOOKS_DIR)
+        || relative_path.starts_with(config::Constants::ASSET_DEPLOYMENT_DIR)
+    {
         fs::set_permissions(&dest, fs::Permissions::from_mode(0o755))
             .with_context(|| format!("Failed to set permissions on {}", dest.display()))?;
     }

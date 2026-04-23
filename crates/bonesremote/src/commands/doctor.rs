@@ -3,8 +3,10 @@ use std::process::Command;
 use anyhow::Result;
 use console::style;
 
+use crate::config;
+
 pub fn run() -> Result<()> {
-    println!("{}", style("bonesremote doctor").bold());
+    println!("{}", style(format!("{} doctor", config::Constants::BINARY_NAME)).bold());
 
     let mut issues: Vec<String> = Vec::new();
 
@@ -24,23 +26,24 @@ pub fn run() -> Result<()> {
 }
 
 fn check_globally_available(issues: &mut Vec<String>) {
-    let result = Command::new("bonesremote").arg("version").output();
+    let result = Command::new(config::Constants::BINARY_NAME).arg("version").output();
 
     match result {
         Ok(output) if output.status.success() => {}
-        _ => issues.push("bonesremote is not globally available (not in PATH)".into()),
+        _ => issues.push(format!("{} is not globally available (not in PATH)", config::Constants::BINARY_NAME)),
     }
 }
 
 fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let result = Command::new("sudo").args(["-n", "bonesremote", "version"]).output();
+    let result = Command::new("sudo").args(["-n", config::Constants::BINARY_NAME, "version"]).output();
 
     match result {
         Ok(output) if output.status.success() => {}
-        _ => issues.push(
-            "bonesremote cannot run via sudo without a password \
-             (run 'sudo bonesremote init')"
-                .into(),
-        ),
+        _ => issues.push(format!(
+            "{} cannot run via sudo without a password \
+                 (run 'sudo {} init')",
+            config::Constants::BINARY_NAME,
+            config::Constants::BINARY_NAME
+        )),
     }
 }

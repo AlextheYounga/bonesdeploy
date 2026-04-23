@@ -186,6 +186,10 @@ bonesdeploy/
   - Manually runs remote `pre-receive` and `post-receive` hooks over SSH without pushing commits.
   - Sets `BONES_FORCE_DEPLOY=1` so manual deploy runs even when `deploy_on_push = false`.
 
+- **server setup**
+  - Runs `.bones/server/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
+  - Passes `deploy_user`, `service_user`, `group`, and `live_root_parent` from `bones.toml` as playbook variables.
+
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
 
