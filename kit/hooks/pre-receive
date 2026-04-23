@@ -3,7 +3,7 @@
 # pre-receive — Remote hook, runs before refs are updated.
 #
 # Runs bonesremote doctor to validate the server environment,
-# then calls pre-deploy to prepare the worktree for deployment.
+# then stages a release directly.
 #
 # GIT_DIR is set by git to the bare repo path.
 
@@ -11,16 +11,20 @@ set -euo pipefail
 
 GIT_DIR="${GIT_DIR:-.}"
 GIT_DIR=$(cd "$GIT_DIR" && pwd)
+HOOKS_LIB="$GIT_DIR/bones/hooks.sh"
 
-HOOKS_DIR="$GIT_DIR/hooks"
-
-echo "[bonesdeploy] Running remote doctor..."
-
-if ! sudo bonesremote doctor; then
-    echo "[bonesdeploy] Remote doctor reported issues. Push rejected."
+if [ ! -f "$HOOKS_LIB" ]; then
+    echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"
     exit 1
 fi
 
-echo "[bonesdeploy] Doctor passed. Running pre-deploy..."
+# shellcheck source=/dev/null
+. "$HOOKS_LIB"
+bones_init_remote_context "$GIT_DIR"
 
-exec "$HOOKS_DIR/pre-deploy"
+main() {
+	bones_run_doctor_remote
+	bones_stage_release
+}
+
+main

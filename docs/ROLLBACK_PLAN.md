@@ -2,14 +2,14 @@
 
 ## Context
 
-Currently, every deploy does `git checkout -f` directly into the worktree (`/var/www/lawsnipe`), overwriting files in-place. There's no way to instantly roll back if something breaks, and persistent files like `.env` and `storage/` get their permissions churned every deploy. This feature introduces Capistrano-style releases: each deploy goes into a timestamped directory, a `current` symlink points to the active release, and rollback is just a symlink swap.
+The legacy model checked out directly into a live worktree path and overwrote files in place. The release model introduced here deploys into timestamped release directories, points `current` at the active release, and performs rollback by repointing that symlink.
 
 No backward compatibility is needed — no one else is using bonesdeploy yet.
 
 ## Target Directory Structure
 
 ```
-/var/www/lawsnipe/
+/srv/deployments/lawsnipe/
 ├── releases/
 │   ├── 20260323_183800/
 │   ├── 20260323_192100/
@@ -21,7 +21,7 @@ No backward compatibility is needed — no one else is using bonesdeploy yet.
 └── current -> releases/20260323_201500/
 ```
 
-Web server document root becomes `/var/www/lawsnipe/current/public`.
+`/var/www/lawsnipe` should be a symlink to `/srv/deployments/lawsnipe/current`.
 
 ## New Config Fields
 
@@ -35,19 +35,21 @@ shared_paths = [".env", "storage", "node_modules"]
 
 ## New Deploy Flow
 
-1. **pre-receive**: `sudo bonesremote doctor` (unchanged), then calls `pre-deploy`
-2. **pre-deploy**: `sudo bonesremote prepare-release --config ...`
-   - Creates `releases/` and `shared/` dirs if missing
-   - Creates `releases/{YYYYMMDD_HHMMSS}/`
-   - Chowns new release dir + shared dir to deploy user
-   - Writes release name to `{git_dir}/bones/.current_release` (hook state file)
-3. **post-receive**: `git checkout -f` into `releases/{timestamp}/` (reads `.current_release`), then calls `deploy`
-4. **deploy**: `cd` into release dir, runs deployment scripts, then calls `sudo bonesremote activate-release --config ...`
-   - Symlinks each shared_path from release dir → `shared/`
-   - Atomically swaps `current` symlink (create tmp link, then `rename`)
-   - Prunes old releases beyond `keep` count
-   - Then calls `post-deploy`
-5. **post-deploy**: `sudo bonesremote post-deploy --config ...`
+1. **pre-receive**: `sudo bonesremote doctor`, then `sudo bonesremote release stage --config ...`
+    - Creates `releases/` and `shared/` dirs if missing
+    - Creates `releases/{YYYYMMDD_HHMMSS}/`
+    - Chowns new release dir + shared dir to deploy user
+    - Writes release name to `{git_dir}/bones/.staged_release` (hook state file)
+2. **post-receive** runs three remote hook commands in order:
+   - `sudo bonesremote hooks post-receive --config ...`
+   - `sudo bonesremote hooks deploy --config ...`
+   - `sudo bonesremote hooks post-deploy --config ...`
+3. **bonesremote hooks post-receive**: `git checkout -f` into `releases/{timestamp}` and wires shared paths.
+4. **bonesremote hooks deploy**: runs deployment scripts, then calls `sudo bonesremote release activate --config ...`
+    - Symlinks each shared_path from release dir → `shared/`
+    - Atomically swaps `current` symlink (create tmp link, then `rename`)
+    - Prunes old releases beyond `keep` count
+5. **bonesremote hooks post-deploy**: hardens permissions on the release dir pointed to by `current` + `shared/`
    - Hardens permissions on the release dir pointed to by `current` + `shared/`
 
 If a deployment script fails at step 4, `current` still points to the previous release. The site stays up.
@@ -58,15 +60,18 @@ If a deployment script fails at step 4, `current` still points to the previous r
 
 | Command | Description |
 |---------|-------------|
-| `prepare-release --config` | Create release dir, chown, write state file |
-| `activate-release --config` | Symlink shared paths, swap `current`, prune old releases |
-| `rollback --config` | Re-point `current` to previous release |
+| `release stage --config` | Create release dir, chown, write state file |
+| `release activate --config` | Symlink shared paths, swap `current`, prune old releases |
+| `release rollback --config` | Re-point `current` to previous release |
+| `hooks post-receive --config` | Checkout into staged release and wire shared paths |
+| `hooks deploy --config` | Run deployment scripts and activate/drop failed release |
+| `hooks post-deploy --config` | Harden permissions on active release + shared paths |
 
 ### bonesdeploy (local CLI)
 
 | Command | Description |
 |---------|-------------|
-| `rollback` | SSH in, run `sudo bonesremote rollback` |
+| `rollback` | SSH in, run `sudo bonesremote release rollback` |
 
 ## Implementation Order
 
@@ -96,7 +101,7 @@ pub releases: Option<Releases>,
 ```
 
 ### Step 2: Refactor permissions.rs
-Extract `harden` logic so it can accept an arbitrary root path instead of always using `worktree`. This allows hardening just the current release + shared dir.
+Extract `harden` logic so it can accept explicit target paths. This allows hardening just the current release + shared dir.
 
 **File:** `crates/bonesremote/src/permissions.rs`
 
@@ -106,32 +111,32 @@ Extract `harden` logic so it can accept an arbitrary root path instead of always
 
 ### Step 3: New remote commands
 **New files:**
-- `crates/bonesremote/src/commands/prepare_release.rs`
+- `crates/bonesremote/src/commands/stage_release.rs`
 - `crates/bonesremote/src/commands/activate_release.rs`
 - `crates/bonesremote/src/commands/rollback.rs`
 
 **Modified:** `crates/bonesremote/src/commands/mod.rs` — register new subcommands
 
-#### prepare_release.rs
+#### stage_release.rs
 1. Load config
-2. Create `{worktree}/releases/` and `{worktree}/shared/` if missing
+2. Create `{deploy_root}/releases/` and `{deploy_root}/shared/` if missing
 3. Generate timestamp: `chrono::Local::now().format("%Y%m%d_%H%M%S")`
-4. Create `{worktree}/releases/{timestamp}/`
+4. Create `{deploy_root}/releases/{timestamp}/`
 5. Chown new release dir + shared dir to deploy user
-6. Write timestamp to `{git_dir}/bones/.current_release`
+6. Write timestamp to `{git_dir}/bones/.staged_release`
 
 Requires adding `chrono` dep to `crates/bonesremote/Cargo.toml`.
 The `--config` arg gives us `bones.toml` path. Derive `git_dir` as the parent of `bones/bones.toml`.
 
 #### activate_release.rs
-1. Load config, read release name from `.current_release`
+1. Load config, read release name from `.staged_release`
 2. For each `shared_paths` entry:
    - If path exists in release dir but not in shared: move it to shared (first deploy seeds shared from checkout)
    - If path doesn't exist in shared: create it (mkdir for dirs, touch for files)
    - Remove path from release dir, create symlink `release/{path}` → `../../shared/{path}`
 3. Atomic symlink swap: `symlink(target, "current.tmp")` then `rename("current.tmp", "current")`
 4. Prune: list `releases/`, sort, remove oldest beyond `keep` (never remove what `current` points to)
-5. Clean up `.current_release` state file
+5. Clean up `.staged_release` state file
 
 #### rollback.rs
 1. Load config
@@ -143,30 +148,19 @@ The `--config` arg gives us `bones.toml` path. Derive `git_dir` as the parent of
 ### Step 4: Update hook templates
 **Files in `kit/hooks/`:**
 
-**pre-deploy** — replace `sudo bonesremote pre-deploy` with `sudo bonesremote prepare-release`
+**pre-receive** — run `sudo bonesremote release stage --config "$BONES_TOML"`
 
-**post-receive** — read `.current_release`, checkout into that release dir:
+**post-receive** — orchestrate all deployment stages via remote hook commands:
 ```bash
-RELEASE_DIR=$(cat "$GIT_DIR/bones/.current_release")
-RELEASE_PATH="$WORKTREE/releases/$RELEASE_DIR"
-git --work-tree="$RELEASE_PATH" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
+sudo bonesremote hooks post-receive --config "$BONES_TOML"
+sudo bonesremote hooks deploy --config "$BONES_TOML"
+sudo bonesremote hooks post-deploy --config "$BONES_TOML"
 ```
-
-**deploy** — cd into release dir instead of worktree, call `activate-release` after scripts succeed:
-```bash
-RELEASE_DIR=$(cat "$GIT_DIR/bones/.current_release")
-RELEASE_PATH="$WORKTREE/releases/$RELEASE_DIR"
-cd "$RELEASE_PATH"
-# ... run deployment scripts ...
-sudo bonesremote activate-release --config "$BONES_TOML"
-```
-
-**post-deploy** — unchanged (the remote command internally resolves `current` → release dir)
 
 ### Step 5: Local rollback command
 **New file:** `crates/bonesdeploy/src/commands/rollback.rs`
 
-Same pattern as `redeploy.rs`: load config, SSH in, `stream_cmd` to run `sudo bonesremote rollback --config ...`.
+Same pattern as `redeploy.rs`: load config, SSH in, `stream_cmd` to run `sudo bonesremote release rollback --config ...`.
 
 **Modified:** `crates/bonesdeploy/src/commands/mod.rs` — add `Rollback` variant
 

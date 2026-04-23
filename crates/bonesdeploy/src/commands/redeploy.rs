@@ -14,29 +14,15 @@ pub async fn run() -> Result<()> {
 
     let git_dir = &cfg.data.git_dir;
 
-    println!(
-        "Redeploying {} on {}...",
-        style(&cfg.data.project_name).cyan().bold(),
-        style(&cfg.data.host).cyan()
-    );
+    println!("Redeploying {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
 
     let session = ssh::connect(&cfg).await?;
 
-    // Run pre-receive (doctor + pre-deploy)
     println!("Running pre-receive...");
-    ssh::stream_cmd(
-        &session,
-        &format!("GIT_DIR={git_dir} {git_dir}/hooks/pre-receive </dev/null"),
-    )
-    .await?;
+    ssh::stream_cmd(&session, &format!("GIT_DIR='{git_dir}' '{git_dir}/hooks/pre-receive' </dev/null")).await?;
 
-    // Run post-receive (checkout + deploy + post-deploy)
     println!("Running post-receive...");
-    ssh::stream_cmd(
-        &session,
-        &format!("GIT_DIR={git_dir} {git_dir}/hooks/post-receive </dev/null"),
-    )
-    .await?;
+    ssh::stream_cmd(&session, &format!("GIT_DIR='{git_dir}' '{git_dir}/hooks/post-receive' </dev/null")).await?;
 
     session.close().await?;
 

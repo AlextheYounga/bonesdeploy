@@ -6,11 +6,7 @@ use crate::config::BonesConfig;
 
 pub async fn connect(config: &BonesConfig) -> Result<Session> {
     let host = &config.data.host;
-    let port: u16 = config
-        .data
-        .port
-        .parse()
-        .with_context(|| format!("Invalid port: {}", config.data.port))?;
+    let port: u16 = config.data.port.parse().with_context(|| format!("Invalid port: {}", config.data.port))?;
     let user = &config.permissions.defaults.deploy;
 
     let session = SessionBuilder::default()
@@ -52,8 +48,8 @@ pub async fn stream_cmd(session: &Session, cmd: &str) -> Result<()> {
         .await
         .with_context(|| format!("Failed to execute remote command: {cmd}"))?;
 
-    let stdout = child.stdout().take().expect("stdout was piped");
-    let stderr = child.stderr().take().expect("stderr was piped");
+    let stdout = child.stdout().take().ok_or_else(|| anyhow::anyhow!("stdout was not piped"))?;
+    let stderr = child.stderr().take().ok_or_else(|| anyhow::anyhow!("stderr was not piped"))?;
 
     let stdout_task = tokio::spawn(async move {
         let reader = BufReader::new(stdout);
@@ -74,10 +70,7 @@ pub async fn stream_cmd(session: &Session, cmd: &str) -> Result<()> {
     // Drain both streams concurrently before checking exit status
     let _ = tokio::join!(stdout_task, stderr_task);
 
-    let status = child
-        .wait()
-        .await
-        .context("Failed to wait for remote command")?;
+    let status = child.wait().await.context("Failed to wait for remote command")?;
 
     if !status.success() {
         bail!("Remote command failed: {cmd}");
@@ -88,14 +81,7 @@ pub async fn stream_cmd(session: &Session, cmd: &str) -> Result<()> {
 
 pub async fn create_bare_repo(session: &Session, git_dir: &str) -> Result<()> {
     let check = format!("test -d {git_dir}");
-    if session
-        .command("bash")
-        .arg("-c")
-        .arg(&check)
-        .status()
-        .await?
-        .success()
-    {
+    if session.command("bash").arg("-c").arg(&check).status().await?.success() {
         println!("Bare repo already exists at {git_dir}");
         return Ok(());
     }
@@ -105,17 +91,12 @@ pub async fn create_bare_repo(session: &Session, git_dir: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn upload_post_receive(
-    session: &Session,
-    git_dir: &str,
-    hook_content: &str,
-) -> Result<()> {
+pub async fn upload_post_receive(session: &Session, git_dir: &str, hook_content: &str) -> Result<()> {
     let hook_path = format!("{git_dir}/hooks/post-receive");
 
     // Write hook content via heredoc
-    let cmd = format!(
-        "cat > '{hook_path}' << 'BONESDEPLOY_EOF'\n{hook_content}\nBONESDEPLOY_EOF\nchmod +x '{hook_path}'"
-    );
+    let cmd =
+        format!("cat > '{hook_path}' << 'BONESDEPLOY_EOF'\n{hook_content}\nBONESDEPLOY_EOF\nchmod +x '{hook_path}'");
     run_cmd(session, &cmd).await?;
     println!("Uploaded post-receive hook to {hook_path}");
     Ok(())

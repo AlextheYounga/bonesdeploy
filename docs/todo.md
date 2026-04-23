@@ -10,7 +10,7 @@
 - [x] Implement load/save for local config (`.bones/bones.toml`)
 - [x] Set up `rust-embed` pointing at `kit/` in `bonesdeploy/src/embedded.rs`
 - [x] Write scaffold extraction: create `.bones/` directory tree from embedded assets
-- [x] Write the kit hook scripts (pre-push, pre-receive, pre-deploy, post-receive, deploy, post-deploy)
+- [x] Write the kit hook scripts (pre-push, pre-receive, post-receive) and shared hook library (`hooks.sh`)
 
 ## Phase 3: bonesdeploy init
 - [x] Implement `prompts.rs` using inquire (collect all bones.toml fields with defaults)
@@ -55,9 +55,10 @@
 - [x] Check `bonesremote` can run without password (sudo -n)
 - [x] Check `bonesremote` is globally available (which/command -v)
 
-## Phase 9: bonesremote pre-deploy & post-deploy
+## Phase 9: bonesremote release + hook commands
 - [x] Implement `config.rs` for remote (discover `bones.toml` relative to bare repo)
-- [x] `pre-deploy`: chown worktree to deploy user
+- [x] `release stage|wire|activate|drop-failed|rollback`
+- [x] `hooks post-receive|deploy|post-deploy`
 - [x] `post-deploy`: implement `permissions.rs`
   - [x] Apply default ownership (service_user:service_group)
   - [x] Apply default dir_mode and file_mode
