@@ -1,6 +1,6 @@
-# GitBones v3
+# BonesDeploy v3
 
-A Rust CLI that compiles into a single binary, containing embeds of boilerplate scripts along with other git remote helpers. It produces two executables: `gitbones` (local CLI for setup and management) and `gitbones-remote` (server-side tool for remote operations, installed on the deployment host).
+A Rust CLI that compiles into a single binary, containing embeds of boilerplate scripts along with other git remote helpers. It produces two executables: `bonesdeploy` (local CLI for setup and management) and `bonesremote` (server-side tool for remote operations, installed on the deployment host).
 
 ## Deployment Methodology
 We have an SSH deployment user (normally `git`) that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a service user: `applications`. This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
@@ -11,7 +11,7 @@ We have an SSH deployment user (normally `git`) that handles deployment concerns
 - Setting up inotify systems are cumbersome.
 
 ### Proposed Solution of This Project
-We create a `gitbones-remote` executable that does not require a password and allows it to change ownership to a deploy user and harden back the permissions based on what is configured under `permissions` in bones.toml. Running `gitbones-remote init` on the remote (as sudo) installs a drop-in file at `/etc/sudoers.d/gitbones`, allowing the `git` user to run gitbones-remote without password.
+We create a `bonesremote` executable that does not require a password and allows it to change ownership to a deploy user and harden back the permissions based on what is configured under `permissions` in bones.toml. Running `bonesremote init` on the remote (as sudo) installs a drop-in file at `/etc/sudoers.d/bonesdeploy`, allowing the `git` user to run bonesremote without password.
 
 ## Bones Scaffolding
 .bones  
@@ -28,7 +28,7 @@ We create a `gitbones-remote` executable that does not require a password and al
     └── pre-receive  
 
 ### Bones Toml
-This stores crucial data we will need and is collected on running `gitbones init` via user prompts.  
+This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
 Collects the following project information from the user:  
 - `remote_name`: str (production, staging, etc.)  
 - `project_name`: str  
@@ -89,14 +89,14 @@ type      = "file"
 ```
 
 ### Hooks
-Hooks are static shell scripts embedded in the `gitbones` binary. They are written to `.bones/hooks/` once during `gitbones init`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `gitbones push`.
+Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push`.
 
-- `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our gitbones designated remote. If so, then we run `gitbones doctor` and we fail if the doctor command expresses any warning or errors.  
-- `pre-receive` => This runs `gitbones-remote doctor` and fails if there are any warnings or errors. Then we call `pre-deploy`.
-- `pre-deploy` => This runs `gitbones-remote pre-deploy`, which changes the permissions of the worktree to be owned by the ssh_user, which is necessary in order to run deployment scripts from this user. `gitbones-remote` will be allowlisted in the sudoers file. 
+- `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor` and we fail if the doctor command expresses any warning or errors.  
+- `pre-receive` => This runs `bonesremote doctor` and fails if there are any warnings or errors. Then we call `pre-deploy`.
+- `pre-deploy` => This runs `bonesremote pre-deploy`, which changes the permissions of the worktree to be owned by the ssh_user, which is necessary in order to run deployment scripts from this user. `bonesremote` will be allowlisted in the sudoers file. 
 - `post-receive` => Update our git worktree to the latest commit (standard git deployment flow). Then it will call our custom git-hook, `deploy`.  
 - `deploy` => Our custom meta caller. This will scan our `{project_name}.git/bones/deployment` folder and run these scripts sequentially. 
-- `post-deploy` => Runs `gitbones-remote post-deploy`, which sets permissions back to our service user as detailed in bones.toml
+- `post-deploy` => Runs `bonesremote post-deploy`, which sets permissions back to our service user as detailed in bones.toml
 
 ### Deployment Folder
 This folder stores deployment scripts to be called by `deploy`. Files in this folder must be ordered sequentially like `01_run_deployment_concerns.sh` and `02_lockup_permissions.sh`. They are named in numerical order and all of these scripts are always run.
@@ -105,14 +105,14 @@ This folder stores deployment scripts to be called by `deploy`. Files in this fo
 This Cargo workspace has two crates under `crates/`, each with its own dependencies. There is no shared lib crate; the `bones.toml` structs are duplicated since each binary discovers and uses config differently.
 
 ```
-gitbones/
+bonesdeploy/
 ├── Cargo.toml                  # workspace root
 ├── kit/                        # embedded assets (scaffolding templates)
 │   ├── bones.toml
 │   ├── deployment/
 │   └── hooks/
 ├── crates/
-│   ├── gitbones/               # local CLI binary
+│   ├── bonesdeploy/               # local CLI binary
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       ├── main.rs         # clap setup, command dispatch
@@ -127,7 +127,7 @@ gitbones/
 │   │       ├── git.rs          # git2 operations: read remote URLs, repo validation
 │   │       ├── prompts.rs      # interactive user input collection, returns config
 │   │       └── ssh.rs          # openssh session management + rsync
-│   └── gitbones-remote/        # server-side binary
+│   └── bonesremote/        # server-side binary
 │       ├── Cargo.toml
 │       └── src/
 │           ├── main.rs
@@ -160,10 +160,10 @@ gitbones/
     - `.bones` folder is set up correctly. Deployment scripts are named appropriately.
     - Local `pre-push` hook is symlinked properly.
   - Runs remote checks (skipped with `--local`):
-    - `gitbones-remote` executable exists on remote and can be run globally.
-    - `{project_name}.git/bones` folder exists on remote (needs `gitbones push` warning)
+    - `bonesremote` executable exists on remote and can be run globally.
+    - `{project_name}.git/bones` folder exists on remote (needs `bonesdeploy push` warning)
     - `{project_name}.git/bones/hooks` matches with `{project_name}.git/hooks` inside the remote bare repo.
-  - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag since the remote is independently validated by `gitbones-remote doctor` in the `pre-receive` hook.
+  - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag since the remote is independently validated by `bonesremote doctor` in the `pre-receive` hook.
 
 - **push**
   - Uses an `rsync -av --delete` command to push up our local `.bones` folder to the bare repo.
@@ -172,37 +172,37 @@ gitbones/
   - Runs commands on remote that symlinks our `{project_name}.git/bones/hooks` files are symlinked with `{project_name}.git/hooks` properly.
 
 - **version**:
-  - Echoes "gitbones 0.1.0".
+  - Echoes "bonesdeploy 0.1.0".
 
 ### GitbonesRemote CLI Commands
 - **init**:
   - Must be run as sudo.
-  - Installs a drop-in file at `/etc/sudoers.d/gitbones` to allow `gitbones-remote` commands without requiring password.
+  - Installs a drop-in file at `/etc/sudoers.d/bonesdeploy` to allow `bonesremote` commands without requiring password.
 - **doctor**:
   - Checks to see if the server is set up properly:
-    - `gitbones-remote` can be run without requiring password
-    - `gitbones-remote` is globally available.
+    - `bonesremote` can be run without requiring password
+    - `bonesremote` is globally available.
 - **pre-deploy**
 	- Sets all file ownership to git for the deployment. 
 - **post-deploy**
 	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.toml`, like for instance setting everything back to be owned by the service user. 
 - **version**:
-  - Echoes "gitbones 0.1.0".
+  - Echoes "bonesdeploy 0.1.0".
 
 ## Security Notes
-- Sudo access for the deployment user is strictly limited to passwordless execution of gitbones-remote commands via /etc/sudoers configuration.
+- Sudo access for the deployment user is strictly limited to passwordless execution of bonesremote commands via /etc/sudoers configuration.
 - No broader sudo privileges are granted.
 - All operations are audited through system logs.
 
 ## Flow
-- User runs `gitbones init`, and the procedures outlined above are executed.
+- User runs `bonesdeploy init`, and the procedures outlined above are executed.
 - User can make any changes to their deployment scripts or hooks in `.bones/` (e.g., customizing `deployment/` files or adding project-specific logic).
-- User runs `gitbones push` to sync the `.bones/` folder to the remote bare repo.
+- User runs `bonesdeploy push` to sync the `.bones/` folder to the remote bare repo.
 - User runs `git push production master` or some similar command where the remote name aligns with our bones.toml configuration.
-- The `pre-push` hook checks to see if we are pushing to our bones remote (in this example, `production`). If so, it runs `gitbones doctor` and fails on warnings/errors.
-- On remote: `pre-receive` runs `gitbones-remote doctor` (fails on issues), then calls `pre-deploy` (which runs `gitbones-remote pre-deploy` for ownership changes).
+- The `pre-push` hook checks to see if we are pushing to our bones remote (in this example, `production`). If so, it runs `bonesdeploy doctor` and fails on warnings/errors.
+- On remote: `pre-receive` runs `bonesremote doctor` (fails on issues), then calls `pre-deploy` (which runs `bonesremote pre-deploy` for ownership changes).
 - `post-receive` updates the worktree to the latest commit, then calls `deploy` (runs all `deployment/` scripts sequentially).
-- Finally, `post-deploy` calls `gitbones-remote post-deploy` to harden permissions based on bones.toml.
+- Finally, `post-deploy` calls `bonesremote post-deploy` to harden permissions based on bones.toml.
 
 ## Cargo Dependencies
 - clap

@@ -8,7 +8,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "gitbones-remote", about = "Server-side git deployment tool")]
+#[command(name = "bonesremote", about = "Server-side git deployment tool")]
 pub struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -16,7 +16,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Install sudoers drop-in for passwordless gitbones-remote
+    /// Install sudoers drop-in for passwordless bonesremote
     Init,
     /// Check server environment health
     Doctor,

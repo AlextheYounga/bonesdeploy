@@ -27,7 +27,7 @@ pub async fn run() -> Result<()> {
          5. Create a bare repo on the remote (if needed)\n  \
          6. Upload the post-receive hook to the remote\n\n\
          A git remote URL must already be configured for the deployment remote.\n",
-        style("gitbones init").bold()
+        style("bonesdeploy init").bold()
     );
 
     let proceed = Confirm::new("Continue?").with_default(true).prompt()?;
@@ -87,7 +87,7 @@ pub async fn run() -> Result<()> {
     println!(
         "\n{} Run {} to sync .bones/ to the remote.",
         style("Done!").green().bold(),
-        style("gitbones push").cyan()
+        style("bonesdeploy push").cyan()
     );
 
     Ok(())

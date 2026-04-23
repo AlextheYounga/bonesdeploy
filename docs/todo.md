@@ -1,18 +1,18 @@
-# GitBones TODO
+# BonesDeploy TODO
 
 ## Phase 1: Workspace & Scaffolding
-- [x] Convert to Cargo workspace with `crates/gitbones` and `crates/gitbones-remote`
+- [x] Convert to Cargo workspace with `crates/bonesdeploy` and `crates/bonesremote`
 - [x] Set up clap CLI skeleton for both binaries (subcommands, help text)
 - [x] Wire up `version` command for both binaries
 
 ## Phase 2: Config & Embedded Assets
-- [x] Define `bones.toml` serde structs in `gitbones/src/config.rs`
+- [x] Define `bones.toml` serde structs in `bonesdeploy/src/config.rs`
 - [x] Implement load/save for local config (`.bones/bones.toml`)
-- [x] Set up `rust-embed` pointing at `kit/` in `gitbones/src/embedded.rs`
+- [x] Set up `rust-embed` pointing at `kit/` in `bonesdeploy/src/embedded.rs`
 - [x] Write scaffold extraction: create `.bones/` directory tree from embedded assets
 - [x] Write the kit hook scripts (pre-push, pre-receive, pre-deploy, post-receive, deploy, post-deploy)
 
-## Phase 3: gitbones init
+## Phase 3: bonesdeploy init
 - [x] Implement `prompts.rs` using inquire (collect all bones.toml fields with defaults)
 - [x] Implement `git.rs` (read remote URL from git2, validate repo state)
 - [x] Implement init command orchestration:
@@ -24,38 +24,38 @@
   - [x] Save config to `.bones/bones.toml`
 - [x] Symlink `.bones/hooks/pre-push` to `.git/hooks/pre-push`
 
-## Phase 4: SSH & Remote Setup (gitbones init, continued)
+## Phase 4: SSH & Remote Setup (bonesdeploy init, continued)
 - [x] Implement `ssh.rs` (openssh session from host/port/deploy_user in config)
 - [x] Create bare repo on remote if it doesn't exist
 - [x] Upload post-receive hook to remote bare repo
 
-## Phase 5: gitbones push
+## Phase 5: bonesdeploy push
 - [x] Implement rsync of `.bones/` to `{git_dir}/bones/` on remote
 - [x] Delete sample hooks from remote bare repo `{git_dir}/hooks/`
 - [x] Symlink `{git_dir}/bones/hooks/*` to `{git_dir}/hooks/` on remote
 
-## Phase 6: gitbones doctor
+## Phase 6: bonesdeploy doctor
 - [x] Local checks:
   - [x] `.bones/` folder structure is valid
   - [x] Deployment scripts follow naming convention
   - [x] `pre-push` hook is symlinked to `.git/hooks/pre-push`
 - [x] Remote checks (over SSH, skipped with `--local`):
-  - [x] `gitbones-remote` is globally available on remote
+  - [x] `bonesremote` is globally available on remote
   - [x] `{git_dir}/bones/` exists on remote
   - [x] `{git_dir}/bones/hooks/` entries match `{git_dir}/hooks/` symlinks
-- [x] Implement `--local` flag (pre-push hook uses this since remote is validated independently by gitbones-remote doctor)
+- [x] Implement `--local` flag (pre-push hook uses this since remote is validated independently by bonesremote doctor)
 
-## Phase 7: gitbones-remote init
-- [x] Define `bones.toml` serde structs in `gitbones-remote/src/config.rs`
+## Phase 7: bonesremote init
+- [x] Define `bones.toml` serde structs in `bonesremote/src/config.rs`
 - [x] Check that command is run as root/sudo
-- [x] Write `/etc/sudoers.d/gitbones` drop-in file
+- [x] Write `/etc/sudoers.d/bonesdeploy` drop-in file
 - [x] Validate with `visudo -c`
 
-## Phase 8: gitbones-remote doctor
-- [x] Check `gitbones-remote` can run without password (sudo -n)
-- [x] Check `gitbones-remote` is globally available (which/command -v)
+## Phase 8: bonesremote doctor
+- [x] Check `bonesremote` can run without password (sudo -n)
+- [x] Check `bonesremote` is globally available (which/command -v)
 
-## Phase 9: gitbones-remote pre-deploy & post-deploy
+## Phase 9: bonesremote pre-deploy & post-deploy
 - [x] Implement `config.rs` for remote (discover `bones.toml` relative to bare repo)
 - [x] `pre-deploy`: chown worktree to deploy user
 - [x] `post-deploy`: implement `permissions.rs`

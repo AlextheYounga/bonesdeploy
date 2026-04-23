@@ -2,7 +2,7 @@
 #
 # post-deploy — Remote hook, called by deploy.
 #
-# Runs gitbones-remote post-deploy, which hardens permissions
+# Runs bonesremote post-deploy, which hardens permissions
 # back to the service user as configured in bones.toml.
 #
 # GIT_DIR is set by git to the bare repo path.
@@ -14,11 +14,11 @@ GIT_DIR=$(cd "$GIT_DIR" && pwd)
 
 BONES_TOML="$GIT_DIR/bones/bones.toml"
 
-echo "[gitbones] Running post-deploy (hardening permissions)..."
+echo "[bonesdeploy] Running post-deploy (hardening permissions)..."
 
-if ! sudo gitbones-remote post-deploy --config "$BONES_TOML"; then
-    echo "[gitbones] post-deploy failed."
+if ! sudo bonesremote post-deploy --config "$BONES_TOML"; then
+    echo "[bonesdeploy] post-deploy failed."
     exit 1
 fi
 
-echo "[gitbones] post-deploy complete. Deployment finished."
+echo "[bonesdeploy] post-deploy complete. Deployment finished."

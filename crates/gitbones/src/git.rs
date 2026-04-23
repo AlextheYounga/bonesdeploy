@@ -11,7 +11,7 @@ pub fn validate_remote_exists(repo: &Repository, remote_name: &str) -> Result<()
     if !exists {
         bail!(
             "No git remote '{remote_name}' found. \
-             Please set one up before running gitbones init:\n  \
+             Please set one up before running bonesdeploy init:\n  \
              git remote add {remote_name} git@<host>:<repo>.git"
         );
     }

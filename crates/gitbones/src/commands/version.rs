@@ -1,3 +1,3 @@
 pub fn run() {
-    println!("gitbones {}", env!("CARGO_PKG_VERSION"));
+    println!("bonesdeploy {}", env!("CARGO_PKG_VERSION"));
 }

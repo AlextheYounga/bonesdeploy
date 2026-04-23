@@ -1,61 +1,61 @@
-# GitBones ☠️
+# BonesDeploy ☠️
 
 ## Git Deployments with a Spine in a Framework as Skinny as Bones 🏴‍☠️
 
-A drop-in Rust deployment system for git-based deployments over SSH. GitBones scaffolds hook scripts and deployment configs into your repo, syncs them to a remote bare repository, and manages file ownership and permissions across deploys without forcing containers, a control plane, or a platform layer.
+A drop-in Rust deployment system for git-based deployments over SSH. BonesDeploy scaffolds hook scripts and deployment configs into your repo, syncs them to a remote bare repository, and manages file ownership and permissions across deploys without forcing containers, a control plane, or a platform layer.
 
 It produces two binaries:
-- **`gitbones`** — local CLI for setup and management
-- **`gitbones-remote`** — server-side tool for remote operations, installed on the deployment host
+- **`bonesdeploy`** — local CLI for setup and management
+- **`bonesremote`** — server-side tool for remote operations, installed on the deployment host
 
-## Why GitBones
+## Why BonesDeploy
 
-GitBones is built for developers who want `git push` deployments without handing deployment over to a PaaS or rebuilding everything around Docker.
+BonesDeploy is built for developers who want `git push` deployments without handing deployment over to a PaaS or rebuilding everything around Docker.
 
 - **Drop-in** — add it to an existing repo, scaffold `.bones/`, and deploy over your existing SSH + bare repo workflow
 - **Git-native** — hooks, remotes, and bare repos stay the source of truth instead of hiding deployment behind a daemon
-- **Permission-aware** — GitBones treats deploy-user to service-user handoff as a first-class concern instead of leaving shared groups or ACL sprawl behind
+- **Permission-aware** — BonesDeploy treats deploy-user to service-user handoff as a first-class concern instead of leaving shared groups or ACL sprawl behind
 - **Self-hosted and lightweight** — ideal for VPSes, old servers, and Raspberry Pis where simplicity matters more than orchestration
-- **Editable by design** — the generated hooks and deployment scripts are yours; GitBones gives you structure, not lock-in
+- **Editable by design** — the generated hooks and deployment scripts are yours; BonesDeploy gives you structure, not lock-in
 
-If you want a Heroku-style abstraction layer, use a platform. If you want a disciplined, transparent deployment skeleton that drops into a normal Linux box, use GitBones.
+If you want a Heroku-style abstraction layer, use a platform. If you want a disciplined, transparent deployment skeleton that drops into a normal Linux box, use BonesDeploy.
 
 ## How It Works
 
-GitBones uses a two-user deployment model:
+BonesDeploy uses a two-user deployment model:
 
 1. A **deploy user** (default: `git`) handles SSH access and runs deployment scripts. This user has restricted sudo ability but no password login.
 2. A **service user** (default: `applications`) owns the deployed files. This user has no home folder, no login, and no sudo ability — limiting attack scope.
 
-During deployment, `gitbones-remote` temporarily changes file ownership to the deploy user so scripts can write, then hardens permissions back to the service user afterward. The sudoers configuration is strictly limited to `gitbones-remote` commands only.
+During deployment, `bonesremote` temporarily changes file ownership to the deploy user so scripts can write, then hardens permissions back to the service user afterward. The sudoers configuration is strictly limited to `bonesremote` commands only.
 
 This gives you a clean privilege boundary:
 
 - the **deploy user** can connect and deploy
 - the **service user** ends up owning the app
-- `gitbones-remote` is the only privileged bridge between those two phases
+- `bonesremote` is the only privileged bridge between those two phases
 
 ## Installation
 
-### Local (gitbones)
+### Local (bonesdeploy)
 
 ```sh
-cargo install --git https://github.com/AlextheYounga/gitbones.git gitbones
+cargo install --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
 ```
 
-### Server (gitbones-remote)
+### Server (bonesremote)
 
 ```sh
-sudo cargo install --root /usr/local --git https://github.com/AlextheYounga/gitbones.git gitbones-remote --force
+sudo cargo install --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
 Then run the one-time server setup as root:
 
 ```sh
-sudo gitbones-remote init
+sudo bonesremote init
 ```
 
-This installs a sudoers drop-in at `/etc/sudoers.d/gitbones` so the deploy user can run `gitbones-remote` without a password.
+This installs a sudoers drop-in at `/etc/sudoers.d/bonesdeploy` so the deploy user can run `bonesremote` without a password.
 
 ## Usage
 
@@ -64,7 +64,7 @@ This installs a sudoers drop-in at `/etc/sudoers.d/gitbones` so the deploy user 
 In your project repository:
 
 ```sh
-gitbones init
+bonesdeploy init
 ```
 
 This will:
@@ -86,7 +86,7 @@ git remote add production git@deploy.example.com:/home/git/myproject.git
 After editing hooks or deployment scripts in `.bones/`:
 
 ```sh
-gitbones push
+bonesdeploy push
 ```
 
 This rsyncs `.bones/` to the remote bare repo and symlinks the hooks.
@@ -100,8 +100,8 @@ git push production master
 ```
 
 The hook chain handles the rest:
-1. **pre-push** (local) — runs `gitbones doctor --local`
-2. **pre-receive** (remote) — runs `gitbones-remote doctor`, then `pre-deploy`
+1. **pre-push** (local) — runs `bonesdeploy doctor --local`
+2. **pre-receive** (remote) — runs `bonesremote doctor`, then `pre-deploy`
 3. **pre-deploy** (remote) — changes worktree ownership to deploy user
 4. **post-receive** (remote) — checks out latest commit to worktree
 5. **deploy** (remote) — runs scripts in `.bones/deployment/` sequentially
@@ -110,13 +110,13 @@ The hook chain handles the rest:
 ### Health Checks
 
 ```sh
-gitbones doctor          # check local + remote
-gitbones doctor --local  # check local only
+bonesdeploy doctor          # check local + remote
+bonesdeploy doctor --local  # check local only
 ```
 
 ## Configuration
 
-`gitbones init` generates `.bones/bones.toml`:
+`bonesdeploy init` generates `.bones/bones.toml`:
 
 ```toml
 [data]
@@ -144,7 +144,7 @@ mode = "660"
 type = "file"
 ```
 
-Remote host and port are not stored separately in `bones.toml`. GitBones reads that information from the URL configured with `git remote add`.
+Remote host and port are not stored separately in `bones.toml`. BonesDeploy reads that information from the URL configured with `git remote add`.
 
 ## Project Structure
 
@@ -166,7 +166,7 @@ Hooks are written to `.bones/hooks/` once during init. After that they belong to
 
 ## Good Fit
 
-GitBones is a strong fit when you want:
+BonesDeploy is a strong fit when you want:
 
 - direct Linux deploys over SSH
 - simple app hosting on one machine at a time
@@ -174,7 +174,7 @@ GitBones is a strong fit when you want:
 - a lightweight alternative to container-first deployment stacks
 - something you can run comfortably on low-cost hosts and Raspberry Pis
 
-GitBones can still deploy Docker-based apps if your deployment scripts call `docker compose`, but Docker is optional rather than the foundation.
+BonesDeploy can still deploy Docker-based apps if your deployment scripts call `docker compose`, but Docker is optional rather than the foundation.
 
 ## License
 
