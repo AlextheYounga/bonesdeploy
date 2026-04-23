@@ -23,16 +23,16 @@ STAGED_RELEASE=$(tr -d '[:space:]' < "$STAGED_RELEASE_FILE")
 RELEASE_PATH="$DEPLOY_ROOT/releases/$STAGED_RELEASE"
 
 if [ -z "$DEPLOY_ROOT" ] || [ -z "$BRANCH" ] || [ -z "$STAGED_RELEASE" ]; then
-    echo "[gitbones] Error: Could not read deploy_root, branch, or staged release state"
+    echo "[bonesdeploy] Error: Could not read deploy_root, branch, or staged release state"
     exit 1
 fi
 
-echo "[gitbones] Checking out $BRANCH to $RELEASE_PATH..."
+echo "[bonesdeploy] Checking out $BRANCH to $RELEASE_PATH..."
 
 git --work-tree="$RELEASE_PATH" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
 
-echo "[gitbones] Wiring shared paths for staged release..."
-sudo gitbones-remote release wire --config "$BONES_TOML"
+echo "[bonesdeploy] Wiring shared paths for staged release..."
+sudo bonesremote release wire --config "$BONES_TOML"
 
 echo "[bonesdeploy] Checkout complete. Running deploy..."
 

@@ -96,7 +96,7 @@ Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are wr
 - `pre-deploy` => This runs `bonesremote pre-deploy`, which changes the permissions of the worktree to be owned by the ssh_user, which is necessary in order to run deployment scripts from this user. `bonesremote` will be allowlisted in the sudoers file. 
 - `post-receive` => Update our git worktree to the latest commit (standard git deployment flow). Then it will call our custom git-hook, `deploy`.  
 - `deploy` => Our custom meta caller. This will scan our `{project_name}.git/bones/deployment` folder and run these scripts sequentially. 
-- `post-deploy` => Runs `gitbones-remote hooks post-deploy`, which sets permissions back to our service user as detailed in bones.toml
+- `post-deploy` => Runs `bonesremote hooks post-deploy`, which sets permissions back to our service user as detailed in bones.toml
 
 ### Deployment Folder
 This folder stores deployment scripts to be called by `deploy`. Files in this folder must be ordered sequentially like `01_run_deployment_concerns.sh` and `02_lockup_permissions.sh`. They are named in numerical order and all of these scripts are always run.
@@ -143,7 +143,7 @@ bonesdeploy/
 └── docs/
 ```
 
-### Gitbones CLI Commands
+### BonesDeploy CLI Commands
 - **init**:
   - Informs the user that there should be a remote git url set up, explains what's going to happen, and then asks the user for permission to proceed.
   - Gets or creates the `.bones` folder with our default scaffolding.
@@ -174,7 +174,7 @@ bonesdeploy/
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
 
-### GitbonesRemote CLI Commands
+### BonesDeployRemote CLI Commands
 - **init**:
   - Must be run as sudo.
   - Installs a drop-in file at `/etc/sudoers.d/bonesdeploy` to allow `bonesremote` commands without requiring password.
@@ -202,7 +202,7 @@ bonesdeploy/
 - The `pre-push` hook checks to see if we are pushing to our bones remote (in this example, `production`). If so, it runs `bonesdeploy doctor` and fails on warnings/errors.
 - On remote: `pre-receive` runs `bonesremote doctor` (fails on issues), then calls `pre-deploy` (which runs `bonesremote pre-deploy` for ownership changes).
 - `post-receive` updates the worktree to the latest commit, then calls `deploy` (runs all `deployment/` scripts sequentially).
-- Finally, `post-deploy` calls `gitbones-remote hooks post-deploy` to harden permissions based on bones.toml.
+- Finally, `post-deploy` calls `bonesremote hooks post-deploy` to harden permissions based on bones.toml.
 
 ## Cargo Dependencies
 - clap

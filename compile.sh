@@ -1,4 +1,4 @@
 cargo build --release
-cp ./target/release/gitbones ./bin/
-cp ./target/release/gitbones-remote ./bin/
+cp ./target/release/bonesdeploy ./bin/
+cp ./target/release/bonesremote ./bin/
 

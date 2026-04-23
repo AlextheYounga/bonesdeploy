@@ -20,21 +20,21 @@ WORKTREE=$(grep -E '^worktree\s*=' "$BONES_TOML" | head -1 | sed 's/.*=\s*"\(.*\
 BRANCH=$(grep -E '^branch\s*=' "$BONES_TOML" | head -1 | sed 's/.*=\s*"\(.*\)"/\1/')
 
 if [ -z "$WORKTREE" ] || [ -z "$BRANCH" ]; then
-    echo "[gitbones] Error: Could not read worktree or branch from $BONES_TOML"
+    echo "[bonesdeploy] Error: Could not read worktree or branch from $BONES_TOML"
     exit 1
 fi
 
 # Enter maintenance mode before checkout so the live worktree
 # is never served in a half-written state.
 if [ -f "$WORKTREE/artisan" ]; then
-    echo "[gitbones] Entering maintenance mode before checkout..."
+    echo "[bonesdeploy] Entering maintenance mode before checkout..."
     php "$WORKTREE/artisan" down || true
 fi
 
-echo "[gitbones] Checking out $BRANCH to $WORKTREE..."
+echo "[bonesdeploy] Checking out $BRANCH to $WORKTREE..."
 
 git --work-tree="$WORKTREE" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
 
-echo "[gitbones] Checkout complete. Running deploy..."
+echo "[bonesdeploy] Checkout complete. Running deploy..."
 
 exec "$HOOKS_DIR/deploy"

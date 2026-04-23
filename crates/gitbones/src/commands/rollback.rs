@@ -17,7 +17,7 @@ pub async fn run() -> Result<()> {
     println!("Rolling back {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
 
     let session = ssh::connect(&cfg).await?;
-    let command = format!("sudo gitbones-remote release rollback --config '{remote_bones_toml}'");
+    let command = format!("sudo bonesremote release rollback --config '{remote_bones_toml}'");
     ssh::stream_cmd(&session, &command).await?;
     session.close().await?;
 

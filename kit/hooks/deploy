@@ -22,7 +22,7 @@ STAGED_RELEASE=$(tr -d '[:space:]' < "$STAGED_RELEASE_FILE")
 RELEASE_PATH="$DEPLOY_ROOT/releases/$STAGED_RELEASE"
 
 if [ -z "$DEPLOY_ROOT" ] || [ -z "$STAGED_RELEASE" ]; then
-    echo "[gitbones] Error: Could not read deploy_root or staged release state"
+    echo "[bonesdeploy] Error: Could not read deploy_root or staged release state"
     exit 1
 fi
 
@@ -37,8 +37,8 @@ else
         echo "[bonesdeploy] Running $(basename "$script")..."
 
         if ! bash "$script"; then
-            echo "[gitbones] Deployment script $(basename "$script") failed."
-            sudo gitbones-remote release drop-failed --config "$BONES_TOML"
+            echo "[bonesdeploy] Deployment script $(basename "$script") failed."
+            sudo bonesremote release drop-failed --config "$BONES_TOML"
             exit 1
         fi
     done
@@ -46,8 +46,8 @@ else
     echo "[bonesdeploy] All deployment scripts completed."
 fi
 
-sudo gitbones-remote release activate --config "$BONES_TOML"
+sudo bonesremote release activate --config "$BONES_TOML"
 
-echo "[gitbones] Running post-deploy..."
+echo "[bonesdeploy] Running post-deploy..."
 
 exec "$HOOKS_DIR/post-deploy"

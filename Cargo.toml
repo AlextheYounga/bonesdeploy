@@ -1,5 +1,5 @@
 [workspace]
 resolver = "3"
-members = ["crates/gitbones", "crates/gitbones-remote"]
+members = ["crates/bonesdeploy", "crates/bonesremote"]
 
 [workspace.lints.clippy]

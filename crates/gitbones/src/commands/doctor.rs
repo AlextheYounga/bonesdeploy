@@ -12,7 +12,7 @@ const BONES_DIR: &str = ".bones";
 const BONES_TOML: &str = ".bones/bones.toml";
 
 pub async fn run(local_only: bool) -> Result<()> {
-    println!("{}", style("gitbones doctor").bold());
+    println!("{}", style("bonesdeploy doctor").bold());
 
     let mut issues: Vec<String> = Vec::new();
 
@@ -111,15 +111,15 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
 
     let git_dir = &cfg.data.git_dir;
 
-    // Check gitbones-remote is globally available
-    if ssh::run_cmd(&session, "command -v gitbones-remote").await.is_err() {
-        issues.push("gitbones-remote is not available on the remote".into());
+    // Check bonesremote is globally available
+    if ssh::run_cmd(&session, "command -v bonesremote").await.is_err() {
+        issues.push("bonesremote is not available on the remote".into());
     }
 
     // Check bones/ folder exists on remote
     let check_bones = format!("test -d {git_dir}/bones");
     if ssh::run_cmd(&session, &check_bones).await.is_err() {
-        issues.push(format!("{git_dir}/bones/ does not exist on remote (run 'gitbones push')"));
+        issues.push(format!("{git_dir}/bones/ does not exist on remote (run 'bonesdeploy push')"));
     }
 
     // Check local .bones/ is in sync with remote
@@ -191,7 +191,7 @@ fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
 
     if !changed.is_empty() {
         issues.push(format!(
-            "Local .bones/ is out of sync with remote (run 'gitbones push'). Changed files:\n{}",
+            "Local .bones/ is out of sync with remote (run 'bonesdeploy push'). Changed files:\n{}",
             changed.iter().map(|f| format!("      {f}")).collect::<Vec<_>>().join("\n")
         ));
     }

@@ -50,8 +50,8 @@ That means a failed deploy can leave the live directory partially updated.
 ### New Flow
 
 1. `pre-receive`
-   - run `gitbones-remote doctor`
-   - run `gitbones-remote release stage --config ...`
+   - run `bonesremote doctor`
+   - run `bonesremote release stage --config ...`
 2. `stage-release`
    - create `deploy_root/releases/` and `deploy_root/shared/` if missing
    - create a new timestamped release directory
@@ -60,7 +60,7 @@ That means a failed deploy can leave the live directory partially updated.
 3. `post-receive`
    - read the staged release name from the state file
    - `git checkout -f` into `deploy_root/releases/<release>/`
-   - run `gitbones-remote release wire --config ...`
+   - run `bonesremote release wire --config ...`
    - call `deploy`
 4. `wire-release`
    - seed and symlink configured shared paths into the staged release
@@ -68,14 +68,14 @@ That means a failed deploy can leave the live directory partially updated.
 5. `deploy`
    - `cd` into the new release directory
    - run deployment scripts from `bones/deployment/`
-   - call `gitbones-remote release activate --config ...`
+   - call `bonesremote release activate --config ...`
 6. `activate-release`
    - atomically update `deploy_root/current`
    - leave `live_root` pointing at `deploy_root/current`
    - prune old releases beyond the configured retention count
    - clean up staged release state
 7. `post-deploy`
-   - run `gitbones-remote hooks post-deploy --config ...`
+   - run `bonesremote hooks post-deploy --config ...`
    - harden permissions on the active release and shared paths
 
 If deployment scripts fail before activation:
@@ -112,8 +112,8 @@ Initial default shared paths should remain conservative. Good starter examples:
 
 Both config structs currently use `data.worktree`:
 
-- `crates/gitbones/src/config.rs`
-- `crates/gitbones-remote/src/config.rs`
+- `crates/bonesdeploy/src/config.rs`
+- `crates/bonesremote/src/config.rs`
 
 Replace that with explicit release-oriented fields.
 
@@ -163,11 +163,11 @@ pub struct Releases {
 }
 ```
 
-Also update `is_configured()` in `crates/gitbones/src/config.rs` to require both `live_root` and `deploy_root`.
+Also update `is_configured()` in `crates/bonesdeploy/src/config.rs` to require both `live_root` and `deploy_root`.
 
 ## Prompt Changes
 
-Update `crates/gitbones/src/prompts.rs`:
+Update `crates/bonesdeploy/src/prompts.rs`:
 
 - replace the `Worktree path on remote:` prompt
 - add `Live root on remote:` with default `/var/www/<project_name>`
@@ -183,7 +183,7 @@ The generated `kit/bones.toml` should include comments explaining:
 
 ## Remote Command Changes
 
-Current remote commands live in `crates/gitbones-remote/src/commands/` and only cover:
+Current remote commands live in `crates/bonesremote/src/commands/` and only cover:
 
 - `doctor`
 - `pre_deploy`
@@ -197,7 +197,7 @@ Add these commands:
 - `rollback.rs`
 - `drop_failed_release.rs`
 
-Update `crates/gitbones-remote/src/commands/mod.rs` to register them.
+Update `crates/bonesremote/src/commands/mod.rs` to register them.
 
 ### stage-release
 
@@ -265,7 +265,7 @@ Responsibilities:
 
 ## Permissions Changes
 
-`crates/gitbones-remote/src/permissions.rs` currently assumes a single deployment root via `cfg.data.worktree`.
+`crates/bonesremote/src/permissions.rs` currently assumes a single deployment root via `cfg.data.worktree`.
 
 That file needs to be refactored so permission changes can target specific paths.
 
@@ -287,10 +287,10 @@ Update the embedded hook templates in `kit/hooks/`.
 
 ### pre-deploy
 
-Replace the old call to `gitbones-remote pre-deploy` with:
+Replace the old call to `bonesremote pre-deploy` with:
 
 ```bash
-sudo gitbones-remote release stage --config "$BONES_TOML"
+sudo bonesremote release stage --config "$BONES_TOML"
 ```
 
 ### post-receive
@@ -300,7 +300,7 @@ Stop checking out into `worktree`. Instead:
 1. read `deploy_root` and `branch` from `bones.toml`
 2. read `.staged_release`
 3. checkout into `deploy_root/releases/<release>`
-4. run `sudo gitbones-remote release wire --config "$BONES_TOML"`
+4. run `sudo bonesremote release wire --config "$BONES_TOML"`
 
 ### deploy
 
@@ -309,14 +309,14 @@ Change the working directory from `worktree` to the staged release path.
 If deployment scripts succeed:
 
 ```bash
-sudo gitbones-remote release activate --config "$BONES_TOML"
+sudo bonesremote release activate --config "$BONES_TOML"
 exec "$HOOKS_DIR/post-deploy"
 ```
 
 If a deployment script fails:
 
 ```bash
-sudo gitbones-remote release drop-failed --config "$BONES_TOML"
+sudo bonesremote release drop-failed --config "$BONES_TOML"
 exit 1
 ```
 
@@ -365,15 +365,15 @@ When SQLite is used, this should also be configurable as shared:
 
 Remove `Redeploy` from:
 
-- `crates/gitbones/src/commands/mod.rs`
-- `crates/gitbones/src/commands/redeploy.rs`
+- `crates/bonesdeploy/src/commands/mod.rs`
+- `crates/bonesdeploy/src/commands/redeploy.rs`
 
 ### Add rollback
 
 Add a local `rollback` command that SSHes to the remote and runs:
 
 ```bash
-sudo gitbones-remote release rollback --config <remote bones.toml path>
+sudo bonesremote release rollback --config <remote bones.toml path>
 ```
 
 This should follow the same SSH execution pattern as the existing local commands.
@@ -407,8 +407,8 @@ Areas to update:
 ## Verification Checklist
 
 1. `cargo check`
-2. run `gitbones init` and verify generated config comments are clear
-3. run `gitbones push` and confirm remote hooks are updated
+2. run `bonesdeploy init` and verify generated config comments are clear
+3. run `bonesdeploy push` and confirm remote hooks are updated
 4. push a deployment and verify:
    - a new release directory is created
    - `deploy_root/current` points to the new release
@@ -416,4 +416,4 @@ Areas to update:
    - shared paths are symlinked into the release
    - old site stays live if a deploy script fails
 5. push multiple times and verify old releases are pruned to `keep`
-6. run `gitbones rollback` and verify `current` points to the previous release
+6. run `bonesdeploy rollback` and verify `current` points to the previous release

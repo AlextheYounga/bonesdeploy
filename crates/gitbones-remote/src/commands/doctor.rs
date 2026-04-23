@@ -4,7 +4,7 @@ use anyhow::Result;
 use console::style;
 
 pub fn run() -> Result<()> {
-    println!("{}", style("gitbones-remote doctor").bold());
+    println!("{}", style("bonesremote doctor").bold());
 
     let mut issues: Vec<String> = Vec::new();
 
@@ -24,22 +24,22 @@ pub fn run() -> Result<()> {
 }
 
 fn check_globally_available(issues: &mut Vec<String>) {
-    let result = Command::new("gitbones-remote").arg("version").output();
+    let result = Command::new("bonesremote").arg("version").output();
 
     match result {
         Ok(output) if output.status.success() => {}
-        _ => issues.push("gitbones-remote is not globally available (not in PATH)".into()),
+        _ => issues.push("bonesremote is not globally available (not in PATH)".into()),
     }
 }
 
 fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let result = Command::new("sudo").args(["-n", "gitbones-remote", "version"]).output();
+    let result = Command::new("sudo").args(["-n", "bonesremote", "version"]).output();
 
     match result {
         Ok(output) if output.status.success() => {}
         _ => issues.push(
-            "gitbones-remote cannot run via sudo without a password \
-             (run 'sudo gitbones-remote init')"
+            "bonesremote cannot run via sudo without a password \
+             (run 'sudo bonesremote init')"
                 .into(),
         ),
     }

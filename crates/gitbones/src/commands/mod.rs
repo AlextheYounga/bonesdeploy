@@ -9,7 +9,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "gitbones", about = "Git deployment scaffolding tool")]
+#[command(name = "bonesdeploy", about = "Git deployment scaffolding tool")]
 pub struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -17,7 +17,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Set up gitbones in the current repository
+    /// Set up bonesdeploy in the current repository
     Init,
     /// Check local and remote environment health
     Doctor {
