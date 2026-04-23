@@ -20,8 +20,6 @@ We create a `bonesremote` executable that does not require a password and allows
 │   ├── 01_run_deployment_concerns.sh
 │   └── 02_permissions_lockup.sh (example)  
 └── hooks  
-    ├── deploy  
-    ├── post-deploy  
     ├── post-receive
     ├── pre-push  
     └── pre-receive  
@@ -34,8 +32,11 @@ Collects the following project information from the user:
 - `host`: str
 - `port`: str
 - `git_dir`: str (defaults to `/home/git/{project_name}.git`)  
-- `worktree`: str (defaults to `/var/www/{project_name}`)  
+- `live_root`: str (defaults to `/var/www/{project_name}`)  
+- `deploy_root`: str (defaults to `/srv/deployments/{project_name}`)  
 - `branch`: str (defaults to master)  
+- `releases.keep`: int (defaults to `5`)
+- `releases.shared_paths`: list[str] (defaults to [`.env`, `storage`])
 
 Then we ask permissions questions:  
 - `deploy_user`: str (defaults to "git")  
@@ -51,7 +52,8 @@ host = "deploy.example.com"
 port = "22"
 
 git_dir = "/home/git/lawsnipe.git"  
-worktree = "/var/www/lawsnipe"  
+live_root = "/var/www/lawsnipe"  
+deploy_root = "/srv/deployments/lawsnipe"
 branch = "master"  
 
 # These are the permissions that ultimately get applied to every file post-deployment.  
@@ -85,6 +87,10 @@ type      = "dir"
 path      = "database/database.sqlite"  
 mode      = "660"  
 type      = "file"  
+
+[releases]
+keep = 5
+shared_paths = [".env", "storage"]
 ```
 
 ### Hooks
@@ -92,12 +98,10 @@ Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are wr
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor` and we fail if the doctor command expresses any warning or errors.  
 - `pre-receive` => Runs `bonesremote doctor` and fails on issues, then runs `bonesremote release stage --config ...` to create a staged release directory and write staged release state.
-- `post-receive` => Runs `bonesremote hooks post-receive --config ...` to checkout and wire the staged release, then calls `deploy`.
-- `deploy` => Runs `bonesremote hooks deploy --config ...`, which executes deployment scripts against the staged release and handles activation/failure cleanup.
-- `post-deploy` => Runs `bonesremote hooks post-deploy --config ...` to harden permissions back to service ownership.
+- `post-receive` => Runs the full deployment pipeline by calling, in order, `bonesremote hooks post-receive --config ...`, `bonesremote hooks deploy --config ...`, and `bonesremote hooks post-deploy --config ...`.
 
 ### Deployment Folder
-This folder stores deployment scripts to be called by `deploy`. Files in this folder must be ordered sequentially like `01_run_deployment_concerns.sh` and `02_lockup_permissions.sh`. They are named in numerical order and all of these scripts are always run.
+This folder stores deployment scripts that are run by `bonesremote hooks deploy`. Files in this folder must be ordered sequentially like `01_run_deployment_concerns.sh` and `02_lockup_permissions.sh`. They are named in numerical order and all of these scripts are always run.
 
 ## Crate Structure
 This Cargo workspace has two crates under `crates/`, each with its own dependencies. There is no shared lib crate; the `bones.toml` structs are duplicated since each binary discovers and uses config differently.
@@ -133,7 +137,13 @@ bonesdeploy/
 │           │   ├── mod.rs
 │           │   ├── init.rs
 │           │   ├── doctor.rs
-│           │   ├── pre_deploy.rs
+│           │   ├── stage_release.rs
+│           │   ├── wire_release.rs
+│           │   ├── activate_release.rs
+│           │   ├── drop_failed_release.rs
+│           │   ├── rollback.rs
+│           │   ├── post_receive.rs
+│           │   ├── deploy.rs
 │           │   ├── post_deploy.rs
 │           │   └── version.rs
 │           ├── config.rs       # bones.toml structs + remote file discovery
@@ -173,6 +183,8 @@ bonesdeploy/
   - Echoes "bonesdeploy 0.1.0".
 
 ### BonesDeployRemote CLI Commands
+- **Release commands** live under `bonesremote release ...`
+- **Hook commands** live under `bonesremote hooks ...`
 - **init**:
   - Must be run as sudo.
   - Installs a drop-in file at `/etc/sudoers.d/bonesdeploy` to allow `bonesremote` commands without requiring password.
@@ -194,7 +206,7 @@ bonesdeploy/
 	- Checks out the configured branch into the staged release and wires shared paths.
 - **hooks deploy**
 	- Runs deployment scripts in the staged release, drops failed staged releases on error, and activates release on success.
-- **post-deploy**
+- **hooks post-deploy**
 	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.toml`, like for instance setting everything back to be owned by the service user. 
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
@@ -213,17 +225,15 @@ bonesdeploy/
 
 ### Hook Event Order on `git push`
 
-`pre-push -> pre-receive -> post-receive -> deploy -> post-deploy`
+`pre-push -> pre-receive -> post-receive`
 
 1. Git receives pack data in the remote bare repo and runs `pre-receive`.
 2. `pre-receive` runs `bonesremote doctor`, then `bonesremote release stage --config "$BONES_TOML"`.
 3. If `pre-receive` exits successfully, Git updates refs.
 4. Git runs `post-receive`.
-5. `post-receive` runs `bonesremote hooks post-receive --config "$BONES_TOML"` and then executes `deploy`.
-6. `deploy` runs `bonesremote hooks deploy --config "$BONES_TOML"`.
-7. `bonesremote hooks deploy` runs deployment scripts from `bones/deployment/`, drops staged release on failure, and activates release on success.
-8. If deploy succeeds, `deploy` executes `post-deploy`.
-9. `post-deploy` runs `bonesremote hooks post-deploy --config "$BONES_TOML"` to apply final permission hardening.
+5. `post-receive` runs `bonesremote hooks post-receive --config "$BONES_TOML"` (checkout + shared wiring).
+6. Then `post-receive` runs `bonesremote hooks deploy --config "$BONES_TOML"` (deployment scripts + activate/drop-failed).
+7. Finally `post-receive` runs `bonesremote hooks post-deploy --config "$BONES_TOML"` (permission hardening).
 
 ## Cargo Dependencies
 - clap

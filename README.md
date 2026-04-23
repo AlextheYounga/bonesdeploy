@@ -101,13 +101,13 @@ git push production master
 
 The hook chain handles the rest:
 1. **pre-push** (local) — runs `bonesdeploy doctor --local`
-2. **pre-receive** (remote) — runs `bonesremote doctor`, then `pre-deploy`
-3. **pre-deploy** (remote) — changes worktree ownership to deploy user
-4. **post-receive** (remote) — checks out latest commit to worktree
-5. **deploy** (remote) — runs scripts in `.bones/deployment/` sequentially
-6. **post-deploy** (remote) — hardens permissions back to service user
+2. **pre-receive** (remote) — runs `bonesremote doctor`, then `bonesremote release stage --config ...`
+3. **post-receive** (remote) — runs the deployment pipeline:
+   - `bonesremote hooks post-receive --config ...` (checkout + wire shared paths)
+   - `bonesremote hooks deploy --config ...` (run deployment scripts + activate/drop-failed)
+   - `bonesremote hooks post-deploy --config ...` (permission hardening)
 
-`pre-push -> pre-receive -> post-receive -> deploy -> post-deploy`
+`pre-push -> pre-receive -> post-receive`
 
 ### Health Checks
 
@@ -125,7 +125,8 @@ bonesdeploy doctor --local  # check local only
 remote_name = "production"
 project_name = "myproject"
 git_dir = "/home/git/myproject.git"
-worktree = "/var/www/myproject"
+live_root = "/var/www/myproject"
+deploy_root = "/srv/deployments/myproject"
 branch = "master"
 
 [permissions.defaults]
@@ -144,6 +145,10 @@ recursive = true
 path = "database/database.sqlite"
 mode = "660"
 type = "file"
+
+[releases]
+keep = 5
+shared_paths = [".env", "storage"]
 ```
 
 Remote host and port are not stored separately in `bones.toml`. BonesDeploy reads that information from the URL configured with `git remote add`.
@@ -158,10 +163,7 @@ Remote host and port are not stored separately in `bones.toml`. BonesDeploy read
 └── hooks/
     ├── pre-push         # symlinked to .git/hooks/pre-push
     ├── pre-receive
-    ├── pre-deploy
-    ├── post-receive
-    ├── deploy
-    └── post-deploy
+    └── post-receive
 ```
 
 Hooks are written to `.bones/hooks/` once during init. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
