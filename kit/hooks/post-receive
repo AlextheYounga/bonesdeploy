@@ -23,6 +23,11 @@ fi
 bones_init_remote_context "$GIT_DIR"
 
 main() {
+	if ! bones_should_deploy_on_push; then
+		echo "[bonesdeploy] deploy_on_push=false, skipping deployment on push."
+		exit 0
+	fi
+
 	bones_wire_release
 	bones_run_deployment
 	bones_post_deploy

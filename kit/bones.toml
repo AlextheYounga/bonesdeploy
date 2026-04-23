@@ -2,6 +2,7 @@
 [data]
 port="22"
 branch="master"
+deploy_on_push=true
 
 # live_root is the public path your web server points to.
 # It should remain a symlink to deploy_root/current.

@@ -4,6 +4,25 @@ bones_init_remote_context() {
 	BONES_TOML="$GIT_DIR/bones/bones.toml"
 }
 
+bones_should_deploy_on_push() {
+	if [ "${BONES_FORCE_DEPLOY:-0}" = "1" ]; then
+		return 0
+	fi
+
+	local deploy_on_push
+	deploy_on_push=$(grep -E '^deploy_on_push\s*=' "$BONES_TOML" | head -1 | sed 's/#.*$//' | sed 's/.*=\s*//' | tr -d '[:space:]')
+
+	if [ -z "$deploy_on_push" ]; then
+		return 0
+	fi
+
+	if [ "$deploy_on_push" = "false" ]; then
+		return 1
+	fi
+
+	return 0
+}
+
 bones_run_doctor_remote() {
 	echo "[bonesdeploy] Running remote doctor..."
 

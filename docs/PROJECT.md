@@ -36,6 +36,7 @@ Collects the following project information from the user:
 - `live_root`: str (defaults to `/var/www/{project_name}`)  
 - `deploy_root`: str (defaults to `/srv/deployments/{project_name}`)  
 - `branch`: str (defaults to master)  
+- `deploy_on_push`: bool (defaults to true)
 - `releases.keep`: int (defaults to `5`)
 - `releases.shared_paths`: list[str] (defaults to [`.env`, `storage`])
 
@@ -56,6 +57,7 @@ git_dir = "/home/git/lawsnipe.git"
 live_root = "/var/www/lawsnipe"  
 deploy_root = "/srv/deployments/lawsnipe"
 branch = "master"  
+deploy_on_push = true
 
 # These are the permissions that ultimately get applied to every file post-deployment.  
 [permissions.defaults]  
@@ -180,6 +182,10 @@ bonesdeploy/
   - Deletes sample git hooks in bare repo, so that our files will be the only files to worry about in the `{project_name}.git/hooks` folder.
   - Runs commands on remote that symlinks our `{project_name}.git/bones/hooks` files are symlinked with `{project_name}.git/hooks` properly.
 
+- **deploy**
+  - Manually runs remote `pre-receive` and `post-receive` hooks over SSH without pushing commits.
+  - Sets `BONES_FORCE_DEPLOY=1` so manual deploy runs even when `deploy_on_push = false`.
+
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
 
@@ -229,7 +235,8 @@ bonesdeploy/
 `pre-push -> pre-receive -> post-receive`
 
 1. Git receives pack data in the remote bare repo and runs `pre-receive`.
-2. `pre-receive` runs `bonesremote doctor`, then `bonesremote release stage --config "$BONES_TOML"`.
+2. If `deploy_on_push = true`, `pre-receive` runs `bonesremote doctor`, then `bonesremote release stage --config "$BONES_TOML"`.
+   - If `deploy_on_push = false`, `pre-receive` exits early and no deploy steps run.
 3. If `pre-receive` exits successfully, Git updates refs.
 4. Git runs `post-receive`.
 5. `post-receive` runs `bonesremote hooks post-receive --config "$BONES_TOML"` (checkout + shared wiring).

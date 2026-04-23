@@ -31,6 +31,8 @@ pub struct Data {
     pub deploy_root: String,
     #[serde(default = "default_branch")]
     pub branch: String,
+    #[serde(default = "default_deploy_on_push")]
+    pub deploy_on_push: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -96,6 +98,9 @@ fn default_port() -> String {
 }
 fn default_branch() -> String {
     "master".into()
+}
+fn default_deploy_on_push() -> bool {
+    true
 }
 fn default_keep() -> usize {
     5

@@ -109,6 +109,12 @@ The hook chain handles the rest:
 
 `pre-push -> pre-receive -> post-receive`
 
+If you set `deploy_on_push = false`, pushes only update refs. Run manual deploy when ready:
+
+```sh
+bonesdeploy deploy
+```
+
 ### Health Checks
 
 ```sh
@@ -128,6 +134,7 @@ git_dir = "/home/git/myproject.git"
 live_root = "/var/www/myproject"
 deploy_root = "/srv/deployments/myproject"
 branch = "master"
+deploy_on_push = true
 
 [permissions.defaults]
 deploy = "git"

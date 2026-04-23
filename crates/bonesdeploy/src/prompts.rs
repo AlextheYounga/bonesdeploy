@@ -1,5 +1,5 @@
 use anyhow::{Result, anyhow};
-use inquire::{Select, Text};
+use inquire::{Confirm, Select, Text};
 
 use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases};
 
@@ -38,6 +38,7 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
     let live_root = prompt_live_root(&project_name, seed)?;
     let deploy_root = prompt_deploy_root(&project_name, seed)?;
     let branch = prompt_branch(seed)?;
+    let deploy_on_push = prompt_deploy_on_push(seed)?;
     let deploy_user = prompt_deploy_user(seed)?;
     let service_user = prompt_service_user(seed)?;
     let service_group = prompt_service_group(seed)?;
@@ -48,7 +49,7 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
     let path_overrides = seed.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
 
     Ok(BonesConfig {
-        data: Data { remote_name, project_name, host, port, git_dir, live_root, deploy_root, branch },
+        data: Data { remote_name, project_name, host, port, git_dir, live_root, deploy_root, branch, deploy_on_push },
         permissions: Permissions {
             defaults: PermissionDefaults {
                 deploy: deploy_user,
@@ -132,6 +133,18 @@ fn prompt_deploy_root(project_name: &str, seed: Option<&BonesConfig>) -> Result<
 fn prompt_branch(seed: Option<&BonesConfig>) -> Result<String> {
     let default_branch = seed.map(|cfg| cfg.data.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("master");
     Text::new("Branch:").with_default(default_branch).prompt().map_err(|err| anyhow!(err))
+}
+
+fn prompt_deploy_on_push(seed: Option<&BonesConfig>) -> Result<bool> {
+    let default_deploy_on_push = match seed {
+        Some(cfg) => cfg.data.deploy_on_push,
+        None => true,
+    };
+    Confirm::new("Deploy automatically on push?")
+        .with_default(default_deploy_on_push)
+        .with_help_message("If false, pushes update git refs only; run 'bonesdeploy deploy' to deploy manually")
+        .prompt()
+        .map_err(|err| anyhow!(err))
 }
 
 fn prompt_deploy_user(seed: Option<&BonesConfig>) -> Result<String> {
