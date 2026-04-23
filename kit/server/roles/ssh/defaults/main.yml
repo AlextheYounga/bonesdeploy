@@ -20,5 +20,4 @@ ssh_allow_users: []
 ssh_allow_groups: []
 
 ssh_manage_authorized_keys: true
-ssh_admin_authorized_keys: []
 ssh_deploy_authorized_keys: []

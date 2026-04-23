@@ -41,7 +41,7 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
     let deploy_on_push = prompt_deploy_on_push(seed)?;
     let deploy_user = prompt_deploy_user(seed)?;
     let service_user = prompt_service_user(seed)?;
-    let service_group = prompt_service_group(seed)?;
+    let group = prompt_group(seed)?;
     let dir_mode = prompt_dir_mode(seed)?;
     let file_mode = prompt_file_mode(seed)?;
     let releases_keep = prompt_releases_keep(seed)?;
@@ -51,13 +51,7 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
     Ok(BonesConfig {
         data: Data { remote_name, project_name, host, port, git_dir, live_root, deploy_root, branch, deploy_on_push },
         permissions: Permissions {
-            defaults: PermissionDefaults {
-                deploy: deploy_user,
-                owner: service_user,
-                group: service_group,
-                dir_mode,
-                file_mode,
-            },
+            defaults: PermissionDefaults { deploy_user, service_user, group, dir_mode, file_mode },
             paths: path_overrides,
         },
         releases: Releases { keep: releases_keep, shared_paths },
@@ -148,14 +142,16 @@ fn prompt_deploy_on_push(seed: Option<&BonesConfig>) -> Result<bool> {
 }
 
 fn prompt_deploy_user(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_deploy_user =
-        seed.map(|cfg| cfg.permissions.defaults.deploy.as_str()).filter(|value| !value.is_empty()).unwrap_or("git");
+    let default_deploy_user = seed
+        .map(|cfg| cfg.permissions.defaults.deploy_user.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("git");
     Text::new("Deploy user (SSH user):").with_default(default_deploy_user).prompt().map_err(|err| anyhow!(err))
 }
 
 fn prompt_service_user(seed: Option<&BonesConfig>) -> Result<String> {
     let default_service_user = seed
-        .map(|cfg| cfg.permissions.defaults.owner.as_str())
+        .map(|cfg| cfg.permissions.defaults.service_user.as_str())
         .filter(|value| !value.is_empty())
         .unwrap_or("applications");
     Text::new("Service user (final file owner):")
@@ -164,10 +160,10 @@ fn prompt_service_user(seed: Option<&BonesConfig>) -> Result<String> {
         .map_err(|err| anyhow!(err))
 }
 
-fn prompt_service_group(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_service_group =
+fn prompt_group(seed: Option<&BonesConfig>) -> Result<String> {
+    let default_group =
         seed.map(|cfg| cfg.permissions.defaults.group.as_str()).filter(|value| !value.is_empty()).unwrap_or("www-data");
-    Text::new("Service group:").with_default(default_service_group).prompt().map_err(|err| anyhow!(err))
+    Text::new("Group:").with_default(default_group).prompt().map_err(|err| anyhow!(err))
 }
 
 fn prompt_dir_mode(seed: Option<&BonesConfig>) -> Result<String> {

@@ -1,5 +1,7 @@
----
+# Users role
 
-# Users role - Create and configure system users
+Ensures the minimum users and group expected by bonesdeploy:
 
-# This role sets up admin, deploy, and application users with proper groups and permissions
+- `deploy_user`
+- `service_user`
+- `group`

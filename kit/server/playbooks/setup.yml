@@ -1,86 +1,21 @@
 ---
-# Initial Server Setup Playbook
-#
-# This playbook performs first-time server configuration:
-# - Installs base packages (common role)
-# - Creates users and groups (users role)
-# - Configures SSH (ssh role)
-# - Configures firewall (firewall role)
-#
-# Usage:
-#   ansible-playbook -i inventory/inventory.yml playbooks/bootstrap.yml -K
-#   ansible-playbook -i inventory/inventory.yml playbooks/bootstrap.yml --limit <hostname> -K
-#
-# Note: -K or --ask-become-pass prompts for sudo password
-
-- name: Initial Server Setup
-  hosts: production:home
+- name: Server setup for bonesdeploy
+  hosts: all
   become: true
-
-  pre_tasks:
-    - name: Update apt cache if older than 1 hour
-      ansible.builtin.apt:
-        update_cache: true
-        cache_valid_time: 3600
-      tags: always
-
-    - name: Gather facts
-      ansible.builtin.setup:
-      tags: always
 
   roles:
     - role: users
       tags: [users]
 
     - role: common
-      tags: [common, packages]
-
-    - role: docker
-      tags: [docker]
-
-    - role: ssh
-      tags: [ssh, security]
-
-    - role: firewall
-      tags: [firewall, security]
+      tags: [common]
 
   post_tasks:
-    - name: Validate SSH daemon configuration
-      ansible.builtin.command: sshd -t
-      changed_when: false
-      tags: [always, verify, security]
-
-    - name: Verify SSH service is active
-      ansible.builtin.command: systemctl is-active "{{ ssh_service_name }}"
-      register: bootstrap_ssh_service_status
-      changed_when: false
-      failed_when: bootstrap_ssh_service_status.stdout | trim != 'active'
-      tags: [always, verify, security]
-
-    - name: Verify UFW is active
-      ansible.builtin.command: ufw status
-      register: bootstrap_ufw_status
-      changed_when: false
-      failed_when: "'Status: active' not in bootstrap_ufw_status.stdout"
-      tags: [always, verify, security]
-
-    - name: Verify fail2ban sshd jail status
-      ansible.builtin.command: fail2ban-client status sshd
-      register: bootstrap_fail2ban_status
-      changed_when: false
-      when: common_fail2ban_enabled and common_fail2ban_sshd_enabled
-      tags: [always, verify, security]
-
-    - name: Display completion message
+    - name: Display setup completion
       ansible.builtin.debug:
         msg: |
-          ========================================
-          Initial server setup completed!
-          ========================================
-
-          Next steps:
-          1. Configure SSH keys for {{ admin_user }} and {{ deploy_user }}
-          2. Review firewall rules: sudo ufw status
-          3. Review SSH policy: sudo sshd -T | grep -E 'port|passwordauthentication'
-          4. Apply optional roles only if needed (example: borgbackup)
+          Bones server setup completed.
+          Deploy user: {{ deploy_user }}
+          Service user: {{ service_user }}
+          Group: {{ group }}
       tags: always

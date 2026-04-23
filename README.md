@@ -137,8 +137,8 @@ branch = "master"
 deploy_on_push = true
 
 [permissions.defaults]
-deploy = "git"
-owner = "applications"
+deploy_user = "git"
+service_user = "applications"
 group = "www-data"
 dir_mode = "750"
 file_mode = "640"
