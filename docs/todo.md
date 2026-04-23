@@ -1,4 +1,4 @@
-# GitBones TODO
+# BonesDeploy TODO
 
 ## Phase 1: Workspace & Scaffolding
 - [x] Convert to Cargo workspace with `crates/gitbones` and `crates/gitbones-remote`

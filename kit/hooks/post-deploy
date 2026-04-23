@@ -14,11 +14,11 @@ GIT_DIR=$(cd "$GIT_DIR" && pwd)
 
 BONES_TOML="$GIT_DIR/bones/bones.toml"
 
-echo "[gitbones] Running post-deploy (hardening permissions)..."
+echo "[bonesdeploy] Running post-deploy (hardening permissions)..."
 
 if ! sudo gitbones-remote hooks post-deploy --config "$BONES_TOML"; then
     echo "[gitbones] post-deploy failed."
     exit 1
 fi
 
-echo "[gitbones] post-deploy complete. Deployment finished."
+echo "[bonesdeploy] post-deploy complete. Deployment finished."

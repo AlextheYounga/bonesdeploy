@@ -27,14 +27,14 @@ if [ -z "$DEPLOY_ROOT" ] || [ -z "$STAGED_RELEASE" ]; then
 fi
 
 if [ ! -d "$DEPLOYMENT_DIR" ]; then
-    echo "[gitbones] No deployment directory found. Skipping deploy scripts."
+    echo "[bonesdeploy] No deployment directory found. Skipping deploy scripts."
 else
     cd "$RELEASE_PATH"
 
     for script in "$DEPLOYMENT_DIR"/*; do
         [ -f "$script" ] || continue
 
-        echo "[gitbones] Running $(basename "$script")..."
+        echo "[bonesdeploy] Running $(basename "$script")..."
 
         if ! bash "$script"; then
             echo "[gitbones] Deployment script $(basename "$script") failed."
@@ -43,7 +43,7 @@ else
         fi
     done
 
-    echo "[gitbones] All deployment scripts completed."
+    echo "[bonesdeploy] All deployment scripts completed."
 fi
 
 sudo gitbones-remote release activate --config "$BONES_TOML"

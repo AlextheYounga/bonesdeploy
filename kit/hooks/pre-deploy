@@ -21,4 +21,4 @@ if ! sudo gitbones-remote release stage --config "$BONES_TOML"; then
     exit 1
 fi
 
-echo "[gitbones] pre-deploy complete."
+echo "[bonesdeploy] pre-deploy complete."
