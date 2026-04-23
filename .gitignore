@@ -38,3 +38,5 @@ __trash__
 *.swp
 *.swo
 .worktrees
+bin
+.dylint
