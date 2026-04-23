@@ -95,7 +95,8 @@ pub async fn upload_post_receive(session: &Session, git_dir: &str, hook_content:
     let hook_path = format!("{git_dir}/hooks/post-receive");
 
     // Write hook content via heredoc
-    let cmd = format!("cat > '{hook_path}' << 'BONESDEPLOY_EOF'\n{hook_content}\nBONESDEPLOY_EOF\nchmod +x '{hook_path}'");
+    let cmd =
+        format!("cat > '{hook_path}' << 'BONESDEPLOY_EOF'\n{hook_content}\nBONESDEPLOY_EOF\nchmod +x '{hook_path}'");
     run_cmd(session, &cmd).await?;
     println!("Uploaded post-receive hook to {hook_path}");
     Ok(())

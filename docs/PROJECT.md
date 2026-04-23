@@ -23,7 +23,6 @@ We create a `bonesremote` executable that does not require a password and allows
     ├── deploy  
     ├── post-deploy  
     ├── post-receive
-	├── pre-deploy    
     ├── pre-push  
     └── pre-receive  
 
@@ -92,11 +91,10 @@ type      = "file"
 Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor` and we fail if the doctor command expresses any warning or errors.  
-- `pre-receive` => This runs `bonesremote doctor` and fails if there are any warnings or errors. Then we call `pre-deploy`.
-- `pre-deploy` => This runs `bonesremote pre-deploy`, which changes the permissions of the worktree to be owned by the ssh_user, which is necessary in order to run deployment scripts from this user. `bonesremote` will be allowlisted in the sudoers file. 
-- `post-receive` => Update our git worktree to the latest commit (standard git deployment flow). Then it will call our custom git-hook, `deploy`.  
-- `deploy` => Our custom meta caller. This will scan our `{project_name}.git/bones/deployment` folder and run these scripts sequentially. 
-- `post-deploy` => Runs `bonesremote hooks post-deploy`, which sets permissions back to our service user as detailed in bones.toml
+- `pre-receive` => Runs `bonesremote doctor` and fails on issues, then runs `bonesremote release stage --config ...` to create a staged release directory and write staged release state.
+- `post-receive` => Runs `bonesremote hooks post-receive --config ...` to checkout and wire the staged release, then calls `deploy`.
+- `deploy` => Runs `bonesremote hooks deploy --config ...`, which executes deployment scripts against the staged release and handles activation/failure cleanup.
+- `post-deploy` => Runs `bonesremote hooks post-deploy --config ...` to harden permissions back to service ownership.
 
 ### Deployment Folder
 This folder stores deployment scripts to be called by `deploy`. Files in this folder must be ordered sequentially like `01_run_deployment_concerns.sh` and `02_lockup_permissions.sh`. They are named in numerical order and all of these scripts are always run.
@@ -182,8 +180,20 @@ bonesdeploy/
   - Checks to see if the server is set up properly:
     - `bonesremote` can be run without requiring password
     - `bonesremote` is globally available.
-- **pre-deploy**
-	- Sets all file ownership to git for the deployment. 
+- **release stage**
+	- Creates a staged release and writes staged release state before checkout.
+- **release wire**
+	- Wires shared paths into the staged release after checkout.
+- **release activate**
+	- Atomically switches `current` to the staged release and prunes old releases.
+- **release drop-failed**
+	- Deletes a failed staged release and clears staged release state.
+- **release rollback**
+	- Repoints `current` to the previous release.
+- **hooks post-receive**
+	- Checks out the configured branch into the staged release and wires shared paths.
+- **hooks deploy**
+	- Runs deployment scripts in the staged release, drops failed staged releases on error, and activates release on success.
 - **post-deploy**
 	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.toml`, like for instance setting everything back to be owned by the service user. 
 - **version**:
@@ -200,9 +210,20 @@ bonesdeploy/
 - User runs `bonesdeploy push` to sync the `.bones/` folder to the remote bare repo.
 - User runs `git push production master` or some similar command where the remote name aligns with our bones.toml configuration.
 - The `pre-push` hook checks to see if we are pushing to our bones remote (in this example, `production`). If so, it runs `bonesdeploy doctor` and fails on warnings/errors.
-- On remote: `pre-receive` runs `bonesremote doctor` (fails on issues), then calls `pre-deploy` (which runs `bonesremote pre-deploy` for ownership changes).
-- `post-receive` updates the worktree to the latest commit, then calls `deploy` (runs all `deployment/` scripts sequentially).
-- Finally, `post-deploy` calls `bonesremote hooks post-deploy` to harden permissions based on bones.toml.
+
+### Hook Event Order on `git push`
+
+`pre-push -> pre-receive -> post-receive -> deploy -> post-deploy`
+
+1. Git receives pack data in the remote bare repo and runs `pre-receive`.
+2. `pre-receive` runs `bonesremote doctor`, then `bonesremote release stage --config "$BONES_TOML"`.
+3. If `pre-receive` exits successfully, Git updates refs.
+4. Git runs `post-receive`.
+5. `post-receive` runs `bonesremote hooks post-receive --config "$BONES_TOML"` and then executes `deploy`.
+6. `deploy` runs `bonesremote hooks deploy --config "$BONES_TOML"`.
+7. `bonesremote hooks deploy` runs deployment scripts from `bones/deployment/`, drops staged release on failure, and activates release on success.
+8. If deploy succeeds, `deploy` executes `post-deploy`.
+9. `post-deploy` runs `bonesremote hooks post-deploy --config "$BONES_TOML"` to apply final permission hardening.
 
 ## Cargo Dependencies
 - clap

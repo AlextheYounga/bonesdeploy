@@ -1,8 +1,10 @@
 mod activate_release;
+mod deploy;
 mod doctor;
 mod drop_failed_release;
 mod init;
 mod post_deploy;
+mod post_receive;
 mod rollback;
 mod stage_release;
 mod version;
@@ -74,6 +76,18 @@ enum ReleaseCommand {
 
 #[derive(Subcommand)]
 enum HookCommand {
+    /// Run deployment scripts and release activation sequence
+    Deploy {
+        /// Path to bones.toml config file
+        #[arg(long)]
+        config: String,
+    },
+    /// Run the post-receive checkout and release wiring sequence
+    PostReceive {
+        /// Path to bones.toml config file
+        #[arg(long)]
+        config: String,
+    },
     /// Harden permissions back to service user after deployment
     PostDeploy {
         /// Path to bones.toml config file
@@ -94,6 +108,8 @@ pub fn run(cli: &Cli) -> Result<()> {
             ReleaseCommand::Rollback { config } => rollback::run(config),
         },
         Command::Hooks { command } => match command {
+            HookCommand::Deploy { config } => deploy::run(config),
+            HookCommand::PostReceive { config } => post_receive::run(config),
             HookCommand::PostDeploy { config } => post_deploy::run(config),
         },
         Command::Version => {

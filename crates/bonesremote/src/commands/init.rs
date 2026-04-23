@@ -42,8 +42,7 @@ pub fn run() -> Result<()> {
 }
 
 fn which_bonesdeploy_remote() -> Result<String> {
-    let output =
-        Command::new("which").arg("bonesremote").output().context("Failed to run 'which bonesremote'")?;
+    let output = Command::new("which").arg("bonesremote").output().context("Failed to run 'which bonesremote'")?;
 
     if !output.status.success() {
         bail!(
