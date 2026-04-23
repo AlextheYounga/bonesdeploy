@@ -3,6 +3,7 @@ mod doctor;
 mod init;
 mod push;
 mod rollback;
+mod server_setup;
 mod version;
 
 use anyhow::Result;
@@ -29,10 +30,21 @@ enum Command {
     Push,
     /// Run deployment hooks manually without pushing commits
     Deploy,
+    /// Server setup operations
+    Server {
+        #[command(subcommand)]
+        command: ServerCommand,
+    },
     /// Roll back current release to the previous one
     Rollback,
     /// Print the version
     Version,
+}
+
+#[derive(Subcommand)]
+enum ServerCommand {
+    /// Run server setup playbook against configured host
+    Setup,
 }
 
 pub async fn run(cli: &Cli) -> Result<()> {
@@ -41,6 +53,9 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,
         Command::Deploy => deploy::run().await,
+        Command::Server { command } => match command {
+            ServerCommand::Setup => server_setup::run(),
+        },
         Command::Rollback => rollback::run().await,
         Command::Version => {
             version::run();
