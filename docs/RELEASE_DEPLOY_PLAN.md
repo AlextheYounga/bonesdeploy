@@ -37,9 +37,9 @@ Definitions:
 
 ## Deployment Flow
 
-### Current Flow
+### Previous Flow
 
-Today `kit/hooks/post-receive` checks out directly into the configured worktree:
+The previous flow checked out directly into the configured worktree:
 
 ```bash
 git --work-tree="$WORKTREE" --git-dir="$GIT_DIR" checkout -f "$BRANCH"
@@ -52,30 +52,28 @@ That means a failed deploy can leave the live directory partially updated.
 1. `pre-receive`
    - run `bonesremote doctor`
    - run `bonesremote release stage --config ...`
-2. `stage-release`
+2. `release stage`
    - create `deploy_root/releases/` and `deploy_root/shared/` if missing
    - create a new timestamped release directory
    - ensure `live_root` is a symlink to `deploy_root/current`
    - write the chosen release name to a state file under `git_dir/bones/`
 3. `post-receive`
-   - read the staged release name from the state file
-   - `git checkout -f` into `deploy_root/releases/<release>/`
-   - run `bonesremote release wire --config ...`
-   - call `deploy`
-4. `wire-release`
+   - run `bonesremote hooks post-receive --config ...` (checkout + wire)
+   - run `bonesremote hooks deploy --config ...` (scripts + activate/drop-failed)
+   - run `bonesremote hooks post-deploy --config ...` (permission hardening)
+4. `release wire`
    - seed and symlink configured shared paths into the staged release
    - make the release ready for framework-specific build steps
-5. `deploy`
-   - `cd` into the new release directory
+5. `deploy` (internalized in `bonesremote hooks deploy`)
    - run deployment scripts from `bones/deployment/`
-   - call `bonesremote release activate --config ...`
-6. `activate-release`
+   - call `bonesremote release activate --config ...` on success
+   - call `bonesremote release drop-failed --config ...` on failure
+6. `release activate`
    - atomically update `deploy_root/current`
    - leave `live_root` pointing at `deploy_root/current`
    - prune old releases beyond the configured retention count
    - clean up staged release state
-7. `post-deploy`
-   - run `bonesremote hooks post-deploy --config ...`
+7. `post-deploy` (internalized in `bonesremote hooks post-deploy`)
    - harden permissions on the active release and shared paths
 
 If deployment scripts fail before activation:
@@ -110,7 +108,7 @@ Initial default shared paths should remain conservative. Good starter examples:
 
 ## Config Changes
 
-Both config structs currently use `data.worktree`:
+Both config structs previously used `data.worktree`:
 
 - `crates/bonesdeploy/src/config.rs`
 - `crates/bonesremote/src/config.rs`
@@ -183,11 +181,10 @@ The generated `kit/bones.toml` should include comments explaining:
 
 ## Remote Command Changes
 
-Current remote commands live in `crates/bonesremote/src/commands/` and only cover:
+Current remote commands live in `crates/bonesremote/src/commands/` and are namespaced under:
 
-- `doctor`
-- `pre_deploy`
-- `post_deploy`
+- `release ...`
+- `hooks ...`
 
 Add these commands:
 
@@ -196,10 +193,12 @@ Add these commands:
 - `activate_release.rs`
 - `rollback.rs`
 - `drop_failed_release.rs`
+- `post_receive.rs`
+- `deploy.rs`
 
 Update `crates/bonesremote/src/commands/mod.rs` to register them.
 
-### stage-release
+### release stage
 
 Responsibilities:
 
@@ -211,7 +210,7 @@ Responsibilities:
 6. chown the new release directory and `shared/` to the deploy user
 7. write the staged release name to `git_dir/bones/.staged_release`
 
-### activate-release
+### release activate
 
 Responsibilities:
 
@@ -222,7 +221,7 @@ Responsibilities:
 5. prune old releases, excluding the newly active one
 6. remove `.staged_release`
 
-### wire-release
+### release wire
 
 Responsibilities:
 
@@ -241,7 +240,7 @@ Atomic switch should use the standard pattern:
 1. create a temporary symlink
 2. rename it into place as `current`
 
-### drop-failed-release
+### release drop-failed
 
 Responsibilities:
 
@@ -265,7 +264,7 @@ Responsibilities:
 
 ## Permissions Changes
 
-`crates/bonesremote/src/permissions.rs` currently assumes a single deployment root via `cfg.data.worktree`.
+`crates/bonesremote/src/permissions.rs` previously assumed a single deployment root via `cfg.data.worktree`.
 
 That file needs to be refactored so permission changes can target specific paths.
 
@@ -283,46 +282,26 @@ Rules:
 
 ## Hook Changes
 
-Update the embedded hook templates in `kit/hooks/`.
+Update the embedded hook templates so entrypoints stay thin and shared logic lives in `.bones/hooks.sh`.
 
-### pre-deploy
+### pre-receive
 
-Replace the old call to `bonesremote pre-deploy` with:
+Run doctor and staging directly:
 
 ```bash
+sudo bonesremote doctor
 sudo bonesremote release stage --config "$BONES_TOML"
 ```
 
 ### post-receive
 
-Stop checking out into `worktree`. Instead:
-
-1. read `deploy_root` and `branch` from `bones.toml`
-2. read `.staged_release`
-3. checkout into `deploy_root/releases/<release>`
-4. run `sudo bonesremote release wire --config "$BONES_TOML"`
-
-### deploy
-
-Change the working directory from `worktree` to the staged release path.
-
-If deployment scripts succeed:
+Run the full pipeline in order:
 
 ```bash
-sudo bonesremote release activate --config "$BONES_TOML"
-exec "$HOOKS_DIR/post-deploy"
+sudo bonesremote hooks post-receive --config "$BONES_TOML"
+sudo bonesremote hooks deploy --config "$BONES_TOML"
+sudo bonesremote hooks post-deploy --config "$BONES_TOML"
 ```
-
-If a deployment script fails:
-
-```bash
-sudo bonesremote release drop-failed --config "$BONES_TOML"
-exit 1
-```
-
-### post-deploy
-
-Keep the same high-level behavior, but the remote command should now harden the active release plus shared paths rather than an old single worktree.
 
 ## Laravel Fit
 
@@ -338,7 +317,7 @@ The Laravel template fits this design, but it exposed one important correction t
 - `php artisan migrate --force`
 - cache rebuild commands
 
-That means `.env` and `storage/` cannot wait until final activation. They must be attached to the staged release immediately after checkout. That is why this plan now includes `wire-release`.
+That means `.env` and `storage/` cannot wait until final activation. They must be attached to the staged release immediately after checkout. That is why this plan now includes `release wire`.
 
 ### Maintenance mode timing should move later
 
@@ -361,12 +340,9 @@ When SQLite is used, this should also be configurable as shared:
 
 ## Local CLI Changes
 
-### Remove redeploy
+### Keep redeploy
 
-Remove `Redeploy` from:
-
-- `crates/bonesdeploy/src/commands/mod.rs`
-- `crates/bonesdeploy/src/commands/redeploy.rs`
+Keep `redeploy` as a helper that reruns the same remote hook pipeline without pushing commits.
 
 ### Add rollback
 
