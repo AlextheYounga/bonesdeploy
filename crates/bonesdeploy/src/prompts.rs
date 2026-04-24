@@ -1,7 +1,8 @@
 use anyhow::{Result, anyhow};
-use inquire::{Confirm, Select, Text};
+use inquire::{Select, Text};
 
 use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Runtime, Ssl};
+use crate::git;
 
 pub fn choose_template(available_templates: &[String]) -> Result<Option<String>> {
     let mut options = Vec::with_capacity(available_templates.len() + 1);
@@ -30,22 +31,47 @@ pub fn collect(project_name_hint: &str) -> Result<BonesConfig> {
 }
 
 pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) -> Result<BonesConfig> {
-    let remote_name = prompt_remote_name(seed)?;
     let project_name = prompt_project_name(project_name_hint, seed)?;
-    let host = prompt_host(seed)?;
-    let port = prompt_port(seed)?;
-    let git_dir = prompt_git_dir(&project_name, seed)?;
-    let live_root = prompt_live_root(&project_name, seed)?;
-    let deploy_root = prompt_deploy_root(&project_name, seed)?;
     let branch = prompt_branch(seed)?;
-    let deploy_on_push = prompt_deploy_on_push(seed)?;
-    let deploy_user = prompt_deploy_user(seed)?;
-    let service_user = prompt_service_user(&project_name, seed)?;
-    let group = prompt_group(seed)?;
-    let dir_mode = prompt_dir_mode(seed)?;
-    let file_mode = prompt_file_mode(seed)?;
-    let releases_keep = prompt_releases_keep(seed)?;
-    let shared_paths = prompt_shared_paths(seed)?;
+    let remote_name = prompt_remote_name(seed)?;
+    let inferred_remote =
+        if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
+    let host = prompt_host(seed, inferred_remote.as_ref())?;
+    let port = prompt_port(seed, inferred_remote.as_ref())?;
+    let git_dir = prompt_git_dir(&project_name, seed, inferred_remote.as_ref())?;
+    let live_root = default_live_root(&project_name, seed);
+    let deploy_root = default_deploy_root(&project_name, seed);
+    let deploy_on_push = seed.is_none_or(|cfg| cfg.data.deploy_on_push);
+    let deploy_user = seed
+        .map(|cfg| cfg.permissions.defaults.deploy_user.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("git")
+        .to_string();
+    let service_user = seed
+        .map(|cfg| cfg.permissions.defaults.service_user.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(&project_name)
+        .to_string();
+    let group = seed
+        .map(|cfg| cfg.permissions.defaults.group.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("www-data")
+        .to_string();
+    let dir_mode = seed
+        .map(|cfg| cfg.permissions.defaults.dir_mode.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("750")
+        .to_string();
+    let file_mode = seed
+        .map(|cfg| cfg.permissions.defaults.file_mode.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("640")
+        .to_string();
+    let releases_keep = seed.map_or(5, |cfg| cfg.releases.keep.max(1));
+    let shared_paths = seed
+        .map(|cfg| cfg.releases.shared_paths.clone())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| vec![String::from(".env"), String::from("storage")]);
     let path_overrides = seed.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
 
     Ok(BonesConfig {
@@ -61,13 +87,59 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
 }
 
 fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_remote_name =
-        seed.map(|cfg| cfg.data.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
-    Text::new("Remote name:")
-        .with_default(default_remote_name)
-        .with_help_message("e.g. production, staging")
+    const CREATE_REMOTE_OPTION: &str = "Create new deployment remote";
+
+    let remotes = git::list_remotes()?;
+    if remotes.is_empty() {
+        let default_remote =
+            seed.map(|cfg| cfg.data.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
+        return Text::new("Deployment remote name:")
+            .with_default(default_remote)
+            .with_help_message("bonesdeploy will create this git remote if it does not exist")
+            .prompt()
+            .map_err(|err| anyhow!(err));
+    }
+
+    let default_remote = seed.map(|cfg| cfg.data.remote_name.clone()).filter(|value| !value.is_empty());
+    let mut options = if let Some(default_remote) = default_remote {
+        if remotes.contains(&default_remote) {
+            let mut ordered = Vec::with_capacity(remotes.len());
+            ordered.push(default_remote.clone());
+            ordered.extend(remotes.into_iter().filter(|name| name != &default_remote));
+            ordered
+        } else {
+            remotes
+        }
+    } else {
+        remotes
+    };
+    options.push(String::from(CREATE_REMOTE_OPTION));
+
+    let choice = Select::new("Deployment remote:", options)
+        .with_help_message("Choose the git remote bonesdeploy will manage")
         .prompt()
-        .map_err(|err| anyhow!(err))
+        .map_err(|err| anyhow!(err))?;
+
+    if choice == CREATE_REMOTE_OPTION {
+        let default_remote =
+            seed.map(|cfg| cfg.data.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
+        return Text::new("Deployment remote name:")
+            .with_default(default_remote)
+            .with_help_message("bonesdeploy will create this git remote if it does not exist")
+            .prompt()
+            .map_err(|err| anyhow!(err));
+    }
+
+    Ok(choice)
+}
+
+fn prompt_port(seed: Option<&BonesConfig>, inferred_remote: Option<&git::RemoteConnectionDetails>) -> Result<String> {
+    if let Some(details) = inferred_remote {
+        return Ok(details.port.clone());
+    }
+
+    let default_port = seed.map(|cfg| cfg.data.port.as_str()).filter(|value| !value.is_empty()).unwrap_or("22");
+    Text::new("SSH port:").with_default(default_port).prompt().map_err(|err| anyhow!(err))
 }
 
 fn prompt_project_name(project_name_hint: &str, seed: Option<&BonesConfig>) -> Result<String> {
@@ -76,133 +148,61 @@ fn prompt_project_name(project_name_hint: &str, seed: Option<&BonesConfig>) -> R
     Text::new("Project name:").with_default(default_project_name).prompt().map_err(|err| anyhow!(err))
 }
 
-fn prompt_host(seed: Option<&BonesConfig>) -> Result<String> {
+fn prompt_host(seed: Option<&BonesConfig>, inferred_remote: Option<&git::RemoteConnectionDetails>) -> Result<String> {
+    if let Some(details) = inferred_remote {
+        return Ok(details.host.clone());
+    }
+
     let default_host = seed.map(|cfg| cfg.data.host.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
-    Text::new("Host:")
+    Text::new("Server host or IP:")
         .with_default(default_host)
-        .with_help_message("e.g. deploy.example.com")
+        .with_help_message("e.g. deploy.example.com or 203.0.113.10")
         .prompt()
         .map_err(|err| anyhow!(err))
 }
 
-fn prompt_port(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_port = seed.map(|cfg| cfg.data.port.as_str()).filter(|value| !value.is_empty()).unwrap_or("22");
-    Text::new("Port:").with_default(default_port).prompt().map_err(|err| anyhow!(err))
-}
+fn prompt_git_dir(
+    project_name: &str,
+    seed: Option<&BonesConfig>,
+    inferred_remote: Option<&git::RemoteConnectionDetails>,
+) -> Result<String> {
+    if let Some(details) = inferred_remote {
+        return Ok(details.git_dir.clone());
+    }
 
-fn prompt_git_dir(project_name: &str, seed: Option<&BonesConfig>) -> Result<String> {
     let default_git_dir = seed
         .map(|cfg| cfg.data.git_dir.as_str())
         .filter(|value| !value.is_empty())
         .map_or_else(|| format!("/home/git/{project_name}.git"), |value| value.replace("<project_name>", project_name));
-    Text::new("Git directory (bare repo path on remote):")
+    Text::new("Git directory on server:")
         .with_default(&default_git_dir)
+        .with_help_message("Path for the bare repo, e.g. /home/git/<project>.git")
         .prompt()
         .map_err(|err| anyhow!(err))
 }
 
-fn prompt_live_root(project_name: &str, seed: Option<&BonesConfig>) -> Result<String> {
-    let default_live_root = seed
-        .map(|cfg| cfg.data.live_root.as_str())
+fn default_live_root(project_name: &str, seed: Option<&BonesConfig>) -> String {
+    seed.map(|cfg| cfg.data.live_root.as_str())
         .filter(|value| !value.is_empty())
-        .map_or_else(|| format!("/var/www/{project_name}"), |value| value.replace("<project_name>", project_name));
-    Text::new("Live root on remote:")
-        .with_default(&default_live_root)
-        .with_help_message("Public path your web server points at")
-        .prompt()
-        .map_err(|err| anyhow!(err))
+        .map_or_else(|| format!("/var/www/{project_name}"), |value| value.replace("<project_name>", project_name))
 }
 
-fn prompt_deploy_root(project_name: &str, seed: Option<&BonesConfig>) -> Result<String> {
-    let default_deploy_root =
-        seed.map(|cfg| cfg.data.deploy_root.as_str()).filter(|value| !value.is_empty()).map_or_else(
-            || format!("/srv/deployments/{project_name}"),
-            |value| value.replace("<project_name>", project_name),
-        );
-    Text::new("Deploy root on remote:")
-        .with_default(&default_deploy_root)
-        .with_help_message("Stores build/workspace, runtime/, shared/, and current")
-        .prompt()
-        .map_err(|err| anyhow!(err))
+fn default_deploy_root(project_name: &str, seed: Option<&BonesConfig>) -> String {
+    seed.map(|cfg| cfg.data.deploy_root.as_str()).filter(|value| !value.is_empty()).map_or_else(
+        || format!("/srv/deployments/{project_name}"),
+        |value| value.replace("<project_name>", project_name),
+    )
 }
 
 fn prompt_branch(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_branch = seed.map(|cfg| cfg.data.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("master");
+    let default_branch = seed.map(|cfg| cfg.data.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("main");
     Text::new("Branch:").with_default(default_branch).prompt().map_err(|err| anyhow!(err))
 }
 
-fn prompt_deploy_on_push(seed: Option<&BonesConfig>) -> Result<bool> {
-    let default_deploy_on_push = match seed {
-        Some(cfg) => cfg.data.deploy_on_push,
-        None => true,
-    };
-    Confirm::new("Deploy automatically on push?")
-        .with_default(default_deploy_on_push)
-        .with_help_message("If false, pushes update git refs only; run 'bonesdeploy deploy' to deploy manually")
+pub fn prompt_bootstrap_ssh_user() -> Result<String> {
+    Text::new("Server SSH user for initial setup:")
+        .with_default("root")
+        .with_help_message("Used only for the first ansible run before deploy user access is ready")
         .prompt()
         .map_err(|err| anyhow!(err))
-}
-
-fn prompt_deploy_user(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_deploy_user = seed
-        .map(|cfg| cfg.permissions.defaults.deploy_user.as_str())
-        .filter(|value| !value.is_empty())
-        .unwrap_or("git");
-    Text::new("Deploy user (SSH user):").with_default(default_deploy_user).prompt().map_err(|err| anyhow!(err))
-}
-
-fn prompt_service_user(project_name: &str, seed: Option<&BonesConfig>) -> Result<String> {
-    let default_service_user = seed
-        .map(|cfg| cfg.permissions.defaults.service_user.as_str())
-        .filter(|value| !value.is_empty())
-        .unwrap_or(project_name);
-    Text::new("Service user (final file owner):")
-        .with_default(default_service_user)
-        .prompt()
-        .map_err(|err| anyhow!(err))
-}
-
-fn prompt_group(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_group =
-        seed.map(|cfg| cfg.permissions.defaults.group.as_str()).filter(|value| !value.is_empty()).unwrap_or("www-data");
-    Text::new("Group:").with_default(default_group).prompt().map_err(|err| anyhow!(err))
-}
-
-fn prompt_dir_mode(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_dir_mode =
-        seed.map(|cfg| cfg.permissions.defaults.dir_mode.as_str()).filter(|value| !value.is_empty()).unwrap_or("750");
-    Text::new("Default directory mode:").with_default(default_dir_mode).prompt().map_err(|err| anyhow!(err))
-}
-
-fn prompt_file_mode(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_file_mode =
-        seed.map(|cfg| cfg.permissions.defaults.file_mode.as_str()).filter(|value| !value.is_empty()).unwrap_or("640");
-    Text::new("Default file mode:").with_default(default_file_mode).prompt().map_err(|err| anyhow!(err))
-}
-
-fn prompt_releases_keep(seed: Option<&BonesConfig>) -> Result<usize> {
-    let default_releases_keep = seed.map(|cfg| cfg.releases.keep).filter(|value| *value > 0).unwrap_or(5).to_string();
-    let releases_keep_raw = Text::new("Releases to keep:")
-        .with_default(&default_releases_keep)
-        .with_help_message("Old releases beyond this count are pruned")
-        .prompt()
-        .map_err(|err| anyhow!(err))?;
-    releases_keep_raw.parse::<usize>().map_err(Into::into)
-}
-
-fn prompt_shared_paths(seed: Option<&BonesConfig>) -> Result<Vec<String>> {
-    let default_shared_paths = seed
-        .map(|cfg| cfg.releases.shared_paths.join(", "))
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| String::from(".env, storage"));
-    let shared_paths_raw = Text::new("Shared paths (comma-separated):")
-        .with_default(&default_shared_paths)
-        .with_help_message("These paths are symlinked from deploy_root/shared")
-        .prompt()
-        .map_err(|err| anyhow!(err))?;
-    Ok(parse_shared_paths(&shared_paths_raw))
-}
-
-fn parse_shared_paths(raw: &str) -> Vec<String> {
-    raw.split(',').map(str::trim).filter(|path| !path.is_empty()).map(ToOwned::to_owned).collect()
 }

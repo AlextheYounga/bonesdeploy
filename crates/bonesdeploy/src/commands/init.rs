@@ -5,8 +5,8 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use console::style;
-use inquire::Confirm;
 
+use super::server_setup;
 use crate::config;
 use crate::embedded;
 use crate::git;
@@ -14,25 +14,6 @@ use crate::prompts;
 use crate::ssh;
 
 pub async fn run() -> Result<()> {
-    println!(
-        "{}\n\n\
-         This will:\n  \
-         1. Create a .bones/ folder with hooks and deployment scripts\n  \
-         2. Collect project configuration (remote, host, permissions)\n  \
-         3. Update .gitignore\n  \
-         4. Symlink the pre-push hook into .git/hooks/\n  \
-         5. Create a bare repo on the remote (if needed)\n  \
-         6. Upload the post-receive hook to the remote\n\n\
-         A git remote URL must already be configured for the deployment remote.\n",
-        style("bonesdeploy init").bold()
-    );
-
-    let proceed = Confirm::new("Continue?").with_default(true).prompt()?;
-    if !proceed {
-        println!("Aborted.");
-        return Ok(());
-    }
-
     git::ensure_git_repository()?;
 
     // Extract scaffold to .bones/
@@ -60,12 +41,12 @@ pub async fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = load_or_collect_config(bones_toml)?;
 
-    // Validate the remote exists
-    git::validate_remote_exists(&cfg.data.remote_name)?;
-
     // Save config
     config::save(&cfg, bones_toml)?;
     println!("Saved config to {}", config::Constants::BONES_TOML);
+
+    run_initial_server_setup(&cfg)?;
+    ensure_local_remote(&cfg)?;
 
     // Symlink pre-push hook
     symlink_pre_push()?;
@@ -145,4 +126,29 @@ fn repo_directory_name() -> Result<String> {
     let cwd = env::current_dir()?;
     let name = cwd.file_name().map_or_else(|| "project".into(), |n| n.to_string_lossy().to_string());
     Ok(name)
+}
+
+fn run_initial_server_setup(cfg: &config::BonesConfig) -> Result<()> {
+    let bootstrap_user = prompts::prompt_bootstrap_ssh_user()?;
+
+    println!(
+        "Running {} against {} as {}...",
+        style("server setup").cyan().bold(),
+        style(&cfg.data.host).cyan(),
+        style(&bootstrap_user).cyan(),
+    );
+
+    server_setup::ensure_ansible_playbook_installed()?;
+    server_setup::run_ansible_playbook(cfg, &bootstrap_user, &[])
+}
+
+fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
+    if git::remote_exists(&cfg.data.remote_name)? {
+        return Ok(());
+    }
+
+    let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, cfg.data.host, cfg.data.git_dir);
+    git::add_remote(&cfg.data.remote_name, &remote_url)?;
+    println!("Added git remote {} -> {}", cfg.data.remote_name, remote_url);
+    Ok(())
 }

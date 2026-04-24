@@ -36,23 +36,26 @@ We create a `bonesremote` executable that does not require a password and allows
 
 ### Bones Toml
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
-Collects the following project information from the user:  
-- `remote_name`: str (production, staging, etc.)  
-- `project_name`: str  
-- `host`: str
-- `port`: str
-- `git_dir`: str (defaults to `/home/git/{project_name}.git`)  
-- `live_root`: str (defaults to `/var/www/{project_name}`)  
-- `deploy_root`: str (defaults to `/srv/deployments/{project_name}`)  
-- `branch`: str (defaults to master)  
-- `deploy_on_push`: bool (defaults to true)
-- `releases.keep`: int (defaults to `5`)
-- `releases.shared_paths`: list[str] (defaults to [`.env`, `storage`])
+Collects the following project information from the user:
+- `project_name`: str
+- `branch`: str
+- `remote_name`: existing remote selection when available, otherwise prompted name
+- `host`: prompted when not inferable from selected remote
+- `port`: defaults to `22`, prompt shown when remote inference is unavailable
+- `git_dir`: inferred from selected remote URL when possible, otherwise prompted
+- `bootstrap_ssh_user`: init-only prompt (default `root`) used to run the first server setup playbook
 
-Then we ask permissions questions:  
-- `deploy_user`: str (defaults to "git")  
-- `service_user`: str (defaults to `project_name` - a service user who has final ownership of the site)  
-- `group`: str (defaults to www-data)  
+Everything else is defaulted for Debian/Ubuntu-first usability:
+- `live_root`: defaults to `/var/www/{project_name}`
+- `deploy_root`: defaults to `/srv/deployments/{project_name}`
+- `deploy_on_push`: defaults to `true`
+- `permissions.defaults.deploy_user`: defaults to `git`
+- `permissions.defaults.service_user`: defaults to `{project_name}`
+- `permissions.defaults.group`: defaults to `www-data`
+- `permissions.defaults.dir_mode`: defaults to `750`
+- `permissions.defaults.file_mode`: defaults to `640`
+- `releases.keep`: defaults to `5`
+- `releases.shared_paths`: defaults to [`.env`, `storage`]
 
 Example `bones.toml`:
 ```toml
@@ -104,10 +107,11 @@ type      = "file"
 keep = 5
 shared_paths = [".env", "storage"]
 
-[runtime]
-command = ["/usr/bin/node", "server.js"]
-working_dir = "."
-writable_paths = []
+# Optional runtime launcher settings (only for service/landlock-managed apps).
+# [runtime]
+# command = ["/usr/bin/node", "server.js"]
+# working_dir = "."
+# writable_paths = []
 
 [ssl]
 enabled = true
@@ -175,11 +179,12 @@ bonesdeploy/
 
 ### BonesDeploy CLI Commands
 - **init**:
-  - Informs the user that there should be a remote git url set up, explains what's going to happen, and then asks the user for permission to proceed.
   - Gets or creates the `.bones` folder with our default scaffolding.
   - Updates `.gitignore` to add .bones folder.
-  - Loads existing config from `.bones/bones.toml` or collects new user input via prompts.
-  - Creates upstream bare repository on remote using the url set in `git remote [remote_name]`, setting it up if it doesn't exist. We fail if no git remote URL is set.
+  - Loads existing config from `.bones/bones.toml` or collects user input via prompts.
+  - Runs `.bones/server/playbooks/setup.yml` first so deploy user/server prerequisites are in place before remote git setup.
+  - Creates local deployment remote if missing using `{deploy_user}@{host}:{git_dir}`.
+  - Creates upstream bare repository on remote using configured host/git directory.
   - Builds and uploads post-receive hook to remote.
   - Saves config to `.bones/bones.toml`.
 
@@ -230,7 +235,7 @@ bonesdeploy/
     - `bonesremote` can be run without requiring password
     - `bonesremote` is globally available.
     - Landlock support is available on the host.
-  - With `--config`, also validates runtime readiness (`runtime.command`, service user, runtime tree, and systemd unit).
+  - With `--config`, validates runtime readiness only when `runtime.command` is configured (`service_user`, runtime tree, and systemd unit).
 - **release stage**
 	- Creates a staged runtime tree under `runtime/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout.
 - **release wire**

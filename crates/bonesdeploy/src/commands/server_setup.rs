@@ -1,10 +1,13 @@
+use std::env;
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 use console::style;
 
 use crate::config;
+use crate::embedded;
 
 pub fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
@@ -17,9 +20,6 @@ pub fn run() -> Result<()> {
 
     ensure_ansible_playbook_installed()?;
 
-    let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
-    let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
-
     println!(
         "Running {} against {} as {}...",
         style("server setup").cyan().bold(),
@@ -27,32 +27,42 @@ pub fn run() -> Result<()> {
         style(&cfg.permissions.defaults.deploy_user).cyan(),
     );
 
-    run_ansible_playbook(&cfg, &runtime_config_path, &live_root_parent, &[])?;
+    run_ansible_playbook(&cfg, &cfg.permissions.defaults.deploy_user, &[])?;
 
     println!("\n{} Server setup complete.", style("Done!").green().bold());
 
     Ok(())
 }
 
-pub fn run_ansible_playbook(
-    cfg: &config::BonesConfig,
-    runtime_config_path: &str,
-    live_root_parent: &str,
-    extra_args: &[String],
-) -> Result<()> {
+pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<()> {
     let playbook = Path::new(config::Constants::BONES_SERVER_SETUP_PLAYBOOK);
     if !playbook.is_file() {
         bail!("Missing server setup playbook: {}", playbook.display());
     }
 
+    let roles_dir = Path::new(config::Constants::BONES_SERVER_ROLES_DIR);
+    if !roles_dir.is_dir() {
+        bail!("Missing server roles directory: {}", roles_dir.display());
+    }
+
+    ensure_python3_available(cfg, ssh_user)?;
+
+    let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
+    let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
+
     let inventory = format!("{},", cfg.data.host);
+    let roles_path = env::var("ANSIBLE_ROLES_PATH")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map_or_else(|| roles_dir.display().to_string(), |existing| format!("{}:{existing}", roles_dir.display()));
 
     let mut command = Command::new("ansible-playbook");
+    command.env("ANSIBLE_ROLES_PATH", roles_path);
     command
         .arg("-i")
         .arg(&inventory)
         .arg("-u")
-        .arg(&cfg.permissions.defaults.deploy_user)
+        .arg(ssh_user)
         .arg("-e")
         .arg(format!("ansible_port={}", cfg.data.port))
         .arg("-e")
@@ -91,6 +101,37 @@ pub fn run_ansible_playbook(
 
     if !status.success() {
         bail!("ansible-playbook failed with status {status}");
+    }
+
+    Ok(())
+}
+
+fn ensure_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {
+    let host = format!("{ssh_user}@{}", cfg.data.host);
+    let script = embedded::read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASSET)?;
+
+    println!("Ensuring python3 is available on remote host...");
+
+    let mut child = Command::new("ssh")
+        .arg("-p")
+        .arg(&cfg.data.port)
+        .arg("-o")
+        .arg("StrictHostKeyChecking=accept-new")
+        .arg("-T")
+        .arg(host)
+        .arg("bash -s")
+        .stdin(Stdio::piped())
+        .spawn()
+        .context("Failed to start remote python3 bootstrap command over SSH")?;
+
+    let mut stdin = child.stdin.take().context("Failed to open stdin for SSH process")?;
+    stdin.write_all(script.as_bytes()).context("Failed to send python3 bootstrap script over SSH")?;
+    drop(stdin);
+
+    let status = child.wait().context("Failed to run remote python3 bootstrap command over SSH")?;
+
+    if !status.success() {
+        bail!("Failed to ensure python3 is installed on the remote host");
     }
 
     Ok(())

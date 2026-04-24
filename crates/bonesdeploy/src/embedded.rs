@@ -85,6 +85,7 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
     if relative_path.starts_with(config::Constants::ASSET_HOOKS_DIR)
         || relative_path.starts_with(config::Constants::ASSET_DEPLOYMENT_DIR)
+        || relative_path.starts_with(config::Constants::ASSET_SCRIPTS_DIR)
     {
         fs::set_permissions(&dest, fs::Permissions::from_mode(0o755))
             .with_context(|| format!("Failed to set permissions on {}", dest.display()))?;
