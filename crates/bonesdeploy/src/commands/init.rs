@@ -17,13 +17,14 @@ pub async fn run() -> Result<()> {
     println!(
         "{}\n\n\
          This will:\n  \
-         1. Create a .bones/ folder with hooks and deployment scripts\n  \
-         2. Collect project configuration (remote, host, permissions)\n  \
-         3. Update .gitignore\n  \
-         4. Symlink the pre-push hook into .git/hooks/\n  \
-         5. Create a bare repo on the remote (if needed)\n  \
-         6. Upload the post-receive hook to the remote\n\n\
-         A git remote URL must already be configured for the deployment remote.\n",
+          1. Create a .bones/ folder with hooks and deployment scripts\n  \
+          2. Collect minimal project configuration (project name, branch, deployment remote)\n  \
+          3. Update .gitignore\n  \
+          4. Symlink the pre-push hook into .git/hooks/\n  \
+          5. Create a bare repo on the remote (if needed)\n  \
+          6. Upload the post-receive hook to the remote\n\n\
+          Assumptions: fresh Debian/Ubuntu host with opinionated defaults\n  \
+          (port 22, /var/www/<project>, /srv/deployments/<project>, deploy user git).\n",
         style("bonesdeploy init").bold()
     );
 
@@ -66,6 +67,7 @@ pub async fn run() -> Result<()> {
     // Save config
     config::save(&cfg, bones_toml)?;
     println!("Saved config to {}", config::Constants::BONES_TOML);
+    print_resolved_config(&cfg);
 
     // Symlink pre-push hook
     symlink_pre_push()?;
@@ -145,4 +147,32 @@ fn repo_directory_name() -> Result<String> {
     let cwd = env::current_dir()?;
     let name = cwd.file_name().map_or_else(|| "project".into(), |n| n.to_string_lossy().to_string());
     Ok(name)
+}
+
+fn print_resolved_config(cfg: &config::BonesConfig) {
+    println!(
+        "\nResolved defaults:\n  \
+         project_name: {}\n  \
+         branch: {}\n  \
+         remote_name: {}\n  \
+         host: {}\n  \
+         port: {}\n  \
+         git_dir: {}\n  \
+         live_root: {}\n  \
+         deploy_root: {}\n  \
+         deploy_user: {}\n  \
+         service_user: {}\n  \
+         group: {}",
+        cfg.data.project_name,
+        cfg.data.branch,
+        cfg.data.remote_name,
+        cfg.data.host,
+        cfg.data.port,
+        cfg.data.git_dir,
+        cfg.data.live_root,
+        cfg.data.deploy_root,
+        cfg.permissions.defaults.deploy_user,
+        cfg.permissions.defaults.service_user,
+        cfg.permissions.defaults.group,
+    );
 }

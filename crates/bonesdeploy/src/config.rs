@@ -11,7 +11,7 @@ pub struct BonesConfig {
     pub permissions: Permissions,
     #[serde(default)]
     pub releases: Releases,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_default_runtime")]
     pub runtime: Runtime,
     #[serde(default)]
     pub ssl: Ssl,
@@ -72,7 +72,7 @@ pub struct Releases {
     pub shared_paths: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Runtime {
     #[serde(default)]
     pub command: Vec<String>,
@@ -186,6 +186,10 @@ fn default_runtime_writable_paths() -> Vec<String> {
     Vec::new()
 }
 
+fn is_default_runtime(runtime: &Runtime) -> bool {
+    runtime == &Runtime::default()
+}
+
 pub fn is_configured(config: &BonesConfig) -> bool {
     let d = &config.data;
     !d.remote_name.is_empty()
@@ -209,7 +213,18 @@ pub fn load(path: &Path) -> Result<BonesConfig> {
 }
 
 pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
-    let content = toml::to_string_pretty(config).context("Failed to serialize config")?;
+    let mut content = toml::to_string_pretty(config).context("Failed to serialize config")?;
+
+    if !content.contains("[runtime]") {
+        content.push_str(
+            "\n# Optional runtime launcher settings (only needed for service/landlock-managed apps).\n\
+# [runtime]\n\
+# command = [\"/usr/bin/node\", \"server.js\"]\n\
+# working_dir = \".\"\n\
+# writable_paths = []\n",
+        );
+    }
+
     fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }

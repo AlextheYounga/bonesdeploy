@@ -30,17 +30,11 @@ keep = 5
 # Paths that are persisted in deploy_root/shared and symlinked into each release.
 shared_paths = [".env", "storage"]
 
-[runtime]
-# Final command started by the runtime launcher.
-# Example: ["/usr/bin/node", "server.js"]
-command = []
-
-# Working directory relative to the active runtime tree.
-working_dir = "."
-
-# Optional: additional writable roots if your runtime needs them.
-# Boundary defaults already allow writes to the active runtime tree and deploy_root/shared.
-writable_paths = []
+# Optional runtime launcher settings (only needed for service/landlock-managed apps).
+# [runtime]
+# command = ["/usr/bin/node", "server.js"]
+# working_dir = "."
+# writable_paths = []
 
 [ssl]
 # Optional TLS values used by `bonesdeploy server ssl`.

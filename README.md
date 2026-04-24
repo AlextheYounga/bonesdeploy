@@ -69,11 +69,20 @@ bonesdeploy init
 
 This will:
 1. Create a `.bones/` folder with hooks and deployment script templates
-2. Prompt for project configuration (remote name, project paths, branch, permissions, etc.)
+2. Prompt only for project name, branch, and deployment remote
 3. Add `.bones` to `.gitignore`
 4. Symlink the `pre-push` hook into `.git/hooks/`
 5. Create a bare repo on the remote if needed
 6. Upload the `post-receive` hook to the remote
+
+BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.toml`:
+
+- `port = "22"`
+- `live_root = "/var/www/<project_name>"`
+- `deploy_root = "/srv/deployments/<project_name>"`
+- `deploy_user = "git"`
+- `service_user = "<project_name>"`
+- `group = "www-data"`
 
 A git remote must already be configured for the deployment target:
 
@@ -176,13 +185,19 @@ type = "file"
 keep = 5
 shared_paths = [".env", "storage"]
 
+# Optional runtime launcher settings (only needed for service/landlock-managed apps).
+# [runtime]
+# command = ["/usr/bin/node", "server.js"]
+# working_dir = "."
+# writable_paths = []
+
 [ssl]
 enabled = false
 domain = ""
 email = ""
 ```
 
-Remote host and port are not stored separately in `bones.toml`. BonesDeploy reads that information from the URL configured with `git remote add`.
+`host` and `git_dir` are inferred from the deployment remote URL when possible; if parsing fails, init asks only for those missing values.
 
 ## Project Structure
 
