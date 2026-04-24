@@ -1,11 +1,13 @@
 use std::env;
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 use console::style;
 
 use crate::config;
+use crate::embedded;
 
 pub fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
@@ -42,6 +44,8 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
     if !roles_dir.is_dir() {
         bail!("Missing server roles directory: {}", roles_dir.display());
     }
+
+    ensure_python3_available(cfg, ssh_user)?;
 
     let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
     let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
@@ -97,6 +101,37 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
 
     if !status.success() {
         bail!("ansible-playbook failed with status {status}");
+    }
+
+    Ok(())
+}
+
+fn ensure_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {
+    let host = format!("{ssh_user}@{}", cfg.data.host);
+    let script = embedded::read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASSET)?;
+
+    println!("Ensuring python3 is available on remote host...");
+
+    let mut child = Command::new("ssh")
+        .arg("-p")
+        .arg(&cfg.data.port)
+        .arg("-o")
+        .arg("StrictHostKeyChecking=accept-new")
+        .arg("-T")
+        .arg(host)
+        .arg("bash -s")
+        .stdin(Stdio::piped())
+        .spawn()
+        .context("Failed to start remote python3 bootstrap command over SSH")?;
+
+    let mut stdin = child.stdin.take().context("Failed to open stdin for SSH process")?;
+    stdin.write_all(script.as_bytes()).context("Failed to send python3 bootstrap script over SSH")?;
+    drop(stdin);
+
+    let status = child.wait().context("Failed to run remote python3 bootstrap command over SSH")?;
+
+    if !status.success() {
+        bail!("Failed to ensure python3 is installed on the remote host");
     }
 
     Ok(())
