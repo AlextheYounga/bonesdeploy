@@ -37,6 +37,11 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
         bail!("Missing server setup playbook: {}", playbook.display());
     }
 
+    let roles_dir = Path::new(config::Constants::BONES_SERVER_ROLES_DIR);
+    if !roles_dir.is_dir() {
+        bail!("Missing server roles directory: {}", roles_dir.display());
+    }
+
     let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
     let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
 
@@ -46,6 +51,8 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
     command
         .arg("-i")
         .arg(&inventory)
+        .arg("--roles-path")
+        .arg(roles_dir)
         .arg("-u")
         .arg(ssh_user)
         .arg("-e")
