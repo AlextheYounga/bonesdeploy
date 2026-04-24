@@ -1,4 +1,5 @@
-use std::path::Path;
+use std::io::ErrorKind;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
@@ -47,7 +48,8 @@ pub fn run_ansible_playbook(
 
     let inventory = format!("{},", cfg.data.host);
 
-    let mut command = Command::new("ansible-playbook");
+    let ansible_playbook_binary = resolve_ansible_playbook_binary()?;
+    let mut command = Command::new(&ansible_playbook_binary);
     command
         .arg("-i")
         .arg(&inventory)
@@ -97,16 +99,122 @@ pub fn run_ansible_playbook(
 }
 
 pub(crate) fn ensure_ansible_playbook_installed() -> Result<()> {
-    let status = Command::new("ansible-playbook")
-        .arg("--version")
+    let _ = resolve_ansible_playbook_binary()?;
+
+    Ok(())
+}
+
+fn resolve_ansible_playbook_binary() -> Result<PathBuf> {
+    if ansible_playbook_available(Path::new("ansible-playbook"))? {
+        return Ok(PathBuf::from("ansible-playbook"));
+    }
+
+    if let Some(local_ansible_playbook) = user_ansible_playbook_path()?
+        && ansible_playbook_available(&local_ansible_playbook)?
+    {
+        return Ok(local_ansible_playbook);
+    }
+
+    ensure_python3_available()?;
+    ensure_pip_available()?;
+    install_ansible_with_pip()?;
+
+    if ansible_playbook_available(Path::new("ansible-playbook"))? {
+        return Ok(PathBuf::from("ansible-playbook"));
+    }
+
+    if let Some(local_ansible_playbook) = user_ansible_playbook_path()?
+        && ansible_playbook_available(&local_ansible_playbook)?
+    {
+        return Ok(local_ansible_playbook);
+    }
+
+    bail!("Installed Ansible with pip, but ansible-playbook is still unavailable. Ensure ~/.local/bin is in PATH.")
+}
+
+fn ansible_playbook_available(binary: &Path) -> Result<bool> {
+    match Command::new(binary).arg("--version").status() {
+        Ok(status) => Ok(status.success()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error).with_context(|| format!("Failed to run {} --version", binary.display())),
+    }
+}
+
+fn ensure_python3_available() -> Result<()> {
+    match Command::new("python3").arg("--version").status() {
+        Ok(status) if status.success() => Ok(()),
+        Ok(_) => bail!("python3 is installed but failed to execute. Install a working Python 3 runtime and retry."),
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            bail!("python3 is required to install Ansible. Install python3 and retry.")
+        }
+        Err(error) => Err(error).context("Failed to run python3 --version"),
+    }
+}
+
+fn ensure_pip_available() -> Result<()> {
+    if python_module_available("pip")? {
+        return Ok(());
+    }
+
+    let status = Command::new("python3")
+        .args(["-m", "ensurepip", "--upgrade"])
         .status()
-        .context("Failed to run ansible-playbook --version")?;
+        .context("Failed to run python3 -m ensurepip --upgrade")?;
 
     if !status.success() {
-        bail!("ansible-playbook is not available. Install Ansible locally and try again.");
+        bail!("pip is not available for python3. Install python3-pip and retry.");
+    }
+
+    if !python_module_available("pip")? {
+        bail!("pip is still unavailable after running ensurepip. Install python3-pip and retry.");
     }
 
     Ok(())
+}
+
+fn python_module_available(module_name: &str) -> Result<bool> {
+    let status = Command::new("python3")
+        .args(["-m", module_name, "--version"])
+        .status()
+        .with_context(|| format!("Failed to run python3 -m {module_name} --version"))?;
+
+    Ok(status.success())
+}
+
+fn install_ansible_with_pip() -> Result<()> {
+    println!(
+        "{}",
+        style("ansible-playbook not found. Installing Ansible with python3 -m pip install --user ansible...").yellow()
+    );
+
+    let status = Command::new("python3")
+        .args(["-m", "pip", "install", "--user", "ansible"])
+        .status()
+        .context("Failed to run python3 -m pip install --user ansible")?;
+
+    if !status.success() {
+        bail!("Automatic Ansible installation failed. Run `python3 -m pip install --user ansible` and retry.");
+    }
+
+    Ok(())
+}
+
+fn user_ansible_playbook_path() -> Result<Option<PathBuf>> {
+    let output = Command::new("python3").args(["-c", "import site; print(site.USER_BASE)"]).output();
+
+    let output = match output {
+        Ok(output) if output.status.success() => output,
+        Ok(_) => return Ok(None),
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error).context("Failed to discover python3 user base"),
+    };
+
+    let user_base = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if user_base.is_empty() {
+        return Ok(None);
+    }
+
+    Ok(Some(Path::new(&user_base).join("bin").join("ansible-playbook")))
 }
 
 pub(crate) fn resolve_live_root_parent(live_root: &str) -> String {

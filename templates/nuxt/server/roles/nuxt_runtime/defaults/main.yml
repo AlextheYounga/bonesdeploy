@@ -1,0 +1,4 @@
+---
+nuxt_global_npm_packages:
+  - pm2
+  - pnpm

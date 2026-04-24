@@ -88,7 +88,9 @@ bonesdeploy server setup
 ```
 
 This runs `.bones/server/playbooks/setup.yml` locally with Ansible against your configured remote host.
-It installs nginx and provisions a default project vhost that serves `.bones/server/roles/nginx/defaults/index.html.j2` until your first deployment is live.
+If `ansible-playbook` is missing, BonesDeploy installs Ansible automatically with `python3 -m pip install --user ansible`.
+Template-based projects also scaffold language-specific setup roles (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install global PM2/PNPM tools).
+Every setup also installs nginx and provisions a default project vhost that serves `.bones/server/roles/nginx/defaults/index.html.j2` until your first deployment is live.
 
 To customize nginx behavior, edit `.bones/server/nginx/site.conf.j2` and re-run `bonesdeploy server setup`.
 
