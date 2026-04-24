@@ -6,10 +6,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 
-use crate::config::BonesConfig;
+use crate::config::{BonesConfig, Constants};
 
 pub fn staged_release_path(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.git_dir).join("bones").join(".staged_release")
+    Path::new(&cfg.data.git_dir).join("bones").join(Constants::STAGED_RELEASE_FILE)
 }
 
 pub fn read_staged_release(cfg: &BonesConfig) -> Result<String> {
@@ -49,15 +49,15 @@ pub fn release_dir(cfg: &BonesConfig, release: &str) -> PathBuf {
 }
 
 pub fn releases_dir(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.deploy_root).join("releases")
+    Path::new(&cfg.data.deploy_root).join(Constants::RELEASES_DIR)
 }
 
 pub fn shared_dir(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.deploy_root).join("shared")
+    Path::new(&cfg.data.deploy_root).join(Constants::SHARED_DIR)
 }
 
 pub fn current_link(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.deploy_root).join("current")
+    Path::new(&cfg.data.deploy_root).join(Constants::CURRENT_LINK)
 }
 
 pub fn current_release_dir(cfg: &BonesConfig) -> Result<PathBuf> {

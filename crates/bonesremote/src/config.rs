@@ -18,6 +18,10 @@ pub struct Constants;
 impl Constants {
     pub const BINARY_NAME: &str = "bonesremote";
     pub const SUDOERS_PATH: &str = "/etc/sudoers.d/bonesdeploy";
+    pub const STAGED_RELEASE_FILE: &str = ".staged_release";
+    pub const RELEASES_DIR: &str = "releases";
+    pub const SHARED_DIR: &str = "shared";
+    pub const CURRENT_LINK: &str = "current";
 }
 
 #[derive(Debug, Serialize, Deserialize)]
