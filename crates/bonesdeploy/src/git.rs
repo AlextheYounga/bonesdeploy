@@ -21,16 +21,21 @@ pub fn ensure_git_repository() -> Result<()> {
     Ok(())
 }
 
-pub fn validate_remote_exists(remote_name: &str) -> Result<()> {
+pub fn remote_exists(remote_name: &str) -> Result<bool> {
     let status = Command::new("git").args(["remote", "get-url", remote_name]).status().context("Failed to run git")?;
+    Ok(status.success())
+}
+
+pub fn add_remote(remote_name: &str, remote_url: &str) -> Result<()> {
+    let status = Command::new("git")
+        .args(["remote", "add", remote_name, remote_url])
+        .status()
+        .with_context(|| format!("Failed to add git remote '{remote_name}'"))?;
 
     if !status.success() {
-        bail!(
-            "No git remote '{remote_name}' found. \
-             Please set one up before running bonesdeploy init:\n  \
-             git remote add {remote_name} git@<host>:<repo>.git"
-        );
+        bail!("Failed to add git remote '{remote_name}'");
     }
+
     Ok(())
 }
 

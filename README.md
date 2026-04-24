@@ -69,11 +69,13 @@ bonesdeploy init
 
 This will:
 1. Create a `.bones/` folder with hooks and deployment script templates
-2. Prompt only for project name, branch, and deployment remote
+2. Prompt for project name, branch, remote name, host, git directory, and bootstrap SSH user
 3. Add `.bones` to `.gitignore`
 4. Symlink the `pre-push` hook into `.git/hooks/`
-5. Create a bare repo on the remote if needed
-6. Upload the `post-receive` hook to the remote
+5. Run server setup playbook first (to create deploy user and baseline host state)
+6. Create a local deployment git remote if needed
+7. Create a bare repo on the remote if needed
+8. Upload the `post-receive` hook to the remote
 
 BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.toml`:
 
@@ -84,11 +86,7 @@ BonesDeploy assumes opinionated server defaults unless you change them in `.bone
 - `service_user = "<project_name>"`
 - `group = "www-data"`
 
-A git remote must already be configured for the deployment target:
-
-```sh
-git remote add production git@deploy.example.com:/home/git/myproject.git
-```
+A deployment remote no longer needs to exist before `bonesdeploy init`; if missing, init will create it from your prompted host/git directory values.
 
 Before first deploy, run server setup:
 

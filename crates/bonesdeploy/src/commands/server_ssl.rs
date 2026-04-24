@@ -30,9 +30,6 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
 
     server_setup::ensure_ansible_playbook_installed()?;
 
-    let live_root_parent = server_setup::resolve_live_root_parent(&cfg.data.live_root);
-    let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
-
     println!(
         "Running {} against {} for {}...",
         style("server ssl").cyan().bold(),
@@ -54,7 +51,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let mut cfg_for_run = cfg.clone();
     cfg_for_run.ssl.enabled = false;
 
-    server_setup::run_ansible_playbook(&cfg_for_run, &runtime_config_path, &live_root_parent, &extra_args)?;
+    server_setup::run_ansible_playbook(&cfg_for_run, &cfg.permissions.defaults.deploy_user, &extra_args)?;
 
     cfg.ssl.enabled = true;
     config::save(&cfg, bones_toml)?;

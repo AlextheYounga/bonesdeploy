@@ -17,9 +17,6 @@ pub fn run() -> Result<()> {
 
     ensure_ansible_playbook_installed()?;
 
-    let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
-    let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
-
     println!(
         "Running {} against {} as {}...",
         style("server setup").cyan().bold(),
@@ -27,23 +24,21 @@ pub fn run() -> Result<()> {
         style(&cfg.permissions.defaults.deploy_user).cyan(),
     );
 
-    run_ansible_playbook(&cfg, &runtime_config_path, &live_root_parent, &[])?;
+    run_ansible_playbook(&cfg, &cfg.permissions.defaults.deploy_user, &[])?;
 
     println!("\n{} Server setup complete.", style("Done!").green().bold());
 
     Ok(())
 }
 
-pub fn run_ansible_playbook(
-    cfg: &config::BonesConfig,
-    runtime_config_path: &str,
-    live_root_parent: &str,
-    extra_args: &[String],
-) -> Result<()> {
+pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<()> {
     let playbook = Path::new(config::Constants::BONES_SERVER_SETUP_PLAYBOOK);
     if !playbook.is_file() {
         bail!("Missing server setup playbook: {}", playbook.display());
     }
+
+    let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
+    let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
 
     let inventory = format!("{},", cfg.data.host);
 
@@ -52,7 +47,7 @@ pub fn run_ansible_playbook(
         .arg("-i")
         .arg(&inventory)
         .arg("-u")
-        .arg(&cfg.permissions.defaults.deploy_user)
+        .arg(ssh_user)
         .arg("-e")
         .arg(format!("ansible_port={}", cfg.data.port))
         .arg("-e")

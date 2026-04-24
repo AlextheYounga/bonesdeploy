@@ -36,15 +36,16 @@ We create a `bonesremote` executable that does not require a password and allows
 
 ### Bones Toml
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
-Collects only the following project information from the user:
-- `remote_name`: selection from existing git remotes
+Collects the following project information from the user:
 - `project_name`: str
 - `branch`: str
+- `remote_name`: existing remote selection when available, otherwise prompted name
+- `host`: prompted when not inferable from selected remote
+- `port`: defaults to `22`, prompt shown when remote inference is unavailable
+- `git_dir`: inferred from selected remote URL when possible, otherwise prompted
+- `bootstrap_ssh_user`: init-only prompt used to run the first server setup playbook
 
-Everything else is inferred or defaulted for Debian/Ubuntu-first usability:
-- `host`: inferred from selected remote URL
-- `port`: defaults to `22`
-- `git_dir`: inferred from selected remote URL when possible, else defaults to `/home/git/{project_name}.git`
+Everything else is defaulted for Debian/Ubuntu-first usability:
 - `live_root`: defaults to `/var/www/{project_name}`
 - `deploy_root`: defaults to `/srv/deployments/{project_name}`
 - `deploy_on_push`: defaults to `true`
@@ -178,12 +179,12 @@ bonesdeploy/
 
 ### BonesDeploy CLI Commands
 - **init**:
-  - Informs the user that there should be a remote git url set up, explains what's going to happen, and then asks the user for permission to proceed.
   - Gets or creates the `.bones` folder with our default scaffolding.
   - Updates `.gitignore` to add .bones folder.
-  - Loads existing config from `.bones/bones.toml` or collects minimal user input via prompts (`project_name`, `branch`, deployment remote).
-  - Infers host and git directory from the selected remote URL when possible, and applies opinionated defaults for all other settings.
-  - Creates upstream bare repository on remote using the url set in `git remote [remote_name]`, setting it up if it doesn't exist. We fail if no git remote URL is set.
+  - Loads existing config from `.bones/bones.toml` or collects user input via prompts.
+  - Runs `.bones/server/playbooks/setup.yml` first so deploy user/server prerequisites are in place before remote git setup.
+  - Creates local deployment remote if missing using `{deploy_user}@{host}:{git_dir}`.
+  - Creates upstream bare repository on remote using configured host/git directory.
   - Builds and uploads post-receive hook to remote.
   - Saves config to `.bones/bones.toml`.
 

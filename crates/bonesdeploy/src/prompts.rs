@@ -31,16 +31,12 @@ pub fn collect(project_name_hint: &str) -> Result<BonesConfig> {
 }
 
 pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) -> Result<BonesConfig> {
-    let remote_name = prompt_remote_name(seed)?;
     let project_name = prompt_project_name(project_name_hint, seed)?;
     let branch = prompt_branch(seed)?;
+    let remote_name = prompt_remote_name(seed)?;
     let inferred_remote = git::infer_remote_connection_details(&remote_name)?;
     let host = prompt_host(seed, inferred_remote.as_ref())?;
-    let port = inferred_remote
-        .as_ref()
-        .map(|details| details.port.clone())
-        .or_else(|| seed.map(|cfg| cfg.data.port.clone()).filter(|value| !value.is_empty()))
-        .unwrap_or_else(|| String::from("22"));
+    let port = prompt_port(seed, inferred_remote.as_ref())?;
     let git_dir = prompt_git_dir(&project_name, seed, inferred_remote.as_ref())?;
     let live_root = default_live_root(&project_name, seed);
     let deploy_root = default_deploy_root(&project_name, seed);
@@ -92,9 +88,13 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
 fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
     let remotes = git::list_remotes()?;
     if remotes.is_empty() {
-        return Err(anyhow!(
-            "No git remotes found. Add one first (for example: git remote add production git@host:/home/git/project.git)"
-        ));
+        let default_remote =
+            seed.map(|cfg| cfg.data.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
+        return Text::new("Deployment remote name:")
+            .with_default(default_remote)
+            .with_help_message("bonesdeploy will create this git remote if it does not exist")
+            .prompt()
+            .map_err(|err| anyhow!(err));
     }
 
     let default_remote = seed.map(|cfg| cfg.data.remote_name.clone()).filter(|value| !value.is_empty());
@@ -115,6 +115,15 @@ fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
         .with_help_message("Choose the git remote bonesdeploy will manage")
         .prompt()
         .map_err(|err| anyhow!(err))
+}
+
+fn prompt_port(seed: Option<&BonesConfig>, inferred_remote: Option<&git::RemoteConnectionDetails>) -> Result<String> {
+    if let Some(details) = inferred_remote {
+        return Ok(details.port.clone());
+    }
+
+    let default_port = seed.map(|cfg| cfg.data.port.as_str()).filter(|value| !value.is_empty()).unwrap_or("22");
+    Text::new("SSH port:").with_default(default_port).prompt().map_err(|err| anyhow!(err))
 }
 
 fn prompt_project_name(project_name_hint: &str, seed: Option<&BonesConfig>) -> Result<String> {
@@ -171,4 +180,16 @@ fn default_deploy_root(project_name: &str, seed: Option<&BonesConfig>) -> String
 fn prompt_branch(seed: Option<&BonesConfig>) -> Result<String> {
     let default_branch = seed.map(|cfg| cfg.data.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("main");
     Text::new("Branch:").with_default(default_branch).prompt().map_err(|err| anyhow!(err))
+}
+
+pub fn prompt_bootstrap_ssh_user(seed: Option<&BonesConfig>) -> Result<String> {
+    let default_user = seed
+        .map(|cfg| cfg.permissions.defaults.deploy_user.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("root");
+    Text::new("Server SSH user for initial setup:")
+        .with_default(default_user)
+        .with_help_message("Used only for the first ansible run before deploy user access is ready")
+        .prompt()
+        .map_err(|err| anyhow!(err))
 }
