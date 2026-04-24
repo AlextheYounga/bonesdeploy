@@ -199,13 +199,9 @@ fn prompt_branch(seed: Option<&BonesConfig>) -> Result<String> {
     Text::new("Branch:").with_default(default_branch).prompt().map_err(|err| anyhow!(err))
 }
 
-pub fn prompt_bootstrap_ssh_user(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_user = seed
-        .map(|cfg| cfg.permissions.defaults.deploy_user.as_str())
-        .filter(|value| !value.is_empty())
-        .unwrap_or("root");
+pub fn prompt_bootstrap_ssh_user() -> Result<String> {
     Text::new("Server SSH user for initial setup:")
-        .with_default(default_user)
+        .with_default("root")
         .with_help_message("Used only for the first ansible run before deploy user access is ready")
         .prompt()
         .map_err(|err| anyhow!(err))

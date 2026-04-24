@@ -43,7 +43,7 @@ Collects the following project information from the user:
 - `host`: prompted when not inferable from selected remote
 - `port`: defaults to `22`, prompt shown when remote inference is unavailable
 - `git_dir`: inferred from selected remote URL when possible, otherwise prompted
-- `bootstrap_ssh_user`: init-only prompt used to run the first server setup playbook
+- `bootstrap_ssh_user`: init-only prompt (default `root`) used to run the first server setup playbook
 
 Everything else is defaulted for Debian/Ubuntu-first usability:
 - `live_root`: defaults to `/var/www/{project_name}`

@@ -69,7 +69,7 @@ bonesdeploy init
 
 This will:
 1. Create a `.bones/` folder with hooks and deployment script templates
-2. Prompt for project name, branch, remote name, host, git directory, and bootstrap SSH user
+2. Prompt for project name, branch, remote name, host, git directory, and bootstrap SSH user (defaults to `root`)
 3. Add `.bones` to `.gitignore`
 4. Symlink the `pre-push` hook into `.git/hooks/`
 5. Run server setup playbook first (to create deploy user and baseline host state)

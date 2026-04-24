@@ -129,7 +129,7 @@ fn repo_directory_name() -> Result<String> {
 }
 
 fn run_initial_server_setup(cfg: &config::BonesConfig) -> Result<()> {
-    let bootstrap_user = prompts::prompt_bootstrap_ssh_user(Some(cfg))?;
+    let bootstrap_user = prompts::prompt_bootstrap_ssh_user()?;
 
     println!(
         "Running {} against {} as {}...",
