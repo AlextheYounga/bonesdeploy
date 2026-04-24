@@ -88,9 +88,17 @@ bonesdeploy server setup
 ```
 
 This runs `.bones/server/playbooks/setup.yml` locally with Ansible against your configured remote host.
-It installs nginx and provisions a default project vhost that serves `.bones/server/nginx/placeholder/index.html.j2` until your first deployment is live.
+It installs nginx and provisions a default project vhost that serves `.bones/server/roles/nginx/defaults/index.html.j2` until your first deployment is live.
 
 To customize nginx behavior, edit `.bones/server/nginx/site.conf.j2` and re-run `bonesdeploy server setup`.
+
+When DNS is ready, enable SSL with certbot:
+
+```sh
+bonesdeploy server ssl --domain app.example.com --email ops@example.com
+```
+
+This obtains a Let's Encrypt certificate and updates the managed nginx site to listen on 443 and redirect HTTP to HTTPS.
 
 ### Syncing Configuration
 
@@ -167,6 +175,11 @@ type = "file"
 [releases]
 keep = 5
 shared_paths = [".env", "storage"]
+
+[ssl]
+enabled = false
+domain = ""
+email = ""
 ```
 
 Remote host and port are not stored separately in `bones.toml`. BonesDeploy reads that information from the URL configured with `git remote add`.

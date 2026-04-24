@@ -13,6 +13,8 @@ pub struct BonesConfig {
     pub releases: Releases,
     #[serde(default)]
     pub runtime: Runtime,
+    #[serde(default)]
+    pub ssl: Ssl,
 }
 
 pub struct Constants;
@@ -78,6 +80,16 @@ pub struct Runtime {
     pub working_dir: String,
     #[serde(default = "default_runtime_writable_paths")]
     pub writable_paths: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Ssl {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub domain: String,
+    #[serde(default)]
+    pub email: String,
 }
 
 impl Default for Runtime {

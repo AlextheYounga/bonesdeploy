@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use inquire::{Confirm, Select, Text};
 
-use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Runtime};
+use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Runtime, Ssl};
 
 pub fn choose_template(available_templates: &[String]) -> Result<Option<String>> {
     let mut options = Vec::with_capacity(available_templates.len() + 1);
@@ -56,6 +56,7 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
         },
         releases: Releases { keep: releases_keep, shared_paths },
         runtime: seed.map_or_else(Runtime::default, |cfg| cfg.runtime.clone()),
+        ssl: seed.map_or_else(Ssl::default, |cfg| cfg.ssl.clone()),
     })
 }
 

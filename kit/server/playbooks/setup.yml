@@ -13,6 +13,9 @@
     - role: nginx
       tags: [nginx]
 
+    - role: ssl
+      tags: [ssl]
+
     - role: runtime
       tags: [runtime]
 
