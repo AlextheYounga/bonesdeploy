@@ -216,6 +216,10 @@ bonesdeploy/
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders `.bones/server/nginx/site.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
 
+- **manage**
+  - Opens the remote management TUI over SSH (`bonesremote manage --config ...`) with an interactive terminal session.
+  - Acts as a thin local entrypoint so all TUI logic remains server-side in `bonesremote`.
+
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
 
@@ -249,6 +253,9 @@ bonesdeploy/
 	- Resolves `live_root` to the active runtime tree, applies Landlock policy, and `exec`s `runtime.command`.
 - **hooks post-deploy**
 	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.toml`, like for instance setting everything back to be owned by the service user, then prunes old releases. 
+- **manage**
+  - Opens the ratatui management interface with a home menu and pages for Releases, Site, and Traffic.
+  - Provides release state visibility (current, staged, historical) and scaffolded pages for Site and Traffic concerns.
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
 

@@ -4,6 +4,7 @@ mod doctor;
 mod drop_failed_release;
 mod init;
 mod landlock_exec;
+mod manage;
 mod post_deploy;
 mod post_receive;
 mod rollback;
@@ -44,6 +45,12 @@ enum Command {
     Release {
         #[command(subcommand)]
         command: ReleaseCommand,
+    },
+    /// Open interactive server management TUI
+    Manage {
+        /// Path to bones.toml config file
+        #[arg(long)]
+        config: String,
     },
     /// Hook-oriented helper commands
     Hooks {
@@ -134,6 +141,7 @@ pub fn run(cli: &Cli) -> Result<()> {
             ReleaseCommand::DropFailed { config } => drop_failed_release::run(config),
             ReleaseCommand::Rollback { config } => rollback::run(config),
         },
+        Command::Manage { config } => manage::run(config),
         Command::Hooks { command } => match command {
             HookCommand::Deploy { config } => deploy::run(config),
             HookCommand::PostReceive { config } => post_receive::run(config),

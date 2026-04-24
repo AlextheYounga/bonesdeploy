@@ -1,6 +1,7 @@
 mod deploy;
 mod doctor;
 mod init;
+mod manage;
 mod push;
 mod rollback;
 mod server_setup;
@@ -36,6 +37,8 @@ enum Command {
         #[command(subcommand)]
         command: ServerCommand,
     },
+    /// Open remote server management TUI
+    Manage,
     /// Roll back current release to the previous one
     Rollback,
     /// Print the version
@@ -63,6 +66,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,
         Command::Deploy => deploy::run().await,
+        Command::Manage => manage::run(),
         Command::Server { command } => match command {
             ServerCommand::Setup => server_setup::run(),
             ServerCommand::Ssl { domain, email } => server_ssl::run(domain.clone(), email.clone()),
