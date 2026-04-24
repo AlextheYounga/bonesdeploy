@@ -1,3 +1,4 @@
+use std::env;
 use std::path::Path;
 use std::process::Command;
 
@@ -46,13 +47,16 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
     let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
 
     let inventory = format!("{},", cfg.data.host);
+    let roles_path = env::var("ANSIBLE_ROLES_PATH")
+        .ok()
+        .filter(|value| !value.is_empty())
+        .map_or_else(|| roles_dir.display().to_string(), |existing| format!("{}:{existing}", roles_dir.display()));
 
     let mut command = Command::new("ansible-playbook");
+    command.env("ANSIBLE_ROLES_PATH", roles_path);
     command
         .arg("-i")
         .arg(&inventory)
-        .arg("--roles-path")
-        .arg(roles_dir)
         .arg("-u")
         .arg(ssh_user)
         .arg("-e")
