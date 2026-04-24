@@ -1,0 +1,14 @@
+---
+nginx_package_name: nginx
+nginx_service_name: nginx
+
+nginx_site_name: "{{ project_name }}"
+nginx_site_template_path: "{{ playbook_dir }}/../nginx/site.conf.j2"
+nginx_placeholder_template_path: "{{ playbook_dir }}/../roles/nginx/defaults/index.html.j2"
+nginx_placeholder_root: "/var/lib/bonesdeploy/placeholder/{{ project_name }}"
+nginx_server_name: "_"
+nginx_ssl_enabled: false
+nginx_ssl_certificate_path: "/etc/letsencrypt/live/{{ nginx_server_name }}/fullchain.pem"
+nginx_ssl_certificate_key_path: "/etc/letsencrypt/live/{{ nginx_server_name }}/privkey.pem"
+
+nginx_disable_default_site: true

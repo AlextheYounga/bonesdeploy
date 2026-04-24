@@ -27,9 +27,28 @@ pub fn run() -> Result<()> {
         style(&cfg.permissions.defaults.deploy_user).cyan(),
     );
 
+    run_ansible_playbook(&cfg, &runtime_config_path, &live_root_parent, &[])?;
+
+    println!("\n{} Server setup complete.", style("Done!").green().bold());
+
+    Ok(())
+}
+
+pub fn run_ansible_playbook(
+    cfg: &config::BonesConfig,
+    runtime_config_path: &str,
+    live_root_parent: &str,
+    extra_args: &[String],
+) -> Result<()> {
+    let playbook = Path::new(config::Constants::BONES_SERVER_SETUP_PLAYBOOK);
+    if !playbook.is_file() {
+        bail!("Missing server setup playbook: {}", playbook.display());
+    }
+
     let inventory = format!("{},", cfg.data.host);
 
-    let status = Command::new("ansible-playbook")
+    let mut command = Command::new("ansible-playbook");
+    command
         .arg("-i")
         .arg(&inventory)
         .arg("-u")
@@ -51,21 +70,33 @@ pub fn run() -> Result<()> {
         .arg("-e")
         .arg(format!("git_dir={}", cfg.data.git_dir))
         .arg("-e")
-        .arg(format!("runtime_config_path={runtime_config_path}"))
-        .arg(playbook)
-        .status()
-        .context("Failed to run ansible-playbook")?;
+        .arg(format!("runtime_config_path={runtime_config_path}"));
+
+    if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
+        command
+            .arg("-e")
+            .arg(format!("nginx_server_name={}", cfg.ssl.domain))
+            .arg("-e")
+            .arg("nginx_ssl_enabled=true")
+            .arg("-e")
+            .arg(format!("nginx_ssl_certificate_path=/etc/letsencrypt/live/{}/fullchain.pem", cfg.ssl.domain))
+            .arg("-e")
+            .arg(format!("nginx_ssl_certificate_key_path=/etc/letsencrypt/live/{}/privkey.pem", cfg.ssl.domain));
+    }
+
+    command.args(extra_args);
+    command.arg(playbook);
+
+    let status = command.status().context("Failed to run ansible-playbook")?;
 
     if !status.success() {
         bail!("ansible-playbook failed with status {status}");
     }
 
-    println!("\n{} Server setup complete.", style("Done!").green().bold());
-
     Ok(())
 }
 
-fn ensure_ansible_playbook_installed() -> Result<()> {
+pub(crate) fn ensure_ansible_playbook_installed() -> Result<()> {
     let status = Command::new("ansible-playbook")
         .arg("--version")
         .status()
@@ -78,7 +109,7 @@ fn ensure_ansible_playbook_installed() -> Result<()> {
     Ok(())
 }
 
-fn resolve_live_root_parent(live_root: &str) -> String {
+pub(crate) fn resolve_live_root_parent(live_root: &str) -> String {
     Path::new(live_root)
         .parent()
         .filter(|path| !path.as_os_str().is_empty())

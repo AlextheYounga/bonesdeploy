@@ -17,6 +17,15 @@ We create a `bonesremote` executable that does not require a password and allows
 .bones  
 ├── bones.toml  
 ├── hooks.sh
+├── server
+│   ├── nginx
+│   │   └── site.conf.j2
+│   ├── playbooks
+│   │   └── setup.yml
+│   └── roles
+│       └── nginx
+│           └── defaults
+│               └── index.html.j2
 ├── deployment  
 │   ├── 01_run_deployment_concerns.sh
 │   └── 02_permissions_lockup.sh (example)  
@@ -99,6 +108,11 @@ shared_paths = [".env", "storage"]
 command = ["/usr/bin/node", "server.js"]
 working_dir = "."
 writable_paths = []
+
+[ssl]
+enabled = true
+domain = "app.example.com"
+email = "ops@example.com"
 ```
 
 ### Hooks
@@ -194,6 +208,13 @@ bonesdeploy/
 - **server setup**
   - Runs `.bones/server/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
   - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, `git_dir`, and `runtime_config_path` from `bones.toml` as playbook variables.
+  - Installs nginx and provisions a project default site from `.bones/server/nginx/site.conf.j2`.
+  - Seeds a placeholder page from `.bones/server/roles/nginx/defaults/index.html.j2` so the host serves a branded default page before first deployment.
+
+- **server ssl**
+  - Runs the SSL Ansible role against the configured host.
+  - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
+  - Re-renders `.bones/server/nginx/site.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
 
 - **version**:
   - Echoes "bonesdeploy 0.1.0".

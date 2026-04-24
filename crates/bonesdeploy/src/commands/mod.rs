@@ -4,6 +4,7 @@ mod init;
 mod push;
 mod rollback;
 mod server_setup;
+mod server_ssl;
 mod version;
 
 use anyhow::Result;
@@ -45,6 +46,15 @@ enum Command {
 enum ServerCommand {
     /// Run server setup playbook against configured host
     Setup,
+    /// Obtain and configure SSL certificates with certbot
+    Ssl {
+        /// Domain name for the certificate (e.g. app.example.com)
+        #[arg(long)]
+        domain: Option<String>,
+        /// Email used for Let's Encrypt registration and notices
+        #[arg(long)]
+        email: Option<String>,
+    },
 }
 
 pub async fn run(cli: &Cli) -> Result<()> {
@@ -55,6 +65,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Deploy => deploy::run().await,
         Command::Server { command } => match command {
             ServerCommand::Setup => server_setup::run(),
+            ServerCommand::Ssl { domain, email } => server_ssl::run(domain.clone(), email.clone()),
         },
         Command::Rollback => rollback::run().await,
         Command::Version => {

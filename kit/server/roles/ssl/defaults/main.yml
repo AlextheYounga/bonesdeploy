@@ -1,0 +1,8 @@
+---
+ssl_enabled: false
+ssl_domain: ""
+ssl_email: ""
+ssl_certbot_package: certbot
+
+ssl_cert_path: "/etc/letsencrypt/live/{{ ssl_domain }}/fullchain.pem"
+ssl_key_path: "/etc/letsencrypt/live/{{ ssl_domain }}/privkey.pem"
