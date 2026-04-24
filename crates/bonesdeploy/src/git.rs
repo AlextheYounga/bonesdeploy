@@ -22,8 +22,8 @@ pub fn ensure_git_repository() -> Result<()> {
 }
 
 pub fn remote_exists(remote_name: &str) -> Result<bool> {
-    let status = Command::new("git").args(["remote", "get-url", remote_name]).status().context("Failed to run git")?;
-    Ok(status.success())
+    let output = Command::new("git").args(["remote", "get-url", remote_name]).output().context("Failed to run git")?;
+    Ok(output.status.success())
 }
 
 pub fn add_remote(remote_name: &str, remote_url: &str) -> Result<()> {

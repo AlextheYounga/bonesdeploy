@@ -174,8 +174,9 @@ fn prompt_git_dir(
         .map(|cfg| cfg.data.git_dir.as_str())
         .filter(|value| !value.is_empty())
         .map_or_else(|| format!("/home/git/{project_name}.git"), |value| value.replace("<project_name>", project_name));
-    Text::new("Git directory (could not infer from remote URL):")
+    Text::new("Git directory on server:")
         .with_default(&default_git_dir)
+        .with_help_message("Path for the bare repo, e.g. /home/git/<project>.git")
         .prompt()
         .map_err(|err| anyhow!(err))
 }
