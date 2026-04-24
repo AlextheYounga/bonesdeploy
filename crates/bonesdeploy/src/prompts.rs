@@ -34,7 +34,8 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
     let project_name = prompt_project_name(project_name_hint, seed)?;
     let branch = prompt_branch(seed)?;
     let remote_name = prompt_remote_name(seed)?;
-    let inferred_remote = git::infer_remote_connection_details(&remote_name)?;
+    let inferred_remote =
+        if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
     let host = prompt_host(seed, inferred_remote.as_ref())?;
     let port = prompt_port(seed, inferred_remote.as_ref())?;
     let git_dir = prompt_git_dir(&project_name, seed, inferred_remote.as_ref())?;
@@ -86,6 +87,8 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
 }
 
 fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
+    const CREATE_REMOTE_OPTION: &str = "Create new deployment remote";
+
     let remotes = git::list_remotes()?;
     if remotes.is_empty() {
         let default_remote =
@@ -98,7 +101,7 @@ fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
     }
 
     let default_remote = seed.map(|cfg| cfg.data.remote_name.clone()).filter(|value| !value.is_empty());
-    let options = if let Some(default_remote) = default_remote {
+    let mut options = if let Some(default_remote) = default_remote {
         if remotes.contains(&default_remote) {
             let mut ordered = Vec::with_capacity(remotes.len());
             ordered.push(default_remote.clone());
@@ -110,11 +113,24 @@ fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
     } else {
         remotes
     };
+    options.push(String::from(CREATE_REMOTE_OPTION));
 
-    Select::new("Deployment remote:", options)
+    let choice = Select::new("Deployment remote:", options)
         .with_help_message("Choose the git remote bonesdeploy will manage")
         .prompt()
-        .map_err(|err| anyhow!(err))
+        .map_err(|err| anyhow!(err))?;
+
+    if choice == CREATE_REMOTE_OPTION {
+        let default_remote =
+            seed.map(|cfg| cfg.data.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
+        return Text::new("Deployment remote name:")
+            .with_default(default_remote)
+            .with_help_message("bonesdeploy will create this git remote if it does not exist")
+            .prompt()
+            .map_err(|err| anyhow!(err));
+    }
+
+    Ok(choice)
 }
 
 fn prompt_port(seed: Option<&BonesConfig>, inferred_remote: Option<&git::RemoteConnectionDetails>) -> Result<String> {
@@ -138,9 +154,9 @@ fn prompt_host(seed: Option<&BonesConfig>, inferred_remote: Option<&git::RemoteC
     }
 
     let default_host = seed.map(|cfg| cfg.data.host.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
-    Text::new("Host (could not infer from remote URL):")
+    Text::new("Server host or IP:")
         .with_default(default_host)
-        .with_help_message("e.g. deploy.example.com")
+        .with_help_message("e.g. deploy.example.com or 203.0.113.10")
         .prompt()
         .map_err(|err| anyhow!(err))
 }
