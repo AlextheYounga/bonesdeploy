@@ -17,13 +17,16 @@ pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
 
     let deploy_root = Path::new(&cfg.data.deploy_root);
+    let build_root = release_state::build_root(&cfg);
     let releases_dir = release_state::releases_dir(&cfg);
     let shared_dir = release_state::shared_dir(&cfg);
 
     fs::create_dir_all(deploy_root)
         .with_context(|| format!("Failed to create deploy_root: {}", deploy_root.display()))?;
     fs::create_dir_all(&releases_dir)
-        .with_context(|| format!("Failed to create releases dir: {}", releases_dir.display()))?;
+        .with_context(|| format!("Failed to create runtime dir: {}", releases_dir.display()))?;
+    fs::create_dir_all(&build_root)
+        .with_context(|| format!("Failed to create build workspace: {}", build_root.display()))?;
     fs::create_dir_all(&shared_dir)
         .with_context(|| format!("Failed to create shared dir: {}", shared_dir.display()))?;
 
@@ -35,6 +38,7 @@ pub fn run(config_path: &str) -> Result<()> {
     ensure_live_root_symlink(&cfg)?;
 
     permissions::chown_paths_to_deploy_user(&cfg, &[deploy_root, releases_dir.as_path()], false)?;
+    permissions::chown_paths_to_deploy_user(&cfg, &[build_root.as_path()], true)?;
     permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path(), shared_dir.as_path()], true)?;
     release_state::write_staged_release(&cfg, &release_name)?;
 

@@ -1,5 +1,5 @@
 ---
 deploy_user: git
-service_user: applications
+service_user: "{{ project_name }}"
 group: www-data
 live_root_parent: /var/www

@@ -16,11 +16,16 @@ pub fn run(config_path: &str) -> Result<()> {
 
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
-    let release_path = release_state::release_dir(&cfg, &release_name);
+    let runtime_path = release_state::release_dir(&cfg, &release_name);
+    let build_root = release_state::build_root(&cfg);
     let deployment_dir = Path::new(&cfg.data.git_dir).join("bones").join("deployment");
 
-    if !release_path.exists() {
-        bail!("Staged release directory does not exist: {}", release_path.display());
+    if !runtime_path.exists() {
+        bail!("Staged runtime directory does not exist: {}", runtime_path.display());
+    }
+
+    if !build_root.exists() {
+        bail!("Build workspace does not exist: {}", build_root.display());
     }
 
     let scripts = list_deployment_scripts(&deployment_dir)?;
@@ -33,7 +38,7 @@ pub fn run(config_path: &str) -> Result<()> {
 
             let status = Command::new("bash")
                 .arg(&script)
-                .current_dir(&release_path)
+                .current_dir(&build_root)
                 .status()
                 .with_context(|| format!("Failed to execute deployment script {}", script.display()))?;
 
@@ -48,7 +53,46 @@ pub fn run(config_path: &str) -> Result<()> {
         println!("All deployment scripts completed.");
     }
 
+    publish_runtime_tree(&build_root, &runtime_path)?;
+
     activate_release::run(config_path)
+}
+
+fn publish_runtime_tree(build_root: &Path, runtime_path: &Path) -> Result<()> {
+    clear_directory(runtime_path)?;
+
+    let copy_source = build_root.join(".");
+    let status = Command::new("cp").arg("-a").arg(&copy_source).arg(runtime_path).status().with_context(|| {
+        format!("Failed to copy build workspace {} to runtime tree {}", build_root.display(), runtime_path.display())
+    })?;
+
+    if !status.success() {
+        bail!(
+            "Failed to publish runtime tree from {} to {}: status {status}",
+            build_root.display(),
+            runtime_path.display()
+        );
+    }
+
+    println!("Published runtime tree: {}", runtime_path.display());
+    Ok(())
+}
+
+fn clear_directory(path: &Path) -> Result<()> {
+    for entry in fs::read_dir(path).with_context(|| format!("Failed to read directory {}", path.display()))? {
+        let entry = entry?;
+        let entry_path = entry.path();
+        let file_type = entry.file_type().with_context(|| format!("Failed to inspect {}", entry_path.display()))?;
+
+        if file_type.is_dir() {
+            fs::remove_dir_all(&entry_path)
+                .with_context(|| format!("Failed to remove directory {}", entry_path.display()))?;
+        } else {
+            fs::remove_file(&entry_path).with_context(|| format!("Failed to remove {}", entry_path.display()))?;
+        }
+    }
+
+    Ok(())
 }
 
 fn list_deployment_scripts(deployment_dir: &Path) -> Result<Vec<PathBuf>> {

@@ -18,6 +18,7 @@ pub fn run() -> Result<()> {
     ensure_ansible_playbook_installed()?;
 
     let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
+    let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
 
     println!(
         "Running {} against {} as {}...",
@@ -43,6 +44,14 @@ pub fn run() -> Result<()> {
         .arg(format!("group={}", cfg.permissions.defaults.group))
         .arg("-e")
         .arg(format!("live_root_parent={live_root_parent}"))
+        .arg("-e")
+        .arg(format!("live_root={}", cfg.data.live_root))
+        .arg("-e")
+        .arg(format!("project_name={}", cfg.data.project_name))
+        .arg("-e")
+        .arg(format!("git_dir={}", cfg.data.git_dir))
+        .arg("-e")
+        .arg(format!("runtime_config_path={runtime_config_path}"))
         .arg(playbook)
         .status()
         .context("Failed to run ansible-playbook")?;

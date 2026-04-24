@@ -1,0 +1,6 @@
+---
+runtime_service_name: "{{ project_name }}"
+runtime_config_path: "{{ git_dir }}/bones/bones.toml"
+runtime_restart: always
+runtime_enable_service: false
+runtime_service_state: stopped

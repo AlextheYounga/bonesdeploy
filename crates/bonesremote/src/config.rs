@@ -11,6 +11,8 @@ pub struct BonesConfig {
     pub permissions: Permissions,
     #[serde(default)]
     pub releases: Releases,
+    #[serde(default)]
+    pub runtime: Runtime,
 }
 
 pub struct Constants;
@@ -19,7 +21,9 @@ impl Constants {
     pub const BINARY_NAME: &str = "bonesremote";
     pub const SUDOERS_PATH: &str = "/etc/sudoers.d/bonesdeploy";
     pub const STAGED_RELEASE_FILE: &str = ".staged_release";
-    pub const RELEASES_DIR: &str = "releases";
+    pub const BUILD_DIR: &str = "build";
+    pub const BUILD_WORKSPACE_DIR: &str = "workspace";
+    pub const RUNTIME_DIR: &str = "runtime";
     pub const SHARED_DIR: &str = "shared";
     pub const CURRENT_LINK: &str = "current";
 }
@@ -52,6 +56,26 @@ pub struct Releases {
     pub keep: usize,
     #[serde(default)]
     pub shared_paths: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Runtime {
+    #[serde(default)]
+    pub command: Vec<String>,
+    #[serde(default = "default_runtime_working_dir")]
+    pub working_dir: String,
+    #[serde(default = "default_runtime_writable_paths")]
+    pub writable_paths: Vec<String>,
+}
+
+impl Default for Runtime {
+    fn default() -> Self {
+        Self {
+            command: Vec::new(),
+            working_dir: default_runtime_working_dir(),
+            writable_paths: default_runtime_writable_paths(),
+        }
+    }
 }
 
 impl Default for Releases {
@@ -120,7 +144,7 @@ fn default_deploy_user() -> String {
     "git".into()
 }
 fn default_service_user() -> String {
-    "applications".into()
+    String::new()
 }
 fn default_group() -> String {
     "www-data".into()
@@ -131,10 +155,21 @@ fn default_dir_mode() -> String {
 fn default_file_mode() -> String {
     "640".into()
 }
+fn default_runtime_working_dir() -> String {
+    ".".into()
+}
+fn default_runtime_writable_paths() -> Vec<String> {
+    Vec::new()
+}
 
 pub fn load(path: &Path) -> Result<BonesConfig> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let config: BonesConfig =
+    let mut config: BonesConfig =
         toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+
+    if config.permissions.defaults.service_user.is_empty() {
+        config.permissions.defaults.service_user = config.data.project_name.clone();
+    }
+
     Ok(config)
 }

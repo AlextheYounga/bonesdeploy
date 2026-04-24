@@ -13,18 +13,17 @@ pub fn run(config_path: &str) -> Result<()> {
     privileges::ensure_not_root("bonesremote hooks post-receive")?;
 
     let cfg = config::load(Path::new(config_path))?;
-    let release_name = release_state::read_staged_release(&cfg)?;
-    let release_path = release_state::release_dir(&cfg, &release_name);
+    let build_root = release_state::build_root(&cfg);
 
-    if !release_path.exists() {
-        bail!("Staged release directory does not exist: {}", release_path.display());
+    if !build_root.exists() {
+        bail!("Build workspace does not exist: {}", build_root.display());
     }
 
-    println!("Checking out {} to {}...", cfg.data.branch, release_path.display());
+    println!("Checking out {} to {}...", cfg.data.branch, build_root.display());
 
     let status = Command::new("git")
         .arg("--work-tree")
-        .arg(&release_path)
+        .arg(&build_root)
         .arg("--git-dir")
         .arg(&cfg.data.git_dir)
         .arg("checkout")
@@ -32,7 +31,7 @@ pub fn run(config_path: &str) -> Result<()> {
         .arg(&cfg.data.branch)
         .status()
         .with_context(|| {
-            format!("Failed to run git checkout for branch '{}' into {}", cfg.data.branch, release_path.display())
+            format!("Failed to run git checkout for branch '{}' into {}", cfg.data.branch, build_root.display())
         })?;
 
     if !status.success() {

@@ -1,7 +1,7 @@
 use anyhow::{Result, anyhow};
 use inquire::{Confirm, Select, Text};
 
-use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases};
+use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Runtime};
 
 pub fn choose_template(available_templates: &[String]) -> Result<Option<String>> {
     let mut options = Vec::with_capacity(available_templates.len() + 1);
@@ -40,7 +40,7 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
     let branch = prompt_branch(seed)?;
     let deploy_on_push = prompt_deploy_on_push(seed)?;
     let deploy_user = prompt_deploy_user(seed)?;
-    let service_user = prompt_service_user(seed)?;
+    let service_user = prompt_service_user(&project_name, seed)?;
     let group = prompt_group(seed)?;
     let dir_mode = prompt_dir_mode(seed)?;
     let file_mode = prompt_file_mode(seed)?;
@@ -55,6 +55,7 @@ pub fn collect_from_seed(project_name_hint: &str, seed: Option<&BonesConfig>) ->
             paths: path_overrides,
         },
         releases: Releases { keep: releases_keep, shared_paths },
+        runtime: seed.map_or_else(Runtime::default, |cfg| cfg.runtime.clone()),
     })
 }
 
@@ -119,7 +120,7 @@ fn prompt_deploy_root(project_name: &str, seed: Option<&BonesConfig>) -> Result<
         );
     Text::new("Deploy root on remote:")
         .with_default(&default_deploy_root)
-        .with_help_message("Stores releases/, shared/, and current")
+        .with_help_message("Stores build/workspace, runtime/, shared/, and current")
         .prompt()
         .map_err(|err| anyhow!(err))
 }
@@ -149,11 +150,11 @@ fn prompt_deploy_user(seed: Option<&BonesConfig>) -> Result<String> {
     Text::new("Deploy user (SSH user):").with_default(default_deploy_user).prompt().map_err(|err| anyhow!(err))
 }
 
-fn prompt_service_user(seed: Option<&BonesConfig>) -> Result<String> {
+fn prompt_service_user(project_name: &str, seed: Option<&BonesConfig>) -> Result<String> {
     let default_service_user = seed
         .map(|cfg| cfg.permissions.defaults.service_user.as_str())
         .filter(|value| !value.is_empty())
-        .unwrap_or("applications");
+        .unwrap_or(project_name);
     Text::new("Service user (final file owner):")
         .with_default(default_service_user)
         .prompt()

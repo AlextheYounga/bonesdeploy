@@ -19,7 +19,7 @@ pub fn run(config_path: &str) -> Result<()> {
     let current_idx = releases
         .iter()
         .position(|name| name == &current_name)
-        .with_context(|| format!("Current release '{current_name}' was not found in releases/"))?;
+        .with_context(|| format!("Current release '{current_name}' was not found in runtime/"))?;
 
     if current_idx == 0 {
         bail!("Current release is already the oldest release; cannot roll back");

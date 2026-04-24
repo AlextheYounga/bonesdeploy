@@ -3,6 +3,7 @@ mod deploy;
 mod doctor;
 mod drop_failed_release;
 mod init;
+mod landlock_exec;
 mod post_deploy;
 mod post_receive;
 mod rollback;
@@ -29,7 +30,16 @@ enum Command {
         deploy_user: String,
     },
     /// Check server environment health
-    Doctor,
+    Doctor {
+        /// Optional path to bones.toml for runtime checks
+        #[arg(long)]
+        config: Option<String>,
+    },
+    /// Runtime isolation launcher commands
+    Landlock {
+        #[command(subcommand)]
+        command: LandlockCommand,
+    },
     /// Release lifecycle operations
     Release {
         #[command(subcommand)]
@@ -100,10 +110,23 @@ enum HookCommand {
     },
 }
 
+#[derive(Subcommand)]
+enum LandlockCommand {
+    /// Apply Landlock and exec the runtime command
+    Exec {
+        /// Path to bones.toml config file
+        #[arg(long)]
+        config: String,
+    },
+}
+
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init { deploy_user } => init::run(deploy_user),
-        Command::Doctor => doctor::run(),
+        Command::Doctor { config } => doctor::run(config.as_deref()),
+        Command::Landlock { command } => match command {
+            LandlockCommand::Exec { config } => landlock_exec::run(config),
+        },
         Command::Release { command } => match command {
             ReleaseCommand::Stage { config } => stage_release::run(config),
             ReleaseCommand::Wire { config } => wire_release::run(config),

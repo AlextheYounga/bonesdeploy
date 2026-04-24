@@ -49,7 +49,11 @@ pub fn release_dir(cfg: &BonesConfig, release: &str) -> PathBuf {
 }
 
 pub fn releases_dir(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.deploy_root).join(Constants::RELEASES_DIR)
+    Path::new(&cfg.data.deploy_root).join(Constants::RUNTIME_DIR)
+}
+
+pub fn build_root(cfg: &BonesConfig) -> PathBuf {
+    Path::new(&cfg.data.deploy_root).join(Constants::BUILD_DIR).join(Constants::BUILD_WORKSPACE_DIR)
 }
 
 pub fn shared_dir(cfg: &BonesConfig) -> PathBuf {

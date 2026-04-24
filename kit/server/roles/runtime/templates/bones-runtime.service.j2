@@ -1,0 +1,14 @@
+[Unit]
+Description=Bones runtime for {{ runtime_service_name }}
+After=network.target
+
+[Service]
+Type=simple
+User={{ service_user }}
+WorkingDirectory={{ live_root }}
+ExecStart=/usr/local/bin/bonesremote landlock exec --config {{ runtime_config_path }}
+Restart={{ runtime_restart }}
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

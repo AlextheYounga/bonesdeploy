@@ -10,14 +10,14 @@ use crate::release_state;
 pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
-    let release_dir = release_state::release_dir(&cfg, &release_name);
+    let build_root = release_state::build_root(&cfg);
     let shared_dir = release_state::shared_dir(&cfg);
 
     for shared_path in &cfg.releases.shared_paths {
-        wire_path(&release_dir, &shared_dir, shared_path)?;
+        wire_path(&build_root, &shared_dir, shared_path)?;
     }
 
-    println!("Wired release: {release_name}");
+    println!("Wired build workspace for staged runtime: {release_name}");
     Ok(())
 }
 

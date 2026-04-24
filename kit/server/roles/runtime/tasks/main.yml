@@ -1,0 +1,18 @@
+---
+- name: Ensure runtime service unit is installed
+  ansible.builtin.template:
+    src: bones-runtime.service.j2
+    dest: "/etc/systemd/system/{{ runtime_service_name }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+  tags: [runtime]
+
+- name: Ensure runtime service enable/state
+  ansible.builtin.systemd:
+    name: "{{ runtime_service_name }}"
+    enabled: "{{ runtime_enable_service }}"
+    state: "{{ runtime_service_state }}"
+    daemon_reload: true
+  tags: [runtime]
