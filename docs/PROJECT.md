@@ -17,6 +17,13 @@ We create a `bonesremote` executable that does not require a password and allows
 .bones  
 ├── bones.toml  
 ├── hooks.sh
+├── server
+│   ├── nginx
+│   │   ├── site.conf.j2
+│   │   └── placeholder
+│   │       └── index.html.j2
+│   └── playbooks
+│       └── setup.yml
 ├── deployment  
 │   ├── 01_run_deployment_concerns.sh
 │   └── 02_permissions_lockup.sh (example)  
@@ -194,6 +201,8 @@ bonesdeploy/
 - **server setup**
   - Runs `.bones/server/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
   - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, `git_dir`, and `runtime_config_path` from `bones.toml` as playbook variables.
+  - Installs nginx and provisions a project default site from `.bones/server/nginx/site.conf.j2`.
+  - Seeds a placeholder page from `.bones/server/nginx/placeholder/index.html.j2` so the host serves a branded default page before first deployment.
 
 - **version**:
   - Echoes "bonesdeploy 0.1.0".

@@ -88,6 +88,9 @@ bonesdeploy server setup
 ```
 
 This runs `.bones/server/playbooks/setup.yml` locally with Ansible against your configured remote host.
+It installs nginx and provisions a default project vhost that serves `.bones/server/nginx/placeholder/index.html.j2` until your first deployment is live.
+
+To customize nginx behavior, edit `.bones/server/nginx/site.conf.j2` and re-run `bonesdeploy server setup`.
 
 ### Syncing Configuration
 

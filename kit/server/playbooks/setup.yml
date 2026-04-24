@@ -10,6 +10,9 @@
     - role: common
       tags: [common]
 
+    - role: nginx
+      tags: [nginx]
+
     - role: runtime
       tags: [runtime]
 
