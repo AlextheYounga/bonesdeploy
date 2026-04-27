@@ -74,7 +74,7 @@ This will:
 4. Symlink the `pre-push` hook into `.git/hooks/`
 5. Create a local deployment git remote if needed
 
-BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.toml`:
+BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.yaml`:
 
 - `port = "22"`
 - `live_root = "/var/www/<project_name>"`
@@ -147,49 +147,47 @@ bonesdeploy doctor --local  # check local only
 
 ## Configuration
 
-`bonesdeploy init` generates `.bones/bones.toml`:
+`bonesdeploy init` generates `.bones/bones.yaml`:
 
-```toml
-[data]
-remote_name = "production"
-project_name = "myproject"
-git_dir = "/home/git/myproject.git"
-live_root = "/var/www/myproject"
-deploy_root = "/srv/deployments/myproject"
-branch = "master"
-deploy_on_push = true
+```yaml
+data:
+  remote_name: "production"
+  project_name: "myproject"
+  git_dir: "/home/git/myproject.git"
+  live_root: "/var/www/myproject"
+  deploy_root: "/srv/deployments/myproject"
+  branch: "master"
+  deploy_on_push: true
 
-[permissions.defaults]
-deploy_user = "git"
-service_user = "applications"
-group = "www-data"
-dir_mode = "750"
-file_mode = "640"
+permissions:
+  defaults:
+    deploy_user: "git"
+    service_user: "applications"
+    group: "www-data"
+    dir_mode: "750"
+    file_mode: "640"
+  paths:
+    - path: "storage"
+      mode: "770"
+      recursive: true
+    - path: "database/database.sqlite"
+      mode: "660"
+      type: "file"
 
-[[permissions.paths]]
-path = "storage"
-mode = "770"
-recursive = true
-
-[[permissions.paths]]
-path = "database/database.sqlite"
-mode = "660"
-type = "file"
-
-[releases]
-keep = 5
-shared_paths = [".env", "storage"]
+releases:
+  keep: 5
+  shared_paths: [".env", "storage"]
 
 # Optional runtime launcher settings (only needed for service/landlock-managed apps).
-# [runtime]
-# command = ["/usr/bin/node", "server.js"]
-# working_dir = "."
-# writable_paths = []
+# runtime:
+#   command: ["/usr/bin/node", "server.js"]
+#   working_dir: "."
+#   writable_paths: []
 
-[ssl]
-enabled = false
-domain = ""
-email = ""
+ssl:
+  enabled: false
+  domain: ""
+  email: ""
 ```
 
 `host` and `git_dir` are inferred from the deployment remote URL when possible; if parsing fails, init asks only for those missing values.
@@ -198,7 +196,7 @@ email = ""
 
 ```
 .bones/
-├── bones.toml           # project configuration
+├── bones.yaml           # project configuration
 ├── hooks.sh             # shared hook functions imported by hook entrypoints
 ├── deployment/
 │   └── 01_*.sh          # deployment scripts (run sequentially)

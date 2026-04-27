@@ -1,7 +1,7 @@
-bones_init_remote_context() {
+	bones_init_remote_context() {
 	local git_dir_input="${1:-${GIT_DIR:-.}}"
 	GIT_DIR=$(cd "$git_dir_input" && pwd)
-	BONES_TOML="$GIT_DIR/bones/bones.toml"
+	BONES_YAML="$GIT_DIR/bones/bones.yaml"
 }
 
 bones_should_deploy_on_push() {
@@ -10,7 +10,7 @@ bones_should_deploy_on_push() {
 	fi
 
 	local deploy_on_push
-	deploy_on_push=$(grep -E '^deploy_on_push\s*=' "$BONES_TOML" | head -1 | sed 's/#.*$//' | sed 's/.*=\s*//' | tr -d '[:space:]')
+	deploy_on_push=$(grep -E '^[[:space:]]*deploy_on_push:[[:space:]]*' "$BONES_YAML" | head -1 | sed 's/#.*$//' | sed 's/^[^:]*:[[:space:]]*//' | tr -d '[:space:]')
 
 	if [ -z "$deploy_on_push" ]; then
 		return 0
@@ -26,7 +26,7 @@ bones_should_deploy_on_push() {
 	bones_run_doctor_remote() {
 		echo "[bonesdeploy] Running remote doctor..."
 
-		if ! bonesremote doctor --config "$BONES_TOML"; then
+		if ! bonesremote doctor --config "$BONES_YAML"; then
 			echo "[bonesdeploy] Remote doctor reported issues. Push rejected."
 			exit 1
 		fi
@@ -35,7 +35,7 @@ bones_should_deploy_on_push() {
 }
 
 bones_stage_release() {
-	if ! sudo bonesremote release stage --config "$BONES_TOML"; then
+	if ! sudo bonesremote release stage --config "$BONES_YAML"; then
 		echo "[bonesdeploy] release stage failed. Push rejected."
 		exit 1
 	fi
@@ -46,7 +46,7 @@ bones_stage_release() {
 	bones_wire_release() {
 		echo "[bonesdeploy] Running post-receive checkout + release wiring..."
 
-		if ! bonesremote hooks post-receive --config "$BONES_TOML"; then
+		if ! bonesremote hooks post-receive --config "$BONES_YAML"; then
 			echo "[bonesdeploy] post-receive hook command failed."
 			exit 1
 		fi
@@ -57,7 +57,7 @@ bones_stage_release() {
 	bones_run_deployment() {
 		echo "[bonesdeploy] Running deploy hook command..."
 
-		if ! bonesremote hooks deploy --config "$BONES_TOML"; then
+		if ! bonesremote hooks deploy --config "$BONES_YAML"; then
 			echo "[bonesdeploy] deploy hook command failed."
 			exit 1
 		fi
@@ -68,7 +68,7 @@ bones_stage_release() {
 bones_post_deploy() {
 	echo "[bonesdeploy] Running post-deploy (hardening permissions)..."
 
-	if ! sudo bonesremote hooks post-deploy --config "$BONES_TOML"; then
+	if ! sudo bonesremote hooks post-deploy --config "$BONES_YAML"; then
 		echo "[bonesdeploy] post-deploy failed."
 		exit 1
 	fi
@@ -77,7 +77,7 @@ bones_post_deploy() {
 }
 
 bones_read_local_remote_name() {
-	grep -E '^remote_name\s*=' .bones/bones.toml | head -1 | sed 's/.*=\s*"\(.*\)"/\1/'
+	grep -E '^[[:space:]]*remote_name:[[:space:]]*' .bones/bones.yaml | head -1 | sed 's/#.*$//' | sed 's/^[^:]*:[[:space:]]*//' | sed "s/^'//" | sed "s/'$//" | sed 's/^"//' | sed 's/"$//'
 }
 
 bones_should_run_for_remote() {
@@ -85,7 +85,7 @@ bones_should_run_for_remote() {
 	BONES_REMOTE=$(bones_read_local_remote_name)
 
 	if [ -z "$BONES_REMOTE" ]; then
-		echo "[bonesdeploy] Warning: Could not read remote_name from .bones/bones.toml"
+		echo "[bonesdeploy] Warning: Could not read remote_name from .bones/bones.yaml"
 		return 1
 	fi
 

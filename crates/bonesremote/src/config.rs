@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
+use saphyr::{LoadableYamlNode, Yaml};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -164,12 +165,144 @@ fn default_runtime_writable_paths() -> Vec<String> {
 
 pub fn load(path: &Path) -> Result<BonesConfig> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let mut config: BonesConfig =
-        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    let yaml = parse_yaml_document(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+
+    let data_section = yaml.as_mapping_get("data");
+    let permissions_section = yaml.as_mapping_get("permissions");
+    let defaults_section = permissions_section.and_then(|permissions| permissions.as_mapping_get("defaults"));
+    let releases_section = yaml.as_mapping_get("releases");
+    let runtime_section = yaml.as_mapping_get("runtime");
+
+    let mut config = BonesConfig {
+        data: Data {
+            remote_name: read_string_field(data_section, "remote_name", String::new()),
+            project_name: read_string_field(data_section, "project_name", String::new()),
+            host: read_string_field(data_section, "host", String::new()),
+            port: read_string_field(data_section, "port", default_port()),
+            git_dir: read_string_field(data_section, "git_dir", String::new()),
+            live_root: read_string_field(data_section, "live_root", String::new()),
+            deploy_root: read_string_field(data_section, "deploy_root", String::new()),
+            branch: read_string_field(data_section, "branch", default_branch()),
+            deploy_on_push: read_bool_field(data_section, "deploy_on_push", default_deploy_on_push()),
+        },
+        permissions: Permissions {
+            defaults: PermissionDefaults {
+                deploy_user: read_string_field(defaults_section, "deploy_user", default_deploy_user()),
+                service_user: read_string_field(defaults_section, "service_user", default_service_user()),
+                group: read_string_field(defaults_section, "group", default_group()),
+                dir_mode: read_string_field(defaults_section, "dir_mode", default_dir_mode()),
+                file_mode: read_string_field(defaults_section, "file_mode", default_file_mode()),
+            },
+            paths: read_path_overrides(permissions_section),
+        },
+        releases: Releases {
+            keep: read_usize_field(releases_section, "keep", default_keep()),
+            shared_paths: read_string_list_field(releases_section, "shared_paths"),
+        },
+        runtime: Runtime {
+            command: read_string_list_field(runtime_section, "command"),
+            working_dir: read_string_field(runtime_section, "working_dir", default_runtime_working_dir()),
+            writable_paths: read_string_list_field(runtime_section, "writable_paths"),
+        },
+    };
 
     if config.permissions.defaults.service_user.is_empty() {
         config.permissions.defaults.service_user = config.data.project_name.clone();
     }
 
     Ok(config)
+}
+
+fn parse_yaml_document(content: &str) -> Result<Yaml<'_>> {
+    let documents = Yaml::load_from_str(content).map_err(|error| anyhow!(error))?;
+    documents.into_iter().next().context("YAML document is empty")
+}
+
+fn read_path_overrides(permissions: Option<&Yaml<'_>>) -> Vec<PathOverride> {
+    let Some(paths_node) = permissions.and_then(|node| node.as_mapping_get("paths")) else {
+        return Vec::new();
+    };
+
+    let Some(paths) = paths_node.as_sequence() else {
+        return Vec::new();
+    };
+
+    paths
+        .iter()
+        .filter_map(|path_node| {
+            let path = read_string_field(Some(path_node), "path", String::new());
+            let mode = read_string_field(Some(path_node), "mode", String::new());
+
+            if path.is_empty() || mode.is_empty() {
+                return None;
+            }
+
+            Some(PathOverride {
+                path,
+                mode,
+                recursive: read_bool_field(Some(path_node), "recursive", false),
+                path_type: read_optional_string_field(Some(path_node), "type"),
+            })
+        })
+        .collect()
+}
+
+fn read_string_field(section: Option<&Yaml<'_>>, key: &str, default: String) -> String {
+    section.and_then(|node| node.as_mapping_get(key)).and_then(value_to_string).unwrap_or(default)
+}
+
+fn read_optional_string_field(section: Option<&Yaml<'_>>, key: &str) -> Option<String> {
+    section.and_then(|node| node.as_mapping_get(key)).and_then(value_to_string)
+}
+
+fn read_bool_field(section: Option<&Yaml<'_>>, key: &str, default: bool) -> bool {
+    section.and_then(|node| node.as_mapping_get(key)).and_then(value_to_bool).unwrap_or(default)
+}
+
+fn read_usize_field(section: Option<&Yaml<'_>>, key: &str, default: usize) -> usize {
+    section.and_then(|node| node.as_mapping_get(key)).and_then(value_to_usize).unwrap_or(default)
+}
+
+fn read_string_list_field(section: Option<&Yaml<'_>>, key: &str) -> Vec<String> {
+    let Some(values) = section.and_then(|node| node.as_mapping_get(key)).and_then(Yaml::as_sequence) else {
+        return Vec::new();
+    };
+
+    values.iter().filter_map(value_to_string).collect()
+}
+
+fn value_to_string(value: &Yaml<'_>) -> Option<String> {
+    if let Some(string) = value.as_str() {
+        return Some(string.to_string());
+    }
+    if let Some(integer) = value.as_integer() {
+        return Some(integer.to_string());
+    }
+    if let Some(float) = value.as_floating_point() {
+        return Some(float.to_string());
+    }
+    value.as_bool().map(|boolean| boolean.to_string())
+}
+
+fn value_to_bool(value: &Yaml<'_>) -> Option<bool> {
+    if let Some(boolean) = value.as_bool() {
+        return Some(boolean);
+    }
+
+    let text = value.as_str()?.trim();
+    if text.eq_ignore_ascii_case("true") {
+        return Some(true);
+    }
+    if text.eq_ignore_ascii_case("false") {
+        return Some(false);
+    }
+    None
+}
+
+fn value_to_usize(value: &Yaml<'_>) -> Option<usize> {
+    if let Some(integer) = value.as_integer() {
+        return usize::try_from(integer).ok();
+    }
+
+    value.as_str()?.trim().parse::<usize>().ok()
 }

@@ -36,12 +36,12 @@ pub fn run() -> Result<()> {
     // Update .gitignore
     update_gitignore()?;
 
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
-    let cfg = load_or_collect_config(bones_toml)?;
+    let bones_yaml = Path::new(config::Constants::BONES_YAML);
+    let cfg = load_or_collect_config(bones_yaml)?;
 
     // Save config
-    config::save(&cfg, bones_toml)?;
-    println!("Saved config to {}", config::Constants::BONES_TOML);
+    config::save(&cfg, bones_yaml)?;
+    println!("Saved config to {}", config::Constants::BONES_YAML);
     ensure_local_remote(&cfg)?;
 
     // Symlink pre-push hook
@@ -61,11 +61,11 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-fn load_or_collect_config(bones_toml: &Path) -> Result<config::BonesConfig> {
-    if bones_toml.exists() {
-        let existing = config::load(bones_toml)?;
+fn load_or_collect_config(bones_yaml: &Path) -> Result<config::BonesConfig> {
+    if bones_yaml.exists() {
+        let existing = config::load(bones_yaml)?;
         if config::is_configured(&existing) {
-            println!("Loading existing config from {}...", config::Constants::BONES_TOML);
+            println!("Loading existing config from {}...", config::Constants::BONES_YAML);
             return Ok(existing);
         }
         println!("Config is incomplete, running prompts...");

@@ -8,8 +8,8 @@ use crate::config;
 use crate::ssh;
 
 pub async fn run() -> Result<()> {
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
-    let cfg = config::load(bones_toml)?;
+    let bones_yaml = Path::new(config::Constants::BONES_YAML);
+    let cfg = config::load(bones_yaml)?;
 
     let git_dir = &cfg.data.git_dir;
     let remote_bones = format!("{git_dir}/{}/", config::Constants::REMOTE_BONES_DIR);

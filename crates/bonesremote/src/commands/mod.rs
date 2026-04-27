@@ -31,7 +31,7 @@ enum Command {
     },
     /// Check server environment health
     Doctor {
-        /// Optional path to bones.toml for runtime checks
+        /// Optional path to bones.yaml for runtime checks
         #[arg(long)]
         config: Option<String>,
     },
@@ -58,31 +58,31 @@ enum Command {
 enum ReleaseCommand {
     /// Stage a new release before checkout
     Stage {
-        /// Path to bones.toml config file
+        /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
     /// Wire shared paths into the staged release
     Wire {
-        /// Path to bones.toml config file
+        /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
     /// Atomically activate staged release and prune old releases
     Activate {
-        /// Path to bones.toml config file
+        /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
     /// Drop a failed staged release and clear state
     DropFailed {
-        /// Path to bones.toml config file
+        /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
     /// Repoint current to the previous release
     Rollback {
-        /// Path to bones.toml config file
+        /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
@@ -92,19 +92,19 @@ enum ReleaseCommand {
 enum HookCommand {
     /// Run deployment scripts and release activation sequence
     Deploy {
-        /// Path to bones.toml config file
+        /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
     /// Run the post-receive checkout and release wiring sequence
     PostReceive {
-        /// Path to bones.toml config file
+        /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
     /// Harden permissions back to service user after deployment
     PostDeploy {
-        /// Path to bones.toml config file
+        /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
@@ -114,7 +114,7 @@ enum HookCommand {
 enum LandlockCommand {
     /// Apply Landlock and exec the runtime command
     Exec {
-        /// Path to bones.toml config file
+        /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
