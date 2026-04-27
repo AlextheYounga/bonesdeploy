@@ -6,14 +6,12 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use console::style;
 
-use super::server_setup;
 use crate::config;
 use crate::embedded;
 use crate::git;
 use crate::prompts;
-use crate::ssh;
 
-pub async fn run() -> Result<()> {
+pub fn run() -> Result<()> {
     git::ensure_git_repository()?;
 
     // Extract scaffold to .bones/
@@ -44,26 +42,18 @@ pub async fn run() -> Result<()> {
     // Save config
     config::save(&cfg, bones_toml)?;
     println!("Saved config to {}", config::Constants::BONES_TOML);
-
-    run_initial_server_setup(&cfg)?;
     ensure_local_remote(&cfg)?;
 
     // Symlink pre-push hook
     symlink_pre_push()?;
 
-    // Remote setup over SSH
-    println!("\nConnecting to remote...");
-    let session = ssh::connect(&cfg).await?;
-
-    ssh::create_bare_repo(&session, &cfg.data.git_dir).await?;
-
-    let post_receive = embedded::read_asset(config::Constants::POST_RECEIVE_HOOK_ASSET)?;
-    ssh::upload_post_receive(&session, &cfg.data.git_dir, &post_receive).await?;
-
-    session.close().await?;
-
     println!(
-        "\n{} Run {} to sync .bones/ to the remote.",
+        "\n{} Run {} before your first deploy.",
+        style("Next:").cyan().bold(),
+        style("bonesdeploy server setup").cyan()
+    );
+    println!(
+        "{} Run {} after setup to sync .bones/ to the remote.",
         style("Done!").green().bold(),
         style("bonesdeploy push").cyan()
     );
@@ -126,20 +116,6 @@ fn repo_directory_name() -> Result<String> {
     let cwd = env::current_dir()?;
     let name = cwd.file_name().map_or_else(|| "project".into(), |n| n.to_string_lossy().to_string());
     Ok(name)
-}
-
-fn run_initial_server_setup(cfg: &config::BonesConfig) -> Result<()> {
-    let bootstrap_user = prompts::prompt_bootstrap_ssh_user()?;
-
-    println!(
-        "Running {} against {} as {}...",
-        style("server setup").cyan().bold(),
-        style(&cfg.data.host).cyan(),
-        style(&bootstrap_user).cyan(),
-    );
-
-    server_setup::ensure_ansible_playbook_installed()?;
-    server_setup::run_ansible_playbook(cfg, &bootstrap_user, &[])
 }
 
 fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {

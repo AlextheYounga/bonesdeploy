@@ -2,7 +2,6 @@ use anyhow::{Context, Result, bail};
 use openssh::{KnownHosts, Session, SessionBuilder, Stdio};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
-use crate::config;
 use crate::config::BonesConfig;
 
 pub async fn connect(config: &BonesConfig) -> Result<Session> {
@@ -77,29 +76,5 @@ pub async fn stream_cmd(session: &Session, cmd: &str) -> Result<()> {
         bail!("Remote command failed: {cmd}");
     }
 
-    Ok(())
-}
-
-pub async fn create_bare_repo(session: &Session, git_dir: &str) -> Result<()> {
-    let check = format!("test -d {git_dir}");
-    if session.command("bash").arg("-c").arg(&check).status().await?.success() {
-        println!("Bare repo already exists at {git_dir}");
-        return Ok(());
-    }
-
-    println!("Creating bare repo at {git_dir}...");
-    run_cmd(session, &format!("git init --bare {git_dir}")).await?;
-    Ok(())
-}
-
-pub async fn upload_post_receive(session: &Session, git_dir: &str, hook_content: &str) -> Result<()> {
-    let hook_path =
-        format!("{git_dir}/{}/{}", config::Constants::REMOTE_HOOKS_DIR, config::Constants::POST_RECEIVE_HOOK);
-
-    // Write hook content via heredoc
-    let cmd =
-        format!("cat > '{hook_path}' << 'BONESDEPLOY_EOF'\n{hook_content}\nBONESDEPLOY_EOF\nchmod +x '{hook_path}'");
-    run_cmd(session, &cmd).await?;
-    println!("Uploaded post-receive hook to {hook_path}");
     Ok(())
 }

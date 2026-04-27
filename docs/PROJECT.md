@@ -43,7 +43,6 @@ Collects the following project information from the user:
 - `host`: prompted when not inferable from selected remote
 - `port`: defaults to `22`, prompt shown when remote inference is unavailable
 - `git_dir`: inferred from selected remote URL when possible, otherwise prompted
-- `bootstrap_ssh_user`: init-only prompt (default `root`) used to run the first server setup playbook
 
 Everything else is defaulted for Debian/Ubuntu-first usability:
 - `live_root`: defaults to `/var/www/{project_name}`
@@ -182,10 +181,8 @@ bonesdeploy/
   - Gets or creates the `.bones` folder with our default scaffolding.
   - Updates `.gitignore` to add .bones folder.
   - Loads existing config from `.bones/bones.toml` or collects user input via prompts.
-  - Runs `.bones/server/playbooks/setup.yml` first so deploy user/server prerequisites are in place before remote git setup.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{git_dir}`.
-  - Creates upstream bare repository on remote using configured host/git directory.
-  - Builds and uploads post-receive hook to remote.
+  - Prints next-step guidance to run `bonesdeploy server setup` before first deploy.
   - Saves config to `.bones/bones.toml`.
 
 - **doctor**

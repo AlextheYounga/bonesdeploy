@@ -59,7 +59,7 @@ enum ServerCommand {
 
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init => init::run().await,
+        Command::Init => init::run(),
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,
         Command::Deploy => deploy::run().await,

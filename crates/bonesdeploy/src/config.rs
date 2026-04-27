@@ -41,7 +41,6 @@ impl Constants {
     pub const ASSET_HOOKS_DIR: &'static str = "hooks/";
     pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
     pub const ASSET_SCRIPTS_DIR: &'static str = "scripts/";
-    pub const POST_RECEIVE_HOOK_ASSET: &'static str = "hooks/post-receive";
     pub const PYTHON_BOOTSTRAP_SCRIPT_ASSET: &'static str = "scripts/bootstrap_python3.sh";
 }
 
