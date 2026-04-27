@@ -1,0 +1,33 @@
+---
+- name: Server setup for bonesdeploy (SvelteKit)
+  hosts: all
+  become: true
+
+  roles:
+    - role: users
+      tags: [users]
+
+    - role: common
+      tags: [common]
+
+    - role: sveltekit_runtime
+      tags: [sveltekit]
+
+    - role: nginx
+      tags: [nginx]
+
+    - role: ssl
+      tags: [ssl]
+
+    - role: runtime
+      tags: [runtime]
+
+  post_tasks:
+    - name: Display setup completion
+      ansible.builtin.debug:
+        msg: |
+          Bones SvelteKit server setup completed.
+          Deploy user: {{ deploy_user }}
+          Service user: {{ service_user }}
+          Group: {{ group }}
+      tags: always
