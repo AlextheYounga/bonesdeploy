@@ -59,7 +59,7 @@
   tags: [nginx]
 
 - name: Ensure nginx service is enabled and started
-  ansible.builtin.systemd:
+  ansible.builtin.service:
     name: "{{ nginx_service_name }}"
     enabled: true
     state: started
