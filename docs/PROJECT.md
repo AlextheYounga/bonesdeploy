@@ -11,11 +11,11 @@ We have an SSH deployment user (normally `git`) that handles deployment concerns
 - Setting up inotify systems are cumbersome.
 
 ### Proposed Solution of This Project
-We create a `bonesremote` executable that does not require a password and allows it to change ownership to a deploy user and harden back the permissions based on what is configured under `permissions` in bones.toml. Running `bonesremote init` on the remote (as sudo) installs a drop-in file at `/etc/sudoers.d/bonesdeploy`, allowing the `git` user to run bonesremote without password.
+We create a `bonesremote` executable that does not require a password and allows it to change ownership to a deploy user and harden back the permissions based on what is configured under `permissions` in bones.yaml. Running `bonesremote init` on the remote (as sudo) installs a drop-in file at `/etc/sudoers.d/bonesdeploy`, allowing the `git` user to run bonesremote without password.
 
 ## Bones Scaffolding
 .bones  
-├── bones.toml  
+├── bones.yaml  
 ├── hooks.sh
 ├── server
 │   ├── nginx
@@ -34,7 +34,7 @@ We create a `bonesremote` executable that does not require a password and allows
     ├── pre-push  
     └── pre-receive  
 
-### Bones Toml
+### Bones YAML
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
 Collects the following project information from the user:
 - `project_name`: str
@@ -56,66 +56,59 @@ Everything else is defaulted for Debian/Ubuntu-first usability:
 - `releases.keep`: defaults to `5`
 - `releases.shared_paths`: defaults to [`.env`, `storage`]
 
-Example `bones.toml`:
-```toml
-[data]
-remote_name = "production"
-project_name = "lawsnipe"
-host = "deploy.example.com"
-port = "22"
+Example `bones.yaml`:
+```yaml
+data:
+  remote_name: "production"
+  project_name: "lawsnipe"
+  host: "deploy.example.com"
+  port: "22"
+  git_dir: "/home/git/lawsnipe.git"
+  live_root: "/var/www/lawsnipe"
+  deploy_root: "/srv/deployments/lawsnipe"
+  branch: "master"
+  deploy_on_push: true
 
-git_dir = "/home/git/lawsnipe.git"  
-live_root = "/var/www/lawsnipe"  
-deploy_root = "/srv/deployments/lawsnipe"
-branch = "master"  
-deploy_on_push = true
+# These are the permissions that ultimately get applied to every file post-deployment.
+permissions:
+  defaults:
+    deploy_user: "git"
+    service_user: "lawsnipe"
+    group: "www-data"
+    dir_mode: "750"
+    file_mode: "640"
+  # Path overrides for fine-grained permission control.
+  # recursive = true: applies 'mode' to the directory and all files/directories under it.
+  # type = "dir": applies 'mode' to just that directory.
+  # type = "file": applies 'mode' to just that file.
+  paths:
+    - path: "storage"
+      mode: "770"
+      recursive: true
+    - path: "bootstrap/cache"
+      mode: "770"
+      recursive: true
+    - path: "database"
+      mode: "770"
+      type: "dir"
+    - path: "database/database.sqlite"
+      mode: "660"
+      type: "file"
 
-# These are the permissions that ultimately get applied to every file post-deployment.  
-[permissions.defaults]  
-deploy_user = "git"  
-service_user = "lawsnipe"  
-group = "www-data"  
-dir_mode   = "750"  
-file_mode  = "640"  
-
-# Path overrides for fine-grained permission control.
-# recursive = true: applies 'mode' to the directory and all files/directories under it.
-# type = "dir": applies 'mode' to just that directory.
-# type = "file": applies 'mode' to just that file.
-[[permissions.paths]]
-path      = "storage"
-mode      = "770"
-recursive = true  
-
-[[permissions.paths]]  
-path      = "bootstrap/cache"  
-mode      = "770"  
-recursive = true  
-
-[[permissions.paths]]  
-path      = "database"  
-mode      = "770"  
-type      = "dir"  
-
-[[permissions.paths]]  
-path      = "database/database.sqlite"  
-mode      = "660"  
-type      = "file"  
-
-[releases]
-keep = 5
-shared_paths = [".env", "storage"]
+releases:
+  keep: 5
+  shared_paths: [".env", "storage"]
 
 # Optional runtime launcher settings (only for service/landlock-managed apps).
-# [runtime]
-# command = ["/usr/bin/node", "server.js"]
-# working_dir = "."
-# writable_paths = []
+# runtime:
+#   command: ["/usr/bin/node", "server.js"]
+#   working_dir: "."
+#   writable_paths: []
 
-[ssl]
-enabled = true
-domain = "app.example.com"
-email = "ops@example.com"
+ssl:
+  enabled: true
+  domain: "app.example.com"
+  email: "ops@example.com"
 ```
 
 ### Hooks
@@ -129,13 +122,13 @@ Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are wr
 This folder stores deployment scripts that are run by `bonesremote hooks deploy`. Files in this folder must be ordered sequentially like `01_run_deployment_concerns.sh` and `02_lockup_permissions.sh`. They are named in numerical order and all of these scripts are always run.
 
 ## Crate Structure
-This Cargo workspace has two crates under `crates/`, each with its own dependencies. There is no shared lib crate; the `bones.toml` structs are duplicated since each binary discovers and uses config differently.
+This Cargo workspace has two crates under `crates/`, each with its own dependencies. There is no shared lib crate; the `bones.yaml` structs are duplicated since each binary discovers and uses config differently.
 
 ```
 bonesdeploy/
 ├── Cargo.toml                  # workspace root
 ├── kit/                        # embedded assets (scaffolding templates)
-│   ├── bones.toml
+│   ├── bones.yaml
 │   ├── deployment/
 │   └── hooks/
 ├── crates/
@@ -149,7 +142,7 @@ bonesdeploy/
 │   │       │   ├── doctor.rs
 │   │       │   ├── push.rs
 │   │       │   └── version.rs
-│   │       ├── config.rs       # bones.toml structs + load/save + local file discovery
+│   │       ├── config.rs       # bones.yaml structs + load/save + local file discovery
 │   │       ├── embedded.rs     # rust-embed from kit/, scaffold writing
 │   │       ├── git.rs          # git CLI operations: remote validation, repo checks
 │   │       ├── prompts.rs      # interactive user input collection, returns config
@@ -171,7 +164,7 @@ bonesdeploy/
 │           │   ├── deploy.rs
 │           │   ├── post_deploy.rs
 │           │   └── version.rs
-│           ├── config.rs       # bones.toml structs + remote file discovery
+│           ├── config.rs       # bones.yaml structs + remote file discovery
 │           └── permissions.rs  # chown/chmod logic
 └── docs/
 ```
@@ -180,14 +173,14 @@ bonesdeploy/
 - **init**:
   - Gets or creates the `.bones` folder with our default scaffolding.
   - Updates `.gitignore` to add .bones folder.
-  - Loads existing config from `.bones/bones.toml` or collects user input via prompts.
+  - Loads existing config from `.bones/bones.yaml` or collects user input via prompts.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{git_dir}`.
   - Prints next-step guidance to run `bonesdeploy server setup` before first deploy.
-  - Saves config to `.bones/bones.toml`.
+  - Saves config to `.bones/bones.yaml`.
 
 - **doctor**
   - This command checks all concerns in your local environment.
-  - Loads config from `.bones/bones.toml`
+  - Loads config from `.bones/bones.yaml`
   - Runs local checks:
     - `.bones` folder is set up correctly. Deployment scripts are named appropriately.
     - Local `pre-push` hook is symlinked properly.
@@ -209,7 +202,7 @@ bonesdeploy/
 
 - **server setup**
   - Runs `.bones/server/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
-  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, `git_dir`, and `runtime_config_path` from `bones.toml` as playbook variables.
+  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, `git_dir`, and `runtime_config_path` from `bones.yaml` as playbook variables.
   - Installs nginx and provisions a project default site from `.bones/server/nginx/site.conf.j2`.
   - Seeds a placeholder page from `.bones/server/roles/nginx/defaults/index.html.j2` so the host serves a branded default page before first deployment.
 
@@ -250,7 +243,7 @@ bonesdeploy/
 - **landlock exec**
 	- Resolves `live_root` to the active runtime tree, applies Landlock policy, and `exec`s `runtime.command`.
 - **hooks post-deploy**
-	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.toml`, like for instance setting everything back to be owned by the service user, then prunes old releases. 
+	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.yaml`, like for instance setting everything back to be owned by the service user, then prunes old releases. 
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
 
@@ -263,7 +256,7 @@ bonesdeploy/
 - User runs `bonesdeploy init`, and the procedures outlined above are executed.
 - User can make any changes to their deployment scripts or hooks in `.bones/` (e.g., customizing `deployment/` files or adding project-specific logic).
 - User runs `bonesdeploy push` to sync the `.bones/` folder to the remote bare repo.
-- User runs `git push production master` or some similar command where the remote name aligns with our bones.toml configuration.
+- User runs `git push production master` or some similar command where the remote name aligns with our bones.yaml configuration.
 - The `pre-push` hook checks to see if we are pushing to our bones remote (in this example, `production`). If so, it runs `bonesdeploy doctor` and fails on warnings/errors.
 
 ### Hook Event Order on `git push`
@@ -271,19 +264,19 @@ bonesdeploy/
 `pre-push -> pre-receive -> post-receive`
 
 1. Git receives pack data in the remote bare repo and runs `pre-receive`.
-2. If `deploy_on_push = true`, `pre-receive` runs `bonesremote doctor --config "$BONES_TOML"`, then `sudo bonesremote release stage --config "$BONES_TOML"`.
+2. If `deploy_on_push = true`, `pre-receive` runs `bonesremote doctor --config "$BONES_YAML"`, then `sudo bonesremote release stage --config "$BONES_YAML"`.
    - If `deploy_on_push = false`, `pre-receive` exits early and no deploy steps run.
 3. If `pre-receive` exits successfully, Git updates refs.
 4. Git runs `post-receive`.
-5. `post-receive` runs `bonesremote hooks post-receive --config "$BONES_TOML"` (checkout to `build/workspace` + shared wiring).
-6. Then `post-receive` runs `bonesremote hooks deploy --config "$BONES_TOML"` (deployment scripts in build workspace + runtime publish + activate/drop-failed).
-7. Finally `post-receive` runs `sudo bonesremote hooks post-deploy --config "$BONES_TOML"` (permission hardening + pruning).
+5. `post-receive` runs `bonesremote hooks post-receive --config "$BONES_YAML"` (checkout to `build/workspace` + shared wiring).
+6. Then `post-receive` runs `bonesremote hooks deploy --config "$BONES_YAML"` (deployment scripts in build workspace + runtime publish + activate/drop-failed).
+7. Finally `post-receive` runs `sudo bonesremote hooks post-deploy --config "$BONES_YAML"` (permission hardening + pruning).
 
 ## Cargo Dependencies
 - clap
 - inquire
 - rust-embed
-- toml
+- saphyr
 - rsync
 - openssh
 - serde (derive)

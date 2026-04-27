@@ -10,8 +10,8 @@ use crate::config;
 use crate::embedded;
 
 pub fn run() -> Result<()> {
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
-    let cfg = config::load(bones_toml)?;
+    let bones_yaml = Path::new(config::Constants::BONES_YAML);
+    let cfg = config::load(bones_yaml)?;
 
     let playbook = Path::new(config::Constants::BONES_SERVER_SETUP_PLAYBOOK);
     if !playbook.is_file() {
@@ -48,7 +48,7 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
     ensure_python3_available(cfg, ssh_user)?;
 
     let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
-    let runtime_config_path = format!("{}/bones/bones.toml", cfg.data.git_dir);
+    let runtime_config_path = format!("{}/bones/bones.yaml", cfg.data.git_dir);
 
     let inventory = format!("{},", cfg.data.host);
     let roles_path = env::var("ANSIBLE_ROLES_PATH")
