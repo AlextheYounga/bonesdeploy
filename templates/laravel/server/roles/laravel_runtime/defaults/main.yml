@@ -1,0 +1,15 @@
+---
+laravel_php_packages:
+  - php
+  - php-cli
+  - php-fpm
+  - php-bcmath
+  - php-curl
+  - php-gd
+  - php-intl
+  - php-mbstring
+  - php-mysql
+  - php-sqlite3
+  - php-xml
+  - php-zip
+  - composer
