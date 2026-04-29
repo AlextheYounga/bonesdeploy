@@ -42,7 +42,7 @@ Collects the following project information from the user:
 - `remote_name`: existing remote selection when available, otherwise prompted name
 - `host`: prompted when not inferable from selected remote
 - `port`: defaults to `22`, prompt shown when remote inference is unavailable
-- `git_dir`: inferred from selected remote URL when possible, otherwise prompted
+- `git_dir`: inferred from selected remote URL when possible, else defaults to `/home/git/{project_name}.git`
 
 Everything else is defaulted for Debian/Ubuntu-first usability:
 - `live_root`: defaults to `/var/www/{project_name}`
@@ -55,6 +55,8 @@ Everything else is defaulted for Debian/Ubuntu-first usability:
 - `permissions.defaults.file_mode`: defaults to `640`
 - `releases.keep`: defaults to `5`
 - `releases.shared_paths`: defaults to [`.env`, `storage`]
+
+Users can override any default by editing `.bones/bones.yaml` after init.
 
 Example `bones.yaml`:
 ```yaml

@@ -4,16 +4,15 @@ data:
   branch: 'master'
   deploy_on_push: true
 
-  # live_root is the public path your web server points to.
-  # It should remain a symlink to deploy_root/current.
-  live_root: '/var/www/<project_name>'
-
-  # deploy_root stores deployment/runtime data:
-  # - build/workspace
-  # - runtime/
-  # - shared/
-  # - current (symlink)
-  deploy_root: '/srv/deployments/<project_name>'
+  # Optional path overrides. Leave commented out to use the defaults.
+  # live_root defaults to /var/www/<project_name>
+  #   The public path your web server points to.
+  #   Should remain a symlink to deploy_root/current.
+  # live_root: '/var/www/<project_name>'
+  #
+  # deploy_root defaults to /srv/deployments/<project_name>
+  #   Stores deployment/runtime data: build/workspace, runtime/, shared/, current (symlink).
+  # deploy_root: '/srv/deployments/<project_name>'
 
 # Permissions for deployment
 permissions:
