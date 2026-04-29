@@ -196,12 +196,15 @@ fn is_default_runtime(runtime: &Runtime) -> bool {
 
 pub fn is_configured(config: &BonesConfig) -> bool {
     let d = &config.data;
-    !d.remote_name.is_empty()
-        && !d.project_name.is_empty()
-        && !d.host.is_empty()
-        && !d.git_dir.is_empty()
-        && !d.live_root.is_empty()
-        && !d.deploy_root.is_empty()
+    !d.remote_name.is_empty() && !d.project_name.is_empty() && !d.host.is_empty() && !d.git_dir.is_empty()
+}
+
+pub fn default_live_root_for(project_name: &str) -> String {
+    format!("/var/www/{project_name}")
+}
+
+pub fn default_deploy_root_for(project_name: &str) -> String {
+    format!("/srv/deployments/{project_name}")
 }
 
 pub fn load(path: &Path) -> Result<BonesConfig> {
@@ -257,6 +260,17 @@ pub fn load(path: &Path) -> Result<BonesConfig> {
         config.permissions.defaults.service_user = config.data.project_name.clone();
     }
 
+    // live_root and deploy_root are intentionally hidden from the init flow and
+    // bones.yaml. Fill in project-derived defaults here so consumers can keep
+    // reading them as plain strings; users who want different paths can set
+    // them in bones.yaml and they will round-trip through save() unchanged.
+    if config.data.live_root.is_empty() {
+        config.data.live_root = default_live_root_for(&config.data.project_name);
+    }
+    if config.data.deploy_root.is_empty() {
+        config.data.deploy_root = default_deploy_root_for(&config.data.project_name);
+    }
+
     Ok(config)
 }
 
@@ -279,8 +293,14 @@ fn append_data_section(content: &mut String, data: &Data) {
     let _ = writeln!(content, "  host: {}", yaml_quote(&data.host));
     let _ = writeln!(content, "  port: {}", yaml_quote(&data.port));
     let _ = writeln!(content, "  git_dir: {}", yaml_quote(&data.git_dir));
-    let _ = writeln!(content, "  live_root: {}", yaml_quote(&data.live_root));
-    let _ = writeln!(content, "  deploy_root: {}", yaml_quote(&data.deploy_root));
+    // Only persist live_root / deploy_root when the user has overridden the
+    // project-derived defaults. Keeps fresh bones.yaml files free of path noise.
+    if !data.live_root.is_empty() && data.live_root != default_live_root_for(&data.project_name) {
+        let _ = writeln!(content, "  live_root: {}", yaml_quote(&data.live_root));
+    }
+    if !data.deploy_root.is_empty() && data.deploy_root != default_deploy_root_for(&data.project_name) {
+        let _ = writeln!(content, "  deploy_root: {}", yaml_quote(&data.deploy_root));
+    }
     let _ = writeln!(content, "  branch: {}", yaml_quote(&data.branch));
     let _ = writeln!(content, "  deploy_on_push: {}", data.deploy_on_push);
     content.push('\n');

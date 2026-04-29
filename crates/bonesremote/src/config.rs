@@ -210,6 +210,16 @@ pub fn load(path: &Path) -> Result<BonesConfig> {
         config.permissions.defaults.service_user = config.data.project_name.clone();
     }
 
+    // live_root and deploy_root are hidden from the init flow; fill in
+    // project-derived defaults so the rest of bonesremote can read them as
+    // plain strings. Users may override either path in bones.yaml.
+    if config.data.live_root.is_empty() {
+        config.data.live_root = format!("/var/www/{}", config.data.project_name);
+    }
+    if config.data.deploy_root.is_empty() {
+        config.data.deploy_root = format!("/srv/deployments/{}", config.data.project_name);
+    }
+
     Ok(config)
 }
 
