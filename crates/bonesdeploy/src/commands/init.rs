@@ -5,34 +5,13 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use console::style;
-use inquire::Confirm;
 
 use crate::config;
 use crate::embedded;
 use crate::git;
 use crate::prompts;
-use crate::ssh;
 
-pub async fn run() -> Result<()> {
-    println!(
-        "{}\n\n\
-         This will:\n  \
-         1. Create a .bones/ folder with hooks and deployment scripts\n  \
-         2. Collect project configuration (remote, host, permissions)\n  \
-         3. Update .gitignore\n  \
-         4. Symlink the pre-push hook into .git/hooks/\n  \
-         5. Create a bare repo on the remote (if needed)\n  \
-         6. Upload the post-receive hook to the remote\n\n\
-         A git remote URL must already be configured for the deployment remote.\n",
-        style("bonesdeploy init").bold()
-    );
-
-    let proceed = Confirm::new("Continue?").with_default(true).prompt()?;
-    if !proceed {
-        println!("Aborted.");
-        return Ok(());
-    }
-
+pub fn run() -> Result<()> {
     git::ensure_git_repository()?;
 
     // Extract scaffold to .bones/
@@ -57,32 +36,24 @@ pub async fn run() -> Result<()> {
     // Update .gitignore
     update_gitignore()?;
 
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
-    let cfg = load_or_collect_config(bones_toml)?;
-
-    // Validate the remote exists
-    git::validate_remote_exists(&cfg.data.remote_name)?;
+    let bones_yaml = Path::new(config::Constants::BONES_YAML);
+    let cfg = load_or_collect_config(bones_yaml)?;
 
     // Save config
-    config::save(&cfg, bones_toml)?;
-    println!("Saved config to {}", config::Constants::BONES_TOML);
+    config::save(&cfg, bones_yaml)?;
+    println!("Saved config to {}", config::Constants::BONES_YAML);
+    ensure_local_remote(&cfg)?;
 
     // Symlink pre-push hook
     symlink_pre_push()?;
 
-    // Remote setup over SSH
-    println!("\nConnecting to remote...");
-    let session = ssh::connect(&cfg).await?;
-
-    ssh::create_bare_repo(&session, &cfg.data.git_dir).await?;
-
-    let post_receive = embedded::read_asset(config::Constants::POST_RECEIVE_HOOK_ASSET)?;
-    ssh::upload_post_receive(&session, &cfg.data.git_dir, &post_receive).await?;
-
-    session.close().await?;
-
     println!(
-        "\n{} Run {} to sync .bones/ to the remote.",
+        "\n{} Run {} before your first deploy.",
+        style("Next:").cyan().bold(),
+        style("bonesdeploy server setup").cyan()
+    );
+    println!(
+        "{} Run {} after setup to sync .bones/ to the remote.",
         style("Done!").green().bold(),
         style("bonesdeploy push").cyan()
     );
@@ -90,11 +61,11 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
-fn load_or_collect_config(bones_toml: &Path) -> Result<config::BonesConfig> {
-    if bones_toml.exists() {
-        let existing = config::load(bones_toml)?;
+fn load_or_collect_config(bones_yaml: &Path) -> Result<config::BonesConfig> {
+    if bones_yaml.exists() {
+        let existing = config::load(bones_yaml)?;
         if config::is_configured(&existing) {
-            println!("Loading existing config from {}...", config::Constants::BONES_TOML);
+            println!("Loading existing config from {}...", config::Constants::BONES_YAML);
             return Ok(existing);
         }
         println!("Config is incomplete, running prompts...");
@@ -145,4 +116,15 @@ fn repo_directory_name() -> Result<String> {
     let cwd = env::current_dir()?;
     let name = cwd.file_name().map_or_else(|| "project".into(), |n| n.to_string_lossy().to_string());
     Ok(name)
+}
+
+fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
+    if git::remote_exists(&cfg.data.remote_name)? {
+        return Ok(());
+    }
+
+    let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, cfg.data.host, cfg.data.git_dir);
+    git::add_remote(&cfg.data.remote_name, &remote_url)?;
+    println!("Added git remote {} -> {}", cfg.data.remote_name, remote_url);
+    Ok(())
 }

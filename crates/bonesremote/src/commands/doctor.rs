@@ -97,7 +97,7 @@ fn check_runtime_readiness(config_path: &str, issues: &mut Vec<String>) {
     };
 
     if cfg.runtime.command.is_empty() {
-        issues.push("runtime.command is empty in bones.toml".to_string());
+        return;
     }
 
     let service_user = &cfg.permissions.defaults.service_user;

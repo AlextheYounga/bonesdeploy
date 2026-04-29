@@ -1,0 +1,10 @@
+---
+rails_runtime_packages:
+  - ruby-full
+  - ruby-bundler
+  - build-essential
+  - libffi-dev
+  - libpq-dev
+  - libyaml-dev
+  - shared-mime-info
+  - zlib1g-dev

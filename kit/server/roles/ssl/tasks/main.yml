@@ -38,7 +38,7 @@
   tags: [ssl]
 
 - name: Reload nginx before certbot challenge
-  ansible.builtin.systemd:
+  ansible.builtin.service:
     name: "{{ nginx_service_name }}"
     state: reloaded
   when: ssl_enabled
@@ -84,7 +84,7 @@
   tags: [ssl]
 
 - name: Reload nginx with SSL configuration
-  ansible.builtin.systemd:
+  ansible.builtin.service:
     name: "{{ nginx_service_name }}"
     state: reloaded
   when: ssl_enabled

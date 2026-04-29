@@ -69,17 +69,21 @@ bonesdeploy init
 
 This will:
 1. Create a `.bones/` folder with hooks and deployment script templates
-2. Prompt for project configuration (remote name, project paths, branch, permissions, etc.)
+2. Prompt for project name, branch, remote name, host, port, and git directory
 3. Add `.bones` to `.gitignore`
 4. Symlink the `pre-push` hook into `.git/hooks/`
-5. Create a bare repo on the remote if needed
-6. Upload the `post-receive` hook to the remote
+5. Create a local deployment git remote if needed
 
-A git remote must already be configured for the deployment target:
+BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.yaml`:
 
-```sh
-git remote add production git@deploy.example.com:/home/git/myproject.git
-```
+- `port = "22"`
+- `live_root = "/var/www/<project_name>"`
+- `deploy_root = "/srv/deployments/<project_name>"`
+- `deploy_user = "git"`
+- `service_user = "<project_name>"`
+- `group = "www-data"`
+
+A deployment remote no longer needs to exist before `bonesdeploy init`; if missing, init will create it from your prompted host/git directory values.
 
 Before first deploy, run server setup:
 
@@ -88,7 +92,9 @@ bonesdeploy server setup
 ```
 
 This runs `.bones/server/playbooks/setup.yml` locally with Ansible against your configured remote host.
-It installs nginx and provisions a default project vhost that serves `.bones/server/roles/nginx/defaults/index.html.j2` until your first deployment is live.
+If `ansible-playbook` is missing, BonesDeploy installs Ansible automatically with `python3 -m pip install --user ansible`.
+Template-based projects also scaffold language-specific setup roles (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install global PM2/PNPM tools).
+Every setup also installs nginx and provisions a default project vhost that serves `.bones/server/roles/nginx/defaults/index.html.j2` until your first deployment is live.
 
 To customize nginx behavior, edit `.bones/server/nginx/site.conf.j2` and re-run `bonesdeploy server setup`.
 
@@ -143,52 +149,56 @@ bonesdeploy doctor --local  # check local only
 
 ## Configuration
 
-`bonesdeploy init` generates `.bones/bones.toml`:
+`bonesdeploy init` generates `.bones/bones.yaml`:
 
-```toml
-[data]
-remote_name = "production"
-project_name = "myproject"
-git_dir = "/home/git/myproject.git"
-live_root = "/var/www/myproject"
-deploy_root = "/srv/deployments/myproject"
-branch = "master"
-deploy_on_push = true
+```yaml
+data:
+  remote_name: "production"
+  project_name: "myproject"
+  git_dir: "/home/git/myproject.git"
+  live_root: "/var/www/myproject"
+  deploy_root: "/srv/deployments/myproject"
+  branch: "master"
+  deploy_on_push: true
 
-[permissions.defaults]
-deploy_user = "git"
-service_user = "applications"
-group = "www-data"
-dir_mode = "750"
-file_mode = "640"
+permissions:
+  defaults:
+    deploy_user: "git"
+    service_user: "applications"
+    group: "www-data"
+    dir_mode: "750"
+    file_mode: "640"
+  paths:
+    - path: "storage"
+      mode: "770"
+      recursive: true
+    - path: "database/database.sqlite"
+      mode: "660"
+      type: "file"
 
-[[permissions.paths]]
-path = "storage"
-mode = "770"
-recursive = true
+releases:
+  keep: 5
+  shared_paths: [".env", "storage"]
 
-[[permissions.paths]]
-path = "database/database.sqlite"
-mode = "660"
-type = "file"
+# Optional runtime launcher settings (only needed for service/landlock-managed apps).
+# runtime:
+#   command: ["/usr/bin/node", "server.js"]
+#   working_dir: "."
+#   writable_paths: []
 
-[releases]
-keep = 5
-shared_paths = [".env", "storage"]
-
-[ssl]
-enabled = false
-domain = ""
-email = ""
+ssl:
+  enabled: false
+  domain: ""
+  email: ""
 ```
 
-Remote host and port are not stored separately in `bones.toml`. BonesDeploy reads that information from the URL configured with `git remote add`.
+`host` and `git_dir` are inferred from the deployment remote URL when possible; if parsing fails, init asks only for those missing values.
 
 ## Project Structure
 
 ```
 .bones/
-├── bones.toml           # project configuration
+├── bones.yaml           # project configuration
 ├── hooks.sh             # shared hook functions imported by hook entrypoints
 ├── deployment/
 │   └── 01_*.sh          # deployment scripts (run sequentially)
