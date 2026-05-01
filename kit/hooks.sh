@@ -97,16 +97,22 @@ bones_stage_release() {
 
 bones_wire_release() {
 	local revision="${1:-}"
-	echo "[bonesdeploy] Running post-receive checkout + release wiring..."
+	echo "[bonesdeploy] Running post-receive checkout..."
 	local cmd=(bonesremote hooks post-receive --config "$BONES_YAML")
 	if [ -n "$revision" ]; then
 		cmd+=(--revision "$revision")
 	fi
 
-		if ! "${cmd[@]}"; then
-			echo "[bonesdeploy] post-receive hook command failed."
-			exit 1
-		fi
+	if ! "${cmd[@]}"; then
+		echo "[bonesdeploy] post-receive hook command failed."
+		exit 1
+	fi
+
+	echo "[bonesdeploy] Wiring shared paths just-in-time..."
+	if ! sudo bonesremote release wire --config "$BONES_YAML"; then
+		echo "[bonesdeploy] release wire failed."
+		exit 1
+	fi
 
 	echo "[bonesdeploy] Release wired."
 }

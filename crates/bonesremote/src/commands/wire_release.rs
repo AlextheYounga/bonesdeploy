@@ -5,23 +5,27 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 
 use crate::config;
+use crate::permissions;
+use crate::privileges;
 use crate::release_state;
 
 pub fn run(config_path: &str) -> Result<()> {
+    privileges::ensure_root("bonesremote release wire")?;
+
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
     let build_root = release_state::build_root(&cfg);
     let shared_dir = release_state::shared_dir(&cfg);
 
     for shared_path in &cfg.releases.shared_paths {
-        wire_path(&build_root, &shared_dir, shared_path)?;
+        wire_path(&cfg, &build_root, &shared_dir, shared_path)?;
     }
 
     println!("Wired build workspace for staged runtime: {release_name}");
     Ok(())
 }
 
-fn wire_path(release_dir: &Path, shared_dir: &Path, relative_path: &str) -> Result<()> {
+fn wire_path(cfg: &config::BonesConfig, release_dir: &Path, shared_dir: &Path, relative_path: &str) -> Result<()> {
     let release_path = release_dir.join(relative_path);
     let shared_path = shared_dir.join(relative_path);
 
@@ -39,6 +43,8 @@ fn wire_path(release_dir: &Path, shared_dir: &Path, relative_path: &str) -> Resu
     if !path_exists(&shared_path) {
         create_default_shared_target(&shared_path, relative_path)?;
     }
+
+    permissions::chown_paths_to_deploy_user(cfg, &[shared_path.as_path()], true)?;
 
     ensure_parent_exists(&release_path)?;
     if path_exists(&release_path) {

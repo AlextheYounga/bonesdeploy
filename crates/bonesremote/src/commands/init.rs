@@ -15,10 +15,10 @@ pub fn run(deploy_user: &str) -> Result<()> {
     let sudoers_path = config::Constants::SUDOERS_PATH;
     let bonesdeploy_path = which_bonesdeploy_remote()?;
 
-    // Only the commands that need ownership changes run via sudo.
+    // Only the commands that need ownership or live-state changes run via sudo.
     let sudoers_content = format!(
         "# Installed by bonesremote init\n\
-         {deploy_user} ALL=(root) NOPASSWD: {bonesdeploy_path} release stage --config *, {bonesdeploy_path} hooks post-deploy --config *\n"
+         {deploy_user} ALL=(root) NOPASSWD: {bonesdeploy_path} release stage --config *, {bonesdeploy_path} release wire --config *, {bonesdeploy_path} hooks post-deploy --config *\n"
     );
 
     fs::write(sudoers_path, &sudoers_content).with_context(|| format!("Failed to write {sudoers_path}"))?;

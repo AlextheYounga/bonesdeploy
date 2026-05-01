@@ -172,11 +172,13 @@ fn resolve_ansible_playbook_binary() -> Result<PathBuf> {
 }
 
 fn ansible_playbook_available(binary: &Path) -> Result<bool> {
-    match Command::new(binary).arg("--version").status() {
-        Ok(status) => Ok(status.success()),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
-        Err(error) => Err(error).with_context(|| format!("Failed to run {} --version", binary.display())),
+    let status = Command::new(binary).arg("--version").status();
+    if status.as_ref().is_err_and(|error| error.kind() == ErrorKind::NotFound) {
+        return Ok(false);
     }
+
+    let status = status.with_context(|| format!("Failed to run {} --version", binary.display()))?;
+    Ok(status.success())
 }
 
 fn ensure_local_python3_available() -> Result<()> {
@@ -244,7 +246,10 @@ fn user_ansible_playbook_path() -> Result<Option<PathBuf>> {
     let output = match output {
         Ok(output) if output.status.success() => output,
         Ok(_) => return Ok(None),
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            let _ = error;
+            return Ok(None);
+        }
         Err(error) => return Err(error).context("Failed to discover python3 user base"),
     };
 
