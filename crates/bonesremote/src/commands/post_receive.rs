@@ -9,7 +9,7 @@ use crate::release_state;
 
 use super::wire_release;
 
-pub fn run(config_path: &str) -> Result<()> {
+pub fn run(config_path: &str, revision: Option<&str>) -> Result<()> {
     privileges::ensure_not_root("bonesremote hooks post-receive")?;
 
     let cfg = config::load(Path::new(config_path))?;
@@ -19,7 +19,8 @@ pub fn run(config_path: &str) -> Result<()> {
         bail!("Build workspace does not exist: {}", build_root.display());
     }
 
-    println!("Checking out {} to {}...", cfg.data.branch, build_root.display());
+    let checkout_target = revision.unwrap_or(cfg.data.branch.as_str());
+    println!("Checking out {checkout_target} to {}...", build_root.display());
 
     let status = Command::new("git")
         .arg("--work-tree")
@@ -28,14 +29,14 @@ pub fn run(config_path: &str) -> Result<()> {
         .arg(&cfg.data.git_dir)
         .arg("checkout")
         .arg("-f")
-        .arg(&cfg.data.branch)
+        .arg(checkout_target)
         .status()
         .with_context(|| {
-            format!("Failed to run git checkout for branch '{}' into {}", cfg.data.branch, build_root.display())
+            format!("Failed to run git checkout for target '{checkout_target}' into {}", build_root.display())
         })?;
 
     if !status.success() {
-        bail!("git checkout failed for branch '{}': status {status}", cfg.data.branch);
+        bail!("git checkout failed for target '{checkout_target}': status {status}");
     }
 
     wire_release::run(config_path)?;

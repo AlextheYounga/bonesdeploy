@@ -28,6 +28,10 @@ main() {
 		exit 0
 	fi
 
+	if ! bones_resolve_deploy_push_target; then
+		exit 0
+	fi
+
 	bones_run_doctor_remote
 	bones_stage_release
 }

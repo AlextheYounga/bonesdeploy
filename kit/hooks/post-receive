@@ -28,7 +28,11 @@ main() {
 		exit 0
 	fi
 
-	bones_wire_release
+	if ! bones_resolve_deploy_push_target; then
+		exit 0
+	fi
+
+	bones_wire_release "$BONES_DEPLOY_NEWREV"
 	bones_run_deployment
 	bones_post_deploy
 }
