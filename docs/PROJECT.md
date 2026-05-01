@@ -5,6 +5,28 @@ A Rust CLI that compiles into a single binary, containing embeds of boilerplate 
 ## Deployment Methodology
 We have an SSH deployment user (normally `git`) that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user (defaults to the project name). This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
 
+### Just-in-Time Concerns
+This project should prefer just-in-time mutations.
+
+A concern should only be handled at the last responsible moment: immediately before the system would fail if that mutation did not occur. We should not widen permissions, rewrite symlinks, mutate shared state, or otherwise touch live project state early just because a later step might need it. The idea here is to limit the surface of attack time, so that potential vulnerabilities are not created by "jumping the gun" to solve a problem too early, long before it arises.
+
+This principle exists to keep deployment behavior coherent and safe:
+
+- `pre-receive` should validate and prepare isolated staging state, not mutate live state.
+- build steps should operate on isolated workspace state whenever possible.
+- activation concerns should happen at activation time.
+- permission hardening should happen after a successful activation, not before.
+- if a deploy fails, it should not leave behind broadened access or half-applied live mutations.
+
+In practice, this means we should prefer:
+- isolated staging over speculative live-state mutation
+- narrow, local changes over recursive ownership changes
+- exact, just-before-use fixes over broad upfront rewrites
+- failure-safe sequencing over convenience
+
+If a mutation can be delayed safely, it should be delayed.
+If a mutation affects live state, it must be justified by an immediate need.
+
 ### Common Problems
 - Shared groups have too many logic traps. My apps should not have 660 or 770 permissions on all files so that a `git` user can have read/write.
 - I don't like ACLs; they're far too opaque.
