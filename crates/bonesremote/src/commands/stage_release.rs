@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -35,11 +35,9 @@ pub fn run(config_path: &str) -> Result<()> {
     fs::create_dir_all(&staged_release_dir)
         .with_context(|| format!("Failed to create release dir: {}", staged_release_dir.display()))?;
 
-    ensure_live_root_symlink(&cfg)?;
-
     permissions::chown_paths_to_deploy_user(&cfg, &[deploy_root, releases_dir.as_path()], false)?;
     permissions::chown_paths_to_deploy_user(&cfg, &[build_root.as_path()], true)?;
-    permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path(), shared_dir.as_path()], true)?;
+    permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path()], true)?;
     release_state::write_staged_release(&cfg, &release_name)?;
 
     println!("Staged release: {release_name}");
@@ -50,15 +48,4 @@ fn create_release_name() -> Result<String> {
     static TIMESTAMP_FORMAT: &[FormatItem<'static>] = format_description!("[year][month][day]_[hour][minute][second]");
     let now = OffsetDateTime::now_utc();
     now.format(TIMESTAMP_FORMAT).context("Failed to format release timestamp")
-}
-
-fn ensure_live_root_symlink(cfg: &config::BonesConfig) -> Result<()> {
-    let live_root = Path::new(&cfg.data.live_root);
-    let current_link = release_state::current_link(cfg);
-
-    if live_root.exists() && !live_root.is_symlink() {
-        bail!("live_root exists and is not a symlink: {}", live_root.display());
-    }
-
-    release_state::point_symlink_atomically(live_root, &current_link)
 }
