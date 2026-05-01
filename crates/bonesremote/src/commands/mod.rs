@@ -101,6 +101,9 @@ enum HookCommand {
         /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
+        /// Exact revision to check out into the build workspace
+        #[arg(long)]
+        revision: Option<String>,
     },
     /// Harden permissions back to service user after deployment
     PostDeploy {
@@ -136,7 +139,7 @@ pub fn run(cli: &Cli) -> Result<()> {
         },
         Command::Hooks { command } => match command {
             HookCommand::Deploy { config } => deploy::run(config),
-            HookCommand::PostReceive { config } => post_receive::run(config),
+            HookCommand::PostReceive { config, revision } => post_receive::run(config, revision.as_deref()),
             HookCommand::PostDeploy { config } => post_deploy::run(config),
         },
         Command::Version => {

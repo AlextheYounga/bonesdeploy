@@ -23,6 +23,58 @@ bones_should_deploy_on_push() {
 	return 0
 }
 
+bones_read_config_branch() {
+	grep -E '^[[:space:]]*branch:[[:space:]]*' "$BONES_YAML" | head -1 | sed 's/#.*$//' | sed 's/^[^:]*:[[:space:]]*//' | sed "s/^'//" | sed "s/'$//" | sed 's/^"//' | sed 's/"$//'
+}
+
+bones_is_zero_oid() {
+	local oid="$1"
+	[[ "$oid" =~ ^0+$ ]]
+}
+
+bones_resolve_deploy_push_target() {
+	local branch
+	branch=$(bones_read_config_branch)
+	if [ -z "$branch" ]; then
+		echo "[bonesdeploy] Could not read branch from $BONES_YAML"
+		return 1
+	fi
+
+	local target_ref="refs/heads/$branch"
+	local oldrev=""
+	local newrev=""
+	local refname=""
+
+	if [ "${BONES_FORCE_DEPLOY:-0}" = "1" ]; then
+		newrev=$(git --git-dir "$GIT_DIR" rev-parse "$target_ref" 2>/dev/null || true)
+		if [ -z "$newrev" ]; then
+			echo "[bonesdeploy] Configured deployment ref not found: $target_ref"
+			return 1
+		fi
+	else
+		while read -r oldrev newrev refname; do
+			if [ "$refname" = "$target_ref" ]; then
+				break
+			fi
+			newrev=""
+		done
+
+		if [ -z "$newrev" ]; then
+			echo "[bonesdeploy] Push did not update $target_ref; skipping deployment."
+			return 1
+		fi
+
+		if bones_is_zero_oid "$newrev"; then
+			echo "[bonesdeploy] Push deleted $target_ref; skipping deployment."
+			return 1
+		fi
+	fi
+
+	export BONES_DEPLOY_REF="$target_ref"
+	export BONES_DEPLOY_NEWREV="$newrev"
+	return 0
+}
+
 	bones_run_doctor_remote() {
 		echo "[bonesdeploy] Running remote doctor..."
 
@@ -43,10 +95,15 @@ bones_stage_release() {
 	echo "[bonesdeploy] Release staged."
 }
 
-	bones_wire_release() {
-		echo "[bonesdeploy] Running post-receive checkout + release wiring..."
+bones_wire_release() {
+	local revision="${1:-}"
+	echo "[bonesdeploy] Running post-receive checkout + release wiring..."
+	local cmd=(bonesremote hooks post-receive --config "$BONES_YAML")
+	if [ -n "$revision" ]; then
+		cmd+=(--revision "$revision")
+	fi
 
-		if ! bonesremote hooks post-receive --config "$BONES_YAML"; then
+		if ! "${cmd[@]}"; then
 			echo "[bonesdeploy] post-receive hook command failed."
 			exit 1
 		fi
