@@ -29,6 +29,7 @@ When you are done working, please run and address all warnings/errors:
 ## Principles
 
 - **Above all, Clean Code is non-negotiable.** Utilize "Clean Code" principles, clear code is clear thinking.
+- **Prefer elegance to scrappiness:** We like elegant solutions, we like quality; we hate slop with the power of 1000 suns.
 - **Do Not Make Fallbacks.** We are not NASA engineers. Do not create fallbacks or try to integrate legacy designs unless explicitly asked to do so.
 - **KISS > DRY.** Clarity beats deduplication. DRY must not create indirection.
 - **Consistency is king.** Check existing files for conventions and reusable patterns.
