@@ -128,3 +128,57 @@ fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
 fn has_git_extension(path: &str) -> bool {
     Path::new(path).extension().is_some_and(|ext| ext.eq_ignore_ascii_case("git"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_remote_url, parse_scp_style_url, parse_ssh_style_url};
+
+    #[test]
+    fn parse_ssh_style_url_parses_host_port_and_git_dir() {
+        let details = parse_ssh_style_url("ssh://git@example.com:2222/home/git/myapp.git");
+        assert!(details.is_some());
+        if let Some(details) = details {
+            assert_eq!(details.host, "example.com");
+            assert_eq!(details.port, "2222");
+            assert_eq!(details.git_dir, "/home/git/myapp.git");
+        }
+    }
+
+    #[test]
+    fn parse_ssh_style_url_defaults_port_to_22() {
+        let details = parse_ssh_style_url("ssh://git@example.com/home/git/myapp.git");
+        assert!(details.is_some());
+        if let Some(details) = details {
+            assert_eq!(details.host, "example.com");
+            assert_eq!(details.port, "22");
+            assert_eq!(details.git_dir, "/home/git/myapp.git");
+        }
+    }
+
+    #[test]
+    fn parse_scp_style_url_parses_absolute_git_dir() {
+        let details = parse_scp_style_url("git@example.com:/home/git/myapp.git");
+        assert!(details.is_some());
+        if let Some(details) = details {
+            assert_eq!(details.host, "example.com");
+            assert_eq!(details.port, "22");
+            assert_eq!(details.git_dir, "/home/git/myapp.git");
+        }
+    }
+
+    #[test]
+    fn parse_remote_url_rejects_non_git_paths() {
+        assert!(parse_remote_url("ssh://git@example.com:22/home/git/myapp").is_none());
+        assert!(parse_remote_url("git@example.com:/home/git/myapp").is_none());
+    }
+
+    #[test]
+    fn parse_remote_url_rejects_relative_scp_paths() {
+        assert!(parse_remote_url("git@example.com:myapp.git").is_none());
+    }
+
+    #[test]
+    fn parse_remote_url_rejects_non_ssh_urls() {
+        assert!(parse_remote_url("https://example.com/org/repo.git").is_none());
+    }
+}

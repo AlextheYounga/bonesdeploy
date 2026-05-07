@@ -105,3 +105,84 @@ fn remove_path(path: &Path) -> Result<()> {
 fn path_exists(path: &Path) -> bool {
     fs::symlink_metadata(path).is_ok()
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use anyhow::Result;
+
+    use super::{create_default_shared_target, looks_like_file, remove_path};
+
+    fn temp_dir_path(test_name: &str) -> PathBuf {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
+        std::env::temp_dir().join(format!("bonesremote_wire_release_test_{}_{}_{}", process::id(), nanos, test_name))
+    }
+
+    #[test]
+    fn looks_like_file_treats_dotfiles_as_files() {
+        assert!(looks_like_file(".env"));
+    }
+
+    #[test]
+    fn looks_like_file_treats_extensions_as_files() {
+        assert!(looks_like_file("config/app.json"));
+    }
+
+    #[test]
+    fn looks_like_file_treats_plain_names_as_directories() {
+        assert!(!looks_like_file("storage"));
+        assert!(!looks_like_file("logs/archive"));
+    }
+
+    #[test]
+    fn create_default_shared_target_creates_file_for_file_like_paths() -> Result<()> {
+        let root = temp_dir_path("default_file");
+        let shared_file = root.join("shared").join(".env");
+
+        create_default_shared_target(&shared_file, ".env")?;
+
+        assert!(shared_file.exists());
+        assert!(shared_file.is_file());
+
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn create_default_shared_target_creates_directory_for_directory_like_paths() -> Result<()> {
+        let root = temp_dir_path("default_directory");
+        let shared_dir = root.join("shared").join("storage");
+
+        create_default_shared_target(&shared_dir, "storage")?;
+
+        assert!(shared_dir.exists());
+        assert!(shared_dir.is_dir());
+
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn remove_path_removes_files_and_directories() -> Result<()> {
+        let root = temp_dir_path("remove_path");
+        fs::create_dir_all(&root)?;
+
+        let file_path = root.join("tmp.txt");
+        fs::write(&file_path, "payload")?;
+        remove_path(&file_path)?;
+        assert!(!file_path.exists());
+
+        let dir_path = root.join("tmp_dir");
+        fs::create_dir_all(dir_path.join("nested"))?;
+        fs::write(dir_path.join("nested").join("file.txt"), "payload")?;
+        remove_path(&dir_path)?;
+        assert!(!dir_path.exists());
+
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+}
