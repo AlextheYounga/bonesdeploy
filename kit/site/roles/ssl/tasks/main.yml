@@ -55,7 +55,7 @@
       - "{{ ssl_email }}"
       - --webroot
       - -w
-      - "{{ nginx_placeholder_root }}"
+      - "{{ live_root }}"
       - -d
       - "{{ ssl_domain }}"
       - --keep-until-expiring

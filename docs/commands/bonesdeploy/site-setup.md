@@ -370,25 +370,31 @@ The playbook typically includes tasks for:
    - Create service user (`myapp`)
    - Configure sudoers for passwordless execution
 
-2. **Directory Structure**
+2. **Git Repository**
+   - Initialize bare git repository at `git_dir`
+   - Set up directory structure for hooks
+
+3. **Directory Structure**
    - Create `deploy_root` (`/srv/deployments/myapp`)
    - Create `live_root` parent (`/var/www`)
+   - Create initial placeholder release
    - Set up shared directory
    - Configure permissions
 
-3. **Dependencies**
+4. **Dependencies**
    - Install system packages
    - Install runtime dependencies (Node.js, PHP, etc.)
    - Configure package managers
 
-4. **Systemd Service**
-   - Create service unit file
-   - Enable service
-
-5. **Web Server**
+5. **Per-Site Nginx**
    - Install Nginx
-   - Configure virtual host
-   - Set up SSL (if enabled)
+   - Configure per-site nginx with Landlock isolation
+   - Set up socket directory (`/run/{project}/`)
+   - Create nginx systemd service
+   - Configure main router nginx
+
+6. **SSL (if enabled)**
+   - Set up SSL certificates
 
 ---
 

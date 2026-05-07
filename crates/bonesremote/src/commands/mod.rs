@@ -3,7 +3,7 @@ mod deploy;
 mod doctor;
 mod drop_failed_release;
 mod init;
-mod landlock_exec;
+mod landlock_nginx;
 mod post_deploy;
 mod post_receive;
 mod rollback;
@@ -30,11 +30,7 @@ enum Command {
         deploy_user: String,
     },
     /// Check server environment health
-    Doctor {
-        /// Optional path to bones.yaml for runtime checks
-        #[arg(long)]
-        config: Option<String>,
-    },
+    Doctor,
     /// Runtime isolation launcher commands
     Landlock {
         #[command(subcommand)]
@@ -115,8 +111,8 @@ enum HookCommand {
 
 #[derive(Subcommand)]
 enum LandlockCommand {
-    /// Apply Landlock and exec the runtime command
-    Exec {
+    /// Apply Landlock and exec per-site nginx
+    Nginx {
         /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
@@ -126,9 +122,9 @@ enum LandlockCommand {
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init { deploy_user } => init::run(deploy_user),
-        Command::Doctor { config } => doctor::run(config.as_deref()),
+        Command::Doctor => doctor::run(),
         Command::Landlock { command } => match command {
-            LandlockCommand::Exec { config } => landlock_exec::run(config),
+            LandlockCommand::Nginx { config } => landlock_nginx::run(config),
         },
         Command::Release { command } => match command {
             ReleaseCommand::Stage { config } => stage_release::run(config),

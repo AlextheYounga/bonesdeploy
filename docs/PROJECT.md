@@ -131,11 +131,8 @@ releases:
   keep: 5
   shared_paths: [".env", "storage"]
 
-# Optional runtime launcher settings (only for service/landlock-managed apps).
-# runtime:
-#   command: ["/usr/bin/node", "server.js"]
-#   working_dir: "."
-#   writable_paths: []
+# Optional runtime launcher settings (removed in current version).
+# Per-site nginx with landlock isolation is now configured automatically.
 
 ssl:
   enabled: true
@@ -203,8 +200,8 @@ bonesdeploy/
 │           │   ├── post_receive.rs
 │           │   ├── deploy.rs
 │           │   ├── post_deploy.rs
-│           │   ├── landlock_exec.rs
-│           │   └── version.rs
+          │   │   ├── landlock_nginx.rs
+          │   │   └── version.rs
 │           ├── config.rs       # bones.yaml structs + remote file discovery
 │           ├── permissions.rs  # chown/chmod logic
 │           ├── privileges.rs   # sudoers drop-in install + privilege checks
@@ -259,9 +256,11 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 
 - **site setup**
   - Runs `.bones/site/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
-  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, and `git_dir` from `bones.yaml` as playbook variables.
-  - Installs nginx and provisions a project default site from `.bones/site/nginx/site.conf.j2`.
-  - Seeds a placeholder page from `.bones/site/roles/nginx/defaults/index.html.j2` so the host serves a branded default page before first deployment.
+  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, `deploy_root`, and `git_dir` from `bones.yaml` as playbook variables.
+  - Initializes bare git repository at `git_dir`.
+  - Creates initial placeholder release with default page.
+  - Sets up per-site nginx with Landlock isolation.
+  - Configures main router nginx to proxy domains to per-site unix sockets.
 
 - **site ssl**
   - Runs the SSL Ansible role against the configured host.
@@ -285,7 +284,6 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
     - `bonesremote` can be run without requiring password
     - `bonesremote` is globally available.
     - Landlock support is available on the host.
-  - With `--config`, validates runtime readiness only when `runtime.command` is configured (`service_user`, runtime tree, and systemd unit).
 - **release stage**
 	- Creates a staged runtime tree under `runtime/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout.
 - **release wire**
@@ -300,10 +298,10 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 	- Checks out the resolved revision (or the configured branch if `--revision` is omitted) into `build/workspace`. Wiring is performed by a separate `release wire` call so it can run with elevated privileges just-in-time.
 - **hooks deploy**
 	- Runs deployment scripts in `build/workspace`, copies runtime-ready output into staged `runtime/<timestamp>`, drops failed staged releases on error, and activates release on success.
-- **landlock exec**
-	- Resolves `live_root` to the active runtime tree, applies Landlock policy, and `exec`s `runtime.command`.
+- **landlock nginx**
+	- Resolves `live_root` to the active runtime tree, applies Landlock policy, and `exec`s per-site nginx.
 - **hooks post-deploy**
-	- Installs or updates the project systemd unit when `runtime.command` is configured, then reloads and enables/starts the service.
+	- Restarts the per-site nginx service to pick up the new release.
 	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.yaml`, like for instance setting everything back to be owned by the service user, then prunes old releases. 
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
