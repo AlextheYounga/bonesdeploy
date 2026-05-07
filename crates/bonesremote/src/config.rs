@@ -139,14 +139,14 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{BonesConfig, load};
+    use super::load;
 
     fn temp_file_path(prefix: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
         std::env::temp_dir().join(format!("{prefix}_{}_{}.yaml", std::process::id(), nanos))
     }
 
-    // Confirms omitted runtime ownership/location fields derive from project identity.
+    // Confirms omitted ownership/location fields derive from project identity.
     #[test]
     fn load_derives_service_user_and_roots_from_project_name() {
         let path = temp_file_path("bonesremote_config_derived_defaults");
@@ -240,27 +240,5 @@ data:
         // This codifies intended behavior: service_user should stay explicit/default when
         // project name is missing, instead of becoming an empty user.
         assert_eq!(cfg.permissions.defaults.service_user, "");
-    }
-
-    // Verifies runtime command settings round-trip from YAML into executable config fields.
-    #[test]
-    fn load_round_trips_non_default_runtime_fields() {
-        let path = temp_file_path("bonesremote_config_runtime_fields");
-        let yaml = r#"
-data:
-  project_name: acme
-runtime:
-  command: ['bun', 'run', 'start']
-  working_dir: app
-  writable_paths: ['storage', '/tmp/acme']
-"#;
-
-        fs::write(&path, yaml).unwrap_or_else(|error| panic!("failed to write test config: {error}"));
-        let cfg: BonesConfig = load(&path).unwrap_or_else(|error| panic!("failed to load test config: {error}"));
-        fs::remove_file(&path).ok();
-
-        assert_eq!(cfg.runtime.command, vec!["bun", "run", "start"]);
-        assert_eq!(cfg.runtime.working_dir, "app");
-        assert_eq!(cfg.runtime.writable_paths, vec!["storage", "/tmp/acme"]);
     }
 }

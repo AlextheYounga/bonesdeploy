@@ -76,7 +76,7 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{prune_old_releases, render_runtime_service, write_file_if_changed};
+    use super::prune_old_releases;
     use crate::config;
 
     fn temp_dir(prefix: &str) -> PathBuf {
@@ -110,11 +110,6 @@ mod tests {
                 paths: Vec::new(),
             },
             releases: config::Releases { keep, shared_paths: vec![String::from(".env")] },
-            runtime: config::Runtime {
-                command: vec![String::from("bun"), String::from("run"), String::from("start")],
-                working_dir: String::from("."),
-                writable_paths: Vec::new(),
-            },
         }
     }
 
@@ -130,55 +125,6 @@ mod tests {
         let target = runtime.join(name);
         std::os::unix::fs::symlink(&target, deploy_root.join("current"))
             .unwrap_or_else(|error| panic!("failed to create current symlink: {error}"));
-    }
-
-    // Verifies generated service unit includes the runtime identity and config path contract.
-    #[test]
-    fn render_runtime_service_includes_expected_runtime_fields() {
-        let root = temp_dir("bonesremote_post_deploy_service");
-        let cfg = config_for(&root, 5);
-
-        let service = render_runtime_service(&cfg);
-
-        assert!(service.contains("Description=Bones runtime for acme"));
-        assert!(service.contains("User=svc-acme"));
-        assert!(service.contains(&format!("WorkingDirectory={}", cfg.data.live_root)));
-        assert!(service.contains(&format!("--config {}/bones/bones.yaml", cfg.data.git_dir)));
-
-        fs::remove_dir_all(root).ok();
-    }
-
-    // Prevents unnecessary daemon-reload churn by asserting no-op writes are detected.
-    #[test]
-    fn write_file_if_changed_reports_false_when_contents_are_unchanged() {
-        let root = temp_dir("bonesremote_post_deploy_write_unchanged");
-        let file_path = root.join("service.unit");
-        fs::write(&file_path, "same").unwrap_or_else(|error| panic!("failed to seed file: {error}"));
-
-        let changed = write_file_if_changed(&file_path, "same")
-            .unwrap_or_else(|error| panic!("write_file_if_changed failed: {error}"));
-
-        assert!(!changed);
-        fs::remove_dir_all(root).ok();
-    }
-
-    // Ensures changed service content is persisted so runtime updates actually take effect.
-    #[test]
-    fn write_file_if_changed_reports_true_when_contents_change() {
-        let root = temp_dir("bonesremote_post_deploy_write_changed");
-        let file_path = root.join("service.unit");
-        fs::write(&file_path, "before").unwrap_or_else(|error| panic!("failed to seed file: {error}"));
-
-        let changed = write_file_if_changed(&file_path, "after")
-            .unwrap_or_else(|error| panic!("write_file_if_changed failed: {error}"));
-
-        assert!(changed);
-        assert_eq!(
-            fs::read_to_string(&file_path).unwrap_or_else(|error| panic!("failed to read file: {error}")),
-            "after"
-        );
-
-        fs::remove_dir_all(root).ok();
     }
 
     // Verifies retention policy prunes only the oldest inactive releases beyond keep count.

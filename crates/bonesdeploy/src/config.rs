@@ -206,7 +206,7 @@ mod tests {
     use anyhow::Result;
 
     use super::{
-        BonesConfig, Data, PermissionDefaults, Permissions, Releases, Runtime, Ssl, default_deploy_root_for,
+        BonesConfig, Data, PermissionDefaults, Permissions, Releases, Ssl, default_deploy_root_for,
         default_live_root_for, load, save,
     };
 
@@ -245,7 +245,6 @@ mod tests {
                 paths: Vec::new(),
             },
             releases: Releases { keep: 5, shared_paths: Vec::new() },
-            runtime: Runtime::default(),
             ssl: Ssl::default(),
         }
     }
@@ -305,39 +304,21 @@ mod tests {
         Ok(())
     }
 
-    // Ensures runtime docs are shown when runtime is unset so users discover optional launcher config.
+    // Ensures SSL settings are serialized so SSL setup can round-trip user intent.
     #[test]
-    fn save_appends_runtime_doc_comment_when_runtime_is_default() -> Result<()> {
-        let config = sample_config("phoenix");
-        let path = temp_path("save_runtime_comment.yaml");
-
-        save(&config, &path)?;
-        let content = fs::read_to_string(&path)?;
-
-        assert!(content.contains("# Optional runtime launcher settings"));
-        assert!(content.contains("# runtime:"));
-
-        fs::remove_file(path)?;
-        Ok(())
-    }
-
-    // Ensures runtime docs are not duplicated once runtime is explicitly configured.
-    #[test]
-    fn save_does_not_append_runtime_comment_when_runtime_is_configured() -> Result<()> {
+    fn save_persists_ssl_settings() -> Result<()> {
         let mut config = sample_config("phoenix");
-        config.runtime = Runtime {
-            command: vec![String::from("/usr/bin/node"), String::from("server.js")],
-            working_dir: String::from("."),
-            writable_paths: Vec::new(),
-        };
+        config.ssl =
+            Ssl { enabled: true, domain: String::from("app.example.com"), email: String::from("ops@example.com") };
 
-        let path = temp_path("save_runtime_configured.yaml");
+        let path = temp_path("save_ssl_settings.yaml");
         save(&config, &path)?;
         let content = fs::read_to_string(&path)?;
 
-        assert!(!content.contains("# Optional runtime launcher settings"));
-        assert!(content.contains("runtime:"));
-        assert!(content.contains("command:"));
+        assert!(content.contains("ssl:"));
+        assert!(content.contains("enabled: true"));
+        assert!(content.contains("domain: app.example.com"));
+        assert!(content.contains("email: ops@example.com"));
 
         fs::remove_file(path)?;
         Ok(())

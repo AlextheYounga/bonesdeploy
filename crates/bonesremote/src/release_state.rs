@@ -138,7 +138,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Runtime};
+    use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases};
 
     use super::{
         clear_staged_release, current_release_name, list_releases_sorted, point_symlink_atomically,
@@ -175,7 +175,6 @@ mod tests {
                 paths: Vec::new(),
             },
             releases: Releases { keep: 5, shared_paths: Vec::new() },
-            runtime: Runtime::default(),
         }
     }
 
