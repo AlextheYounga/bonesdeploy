@@ -111,7 +111,6 @@ fn collect_from_seed(project_name_hint: &str, seed: Option<&config::BonesConfig>
             paths: path_overrides,
         },
         releases: config::Releases { keep: releases_keep, shared_paths },
-        runtime: seed.map_or_else(config::Runtime::default, |cfg| cfg.runtime.clone()),
         ssl: seed.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
     })
 }
