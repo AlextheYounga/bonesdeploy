@@ -148,7 +148,7 @@ Notes:
 
 ### bonesdeploy
 
-`bonesdeploy server setup` becomes responsible for runtime isolation setup.
+`bonesdeploy site setup` becomes responsible for host prerequisites.
 
 It should:
 
@@ -181,7 +181,7 @@ hooks into the isolation boundary.
 
 ## Ansible Role Changes
 
-Runtime isolation should be provisioned by `bonesdeploy server setup`.
+Runtime isolation should be provisioned by `bonesdeploy site setup`.
 
 ### users role
 
@@ -313,7 +313,7 @@ Advanced users can still override or extend behavior later.
 2. change `service_user` defaults to `project_name`
 3. add runtime config to `bones.toml`
 4. add `bonesremote landlock exec`
-5. extend `bonesdeploy server setup` to provision the service unit
+5. provision/update the service unit during `bonesremote hooks post-deploy`
 6. extend doctor to verify Landlock support and runtime readiness
 7. update templates and docs to explain the new build/runtime split
 
@@ -336,5 +336,5 @@ The key decisions are:
 - publish into versioned `runtime_root/<timestamp>`
 - keep `live_root` as the stable entrypoint
 - launch the app through `bonesremote landlock`
-- provision the runtime service from `bonesdeploy server setup`
+- provision the runtime service from `bonesdeploy site setup`
 - treat Landlock as runtime-only isolation
