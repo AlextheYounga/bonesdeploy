@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{Result, bail};
 use console::style;
 
-use crate::commands::server_setup;
+use crate::commands::site_setup;
 use crate::config;
 
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
@@ -28,11 +28,11 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
 
     config::save(&cfg, bones_yaml)?;
 
-    server_setup::ensure_ansible_playbook_installed()?;
+    site_setup::ensure_ansible_playbook_installed()?;
 
     println!(
         "Running {} against {} for {}...",
-        style("server ssl").cyan().bold(),
+        style("site ssl").cyan().bold(),
         style(&cfg.data.host).cyan(),
         style(&cfg.ssl.domain).cyan(),
     );
@@ -51,7 +51,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let mut cfg_for_run = cfg.clone();
     cfg_for_run.ssl.enabled = false;
 
-    server_setup::run_ansible_playbook(&cfg_for_run, &cfg.permissions.defaults.deploy_user, &extra_args)?;
+    site_setup::run_ansible_playbook(&cfg_for_run, &cfg.permissions.defaults.deploy_user, &extra_args)?;
 
     cfg.ssl.enabled = true;
     config::save(&cfg, bones_yaml)?;

@@ -1,5 +1,5 @@
 ---
-- name: Server setup for bonesdeploy (Django)
+- name: Site setup for bonesdeploy
   hosts: all
   become: true
 
@@ -10,23 +10,17 @@
     - role: common
       tags: [common]
 
-    - role: django_runtime
-      tags: [django]
-
     - role: nginx
       tags: [nginx]
 
     - role: ssl
       tags: [ssl]
 
-    - role: runtime
-      tags: [runtime]
-
   post_tasks:
     - name: Display setup completion
       ansible.builtin.debug:
         msg: |
-          Bones Django server setup completed.
+          Bones site setup completed.
           Deploy user: {{ deploy_user }}
           Service user: {{ service_user }}
           Group: {{ group }}

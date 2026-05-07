@@ -1,5 +1,5 @@
 ---
-- name: Server setup for bonesdeploy (Next.js)
+- name: Site setup for bonesdeploy (Nuxt)
   hosts: all
   become: true
 
@@ -10,8 +10,8 @@
     - role: common
       tags: [common]
 
-    - role: next_runtime
-      tags: [next]
+    - role: nuxt_runtime
+      tags: [nuxt]
 
     - role: nginx
       tags: [nginx]
@@ -19,14 +19,11 @@
     - role: ssl
       tags: [ssl]
 
-    - role: runtime
-      tags: [runtime]
-
   post_tasks:
     - name: Display setup completion
       ansible.builtin.debug:
         msg: |
-          Bones Next.js server setup completed.
+          Bones Nuxt site setup completed.
           Deploy user: {{ deploy_user }}
           Service user: {{ service_user }}
           Group: {{ group }}

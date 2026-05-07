@@ -1,5 +1,5 @@
 ---
-- name: Server setup for bonesdeploy (Nuxt)
+- name: Site setup for bonesdeploy (Rails)
   hosts: all
   become: true
 
@@ -10,8 +10,8 @@
     - role: common
       tags: [common]
 
-    - role: nuxt_runtime
-      tags: [nuxt]
+    - role: rails_runtime
+      tags: [rails]
 
     - role: nginx
       tags: [nginx]
@@ -19,14 +19,11 @@
     - role: ssl
       tags: [ssl]
 
-    - role: runtime
-      tags: [runtime]
-
   post_tasks:
     - name: Display setup completion
       ansible.builtin.debug:
         msg: |
-          Bones Nuxt server setup completed.
+          Bones Rails site setup completed.
           Deploy user: {{ deploy_user }}
           Service user: {{ service_user }}
           Group: {{ group }}

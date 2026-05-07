@@ -1,5 +1,5 @@
 ---
-- name: Server setup for bonesdeploy (Rails)
+- name: Site setup for bonesdeploy (SvelteKit)
   hosts: all
   become: true
 
@@ -10,8 +10,8 @@
     - role: common
       tags: [common]
 
-    - role: rails_runtime
-      tags: [rails]
+    - role: sveltekit_runtime
+      tags: [sveltekit]
 
     - role: nginx
       tags: [nginx]
@@ -19,14 +19,11 @@
     - role: ssl
       tags: [ssl]
 
-    - role: runtime
-      tags: [runtime]
-
   post_tasks:
     - name: Display setup completion
       ansible.builtin.debug:
         msg: |
-          Bones Rails server setup completed.
+          Bones SvelteKit site setup completed.
           Deploy user: {{ deploy_user }}
           Service user: {{ service_user }}
           Group: {{ group }}

@@ -1,5 +1,5 @@
 ---
-- name: Server setup for bonesdeploy (Vue)
+- name: Site setup for bonesdeploy (Laravel)
   hosts: all
   become: true
 
@@ -10,8 +10,8 @@
     - role: common
       tags: [common]
 
-    - role: vue_runtime
-      tags: [vue]
+    - role: laravel_runtime
+      tags: [laravel]
 
     - role: nginx
       tags: [nginx]
@@ -19,14 +19,11 @@
     - role: ssl
       tags: [ssl]
 
-    - role: runtime
-      tags: [runtime]
-
   post_tasks:
     - name: Display setup completion
       ansible.builtin.debug:
         msg: |
-          Bones Vue server setup completed.
+          Bones Laravel site setup completed.
           Deploy user: {{ deploy_user }}
           Service user: {{ service_user }}
           Group: {{ group }}
