@@ -1,6 +1,4 @@
-use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use ::landlock::{
     ABI, Access, AccessFs, CompatLevel, Compatible, LandlockStatus, PathBeneath, PathFd, RestrictionStatus, Ruleset,
@@ -62,28 +60,6 @@ pub fn restrict_self(policy: &Policy) -> Result<RestrictionStatus> {
     }
 
     Ok(status)
-}
-
-pub fn resolve_command_path(command: &str) -> Result<PathBuf> {
-    let command_path = Path::new(command);
-    if command_path.is_absolute() || command_path.components().count() > 1 {
-        if !command_path.exists() {
-            bail!("Runtime command does not exist: {}", command_path.display());
-        }
-        return fs::canonicalize(command_path)
-            .with_context(|| format!("Failed to resolve runtime command path: {}", command_path.display()));
-    }
-
-    let path_env = env::var_os("PATH").ok_or_else(|| anyhow::anyhow!("PATH is not set"))?;
-    for dir in env::split_paths(&path_env) {
-        let candidate = dir.join(command);
-        if candidate.is_file() {
-            return fs::canonicalize(&candidate)
-                .with_context(|| format!("Failed to resolve runtime command path: {}", candidate.display()));
-        }
-    }
-
-    bail!("Runtime command is not available in PATH: {command}")
 }
 
 pub fn default_system_read_paths() -> Vec<PathBuf> {

@@ -2,16 +2,13 @@
 
 ## Overview
 
-Validates the server environment to ensure all prerequisites and configurations are correct for `bonesremote` to function properly. Performs checks for OS compatibility, binary availability, sudoers configuration, Landlock support, and optionally runtime readiness.
+Validates the server environment to ensure all prerequisites and configurations are correct for `bonesremote` to function properly. Performs checks for OS compatibility, binary availability, sudoers configuration, and Landlock support.
 
 ## Command Signature
 
 ```bash
-bonesremote doctor [--config <path>]
+bonesremote doctor
 ```
-
-**Flags:**
-- `--config <path>`: Optional path to `bones.yaml` for runtime readiness checks
 
 ---
 
@@ -221,110 +218,7 @@ Landlock support check failed: Kernel does not support Landlock
 
 ---
 
-### 7. Check Runtime Readiness (Optional)
-
-**Source:** `doctor.rs:21-23`
-
-```rust
-if let Some(path) = config_path {
-    check_runtime_readiness(path, &mut issues);
-}
-```
-
-If `--config` flag is provided, validates runtime-specific requirements.
-
-**Source:** `doctor.rs:90-126`
-
-```rust
-fn check_runtime_readiness(config_path: &str, issues: &mut Vec<String>) {
-    let path = Path::new(config_path);
-    let cfg = match config::load(path) {
-        Ok(cfg) => cfg,
-        Err(error) => {
-            issues.push(format!("Failed to load config {config_path}: {error}"));
-            return;
-        }
-    };
-
-    if cfg.runtime.command.is_empty() {
-        return;  // No runtime configured
-    }
-
-    // Check service user exists
-    let service_user = &cfg.permissions.defaults.service_user;
-    let user_lookup = Command::new("id").arg("-u").arg(service_user).output();
-    match user_lookup {
-        Ok(output) if output.status.success() => {}
-        _ => issues.push(format!("service user does not exist: {service_user}")),
-    }
-
-    // Check live_root exists
-    match fs::canonicalize(&cfg.data.live_root) {
-        Ok(runtime_tree) => {
-            if !runtime_tree.exists() {
-                issues.push(format!("Resolved runtime tree does not exist: {}", runtime_tree.display()));
-            }
-        }
-        Err(error) => {
-            issues.push(format!("Failed to resolve runtime tree from live_root {}: {error}", cfg.data.live_root));
-        }
-    }
-
-    // Check systemd service exists
-    let service_unit = format!("/etc/systemd/system/{}.service", cfg.data.project_name);
-    if !Path::new(&service_unit).exists() {
-        issues.push(format!("Systemd service unit is missing: {service_unit}"));
-    }
-}
-```
-
-#### 7.1 Load Configuration
-
-Loads `bones.yaml` to check runtime-specific settings.
-
-#### 7.2 Skip if No Runtime
-
-If `runtime.command` is empty, no runtime is configured, so skips remaining checks.
-
-#### 7.3 Verify Service User Exists
-
-Runs `id -u <service_user>` to verify the user exists.
-
-**Example Issue:**
-```
-service user does not exist: myapp
-```
-
-**Solution:** Create the user:
-```bash
-sudo useradd -r -s /bin/false myapp
-```
-
-#### 7.4 Verify Live Root Exists
-
-Checks that the live root path exists and resolves correctly.
-
-**Example Issue:**
-```
-Failed to resolve runtime tree from live_root /var/www/myapp: No such file or directory
-```
-
-**Solution:** Ensure at least one deployment has occurred, or create the directory structure.
-
-#### 7.5 Verify Systemd Service Exists
-
-Checks for the systemd service unit file.
-
-**Example Issue:**
-```
-Systemd service unit is missing: /etc/systemd/system/myapp.service
-```
-
-**Solution:** Run `bonesdeploy site setup` to create the service, or create manually.
-
----
-
-### 8. Report Results
+### 7. Report Results
 
 **Source:** `doctor.rs:25-34`
 
@@ -367,9 +261,6 @@ Doctor found 2 issues
 | **Global availability** | `bonesremote` in PATH | Install globally |
 | **Passwordless sudo** | Sudoers configured | Run `sudo bonesremote init` |
 | **Landlock support** | Kernel supports Landlock | Upgrade kernel |
-| **Service user** (optional) | User exists | Create user |
-| **Live root** (optional) | Directory exists | Deploy once |
-| **Systemd service** (optional) | Service unit exists | Run site setup |
 
 ---
 
@@ -395,9 +286,6 @@ sudo bonesremote init
 
 # 3. Verify setup
 bonesremote doctor
-
-# 4. With project config
-bonesremote doctor --config /home/git/myapp.git/bones/bones.yaml
 ```
 
 ---

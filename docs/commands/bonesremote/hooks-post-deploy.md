@@ -2,7 +2,7 @@
 
 ## Overview
 
-Post-deployment hook that runs after a release is activated. It ensures the runtime service is configured and running, hardens file permissions to restrict access, and prunes old releases to save disk space. This command must be run as root to manage systemd services and change file ownership.
+Post-deployment hook that runs after a release is activated. It restarts the per-site nginx service to pick up the new release, hardens file permissions to restrict access, and prunes old releases to save disk space. This command must be run as root to manage systemd services and change file ownership.
 
 ## Command Signature
 
@@ -46,149 +46,61 @@ Loads deployment configuration.
 
 ---
 
-### 3. Ensure Runtime Service
+### 3. Restart Per-Site Nginx
 
 **Source:** `post_deploy.rs:16`
 
 ```rust
-ensure_runtime_service(&cfg)?;
+restart_site_nginx(&cfg)?;
 ```
 
-If `runtime.command` is configured, ensures the systemd service is set up and running.
+Restarts the per-site nginx service if it's running, so it picks up the new release.
 
-**Source:** `post_deploy.rs:27-42`
+**Source:** `post_deploy.rs:27-47`
 
-#### 3.1 Skip if No Runtime
+#### 3.1 Check Service Status
 
 ```rust
-if cfg.runtime.command.is_empty() {
-    return Ok(());
-}
+let service_name = format!("{}-nginx", cfg.data.project_name);
+let status = Command::new("systemctl")
+    .args(["is-active", "--quiet", &service_name])
+    .status()
+    .context("Failed to check nginx service status")?;
 ```
 
-If no runtime command is configured, skips service setup. The application is assumed to be static files or managed externally.
+Checks if the per-site nginx service is currently active.
 
-#### 3.2 Render Service Unit File
+**Service name:** `{project_name}-nginx` (e.g., `myapp-nginx`)
 
-**Source:** `post_deploy.rs:32`, `post_deploy.rs:44-53`
+#### 3.2 Restart if Active
 
 ```rust
-let service_body = render_runtime_service(cfg);
-```
+if status.success() {
+    let restart_status = Command::new("systemctl")
+        .args(["restart", &service_name])
+        .status()
+        .context("Failed to restart nginx service")?;
 
-**Implementation:**
-```rust
-fn render_runtime_service(cfg: &config::BonesConfig) -> String {
-    let runtime_config_path = format!("{}/bones/bones.yaml", cfg.data.git_dir);
-    format!(
-        "[Unit]\n\
-         Description=Bones runtime for {service_name}\n\
-         After=network.target\n\
-         \n\
-         [Service]\n\
-         Type=simple\n\
-         User={service_user}\n\
-         WorkingDirectory={working_directory}\n\
-         ExecStart=/usr/local/bin/bonesremote landlock exec --config {runtime_config_path}\n\
-         Restart=always\n\
-         RestartSec=2\n\
-         \n\
-         [Install]\n\
-         WantedBy=multi-user.target\n",
-        service_name = cfg.data.project_name,
-        service_user = cfg.permissions.defaults.service_user,
-        working_directory = cfg.data.live_root,
-        runtime_config_path = runtime_config_path,
-    )
-}
-```
-
-**Example Service File:**
-```ini
-[Unit]
-Description=Bones runtime for myapp
-After=network.target
-
-[Service]
-Type=simple
-User=myapp
-WorkingDirectory=/var/www/myapp
-ExecStart=/usr/local/bin/bonesremote landlock exec --config /home/git/myapp.git/bones/bones.yaml
-Restart=always
-RestartSec=2
-
-[Install]
-WantedBy=multi-user.target
-```
-
-**Key Configuration:**
-- **User**: Service user (e.g., `myapp`)
-- **WorkingDirectory**: `live_root` (symlink to current release)
-- **ExecStart**: Launches runtime via Landlock sandbox
-- **Restart**: Automatically restart on failure
-- **RestartSec**: Wait 2 seconds before restart
-
-#### 3.3 Write Service File
-
-**Source:** `post_deploy.rs:33-34`, `post_deploy.rs:55-65`
-
-```rust
-let service_path = format!("/etc/systemd/system/{}.service", cfg.data.project_name);
-let changed = write_file_if_changed(Path::new(&service_path), &service_body)?;
-```
-
-**Implementation:**
-```rust
-fn write_file_if_changed(path: &Path, contents: &str) -> Result<bool> {
-    if path.exists() {
-        let existing = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-        if existing == contents {
-            return Ok(false);  // No changes needed
-        }
+    if !restart_status.success() {
+        bail!("Failed to restart {service_name} service");
     }
-
-    fs::write(path, contents).with_context(|| format!("Failed to write {}", path.display()))?;
-    Ok(true)
+    println!("Restarted {service_name} service");
 }
 ```
 
-**Only writes if changed:**
-- Compares existing file with new content
-- Returns `true` if file was written
-- Returns `false` if already up to date
+If the service is active, restarts it. This causes nginx to:
+1. Stop serving the old release
+2. Re-read the `live_root` symlink (now pointing to new release)
+3. Start serving the new release
 
-**Why check for changes?**
-- Avoid unnecessary daemon-reload
-- Preserve file timestamps
-- More efficient
+**Why restart instead of reload?**
+- Ensures nginx picks up the new `live_root` symlink
+- Cleaner than trying to reload with changed paths
+- Minimal downtime (typically < 1 second)
 
-#### 3.4 Reload Systemd (if needed)
+#### 3.3 Skip if Not Active
 
-**Source:** `post_deploy.rs:36-38`
-
-```rust
-if changed {
-    run_systemctl(["daemon-reload"])?;
-}
-```
-
-If service file was modified, reloads systemd to pick up changes.
-
-#### 3.5 Enable and Start Service
-
-**Source:** `post_deploy.rs:40`
-
-```rust
-run_systemctl(["enable", "--now", &cfg.data.project_name])?;
-```
-
-**Command:** `systemctl enable --now myapp`
-
-**Flags:**
-- `enable`: Enable service to start on boot
-- `--now`: Also start the service immediately
-
-**Result:** Service is running and will auto-start on reboot.
+If the service isn't running yet (e.g., first deployment), the restart is skipped. The service will be started during the initial `site setup`.
 
 ---
 
