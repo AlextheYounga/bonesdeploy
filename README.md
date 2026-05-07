@@ -185,12 +185,6 @@ releases:
   keep: 5
   shared_paths: [".env", "storage"]
 
-# Optional runtime launcher settings (only needed for service/landlock-managed apps).
-# runtime:
-#   command: ["/usr/bin/node", "server.js"]
-#   working_dir: "."
-#   writable_paths: []
-
 ssl:
   enabled: false
   domain: ""

@@ -12,8 +12,6 @@ pub struct BonesConfig {
     pub permissions: Permissions,
     #[serde(default)]
     pub releases: Releases,
-    #[serde(default)]
-    pub runtime: Runtime,
 }
 
 pub struct Constants;
@@ -69,20 +67,6 @@ pub struct Releases {
 impl Default for Releases {
     fn default() -> Self {
         Self { keep: 5, shared_paths: Vec::new() }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Runtime {
-    pub command: Vec<String>,
-    pub working_dir: String,
-    pub writable_paths: Vec<String>,
-}
-
-impl Default for Runtime {
-    fn default() -> Self {
-        Self { command: Vec::new(), working_dir: ".".into(), writable_paths: Vec::new() }
     }
 }
 

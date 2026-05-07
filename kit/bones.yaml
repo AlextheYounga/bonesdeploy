@@ -32,16 +32,8 @@ releases:
     - '.env'
     - 'storage'
 
-# Optional runtime launcher settings (only needed for service/landlock-managed apps).
-# runtime:
-#   command:
-#     - '/usr/bin/node'
-#     - 'server.js'
-#   working_dir: '.'
-#   writable_paths: []
-
 ssl:
-  # Optional TLS values used by `bonesdeploy server ssl`.
+  # Optional TLS values used by `bonesdeploy site ssl`.
   # You can leave these empty and pass --domain/--email on the command.
   enabled: false
   domain: ''

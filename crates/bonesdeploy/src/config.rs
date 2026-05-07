@@ -12,8 +12,6 @@ pub struct BonesConfig {
     pub permissions: Permissions,
     #[serde(default)]
     pub releases: Releases,
-    #[serde(default, skip_serializing_if = "is_default_runtime")]
-    pub runtime: Runtime,
     #[serde(default)]
     pub ssl: Ssl,
 }
@@ -90,20 +88,6 @@ impl Default for Releases {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Runtime {
-    pub command: Vec<String>,
-    pub working_dir: String,
-    pub writable_paths: Vec<String>,
-}
-
-impl Default for Runtime {
-    fn default() -> Self {
-        Self { command: Vec::new(), working_dir: ".".into(), writable_paths: Vec::new() }
-    }
-}
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Ssl {
     #[serde(default)]
@@ -153,20 +137,6 @@ pub struct PathOverride {
     pub path_type: Option<String>,
 }
 
-const RUNTIME_DOC_COMMENT: &str = "\
-# Optional runtime launcher settings (only needed for service/landlock-managed apps).
-# runtime:
-#   command:
-#     - '/usr/bin/node'
-#     - 'server.js'
-#   working_dir: '.'
-#   writable_paths: []
-";
-
-fn is_default_runtime(runtime: &Runtime) -> bool {
-    runtime == &Runtime::default()
-}
-
 pub fn is_configured(config: &BonesConfig) -> bool {
     let d = &config.data;
     !d.remote_name.is_empty() && !d.project_name.is_empty() && !d.host.is_empty() && !d.git_dir.is_empty()
@@ -192,12 +162,7 @@ pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
     hide_derived_defaults(&mut to_serialize);
 
-    let mut yaml = serde_yml::to_string(&to_serialize).context("Failed to serialize bones config")?;
-    if is_default_runtime(&config.runtime) {
-        yaml.push('\n');
-        yaml.push_str(RUNTIME_DOC_COMMENT);
-    }
-
+    let yaml = serde_yml::to_string(&to_serialize).context("Failed to serialize bones config")?;
     fs::write(path, yaml).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
