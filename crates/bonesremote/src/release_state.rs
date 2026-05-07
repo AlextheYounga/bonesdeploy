@@ -179,6 +179,7 @@ mod tests {
         }
     }
 
+    // Verifies staged release state is persisted and readable, which is the handoff between hooks.
     #[test]
     fn write_then_read_staged_release_round_trips() -> Result<()> {
         let root = temp_dir_path("round_trip");
@@ -193,6 +194,7 @@ mod tests {
         Ok(())
     }
 
+    // Ensures empty staged state is treated as invalid to prevent ambiguous deploy targets.
     #[test]
     fn read_staged_release_rejects_empty_file() -> Result<()> {
         let root = temp_dir_path("empty_state");
@@ -212,6 +214,7 @@ mod tests {
         Ok(())
     }
 
+    // Ensures failed/finished flows can clear staged state cleanly before next deployment.
     #[test]
     fn clear_staged_release_removes_state_file() -> Result<()> {
         let root = temp_dir_path("clear_state");
@@ -226,6 +229,7 @@ mod tests {
         Ok(())
     }
 
+    // Verifies atomic symlink helper can create missing parents for first-time activation paths.
     #[test]
     fn point_symlink_atomically_creates_parent_dirs_and_points_to_target() -> Result<()> {
         let root = temp_dir_path("point_symlink_parent");
@@ -245,6 +249,7 @@ mod tests {
         Ok(())
     }
 
+    // Verifies atomic symlink updates repoint current release without leaving stale link targets.
     #[test]
     fn point_symlink_atomically_repoints_existing_link() -> Result<()> {
         let root = temp_dir_path("point_symlink_repoint");
@@ -266,6 +271,7 @@ mod tests {
         Ok(())
     }
 
+    // Ensures release listing is deterministic and excludes non-release files.
     #[test]
     fn list_releases_sorted_returns_only_directories_in_order() -> Result<()> {
         let root = temp_dir_path("list_releases");
@@ -285,6 +291,7 @@ mod tests {
         Ok(())
     }
 
+    // Verifies current release name resolves from the active symlink used by runtime operations.
     #[test]
     fn current_release_name_resolves_from_current_symlink() -> Result<()> {
         let root = temp_dir_path("current_release_name");

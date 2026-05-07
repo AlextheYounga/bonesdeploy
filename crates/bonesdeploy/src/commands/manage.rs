@@ -33,3 +33,26 @@ pub fn run() -> Result<()> {
 fn shell_quote_single(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::shell_quote_single;
+
+    // Plain values still require shell quoting to prevent whitespace/token splitting.
+    #[test]
+    fn shell_quote_single_wraps_plain_value_in_single_quotes() {
+        assert_eq!(shell_quote_single("/srv/deployments/acme"), "'/srv/deployments/acme'");
+    }
+
+    // Embedded single quotes must be escaped safely for remote shell execution.
+    #[test]
+    fn shell_quote_single_escapes_embedded_single_quotes() {
+        assert_eq!(shell_quote_single("it'works"), "'it'\"'\"'works'");
+    }
+
+    // Empty args must remain explicit empty strings, not disappear from command argv.
+    #[test]
+    fn shell_quote_single_handles_empty_string() {
+        assert_eq!(shell_quote_single(""), "''");
+    }
+}

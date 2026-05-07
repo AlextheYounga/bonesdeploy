@@ -285,6 +285,7 @@ mod tests {
         }
     }
 
+    // Confirms service user derives from project name when omitted to keep init output minimal.
     #[test]
     fn load_applies_default_service_user_from_project_name() -> Result<()> {
         let path = temp_path("service_user.yaml");
@@ -297,6 +298,7 @@ mod tests {
         Ok(())
     }
 
+    // Confirms live_root default matches documented project-scoped runtime location.
     #[test]
     fn load_applies_default_live_root_from_project_name() -> Result<()> {
         let path = temp_path("live_root.yaml");
@@ -309,6 +311,7 @@ mod tests {
         Ok(())
     }
 
+    // Confirms deploy_root default matches documented project-scoped release location.
     #[test]
     fn load_applies_default_deploy_root_from_project_name() -> Result<()> {
         let path = temp_path("deploy_root.yaml");
@@ -321,6 +324,7 @@ mod tests {
         Ok(())
     }
 
+    // Ensures save omits derived values so config stays concise and portable across renames.
     #[test]
     fn save_omits_derived_live_and_deploy_roots() -> Result<()> {
         let config = sample_config("phoenix");
@@ -336,6 +340,7 @@ mod tests {
         Ok(())
     }
 
+    // Ensures runtime docs are shown when runtime is unset so users discover optional launcher config.
     #[test]
     fn save_appends_runtime_doc_comment_when_runtime_is_default() -> Result<()> {
         let config = sample_config("phoenix");
@@ -351,6 +356,7 @@ mod tests {
         Ok(())
     }
 
+    // Ensures runtime docs are not duplicated once runtime is explicitly configured.
     #[test]
     fn save_does_not_append_runtime_comment_when_runtime_is_configured() -> Result<()> {
         let mut config = sample_config("phoenix");
@@ -372,6 +378,7 @@ mod tests {
         Ok(())
     }
 
+    // Protects explicit user overrides so load never clobbers intentional non-default paths.
     #[test]
     fn load_preserves_explicit_live_and_deploy_root_overrides() -> Result<()> {
         let path = temp_path("overrides.yaml");

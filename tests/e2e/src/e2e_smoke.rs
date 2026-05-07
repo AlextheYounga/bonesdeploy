@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::support::docker;
 
+// Verifies secure bootstrap default: setup should target root unless explicitly overridden.
 #[test]
 #[ignore = "E2E test requires Docker and SSH setup"]
 fn e2e_harness_bootstrap_user_defaults_to_root() {
@@ -9,6 +10,7 @@ fn e2e_harness_bootstrap_user_defaults_to_root() {
     assert_eq!(user, "root");
 }
 
+// Verifies harness supports custom bootstrap users for non-root provisioning environments.
 #[test]
 #[ignore = "E2E test requires Docker and SSH setup"]
 fn e2e_harness_bootstrap_user_can_be_overridden() {
@@ -16,6 +18,7 @@ fn e2e_harness_bootstrap_user_can_be_overridden() {
     assert!(!user.is_empty());
 }
 
+// Verifies Docker harness lifecycle commands can bring test infrastructure up and down.
 #[test]
 #[ignore = "E2E test requires Docker daemon"]
 fn e2e_harness_can_start_and_stop_container() -> Result<()> {

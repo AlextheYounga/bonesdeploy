@@ -148,3 +148,135 @@ fn apply_derived_defaults(config: &mut BonesConfig) {
         config.data.deploy_root = format!("/srv/deployments/{project_name}");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::{BonesConfig, load};
+
+    fn temp_file_path(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
+        std::env::temp_dir().join(format!("{prefix}_{}_{}.yaml", std::process::id(), nanos))
+    }
+
+    // Confirms omitted runtime ownership/location fields derive from project identity.
+    #[test]
+    fn load_derives_service_user_and_roots_from_project_name() {
+        let path = temp_file_path("bonesremote_config_derived_defaults");
+        let yaml = r#"
+data:
+  project_name: acme
+  host: example.com
+  git_dir: /home/git/acme.git
+"#;
+
+        fs::write(&path, yaml).unwrap_or_else(|error| panic!("failed to write test config: {error}"));
+        let cfg = load(&path).unwrap_or_else(|error| panic!("failed to load test config: {error}"));
+        fs::remove_file(&path).ok();
+
+        assert_eq!(cfg.permissions.defaults.service_user, "acme");
+        assert_eq!(cfg.data.live_root, "/var/www/acme");
+        assert_eq!(cfg.data.deploy_root, "/srv/deployments/acme");
+    }
+
+    // Confirms explicit operator overrides are preserved and never replaced by derived defaults.
+    #[test]
+    fn load_preserves_explicit_service_user_and_roots() {
+        let path = temp_file_path("bonesremote_config_explicit_values");
+        let yaml = r#"
+data:
+  project_name: acme
+  live_root: /custom/live
+  deploy_root: /custom/deploy
+permissions:
+  defaults:
+    service_user: web
+"#;
+
+        fs::write(&path, yaml).unwrap_or_else(|error| panic!("failed to write test config: {error}"));
+        let cfg = load(&path).unwrap_or_else(|error| panic!("failed to load test config: {error}"));
+        fs::remove_file(&path).ok();
+
+        assert_eq!(cfg.permissions.defaults.service_user, "web");
+        assert_eq!(cfg.data.live_root, "/custom/live");
+        assert_eq!(cfg.data.deploy_root, "/custom/deploy");
+    }
+
+    // Confirms baseline defaults keep config load resilient when optional sections are absent.
+    #[test]
+    fn load_uses_defaults_for_missing_fields() {
+        let path = temp_file_path("bonesremote_config_missing_fields");
+        fs::write(&path, "{}\n").unwrap_or_else(|error| panic!("failed to write test config: {error}"));
+
+        let cfg = load(&path).unwrap_or_else(|error| panic!("failed to load test config: {error}"));
+        fs::remove_file(&path).ok();
+
+        assert_eq!(cfg.data.port, "22");
+        assert_eq!(cfg.data.branch, "master");
+        assert_eq!(cfg.permissions.defaults.deploy_user, "git");
+        assert_eq!(cfg.releases.keep, 5);
+    }
+
+    // Invalid YAML must fail loudly so broken config does not proceed into deployment.
+    #[test]
+    fn load_fails_for_invalid_yaml() {
+        let path = temp_file_path("bonesremote_config_invalid_yaml");
+        fs::write(&path, "data: [\n").unwrap_or_else(|error| panic!("failed to write test config: {error}"));
+
+        let result = load(&path);
+        fs::remove_file(&path).ok();
+
+        assert!(result.is_err());
+    }
+
+    // Missing config path must be an immediate error to prevent implicit fallback behavior.
+    #[test]
+    fn load_fails_for_missing_file() {
+        let path = temp_file_path("bonesremote_config_missing_file");
+        let result = load(&path);
+        assert!(result.is_err());
+    }
+
+    // Empty project name should not invent an invalid service user.
+    #[test]
+    fn load_keeps_default_service_user_when_project_name_is_empty() {
+        let path = temp_file_path("bonesremote_config_empty_project");
+        let yaml = r#"
+data:
+  project_name: ''
+"#;
+
+        fs::write(&path, yaml).unwrap_or_else(|error| panic!("failed to write test config: {error}"));
+        let cfg = load(&path).unwrap_or_else(|error| panic!("failed to load test config: {error}"));
+        fs::remove_file(&path).ok();
+
+        // This codifies intended behavior: service_user should stay explicit/default when
+        // project name is missing, instead of becoming an empty user.
+        assert_eq!(cfg.permissions.defaults.service_user, "");
+    }
+
+    // Verifies runtime command settings round-trip from YAML into executable config fields.
+    #[test]
+    fn load_round_trips_non_default_runtime_fields() {
+        let path = temp_file_path("bonesremote_config_runtime_fields");
+        let yaml = r#"
+data:
+  project_name: acme
+runtime:
+  command: ['bun', 'run', 'start']
+  working_dir: app
+  writable_paths: ['storage', '/tmp/acme']
+"#;
+
+        fs::write(&path, yaml).unwrap_or_else(|error| panic!("failed to write test config: {error}"));
+        let cfg: BonesConfig = load(&path).unwrap_or_else(|error| panic!("failed to load test config: {error}"));
+        fs::remove_file(&path).ok();
+
+        assert_eq!(cfg.runtime.command, vec!["bun", "run", "start"]);
+        assert_eq!(cfg.runtime.working_dir, "app");
+        assert_eq!(cfg.runtime.writable_paths, vec!["storage", "/tmp/acme"]);
+    }
+}

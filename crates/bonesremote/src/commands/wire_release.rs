@@ -122,22 +122,26 @@ mod tests {
         std::env::temp_dir().join(format!("bonesremote_wire_release_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
+    // Dotfiles like .env are file semantics and must be symlinked as files.
     #[test]
     fn looks_like_file_treats_dotfiles_as_files() {
         assert!(looks_like_file(".env"));
     }
 
+    // Paths with extensions are treated as files to avoid accidental directory creation.
     #[test]
     fn looks_like_file_treats_extensions_as_files() {
         assert!(looks_like_file("config/app.json"));
     }
 
+    // Plain segment paths are treated as directories for shared-folder wiring.
     #[test]
     fn looks_like_file_treats_plain_names_as_directories() {
         assert!(!looks_like_file("storage"));
         assert!(!looks_like_file("logs/archive"));
     }
 
+    // Ensures missing shared file targets are bootstrapped as files for first deploy.
     #[test]
     fn create_default_shared_target_creates_file_for_file_like_paths() -> Result<()> {
         let root = temp_dir_path("default_file");
@@ -152,6 +156,7 @@ mod tests {
         Ok(())
     }
 
+    // Ensures missing shared directory targets are bootstrapped as directories for first deploy.
     #[test]
     fn create_default_shared_target_creates_directory_for_directory_like_paths() -> Result<()> {
         let root = temp_dir_path("default_directory");
@@ -166,6 +171,7 @@ mod tests {
         Ok(())
     }
 
+    // Verifies cleanup helper removes both file and directory paths before relinking.
     #[test]
     fn remove_path_removes_files_and_directories() -> Result<()> {
         let root = temp_dir_path("remove_path");

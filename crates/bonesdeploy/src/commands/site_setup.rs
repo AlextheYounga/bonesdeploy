@@ -265,3 +265,36 @@ pub(crate) fn resolve_live_root_parent(live_root: &str) -> String {
         .filter(|path| !path.as_os_str().is_empty())
         .map_or_else(|| String::from("/var/www"), |path| path.to_string_lossy().to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::resolve_live_root_parent;
+
+    // Verifies parent extraction for normal live_root paths used by playbook variables.
+    #[test]
+    fn resolve_live_root_parent_uses_parent_directory_for_nested_absolute_path() {
+        let parent = resolve_live_root_parent("/var/www/my-app/current");
+        assert_eq!(parent, "/var/www/my-app");
+    }
+
+    // Verifies root-level live_root values keep '/' parent instead of fallback.
+    #[test]
+    fn resolve_live_root_parent_uses_root_for_single_segment_absolute_path() {
+        let parent = resolve_live_root_parent("/my-app");
+        assert_eq!(parent, "/");
+    }
+
+    // Verifies relative live_root input still derives a usable parent path.
+    #[test]
+    fn resolve_live_root_parent_uses_relative_parent_for_relative_path() {
+        let parent = resolve_live_root_parent("deploy/live");
+        assert_eq!(parent, "deploy");
+    }
+
+    // Empty input should hit safe fallback to documented default parent.
+    #[test]
+    fn resolve_live_root_parent_falls_back_for_empty_path() {
+        let parent = resolve_live_root_parent("");
+        assert_eq!(parent, "/var/www");
+    }
+}

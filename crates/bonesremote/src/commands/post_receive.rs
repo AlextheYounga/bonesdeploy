@@ -125,6 +125,7 @@ mod tests {
         Ok(bare)
     }
 
+    // Ensures post-receive fails fast when build workspace is missing instead of checking out into nowhere.
     #[test]
     fn post_receive_requires_existing_build_workspace() -> Result<()> {
         let root = temp_dir_path("build_workspace_missing");
@@ -142,6 +143,7 @@ mod tests {
         Ok(())
     }
 
+    // Verifies post-receive can materialize requested revision in build workspace before privileged steps.
     #[test]
     fn post_receive_checks_out_requested_revision_into_build_workspace() -> Result<()> {
         let root = temp_dir_path("checkout_revision");

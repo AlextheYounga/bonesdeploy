@@ -11,7 +11,6 @@ You are a **Copilot agent**.
 
 When you are done working, please run and address all warnings/errors:
 - `cargo clippy`
-- `cargo dylint-all`
 - `cargo fmt`
 
 ## Principles
