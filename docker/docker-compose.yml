@@ -1,0 +1,22 @@
+services:
+  bonesdeploy-test-server:
+    privileged: true
+    build:
+      context: .
+    container_name: bonesdeploy-test-server
+    ports:
+      - "2222:22"
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+      - ${HOME}/.ssh/id_rsa.pub:/tmp/host_key.pub:ro
+    tmpfs:
+      - /var/lib/bonesdeploy-test-server
+    command: >
+      /bin/bash -lc "
+      mkdir -p /run/sshd /root/.ssh &&
+      cat /tmp/host_key.pub > /root/.ssh/authorized_keys &&
+      chmod 700 /root/.ssh &&
+      chmod 600 /root/.ssh/authorized_keys &&
+      /usr/sbin/sshd -D -e
+      "
