@@ -121,3 +121,58 @@
     PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
   changed_when: false
   tags: [common, bonesremote]
+
+- name: Ensure bare repo parent directory exists
+  ansible.builtin.file:
+    path: "{{ git_dir | dirname }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0755"
+  tags: [common, git]
+
+- name: Initialize bare git repo
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.command:
+    argv:
+      - git
+      - init
+      - --bare
+      - "{{ git_dir }}"
+  args:
+    creates: "{{ git_dir }}/HEAD"
+  tags: [common, git]
+
+- name: Ensure placeholder release directory exists
+  ansible.builtin.file:
+    path: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ group }}"
+    mode: "0750"
+  tags: [common, placeholder]
+
+- name: Seed placeholder index page into initial release
+  ansible.builtin.template:
+    src: "{{ common_placeholder_template_path }}"
+    dest: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}/index.html"
+    owner: "{{ service_user }}"
+    group: "{{ group }}"
+    mode: "0640"
+  tags: [common, placeholder]
+
+- name: Point current symlink at placeholder release
+  ansible.builtin.file:
+    src: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}"
+    dest: "{{ deploy_root }}/current"
+    state: link
+    force: true
+  tags: [common, placeholder]
+
+- name: Point live root symlink at current
+  ansible.builtin.file:
+    src: "{{ deploy_root }}/current"
+    dest: "{{ live_root }}"
+    state: link
+    force: true
+  tags: [common, placeholder]

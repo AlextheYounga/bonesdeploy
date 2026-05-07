@@ -75,6 +75,8 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
         .arg("-e")
         .arg(format!("live_root={}", cfg.data.live_root))
         .arg("-e")
+        .arg(format!("deploy_root={}", cfg.data.deploy_root))
+        .arg("-e")
         .arg(format!("project_name={}", cfg.data.project_name))
         .arg("-e")
         .arg(format!("git_dir={}", cfg.data.git_dir));

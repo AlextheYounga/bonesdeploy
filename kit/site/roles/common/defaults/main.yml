@@ -20,3 +20,6 @@ nvm_dir: "/home/{{ deploy_user }}/.nvm"
 nvm_init_snippet:
   - 'export NVM_DIR="$HOME/.nvm"'
   - '[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"'
+
+common_placeholder_release_name: "19700101_000000"
+common_placeholder_template_path: "{{ playbook_dir }}/../roles/nginx/defaults/index.html.j2"
