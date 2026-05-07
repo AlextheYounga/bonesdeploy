@@ -1,0 +1,30 @@
+---
+- name: Site setup for bonesdeploy (Next.js)
+  hosts: all
+  become: true
+
+  roles:
+    - role: users
+      tags: [users]
+
+    - role: common
+      tags: [common]
+
+    - role: next_runtime
+      tags: [next]
+
+    - role: nginx
+      tags: [nginx]
+
+    - role: ssl
+      tags: [ssl]
+
+  post_tasks:
+    - name: Display setup completion
+      ansible.builtin.debug:
+        msg: |
+          Bones Next.js site setup completed.
+          Deploy user: {{ deploy_user }}
+          Service user: {{ service_user }}
+          Group: {{ group }}
+      tags: always

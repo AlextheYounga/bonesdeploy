@@ -4,8 +4,8 @@ mod init;
 mod manage;
 mod push;
 mod rollback;
-mod server_setup;
-mod server_ssl;
+mod site_setup;
+mod site_ssl;
 mod version;
 
 use anyhow::Result;
@@ -32,10 +32,10 @@ enum Command {
     Push,
     /// Run deployment hooks manually without pushing commits
     Deploy,
-    /// Server setup operations
-    Server {
+    /// Site setup operations
+    Site {
         #[command(subcommand)]
-        command: ServerCommand,
+        command: SiteCommand,
     },
     /// Open remote server management TUI
     Manage,
@@ -46,8 +46,8 @@ enum Command {
 }
 
 #[derive(Subcommand)]
-enum ServerCommand {
-    /// Run server setup playbook against configured host
+enum SiteCommand {
+    /// Run site setup playbook against configured host
     Setup,
     /// Obtain and configure SSL certificates with certbot
     Ssl {
@@ -67,9 +67,9 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Push => push::run().await,
         Command::Deploy => deploy::run().await,
         Command::Manage => manage::run(),
-        Command::Server { command } => match command {
-            ServerCommand::Setup => server_setup::run(),
-            ServerCommand::Ssl { domain, email } => server_ssl::run(domain.clone(), email.clone()),
+        Command::Site { command } => match command {
+            SiteCommand::Setup => site_setup::run(),
+            SiteCommand::Ssl { domain, email } => site_ssl::run(domain.clone(), email.clone()),
         },
         Command::Rollback => rollback::run().await,
         Command::Version => {

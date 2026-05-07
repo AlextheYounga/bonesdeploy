@@ -49,7 +49,7 @@ cargo install --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
 sudo cargo install --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
-Then run the one-time server setup as root:
+Then run the site setup:
 
 ```sh
 sudo bonesremote init
@@ -83,23 +83,23 @@ BonesDeploy assumes opinionated server defaults unless you change them in `.bone
 - `service_user = "<project_name>"`
 - `group = "www-data"`
 
-Before first deploy, run server setup:
+Before first deploy, run site setup:
 
 ```sh
-bonesdeploy server setup
+bonesdeploy site setup
 ```
 
-This runs `.bones/server/playbooks/setup.yml` locally with Ansible against your configured remote host.
+This runs `.bones/site/playbooks/setup.yml` locally with Ansible against your configured remote host.
 If `ansible-playbook` is missing, BonesDeploy installs Ansible automatically with `python3 -m pip install --user ansible`.
 Template-based projects also scaffold language-specific setup roles (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install global PM2/PNPM tools).
-Every setup also installs nginx and provisions a default project vhost that serves `.bones/server/roles/nginx/defaults/index.html.j2` until your first deployment is live.
+Every setup also installs nginx and provisions a default project vhost that serves `.bones/site/roles/nginx/defaults/index.html.j2` until your first deployment is live.
 
-To customize nginx behavior, edit `.bones/server/nginx/site.conf.j2` and re-run `bonesdeploy server setup`.
+To customize nginx behavior, edit `.bones/site/nginx/site.conf.j2` and re-run `bonesdeploy site setup`.
 
 When DNS is ready, enable SSL with certbot:
 
 ```sh
-bonesdeploy server ssl --domain app.example.com --email ops@example.com
+bonesdeploy site ssl --domain app.example.com --email ops@example.com
 ```
 
 This obtains a Let's Encrypt certificate and updates the managed nginx site to listen on 443 and redirect HTTP to HTTPS.

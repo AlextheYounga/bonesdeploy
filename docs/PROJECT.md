@@ -2,6 +2,8 @@
 
 A Rust CLI that compiles into a single binary, containing embeds of boilerplate scripts along with other git remote helpers. It produces two executables: `bonesdeploy` (local CLI for setup and management) and `bonesremote` (server-side tool for remote operations, installed on the deployment host).
 
+We keep detailed documentation of each command at: `docs/commands/*.md:`
+
 ## Deployment Methodology
 We have an SSH deployment user (normally `git`) that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user (defaults to the project name). This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
 
@@ -163,7 +165,7 @@ bonesdeploy/
 │   ├── deployment/
 │   ├── hooks/
 │   ├── scripts/
-│   └── server/                 # nginx + ansible roles for `bonesdeploy server setup`
+│   └── site/                   # nginx + ansible roles for `bonesdeploy site setup`
 ├── templates/                  # per-framework starter overlays (see below)
 ├── crates/
 │   ├── bonesdeploy/               # local CLI binary
@@ -177,8 +179,8 @@ bonesdeploy/
 │   │       │   ├── push.rs
 │   │       │   ├── deploy.rs
 │   │       │   ├── rollback.rs
-│   │       │   ├── server_setup.rs
-│   │       │   ├── server_ssl.rs
+│   │       │   ├── site_setup.rs
+│   │       │   ├── site_ssl.rs
 │   │       │   └── version.rs
 │   │       ├── config.rs       # bones.yaml structs + load/save + local file discovery
 │   │       ├── embedded.rs     # rust-embed from kit/, scaffold writing
@@ -230,7 +232,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Updates `.gitignore` to add .bones folder.
   - Loads existing config from `.bones/bones.yaml` or collects user input via prompts.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{git_dir}`.
-  - Prints next-step guidance to run `bonesdeploy server setup` before first deploy.
+  - Prints next-step guidance to run `bonesdeploy site setup` before first deploy.
   - Saves config to `.bones/bones.yaml`.
 
 - **doctor**
@@ -255,16 +257,16 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Manually runs remote `pre-receive` and `post-receive` hooks over SSH without pushing commits.
   - Sets `BONES_FORCE_DEPLOY=1` so manual deploy runs even when `deploy_on_push = false`.
 
-- **server setup**
-  - Runs `.bones/server/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
-  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, `git_dir`, and `runtime_config_path` from `bones.yaml` as playbook variables.
-  - Installs nginx and provisions a project default site from `.bones/server/nginx/site.conf.j2`.
-  - Seeds a placeholder page from `.bones/server/roles/nginx/defaults/index.html.j2` so the host serves a branded default page before first deployment.
+- **site setup**
+  - Runs `.bones/site/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
+  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, and `git_dir` from `bones.yaml` as playbook variables.
+  - Installs nginx and provisions a project default site from `.bones/site/nginx/site.conf.j2`.
+  - Seeds a placeholder page from `.bones/site/roles/nginx/defaults/index.html.j2` so the host serves a branded default page before first deployment.
 
-- **server ssl**
+- **site ssl**
   - Runs the SSL Ansible role against the configured host.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
-  - Re-renders `.bones/server/nginx/site.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
+  - Re-renders `.bones/site/nginx/site.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
 
 - **rollback**
   - SSHes into the configured host and runs `bonesremote release rollback --config ...`, which repoints `current` to the previous release without rebuilding.
@@ -301,6 +303,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 - **landlock exec**
 	- Resolves `live_root` to the active runtime tree, applies Landlock policy, and `exec`s `runtime.command`.
 - **hooks post-deploy**
+	- Installs or updates the project systemd unit when `runtime.command` is configured, then reloads and enables/starts the service.
 	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.yaml`, like for instance setting everything back to be owned by the service user, then prunes old releases. 
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
