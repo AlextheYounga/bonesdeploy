@@ -89,6 +89,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonesdeploy-e2e-tests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tempfile",
+]
+
+[[package]]
 name = "bonesremote"
 version = "0.1.1"
 dependencies = [
