@@ -25,9 +25,9 @@ If you want a Heroku-style abstraction layer, use a platform. If you want a disc
 BonesDeploy uses a two-user deployment model:
 
 1. A **deploy user** (default: `git`) handles SSH access and runs deployment scripts. This user has restricted sudo ability but no password login.
-2. A **service user** (default: `applications`) owns the deployed files. This user has no home folder, no login, and no sudo ability — limiting attack scope.
+2. A **service user** (defaults to the project name) owns the deployed files. This user has no home folder, no login, and no sudo ability — limiting attack scope.
 
-During deployment, `bonesremote` temporarily changes file ownership to the deploy user so scripts can write, then hardens permissions back to the service user afterward. The sudoers configuration is strictly limited to `bonesremote` commands only.
+During deployment, `bonesremote` temporarily changes file ownership to the deploy user so scripts can write, then hardens permissions back to the service user afterward. The sudoers configuration is strictly limited to `bonesremote release stage`, `bonesremote release wire`, and `bonesremote hooks post-deploy`.
 
 This gives you a clean privilege boundary:
 
@@ -124,9 +124,10 @@ git push production master
 
 The hook chain handles the rest:
 1. **pre-push** (local) — runs `bonesdeploy doctor --local`
-2. **pre-receive** (remote) — runs `bonesremote doctor`, then `sudo bonesremote release stage --config ...`
+2. **pre-receive** (remote) — resolves the configured deployment ref from the pushed refs; if it matches, runs `bonesremote doctor`, then `sudo bonesremote release stage --config ...`. Pushes to other branches or branch deletions are skipped without staging.
 3. **post-receive** (remote) — runs the deployment pipeline:
-    - `bonesremote hooks post-receive --config ...` (checkout + wire shared paths)
+    - `bonesremote hooks post-receive --config ... --revision <newrev>` (checkout into `build/workspace`)
+    - `sudo bonesremote release wire --config ...` (just-in-time wire shared paths)
     - `bonesremote hooks deploy --config ...` (run deployment scripts + activate/drop-failed)
     - `sudo bonesremote hooks post-deploy --config ...` (permission hardening + pruning)
 
@@ -136,6 +137,12 @@ If you set `deploy_on_push = false`, pushes only update refs. Run manual deploy 
 
 ```sh
 bonesdeploy deploy
+```
+
+To roll back to the previous release without rebuilding:
+
+```sh
+bonesdeploy rollback
 ```
 
 ### Health Checks
@@ -162,7 +169,7 @@ data:
 permissions:
   defaults:
     deploy_user: "git"
-    service_user: "applications"
+    service_user: "myproject"
     group: "www-data"
     dir_mode: "750"
     file_mode: "640"
