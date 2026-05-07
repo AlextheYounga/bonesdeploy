@@ -6,4 +6,5 @@ publish = false
 
 [dev-dependencies]
 anyhow = "1.0.102"
+cargo-llvm-cov = "0.8.5"
 tempfile = "3.27.0"
