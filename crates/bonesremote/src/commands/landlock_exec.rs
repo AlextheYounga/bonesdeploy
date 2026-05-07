@@ -28,7 +28,6 @@ pub fn run(config_path: &str) -> Result<()> {
     let working_dir = resolve_working_dir(&cfg.runtime.working_dir, &active_runtime_root)?;
     let policy = build_policy(&cfg, &active_runtime_root, &shared_root, &command_path)?;
 
-    privileges::set_no_new_privs()?;
     landlock::restrict_self(&policy)?;
 
     env::set_current_dir(&working_dir)
@@ -73,8 +72,6 @@ fn build_policy(
     }
 
     let mut writable_paths = BTreeSet::new();
-
-    writable_paths.insert(runtime_root.to_path_buf());
 
     if shared_root.exists() {
         let resolved_shared_root = fs::canonicalize(shared_root)
