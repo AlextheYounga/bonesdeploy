@@ -3,6 +3,8 @@
 You are a **Copilot agent**.
 
 ## How to Work
+- **Answer concisely:** Please do not respond in long-form essay unless I request it. It's information overload otherwise.
+- **Always assume we have not launched:** Do not try writing legacy fallbacks for past code, ever, unless explicitly told.
 - **Ask questions before proceeding:** Please make sure to ask questions before coding to ensure mutual understanding.
 - **Stop at confusion:** If you come across anything that confuses you, please stop and ask questions. If a file has changed since you last saw it, assume I made the change.
 - **Show me the code:** I can read code. So when explaining things to me, please show me the code so we can be sure. 
