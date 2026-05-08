@@ -4,14 +4,9 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 
 use crate::config;
-use crate::privileges;
 use crate::release_state;
 
-use super::wire_release;
-
 pub fn run(config_path: &str, revision: Option<&str>) -> Result<()> {
-    privileges::ensure_not_root("bonesremote hooks post-receive")?;
-
     let cfg = config::load(Path::new(config_path))?;
     let build_root = release_state::build_root(&cfg);
 
@@ -39,7 +34,6 @@ pub fn run(config_path: &str, revision: Option<&str>) -> Result<()> {
         bail!("git checkout failed for target '{checkout_target}': status {status}");
     }
 
-    wire_release::run(config_path)?;
     Ok(())
 }
 
@@ -55,7 +49,6 @@ mod tests {
 
     use super::run;
     use crate::config::Constants;
-    use crate::release_state;
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -158,13 +151,9 @@ mod tests {
         write_config(&config_path, &bare, &deploy_root, "master")?;
 
         let config_yaml_path = config_path.to_string_lossy().to_string();
-        let cfg = crate::config::load(Path::new(&config_yaml_path))?;
-        release_state::write_staged_release(&cfg, "20260507_181010")?;
-
         let result = run(&config_yaml_path, Some("master"));
 
-        // Documented behavior: post-receive checks out code as deploy user and succeeds;
-        // shared wiring is performed as a separate privileged step.
+        // Post-receive is responsible for checkout; shared-path wiring happens in a separate command.
         assert!(result.is_ok());
         assert!(build_root.join("README.md").exists());
 

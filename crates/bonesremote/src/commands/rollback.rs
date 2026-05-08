@@ -3,12 +3,9 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 
 use crate::config;
-use crate::privileges;
 use crate::release_state;
 
 pub fn run(config_path: &str) -> Result<()> {
-    privileges::ensure_not_root("bonesremote release rollback")?;
-
     let cfg = config::load(Path::new(config_path))?;
     let releases = release_state::list_releases_sorted(&cfg)?;
     if releases.len() < 2 {
