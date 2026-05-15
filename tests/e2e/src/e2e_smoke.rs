@@ -4,7 +4,7 @@ use crate::support::docker;
 
 // Verifies secure bootstrap default: setup should target root unless explicitly overridden.
 #[test]
-#[ignore = "E2E test requires Docker and SSH setup"]
+#[ignore = "e2e test"]
 fn e2e_harness_bootstrap_user_defaults_to_root() {
     let user = docker::bootstrap_ssh_user();
     assert_eq!(user, "root");
@@ -12,7 +12,7 @@ fn e2e_harness_bootstrap_user_defaults_to_root() {
 
 // Verifies harness supports custom bootstrap users for non-root provisioning environments.
 #[test]
-#[ignore = "E2E test requires Docker and SSH setup"]
+#[ignore = "e2e test"]
 fn e2e_harness_bootstrap_user_can_be_overridden() {
     let user = std::env::var("BONES_E2E_BOOTSTRAP_USER").unwrap_or_else(|_| String::from("root"));
     assert!(!user.is_empty());
@@ -20,7 +20,7 @@ fn e2e_harness_bootstrap_user_can_be_overridden() {
 
 // Verifies Docker harness lifecycle commands can bring test infrastructure up and down.
 #[test]
-#[ignore = "E2E test requires Docker daemon"]
+#[ignore = "requires docker"]
 fn e2e_harness_can_start_and_stop_container() -> Result<()> {
     if !docker::docker_available() {
         return Ok(());

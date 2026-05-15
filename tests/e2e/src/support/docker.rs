@@ -12,9 +12,11 @@ pub fn bootstrap_ssh_user() -> String {
 }
 
 pub fn docker_compose_up() -> Result<()> {
+    let compose_file = paths::docker_dir().join("docker-compose.yml");
     let status = Command::new("docker")
-        .args(["compose", "up", "-d", "--build", DEFAULT_SERVICE])
-        .current_dir(paths::docker_dir())
+        .args(["compose", "-f"])
+        .arg(&compose_file)
+        .args(["up", "-d", "--build", DEFAULT_SERVICE])
         .status()
         .context("Failed to run docker compose up")?;
 
@@ -26,9 +28,11 @@ pub fn docker_compose_up() -> Result<()> {
 }
 
 pub fn docker_compose_down() -> Result<()> {
+    let compose_file = paths::docker_dir().join("docker-compose.yml");
     let status = Command::new("docker")
-        .args(["compose", "down", "--remove-orphans"])
-        .current_dir(paths::docker_dir())
+        .args(["compose", "-f"])
+        .arg(&compose_file)
+        .args(["down", "--remove-orphans"])
         .status()
         .context("Failed to run docker compose down")?;
 

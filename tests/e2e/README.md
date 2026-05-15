@@ -18,10 +18,10 @@ Ignored by default:
 cargo test -p bonesdeploy-e2e-tests
 ```
 
-Run E2E tests explicitly:
+Run Docker-backed E2E tests explicitly:
 
 ```bash
-cargo test -p bonesdeploy-e2e-tests -- --ignored --nocapture
+cargo e2e
 ```
 
 ## Bootstrap SSH User
