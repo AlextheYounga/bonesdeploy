@@ -38,6 +38,7 @@ fn run() -> Result<ExitCode, String> {
         "--",
         "--ignored",
         "--nocapture",
+        "--test-threads=1",
     ]);
     test_command.args(extra_args);
 
