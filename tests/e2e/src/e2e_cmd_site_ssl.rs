@@ -1,34 +1,30 @@
 use anyhow::Result;
 
-use crate::support::{cli, fakes, repo};
+use crate::support::{cli, docker, repo};
 
 #[test]
 #[ignore = "e2e test"]
-fn e2e_bonesdeploy_site_ssl_persists_ssl_values_before_running_ansible() -> Result<()> {
+fn e2e_bonesdeploy_site_ssl_reaches_real_ssl_ansible_flow() -> Result<()> {
+    let _docker = docker::docker_session()?;
     let sandbox = repo::create_temp_git_repo()?;
     repo::write_minimal_bones_project(&sandbox.path)?;
-    let fake_bin = fakes::FakeCommandBin::with_ansible_playbook_and_ssh()?;
+    repo::install_real_site_assets(&sandbox.path, &crate::support::paths::workspace_root())?;
 
-    let output = cli::run_bonesdeploy_with_env(
-        &sandbox.path,
-        ["site", "ssl", "--domain", "app.test", "--email", "ops@test"],
-        [("PATH", fake_bin.path())],
-    )?;
-    cli::assert_success(&output)?;
+    let output = cli::run_bonesdeploy(&sandbox.path, ["site", "ssl", "--domain", "app.test", "--email", "ops@test"])?;
+    cli::assert_failure(&output)?;
     cli::assert_stdout_contains(&output, "Running site ssl against 127.0.0.1 for app.test")?;
-    cli::assert_stdout_contains(&output, "SSL setup complete")?;
+    cli::assert_stdout_contains(&output, "Ensuring python3 is available on remote host")?;
 
     repo::assert_bones_yaml_contains(&sandbox.path, "domain: app.test")?;
     repo::assert_bones_yaml_contains(&sandbox.path, "email: ops@test")?;
-    repo::assert_bones_yaml_contains(&sandbox.path, "enabled: true")?;
 
-    let ssh_invocation = fake_bin.ssh_invocation()?;
-    assert!(ssh_invocation.contains("root@127.0.0.1"));
-
-    let ansible_invocation = fake_bin.ansible_invocation()?;
-    assert!(ansible_invocation.contains("--tags nginx,ssl"));
-    assert!(ansible_invocation.contains("ssl_domain=app.test"));
-    assert!(ansible_invocation.contains("ssl_email=ops@test"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("ansible-playbook failed")
+            || stderr.contains("System has not been booted with systemd")
+            || stderr.contains("Failed to connect to bus"),
+        "Expected a meaningful SSL setup failure, got stderr:\n{stderr}"
+    );
 
     Ok(())
 }

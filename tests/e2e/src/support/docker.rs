@@ -23,10 +23,6 @@ pub fn docker_session() -> Result<DockerSession> {
     Ok(DockerSession { _lock: lock })
 }
 
-pub fn docker_available() -> bool {
-    Command::new("docker").arg("--version").output().is_ok_and(|output| output.status.success())
-}
-
 fn ensure_container_running() -> Result<()> {
     let output = Command::new("docker")
         .args(["inspect", "-f", "{{.State.Running}}", DEFAULT_SERVICE])
@@ -34,15 +30,12 @@ fn ensure_container_running() -> Result<()> {
         .context("Failed to inspect e2e Docker container")?;
 
     if !output.status.success() {
-        bail!(
-            "Docker container '{}' is unavailable. Run `tests/e2e/run-e2e.sh` to recreate and start it.",
-            DEFAULT_SERVICE
-        );
+        bail!("Docker container '{}' is unavailable. Run `cargo test-e2e` to recreate and start it.", DEFAULT_SERVICE);
     }
 
     let running = String::from_utf8_lossy(&output.stdout);
     if running.trim() != "true" {
-        bail!("Docker container '{}' is not running. Start it with `tests/e2e/run-e2e.sh`.", DEFAULT_SERVICE);
+        bail!("Docker container '{}' is not running. Start it with `cargo test-e2e`.", DEFAULT_SERVICE);
     }
 
     Ok(())
@@ -50,7 +43,7 @@ fn ensure_container_running() -> Result<()> {
 
 pub fn docker_exec(command: &str) -> Result<()> {
     let status = Command::new("docker")
-        .args(["exec", DEFAULT_SERVICE, "bash", "-lc", command])
+        .args(["exec", "--workdir", "/tmp", DEFAULT_SERVICE, "bash", "-lc", command])
         .status()
         .context("Failed to run docker exec")?;
 
@@ -63,7 +56,7 @@ pub fn docker_exec(command: &str) -> Result<()> {
 
 pub fn docker_exec_output(command: &str) -> Result<String> {
     let output = Command::new("docker")
-        .args(["exec", DEFAULT_SERVICE, "bash", "-lc", command])
+        .args(["exec", "--workdir", "/tmp", DEFAULT_SERVICE, "bash", "-lc", command])
         .output()
         .context("Failed to run docker exec")?;
 

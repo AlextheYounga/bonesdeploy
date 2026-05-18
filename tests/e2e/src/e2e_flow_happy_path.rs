@@ -8,10 +8,6 @@ use crate::support::{cli, docker, repo};
 #[test]
 #[ignore = "requires docker"]
 fn e2e_remote_happy_path_runs_push_deploy_and_rollback_in_sequence() -> Result<()> {
-    if !docker::docker_available() {
-        return Ok(());
-    }
-
     let _docker = docker::docker_session()?;
 
     let sandbox = repo::create_temp_git_repo()?;

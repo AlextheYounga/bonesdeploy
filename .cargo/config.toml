@@ -1,7 +1,7 @@
 [alias]
 dylint-all = "dylint --path .dylint/custom_lints"
 test-unit = "test --workspace --exclude bonesdeploy-e2e-tests"
-test-e2e = "test -p bonesdeploy-e2e-tests"
+test-e2e = "run -p bonesdeploy-e2e-tests --bin test-e2e --"
 cov = "llvm-cov --workspace --exclude bonesdeploy-e2e-tests --summary-only"
 cov-lcov = "llvm-cov --workspace --exclude bonesdeploy-e2e-tests --lcov --output-path target/coverage/lcov.info"
 cov-html = "llvm-cov --workspace --exclude bonesdeploy-e2e-tests --html --output-dir target/coverage/html"

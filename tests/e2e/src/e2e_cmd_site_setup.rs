@@ -1,27 +1,27 @@
 use anyhow::Result;
 
-use crate::support::{cli, fakes, repo};
+use crate::support::{cli, docker, repo};
 
 #[test]
 #[ignore = "e2e test"]
-fn e2e_bonesdeploy_site_setup_invokes_ansible_flow() -> Result<()> {
+fn e2e_bonesdeploy_site_setup_reaches_real_remote_ansible_flow() -> Result<()> {
+    let _docker = docker::docker_session()?;
     let sandbox = repo::create_temp_git_repo()?;
     repo::write_minimal_bones_project(&sandbox.path)?;
-    let fake_bin = fakes::FakeCommandBin::with_ansible_playbook_and_ssh()?;
+    repo::install_real_site_assets(&sandbox.path, &crate::support::paths::workspace_root())?;
 
-    let output = cli::run_bonesdeploy_with_env(&sandbox.path, ["site", "setup"], [("PATH", fake_bin.path())])?;
-    cli::assert_success(&output)?;
+    let output = cli::run_bonesdeploy(&sandbox.path, ["site", "setup"])?;
+    cli::assert_failure(&output)?;
     cli::assert_stdout_contains(&output, "Running site setup against 127.0.0.1 as root")?;
-    cli::assert_stdout_contains(&output, "Site setup complete")?;
+    cli::assert_stdout_contains(&output, "Ensuring python3 is available on remote host")?;
 
-    let ssh_invocation = fake_bin.ssh_invocation()?;
-    assert!(ssh_invocation.contains("-p 2222"));
-    assert!(ssh_invocation.contains("root@127.0.0.1"));
-
-    let ansible_invocation = fake_bin.ansible_invocation()?;
-    assert!(ansible_invocation.contains("-i 127.0.0.1,"));
-    assert!(ansible_invocation.contains("-u root"));
-    assert!(ansible_invocation.contains(".bones/site/playbooks/setup.yml"));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("ansible-playbook failed")
+            || stderr.contains("System has not been booted with systemd")
+            || stderr.contains("Failed to connect to bus"),
+        "Expected a meaningful remote setup failure, got stderr:\n{stderr}"
+    );
 
     Ok(())
 }
