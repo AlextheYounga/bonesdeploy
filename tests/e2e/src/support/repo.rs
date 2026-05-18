@@ -1,4 +1,5 @@
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -38,10 +39,18 @@ pub fn write_minimal_bones_project(repo_root: &Path) -> Result<()> {
     fs::create_dir_all(&roles_dir)?;
 
     fs::write(bones_dir.join("hooks.sh"), "#!/usr/bin/env bash\n")?;
-    fs::write(hooks_dir.join("pre-push"), "#!/usr/bin/env bash\n")?;
-    fs::write(hooks_dir.join("pre-receive"), "#!/usr/bin/env bash\n")?;
-    fs::write(hooks_dir.join("post-receive"), "#!/usr/bin/env bash\n")?;
-    fs::write(deployment_dir.join("01_run_deployment_concerns.sh"), "#!/usr/bin/env bash\n")?;
+    let pre_push = hooks_dir.join("pre-push");
+    let pre_receive = hooks_dir.join("pre-receive");
+    let post_receive = hooks_dir.join("post-receive");
+    let deployment_script = deployment_dir.join("01_run_deployment_concerns.sh");
+    fs::write(&pre_push, "#!/usr/bin/env bash\n")?;
+    fs::write(&pre_receive, "#!/usr/bin/env bash\n")?;
+    fs::write(&post_receive, "#!/usr/bin/env bash\n")?;
+    fs::write(&deployment_script, "#!/usr/bin/env bash\n")?;
+    fs::set_permissions(&pre_push, fs::Permissions::from_mode(0o755))?;
+    fs::set_permissions(&pre_receive, fs::Permissions::from_mode(0o755))?;
+    fs::set_permissions(&post_receive, fs::Permissions::from_mode(0o755))?;
+    fs::set_permissions(&deployment_script, fs::Permissions::from_mode(0o755))?;
     fs::write(playbook_dir.join("setup.yml"), "---\n- hosts: all\n  tasks: []\n")?;
 
     let config = "data:\n  remote_name: production\n  project_name: e2eapp\n  host: 127.0.0.1\n  port: \"2222\"\n  git_dir: /tmp/e2eapp.git\n  branch: master\n  deploy_on_push: true\npermissions:\n  defaults:\n    deploy_user: root\n    service_user: e2eapp\n    group: www-data\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\n  shared_paths:\n    - .env\n    - storage\nssl:\n  enabled: false\n  domain: \"\"\n  email: \"\"\n";

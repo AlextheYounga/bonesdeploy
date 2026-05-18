@@ -18,7 +18,7 @@ fn e2e_harness_bootstrap_user_can_be_overridden() {
     assert!(!user.is_empty());
 }
 
-// Verifies Docker harness lifecycle commands can bring test infrastructure up and down.
+// Verifies Docker harness can acquire a persistent session.
 #[test]
 #[ignore = "requires docker"]
 fn e2e_harness_can_start_and_stop_container() -> Result<()> {
@@ -26,8 +26,7 @@ fn e2e_harness_can_start_and_stop_container() -> Result<()> {
         return Ok(());
     }
 
-    docker::docker_compose_up()?;
-    docker::docker_compose_down()?;
+    let _docker = docker::docker_session()?;
 
     Ok(())
 }

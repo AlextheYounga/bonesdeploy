@@ -25,6 +25,9 @@ mod e2e_cmd_site_ssl;
 mod e2e_cmd_version;
 
 #[cfg(test)]
+mod e2e_flow_happy_path;
+
+#[cfg(test)]
 mod e2e_smoke;
 
 #[cfg(test)]

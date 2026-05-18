@@ -1,4 +1,4 @@
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 use std::sync::OnceLock;
@@ -12,9 +12,24 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
+    run_bonesdeploy_with_env(cwd, args, std::iter::empty::<(OsString, OsString)>())
+}
+
+pub fn run_bonesdeploy_with_env<I, S, E, K, V>(cwd: &Path, args: I, envs: E) -> Result<Output>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+    E: IntoIterator<Item = (K, V)>,
+    K: AsRef<OsStr>,
+    V: AsRef<OsStr>,
+{
     let binary = bonesdeploy_binary_path()?;
-    let status =
-        Command::new(binary).args(args).current_dir(cwd).output().context("Failed to execute bonesdeploy binary")?;
+    let status = Command::new(binary)
+        .args(args)
+        .envs(envs)
+        .current_dir(cwd)
+        .output()
+        .context("Failed to execute bonesdeploy binary")?;
 
     Ok(status)
 }
