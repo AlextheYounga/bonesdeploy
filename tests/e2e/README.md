@@ -21,10 +21,10 @@ cargo test -p bonesdeploy-e2e-tests
 Run Docker-backed E2E tests explicitly:
 
 ```bash
-./tests/e2e/run-e2e.sh
+cargo test-e2e
 ```
 
-`run-e2e.sh` performs a one-time Docker lifecycle step before tests:
+`cargo test-e2e` performs a one-time Docker lifecycle step before tests:
 
 - `docker compose down --remove-orphans`
 - `docker compose up -d`

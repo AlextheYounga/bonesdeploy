@@ -40,3 +40,4 @@ __trash__
 .worktrees
 .dylint
 bin
+!tests/**/bin
