@@ -19,10 +19,6 @@ fn e2e_bonesdeploy_deploy_invokes_remote_hook_path() -> Result<()> {
 #[test]
 #[ignore = "requires docker"]
 fn e2e_deploy_runs_remote_pre_and_post_receive_hooks_with_force_flag() -> Result<()> {
-    if !docker::docker_available() {
-        return Ok(());
-    }
-
     let _docker = docker::docker_session()?;
 
     let sandbox = repo::create_temp_git_repo()?;

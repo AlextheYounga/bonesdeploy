@@ -19,10 +19,6 @@ fn e2e_bonesdeploy_rollback_invokes_remote_release_rollback() -> Result<()> {
 #[test]
 #[ignore = "requires docker"]
 fn e2e_rollback_calls_remote_bonesremote_release_rollback_with_expected_config_path() -> Result<()> {
-    if !docker::docker_available() {
-        return Ok(());
-    }
-
     let _docker = docker::docker_session()?;
 
     let sandbox = repo::create_temp_git_repo()?;

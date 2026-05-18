@@ -23,10 +23,6 @@ pub fn docker_session() -> Result<DockerSession> {
     Ok(DockerSession { _lock: lock })
 }
 
-pub fn docker_available() -> bool {
-    Command::new("docker").arg("--version").output().is_ok_and(|output| output.status.success())
-}
-
 fn ensure_container_running() -> Result<()> {
     let output = Command::new("docker")
         .args(["inspect", "-f", "{{.State.Running}}", DEFAULT_SERVICE])
@@ -50,7 +46,7 @@ fn ensure_container_running() -> Result<()> {
 
 pub fn docker_exec(command: &str) -> Result<()> {
     let status = Command::new("docker")
-        .args(["exec", DEFAULT_SERVICE, "bash", "-lc", command])
+        .args(["exec", "--workdir", "/tmp", DEFAULT_SERVICE, "bash", "-lc", command])
         .status()
         .context("Failed to run docker exec")?;
 
@@ -63,7 +59,7 @@ pub fn docker_exec(command: &str) -> Result<()> {
 
 pub fn docker_exec_output(command: &str) -> Result<String> {
     let output = Command::new("docker")
-        .args(["exec", DEFAULT_SERVICE, "bash", "-lc", command])
+        .args(["exec", "--workdir", "/tmp", DEFAULT_SERVICE, "bash", "-lc", command])
         .output()
         .context("Failed to run docker exec")?;
 

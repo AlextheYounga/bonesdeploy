@@ -22,10 +22,6 @@ fn e2e_harness_bootstrap_user_can_be_overridden() {
 #[test]
 #[ignore = "requires docker"]
 fn e2e_harness_can_start_and_stop_container() -> Result<()> {
-    if !docker::docker_available() {
-        return Ok(());
-    }
-
     let _docker = docker::docker_session()?;
 
     Ok(())

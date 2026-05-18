@@ -19,10 +19,6 @@ fn e2e_bonesdeploy_push_invokes_remote_sync_path() -> Result<()> {
 #[test]
 #[ignore = "requires docker"]
 fn e2e_push_syncs_bones_directory_and_symlinks_remote_hooks() -> Result<()> {
-    if !docker::docker_available() {
-        return Ok(());
-    }
-
     let _docker = docker::docker_session()?;
 
     let sandbox = repo::create_temp_git_repo()?;
