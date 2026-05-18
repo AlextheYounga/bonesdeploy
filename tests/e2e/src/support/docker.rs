@@ -34,12 +34,15 @@ fn ensure_container_running() -> Result<()> {
         .context("Failed to inspect e2e Docker container")?;
 
     if !output.status.success() {
-        bail!("Docker container '{}' is unavailable. Run `cargo e2e` to recreate and start it.", DEFAULT_SERVICE);
+        bail!(
+            "Docker container '{}' is unavailable. Run `tests/e2e/run-e2e.sh` to recreate and start it.",
+            DEFAULT_SERVICE
+        );
     }
 
     let running = String::from_utf8_lossy(&output.stdout);
     if running.trim() != "true" {
-        bail!("Docker container '{}' is not running. Start it with `cargo e2e`.", DEFAULT_SERVICE);
+        bail!("Docker container '{}' is not running. Start it with `tests/e2e/run-e2e.sh`.", DEFAULT_SERVICE);
     }
 
     Ok(())

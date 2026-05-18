@@ -1,5 +1,5 @@
 [workspace]
 resolver = "3"
-members = ["crates/bonesdeploy", "crates/bonesremote", "tests/e2e", "xtask"]
+members = ["crates/bonesdeploy", "crates/bonesremote", "tests/e2e"]
 
 [workspace.lints.clippy]
