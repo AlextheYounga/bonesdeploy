@@ -46,3 +46,34 @@ pub fn docker_compose_down() -> Result<()> {
 pub fn docker_available() -> bool {
     Command::new("docker").arg("--version").status().is_ok_and(|status| status.success())
 }
+
+pub fn docker_exec(command: &str) -> Result<()> {
+    let status = Command::new("docker")
+        .args(["exec", DEFAULT_SERVICE, "bash", "-lc", command])
+        .status()
+        .context("Failed to run docker exec")?;
+
+    if !status.success() {
+        bail!("docker exec failed with status {status}");
+    }
+
+    Ok(())
+}
+
+pub fn docker_exec_output(command: &str) -> Result<String> {
+    let output = Command::new("docker")
+        .args(["exec", DEFAULT_SERVICE, "bash", "-lc", command])
+        .output()
+        .context("Failed to run docker exec")?;
+
+    if !output.status.success() {
+        bail!(
+            "docker exec failed with status {}\nstdout:\n{}\nstderr:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
