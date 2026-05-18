@@ -77,6 +77,14 @@ pub fn assert_pre_push_symlink_exists(repo_root: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn use_unreachable_ssh_port(repo_root: &Path) -> Result<()> {
+    let bones_yaml = repo_root.join(".bones/bones.yaml");
+    let content = fs::read_to_string(&bones_yaml)?;
+    fs::write(&bones_yaml, content.replace("port: \"2222\"", "port: \"1\""))?;
+
+    Ok(())
+}
+
 pub fn assert_bones_yaml_contains(repo_root: &Path, needle: &str) -> Result<()> {
     let content = fs::read_to_string(repo_root.join(".bones/bones.yaml"))?;
     if content.contains(needle) {

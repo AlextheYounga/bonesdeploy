@@ -81,6 +81,18 @@ pub fn assert_success(output: &Output) -> Result<()> {
     )
 }
 
+pub fn assert_failure(output: &Output) -> Result<()> {
+    if !output.status.success() {
+        return Ok(());
+    }
+
+    bail!(
+        "Command unexpectedly succeeded.\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+}
+
 pub fn assert_stdout_contains(output: &Output, expected: &str) -> Result<()> {
     let stdout = String::from_utf8_lossy(&output.stdout);
     if stdout.contains(expected) {

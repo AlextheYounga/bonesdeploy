@@ -7,8 +7,10 @@ use crate::support::{cli, docker, repo};
 fn e2e_bonesdeploy_deploy_invokes_remote_hook_path() -> Result<()> {
     let sandbox = repo::create_temp_git_repo()?;
     repo::write_minimal_bones_project(&sandbox.path)?;
+    repo::use_unreachable_ssh_port(&sandbox.path)?;
 
     let output = cli::run_bonesdeploy(&sandbox.path, ["deploy"])?;
+    cli::assert_failure(&output)?;
     cli::assert_stdout_contains(&output, "Deploying e2eapp on 127.0.0.1")?;
 
     Ok(())
