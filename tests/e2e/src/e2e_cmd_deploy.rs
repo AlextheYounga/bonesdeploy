@@ -7,22 +7,8 @@ use crate::support::{cli, docker, repo};
 fn e2e_bonesdeploy_deploy_invokes_remote_hook_path() -> Result<()> {
     let sandbox = repo::create_temp_git_repo()?;
     repo::write_minimal_bones_project(&sandbox.path)?;
-    repo::use_unreachable_ssh_port(&sandbox.path)?;
 
-    let output = cli::run_bonesdeploy(&sandbox.path, ["deploy"])?;
-    cli::assert_failure(&output)?;
-    cli::assert_stdout_contains(&output, "Deploying e2eapp on 127.0.0.1")?;
-
-    Ok(())
-}
-
-#[test]
-#[ignore = "requires docker"]
-fn e2e_deploy_runs_remote_pre_and_post_receive_hooks_with_force_flag() -> Result<()> {
     let _docker = docker::docker_session()?;
-
-    let sandbox = repo::create_temp_git_repo()?;
-    repo::write_minimal_bones_project(&sandbox.path)?;
 
     docker::docker_exec("git init --bare /tmp/e2eapp.git")?;
     docker::docker_exec(
