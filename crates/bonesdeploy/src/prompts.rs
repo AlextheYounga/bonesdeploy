@@ -112,3 +112,32 @@ fn order_remotes_with_default(remotes: Vec<String>, default_remote: Option<Strin
     ordered.extend(remotes.into_iter().filter(|name| name != &default_remote));
     ordered
 }
+
+#[cfg(test)]
+mod tests {
+    use super::order_remotes_with_default;
+
+    // Without a preferred remote, the existing order should remain stable for user familiarity.
+    #[test]
+    fn order_remotes_keeps_original_order_when_no_default_is_provided() {
+        let remotes = vec![String::from("origin"), String::from("production")];
+        let ordered = order_remotes_with_default(remotes.clone(), None);
+        assert_eq!(ordered, remotes);
+    }
+
+    // Missing defaults should not reorder remotes unexpectedly.
+    #[test]
+    fn order_remotes_keeps_original_order_when_default_is_missing() {
+        let remotes = vec![String::from("origin"), String::from("staging")];
+        let ordered = order_remotes_with_default(remotes.clone(), Some(String::from("production")));
+        assert_eq!(ordered, remotes);
+    }
+
+    // Preferred default must be promoted while preserving all other options.
+    #[test]
+    fn order_remotes_places_default_first_without_losing_other_remotes() {
+        let remotes = vec![String::from("origin"), String::from("production"), String::from("staging")];
+        let ordered = order_remotes_with_default(remotes, Some(String::from("production")));
+        assert_eq!(ordered, vec!["production", "origin", "staging"]);
+    }
+}

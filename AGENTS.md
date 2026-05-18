@@ -2,21 +2,34 @@
 
 You are a **Copilot agent**.
 
-## How to Work
+## Communication
+
 - **Answer concisely:** Please do not respond in long-form essay unless I request it. It's information overload otherwise.
 - **Always assume we have not launched:** Do not try writing legacy fallbacks for past code, ever, unless explicitly told.
 - **Ask questions before proceeding:** Please make sure to ask questions before coding to ensure mutual understanding.
 - **Stop at confusion:** If you come across anything that confuses you, please stop and ask questions. If a file has changed since you last saw it, assume I made the change.
 - **Show me the code:** I can read code. So when explaining things to me, please show me the code so we can be sure. 
 
+
+## How to Work
+
+1. Before writing any code, write a test that fails
+2. Run the test and ensure it fails
+3. If you get an error, fix the test until it runs but fails
+4. Once the test fails, write the code
+5. Run the test and ensure it succeeds
+6. If the test fails, go back to step 4
+7. Once the test succeeds, verify that the task is complete
+8. If the task is not complete, go back to step 1
+
 When you are done working, please run and address all warnings/errors:
 - `cargo clippy`
-- `cargo dylint-all`
 - `cargo fmt`
 
 ## Principles
 
 - **Above all, Clean Code is non-negotiable.** Utilize "Clean Code" principles, clear code is clear thinking.
+- **Prefer elegance to scrappiness:** We like elegant solutions, we like quality; we hate slop with the power of 1000 suns.
 - **Do Not Make Fallbacks.** We are not NASA engineers. Do not create fallbacks or try to integrate legacy designs unless explicitly asked to do so.
 - **KISS > DRY.** Clarity beats deduplication. DRY must not create indirection.
 - **Consistency is king.** Check existing files for conventions and reusable patterns.

@@ -3,12 +3,9 @@ use std::path::Path;
 use anyhow::{Result, bail};
 
 use crate::config;
-use crate::privileges;
 use crate::release_state;
 
 pub fn run(config_path: &str) -> Result<()> {
-    privileges::ensure_not_root("bonesremote release activate")?;
-
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
     let release_dir = release_state::release_dir(&cfg, &release_name);

@@ -224,3 +224,33 @@ BonesDeploy can still deploy Docker-based apps if your deployment scripts call `
 ## License
 
 MIT
+
+## Coverage
+
+Coverage is driven with `cargo-llvm-cov` using cargo aliases in `.cargo/config.toml`.
+
+Install once:
+
+```sh
+cargo install cargo-llvm-cov
+```
+
+Generate a terminal summary:
+
+```sh
+cargo cov
+```
+
+Generate lcov output for CI tooling:
+
+```sh
+cargo cov-lcov
+```
+
+Generate an HTML report:
+
+```sh
+cargo cov-html
+```
+
+Reports are written under `target/coverage/`.

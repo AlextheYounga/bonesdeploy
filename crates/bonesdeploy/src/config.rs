@@ -195,3 +195,148 @@ fn hide_derived_defaults(config: &mut BonesConfig) {
         config.data.deploy_root.clear();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use anyhow::Result;
+
+    use super::{
+        BonesConfig, Data, PermissionDefaults, Permissions, Releases, Ssl, default_deploy_root_for,
+        default_live_root_for, load, save,
+    };
+
+    fn temp_path(file_name: &str) -> PathBuf {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
+        std::env::temp_dir().join(format!("bonesdeploy_config_test_{}_{}_{}", process::id(), nanos, file_name))
+    }
+
+    fn minimal_yaml(project_name: &str) -> String {
+        format!(
+            "data:\n  remote_name: production\n  project_name: {project_name}\n  host: deploy.example.com\n  port: \"22\"\n  git_dir: /home/git/{project_name}.git\n  branch: master\n  deploy_on_push: true\n"
+        )
+    }
+
+    fn sample_config(project_name: &str) -> BonesConfig {
+        BonesConfig {
+            data: Data {
+                remote_name: String::from("production"),
+                project_name: String::from(project_name),
+                host: String::from("deploy.example.com"),
+                port: String::from("22"),
+                git_dir: format!("/home/git/{project_name}.git"),
+                live_root: default_live_root_for(project_name),
+                deploy_root: default_deploy_root_for(project_name),
+                branch: String::from("master"),
+                deploy_on_push: true,
+            },
+            permissions: Permissions {
+                defaults: PermissionDefaults {
+                    deploy_user: String::from("git"),
+                    service_user: String::from(project_name),
+                    group: String::from("www-data"),
+                    dir_mode: String::from("750"),
+                    file_mode: String::from("640"),
+                },
+                paths: Vec::new(),
+            },
+            releases: Releases { keep: 5, shared_paths: Vec::new() },
+            ssl: Ssl::default(),
+        }
+    }
+
+    // Confirms service user derives from project name when omitted to keep init output minimal.
+    #[test]
+    fn load_applies_default_service_user_from_project_name() -> Result<()> {
+        let path = temp_path("service_user.yaml");
+        fs::write(&path, minimal_yaml("lawsnipe"))?;
+
+        let cfg = load(&path)?;
+        assert_eq!(cfg.permissions.defaults.service_user, "lawsnipe");
+
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    // Confirms live_root default matches documented project-scoped runtime location.
+    #[test]
+    fn load_applies_default_live_root_from_project_name() -> Result<()> {
+        let path = temp_path("live_root.yaml");
+        fs::write(&path, minimal_yaml("atlas"))?;
+
+        let cfg = load(&path)?;
+        assert_eq!(cfg.data.live_root, "/var/www/atlas");
+
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    // Confirms deploy_root default matches documented project-scoped release location.
+    #[test]
+    fn load_applies_default_deploy_root_from_project_name() -> Result<()> {
+        let path = temp_path("deploy_root.yaml");
+        fs::write(&path, minimal_yaml("atlas"))?;
+
+        let cfg = load(&path)?;
+        assert_eq!(cfg.data.deploy_root, "/srv/deployments/atlas");
+
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    // Ensures save omits derived values so config stays concise and portable across renames.
+    #[test]
+    fn save_omits_derived_live_and_deploy_roots() -> Result<()> {
+        let config = sample_config("phoenix");
+        let path = temp_path("save_derived_defaults.yaml");
+
+        save(&config, &path)?;
+        let content = fs::read_to_string(&path)?;
+
+        assert!(!content.contains("live_root:"));
+        assert!(!content.contains("deploy_root:"));
+
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    // Ensures SSL settings are serialized so SSL setup can round-trip user intent.
+    #[test]
+    fn save_persists_ssl_settings() -> Result<()> {
+        let mut config = sample_config("phoenix");
+        config.ssl =
+            Ssl { enabled: true, domain: String::from("app.example.com"), email: String::from("ops@example.com") };
+
+        let path = temp_path("save_ssl_settings.yaml");
+        save(&config, &path)?;
+        let content = fs::read_to_string(&path)?;
+
+        assert!(content.contains("ssl:"));
+        assert!(content.contains("enabled: true"));
+        assert!(content.contains("domain: app.example.com"));
+        assert!(content.contains("email: ops@example.com"));
+
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    // Protects explicit user overrides so load never clobbers intentional non-default paths.
+    #[test]
+    fn load_preserves_explicit_live_and_deploy_root_overrides() -> Result<()> {
+        let path = temp_path("overrides.yaml");
+        let yaml = "data:\n  remote_name: production\n  project_name: app\n  host: deploy.example.com\n  port: \"22\"\n  git_dir: /home/git/app.git\n  live_root: /custom/live\n  deploy_root: /custom/deploy\n  branch: master\n  deploy_on_push: true\n";
+
+        fs::write(&path, yaml)?;
+        let cfg = load(Path::new(&path))?;
+
+        assert_eq!(cfg.data.live_root, "/custom/live");
+        assert_eq!(cfg.data.deploy_root, "/custom/deploy");
+
+        fs::remove_file(path)?;
+        Ok(())
+    }
+}

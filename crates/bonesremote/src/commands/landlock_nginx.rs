@@ -8,11 +8,8 @@ use anyhow::{Context, Result, bail};
 
 use crate::config;
 use crate::landlock;
-use crate::privileges;
 
 pub fn run(config_path: &str) -> Result<()> {
-    privileges::ensure_not_root("bonesremote landlock nginx")?;
-
     let cfg = config::load(Path::new(config_path))?;
     let active_runtime_root = fs::canonicalize(&cfg.data.live_root)
         .with_context(|| format!("Failed to resolve live_root: {}", cfg.data.live_root))?;

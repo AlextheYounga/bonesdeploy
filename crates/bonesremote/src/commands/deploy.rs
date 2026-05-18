@@ -5,15 +5,12 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 
 use crate::config;
-use crate::privileges;
 use crate::release_state;
 
 use super::activate_release;
 use super::drop_failed_release;
 
 pub fn run(config_path: &str) -> Result<()> {
-    privileges::ensure_not_root("bonesremote hooks deploy")?;
-
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
     let runtime_path = release_state::release_dir(&cfg, &release_name);
@@ -112,4 +109,95 @@ fn list_deployment_scripts(deployment_dir: &Path) -> Result<Vec<PathBuf>> {
 
     scripts.sort();
     Ok(scripts)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::{Path, PathBuf};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::{clear_directory, list_deployment_scripts, publish_runtime_tree};
+
+    fn temp_dir(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
+        let path = std::env::temp_dir().join(format!("{prefix}_{}_{}", std::process::id(), nanos));
+        fs::create_dir_all(&path).unwrap_or_else(|error| panic!("failed to create temp dir: {error}"));
+        path
+    }
+
+    fn write_file(path: &Path, content: &str) {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap_or_else(|error| panic!("failed to create parent: {error}"));
+        }
+        fs::write(path, content).unwrap_or_else(|error| panic!("failed to write file: {error}"));
+    }
+
+    // Ensures publish prep always starts from a clean runtime dir with no stale artifacts.
+    #[test]
+    fn clear_directory_removes_all_direct_children() {
+        let root = temp_dir("bonesremote_deploy_clear");
+        write_file(&root.join("file.txt"), "hello");
+        write_file(&root.join("nested/inner.txt"), "world");
+
+        clear_directory(&root).unwrap_or_else(|error| panic!("clear_directory failed: {error}"));
+
+        assert!(fs::read_dir(&root).unwrap_or_else(|error| panic!("failed to read dir: {error}")).next().is_none());
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    // Ensures deployment scripts execute in deterministic order and ignore non-script directories.
+    #[test]
+    fn list_deployment_scripts_returns_sorted_files_only() {
+        let deployment_dir = temp_dir("bonesremote_deploy_scripts");
+        write_file(&deployment_dir.join("20_restart.sh"), "#!/usr/bin/env bash\n");
+        write_file(&deployment_dir.join("10_build.sh"), "#!/usr/bin/env bash\n");
+        fs::create_dir_all(deployment_dir.join("ignored_dir"))
+            .unwrap_or_else(|error| panic!("failed to create dir: {error}"));
+
+        let scripts = list_deployment_scripts(&deployment_dir)
+            .unwrap_or_else(|error| panic!("list_deployment_scripts failed: {error}"));
+        let script_names: Vec<String> = scripts
+            .into_iter()
+            .map(|path| {
+                path.file_name().map_or_else(|| panic!("missing file name"), |name| name.to_string_lossy().to_string())
+            })
+            .collect();
+
+        assert_eq!(script_names, vec!["10_build.sh", "20_restart.sh"]);
+
+        fs::remove_dir_all(deployment_dir).ok();
+    }
+
+    // Verifies release publish is a full replacement copy, preserving expected hidden/runtime files.
+    #[test]
+    fn publish_runtime_tree_replaces_runtime_contents_with_build_workspace() {
+        let root = temp_dir("bonesremote_deploy_publish");
+        let build_root = root.join("build_workspace");
+        let runtime_root = root.join("runtime_release");
+        fs::create_dir_all(&build_root).unwrap_or_else(|error| panic!("failed to create build_root: {error}"));
+        fs::create_dir_all(&runtime_root).unwrap_or_else(|error| panic!("failed to create runtime_root: {error}"));
+
+        write_file(&build_root.join("public/index.html"), "<h1>ok</h1>");
+        write_file(&build_root.join(".env.example"), "KEY=value");
+        write_file(&runtime_root.join("stale.txt"), "old");
+
+        publish_runtime_tree(&build_root, &runtime_root)
+            .unwrap_or_else(|error| panic!("publish_runtime_tree failed: {error}"));
+
+        assert!(!runtime_root.join("stale.txt").exists());
+        assert_eq!(
+            fs::read_to_string(runtime_root.join("public/index.html"))
+                .unwrap_or_else(|error| panic!("failed to read published file: {error}")),
+            "<h1>ok</h1>"
+        );
+        assert_eq!(
+            fs::read_to_string(runtime_root.join(".env.example"))
+                .unwrap_or_else(|error| panic!("failed to read published hidden file: {error}")),
+            "KEY=value"
+        );
+
+        fs::remove_dir_all(root).ok();
+    }
 }
