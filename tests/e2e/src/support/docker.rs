@@ -4,8 +4,6 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use anyhow::{Context, Result, bail};
 
-use crate::support::paths;
-
 pub const DEFAULT_SERVICE: &str = "bonesdeploy-test-server";
 
 pub struct DockerSession {
@@ -16,59 +14,35 @@ pub fn bootstrap_ssh_user() -> String {
     env::var("BONES_E2E_BOOTSTRAP_USER").unwrap_or_else(|_| String::from("root"))
 }
 
-pub fn docker_compose_up() -> Result<()> {
-    let compose_file = paths::docker_dir().join("docker-compose.yml");
-    let status = Command::new("docker")
-        .args(["compose", "-f"])
-        .arg(&compose_file)
-        .args(["up", "-d", DEFAULT_SERVICE])
-        .status()
-        .context("Failed to run docker compose up")?;
-
-    if !status.success() {
-        bail!("docker compose up failed with status {status}");
-    }
-
-    Ok(())
-}
-
 pub fn docker_session() -> Result<DockerSession> {
     static DOCKER_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
-    static STARTUP: OnceLock<Result<(), String>> = OnceLock::new();
 
     let lock = DOCKER_LOCK.get_or_init(|| Mutex::new(())).lock().unwrap_or_else(|poisoned| poisoned.into_inner());
-    let startup_result = STARTUP.get_or_init(|| setup_docker_session().map_err(|error| format!("{error:#}")));
-
-    if let Err(message) = startup_result {
-        bail!("{message}");
-    }
+    ensure_container_running()?;
 
     Ok(DockerSession { _lock: lock })
 }
 
-fn setup_docker_session() -> Result<()> {
-    let _ = docker_compose_down();
-    docker_compose_up()
+pub fn docker_available() -> bool {
+    Command::new("docker").arg("--version").output().is_ok_and(|output| output.status.success())
 }
 
-pub fn docker_compose_down() -> Result<()> {
-    let compose_file = paths::docker_dir().join("docker-compose.yml");
-    let status = Command::new("docker")
-        .args(["compose", "-f"])
-        .arg(&compose_file)
-        .args(["down", "--remove-orphans"])
-        .status()
-        .context("Failed to run docker compose down")?;
+fn ensure_container_running() -> Result<()> {
+    let output = Command::new("docker")
+        .args(["inspect", "-f", "{{.State.Running}}", DEFAULT_SERVICE])
+        .output()
+        .context("Failed to inspect e2e Docker container")?;
 
-    if !status.success() {
-        bail!("docker compose down failed with status {status}");
+    if !output.status.success() {
+        bail!("Docker container '{}' is unavailable. Run `cargo e2e` to recreate and start it.", DEFAULT_SERVICE);
+    }
+
+    let running = String::from_utf8_lossy(&output.stdout);
+    if running.trim() != "true" {
+        bail!("Docker container '{}' is not running. Start it with `cargo e2e`.", DEFAULT_SERVICE);
     }
 
     Ok(())
-}
-
-pub fn docker_available() -> bool {
-    Command::new("docker").arg("--version").status().is_ok_and(|status| status.success())
 }
 
 pub fn docker_exec(command: &str) -> Result<()> {

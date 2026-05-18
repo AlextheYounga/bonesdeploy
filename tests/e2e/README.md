@@ -24,6 +24,13 @@ Run Docker-backed E2E tests explicitly:
 cargo e2e
 ```
 
+`cargo e2e` performs a one-time Docker lifecycle step before tests:
+
+- `docker compose down --remove-orphans`
+- `docker compose up -d`
+
+The container remains running after the test suite completes.
+
 ## Bootstrap SSH User
 
 The test harness defaults to a bootstrap SSH user of `root`.

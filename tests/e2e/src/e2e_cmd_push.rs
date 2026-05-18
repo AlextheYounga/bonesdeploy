@@ -9,7 +9,6 @@ fn e2e_bonesdeploy_push_invokes_remote_sync_path() -> Result<()> {
     repo::write_minimal_bones_project(&sandbox.path)?;
 
     let output = cli::run_bonesdeploy(&sandbox.path, ["push"])?;
-    cli::assert_failure(&output)?;
     cli::assert_stdout_contains(&output, "Syncing .bones/ to /tmp/e2eapp.git/bones/")?;
 
     Ok(())

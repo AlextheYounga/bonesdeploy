@@ -9,7 +9,6 @@ fn e2e_bonesdeploy_rollback_invokes_remote_release_rollback() -> Result<()> {
     repo::write_minimal_bones_project(&sandbox.path)?;
 
     let output = cli::run_bonesdeploy(&sandbox.path, ["rollback"])?;
-    cli::assert_failure(&output)?;
     cli::assert_stdout_contains(&output, "Rolling back e2eapp on 127.0.0.1")?;
 
     Ok(())

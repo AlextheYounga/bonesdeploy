@@ -7,7 +7,3 @@ pub fn workspace_root() -> PathBuf {
         .canonicalize()
         .unwrap_or_else(|_| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("..").join(".."))
 }
-
-pub fn docker_dir() -> PathBuf {
-    workspace_root().join("docker")
-}
