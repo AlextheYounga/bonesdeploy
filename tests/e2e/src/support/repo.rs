@@ -86,6 +86,40 @@ pub fn assert_bones_yaml_contains(repo_root: &Path, needle: &str) -> Result<()> 
     bail!("Expected .bones/bones.yaml to contain '{needle}', got:\n{content}")
 }
 
+pub fn install_real_site_assets(repo_root: &Path, workspace_root: &Path) -> Result<()> {
+    let source = workspace_root.join("kit/site");
+    let target = repo_root.join(".bones/site");
+
+    if !source.is_dir() {
+        bail!("Missing source site assets directory: {}", source.display());
+    }
+
+    if target.exists() {
+        fs::remove_dir_all(&target).with_context(|| format!("Failed to remove existing {}", target.display()))?;
+    }
+
+    copy_dir_recursive(&source, &target)
+}
+
+fn copy_dir_recursive(source: &Path, target: &Path) -> Result<()> {
+    fs::create_dir_all(target).with_context(|| format!("Failed to create {}", target.display()))?;
+
+    for entry in fs::read_dir(source).with_context(|| format!("Failed to read {}", source.display()))? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let target_path = target.join(entry.file_name());
+
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&source_path, &target_path)?;
+        } else {
+            fs::copy(&source_path, &target_path)
+                .with_context(|| format!("Failed to copy {} to {}", source_path.display(), target_path.display()))?;
+        }
+    }
+
+    Ok(())
+}
+
 fn run_git<const N: usize>(cwd: &Path, args: [&str; N]) -> Result<()> {
     let output = Command::new("git").args(args).current_dir(cwd).output().context("Failed to run git command")?;
 
