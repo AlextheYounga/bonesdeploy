@@ -32,7 +32,7 @@ fn e2e_remote_happy_path_runs_push_deploy_and_rollback_in_sequence() -> Result<(
     let doctor = cli::run_bonesdeploy(&sandbox.path, ["doctor", "--local"])?;
     cli::assert_success(&doctor)?;
 
-    docker::docker_exec("git init --bare /tmp/e2eapp.git")?;
+    docker::docker_exec("mkdir -p /home/git && git init --bare /home/git/e2eapp.git")?;
     docker::docker_exec(
         "cat >/usr/local/bin/bonesremote <<'EOF'\n#!/usr/bin/env bash\necho \"$@\" >/tmp/bonesremote-invocation.log\nexit 0\nEOF\nchmod +x /usr/local/bin/bonesremote",
     )?;
@@ -50,8 +50,8 @@ fn e2e_remote_happy_path_runs_push_deploy_and_rollback_in_sequence() -> Result<(
     cli::assert_stdout_contains(&rollback, "Rollback complete")?;
 
     let hooks_log = docker::docker_exec_output("cat /tmp/bonesdeploy-hooks.log")?;
-    assert!(hooks_log.contains("PRE BONES_FORCE_DEPLOY=1 GIT_DIR=/tmp/e2eapp.git"));
-    assert!(hooks_log.contains("POST BONES_FORCE_DEPLOY=1 GIT_DIR=/tmp/e2eapp.git"));
+    assert!(hooks_log.contains("PRE BONES_FORCE_DEPLOY=1 GIT_DIR=/home/git/e2eapp.git"));
+    assert!(hooks_log.contains("POST BONES_FORCE_DEPLOY=1 GIT_DIR=/home/git/e2eapp.git"));
 
     let rollback_invocation = docker::docker_exec_output("cat /tmp/bonesremote-invocation.log")?;
     assert!(rollback_invocation.contains("release rollback --config /tmp/e2eapp.git/bones/bones.yaml"));

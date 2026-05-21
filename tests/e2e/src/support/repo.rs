@@ -53,10 +53,10 @@ pub fn write_minimal_bones_project(repo_root: &Path) -> Result<()> {
     fs::set_permissions(&deployment_script, fs::Permissions::from_mode(0o755))?;
     fs::write(playbook_dir.join("setup.yml"), "---\n- hosts: all\n  tasks: []\n")?;
 
-    let config = "data:\n  remote_name: production\n  project_name: e2eapp\n  host: 127.0.0.1\n  port: \"2222\"\n  git_dir: /tmp/e2eapp.git\n  branch: master\n  deploy_on_push: true\npermissions:\n  defaults:\n    deploy_user: root\n    service_user: e2eapp\n    group: www-data\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\n  shared_paths:\n    - .env\n    - storage\nssl:\n  enabled: false\n  domain: \"\"\n  email: \"\"\n";
+    let config = "data:\n  remote_name: production\n  project_name: e2eapp\n  host: 127.0.0.1\n  port: \"2222\"\n  git_dir: /home/git/e2eapp.git\n  branch: master\n  deploy_on_push: true\npermissions:\n  defaults:\n    deploy_user: git\n    service_user: e2eapp\n    group: www-data\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\n  shared_paths:\n    - .env\n    - storage\nssl:\n  enabled: false\n  domain: \"\"\n  email: \"\"\n";
     fs::write(bones_dir.join("bones.yaml"), config)?;
 
-    run_git(repo_root, ["remote", "add", "production", "root@127.0.0.1:/tmp/e2eapp.git"])?;
+    run_git(repo_root, ["remote", "add", "production", "git@127.0.0.1:/home/git/e2eapp.git"])?;
 
     Ok(())
 }

@@ -143,6 +143,15 @@
     creates: "{{ git_dir }}/HEAD"
   tags: [common, git]
 
+- name: Ensure bare repo bones directory exists
+  ansible.builtin.file:
+    path: "{{ git_dir }}/bones"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0755"
+  tags: [common, git]
+
 - name: Ensure placeholder release directory exists
   ansible.builtin.file:
     path: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}"
