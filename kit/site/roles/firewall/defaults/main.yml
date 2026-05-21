@@ -1,0 +1,21 @@
+---
+# Firewall role defaults
+
+firewall_enabled: true
+firewall_default_incoming_policy: deny
+firewall_default_outgoing_policy: allow
+
+firewall_allowed_ports:
+  - http
+  - https
+
+firewall_port_aliases:
+  http: 80
+  https: 443
+
+firewall_manage_ssh: true
+firewall_ssh_port: "{{ ssh_port | default(ansible_port | default(22)) }}"
+firewall_ssh_rate_limit: false
+firewall_ssh_allowed_cidrs: []
+
+firewall_show_status: true

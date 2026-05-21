@@ -1,0 +1,83 @@
+---
+- name: Install nginx
+  ansible.builtin.apt:
+    name: "{{ nginx_package_name }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [nginx, packages]
+
+- name: Ensure socket directory exists
+  ansible.builtin.file:
+    path: "/run/{{ project_name }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ group }}"
+    mode: "0750"
+  tags: [nginx]
+
+- name: Deploy per-site nginx config
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../nginx/site-nginx.conf.j2"
+    dest: "{{ git_dir }}/bones/nginx.conf"
+    owner: "{{ service_user }}"
+    group: "{{ group }}"
+    mode: "0640"
+  tags: [nginx]
+
+- name: Deploy per-site nginx systemd service
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../nginx/site-nginx.service.j2"
+    dest: "/etc/systemd/system/{{ project_name }}-nginx.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+  tags: [nginx]
+
+- name: Deploy router nginx config
+  ansible.builtin.template:
+    src: "{{ playbook_dir }}/../nginx/router.conf.j2"
+    dest: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload nginx
+  tags: [nginx]
+
+- name: Enable router nginx site
+  ansible.builtin.file:
+    src: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
+    dest: "/etc/nginx/sites-enabled/{{ nginx_site_name }}.conf"
+    state: link
+    force: true
+  notify: Reload nginx
+  tags: [nginx]
+
+- name: Disable default nginx site
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  when: nginx_disable_default_site
+  notify: Reload nginx
+  tags: [nginx]
+
+- name: Validate nginx configuration
+  ansible.builtin.command: nginx -t
+  changed_when: false
+  tags: [nginx]
+
+- name: Ensure nginx service is enabled and started
+  ansible.builtin.service:
+    name: "{{ nginx_service_name }}"
+    enabled: true
+    state: started
+  tags: [nginx]
+
+- name: Ensure per-site nginx service is enabled and started
+  ansible.builtin.systemd:
+    name: "{{ project_name }}-nginx"
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: [nginx]

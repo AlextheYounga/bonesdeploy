@@ -38,5 +38,6 @@ __trash__
 *.swp
 *.swo
 .worktrees
-bin
 .dylint
+bin
+!tests/**/bin

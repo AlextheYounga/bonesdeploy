@@ -1,3 +1,5 @@
+use crate::config;
+
 pub fn run() {
-    println!("bonesremote {}", env!("CARGO_PKG_VERSION"));
+    println!("{} {}", config::Constants::BINARY_NAME, env!("CARGO_PKG_VERSION"));
 }

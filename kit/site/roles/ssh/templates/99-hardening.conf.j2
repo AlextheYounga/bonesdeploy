@@ -1,0 +1,16 @@
+# Managed by Ansible
+
+Port {{ ssh_port }}
+PasswordAuthentication {{ 'yes' if ssh_password_authentication else 'no' }}
+PubkeyAuthentication {{ 'yes' if ssh_pubkey_authentication else 'no' }}
+ChallengeResponseAuthentication {{ 'yes' if ssh_challenge_response_authentication else 'no' }}
+UsePAM {{ 'yes' if ssh_use_pam else 'no' }}
+{% if ssh_manage_permit_root_login %}
+PermitRootLogin {{ ssh_permit_root_login }}
+{% endif %}
+{% if ssh_allow_users | length > 0 %}
+AllowUsers {{ ssh_allow_users | join(' ') }}
+{% endif %}
+{% if ssh_allow_groups | length > 0 %}
+AllowGroups {{ ssh_allow_groups | join(' ') }}
+{% endif %}

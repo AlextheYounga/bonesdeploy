@@ -25,9 +25,9 @@ If you want a Heroku-style abstraction layer, use a platform. If you want a disc
 BonesDeploy uses a two-user deployment model:
 
 1. A **deploy user** (default: `git`) handles SSH access and runs deployment scripts. This user has restricted sudo ability but no password login.
-2. A **service user** (default: `applications`) owns the deployed files. This user has no home folder, no login, and no sudo ability — limiting attack scope.
+2. A **service user** (defaults to the project name) owns the deployed files. This user has no home folder, no login, and no sudo ability — limiting attack scope.
 
-During deployment, `bonesremote` temporarily changes file ownership to the deploy user so scripts can write, then hardens permissions back to the service user afterward. The sudoers configuration is strictly limited to `bonesremote` commands only.
+During deployment, `bonesremote` temporarily changes file ownership to the deploy user so scripts can write, then hardens permissions back to the service user afterward. The sudoers configuration is strictly limited to `bonesremote release stage`, `bonesremote release wire`, and `bonesremote hooks post-deploy`.
 
 This gives you a clean privilege boundary:
 
@@ -49,13 +49,13 @@ cargo install --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
 sudo cargo install --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
-Then run the one-time server setup as root:
+Then run the site setup:
 
 ```sh
 sudo bonesremote init
 ```
 
-This installs a sudoers drop-in at `/etc/sudoers.d/bonesdeploy` so the deploy user can run `bonesremote` without a password.
+This installs a sudoers drop-in at `/etc/sudoers.d/bonesdeploy` so the deploy user can run only the privileged `bonesremote` commands without a password.
 
 ## Usage
 
@@ -69,17 +69,40 @@ bonesdeploy init
 
 This will:
 1. Create a `.bones/` folder with hooks and deployment script templates
-2. Prompt for project configuration (remote name, project paths, branch, permissions, etc.)
+2. Prompt for project name, branch, remote name, host, and port
 3. Add `.bones` to `.gitignore`
 4. Symlink the `pre-push` hook into `.git/hooks/`
-5. Create a bare repo on the remote if needed
-6. Upload the `post-receive` hook to the remote
+5. Create a local deployment git remote if needed
 
-A git remote must already be configured for the deployment target:
+BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.yaml`:
+
+- `port = "22"`
+- `live_root = "/var/www/<project_name>"`
+- `deploy_root = "/srv/deployments/<project_name>"`
+- `deploy_user = "git"`
+- `service_user = "<project_name>"`
+- `group = "www-data"`
+
+Before first deploy, run site setup:
 
 ```sh
-git remote add production git@deploy.example.com:/home/git/myproject.git
+bonesdeploy site setup
 ```
+
+This runs `.bones/site/playbooks/setup.yml` locally with Ansible against your configured remote host.
+If `ansible-playbook` is missing, BonesDeploy installs Ansible automatically with `python3 -m pip install --user ansible`.
+Template-based projects also scaffold language-specific setup roles (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install global PM2/PNPM tools).
+Every setup also installs nginx and provisions a default project vhost that serves `.bones/site/roles/nginx/defaults/index.html.j2` until your first deployment is live.
+
+To customize nginx behavior, edit `.bones/site/nginx/site.conf.j2` and re-run `bonesdeploy site setup`.
+
+When DNS is ready, enable SSL with certbot:
+
+```sh
+bonesdeploy site ssl --domain app.example.com --email ops@example.com
+```
+
+This obtains a Let's Encrypt certificate and updates the managed nginx site to listen on 443 and redirect HTTP to HTTPS.
 
 ### Syncing Configuration
 
@@ -101,11 +124,26 @@ git push production master
 
 The hook chain handles the rest:
 1. **pre-push** (local) — runs `bonesdeploy doctor --local`
-2. **pre-receive** (remote) — runs `bonesremote doctor`, then `pre-deploy`
-3. **pre-deploy** (remote) — changes worktree ownership to deploy user
-4. **post-receive** (remote) — checks out latest commit to worktree
-5. **deploy** (remote) — runs scripts in `.bones/deployment/` sequentially
-6. **post-deploy** (remote) — hardens permissions back to service user
+2. **pre-receive** (remote) — resolves the configured deployment ref from the pushed refs; if it matches, runs `bonesremote doctor`, then `sudo bonesremote release stage --config ...`. Pushes to other branches or branch deletions are skipped without staging.
+3. **post-receive** (remote) — runs the deployment pipeline:
+    - `bonesremote hooks post-receive --config ... --revision <newrev>` (checkout into `build/workspace`)
+    - `sudo bonesremote release wire --config ...` (just-in-time wire shared paths)
+    - `bonesremote hooks deploy --config ...` (run deployment scripts + activate/drop-failed)
+    - `sudo bonesremote hooks post-deploy --config ...` (permission hardening + pruning)
+
+`pre-push -> pre-receive -> post-receive`
+
+If you set `deploy_on_push = false`, pushes only update refs. Run manual deploy when ready:
+
+```sh
+bonesdeploy deploy
+```
+
+To roll back to the previous release without rebuilding:
+
+```sh
+bonesdeploy rollback
+```
 
 ### Health Checks
 
@@ -116,53 +154,60 @@ bonesdeploy doctor --local  # check local only
 
 ## Configuration
 
-`bonesdeploy init` generates `.bones/bones.toml`:
+`bonesdeploy init` generates `.bones/bones.yaml`:
 
-```toml
-[data]
-remote_name = "production"
-project_name = "myproject"
-git_dir = "/home/git/myproject.git"
-worktree = "/var/www/myproject"
-branch = "master"
+```yaml
+data:
+  remote_name: "production"
+  project_name: "myproject"
+  git_dir: "/home/git/myproject.git"
+  live_root: "/var/www/myproject"
+  deploy_root: "/srv/deployments/myproject"
+  branch: "master"
+  deploy_on_push: true
 
-[permissions.defaults]
-deploy = "git"
-owner = "applications"
-group = "www-data"
-dir_mode = "750"
-file_mode = "640"
+permissions:
+  defaults:
+    deploy_user: "git"
+    service_user: "myproject"
+    group: "www-data"
+    dir_mode: "750"
+    file_mode: "640"
+  paths:
+    - path: "storage"
+      mode: "770"
+      recursive: true
+    - path: "database/database.sqlite"
+      mode: "660"
+      type: "file"
 
-[[permissions.paths]]
-path = "storage"
-mode = "770"
-recursive = true
+releases:
+  keep: 5
+  shared_paths: [".env", "storage"]
 
-[[permissions.paths]]
-path = "database/database.sqlite"
-mode = "660"
-type = "file"
+ssl:
+  enabled: false
+  domain: ""
+  email: ""
 ```
 
-Remote host and port are not stored separately in `bones.toml`. BonesDeploy reads that information from the URL configured with `git remote add`.
+`host` and `git_dir` are inferred from the deployment remote URL when possible; if parsing fails, init asks only for those missing values.
 
 ## Project Structure
 
 ```
 .bones/
-├── bones.toml           # project configuration
+├── bones.yaml           # project configuration
+├── hooks.sh             # shared hook functions imported by hook entrypoints
 ├── deployment/
 │   └── 01_*.sh          # deployment scripts (run sequentially)
 └── hooks/
     ├── pre-push         # symlinked to .git/hooks/pre-push
     ├── pre-receive
-    ├── pre-deploy
-    ├── post-receive
-    ├── deploy
-    └── post-deploy
+    └── post-receive
 ```
 
-Hooks are written to `.bones/hooks/` once during init. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
+Hooks are written to `.bones/hooks/` once during init and import shared functions from `.bones/hooks.sh`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
 
 ## Good Fit
 
@@ -179,3 +224,33 @@ BonesDeploy can still deploy Docker-based apps if your deployment scripts call `
 ## License
 
 MIT
+
+## Coverage
+
+Coverage is driven with `cargo-llvm-cov` using cargo aliases in `.cargo/config.toml`.
+
+Install once:
+
+```sh
+cargo install cargo-llvm-cov
+```
+
+Generate a terminal summary:
+
+```sh
+cargo cov
+```
+
+Generate lcov output for CI tooling:
+
+```sh
+cargo cov-lcov
+```
+
+Generate an HTML report:
+
+```sh
+cargo cov-html
+```
+
+Reports are written under `target/coverage/`.

@@ -1,0 +1,26 @@
+use anyhow::Result;
+
+use crate::support::{cli, docker, repo};
+
+#[test]
+#[ignore = "e2e test"]
+fn e2e_bonesdeploy_push_invokes_remote_sync_path() -> Result<()> {
+    let sandbox = repo::create_temp_git_repo()?;
+    repo::write_minimal_bones_project(&sandbox.path)?;
+
+    let _docker = docker::docker_session()?;
+
+    docker::docker_exec("git init --bare /tmp/e2eapp.git")?;
+
+    let output = cli::run_bonesdeploy(&sandbox.path, ["push"])?;
+    cli::assert_success(&output)?;
+    cli::assert_stdout_contains(&output, ".bones/ synced to remote")?;
+
+    let remote_config = docker::docker_exec_output("cat /tmp/e2eapp.git/bones/bones.yaml")?;
+    assert!(remote_config.contains("project_name: e2eapp"));
+
+    let pre_receive_target = docker::docker_exec_output("readlink /tmp/e2eapp.git/hooks/pre-receive")?;
+    assert_eq!(pre_receive_target.trim(), "/tmp/e2eapp.git/bones/hooks/pre-receive");
+
+    Ok(())
+}

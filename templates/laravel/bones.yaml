@@ -1,0 +1,31 @@
+data:
+  remote_name: 'production'
+  project_name: ''
+  host: ''
+  port: '22'
+  git_dir: '/home/git/<project_name>.git'
+  worktree: '/var/www/<project_name>'
+  branch: 'master'
+
+permissions:
+  defaults:
+    deploy_user: 'git'
+    service_user: 'applications'
+    group: 'www-data'
+    dir_mode: '750'
+    file_mode: '640'
+  paths:
+    - path: 'storage'
+      mode: '770'
+      recursive: true
+    - path: 'bootstrap/cache'
+      mode: '770'
+      recursive: true
+    - path: 'database'
+      mode: '770'
+      recursive: false
+      type: 'dir'
+    - path: 'database/database.sqlite'
+      mode: '660'
+      recursive: false
+      type: 'file'

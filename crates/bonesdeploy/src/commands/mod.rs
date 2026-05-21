@@ -1,7 +1,11 @@
+mod deploy;
 mod doctor;
 mod init;
+mod manage;
 mod push;
-mod redeploy;
+mod rollback;
+mod site_setup;
+mod site_ssl;
 mod version;
 
 use anyhow::Result;
@@ -26,18 +30,48 @@ enum Command {
     },
     /// Sync .bones/ folder to the remote bare repo
     Push,
-    /// Re-run the deployment hooks without pushing
-    Redeploy,
+    /// Run deployment hooks manually without pushing commits
+    Deploy,
+    /// Site setup operations
+    Site {
+        #[command(subcommand)]
+        command: SiteCommand,
+    },
+    /// Open remote server management TUI
+    Manage,
+    /// Roll back current release to the previous one
+    Rollback,
     /// Print the version
     Version,
 }
 
+#[derive(Subcommand)]
+enum SiteCommand {
+    /// Run site setup playbook against configured host
+    Setup,
+    /// Obtain and configure SSL certificates with certbot
+    Ssl {
+        /// Domain name for the certificate (e.g. app.example.com)
+        #[arg(long)]
+        domain: Option<String>,
+        /// Email used for Let's Encrypt registration and notices
+        #[arg(long)]
+        email: Option<String>,
+    },
+}
+
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init => init::run().await,
+        Command::Init => init::run(),
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,
-        Command::Redeploy => redeploy::run().await,
+        Command::Deploy => deploy::run().await,
+        Command::Manage => manage::run(),
+        Command::Site { command } => match command {
+            SiteCommand::Setup => site_setup::run(),
+            SiteCommand::Ssl { domain, email } => site_ssl::run(domain.clone(), email.clone()),
+        },
+        Command::Rollback => rollback::run().await,
         Command::Version => {
             version::run();
             Ok(())

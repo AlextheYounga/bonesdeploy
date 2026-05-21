@@ -1,0 +1,13 @@
+---
+- name: Install Nuxt global npm tools
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_dir }}"
+    . "${NVM_DIR}/nvm.sh"
+    npm install -g {{ nuxt_global_npm_packages | join(' ') }}
+  args:
+    executable: /bin/bash
+  environment:
+    HOME: "/home/{{ deploy_user }}"
+  tags: [nuxt, npm]

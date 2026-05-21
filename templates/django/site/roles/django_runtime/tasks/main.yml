@@ -1,0 +1,8 @@
+---
+- name: Install Django runtime packages
+  ansible.builtin.apt:
+    name: "{{ django_runtime_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [django, packages]

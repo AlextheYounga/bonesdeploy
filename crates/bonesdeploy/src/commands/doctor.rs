@@ -8,9 +8,6 @@ use console::style;
 use crate::config;
 use crate::ssh;
 
-const BONES_DIR: &str = ".bones";
-const BONES_TOML: &str = ".bones/bones.toml";
-
 pub async fn run(local_only: bool) -> Result<()> {
     println!("{}", style("bonesdeploy doctor").bold());
 
@@ -21,8 +18,8 @@ pub async fn run(local_only: bool) -> Result<()> {
     check_pre_push_symlink(&mut issues);
 
     if !local_only {
-        let bones_toml = Path::new(BONES_TOML);
-        match config::load(bones_toml) {
+        let bones_yaml = Path::new(config::Constants::BONES_YAML);
+        match config::load(bones_yaml) {
             Ok(cfg) => check_remote(&cfg, &mut issues).await,
             Err(e) => issues.push(format!("Cannot load config: {e}")),
         }
@@ -36,23 +33,24 @@ pub async fn run(local_only: bool) -> Result<()> {
         for issue in &issues {
             println!("  {} {issue}", style("!").red().bold());
         }
-        anyhow::bail!(
-            "Doctor found {} issue{}",
-            issues.len(),
-            if issues.len() == 1 { "" } else { "s" }
-        );
+        anyhow::bail!("Doctor found {} issue{}", issues.len(), if issues.len() == 1 { "" } else { "s" });
     }
 }
 
 fn check_bones_structure(issues: &mut Vec<String>) {
-    let bones_dir = Path::new(BONES_DIR);
+    let bones_dir = Path::new(config::Constants::BONES_DIR);
 
     if !bones_dir.exists() {
-        issues.push(".bones/ directory does not exist".into());
+        issues.push(format!("{}/ directory does not exist", config::Constants::BONES_DIR));
         return;
     }
 
-    let expected = [".bones/bones.toml", ".bones/hooks", ".bones/deployment"];
+    let expected = [
+        config::Constants::BONES_YAML,
+        config::Constants::BONES_HOOKS_SCRIPT,
+        config::Constants::BONES_HOOKS_DIR,
+        config::Constants::BONES_DEPLOYMENT_DIR,
+    ];
 
     for path in &expected {
         if !Path::new(path).exists() {
@@ -62,7 +60,7 @@ fn check_bones_structure(issues: &mut Vec<String>) {
 }
 
 fn check_deployment_naming(issues: &mut Vec<String>) {
-    let deployment_dir = Path::new(".bones/deployment");
+    let deployment_dir = Path::new(config::Constants::BONES_DEPLOYMENT_DIR);
     if !deployment_dir.exists() {
         return;
     }
@@ -80,30 +78,29 @@ fn check_deployment_naming(issues: &mut Vec<String>) {
         let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
 
         if !has_numeric_prefix {
-            issues.push(format!(
-                "Deployment script '{name}' does not start with a numeric prefix (e.g. 01_)"
-            ));
+            issues.push(format!("Deployment script '{name}' does not start with a numeric prefix (e.g. 01_)"));
         }
     }
 }
 
 fn check_pre_push_symlink(issues: &mut Vec<String>) {
-    let link = Path::new(".git/hooks/pre-push");
+    let link = Path::new(config::Constants::GIT_PRE_PUSH_HOOK_PATH);
 
     if !link.symlink_metadata().is_ok_and(|m| m.is_symlink()) {
-        issues.push(".git/hooks/pre-push is not symlinked".into());
+        issues.push(format!("{} is not symlinked", config::Constants::GIT_PRE_PUSH_HOOK_PATH));
         return;
     }
 
     let Ok(target) = fs::read_link(link) else {
-        issues.push(".git/hooks/pre-push: cannot read symlink target".into());
+        issues.push(format!("{}: cannot read symlink target", config::Constants::GIT_PRE_PUSH_HOOK_PATH));
         return;
     };
 
-    let expected = Path::new("../../.bones/hooks/pre-push");
+    let expected = Path::new(config::Constants::PRE_PUSH_HOOK_TARGET);
     if target != expected {
         issues.push(format!(
-            ".git/hooks/pre-push points to '{}', expected '{}'",
+            "{} points to '{}', expected '{}'",
+            config::Constants::GIT_PRE_PUSH_HOOK_PATH,
             target.display(),
             expected.display()
         ));
@@ -122,18 +119,16 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
     let git_dir = &cfg.data.git_dir;
 
     // Check bonesremote is globally available
-    if ssh::run_cmd(&session, "command -v bonesremote")
-        .await
-        .is_err()
-    {
+    if ssh::run_cmd(&session, "command -v bonesremote").await.is_err() {
         issues.push("bonesremote is not available on the remote".into());
     }
 
     // Check bones/ folder exists on remote
-    let check_bones = format!("test -d {git_dir}/bones");
+    let check_bones = format!("test -d {git_dir}/{}", config::Constants::REMOTE_BONES_DIR);
     if ssh::run_cmd(&session, &check_bones).await.is_err() {
         issues.push(format!(
-            "{git_dir}/bones/ does not exist on remote (run 'bonesdeploy push')"
+            "{git_dir}/{}/ does not exist on remote (run 'bonesdeploy push')",
+            config::Constants::REMOTE_BONES_DIR
         ));
     }
 
@@ -142,13 +137,17 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
 
     // Check hooks are symlinked properly
     let check_hooks = format!(
-        "for hook in {git_dir}/bones/hooks/*; do \
+        "for hook in {git_dir}/{}/{}/{}; do \
             name=$(basename \"$hook\"); \
-            link=\"{git_dir}/hooks/$name\"; \
+            link=\"{git_dir}/{}/$name\"; \
             if [ ! -L \"$link\" ] || [ \"$(readlink \"$link\")\" != \"$hook\" ]; then \
                 echo \"$name\"; \
             fi; \
-         done"
+         done",
+        config::Constants::REMOTE_BONES_DIR,
+        config::Constants::REMOTE_HOOKS_DIR,
+        "*",
+        config::Constants::REMOTE_HOOKS_DIR
     );
     match ssh::run_cmd(&session, &check_hooks).await {
         Ok(output) => {
@@ -156,7 +155,10 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
                 let hook = hook.trim();
                 if !hook.is_empty() {
                     issues.push(format!(
-                        "{git_dir}/hooks/{hook} is not properly symlinked to bones/hooks/{hook}"
+                        "{git_dir}/{}/{hook} is not properly symlinked to {}/{}/{hook}",
+                        config::Constants::REMOTE_HOOKS_DIR,
+                        config::Constants::REMOTE_BONES_DIR,
+                        config::Constants::REMOTE_HOOKS_DIR
                     ));
                 }
             }
@@ -168,11 +170,11 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
 }
 
 fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
-    let user = &cfg.permissions.defaults.deploy;
+    let user = &cfg.permissions.defaults.deploy_user;
     let host = &cfg.data.host;
     let port = &cfg.data.port;
     let git_dir = &cfg.data.git_dir;
-    let dest = format!("{user}@{host}:{git_dir}/bones/");
+    let dest = format!("{user}@{host}:{git_dir}/{}/", config::Constants::REMOTE_BONES_DIR);
 
     let output = Command::new("rsync")
         .args([
@@ -180,7 +182,7 @@ fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
             "--delete",
             "-e",
             &format!("ssh -p {port}"),
-            &format!("{BONES_DIR}/"),
+            &format!("{}/", config::Constants::BONES_DIR),
             &dest,
         ])
         .output();
@@ -216,11 +218,7 @@ fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
     if !changed.is_empty() {
         issues.push(format!(
             "Local .bones/ is out of sync with remote (run 'bonesdeploy push'). Changed files:\n{}",
-            changed
-                .iter()
-                .map(|f| format!("      {f}"))
-                .collect::<Vec<_>>()
-                .join("\n")
+            changed.iter().map(|f| format!("      {f}")).collect::<Vec<_>>().join("\n")
         ));
     }
 }

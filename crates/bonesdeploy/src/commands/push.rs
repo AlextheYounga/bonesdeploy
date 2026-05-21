@@ -7,15 +7,12 @@ use console::style;
 use crate::config;
 use crate::ssh;
 
-const BONES_DIR: &str = ".bones";
-const BONES_TOML: &str = ".bones/bones.toml";
-
 pub async fn run() -> Result<()> {
-    let bones_toml = Path::new(BONES_TOML);
-    let cfg = config::load(bones_toml)?;
+    let bones_yaml = Path::new(config::Constants::BONES_YAML);
+    let cfg = config::load(bones_yaml)?;
 
     let git_dir = &cfg.data.git_dir;
-    let remote_bones = format!("{git_dir}/bones/");
+    let remote_bones = format!("{git_dir}/{}/", config::Constants::REMOTE_BONES_DIR);
 
     // rsync .bones/ to remote
     println!("Syncing .bones/ to {remote_bones}...");
@@ -26,36 +23,39 @@ pub async fn run() -> Result<()> {
 
     // Delete sample hooks from bare repo
     println!("Cleaning sample hooks from remote...");
-    let cmd =
-        format!("find {git_dir}/hooks/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true");
+    let cmd = format!(
+        "find {git_dir}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true",
+        config::Constants::REMOTE_HOOKS_DIR
+    );
     ssh::run_cmd(&session, &cmd).await?;
 
     // Symlink bones hooks into bare repo hooks
     println!("Symlinking hooks...");
     let cmd = format!(
-        "for hook in {git_dir}/bones/hooks/*; do \
+        "for hook in {git_dir}/{}/{}/{}; do \
             name=$(basename \"$hook\"); \
-            ln -sf \"$hook\" \"{git_dir}/hooks/$name\"; \
-         done"
+            ln -sf \"$hook\" \"{git_dir}/{}/$name\"; \
+          done",
+        config::Constants::REMOTE_BONES_DIR,
+        config::Constants::REMOTE_HOOKS_DIR,
+        "*",
+        config::Constants::REMOTE_HOOKS_DIR
     );
     ssh::run_cmd(&session, &cmd).await?;
 
     session.close().await?;
 
-    println!(
-        "\n{} .bones/ synced to remote.",
-        style("Done!").green().bold()
-    );
+    println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
 
     Ok(())
 }
 
 fn rsync_bones(cfg: &config::BonesConfig) -> Result<()> {
-    let user = &cfg.permissions.defaults.deploy;
+    let user = &cfg.permissions.defaults.deploy_user;
     let host = &cfg.data.host;
     let port = &cfg.data.port;
     let git_dir = &cfg.data.git_dir;
-    let dest = format!("{user}@{host}:{git_dir}/bones/");
+    let dest = format!("{user}@{host}:{git_dir}/{}/", config::Constants::REMOTE_BONES_DIR);
 
     let status = Command::new("rsync")
         .args([
@@ -63,7 +63,7 @@ fn rsync_bones(cfg: &config::BonesConfig) -> Result<()> {
             "--delete",
             "-e",
             &format!("ssh -p {port}"),
-            &format!("{BONES_DIR}/"),
+            &format!("{}/", config::Constants::BONES_DIR),
             &dest,
         ])
         .status()
