@@ -14,9 +14,9 @@ pub fn run() -> Result<()> {
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
     let cfg = config::load(bones_yaml)?;
 
-    let playbook = Path::new(config::Constants::BONES_SITE_SETUP_PLAYBOOK);
+    let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
     if !playbook.is_file() {
-        bail!("Missing site setup playbook: {}", playbook.display());
+        bail!("Missing remote setup playbook: {}", playbook.display());
     }
 
     ensure_ansible_playbook_installed()?;
@@ -26,7 +26,7 @@ pub fn run() -> Result<()> {
 
     println!(
         "Running {} against {} as {}...",
-        style("site setup").cyan().bold(),
+        style("remote setup").cyan().bold(),
         style(&cfg.data.host).cyan(),
         style(&ssh_user).cyan(),
     );
@@ -34,7 +34,7 @@ pub fn run() -> Result<()> {
     let extra_args = vec![String::from("-e"), build_extra_var_json("deploy_authorized_key", &deploy_authorized_key)];
     run_ansible_playbook(&cfg, &ssh_user, &extra_args)?;
 
-    println!("\n{} Site setup complete.", style("Done!").green().bold());
+    println!("\n{} Remote setup complete.", style("Done!").green().bold());
 
     Ok(())
 }
@@ -86,14 +86,14 @@ fn resolve_bootstrap_ssh_user_from(value: Option<String>) -> String {
 }
 
 pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<()> {
-    let playbook = Path::new(config::Constants::BONES_SITE_SETUP_PLAYBOOK);
+    let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
     if !playbook.is_file() {
-        bail!("Missing site setup playbook: {}", playbook.display());
+        bail!("Missing remote setup playbook: {}", playbook.display());
     }
 
-    let roles_dir = Path::new(config::Constants::BONES_SITE_ROLES_DIR);
+    let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
     if !roles_dir.is_dir() {
-        bail!("Missing site roles directory: {}", roles_dir.display());
+        bail!("Missing remote roles directory: {}", roles_dir.display());
     }
 
     ensure_remote_python3_available(cfg, ssh_user)?;

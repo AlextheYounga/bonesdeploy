@@ -1,5 +1,5 @@
 ---
-- name: Site setup for bonesdeploy
+- name: Remote setup for bonesdeploy
   hosts: all
   become: true
 
@@ -20,7 +20,7 @@
     - name: Display setup completion
       ansible.builtin.debug:
         msg: |
-          Bones site setup completed.
+          Bones remote setup completed.
           Deploy user: {{ deploy_user }}
           Service user: {{ service_user }}
           Group: {{ group }}

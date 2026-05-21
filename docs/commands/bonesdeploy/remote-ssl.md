@@ -1,13 +1,13 @@
-# bonesdeploy site ssl
+# bonesdeploy remote ssl
 
 ## Overview
 
-Configures SSL/TLS certificates for the deployment using Let's Encrypt and certbot. This command runs the site setup playbook with SSL-specific variables, obtaining certificates and configuring Nginx for HTTPS. It updates the `bones.yaml` configuration to mark SSL as enabled after successful setup.
+Configures SSL/TLS certificates for the deployment using Let's Encrypt and certbot. This command runs the remote setup playbook with SSL-specific variables, obtaining certificates and configuring Nginx for HTTPS. It updates the `bones.yaml` configuration to mark SSL as enabled after successful setup.
 
 ## Command Signature
 
 ```bash
-bonesdeploy site ssl [--domain <domain>] [--email <email>]
+bonesdeploy remote ssl [--domain <domain>] [--email <email>]
 ```
 
 **Flags:**
@@ -22,7 +22,7 @@ Both flags are optional if values are already configured in `bones.yaml`.
 
 ### 1. Load Configuration
 
-**Source:** `site_ssl.rs:10-11`
+**Source:** `remote_ssl.rs:10-11`
 
 ```rust
 let bones_yaml = Path::new(config::Constants::BONES_YAML);
@@ -35,7 +35,7 @@ Loads the existing configuration. Uses `mut` because SSL settings will be update
 
 ### 2. Update SSL Configuration from Flags
 
-**Source:** `site_ssl.rs:13-19`
+**Source:** `remote_ssl.rs:13-19`
 
 ```rust
 if let Some(value) = domain {
@@ -53,7 +53,7 @@ If `--domain` or `--email` flags are provided, updates the configuration with th
 
 ### 3. Validate Required Fields
 
-**Source:** `site_ssl.rs:21-27`
+**Source:** `remote_ssl.rs:21-27`
 
 ```rust
 if cfg.ssl.domain.is_empty() {
@@ -74,7 +74,7 @@ Ensures both domain and email are set before proceeding. These are required for 
 
 ### 4. Save Updated Configuration
 
-**Source:** `site_ssl.rs:29`
+**Source:** `remote_ssl.rs:29`
 
 ```rust
 config::save(&cfg, bones_yaml)?;
@@ -86,24 +86,24 @@ Saves the configuration with updated SSL settings. This ensures the domain and e
 
 ### 5. Ensure Ansible is Installed
 
-**Source:** `site_ssl.rs:31`
+**Source:** `remote_ssl.rs:31`
 
 ```rust
-site_setup::ensure_ansible_playbook_installed()?;
+remote_setup::ensure_ansible_playbook_installed()?;
 ```
 
-Verifies Ansible is available, auto-installing if necessary (same logic as `bonesdeploy site setup`).
+Verifies Ansible is available, auto-installing if necessary (same logic as `bonesdeploy remote setup`).
 
 ---
 
 ### 6. Print SSL Setup Header
 
-**Source:** `site_ssl.rs:33-38`
+**Source:** `remote_ssl.rs:33-38`
 
 ```rust
 println!(
     "Running {} against {} for {}...",
-    style("site ssl").cyan().bold(),
+    style("remote ssl").cyan().bold(),
     style(&cfg.data.host).cyan(),
     style(&cfg.ssl.domain).cyan(),
 );
@@ -115,7 +115,7 @@ Displays the target host and domain being configured.
 
 ### 7. Construct SSL-Specific Ansible Variables
 
-**Source:** `site_ssl.rs:40-49`
+**Source:** `remote_ssl.rs:40-49`
 
 ```rust
 let extra_args = vec![
@@ -147,7 +147,7 @@ let extra_args = vec![
 
 ### 8. Disable SSL Flag for Ansible Run
 
-**Source:** `site_ssl.rs:51-52`
+**Source:** `remote_ssl.rs:51-52`
 
 ```rust
 let mut cfg_for_run = cfg.clone();
@@ -162,13 +162,13 @@ Temporarily disables the `ssl.enabled` flag for the Ansible run. This prevents t
 
 ### 9. Run Ansible Playbook
 
-**Source:** `site_ssl.rs:54`
+**Source:** `remote_ssl.rs:54`
 
 ```rust
-site_setup::run_ansible_playbook(&cfg_for_run, &cfg.permissions.defaults.deploy_user, &extra_args)?;
+remote_setup::run_ansible_playbook(&cfg_for_run, &cfg.permissions.defaults.deploy_user, &extra_args)?;
 ```
 
-Executes the site setup playbook with SSL-specific variables and tags.
+Executes the remote setup playbook with SSL-specific variables and tags.
 
 #### 9.1 Playbook SSL Tasks
 
@@ -225,20 +225,20 @@ The Ansible playbook typically performs:
 
 ### 10. Enable SSL Flag in Configuration
 
-**Source:** `site_ssl.rs:56-57`
+**Source:** `remote_ssl.rs:56-57`
 
 ```rust
 cfg.ssl.enabled = true;
 config::save(&cfg, bones_yaml)?;
 ```
 
-After successful SSL setup, marks SSL as enabled in `bones.yaml`. This signals to future `site setup` runs and deployment processes that SSL should be used.
+After successful SSL setup, marks SSL as enabled in `bones.yaml`. This signals to future `remote setup` runs and deployment processes that SSL should be used.
 
 ---
 
 ### 11. Print Success Message
 
-**Source:** `site_ssl.rs:59`
+**Source:** `remote_ssl.rs:59`
 
 ```rust
 println!("\n{} SSL setup complete.", style("Done!").green().bold());
@@ -248,7 +248,7 @@ println!("\n{} SSL setup complete.", style("Done!").green().bold());
 
 ## SSL Configuration in bones.yaml
 
-**Before `site ssl`:**
+**Before `remote ssl`:**
 ```yaml
 ssl:
   enabled: false
@@ -256,7 +256,7 @@ ssl:
   email: ""
 ```
 
-**After `site ssl --domain app.example.com --email admin@example.com`:**
+**After `remote ssl --domain app.example.com --email admin@example.com`:**
 ```yaml
 ssl:
   enabled: true
@@ -300,7 +300,7 @@ systemd:
 1. **Domain DNS**: Domain must resolve to the server's IP address
 2. **Port 80 accessible**: Required for Let's Encrypt HTTP-01 challenge
 3. **Port 443 accessible**: Required for HTTPS traffic
-4. **Nginx installed**: Installed during initial `site setup`
+4. **Nginx installed**: Installed during initial `remote setup`
 
 ---
 
@@ -309,7 +309,7 @@ systemd:
 ### Initial Setup (No SSL)
 ```bash
 bonesdeploy init
-bonesdeploy site setup
+bonesdeploy remote setup
 bonesdeploy push
 git push production master
 ```
@@ -317,13 +317,13 @@ git push production master
 ### Add SSL Later
 ```bash
 # Configure SSL
-bonesdeploy site ssl --domain app.example.com --email admin@example.com
+bonesdeploy remote ssl --domain app.example.com --email admin@example.com
 
 # Push updated configuration (now with ssl.enabled=true)
 bonesdeploy push
 
-# Re-run site setup to apply SSL configuration to Nginx
-bonesdeploy site setup --tags nginx
+# Re-run remote setup to apply SSL configuration to Nginx
+bonesdeploy remote setup --tags nginx
 ```
 
 ### SSL During Initial Setup
@@ -337,8 +337,8 @@ bonesdeploy init
 #   domain: app.example.com
 #   email: admin@example.com
 
-# Run site setup (includes SSL)
-bonesdeploy site setup
+# Run remote setup (includes SSL)
+bonesdeploy remote setup
 bonesdeploy push
 git push production master
 ```
@@ -403,7 +403,7 @@ Be aware of Let's Encrypt rate limits:
 
 ## Related Commands
 
-- `bonesdeploy site setup` - Full server provisioning
+- `bonesdeploy remote setup` - Full server provisioning
 - `bonesdeploy init` - Initialize project configuration
 - `bonesdeploy push` - Sync configuration to remote
 - `bonesdeploy doctor` - Validate environment

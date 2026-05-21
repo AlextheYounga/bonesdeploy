@@ -148,7 +148,7 @@ Notes:
 
 ### bonesdeploy
 
-`bonesdeploy site setup` becomes responsible for host prerequisites.
+`bonesdeploy remote setup` becomes responsible for host prerequisites.
 
 It should:
 
@@ -181,7 +181,7 @@ hooks into the isolation boundary.
 
 ## Ansible Role Changes
 
-Runtime isolation should be provisioned by `bonesdeploy site setup`.
+Runtime isolation should be provisioned by `bonesdeploy remote setup`.
 
 ### users role
 
@@ -336,5 +336,5 @@ The key decisions are:
 - publish into versioned `runtime_root/<timestamp>`
 - keep `live_root` as the stable entrypoint
 - launch the app through `bonesremote landlock`
-- provision the runtime service from `bonesdeploy site setup`
+- provision the runtime service from `bonesdeploy remote setup`
 - treat Landlock as runtime-only isolation

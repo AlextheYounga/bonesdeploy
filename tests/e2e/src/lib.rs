@@ -16,10 +16,10 @@ mod e2e_cmd_push;
 mod e2e_cmd_rollback;
 
 #[cfg(test)]
-mod e2e_cmd_site_setup;
+mod e2e_cmd_remote_setup;
 
 #[cfg(test)]
-mod e2e_cmd_site_ssl;
+mod e2e_cmd_remote_ssl;
 
 #[cfg(test)]
 mod e2e_cmd_version;

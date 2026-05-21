@@ -1,4 +1,4 @@
-# bonesdeploy site setup
+# bonesdeploy remote setup
 
 ## Overview
 
@@ -8,7 +8,7 @@ Provisions the remote server for deployment by running an Ansible playbook that 
 
 ### 1. Load Configuration
 
-**Source:** `site_setup.rs:13-14`
+**Source:** `remote_setup.rs:13-14`
 
 ```rust
 let bones_yaml = Path::new(config::Constants::BONES_YAML);
@@ -25,18 +25,18 @@ Loads deployment configuration from `.bones/bones.yaml` to determine:
 
 ### 2. Verify Playbook Exists
 
-**Source:** `site_setup.rs:16-19`
+**Source:** `remote_setup.rs:16-19`
 
 ```rust
-let playbook = Path::new(config::Constants::BONES_SITE_SETUP_PLAYBOOK);
+let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
 if !playbook.is_file() {
-    bail!("Missing site setup playbook: {}", playbook.display());
+    bail!("Missing remote setup playbook: {}", playbook.display());
 }
 ```
 
-Checks for the existence of `.bones/site/playbooks/setup.yml`.
+Checks for the existence of `.bones/remote/playbooks/setup.yml`.
 
-**Expected location:** `.bones/site/playbooks/setup.yml`
+**Expected location:** `.bones/remote/playbooks/setup.yml`
 
 This playbook is responsible for:
 - Creating deploy user
@@ -52,7 +52,7 @@ This playbook is responsible for:
 
 ### 3. Ensure Ansible is Installed
 
-**Source:** `site_setup.rs:21`, `site_setup.rs:139-170`
+**Source:** `remote_setup.rs:21`, `remote_setup.rs:139-170`
 
 ```rust
 ensure_ansible_playbook_installed()?;
@@ -60,7 +60,7 @@ ensure_ansible_playbook_installed()?;
 
 #### 3.1 Check for `ansible-playbook` Binary
 
-**Source:** `site_setup.rs:144-147`
+**Source:** `remote_setup.rs:144-147`
 
 ```rust
 if ansible_playbook_available(Path::new("ansible-playbook"))? {
@@ -72,7 +72,7 @@ First checks if `ansible-playbook` is available in system PATH.
 
 #### 3.2 Check User Local Install
 
-**Source:** `site_setup.rs:149-154`
+**Source:** `remote_setup.rs:149-154`
 
 ```rust
 if let Some(local_ansible_playbook) = user_ansible_playbook_path()?
@@ -86,7 +86,7 @@ If not in system PATH, checks for user-local installation at `~/.local/bin/ansib
 
 #### 3.3 Auto-Install Ansible
 
-**Source:** `site_setup.rs:155-158`
+**Source:** `remote_setup.rs:155-158`
 
 ```rust
 ensure_local_python3_available()?;
@@ -96,19 +96,19 @@ install_ansible_with_pip()?;
 
 If Ansible is not found, automatically installs it:
 
-1. **Check Python 3** (`site_setup.rs:182-191`)
+1. **Check Python 3** (`remote_setup.rs:182-191`)
    ```bash
    python3 --version
    ```
    Ensures Python 3 is installed and functional.
 
-2. **Ensure pip Available** (`site_setup.rs:193-212`)
+2. **Ensure pip Available** (`remote_setup.rs:193-212`)
    ```bash
    python3 -m ensurepip --upgrade
    ```
    Installs pip if not available.
 
-3. **Install Ansible** (`site_setup.rs:223-239`)
+3. **Install Ansible** (`remote_setup.rs:223-239`)
    ```bash
    python3 -m pip install --user ansible
    ```
@@ -121,7 +121,7 @@ ansible-playbook not found. Installing Ansible with python3 -m pip install --use
 
 #### 3.4 Final Verification
 
-**Source:** `site_setup.rs:159-168`
+**Source:** `remote_setup.rs:159-168`
 
 After installation, verifies `ansible-playbook` is now available. If still not found, fails with helpful message:
 ```
@@ -133,7 +133,7 @@ Ensure ~/.local/bin is in PATH.
 
 ### 4. Print Setup Header
 
-**Source:** `site_setup.rs:23-28`
+**Source:** `remote_setup.rs:23-28`
 
 ```rust
 println!(
@@ -150,7 +150,7 @@ Displays target host and SSH user.
 
 ### 5. Ensure Remote Python 3 is Available
 
-**Source:** `site_setup.rs:30`, `site_setup.rs:108-137`
+**Source:** `remote_setup.rs:30`, `remote_setup.rs:108-137`
 
 ```rust
 ensure_remote_python3_available(cfg, ssh_user)?;
@@ -160,7 +160,7 @@ Ansible requires Python 3 on the target host. This step ensures it's installed.
 
 #### 5.1 Load Bootstrap Script
 
-**Source:** `site_setup.rs:110`
+**Source:** `remote_setup.rs:110`
 
 ```rust
 let script = embedded::read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASSET)?;
@@ -172,7 +172,7 @@ Loads an embedded shell script designed to install Python 3 if missing.
 
 #### 5.2 Execute Bootstrap via SSH
 
-**Source:** `site_setup.rs:114-130`
+**Source:** `remote_setup.rs:114-130`
 
 ```rust
 let mut child = Command::new("ssh")
@@ -211,7 +211,7 @@ fi
 
 ### 6. Run Ansible Playbook
 
-**Source:** `site_setup.rs:30`, `site_setup.rs:37-106`
+**Source:** `remote_setup.rs:30`, `remote_setup.rs:37-106`
 
 ```rust
 run_ansible_playbook(&cfg, &cfg.permissions.defaults.deploy_user, &[])?;
@@ -219,15 +219,15 @@ run_ansible_playbook(&cfg, &cfg.permissions.defaults.deploy_user, &[])?;
 
 #### 6.1 Verify Playbook and Roles
 
-**Source:** `site_setup.rs:38-46`
+**Source:** `remote_setup.rs:38-46`
 
 ```rust
-let playbook = Path::new(config::Constants::BONES_SITE_SETUP_PLAYBOOK);
+let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
 if !playbook.is_file() {
-    bail!("Missing site setup playbook: {}", playbook.display());
+    bail!("Missing remote setup playbook: {}", playbook.display());
 }
 
-let roles_dir = Path::new(config::Constants::BONES_SITE_ROLES_DIR);
+let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
 if !roles_dir.is_dir() {
     bail!("Missing site roles directory: {}", roles_dir.display());
 }
@@ -237,7 +237,7 @@ Ensures both the playbook and roles directory exist before proceeding.
 
 #### 6.2 Resolve Paths and Variables
 
-**Source:** `site_setup.rs:48-57`
+**Source:** `remote_setup.rs:48-57`
 
 ```rust
 let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
@@ -257,7 +257,7 @@ let roles_path = env::var("ANSIBLE_ROLES_PATH")
 
 ### 7. Construct Ansible Command
 
-**Source:** `site_setup.rs:57-96`
+**Source:** `remote_setup.rs:57-96`
 
 ```rust
 let ansible_playbook_binary = resolve_ansible_playbook_binary()?;
@@ -312,7 +312,7 @@ command
 
 ### 8. Add SSL Configuration (If Enabled)
 
-**Source:** `site_setup.rs:84-94`
+**Source:** `remote_setup.rs:84-94`
 
 ```rust
 if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
@@ -334,7 +334,7 @@ If SSL is enabled and domain is configured, passes SSL-related variables to the 
 
 ### 9. Execute Playbook
 
-**Source:** `site_setup.rs:96-99`
+**Source:** `remote_setup.rs:96-99`
 
 ```rust
 command.args(extra_args);
@@ -345,7 +345,7 @@ let status = command.status().context("Failed to run ansible-playbook")?;
 
 **Example Command:**
 ```bash
-ANSIBLE_ROLES_PATH=/path/to/.bones/site/roles \
+ANSIBLE_ROLES_PATH=/path/to/.bones/remote/roles \
 ansible-playbook \
   -i "deploy.example.com," \
   -u git \
@@ -358,7 +358,7 @@ ansible-playbook \
   -e "deploy_root=/srv/deployments/myapp" \
   -e "project_name=myapp" \
   -e "git_dir=/home/git/myapp.git" \
-  .bones/site/playbooks/setup.yml
+  .bones/remote/playbooks/setup.yml
 ```
 
 #### 9.1 Playbook Execution
@@ -400,7 +400,7 @@ The playbook typically includes tasks for:
 
 ### 10. Handle Playbook Result
 
-**Source:** `site_setup.rs:101-103`
+**Source:** `remote_setup.rs:101-103`
 
 ```rust
 if !status.success() {
@@ -414,7 +414,7 @@ If the playbook fails, the command exits with an error.
 
 ### 11. Print Success Message
 
-**Source:** `site_setup.rs:32`
+**Source:** `remote_setup.rs:32`
 
 ```rust
 println!("\n{} Site setup complete.", style("Done!").green().bold());
@@ -438,7 +438,7 @@ println!("\n{} Site setup complete.", style("Done!").green().bold());
 bonesdeploy init
 
 # 2. Provision server
-bonesdeploy site setup
+bonesdeploy remote setup
 
 # 3. Sync configuration to remote
 bonesdeploy push
@@ -455,7 +455,7 @@ The setup process is highly customizable through Ansible:
 
 ### Custom Playbooks
 
-Edit `.bones/site/playbooks/setup.yml` to add custom setup tasks:
+Edit `.bones/remote/playbooks/setup.yml` to add custom setup tasks:
 ```yaml
 ---
 - hosts: all
@@ -473,9 +473,9 @@ Edit `.bones/site/playbooks/setup.yml` to add custom setup tasks:
 
 ### Custom Roles
 
-Add roles to `.bones/site/roles/`:
+Add roles to `.bones/remote/roles/`:
 ```
-.bones/site/roles/
+.bones/remote/roles/
 ├── common/
 ├── deploy_user/
 ├── service_user/
@@ -515,6 +515,6 @@ Add roles to `.bones/site/roles/`:
 ## Related Commands
 
 - `bonesdeploy init` - Initialize project configuration
-- `bonesdeploy site ssl` - Configure SSL certificates
+- `bonesdeploy remote ssl` - Configure SSL certificates
 - `bonesdeploy push` - Sync configuration to remote
 - `bonesdeploy doctor` - Validate environment

@@ -80,7 +80,7 @@ version = "1.2.3"
 
 5. **Server setup validation**: Confirm bonesremote is accessible
    ```bash
-   # During site setup
+   # During remote setup
    ssh git@server "bonesremote version"
    # bonesremote 1.0.0
    ```

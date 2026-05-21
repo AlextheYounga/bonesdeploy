@@ -30,8 +30,8 @@ pub fn write_minimal_bones_project(repo_root: &Path) -> Result<()> {
     let bones_dir = repo_root.join(".bones");
     let hooks_dir = bones_dir.join("hooks");
     let deployment_dir = bones_dir.join("deployment");
-    let playbook_dir = bones_dir.join("site/playbooks");
-    let roles_dir = bones_dir.join("site/roles");
+    let playbook_dir = bones_dir.join("remote/playbooks");
+    let roles_dir = bones_dir.join("remote/roles");
 
     fs::create_dir_all(&hooks_dir)?;
     fs::create_dir_all(&deployment_dir)?;
@@ -87,11 +87,11 @@ pub fn assert_bones_yaml_contains(repo_root: &Path, needle: &str) -> Result<()> 
 }
 
 pub fn install_real_site_assets(repo_root: &Path, workspace_root: &Path) -> Result<()> {
-    let source = workspace_root.join("kit/site");
-    let target = repo_root.join(".bones/site");
+    let source = workspace_root.join("kit/remote");
+    let target = repo_root.join(".bones/remote");
 
     if !source.is_dir() {
-        bail!("Missing source site assets directory: {}", source.display());
+        bail!("Missing source remote assets directory: {}", source.display());
     }
 
     if target.exists() {

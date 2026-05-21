@@ -4,15 +4,15 @@ use crate::support::{cli, docker, repo};
 
 #[test]
 #[ignore = "e2e test"]
-fn e2e_bonesdeploy_site_ssl_reaches_real_ssl_ansible_flow() -> Result<()> {
+fn e2e_bonesdeploy_remote_ssl_reaches_real_ssl_ansible_flow() -> Result<()> {
     let _docker = docker::docker_session()?;
     let sandbox = repo::create_temp_git_repo()?;
     repo::write_minimal_bones_project(&sandbox.path)?;
     repo::install_real_site_assets(&sandbox.path, &crate::support::paths::workspace_root())?;
 
-    let output = cli::run_bonesdeploy(&sandbox.path, ["site", "ssl", "--domain", "app.test", "--email", "ops@test"])?;
+    let output = cli::run_bonesdeploy(&sandbox.path, ["remote", "ssl", "--domain", "app.test", "--email", "ops@test"])?;
     cli::assert_failure(&output)?;
-    cli::assert_stdout_contains(&output, "Running site ssl against 127.0.0.1 for app.test")?;
+    cli::assert_stdout_contains(&output, "Running remote ssl against 127.0.0.1 for app.test")?;
     cli::assert_stdout_contains(&output, "Ensuring python3 is available on remote host")?;
 
     repo::assert_bones_yaml_contains(&sandbox.path, "domain: app.test")?;

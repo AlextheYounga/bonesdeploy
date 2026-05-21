@@ -59,7 +59,7 @@ Extracts embedded assets to `.bones/`:
   - `hooks/post-receive` - Server-side hook
   - `hooks/pre-push` - Client-side hook
 - `.bones/deployment/` - Directory for deployment scripts
-- `.bones/site/` - Directory for Ansible site setup
+- `.bones/remote/` - Directory for Ansible site setup
   - `site/playbooks/setup.yml` - Ansible playbook
   - `site/roles/` - Ansible roles directory
 
@@ -214,7 +214,7 @@ Checks if the configured remote name exists in the local Git repository. If not,
 3. Adds remote via `git remote add <name> <url>`
 4. Prints confirmation message
 
-This does not create the server-side git user or bare repository. That still happens during `bonesdeploy site setup` on the VPS.
+This does not create the server-side git user or bare repository. That still happens during `bonesdeploy remote setup` on the VPS.
 
 ---
 
@@ -245,7 +245,7 @@ Creates a symlink from `.git/hooks/pre-push` to `../../.bones/hooks/pre-push`.
 **Source:** `init.rs:50-59`
 
 Prints user guidance:
-1. Run `bonesdeploy site setup` before the first deploy (to provision the server)
+1. Run `bonesdeploy remote setup` before the first deploy (to provision the server)
 2. Run `bonesdeploy push` after setup to sync `.bones/` to the remote
 
 ## Result
@@ -269,4 +269,4 @@ After successful execution:
 
 - `bonesdeploy push` - Syncs `.bones/` to remote bare repository
 - `bonesdeploy doctor` - Validates local and remote setup
-- `bonesdeploy site setup` - Provisions server with Ansible
+- `bonesdeploy remote setup` - Provisions server with Ansible
