@@ -41,3 +41,12 @@
     group: "{{ group }}"
     mode: "2775"
   tags: [users]
+
+- name: Ensure deploy user authorized key is installed
+  ansible.posix.authorized_key:
+    user: "{{ deploy_user }}"
+    key: "{{ deploy_authorized_key }}"
+    state: present
+    manage_dir: true
+  when: deploy_authorized_key | length > 0
+  tags: [users]

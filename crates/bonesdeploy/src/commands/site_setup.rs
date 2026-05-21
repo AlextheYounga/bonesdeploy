@@ -1,4 +1,5 @@
 use std::env;
+use std::fs;
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -21,6 +22,7 @@ pub fn run() -> Result<()> {
     ensure_ansible_playbook_installed()?;
 
     let ssh_user = resolve_bootstrap_ssh_user();
+    let deploy_authorized_key = resolve_deploy_authorized_key()?;
 
     println!(
         "Running {} against {} as {}...",
@@ -29,11 +31,42 @@ pub fn run() -> Result<()> {
         style(&ssh_user).cyan(),
     );
 
-    run_ansible_playbook(&cfg, &ssh_user, &[])?;
+    let extra_args = vec![String::from("-e"), format!("deploy_authorized_key={deploy_authorized_key}")];
+    run_ansible_playbook(&cfg, &ssh_user, &extra_args)?;
 
     println!("\n{} Site setup complete.", style("Done!").green().bold());
 
     Ok(())
+}
+
+fn resolve_deploy_authorized_key() -> Result<String> {
+    if let Some(path) = env::var("BONES_DEPLOY_PUBLIC_KEY_PATH").ok().filter(|value| !value.trim().is_empty()) {
+        return read_public_key(Path::new(path.trim()));
+    }
+
+    let home = env::var("HOME").context("HOME is not set; cannot discover SSH public key")?;
+    let ssh_dir = Path::new(&home).join(".ssh");
+    let candidates = ["id_ed25519.pub", "id_ecdsa.pub", "id_rsa.pub"];
+
+    for candidate in candidates {
+        let path = ssh_dir.join(candidate);
+        if path.is_file() {
+            return read_public_key(&path);
+        }
+    }
+
+    bail!(
+        "No SSH public key found for deploy user setup. Set BONES_DEPLOY_PUBLIC_KEY_PATH or create one of: ~/.ssh/id_ed25519.pub, ~/.ssh/id_ecdsa.pub, ~/.ssh/id_rsa.pub"
+    )
+}
+
+fn read_public_key(path: &Path) -> Result<String> {
+    let key = fs::read_to_string(path).with_context(|| format!("Failed to read SSH public key: {}", path.display()))?;
+    let key = key.trim().to_string();
+    if key.is_empty() {
+        bail!("SSH public key file is empty: {}", path.display());
+    }
+    Ok(key)
 }
 
 pub(crate) fn resolve_bootstrap_ssh_user() -> String {
