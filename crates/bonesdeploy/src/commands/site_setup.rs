@@ -20,18 +20,28 @@ pub fn run() -> Result<()> {
 
     ensure_ansible_playbook_installed()?;
 
+    let ssh_user = resolve_bootstrap_ssh_user();
+
     println!(
         "Running {} against {} as {}...",
         style("site setup").cyan().bold(),
         style(&cfg.data.host).cyan(),
-        style(&cfg.permissions.defaults.deploy_user).cyan(),
+        style(&ssh_user).cyan(),
     );
 
-    run_ansible_playbook(&cfg, &cfg.permissions.defaults.deploy_user, &[])?;
+    run_ansible_playbook(&cfg, &ssh_user, &[])?;
 
     println!("\n{} Site setup complete.", style("Done!").green().bold());
 
     Ok(())
+}
+
+pub(crate) fn resolve_bootstrap_ssh_user() -> String {
+    resolve_bootstrap_ssh_user_from(env::var("BONES_BOOTSTRAP_SSH_USER").ok())
+}
+
+fn resolve_bootstrap_ssh_user_from(value: Option<String>) -> String {
+    value.map(|raw| raw.trim().to_string()).filter(|raw| !raw.is_empty()).unwrap_or_else(|| String::from("root"))
 }
 
 pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<()> {
@@ -268,7 +278,7 @@ pub(crate) fn resolve_live_root_parent(live_root: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::resolve_live_root_parent;
+    use super::{resolve_bootstrap_ssh_user_from, resolve_live_root_parent};
 
     // Verifies parent extraction for normal live_root paths used by playbook variables.
     #[test]
@@ -296,5 +306,26 @@ mod tests {
     fn resolve_live_root_parent_falls_back_for_empty_path() {
         let parent = resolve_live_root_parent("");
         assert_eq!(parent, "/var/www");
+    }
+
+    #[test]
+    fn resolve_bootstrap_ssh_user_defaults_to_root() {
+        let user = resolve_bootstrap_ssh_user_from(None);
+        assert_eq!(user, "root");
+    }
+
+    #[test]
+    fn resolve_bootstrap_ssh_user_uses_env_override() {
+        let user = resolve_bootstrap_ssh_user_from(Some(String::from("ubuntu")));
+        assert_eq!(user, "ubuntu");
+    }
+
+    #[test]
+    fn resolve_bootstrap_ssh_user_trims_and_rejects_blank_values() {
+        let user = resolve_bootstrap_ssh_user_from(Some(String::from("   ")));
+        assert_eq!(user, "root");
+
+        let user = resolve_bootstrap_ssh_user_from(Some(String::from("  ubuntu  ")));
+        assert_eq!(user, "ubuntu");
     }
 }

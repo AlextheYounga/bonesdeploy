@@ -51,7 +51,8 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let mut cfg_for_run = cfg.clone();
     cfg_for_run.ssl.enabled = false;
 
-    site_setup::run_ansible_playbook(&cfg_for_run, &cfg.permissions.defaults.deploy_user, &extra_args)?;
+    let ssh_user = site_setup::resolve_bootstrap_ssh_user();
+    site_setup::run_ansible_playbook(&cfg_for_run, &ssh_user, &extra_args)?;
 
     cfg.ssl.enabled = true;
     config::save(&cfg, bones_yaml)?;
