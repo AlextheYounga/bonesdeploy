@@ -31,7 +31,7 @@ pub fn run() -> Result<()> {
         style(&ssh_user).cyan(),
     );
 
-    let extra_args = vec![String::from("-e"), format!("deploy_authorized_key={deploy_authorized_key}")];
+    let extra_args = vec![String::from("-e"), build_extra_var_json("deploy_authorized_key", &deploy_authorized_key)];
     run_ansible_playbook(&cfg, &ssh_user, &extra_args)?;
 
     println!("\n{} Site setup complete.", style("Done!").green().bold());
@@ -67,6 +67,14 @@ fn read_public_key(path: &Path) -> Result<String> {
         bail!("SSH public key file is empty: {}", path.display());
     }
     Ok(key)
+}
+
+fn build_extra_var_json(name: &str, value: &str) -> String {
+    format!("{{\"{}\":\"{}\"}}", escape_json_string(name), escape_json_string(value))
+}
+
+fn escape_json_string(value: &str) -> String {
+    value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t")
 }
 
 pub(crate) fn resolve_bootstrap_ssh_user() -> String {
@@ -311,7 +319,7 @@ pub(crate) fn resolve_live_root_parent(live_root: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_bootstrap_ssh_user_from, resolve_live_root_parent};
+    use super::{build_extra_var_json, resolve_bootstrap_ssh_user_from, resolve_live_root_parent};
 
     // Verifies parent extraction for normal live_root paths used by playbook variables.
     #[test]
@@ -360,5 +368,13 @@ mod tests {
 
         let user = resolve_bootstrap_ssh_user_from(Some(String::from("  ubuntu  ")));
         assert_eq!(user, "ubuntu");
+    }
+
+    #[test]
+    fn build_extra_var_json_preserves_spaces_in_ssh_public_key() {
+        let extra_var =
+            build_extra_var_json("deploy_authorized_key", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFoo comment@host");
+
+        assert_eq!(extra_var, "{\"deploy_authorized_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFoo comment@host\"}");
     }
 }
