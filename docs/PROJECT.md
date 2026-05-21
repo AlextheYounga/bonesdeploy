@@ -5,7 +5,7 @@ A Rust CLI that compiles into a single binary, containing embeds of boilerplate 
 We keep detailed documentation of each command at: `docs/commands/*.md:`
 
 ## Deployment Methodology
-We have an SSH deployment user (normally `git`) that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user (defaults to the project name). This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
+We have an SSH deployment user (normally `git`) that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user named after the project. This is not a shared `applications` user; it must be a dedicated user per project so isolation works on a shared server. This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
 
 ### Just-in-Time Concerns
 This project should prefer just-in-time mutations.
@@ -79,7 +79,7 @@ Everything else is defaulted for Debian/Ubuntu-first usability:
 - `deploy_root`: defaults to `/srv/deployments/{project_name}`
 - `deploy_on_push`: defaults to `true`
 - `permissions.defaults.deploy_user`: defaults to `git`
-- `permissions.defaults.service_user`: defaults to `{project_name}`
+- `permissions.defaults.service_user`: defaults to `{project_name}` and should be created on the server as that exact project-named user
 - `permissions.defaults.group`: defaults to `www-data`
 - `permissions.defaults.dir_mode`: defaults to `750`
 - `permissions.defaults.file_mode`: defaults to `640`
