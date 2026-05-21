@@ -1,0 +1,17 @@
+[{{ laravel_php_fpm_pool_name }}]
+user = {{ service_user }}
+group = {{ group }}
+
+listen = {{ laravel_php_fpm_socket_path }}
+listen.owner = {{ service_user }}
+listen.group = {{ group }}
+listen.mode = 0660
+
+pm = dynamic
+pm.max_children = 10
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+
+chdir = {{ live_root }}
+clear_env = no

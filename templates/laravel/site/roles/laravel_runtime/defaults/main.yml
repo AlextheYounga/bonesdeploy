@@ -13,3 +13,7 @@ laravel_php_packages:
   - php-xml
   - php-zip
   - composer
+
+laravel_php_fpm_pool_name: "{{ project_name }}"
+laravel_php_fpm_socket_path: "/run/{{ project_name }}/php-fpm.sock"
+laravel_php_fpm_pool_config_path: ""

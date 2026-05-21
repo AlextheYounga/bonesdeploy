@@ -2,6 +2,8 @@
 - name: Site setup for bonesdeploy (Laravel)
   hosts: all
   become: true
+  vars:
+    laravel_php_fpm_socket_path: "/run/{{ project_name }}/php-fpm.sock"
 
   roles:
     - role: users

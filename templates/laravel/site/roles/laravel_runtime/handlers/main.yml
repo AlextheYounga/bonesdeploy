@@ -1,0 +1,5 @@
+---
+- name: Restart php-fpm
+  ansible.builtin.systemd:
+    name: "{{ laravel_php_fpm_service }}"
+    state: restarted
