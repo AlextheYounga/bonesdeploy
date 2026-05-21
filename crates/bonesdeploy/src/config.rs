@@ -198,6 +198,7 @@ fn hide_derived_defaults(config: &mut BonesConfig) {
 
 #[cfg(test)]
 mod tests {
+    use std::env::temp_dir;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process;
@@ -212,7 +213,7 @@ mod tests {
 
     fn temp_path(file_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-        std::env::temp_dir().join(format!("bonesdeploy_config_test_{}_{}_{}", process::id(), nanos, file_name))
+        temp_dir().join(format!("bonesdeploy_config_test_{}_{}_{}", process::id(), nanos, file_name))
     }
 
     fn minimal_yaml(project_name: &str) -> String {

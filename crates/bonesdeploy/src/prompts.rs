@@ -50,7 +50,7 @@ pub fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
     options.push(String::from(CREATE_REMOTE_OPTION));
 
     let choice = Select::new("Deployment remote:", options)
-        .with_help_message("Choose the git remote bonesdeploy will manage")
+        .with_help_message("Choose the local git remote bonesdeploy will manage")
         .prompt()
         .map_err(|err| anyhow!(err))?;
 
@@ -94,7 +94,7 @@ fn prompt_remote_name_text(seed: Option<&BonesConfig>) -> Result<String> {
         seed.map(|cfg| cfg.data.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
     Text::new("Deployment remote name:")
         .with_default(default_remote)
-        .with_help_message("bonesdeploy will create this git remote if it does not exist")
+        .with_help_message("bonesdeploy will add this local git remote if it does not exist")
         .prompt()
         .map_err(|err| anyhow!(err))
 }

@@ -223,6 +223,6 @@ fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
 
     let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, cfg.data.host, cfg.data.git_dir);
     git::add_remote(&cfg.data.remote_name, &remote_url)?;
-    println!("Added git remote {} -> {}", cfg.data.remote_name, remote_url);
+    println!("Configured local git remote {} -> {}", cfg.data.remote_name, remote_url);
     Ok(())
 }

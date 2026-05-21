@@ -197,7 +197,7 @@ Writes the configuration to `.bones/bones.yaml` in YAML format.
 
 ---
 
-### 6. Ensure Git Remote Exists
+### 6. Configure Local Git Remote
 
 **Source:** `init.rs:45`, `init.rs:220-229`
 
@@ -205,7 +205,7 @@ Writes the configuration to `.bones/bones.yaml` in YAML format.
 ensure_local_remote(&cfg)?;
 ```
 
-Checks if the configured remote name exists in the local Git repository. If not, adds it.
+Checks if the configured remote name exists in the local Git repository. If not, adds it locally.
 
 **Implementation:**
 1. Checks if remote exists via `git remote show <name>`
@@ -213,6 +213,8 @@ Checks if the configured remote name exists in the local Git repository. If not,
    - Example: `git@deploy.example.com:/home/git/myapp.git`
 3. Adds remote via `git remote add <name> <url>`
 4. Prints confirmation message
+
+This does not create the server-side git user or bare repository. That still happens during `bonesdeploy site setup` on the VPS.
 
 ---
 
