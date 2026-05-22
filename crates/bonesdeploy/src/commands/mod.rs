@@ -2,6 +2,7 @@ mod deploy;
 mod doctor;
 mod init;
 mod manage;
+mod pull;
 mod push;
 mod remote_setup;
 mod remote_ssl;
@@ -30,6 +31,8 @@ enum Command {
     },
     /// Sync .bones/ folder to the remote bare repo
     Push,
+    /// Sync .bones/ folder back from the remote bare repo
+    Pull,
     /// Run deployment hooks manually without pushing commits
     Deploy,
     /// Remote operations
@@ -65,6 +68,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Init => init::run(),
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,
+        Command::Pull => pull::run(),
         Command::Deploy => deploy::run().await,
         Command::Manage => manage::run(),
         Command::Remote { command } => match command {

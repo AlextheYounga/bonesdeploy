@@ -193,7 +193,7 @@ fn update_gitignore() -> Result<()> {
     Ok(())
 }
 
-fn symlink_pre_push() -> Result<()> {
+pub(crate) fn symlink_pre_push() -> Result<()> {
     let hooks_dir = Path::new(config::Constants::GIT_HOOKS_DIR);
     fs::create_dir_all(hooks_dir)?;
 
