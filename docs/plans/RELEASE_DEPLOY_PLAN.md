@@ -131,7 +131,7 @@ deploy_on_push = true
 
 [permissions.defaults]
 deploy_user = "git"
-service_user = "applications"
+service_user = "lawsnipe"
 group = "www-data"
 dir_mode = "750"
 file_mode = "640"

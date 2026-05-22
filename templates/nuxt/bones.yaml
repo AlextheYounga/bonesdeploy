@@ -10,7 +10,7 @@ data:
 permissions:
   defaults:
     deploy_user: 'git'
-    service_user: 'applications'
+    service_user: ''
     group: 'www-data'
     dir_mode: '750'
     file_mode: '640'
