@@ -78,7 +78,7 @@ bones_resolve_deploy_push_target() {
 	bones_run_doctor_remote() {
 		echo "[bonesdeploy] Running remote doctor..."
 
-		if ! bonesremote doctor --config "$BONES_YAML"; then
+		if ! bonesremote doctor; then
 			echo "[bonesdeploy] Remote doctor reported issues. Push rejected."
 			exit 1
 		fi

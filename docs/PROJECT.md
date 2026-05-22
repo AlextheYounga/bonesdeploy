@@ -144,7 +144,7 @@ ssl:
 Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor --local` and we fail if the doctor command expresses any warning or errors.
-- `pre-receive` => Short-circuits when `deploy_on_push = false`. Otherwise it resolves the configured deployment branch from stdin's pushed refs (skipping deletes and pushes to other branches), then runs `bonesremote doctor --config ...` and `sudo bonesremote release stage --config ...` to prepare build/runtime directories and write staged release state.
+- `pre-receive` => Short-circuits when `deploy_on_push = false`. Otherwise it resolves the configured deployment branch from stdin's pushed refs (skipping deletes and pushes to other branches), then runs `bonesremote doctor` and `sudo bonesremote release stage --config ...` to prepare build/runtime directories and write staged release state.
 - `post-receive` => Re-resolves the deployment ref, then runs the full deployment pipeline by calling, in order: `bonesremote hooks post-receive --config ... --revision <newrev>` (checkout into `build/workspace`), `sudo bonesremote release wire --config ...` (just-in-time shared-path wiring), `bonesremote hooks deploy --config ...`, and `sudo bonesremote hooks post-deploy --config ...`.
 
 ### Deployment Folder
@@ -330,7 +330,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 2. If `deploy_on_push = false`, `pre-receive` exits early and no deploy steps run.
 3. Otherwise `pre-receive` resolves the pushed deployment ref:
    - If the configured branch is not in the pushed refs, or the push deletes it, `pre-receive` exits successfully without staging.
-   - If the configured branch was pushed, `pre-receive` runs `bonesremote doctor --config "$BONES_YAML"`, then `sudo bonesremote release stage --config "$BONES_YAML"`.
+   - If the configured branch was pushed, `pre-receive` runs `bonesremote doctor`, then `sudo bonesremote release stage --config "$BONES_YAML"`.
 4. If `pre-receive` exits successfully, Git updates refs.
 5. Git runs `post-receive`, which re-resolves the deployment ref the same way.
 6. `post-receive` runs `bonesremote hooks post-receive --config "$BONES_YAML" --revision <newrev>` (checkout into `build/workspace`).
