@@ -50,7 +50,7 @@ pub fn run() -> Result<()> {
     println!(
         "\n{} Run {} before your first deploy.",
         style("Next:").cyan().bold(),
-        style("bonesdeploy site setup").cyan()
+        style("bonesdeploy remote setup").cyan()
     );
     println!(
         "{} Run {} after setup to sync .bones/ to the remote.",

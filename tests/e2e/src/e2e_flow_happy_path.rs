@@ -14,9 +14,9 @@ fn e2e_remote_happy_path_runs_full_lifecycle_in_sequence() -> Result<()> {
     let init = cli::run_bonesdeploy(&sandbox.path, ["init"])?;
     cli::assert_success(&init)?;
 
-    let site_setup = cli::run_bonesdeploy(&sandbox.path, ["site", "setup"])?;
-    cli::assert_success(&site_setup)?;
-    cli::assert_stdout_contains(&site_setup, "Site setup complete")?;
+    let remote_setup = cli::run_bonesdeploy(&sandbox.path, ["remote", "setup"])?;
+    cli::assert_success(&remote_setup)?;
+    cli::assert_stdout_contains(&remote_setup, "Remote setup complete")?;
 
     let push = cli::run_bonesdeploy(&sandbox.path, ["push"])?;
     cli::assert_success(&push)?;

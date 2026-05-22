@@ -162,7 +162,7 @@ bonesdeploy/
 │   ├── deployment/
 │   ├── hooks/
 │   ├── scripts/
-│   └── site/                   # nginx + ansible roles for `bonesdeploy site setup`
+│   └── site/                   # nginx + ansible roles for `bonesdeploy remote setup`
 ├── templates/                  # per-framework starter overlays (see below)
 ├── crates/
 │   ├── bonesdeploy/               # local CLI binary
@@ -176,8 +176,8 @@ bonesdeploy/
 │   │       │   ├── push.rs
 │   │       │   ├── deploy.rs
 │   │       │   ├── rollback.rs
-│   │       │   ├── site_setup.rs
-│   │       │   ├── site_ssl.rs
+│   │       │   ├── remote_setup.rs
+│   │       │   ├── remote_ssl.rs
 │   │       │   └── version.rs
 │   │       ├── config.rs       # bones.yaml structs + load/save + local file discovery
 │   │       ├── embedded.rs     # rust-embed from kit/, scaffold writing
@@ -229,7 +229,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Updates `.gitignore` to add .bones folder.
   - Loads existing config from `.bones/bones.yaml` or collects user input via prompts.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{git_dir}`.
-  - Prints next-step guidance to run `bonesdeploy site setup` before first deploy.
+  - Prints next-step guidance to run `bonesdeploy remote setup` before first deploy.
   - Saves config to `.bones/bones.yaml`.
 
 - **doctor**
@@ -254,18 +254,18 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Manually runs remote `pre-receive` and `post-receive` hooks over SSH without pushing commits.
   - Sets `BONES_FORCE_DEPLOY=1` so manual deploy runs even when `deploy_on_push = false`.
 
-- **site setup**
-  - Runs `.bones/site/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
+- ****remote setup****
+  - Runs `.bones/remote/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
   - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, `deploy_root`, and `git_dir` from `bones.yaml` as playbook variables.
   - Initializes bare git repository at `git_dir`.
   - Creates initial placeholder release with default page.
   - Sets up per-site nginx with Landlock isolation.
   - Configures main router nginx to proxy domains to per-site unix sockets.
 
-- **site ssl**
+- ****remote ssl****
   - Runs the SSL Ansible role against the configured host.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
-  - Re-renders `.bones/site/nginx/site.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
+  - Re-renders `.bones/remote/nginx/site.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
 
 - **rollback**
   - SSHes into the configured host and runs `bonesremote release rollback --config ...`, which repoints `current` to the previous release without rebuilding.

@@ -33,7 +33,7 @@ releases:
     - 'storage'
 
 ssl:
-  # Optional TLS values used by `bonesdeploy site ssl`.
+  # Optional TLS values used by `bonesdeploy remote ssl`.
   # You can leave these empty and pass --domain/--email on the command.
   enabled: false
   domain: ''

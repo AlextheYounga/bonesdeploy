@@ -100,7 +100,7 @@ If the service is active, restarts it. This causes nginx to:
 
 #### 3.3 Skip if Not Active
 
-If the service isn't running yet (e.g., first deployment), the restart is skipped. The service will be started during the initial `site setup`.
+If the service isn't running yet (e.g., first deployment), the restart is skipped. The service will be started during the initial `remote setup`.
 
 ---
 

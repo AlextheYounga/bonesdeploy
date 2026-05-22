@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{Result, bail};
 use console::style;
 
-use crate::commands::site_setup;
+use crate::commands::remote_setup;
 use crate::config;
 
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
@@ -28,11 +28,11 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
 
     config::save(&cfg, bones_yaml)?;
 
-    site_setup::ensure_ansible_playbook_installed()?;
+    remote_setup::ensure_ansible_playbook_installed()?;
 
     println!(
         "Running {} against {} for {}...",
-        style("site ssl").cyan().bold(),
+        style("remote ssl").cyan().bold(),
         style(&cfg.data.host).cyan(),
         style(&cfg.ssl.domain).cyan(),
     );
@@ -51,8 +51,8 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let mut cfg_for_run = cfg.clone();
     cfg_for_run.ssl.enabled = false;
 
-    let ssh_user = site_setup::resolve_bootstrap_ssh_user();
-    site_setup::run_ansible_playbook(&cfg_for_run, &ssh_user, &extra_args)?;
+    let ssh_user = remote_setup::resolve_bootstrap_ssh_user();
+    remote_setup::run_ansible_playbook(&cfg_for_run, &ssh_user, &extra_args)?;
 
     cfg.ssl.enabled = true;
     config::save(&cfg, bones_yaml)?;

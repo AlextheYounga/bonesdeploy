@@ -294,4 +294,4 @@ bonesremote doctor
 
 - `bonesremote init` - Initialize sudoers
 - `bonesdeploy doctor` - Client-side validation
-- `bonesdeploy site setup` - Provision server
+- `bonesdeploy remote setup` - Provision server
