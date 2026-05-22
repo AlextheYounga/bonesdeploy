@@ -62,7 +62,7 @@ fn rsync_bones(cfg: &config::BonesConfig) -> Result<()> {
             "-av",
             "--delete",
             "-e",
-            &format!("ssh -p {port}"),
+            &format!("ssh -p {port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"),
             &format!("{}/", config::Constants::BONES_DIR),
             &dest,
         ])
