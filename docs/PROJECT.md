@@ -5,7 +5,7 @@ A Rust CLI that compiles into a single binary, containing embeds of boilerplate 
 We keep detailed documentation of each command at: `docs/commands/*.md:`
 
 ## Deployment Methodology
-We have an SSH deployment user (normally `git`) that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user (defaults to the project name). This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
+We have an SSH deployment user (normally `git`) that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user named after the project. This is not a shared `applications` user; it must be a dedicated user per project so isolation works on a shared server. This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
 
 ### Just-in-Time Concerns
 This project should prefer just-in-time mutations.
@@ -79,7 +79,7 @@ Everything else is defaulted for Debian/Ubuntu-first usability:
 - `deploy_root`: defaults to `/srv/deployments/{project_name}`
 - `deploy_on_push`: defaults to `true`
 - `permissions.defaults.deploy_user`: defaults to `git`
-- `permissions.defaults.service_user`: defaults to `{project_name}`
+- `permissions.defaults.service_user`: defaults to `{project_name}` and should be created on the server as that exact project-named user
 - `permissions.defaults.group`: defaults to `www-data`
 - `permissions.defaults.dir_mode`: defaults to `750`
 - `permissions.defaults.file_mode`: defaults to `640`
@@ -141,10 +141,10 @@ ssl:
 ```
 
 ### Hooks
-Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push`.
+Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor --local` and we fail if the doctor command expresses any warning or errors.
-- `pre-receive` => Short-circuits when `deploy_on_push = false`. Otherwise it resolves the configured deployment branch from stdin's pushed refs (skipping deletes and pushes to other branches), then runs `bonesremote doctor --config ...` and `sudo bonesremote release stage --config ...` to prepare build/runtime directories and write staged release state.
+- `pre-receive` => Short-circuits when `deploy_on_push = false`. Otherwise it resolves the configured deployment branch from stdin's pushed refs (skipping deletes and pushes to other branches), then runs `bonesremote doctor` and `sudo bonesremote release stage --config ...` to prepare build/runtime directories and write staged release state.
 - `post-receive` => Re-resolves the deployment ref, then runs the full deployment pipeline by calling, in order: `bonesremote hooks post-receive --config ... --revision <newrev>` (checkout into `build/workspace`), `sudo bonesremote release wire --config ...` (just-in-time shared-path wiring), `bonesremote hooks deploy --config ...`, and `sudo bonesremote hooks post-deploy --config ...`.
 
 ### Deployment Folder
@@ -162,7 +162,7 @@ bonesdeploy/
 │   ├── deployment/
 │   ├── hooks/
 │   ├── scripts/
-│   └── site/                   # nginx + ansible roles for `bonesdeploy site setup`
+│   └── site/                   # nginx + ansible roles for `bonesdeploy remote setup`
 ├── templates/                  # per-framework starter overlays (see below)
 ├── crates/
 │   ├── bonesdeploy/               # local CLI binary
@@ -176,8 +176,8 @@ bonesdeploy/
 │   │       │   ├── push.rs
 │   │       │   ├── deploy.rs
 │   │       │   ├── rollback.rs
-│   │       │   ├── site_setup.rs
-│   │       │   ├── site_ssl.rs
+│   │       │   ├── remote_setup.rs
+│   │       │   ├── remote_ssl.rs
 │   │       │   └── version.rs
 │   │       ├── config.rs       # bones.yaml structs + load/save + local file discovery
 │   │       ├── embedded.rs     # rust-embed from kit/, scaffold writing
@@ -229,7 +229,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Updates `.gitignore` to add .bones folder.
   - Loads existing config from `.bones/bones.yaml` or collects user input via prompts.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{git_dir}`.
-  - Prints next-step guidance to run `bonesdeploy site setup` before first deploy.
+  - Prints next-step guidance to run `bonesdeploy remote setup` before first deploy.
   - Saves config to `.bones/bones.yaml`.
 
 - **doctor**
@@ -250,22 +250,26 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Deletes sample git hooks in bare repo, so that our files will be the only files to worry about in the `{project_name}.git/hooks` folder.
   - Runs commands on remote that symlinks our `{project_name}.git/bones/hooks` files are symlinked with `{project_name}.git/hooks` properly.
 
+- **pull**
+  - Uses an `rsync -av --delete` command to pull the remote `{project_name}.git/bones/` folder back into local `.bones/`.
+  - Recreates the local `.git/hooks/pre-push` symlink so the repository regains its pre-push check after recovery.
+
 - **deploy**
   - Manually runs remote `pre-receive` and `post-receive` hooks over SSH without pushing commits.
   - Sets `BONES_FORCE_DEPLOY=1` so manual deploy runs even when `deploy_on_push = false`.
 
-- **site setup**
-  - Runs `.bones/site/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
+- ****remote setup****
+  - Runs `.bones/remote/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
   - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, `deploy_root`, and `git_dir` from `bones.yaml` as playbook variables.
   - Initializes bare git repository at `git_dir`.
   - Creates initial placeholder release with default page.
   - Sets up per-site nginx with Landlock isolation.
   - Configures main router nginx to proxy domains to per-site unix sockets.
 
-- **site ssl**
+- ****remote ssl****
   - Runs the SSL Ansible role against the configured host.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
-  - Re-renders `.bones/site/nginx/site.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
+  - Re-renders `.bones/remote/nginx/site.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
 
 - **rollback**
   - SSHes into the configured host and runs `bonesremote release rollback --config ...`, which repoints `current` to the previous release without rebuilding.
@@ -326,7 +330,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 2. If `deploy_on_push = false`, `pre-receive` exits early and no deploy steps run.
 3. Otherwise `pre-receive` resolves the pushed deployment ref:
    - If the configured branch is not in the pushed refs, or the push deletes it, `pre-receive` exits successfully without staging.
-   - If the configured branch was pushed, `pre-receive` runs `bonesremote doctor --config "$BONES_YAML"`, then `sudo bonesremote release stage --config "$BONES_YAML"`.
+   - If the configured branch was pushed, `pre-receive` runs `bonesremote doctor`, then `sudo bonesremote release stage --config "$BONES_YAML"`.
 4. If `pre-receive` exits successfully, Git updates refs.
 5. Git runs `post-receive`, which re-resolves the deployment ref the same way.
 6. `post-receive` runs `bonesremote hooks post-receive --config "$BONES_YAML" --revision <newrev>` (checkout into `build/workspace`).

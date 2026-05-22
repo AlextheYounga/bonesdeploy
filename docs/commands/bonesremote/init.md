@@ -335,5 +335,5 @@ sudo bonesremote init
 ## Related Commands
 
 - `bonesremote doctor` - Validate server setup
-- `bonesdeploy site setup` - Client-side server provisioning
+- `bonesdeploy remote setup` - Client-side server provisioning
 - `bonesdeploy push` - Push configuration to server

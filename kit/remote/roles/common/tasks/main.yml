@@ -1,0 +1,187 @@
+---
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ common_base_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [common, packages]
+
+- name: Check for rustup
+  ansible.builtin.stat:
+    path: "{{ rustup_install_prefix }}/rustup"
+  register: common_rustup_binary
+  tags: [common, bonesremote]
+
+- name: Install rustup and cargo
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl --proto '=https' --tlsv1.2 -sSf {{ rustup_install_script_url }} | sh -s -- -y --profile minimal
+  args:
+    creates: "{{ rustup_install_prefix }}/cargo"
+  when: not common_rustup_binary.stat.exists
+  tags: [common, bonesremote]
+
+- name: Verify cargo installation
+  ansible.builtin.command:
+    argv:
+      - "{{ cargo_binary_path }}"
+      - --version
+  changed_when: false
+  tags: [common, bonesremote]
+
+- name: Install nvm for deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    curl -o- {{ nvm_install_script_url }} | bash
+  args:
+    executable: /bin/bash
+    creates: "{{ nvm_dir }}/nvm.sh"
+  environment:
+    HOME: "/home/{{ deploy_user }}"
+  tags: [common, nvm]
+
+- name: Ensure nvm initialization is present for deploy user
+  ansible.builtin.lineinfile:
+    path: "/home/{{ deploy_user }}/.bashrc"
+    line: "{{ item }}"
+    state: present
+    create: true
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+  loop: "{{ nvm_init_snippet }}"
+  tags: [common, nvm]
+
+- name: Verify nvm for deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_dir }}"
+    . "${NVM_DIR}/nvm.sh"
+    nvm --version
+  args:
+    executable: /bin/bash
+  environment:
+    HOME: "/home/{{ deploy_user }}"
+  changed_when: false
+  tags: [common, nvm]
+
+- name: Install latest LTS Node with nvm for deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_dir }}"
+    . "${NVM_DIR}/nvm.sh"
+    nvm install --lts
+  args:
+    executable: /bin/bash
+  environment:
+    HOME: "/home/{{ deploy_user }}"
+  tags: [common, nvm]
+
+- name: Check for bonesremote binary
+  ansible.builtin.stat:
+    path: "{{ bonesremote_binary_path }}"
+  register: common_bonesremote_binary
+  tags: [common, bonesremote]
+
+- name: Install bonesremote binary
+  ansible.builtin.command:
+    argv:
+      - "{{ cargo_binary_path }}"
+      - install
+      - --root
+      - "{{ bonesremote_install_root }}"
+      - --git
+      - "{{ bonesremote_repo_url }}"
+      - bonesremote
+  when: not common_bonesremote_binary.stat.exists
+  tags: [common, bonesremote]
+
+- name: Run bonesremote init
+  ansible.builtin.command:
+    argv:
+      - bonesremote
+      - init
+      - --deploy-user
+      - "{{ deploy_user }}"
+  environment:
+    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+  tags: [common, bonesremote]
+
+- name: Run bonesremote doctor as deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.command:
+    argv:
+      - bonesremote
+      - doctor
+  environment:
+    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+  changed_when: false
+  tags: [common, bonesremote]
+
+- name: Ensure bare repo parent directory exists
+  ansible.builtin.file:
+    path: "{{ git_dir | dirname }}"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0755"
+  tags: [common, git]
+
+- name: Initialize bare git repo
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.command:
+    argv:
+      - git
+      - init
+      - --bare
+      - "{{ git_dir }}"
+  args:
+    creates: "{{ git_dir }}/HEAD"
+  tags: [common, git]
+
+- name: Ensure bare repo bones directory exists
+  ansible.builtin.file:
+    path: "{{ git_dir }}/bones"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0755"
+  tags: [common, git]
+
+- name: Ensure placeholder release directory exists
+  ansible.builtin.file:
+    path: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ group }}"
+    mode: "0750"
+  tags: [common, placeholder]
+
+- name: Seed placeholder index page into initial release
+  ansible.builtin.template:
+    src: "{{ common_placeholder_template_path }}"
+    dest: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}/index.html"
+    owner: "{{ service_user }}"
+    group: "{{ group }}"
+    mode: "0640"
+  tags: [common, placeholder]
+
+- name: Point current symlink at placeholder release
+  ansible.builtin.file:
+    src: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}"
+    dest: "{{ deploy_root }}/current"
+    state: link
+    force: true
+  tags: [common, placeholder]
+
+- name: Point live root symlink at current
+  ansible.builtin.file:
+    src: "{{ deploy_root }}/current"
+    dest: "{{ live_root }}"
+    state: link
+    force: true
+  tags: [common, placeholder]

@@ -5,6 +5,7 @@ use anyhow::{Context, Result, bail};
 
 #[derive(Debug, Clone)]
 pub struct RemoteConnectionDetails {
+    pub user: String,
     pub host: String,
     pub port: String,
     pub git_dir: String,
@@ -103,7 +104,7 @@ fn parse_ssh_style_url(url: &str) -> Option<RemoteConnectionDetails> {
         return None;
     }
 
-    Some(RemoteConnectionDetails { host, port, git_dir: path.to_string() })
+    Some(RemoteConnectionDetails { user: parse_user(authority), host, port, git_dir: path.to_string() })
 }
 
 fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
@@ -122,7 +123,11 @@ fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
         return None;
     }
 
-    Some(RemoteConnectionDetails { host: host.to_string(), port: String::from("22"), git_dir })
+    Some(RemoteConnectionDetails { user: parse_user(left), host: host.to_string(), port: String::from("22"), git_dir })
+}
+
+fn parse_user(authority: &str) -> String {
+    authority.rsplit_once('@').map_or_else(|| String::from("git"), |(user, _)| user.to_string())
 }
 
 fn has_git_extension(path: &str) -> bool {
@@ -139,6 +144,7 @@ mod tests {
         let details = parse_ssh_style_url("ssh://git@example.com:2222/home/git/myapp.git");
         assert!(details.is_some());
         if let Some(details) = details {
+            assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "2222");
             assert_eq!(details.git_dir, "/home/git/myapp.git");
@@ -151,6 +157,7 @@ mod tests {
         let details = parse_ssh_style_url("ssh://git@example.com/home/git/myapp.git");
         assert!(details.is_some());
         if let Some(details) = details {
+            assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
             assert_eq!(details.git_dir, "/home/git/myapp.git");
@@ -163,6 +170,7 @@ mod tests {
         let details = parse_scp_style_url("git@example.com:/home/git/myapp.git");
         assert!(details.is_some());
         if let Some(details) = details {
+            assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
             assert_eq!(details.git_dir, "/home/git/myapp.git");

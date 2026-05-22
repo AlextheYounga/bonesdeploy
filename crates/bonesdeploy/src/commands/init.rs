@@ -50,7 +50,7 @@ pub fn run() -> Result<()> {
     println!(
         "\n{} Run {} before your first deploy.",
         style("Next:").cyan().bold(),
-        style("bonesdeploy site setup").cyan()
+        style("bonesdeploy remote setup").cyan()
     );
     println!(
         "{} Run {} after setup to sync .bones/ to the remote.",
@@ -193,7 +193,7 @@ fn update_gitignore() -> Result<()> {
     Ok(())
 }
 
-fn symlink_pre_push() -> Result<()> {
+pub(crate) fn symlink_pre_push() -> Result<()> {
     let hooks_dir = Path::new(config::Constants::GIT_HOOKS_DIR);
     fs::create_dir_all(hooks_dir)?;
 
@@ -223,6 +223,36 @@ fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
 
     let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, cfg.data.host, cfg.data.git_dir);
     git::add_remote(&cfg.data.remote_name, &remote_url)?;
-    println!("Added git remote {} -> {}", cfg.data.remote_name, remote_url);
+    println!("Configured local git remote {} -> {}", cfg.data.remote_name, remote_url);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    const TEMPLATES: [&str; 7] = [
+        "templates/django/bones.yaml",
+        "templates/laravel/bones.yaml",
+        "templates/next/bones.yaml",
+        "templates/nuxt/bones.yaml",
+        "templates/rails/bones.yaml",
+        "templates/sveltekit/bones.yaml",
+        "templates/vue/bones.yaml",
+    ];
+
+    #[test]
+    fn template_service_user_defaults_to_project_name_not_applications() {
+        for template in TEMPLATES {
+            let content = fs::read_to_string(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(template));
+            assert!(content.is_ok(), "failed to read {template}");
+            let content = content.unwrap_or_default();
+
+            assert!(
+                !content.contains("service_user: 'applications'"),
+                "template {template} still hardcodes applications as the service user\n{content}"
+            );
+        }
+    }
 }

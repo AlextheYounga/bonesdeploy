@@ -93,3 +93,18 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::read_asset;
+
+    // The remote doctor hook should invoke the command without a config flag.
+    #[test]
+    fn hooks_script_does_not_pass_config_to_doctor() {
+        let hooks_script = read_asset("hooks.sh");
+        assert!(hooks_script.is_ok(), "hooks.sh should be embedded");
+
+        let hooks_script = hooks_script.unwrap_or_default();
+        assert!(!hooks_script.contains("bonesremote doctor --config"));
+    }
+}

@@ -385,4 +385,4 @@ nginx: [emerg] bind() to unix:/run/myapp/nginx.sock failed
 
 - `bonesremote doctor` - Check Landlock support
 - `bonesremote hooks post-deploy` - Restarts per-site nginx
-- `bonesdeploy site setup` - Provisions server with per-site nginx
+- `bonesdeploy remote setup` - Provisions server with per-site nginx

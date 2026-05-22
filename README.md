@@ -2,6 +2,8 @@
 
 ## Git Deployments with a Spine in a Barebones Framework 🏴‍☠️
 
+> WARNING: BonesDeploy is still under active development. There may be some cool bugs!
+
 A drop-in Rust deployment system for git-based deployments over SSH. BonesDeploy scaffolds hook scripts and deployment configs into your repo, syncs them to a remote bare repository, and manages file ownership and permissions across deploys without forcing containers, a control plane, or a platform layer.
 
 It produces two binaries:
@@ -49,7 +51,7 @@ cargo install --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
 sudo cargo install --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
-Then run the site setup:
+Then run the remote setup:
 
 ```sh
 sudo bonesremote init
@@ -83,23 +85,23 @@ BonesDeploy assumes opinionated server defaults unless you change them in `.bone
 - `service_user = "<project_name>"`
 - `group = "www-data"`
 
-Before first deploy, run site setup:
+Before first deploy, run remote setup:
 
 ```sh
-bonesdeploy site setup
+bonesdeploy remote setup
 ```
 
-This runs `.bones/site/playbooks/setup.yml` locally with Ansible against your configured remote host.
+This runs `.bones/remote/playbooks/setup.yml` locally with Ansible against your configured remote host.
 If `ansible-playbook` is missing, BonesDeploy installs Ansible automatically with `python3 -m pip install --user ansible`.
 Template-based projects also scaffold language-specific setup roles (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install global PM2/PNPM tools).
-Every setup also installs nginx and provisions a default project vhost that serves `.bones/site/roles/nginx/defaults/index.html.j2` until your first deployment is live.
+Every setup also installs nginx and provisions a default project vhost that serves `.bones/remote/roles/nginx/defaults/index.html.j2` until your first deployment is live.
 
-To customize nginx behavior, edit `.bones/site/nginx/site.conf.j2` and re-run `bonesdeploy site setup`.
+To customize nginx behavior, edit `.bones/remote/nginx/site.conf.j2` and re-run `bonesdeploy remote setup`.
 
 When DNS is ready, enable SSL with certbot:
 
 ```sh
-bonesdeploy site ssl --domain app.example.com --email ops@example.com
+bonesdeploy remote ssl --domain app.example.com --email ops@example.com
 ```
 
 This obtains a Let's Encrypt certificate and updates the managed nginx site to listen on 443 and redirect HTTP to HTTPS.

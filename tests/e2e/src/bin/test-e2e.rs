@@ -40,7 +40,12 @@ fn run() -> Result<ExitCode, String> {
         "--nocapture",
         "--test-threads=1",
     ]);
-    test_command.args(extra_args);
+
+    if extra_args.is_empty() {
+        test_command.arg("e2e_remote_happy_path_runs_full_lifecycle_in_sequence");
+    } else {
+        test_command.args(extra_args);
+    }
 
     let status = test_command.status().map_err(|error| format!("Failed to run cargo test: {error}"))?;
 

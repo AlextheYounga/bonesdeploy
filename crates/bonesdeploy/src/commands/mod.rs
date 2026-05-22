@@ -2,10 +2,11 @@ mod deploy;
 mod doctor;
 mod init;
 mod manage;
+mod pull;
 mod push;
+mod remote_setup;
+mod remote_ssl;
 mod rollback;
-mod site_setup;
-mod site_ssl;
 mod version;
 
 use anyhow::Result;
@@ -30,12 +31,14 @@ enum Command {
     },
     /// Sync .bones/ folder to the remote bare repo
     Push,
+    /// Sync .bones/ folder back from the remote bare repo
+    Pull,
     /// Run deployment hooks manually without pushing commits
     Deploy,
-    /// Site setup operations
-    Site {
+    /// Remote operations
+    Remote {
         #[command(subcommand)]
-        command: SiteCommand,
+        command: RemoteCommand,
     },
     /// Open remote server management TUI
     Manage,
@@ -46,8 +49,8 @@ enum Command {
 }
 
 #[derive(Subcommand)]
-enum SiteCommand {
-    /// Run site setup playbook against configured host
+enum RemoteCommand {
+    /// Run remote setup playbook against configured host
     Setup,
     /// Obtain and configure SSL certificates with certbot
     Ssl {
@@ -65,11 +68,12 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Init => init::run(),
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,
+        Command::Pull => pull::run(),
         Command::Deploy => deploy::run().await,
         Command::Manage => manage::run(),
-        Command::Site { command } => match command {
-            SiteCommand::Setup => site_setup::run(),
-            SiteCommand::Ssl { domain, email } => site_ssl::run(domain.clone(), email.clone()),
+        Command::Remote { command } => match command {
+            RemoteCommand::Setup => remote_setup::run(),
+            RemoteCommand::Ssl { domain, email } => remote_ssl::run(domain.clone(), email.clone()),
         },
         Command::Rollback => rollback::run().await,
         Command::Version => {

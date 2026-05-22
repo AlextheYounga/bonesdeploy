@@ -1,0 +1,10 @@
+[package]
+name = "cleancode"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+syn = { version = "2", features = ["full", "extra-traits", "visit"] }
+
+[lints]
+workspace = true

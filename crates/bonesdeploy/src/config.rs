@@ -24,8 +24,8 @@ impl Constants {
     pub const BONES_HOOKS_SCRIPT: &'static str = ".bones/hooks.sh";
     pub const BONES_HOOKS_DIR: &'static str = ".bones/hooks";
     pub const BONES_DEPLOYMENT_DIR: &'static str = ".bones/deployment";
-    pub const BONES_SITE_SETUP_PLAYBOOK: &'static str = ".bones/site/playbooks/setup.yml";
-    pub const BONES_SITE_ROLES_DIR: &'static str = ".bones/site/roles";
+    pub const BONES_REMOTE_SETUP_PLAYBOOK: &'static str = ".bones/remote/playbooks/setup.yml";
+    pub const BONES_REMOTE_ROLES_DIR: &'static str = ".bones/remote/roles";
 
     pub const GIT_HOOKS_DIR: &'static str = ".git/hooks";
     pub const GIT_PRE_PUSH_HOOK_PATH: &'static str = ".git/hooks/pre-push";
@@ -198,6 +198,7 @@ fn hide_derived_defaults(config: &mut BonesConfig) {
 
 #[cfg(test)]
 mod tests {
+    use std::env::temp_dir;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process;
@@ -212,7 +213,7 @@ mod tests {
 
     fn temp_path(file_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-        std::env::temp_dir().join(format!("bonesdeploy_config_test_{}_{}_{}", process::id(), nanos, file_name))
+        temp_dir().join(format!("bonesdeploy_config_test_{}_{}_{}", process::id(), nanos, file_name))
     }
 
     fn minimal_yaml(project_name: &str) -> String {
