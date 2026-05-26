@@ -1,3 +1,5 @@
+use std::fs;
+use std::io::ErrorKind;
 use std::path::Path;
 use std::process::Command;
 
@@ -9,10 +11,7 @@ use crate::release_state;
 pub fn run(config_path: &str, revision: Option<&str>) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
     let build_root = release_state::build_root(&cfg);
-
-    if !build_root.exists() {
-        bail!("Build workspace does not exist: {}", build_root.display());
-    }
+    ensure_build_workspace_accessible(&build_root)?;
 
     let checkout_target = revision.unwrap_or(cfg.data.branch.as_str());
     println!("Checking out {checkout_target} to {}...", build_root.display());
@@ -37,9 +36,30 @@ pub fn run(config_path: &str, revision: Option<&str>) -> Result<()> {
     Ok(())
 }
 
+fn ensure_build_workspace_accessible(build_root: &Path) -> Result<()> {
+    match fs::metadata(build_root) {
+        Ok(metadata) => {
+            if metadata.is_dir() {
+                Ok(())
+            } else {
+                bail!("Build workspace is not a directory: {}", build_root.display())
+            }
+        }
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            bail!("Build workspace does not exist: {}", build_root.display())
+        }
+        Err(error) if error.kind() == ErrorKind::PermissionDenied => {
+            bail!("Build workspace is not accessible (permission denied): {}", build_root.display())
+        }
+        Err(error) => bail!("Failed to inspect build workspace {}: {error}", build_root.display()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::fs;
+    use std::os::unix::fs::PermissionsExt;
     use std::path::{Path, PathBuf};
     use std::process;
     use std::process::Command;
@@ -52,7 +72,7 @@ mod tests {
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-        std::env::temp_dir().join(format!("bonesremote_post_receive_test_{}_{}_{}", process::id(), nanos, test_name))
+        env::temp_dir().join(format!("bonesremote_post_receive_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
     fn run_command(command: &mut Command, label: &str) -> Result<()> {
@@ -156,6 +176,42 @@ mod tests {
         // Post-receive is responsible for checkout; shared-path wiring happens in a separate command.
         assert!(result.is_ok());
         assert!(build_root.join("README.md").exists());
+
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    // Ensures permission issues are reported as permission errors, not as missing workspace.
+    #[test]
+    fn post_receive_reports_permission_denied_for_inaccessible_workspace() -> Result<()> {
+        let root = temp_dir_path("workspace_permission_denied");
+        fs::create_dir_all(&root)?;
+
+        let bare = create_remote_with_master_commit(&root)?;
+        let deploy_root = root.join("deploy");
+        let build_dir = deploy_root.join(Constants::BUILD_DIR);
+        let build_root = build_dir.join(Constants::BUILD_WORKSPACE_DIR);
+        fs::create_dir_all(&build_root)?;
+
+        let config_path = root.join("bones.yaml");
+        write_config(&config_path, &bare, &deploy_root, "master")?;
+
+        let mut perms = fs::metadata(&build_dir)?.permissions();
+        perms.set_mode(0o000);
+        fs::set_permissions(&build_dir, perms)?;
+
+        let result = run(config_path.to_string_lossy().as_ref(), Some("master"));
+
+        let mut restore = fs::metadata(&build_dir)?.permissions();
+        restore.set_mode(0o755);
+        fs::set_permissions(&build_dir, restore)?;
+
+        let error = if let Err(error) = result {
+            error
+        } else {
+            anyhow::bail!("post-receive should fail when workspace path is inaccessible");
+        };
+        assert!(error.to_string().to_lowercase().contains("permission denied"));
 
         fs::remove_dir_all(root)?;
         Ok(())
