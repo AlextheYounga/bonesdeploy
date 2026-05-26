@@ -75,7 +75,7 @@ Collects the following project information from the user:
 - `git_dir`: inferred from selected remote URL when possible, else defaults to `/home/git/{project_name}.git`
 
 Everything else is defaulted for Debian/Ubuntu-first usability:
-- `live_root`: defaults to `/var/www/{project_name}`
+- `public_path`: defaults to `/var/www/{project_name}`
 - `deploy_root`: defaults to `/srv/deployments/{project_name}`
 - `deploy_on_push`: defaults to `true`
 - `permissions.defaults.deploy_user`: defaults to `git`
@@ -96,7 +96,7 @@ data:
   host: "deploy.example.com"
   port: "22"
   git_dir: "/home/git/lawsnipe.git"
-  live_root: "/var/www/lawsnipe"
+  public_path: "/var/www/lawsnipe"
   deploy_root: "/srv/deployments/lawsnipe"
   branch: "master"
   deploy_on_push: true
@@ -260,7 +260,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 
 - ****remote setup****
   - Runs `.bones/remote/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
-  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `live_root_parent`, `live_root`, `deploy_root`, and `git_dir` from `bones.yaml` as playbook variables.
+  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `public_path_parent`, `public_path`, `deploy_root`, and `git_dir` from `bones.yaml` as playbook variables.
   - Initializes bare git repository at `git_dir`.
   - Creates initial placeholder release with default page.
   - Sets up per-site nginx with Landlock isolation.
@@ -303,10 +303,10 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 - **hooks deploy**
 	- Runs deployment scripts in `build/workspace`, copies runtime-ready output into staged `runtime/<timestamp>`, drops failed staged releases on error, and activates release on success.
 - **landlock nginx**
-	- Resolves `live_root` to the active runtime tree, applies Landlock policy, and `exec`s per-site nginx.
+  - Resolves `public_path` to the active runtime tree, applies Landlock policy, and `exec`s per-site nginx.
 - **hooks post-deploy**
 	- Restarts the per-site nginx service to pick up the new release.
-	- Runs a permissions hardening function setting all permissions back to the layout configured in `bones.yaml`, like for instance setting everything back to be owned by the service user, then prunes old releases. 
+  - Runs a permissions hardening function setting the active release back to the layout configured in `bones.yaml`, including service-user ownership, then prunes old releases.
 - **version**:
   - Echoes "bonesdeploy 0.1.0".
 

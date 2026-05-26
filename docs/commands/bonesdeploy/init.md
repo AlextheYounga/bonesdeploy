@@ -121,7 +121,7 @@ If configuration is incomplete, prompts for:
 
 1. **Project Name** (`init.rs:69`)
    - Default: Current directory name
-   - Used to derive default service user, live_root, and deploy_root
+   - Used to derive default service user, public_path, and deploy_root
 
 2. **Branch** (`init.rs:70`)
    - Default: `master`
@@ -144,10 +144,10 @@ If configuration is incomplete, prompts for:
    - Path to the bare Git repository on the remote server
    - If remote already exists, infers from remote URL
 
-7. **Live Root** (`init.rs:81`, `init.rs:144-161`)
-   - Default: `/var/www/<project_name>`
-   - Symlink pointing to the active release
-   - Only stored in config if explicitly overridden
+7. **Public Path** (`init.rs:81`, `init.rs:144-161`)
+    - Default: `/var/www/<project_name>`
+    - Symlink pointing to the active release
+    - Only stored in config if explicitly overridden
 
 8. **Deploy Root** (`init.rs:82-83`)
    - Default: `/srv/deployments/<project_name>`
@@ -191,7 +191,7 @@ println!("Saved config to {}", config::Constants::BONES_YAML);
 Writes the configuration to `.bones/bones.yaml` in YAML format.
 
 **Special handling:**
-- Omits `live_root` and `deploy_root` if they match project-derived defaults (keeps config clean)
+- Omits `public_path` and `deploy_root` if they match project-derived defaults (keeps config clean)
 - Includes runtime configuration comment block if runtime is default/empty
 - Preserves SSL settings if previously configured
 

@@ -46,20 +46,20 @@ Loads `bones.yaml` to get site configuration.
 
 ---
 
-### 3. Resolve Active Runtime Root
+### 3. Resolve Active Public Path
 
 **Source:** `landlock_nginx.rs:17-18`
 
 ```rust
-let active_runtime_root = fs::canonicalize(&cfg.data.live_root)
-    .with_context(|| format!("Failed to resolve live_root: {}", cfg.data.live_root))?;
+let active_public_path = fs::canonicalize(&cfg.data.public_path)
+    .with_context(|| format!("Failed to resolve public_path: {}", cfg.data.public_path))?;
 ```
 
-Resolves the `live_root` symlink to the actual release directory.
+Resolves the `public_path` symlink to the actual release directory.
 
 **Example:**
-- `live_root`: `/var/www/myapp` (symlink)
-- `active_runtime_root`: `/srv/deployments/myapp/runtime/20260507_150000` (resolved)
+- `public_path`: `/var/www/myapp` (symlink)
+- `active_public_path`: `/srv/deployments/myapp/runtime/20260507_150000` (resolved)
 
 ---
 
@@ -69,7 +69,7 @@ Resolves the `live_root` symlink to the actual release directory.
 
 ```rust
 let socket_dir = PathBuf::from("/run").join(&cfg.data.project_name);
-let policy = build_policy(&active_runtime_root, &socket_dir);
+let policy = build_policy(&active_public_path, &socket_dir);
 ```
 
 #### 4.1 Define Read-Only Paths
@@ -84,7 +84,7 @@ for system_path in landlock::default_system_read_paths() {
 ```
 
 **Read-only access granted to:**
-1. **Runtime root** - Application code and assets (e.g., `/srv/deployments/myapp/runtime/20260507_150000`)
+1. **Runtime tree** - Application code and assets (e.g., `/srv/deployments/myapp/runtime/20260507_150000`)
 2. **System paths** - Essential system directories:
    - `/usr` - User programs
    - `/lib`, `/lib64` - Shared libraries
@@ -143,7 +143,7 @@ Applies the Landlock policy to the current process.
 3. All future filesystem operations are restricted
 
 **After this point, nginx can only:**
-- Read from: site's release directory, system paths
+- Read from: site's active release directory, system paths
 - Write to: `/run/{project_name}/`
 - All other filesystem access is denied
 
@@ -318,7 +318,7 @@ http {
 - Listens on unix socket (not port)
 - All temp paths under `/run/{project}/`
 - Logs to stderr (for systemd/journald)
-- Serves from `live_root`
+- Serves from `public_path`
 
 ---
 

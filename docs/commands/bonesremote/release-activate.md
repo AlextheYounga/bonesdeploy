@@ -2,7 +2,7 @@
 
 ## Overview
 
-Atomically activates the staged release by switching the `current` symlink to point to the new release directory. This makes the new release live and accessible via the `live_root` symlink. The command also clears the staged release state, marking the deployment as complete.
+Atomically activates the staged release by switching the `current` symlink to point to the new release directory. This makes the new release live and accessible via the `public_path` symlink. The command also clears the staged release state, marking the deployment as complete.
 
 ## Command Signature
 
@@ -63,12 +63,12 @@ Reads the staged release name from `<git_dir>/bones/.staged_release`.
 
 ```rust
 let release_dir = release_state::release_dir(&cfg, &release_name);
-let live_root = Path::new(&cfg.data.live_root);
+let public_path = Path::new(&cfg.data.public_path);
 ```
 
 **Paths:**
 - `release_dir`: `/srv/deployments/myapp/runtime/20260507_150432`
-- `live_root`: `/var/www/myapp`
+- `public_path`: `/var/www/myapp`
 
 ---
 
@@ -88,26 +88,26 @@ Ensures the release directory was actually created and populated.
 
 ---
 
-### 6. Validate live_root State
+### 6. Validate public_path State
 
 **Source:** `activate_release.rs:21-23`
 
 ```rust
-if live_root.exists() && !live_root.is_symlink() {
-    bail!("live_root exists and is not a symlink: {}", live_root.display());
+if public_path.exists() && !public_path.is_symlink() {
+    bail!("public_path exists and is not a symlink: {}", public_path.display());
 }
 ```
 
-**Validates:** If `live_root` exists, it must be a symlink.
+**Validates:** If `public_path` exists, it must be a symlink.
 
 **Why?**
-- `live_root` should always be a symlink to `current`
+- `public_path` should always be a symlink to `current`
 - If it's a real directory, activation would fail or have unexpected behavior
 - Indicates a configuration error or manual intervention
 
 **Example Error:**
 ```
-live_root exists and is not a symlink: /var/www/myapp
+public_path exists and is not a symlink: /var/www/myapp
 ```
 
 **Solution:** Remove or rename the directory, then re-run.
@@ -131,25 +131,25 @@ let current_link = release_state::current_link(&cfg);
 **Source:** `activate_release.rs:27-29`
 
 ```rust
-release_state::point_symlink_atomically(live_root, &current_link)?;
+release_state::point_symlink_atomically(public_path, &current_link)?;
 release_state::point_symlink_atomically(&current_link, &release_dir)?;
 ```
 
-#### 8.1 First Symlink: live_root → current
+#### 8.1 First Symlink: public_path → current
 
 ```rust
-release_state::point_symlink_atomically(live_root, &current_link)?;
+release_state::point_symlink_atomically(public_path, &current_link)?;
 ```
 
 **Creates:** `/var/www/myapp` → `/srv/deployments/myapp/current`
 
-**Purpose:** Ensures `live_root` points to the `current` symlink.
+**Purpose:** Ensures `public_path` points to the `current` symlink.
 
 **Why two symlinks?**
-- `live_root`: User-friendly path (`/var/www/myapp`)
+- `public_path`: User-friendly path (`/var/www/myapp`)
 - `current`: Deployment-managed path (`/srv/deployments/myapp/current`)
-- Allows changing `current` without changing `live_root`
-- `live_root` can be managed separately (e.g., for SSL setup)
+- Allows changing `current` without changing `public_path`
+- `public_path` can be managed separately (e.g., for SSL setup)
 
 #### 8.2 Second Symlink: current → release
 
@@ -273,7 +273,7 @@ Activated release: 20260507_150432
 After activation, the symlink chain is:
 
 ```
-/var/www/myapp (live_root)
+/var/www/myapp (public_path)
     ↓
 /srv/deployments/myapp/current (current link)
     ↓
@@ -281,9 +281,9 @@ After activation, the symlink chain is:
 ```
 
 **Why two levels?**
-1. **live_root**: User-facing path, typically in `/var/www/`
+1. **public_path**: User-facing path, typically in `/var/www/`
 2. **current**: Deployment path, in `/srv/deployments/`
-3. **Separation of concerns**: Web server uses `live_root`, deployment manages `current`
+3. **Separation of concerns**: Web server uses `public_path`, deployment manages `current`
 
 ---
 
@@ -314,7 +314,7 @@ After activation, the symlink chain is:
 ### Pre-activation Validation
 
 1. **Release directory exists**: Confirms deployment completed
-2. **live_root is symlink**: Prevents overwriting real directory
+2. **public_path is symlink**: Prevents overwriting real directory
 
 ### Why These Matter
 
@@ -325,9 +325,9 @@ Staged release directory does not exist: /srv/deployments/myapp/runtime/20260507
 - Deployment failed or didn't run
 - No release to activate
 
-**live_root is not symlink:**
+**public_path is not symlink:**
 ```
-live_root exists and is not a symlink: /var/www/myapp
+public_path exists and is not a symlink: /var/www/myapp
 ```
 - Someone manually created directory
 - Would conflict with symlink creation

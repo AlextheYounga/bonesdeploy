@@ -1,10 +1,10 @@
-# Linux Single-Server App Isolation Security Policy
+# BonesDeploy Linux App Isolation Security Policy
 
 ## Purpose
 
-This document defines the target security posture for running multiple applications on a single Linux server. It is intended to be used by a human operator or an automated agent to compare the current server configuration against a desired hardened baseline.
+This document defines the target security posture for BonesDeploy-managed applications running on a single Linux server. It is intended to be used by a human operator or an automated agent to compare the current server configuration against a desired hardened baseline.
 
-The goal is not perfect hostile multi-tenant isolation. The goal is strong practical isolation between applications controlled by the same operator, with reduced blast radius if one application, build process, dependency, web endpoint, or worker process is compromised.
+The goal is not perfect hostile multi-tenant isolation. The goal is strong practical isolation between BonesDeploy projects controlled by the same operator, with reduced blast radius if one application, build process, dependency, web endpoint, or worker process is compromised.
 
 For truly hostile multi-tenant workloads, this policy should be treated as an inner hardening layer only. Hostile tenants should be isolated with VMs, microVMs, or separate servers.
 
@@ -64,13 +64,13 @@ This policy does not claim to fully protect against:
 
 ## 2.1 Preferred App Root
 
-Applications should be deployed under:
+BonesDeploy projects should be deployed under:
 
 ```text
 /srv/apps/<app-name>/
 ```
 
-Preferred app structure:
+Preferred BonesDeploy app structure:
 
 ```text
 /srv/apps/<app-name>/
@@ -87,7 +87,7 @@ Preferred app structure:
   logs/        # optional; /var/log/<app-name> is also acceptable
 ```
 
-Only the app's public web directory should be exposed by the web server, for example:
+Only the app's `public_path` should be exposed by the web server, for example:
 
 ```text
 /srv/apps/<app-name>/current/public
@@ -106,36 +106,37 @@ The web server must not expose:
 
 ## 2.2 `/srv` vs `/var/www`
 
-`/srv/apps` is preferred over `/var/www` for multi-app deployment because it represents service/application data, not merely web document roots.
+`/srv/apps` is preferred over `/var/www` for BonesDeploy-managed applications because it represents service/application data, not merely web document roots.
 
 `/var/www` is acceptable only for simple static sites or conventional web roots where no private source code, secrets, runtime state, or deployment metadata is stored beneath the served path.
 
 ## 2.3 Ownership Rules
 
-Each app must have its own Unix user and group:
+Each app must have its own Unix service user and group:
 
 ```text
 app1 -> user app1, group app1
 app2 -> user app2, group app2
 ```
 
-Expected ownership:
+Expected ownership and control:
 
 ```text
 /srv/apps/app1              root:root or deploy:deploy
-/srv/apps/app1/releases     deploy:deploy or root:deploy
+/srv/apps/app1/releases     deploy:deploy while staging
 /srv/apps/app1/current      symlink managed by deploy/root
-/srv/apps/app1/shared       app1:app1 or deploy:app1 with strict modes
-/srv/apps/app1/cache        app1:app1
-/srv/apps/app1/tmp          app1:app1
-/srv/apps/app1/logs         app1:app1 or root:adm depending on logging model
+/srv/apps/app1/shared       service-user:service-user or deploy:service-user with strict modes
+/srv/apps/app1/cache        service-user:service-user
+/srv/apps/app1/tmp          service-user:service-user
+/srv/apps/app1/logs         service-user:service-user or root:adm depending on logging model
 ```
 
-The runtime app user should not generally own immutable release code. A good default is:
+The deploy user prepares releases, but the active release tree should be service-user-owned after activation and post-deploy hardening. A good default is:
 
 ```text
-release code: deploy-owned or root-owned, read-only to app user
-runtime writable dirs: app-owned
+staging/build workspace: deploy-owned or root-owned
+active release tree: service-owned
+runtime writable dirs: service-owned
 ```
 
 ## 2.4 Permission Rules
@@ -146,17 +147,17 @@ Suggested baseline:
 
 ```text
 /srv/apps                  0751 root:root
-/srv/apps/<app>            0750 root:<app-group> or deploy:<app-group>
-/srv/apps/<app>/releases   0750 deploy:<app-group>
-/srv/apps/<app>/shared     0750 <app-user>:<app-group>
-/srv/apps/<app>/tmp        0700 <app-user>:<app-group>
-/srv/apps/<app>/cache      0700 <app-user>:<app-group>
+/srv/apps/<app>            0750 root:<service-group> or deploy:<service-group>
+/srv/apps/<app>/releases   0750 deploy:<service-group>
+/srv/apps/<app>/shared     0750 <service-user>:<service-group>
+/srv/apps/<app>/tmp        0700 <service-user>:<service-group>
+/srv/apps/<app>/cache      0700 <service-user>:<service-group>
 ```
 
 Secret files should be stricter:
 
 ```text
-.env                       0640 root:<app-group> or deploy:<app-group>
+.env                       0640 root:<service-group> or deploy:<service-group>
 private keys               0600 owner-only
 SQLite DBs                 0600 or 0640 depending on group access
 ```
@@ -165,7 +166,7 @@ World-readable app directories should be treated as a finding unless explicitly 
 
 ## 2.5 Writable Directory Rules
 
-Runtime processes should only be able to write to explicitly approved directories, such as:
+Service processes should only be able to write to explicitly approved directories, such as:
 
 ```text
 /srv/apps/<app>/shared/storage
@@ -176,7 +177,7 @@ Runtime processes should only be able to write to explicitly approved directorie
 /var/log/<app> or /srv/apps/<app>/logs
 ```
 
-Runtime app users should not be able to write to:
+Service users should not be able to write to:
 
 ```text
 /srv/apps/<app>/current
@@ -198,7 +199,7 @@ Runtime app users should not be able to write to:
 
 ## 3.1 One App, One Unix User
 
-Each app should run as a dedicated unprivileged Unix user.
+Each app should run as a dedicated unprivileged Unix service user.
 
 Bad:
 
@@ -216,9 +217,9 @@ app2 runs as app2
 app3 runs as app3
 ```
 
-## 3.2 No Login Shells for App Users
+## 3.2 No Login Shells for Service Users
 
-App runtime users should generally have no interactive shell:
+Service users should generally have no home directory and no interactive shell:
 
 ```text
 /usr/sbin/nologin
@@ -227,33 +228,33 @@ App runtime users should generally have no interactive shell:
 
 Exception: temporary debugging access may be granted, but it should be time-limited and removed afterward.
 
-## 3.3 No Sudo for App Users
+## 3.3 No Sudo for Service Users
 
-App runtime users must not have sudo privileges.
+Service users must not have sudo privileges.
 
 The following should be treated as critical findings:
 
 ```text
-app user in sudo group
-app user in wheel group
-app user has NOPASSWD sudo rule
-app user can run package manager commands with sudo
-app user can restart arbitrary system services with sudo
+service user in sudo group
+service user in wheel group
+service user has NOPASSWD sudo rule
+service user can run package manager commands with sudo
+service user can restart arbitrary system services with sudo
 ```
 
 ## 3.4 Deploy User Separation
 
-The deployment user should be distinct from runtime app users.
+The deployment user should be distinct from service users.
 
 Example:
 
 ```text
 deploy user: deploy or bonesdeploy
-runtime user: app1, app2, app3
+service user: app1, app2, app3
 web server user: nginx or www-data
 ```
 
-The deploy user may manage releases and symlinks, but application runtime users should not be able to mutate deployment metadata or other app releases.
+The deploy user may manage releases and symlinks, but service users should not be able to mutate deployment metadata or other app releases.
 
 ---
 
@@ -267,8 +268,8 @@ Each app service should use as many of the following as practical:
 
 ```ini
 [Service]
-User=<app-user>
-Group=<app-group>
+User=<service-user>
+Group=<service-group>
 WorkingDirectory=/srv/apps/<app>/current
 NoNewPrivileges=true
 PrivateTmp=true
@@ -653,7 +654,7 @@ logs
 
 ## 10.2 Secrets Access
 
-Only the specific runtime user or service requiring a secret should be able to read it.
+Only the specific service user or service requiring a secret should be able to read it.
 
 The deploy worker should not pass all global secrets to every build job.
 
@@ -664,12 +665,12 @@ Build jobs should receive only the minimum secrets required for that exact job.
 The agent should flag:
 
 - `.env` files world-readable
-- `.env` files readable by unrelated app users
+- `.env` files readable by unrelated service users
 - secrets under public web roots
 - secrets copied into release artifacts
 - secrets present in logs
 - secrets exposed through systemd unit files readable by all users
-- SSH private keys readable by app users
+- SSH private keys readable by service users
 - package manager tokens readable by untrusted build scripts
 
 ---
@@ -686,7 +687,7 @@ www-data
 caddy
 ```
 
-It should not run as an application runtime user unless explicitly justified.
+It should not run as a service user unless explicitly justified.
 
 ## 11.2 Static File Access
 
@@ -734,16 +735,16 @@ If SQLite is used, database files should be app-specific and protected:
 Permissions:
 
 ```text
-0600 <app-user>:<app-group>
+0600 <service-user>:<service-group>
 ```
 
 or, if deploy/backup group access is needed:
 
 ```text
-0640 <app-user>:<restricted-group>
+0640 <service-user>:<restricted-group>
 ```
 
-Other app users should not be able to read SQLite files.
+Other service users should not be able to read SQLite files.
 
 ## 12.2 Network Databases
 
@@ -779,7 +780,7 @@ If shared, logical separation should be used where possible, but for stronger is
 
 ## 13.1 Separate Deployment Service
 
-Deployment orchestration should run as a dedicated user, not as root unless absolutely necessary.
+Deployment orchestration should run as the BonesDeploy deploy user, not as root unless absolutely necessary.
 
 Example:
 
@@ -798,11 +799,11 @@ Deployments should use release directories and atomic symlink flips:
 /srv/apps/<app>/current -> releases/<release-id>
 ```
 
-App runtime users should not mutate old releases or deployment metadata.
+Service users should not mutate old releases or deployment metadata.
 
 ## 13.3 Build Isolation
 
-Builds should occur in a staging/build workspace, not directly inside the live release path.
+Builds should occur in a staging/build workspace, not directly inside the public path or active release tree.
 
 Example:
 
@@ -812,7 +813,7 @@ Example:
 
 Build scripts should be run with:
 
-- Dedicated build user or app user
+- Dedicated build user or deploy user
 - No sudo
 - Dropped capabilities
 - cgroup limits
@@ -829,9 +830,9 @@ The agent should flag:
 - Build scripts running as deploy user with broad access to all apps
 - Package install scripts inheriting production secrets
 - Build workspace shared across apps
-- Live release path writable during build
-- Current symlink writable by app runtime user
-- Deployment SSH keys readable by app runtime user
+- Public path writable during build
+- Current symlink writable by service user
+- Deployment SSH keys readable by service user
 
 ---
 
@@ -844,9 +845,9 @@ Access to the Docker socket is equivalent to root-level control of the host in m
 The agent should treat the following as critical unless explicitly justified:
 
 ```text
-app user can access /var/run/docker.sock
+service user can access /var/run/docker.sock
 container mounts /var/run/docker.sock
-app user is in docker group
+service user is in docker group
 ```
 
 ## 14.2 Container Hardening
@@ -902,7 +903,7 @@ Root login should be disabled unless there is a documented emergency access mode
 
 Deployment SSH keys should be readable only by the deploy user or root.
 
-App runtime users should not be able to read deployment keys.
+Service users should not be able to read deployment keys.
 
 The agent should flag:
 
@@ -933,7 +934,7 @@ Application logs should not contain:
 
 Logs should be writable by the app or captured by journald, but not broadly writable by unrelated users.
 
-Other app users should not be able to read sensitive logs.
+Other service users should not be able to read sensitive logs.
 
 ## 16.3 Audit Signals
 
@@ -956,16 +957,16 @@ The agent should flag missing or disabled logs for critical services.
 
 Backup jobs often need broad read access. Therefore, backup users/services should be treated as high-privilege.
 
-Backup credentials should not be readable by app users.
+Backup credentials should not be readable by service users.
 
 ## 17.2 Backup Storage
 
-Backups should not be stored inside public web roots or app directories readable by app users.
+Backups should not be stored inside public_path or app directories readable by service users.
 
 The agent should flag:
 
 - `.tar`, `.zip`, `.sql`, `.sqlite`, `.bak`, `.dump` files under public directories
-- backups readable by unrelated app users
+- backups readable by unrelated service users
 - backups containing secrets without encryption
 - backup credentials available to runtime apps
 
@@ -977,7 +978,7 @@ The agent should flag:
 
 Production services should not generally need to run package managers at runtime.
 
-The agent should flag if runtime app users can run or write to package manager global locations unnecessarily:
+The agent should flag if service users can run or write to package manager global locations unnecessarily:
 
 ```text
 npm global dirs
@@ -991,7 +992,7 @@ cargo global paths
 
 Dependencies should be installed during build/deploy, not by the runtime web process.
 
-Runtime app users should not need write access to:
+Service users should not need write access to:
 
 ```text
 node_modules
@@ -1023,11 +1024,11 @@ findmnt
 ```bash
 getent passwd
 getent group
-sudo -l -U <app-user>
-groups <app-user>
+sudo -l -U <service-user>
+groups <service-user>
 ```
 
-Check whether app users:
+Check whether service users:
 
 - have login shells
 - belong to sudo/wheel/docker groups
@@ -1124,20 +1125,20 @@ Do not print secret contents into logs or reports unless explicitly requested. R
 ## Critical Findings
 
 - App service runs as root without necessity
-- App user has sudo/wheel/docker access
+- Service user has sudo/wheel/docker access
 - App can read another app's secrets or database
 - Docker socket exposed to app/container
 - Public web access to `.env`, `.git`, database files, backups, or private keys
-- SSH private keys readable by app users
+- SSH private keys readable by service users
 - Database/Redis/Memcached publicly exposed without strong auth/firewalling
 - Build scripts run as root with untrusted input
 
 ## High Findings
 
-- All apps run as one shared Unix user
+- All apps run as one shared Unix service user
 - AppArmor disabled or app services unconfined
 - No cgroup limits on untrusted workers
-- Runtime app can write to release/source code directories
+- Service user can write to release/source code directories
 - Broad write access to `/srv/apps/**`
 - `NoNewPrivileges=false` or absent for app services
 - Dangerous capabilities granted unnecessarily
@@ -1147,7 +1148,7 @@ Do not print secret contents into logs or reports unless explicitly requested. R
 
 - No `ProtectSystem` or weak systemd hardening
 - No `PrivateTmp`
-- Logs readable by unrelated app users
+- Logs readable by unrelated service users
 - Upload directories allow script execution
 - App backend binds publicly instead of localhost/private socket
 - App has broader read access than necessary
@@ -1196,16 +1197,16 @@ exception:
 
 # 22. Desired End State Summary
 
-A well-configured server should look like this:
+A well-configured BonesDeploy server should look like this:
 
 ```text
 /srv/apps/<app> layout per app
-one Unix user per app
-no app users with sudo/docker/root access
-runtime users cannot write immutable release code
+one Unix service user per app
+no service users with sudo/docker/root access
+service users cannot write immutable release code
 only app-specific writable dirs are writable
 secrets readable only by intended service users
-nginx/caddy exposes only public web dirs and reverse proxies to local backends
+nginx/caddy exposes only public_path and reverse proxies to local backends
 systemd hardening enabled per service
 capabilities dropped by default
 NoNewPrivileges enabled

@@ -240,7 +240,7 @@ Ensures both the playbook and roles directory exist before proceeding.
 **Source:** `remote_setup.rs:48-57`
 
 ```rust
-let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
+let public_path_parent = resolve_public_path_parent(&cfg.data.public_path);
 let inventory = format!("{},", cfg.data.host);
 let roles_path = env::var("ANSIBLE_ROLES_PATH")
     .ok()
@@ -249,7 +249,7 @@ let roles_path = env::var("ANSIBLE_ROLES_PATH")
 ```
 
 **Variables:**
-- `live_root_parent`: Parent directory of live root (e.g., `/var/www` from `/var/www/myapp`)
+- `public_path_parent`: Parent directory of public path (e.g., `/var/www` from `/var/www/myapp`)
 - `inventory`: Comma-separated host list (trailing comma required for single host)
 - `roles_path`: Colon-separated path to Ansible roles (respects existing `ANSIBLE_ROLES_PATH`)
 
@@ -277,9 +277,9 @@ command
     .arg("-e")
     .arg(format!("group={}", cfg.permissions.defaults.group))
     .arg("-e")
-    .arg(format!("live_root_parent={live_root_parent}"))
+    .arg(format!("public_path_parent={public_path_parent}"))
     .arg("-e")
-    .arg(format!("live_root={}", cfg.data.live_root))
+    .arg(format!("public_path={}", cfg.data.public_path))
     .arg("-e")
     .arg(format!("deploy_root={}", cfg.data.deploy_root))
     .arg("-e")
@@ -302,8 +302,8 @@ command
 | `deploy_user` | `git` (default) | User that runs deployments |
 | `service_user` | `{project_name}` | User that runs the application |
 | `group` | `www-data` | Group for files |
-| `live_root_parent` | `/var/www` | Parent of live root |
-| `live_root` | `/var/www/{project}` | Symlink to active release |
+| `public_path_parent` | `/var/www` | Parent of public path |
+| `public_path` | `/var/www/{project}` | Symlink to active release |
 | `deploy_root` | `/srv/deployments/{project}` | All releases directory |
 | `project_name` | `{project}` | Project identifier |
 | `git_dir` | `/home/git/{project}.git` | Bare repository path |
@@ -353,8 +353,8 @@ ansible-playbook \
   -e "deploy_user=git" \
   -e "service_user=myapp" \
   -e "group=www-data" \
-  -e "live_root_parent=/var/www" \
-  -e "live_root=/var/www/myapp" \
+  -e "public_path_parent=/var/www" \
+  -e "public_path=/var/www/myapp" \
   -e "deploy_root=/srv/deployments/myapp" \
   -e "project_name=myapp" \
   -e "git_dir=/home/git/myapp.git" \
@@ -376,7 +376,7 @@ The playbook typically includes tasks for:
 
 3. **Directory Structure**
    - Create `deploy_root` (`/srv/deployments/myapp`)
-   - Create `live_root` parent (`/var/www`)
+    - Create `public_path` parent (`/var/www`)
    - Create initial placeholder release
    - Set up shared directory
    - Configure permissions

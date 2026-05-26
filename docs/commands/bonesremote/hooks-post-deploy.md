@@ -90,11 +90,11 @@ if status.success() {
 
 If the service is active, restarts it. This causes nginx to:
 1. Stop serving the old release
-2. Re-read the `live_root` symlink (now pointing to new release)
+2. Re-read the `public_path` symlink (now pointing to new release)
 3. Start serving the new release
 
 **Why restart instead of reload?**
-- Ensures nginx picks up the new `live_root` symlink
+- Ensures nginx picks up the new `public_path` symlink
 - Cleaner than trying to reload with changed paths
 - Minimal downtime (typically < 1 second)
 
@@ -269,7 +269,7 @@ permissions:
 
 data:
   project_name: myapp
-  live_root: /var/www/myapp
+  public_path: /var/www/myapp
   git_dir: /home/git/myapp.git
 ```
 
