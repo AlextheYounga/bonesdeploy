@@ -2,25 +2,46 @@
 
 ## Purpose
 
-Secrets should stay in protected, app-specific locations and only be readable by the identities that need them.
+Secrets should be stored only in project-specific protected locations and be readable only by the identities that actually need them.
 
-## Rules
+## Secrets Placement
 
-- Keep secrets out of Git, logs, public paths, and shared build caches.
-- Prefer `shared/.env`, `EnvironmentFile`, or another strict per-app secret location.
-- Do not hand every build job every secret.
-- Service users should not be able to read deployment SSH keys.
+Secrets should be stored only in protected locations such as:
 
-## BonesDeploy Notes
+```text
+/srv/deployments/<project>/shared/.env
+/etc/<project>/env
+systemd EnvironmentFile with strict permissions
+```
 
-- This policy aligns with the `deploy_user` / `service_user` split in `docs/PROJECT.md`.
-- `bonesdeploy init` and remote setup should keep secret paths separate from the served path.
-- Post-deploy hardening should never broaden secret readability.
+Secrets should not be stored in:
+
+```text
+Git repositories
+release directories readable by unrelated users
+world-readable files
+web-served directories
+shell history
+shared build caches
+shared temp directories
+logs
+```
+
+## Secrets Access
+
+Only the specific service or identity requiring a secret should be able to read it.
+The deploy worker should not pass all global secrets to every build job.
+Build jobs should receive only the minimum secrets required for that exact job.
 
 ## Findings
 
-- `.env` world-readable
-- secrets stored in a web-served directory
+The agent or operator should flag:
+
+- `.env` files world-readable
+- `.env` files readable by unrelated service users
+- secrets under public web roots
 - secrets copied into release artifacts
-- SSH keys readable by service users
-- build jobs receive secrets they do not need
+- secrets present in logs
+- secrets exposed through unit files readable by all users
+- SSH private keys readable by service users
+- package-manager tokens readable by untrusted build scripts

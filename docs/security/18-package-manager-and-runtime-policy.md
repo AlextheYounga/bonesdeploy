@@ -2,20 +2,37 @@
 
 ## Purpose
 
-Production runtime processes should not need package manager privileges or write access to dependency stores.
+Production services should not generally need package-manager privileges or write access to dependency stores at runtime.
 
-## Rules
+## Package Managers in Production
 
-- Dependencies should normally be installed during build or deploy, not at runtime.
-- Service users should not write to global package-manager locations.
-- Runtime processes should not receive broader dependency-write access than necessary.
+The agent or operator should flag if service users can run or write to package-manager global locations unnecessarily:
 
-## BonesDeploy Notes
+```text
+npm global dirs
+composer global auth or cache
+pip global locations
+gem global paths
+cargo global paths
+```
 
-- This fits the release/deploy split used by `bonesremote release-stage` and `release-activate`.
-- Keep runtime code immutable so post-deploy hardening can make the active release service-owned but not mutable.
+## Build vs Runtime Separation
+
+Dependencies should be installed during build or deploy, not by the runtime web process.
+Service users should not need write access to:
+
+```text
+node_modules
+vendor
+.venv
+bundle
+```
+
+unless the application is explicitly designed for dynamic plugin or dependency installation.
 
 ## Findings
+
+The agent or operator should flag:
 
 - service user can write package-manager globals
 - runtime process installs dependencies on demand

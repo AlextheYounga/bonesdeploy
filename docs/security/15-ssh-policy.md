@@ -2,23 +2,32 @@
 
 ## Purpose
 
-SSH should be key-based, restricted, and separated from runtime service identities.
+SSH should be key-based, restricted, and kept separate from runtime service identities.
 
-## Rules
+## SSH Access
 
-- Password auth should be disabled on exposed SSH unless there is a specific reason.
-- Root login should be disabled unless there is a documented emergency path.
-- Deployment SSH keys should be readable only by the deploy identity or root.
-- Service users should not read deployment keys.
+SSH should use key-based authentication.
+Recommended baseline:
 
-## BonesDeploy Notes
+```text
+PasswordAuthentication no
+PermitRootLogin no
+PubkeyAuthentication yes
+```
 
-- `deploy_user` is the SSH/deployment identity, not the service runtime identity.
-- `bonesdeploy init` should keep the deploy and service identities distinct.
+Root login should be disabled unless there is a documented emergency access model.
+
+## SSH Keys
+
+Deployment SSH keys should be readable only by the deploy user or root.
+Service users should not be able to read deployment keys.
 
 ## Findings
 
-- password auth enabled on internet-facing SSH
+The agent or operator should flag:
+
+- private keys world-readable or group-readable by broad groups
+- service users with SSH private keys
+- shared SSH keys across unrelated projects
 - root login enabled without justification
-- private keys are group-readable by broad groups
-- service users can read deployment keys
+- password auth enabled on internet-facing SSH without justification

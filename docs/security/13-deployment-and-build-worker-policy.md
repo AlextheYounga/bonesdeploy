@@ -5,22 +5,51 @@
 Deployment and build work should be separated from runtime service execution.
 The deploy identity can manage releases, but it should not become the runtime identity.
 
-## Rules
+## Separate Deployment Service
 
-- Deployment orchestration should run as `deploy_user`, not root.
-- Release work should use release directories and atomic symlink flips.
-- Build scripts should run in `deploy_root/build/workspace`, not in `public_path`.
-- Build jobs should use the minimum secrets, permissions, and network access required.
+Deployment orchestration should run as the BonesDeploy deploy user, not as root unless absolutely necessary.
+Where root actions are needed, use narrow, audited helper commands rather than broad sudo.
 
-## BonesDeploy Notes
+## Atomic Releases
 
-- This policy matches `bonesremote release-stage`, `release-wire`, `release-activate`, and `hooks-post-deploy`.
-- `bonesdeploy remote-setup` should create the layout needed for this separation.
-- The active release tree should become service-owned after activation and hardening.
+Deployments should use release directories and atomic symlink flips:
+
+```text
+/srv/deployments/<project>/runtime/<release-id>
+/srv/deployments/<project>/current -> runtime/<release-id>
+/var/www/<project> -> /srv/deployments/<project>/current
+```
+
+Service users should not mutate old releases or deployment metadata.
+
+## Build Isolation
+
+Builds should occur in a staging workspace, not directly inside `public_path` or the active release tree.
+In the current model that workspace is:
+
+```text
+/srv/deployments/<project>/build/workspace
+```
+
+Build scripts should run with:
+
+- deploy user or another dedicated build identity
+- no sudo
+- dropped capabilities where possible
+- cgroup limits
+- AppArmor profile where available
+- Landlock restrictions where practical
+- minimal secrets
+- controlled network access
 
 ## Findings
 
-- build script runs as root
-- build workspace is shared across projects
-- public path is writable during build
-- deployment SSH keys are readable by the service user
+The agent or operator should flag:
+
+- build scripts running as root
+- build scripts running as deploy user with broad access to all projects
+- package install scripts inheriting production secrets
+- build workspace shared across projects
+- public path writable during build
+- current symlink writable by service user
+- deployment SSH keys readable by service user

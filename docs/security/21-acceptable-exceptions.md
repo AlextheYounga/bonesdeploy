@@ -2,29 +2,42 @@
 
 ## Purpose
 
-Exceptions are allowed when they are narrow, explicit, and documented.
+Exceptions are allowed when they are explicit, narrow, and documented.
+They should never silently become the default operating model.
 
-## Rules
+## Required Fields
 
-- Every exception should name the service, the control being relaxed, the reason, and the review date.
-- Compensating controls should be listed alongside the exception.
-- Exceptions should never become silent defaults.
+Each exception should include:
 
-## BonesDeploy Notes
-
-- Use exceptions only when the current `deploy_user` / `service_user` / `public_path` model truly needs them.
-- If an exception weakens the active release hardening, document the reason and the compensating controls.
+```yaml
+exception:
+  service: <service-name>
+  control: <policy-control-being-relaxed>
+  reason: <why-this-is-required>
+  compensating_controls:
+    - <control>
+  review_date: <date>
+```
 
 ## Example
 
 ```yaml
 exception:
-  service: example.service
+  service: image-processor.service
   control: MemoryMax higher than default
-  reason: Large workload needs more memory
+  reason: Large image transformations need more memory
   compensating_controls:
-    - Dedicated service user
+    - Runs as dedicated user
     - AppArmor enforced
     - No sudo
+    - PrivateTmp enabled
   review_date: 2026-08-01
 ```
+
+## Findings
+
+The agent or operator should flag:
+
+- undocumented exceptions
+- broad exceptions with no compensating controls
+- expired exceptions that were never reviewed

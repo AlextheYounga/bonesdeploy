@@ -2,22 +2,22 @@
 
 ## Purpose
 
-Backups need broad read access in some cases, but that makes them high-value targets.
+Backup jobs often need broad read access, which makes them high-value and high-privilege.
 
-## Rules
+## Backup Access
 
-- Backups should not live inside public paths.
-- Backup credentials should not be readable by service users.
-- Backup archives should not be world-readable.
-- Secrets in backups should be encrypted or otherwise protected as required by policy.
+Backup users or services should be treated as privileged infrastructure.
+Backup credentials should not be readable by service users.
 
-## BonesDeploy Notes
+## Backup Storage
 
-- Backups should not interfere with the active release or `shared/` runtime state.
-- Treat backup jobs as privileged infrastructure, not app runtime.
+Backups should not be stored inside `public_path` or under application paths readable by unrelated service users.
 
 ## Findings
 
-- backup archives under public directories
-- backup credentials readable by service users
-- backups exposed to unrelated projects
+The agent or operator should flag:
+
+- `.tar`, `.zip`, `.sql`, `.sqlite`, `.bak`, or `.dump` files under public directories
+- backups readable by unrelated service users
+- backups containing secrets without encryption
+- backup credentials available to runtime applications

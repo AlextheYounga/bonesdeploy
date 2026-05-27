@@ -3,24 +3,50 @@
 ## Purpose
 
 The web server should expose only the public surface of a project.
-It should never become a back door into release trees, shared state, or deployment metadata.
+It should not provide a back door into release trees, shared state, deployment metadata, or sensitive files.
 
-## Rules
+## Web Server User Separation
 
-- Web server users should stay separate from service users.
-- Static roots should point only at `public_path`, which resolves to `/var/www/<project>` and then to `/srv/deployments/<project>/current`.
-- Upload directories should not execute code.
-- Sensitive files such as `.env`, `.git`, backups, and databases must not be web-accessible.
+The web server should run as its own user such as:
 
-## BonesDeploy Notes
+```text
+nginx
+www-data
+caddy
+```
 
-- `docs/commands/bonesremote/landlock-nginx.md` should serve from `public_path` and not the whole release tree.
-- `docs/commands/bonesremote/release-activate.md` makes the served path follow the active release atomically.
-- `docs/commands/bonesremote/hooks-post-deploy.md` should harden ownership after activation, not before.
+It should not run as a project `service_user` unless there is an explicit documented reason.
+
+## Static File Access
+
+The web server should read only the public or static directories needed for serving.
+In the current BonesDeploy model, it should serve only from `public_path`.
+
+Good:
+
+```text
+/var/www/app1 -> /srv/deployments/app1/current
+```
+
+Bad:
+
+```text
+web root exposes /srv/deployments/app1/current directly
+web root exposes /srv/deployments/app1
+web root exposes /srv/deployments
+```
+
+## Uploads
+
+Uploaded files should not be executable.
+Upload directories should avoid script execution.
+For stacks such as PHP applications, upload directories must not allow uploaded scripts to execute.
 
 ## Findings
 
-- web root exposes the app root instead of `public_path`
+The agent or operator should flag:
+
+- web roots that expose app root instead of `public_path`
 - directory listing enabled unintentionally
-- upload directory can execute scripts
-- `.env`, `.git`, logs, or databases are reachable over HTTP
+- upload directories that allow script execution
+- sensitive files accessible over HTTP such as `.env`, `.git`, backups, SQLite DBs, or logs

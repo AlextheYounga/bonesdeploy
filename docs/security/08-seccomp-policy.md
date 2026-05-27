@@ -2,24 +2,41 @@
 
 ## Purpose
 
-Seccomp should be used where practical to reduce risky syscall families.
-It is especially useful when the service or worker handles untrusted input.
+Where practical, services should use seccomp syscall filtering to reduce unnecessary syscall surface.
 
-## Rules
+## Recommended Usage
 
-- Prefer systemd syscall filtering for long-running services when it fits the app.
-- Use runtime seccomp profiles for containers.
-- Treat mount, ptrace, raw IO, kernel module, and BPF access as high-risk unless required.
-- Document any exception that needs a dangerous syscall family.
+For systemd services, consider:
 
-## BonesDeploy Notes
+```ini
+SystemCallFilter=
+SystemCallArchitectures=native
+```
 
-- Seccomp complements the systemd baseline in `docs/security/04-systemd-service-hardening.md`.
-- It should be evaluated for app services, build workers, and containerized workers.
+For containers, use runtime seccomp profiles.
+
+Seccomp is especially useful when a service or worker handles untrusted input or executes child processes with complex dependency trees.
+
+## High-Risk Syscall Families
+
+The agent or operator should identify whether services have access to high-risk syscall families such as:
+
+- mounting filesystems
+- kernel module operations
+- raw IO
+- ptrace
+- keyring abuse
+- namespace creation when not required
+- BPF operations when not required
+
+Systemd hardening options may cover some of these more safely than maintaining a large custom syscall list by hand.
 
 ## Findings
 
-- untrusted service has no syscall restrictions
-- broad namespace creation permissions
-- mount-related syscalls available without need
-- ptrace or BPF access available without need
+The agent or operator should flag:
+
+- services with no syscall restrictions when they run untrusted code
+- broad permission for namespace creation in untrusted workers
+- broad permission for mount-related syscalls
+- `ptrace` available without need
+- BPF-related permissions available without need

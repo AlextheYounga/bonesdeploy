@@ -2,25 +2,46 @@
 
 ## Purpose
 
-Cgroups should prevent one app or worker from exhausting the host.
+Cgroups should prevent one project or worker from exhausting the host.
 Resource limits are part of the security model, not just performance tuning.
 
-## Rules
+## Required Controls
 
-- Each app service should have memory, CPU, and task limits.
-- Build workers should also have cgroup limits.
-- Untrusted or bursty processes should never run with unlimited resources.
-- Shared service cgroups across unrelated apps should be avoided.
+Every application service should have resource limits appropriate to its role.
+Minimum recommended controls:
 
-## BonesDeploy Notes
+```ini
+TasksMax=256
+MemoryMax=<app-specific>
+CPUQuota=<app-specific>
+```
 
-- Apply limits to the service managed after `bonesremote release activate`.
-- Build and deployment jobs should use explicit limits in the same spirit as the app service.
-- Keep the limits documented so `bonesdeploy doctor` can compare intent against reality.
+For heavier services, use documented higher values.
+
+## Security Goals
+
+Cgroups should help prevent:
+
+- fork bombs
+- unlimited memory growth
+- one project monopolizing CPU
+- excessive process or thread creation
+- some forms of IO abuse
+
+## Scope
+
+Resource isolation should cover:
+
+- long-lived application services
+- deploy workers that execute untrusted or bursty jobs
+- other background workers that can create many subprocesses or consume large memory spikes
 
 ## Findings
 
-- no `TasksMax` or very high task limit
-- no memory limit on an app service
-- no CPU control for untrusted workers
-- multiple apps share one service cgroup unnecessarily
+The agent or operator should flag:
+
+- no `TasksMax` or very high task limits
+- no memory limit on application services
+- no CPU control for untrusted or bursty workers
+- build workers with no cgroup limits
+- multiple projects sharing one service cgroup unnecessarily

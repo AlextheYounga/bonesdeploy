@@ -2,21 +2,43 @@
 
 ## Purpose
 
-Logs should help with incident response without leaking secrets or becoming writable by unrelated users.
+Logs should support incident response without leaking secrets or becoming writable by unrelated users.
 
-## Rules
+## Logs Should Not Leak Secrets
 
-- Logs must not contain secrets, tokens, or private key material.
-- Logs should be owned and permissioned so unrelated service users cannot read them.
-- Keep systemd journal, auth logs, sudo logs, AppArmor denials, web logs, and deployment logs available for review.
+Application logs should not contain:
 
-## BonesDeploy Notes
+- `.env` contents
+- Authorization headers
+- API tokens
+- OAuth secrets
+- database passwords
+- private keys
+- session cookies
+- full request bodies containing credentials
 
-- Post-deploy and service restart flows should keep log visibility intact.
-- If logs live under a project directory, that directory should remain out of the web server path.
+## Log Permissions
+
+Logs should be writable by the application or captured by journald, but not broadly writable by unrelated users.
+Other service users should not be able to read sensitive logs.
+
+## Audit Signals
+
+The system should preserve logs useful for security review:
+
+- systemd journal for application services
+- auth logs
+- sudo logs
+- AppArmor denials
+- web server access and error logs
+- deployment logs
+
+Missing or disabled logs for critical services should be treated as findings.
 
 ## Findings
 
-- logs contain secrets
-- logs are readable by unrelated service users
-- critical audit logs are missing or disabled
+The agent or operator should flag:
+
+- logs containing secrets
+- logs readable by unrelated service users
+- critical audit logs missing or disabled
