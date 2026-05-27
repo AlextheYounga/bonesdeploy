@@ -3,8 +3,9 @@ data:
   project_name: ''
   host: ''
   port: '22'
-  git_dir: '/home/git/<project_name>.git'
-  worktree: '/var/www/<project_name>'
+  repo_path: '/home/git/<project_name>.git'
+  project_root: '/srv/deployments/<project_name>'
+  web_root: 'public'
   branch: 'master'
 
 permissions:

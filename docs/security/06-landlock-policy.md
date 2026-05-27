@@ -31,7 +31,7 @@ allow read:       /lib
 allow read:       /lib64
 allow read:       /etc/ssl
 allow read/write: /srv/deployments/app1/build/workspace
-allow read/write: /srv/deployments/app1/runtime/<new-release>
+allow read/write: /srv/deployments/app1/releases/<new-release>
 deny:             /srv/deployments/app2
 deny:             /srv/deployments/app3
 deny:             /srv/deployments/app1/shared/.env unless required

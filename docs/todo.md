@@ -30,9 +30,9 @@
 - [x] Upload post-receive hook to remote bare repo
 
 ## Phase 5: bonesdeploy push
-- [x] Implement rsync of `.bones/` to `{git_dir}/bones/` on remote
-- [x] Delete sample hooks from remote bare repo `{git_dir}/hooks/`
-- [x] Symlink `{git_dir}/bones/hooks/*` to `{git_dir}/hooks/` on remote
+- [x] Implement rsync of `.bones/` to `{repo_path}/bones/` on remote
+- [x] Delete sample hooks from remote bare repo `{repo_path}/hooks/`
+- [x] Symlink `{repo_path}/bones/hooks/*` to `{repo_path}/hooks/` on remote
 
 ## Phase 6: bonesdeploy doctor
 - [x] Local checks:
@@ -41,8 +41,8 @@
   - [x] `pre-push` hook is symlinked to `.git/hooks/pre-push`
 - [x] Remote checks (over SSH, skipped with `--local`):
   - [x] `bonesremote` is globally available on remote
-  - [x] `{git_dir}/bones/` exists on remote
-  - [x] `{git_dir}/bones/hooks/` entries match `{git_dir}/hooks/` symlinks
+  - [x] `{repo_path}/bones/` exists on remote
+  - [x] `{repo_path}/bones/hooks/` entries match `{repo_path}/hooks/` symlinks
 - [x] Implement `--local` flag (pre-push hook uses this since remote is validated independently by bonesremote doctor)
 
 ## Phase 7: bonesremote init

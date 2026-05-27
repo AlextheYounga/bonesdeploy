@@ -79,8 +79,8 @@ This will:
 BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.yaml`:
 
 - `port = "22"`
-- `live_root = "/var/www/<project_name>"`
-- `deploy_root = "/srv/deployments/<project_name>"`
+- `web_root = "/var/www/<project_name>"`
+- `project_root = "/srv/deployments/<project_name>"`
 - `deploy_user = "git"`
 - `service_user = "<project_name>"`
 - `group = "www-data"`
@@ -162,9 +162,9 @@ bonesdeploy doctor --local  # check local only
 data:
   remote_name: "production"
   project_name: "myproject"
-  git_dir: "/home/git/myproject.git"
-  live_root: "/var/www/myproject"
-  deploy_root: "/srv/deployments/myproject"
+  repo_path: "/home/git/myproject.git"
+  web_root: "/var/www/myproject"
+  project_root: "/srv/deployments/myproject"
   branch: "master"
   deploy_on_push: true
 
@@ -193,7 +193,7 @@ ssl:
   email: ""
 ```
 
-`host` and `git_dir` are inferred from the deployment remote URL when possible; if parsing fails, init asks only for those missing values.
+`host` and `repo_path` are inferred from the deployment remote URL when possible; if parsing fails, init asks only for those missing values.
 
 ## Project Structure
 

@@ -13,12 +13,12 @@ use super::drop_failed_release;
 pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
-    let runtime_path = release_state::release_dir(&cfg, &release_name);
+    let release_path = release_state::release_dir(&cfg, &release_name);
     let build_root = release_state::build_root(&cfg);
-    let deployment_dir = Path::new(&cfg.data.git_dir).join("bones").join("deployment");
+    let deployment_dir = Path::new(&cfg.data.repo_path).join("bones").join("deployment");
 
-    if !runtime_path.exists() {
-        bail!("Staged runtime directory does not exist: {}", runtime_path.display());
+    if !release_path.exists() {
+        bail!("Staged release directory does not exist: {}", release_path.display());
     }
 
     if !build_root.exists() {
@@ -50,28 +50,28 @@ pub fn run(config_path: &str) -> Result<()> {
         println!("All deployment scripts completed.");
     }
 
-    publish_runtime_tree(&build_root, &runtime_path)?;
+    publish_release_tree(&build_root, &release_path)?;
 
     activate_release::run(config_path)
 }
 
-fn publish_runtime_tree(build_root: &Path, runtime_path: &Path) -> Result<()> {
-    clear_directory(runtime_path)?;
+fn publish_release_tree(build_root: &Path, release_path: &Path) -> Result<()> {
+    clear_directory(release_path)?;
 
     let copy_source = build_root.join(".");
-    let status = Command::new("cp").arg("-a").arg(&copy_source).arg(runtime_path).status().with_context(|| {
-        format!("Failed to copy build workspace {} to runtime tree {}", build_root.display(), runtime_path.display())
+    let status = Command::new("cp").arg("-a").arg(&copy_source).arg(release_path).status().with_context(|| {
+        format!("Failed to copy build workspace {} to release tree {}", build_root.display(), release_path.display())
     })?;
 
     if !status.success() {
         bail!(
-            "Failed to publish runtime tree from {} to {}: status {status}",
+            "Failed to publish release tree from {} to {}: status {status}",
             build_root.display(),
-            runtime_path.display()
+            release_path.display()
         );
     }
 
-    println!("Published runtime tree: {}", runtime_path.display());
+    println!("Published release tree: {}", release_path.display());
     Ok(())
 }
 
@@ -117,7 +117,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{clear_directory, list_deployment_scripts, publish_runtime_tree};
+    use super::{clear_directory, list_deployment_scripts, publish_release_tree};
 
     fn temp_dir(prefix: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
@@ -170,30 +170,30 @@ mod tests {
         fs::remove_dir_all(deployment_dir).ok();
     }
 
-    // Verifies release publish is a full replacement copy, preserving expected hidden/runtime files.
+    // Verifies release publish is a full replacement copy, preserving expected hidden files.
     #[test]
-    fn publish_runtime_tree_replaces_runtime_contents_with_build_workspace() {
+    fn publish_release_tree_replaces_release_contents_with_build_workspace() {
         let root = temp_dir("bonesremote_deploy_publish");
         let build_root = root.join("build_workspace");
-        let runtime_root = root.join("runtime_release");
+        let release_root = root.join("release_tree");
         fs::create_dir_all(&build_root).unwrap_or_else(|error| panic!("failed to create build_root: {error}"));
-        fs::create_dir_all(&runtime_root).unwrap_or_else(|error| panic!("failed to create runtime_root: {error}"));
+        fs::create_dir_all(&release_root).unwrap_or_else(|error| panic!("failed to create release_root: {error}"));
 
         write_file(&build_root.join("public/index.html"), "<h1>ok</h1>");
         write_file(&build_root.join(".env.example"), "KEY=value");
-        write_file(&runtime_root.join("stale.txt"), "old");
+        write_file(&release_root.join("stale.txt"), "old");
 
-        publish_runtime_tree(&build_root, &runtime_root)
-            .unwrap_or_else(|error| panic!("publish_runtime_tree failed: {error}"));
+        publish_release_tree(&build_root, &release_root)
+            .unwrap_or_else(|error| panic!("publish_release_tree failed: {error}"));
 
-        assert!(!runtime_root.join("stale.txt").exists());
+        assert!(!release_root.join("stale.txt").exists());
         assert_eq!(
-            fs::read_to_string(runtime_root.join("public/index.html"))
+            fs::read_to_string(release_root.join("public/index.html"))
                 .unwrap_or_else(|error| panic!("failed to read published file: {error}")),
             "<h1>ok</h1>"
         );
         assert_eq!(
-            fs::read_to_string(runtime_root.join(".env.example"))
+            fs::read_to_string(release_root.join(".env.example"))
                 .unwrap_or_else(|error| panic!("failed to read published hidden file: {error}")),
             "KEY=value"
         );

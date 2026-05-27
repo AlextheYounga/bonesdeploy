@@ -15,8 +15,8 @@ Where root actions are needed, use narrow, audited helper commands rather than b
 Deployments should use release directories and atomic symlink flips:
 
 ```text
-/srv/deployments/<project>/runtime/<release-id>
-/srv/deployments/<project>/current -> runtime/<release-id>
+/srv/deployments/<project>/releases/<release-id>
+/srv/deployments/<project>/current -> releases/<release-id>
 /var/www/<project> -> /srv/deployments/<project>/current
 ```
 
@@ -24,7 +24,7 @@ Service users should not mutate old releases or deployment metadata.
 
 ## Build Isolation
 
-Builds should occur in a staging workspace, not directly inside `public_path` or the active release tree.
+Builds should occur in a staging workspace, not directly inside `web_root` or the active release tree.
 In the current model that workspace is:
 
 ```text

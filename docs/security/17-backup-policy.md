@@ -11,7 +11,7 @@ Backup credentials should not be readable by service users.
 
 ## Backup Storage
 
-Backups should not be stored inside `public_path` or under application paths readable by unrelated service users.
+Backups should not be stored inside `web_root` or under application paths readable by unrelated service users.
 
 ## Findings
 

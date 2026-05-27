@@ -24,7 +24,7 @@ fn e2e_bonesdeploy_init_does_not_claim_to_create_the_remote_user() -> Result<()>
     repo::write_minimal_bones_project(&sandbox.path)?;
     std::fs::write(
         sandbox.path.join(".bones/bones.yaml"),
-        "data:\n  remote_name: production\n  project_name: e2eapp\n  host: 127.0.0.1\n  port: \"22\"\n  git_dir: /home/git/e2eapp.git\n  branch: master\n  deploy_on_push: true\npermissions:\n  defaults:\n    deploy_user: git\n    service_user: e2eapp\n    group: www-data\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\n  shared_paths:\n    - .env\n    - storage\nssl:\n  enabled: false\n  domain: \"\"\n  email: \"\"\n",
+        "data:\n  remote_name: production\n  project_name: e2eapp\n  host: 127.0.0.1\n  port: \"22\"\n  repo_path: /home/git/e2eapp.git\n  project_root: /srv/deployments/e2eapp\n  web_root: public\n  branch: master\n  deploy_on_push: true\npermissions:\n  defaults:\n    deploy_user: git\n    service_user: e2eapp\n    group: www-data\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\n  shared_files:\n    - .env\n  shared_dirs:\n    - storage\nssl:\n  enabled: false\n  domain: \"\"\n  email: \"\"\n",
     )?;
 
     let status = Command::new("git")

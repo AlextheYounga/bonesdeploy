@@ -17,10 +17,10 @@ BonesDeploy's isolation model depends on a few core identities and paths:
 
 - `deploy_user` handles SSH and deployment orchestration.
 - `service_user` runs the long-lived application process.
-- `deploy_root` stores build state, release trees, shared state, and deploy-managed symlinks.
-- `public_path` is the stable user-facing path, normally `/var/www/<project>`.
+- `project_root` stores build state, release trees, shared state, and deploy-managed symlinks.
+- `web_root` is the stable user-facing path, normally `/var/www/<project>`.
 
-In the current model, `public_path` points to `deploy_root/current`, and `current` points to the active directory under `deploy_root/runtime/<release-id>`.
+In the current model, `web_root` points to `project_root/current`, and `current` points to the active directory under `project_root/releases/<release-id>`.
 
 ## Assumed Threats
 
@@ -62,7 +62,7 @@ Within BonesDeploy, good isolation means:
 - deploy work happens just in time instead of mutating live state early
 - build steps work in isolated staging state, not in the active public tree
 - the active release becomes `service_user`-owned after activation and hardening
-- `public_path` remains a stable symlink to the active release
+- `web_root` remains a stable symlink to the active release
 - service processes see only the active release and approved writable paths
 - failed deploys do not leave broadened permissions or partially mutated live state behind
 

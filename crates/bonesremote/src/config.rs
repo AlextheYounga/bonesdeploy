@@ -22,7 +22,7 @@ impl Constants {
     pub const STAGED_RELEASE_FILE: &str = ".staged_release";
     pub const BUILD_DIR: &str = "build";
     pub const BUILD_WORKSPACE_DIR: &str = "workspace";
-    pub const RUNTIME_DIR: &str = "runtime";
+    pub const RELEASES_DIR: &str = "releases";
     pub const SHARED_DIR: &str = "shared";
     pub const CURRENT_LINK: &str = "current";
 }
@@ -34,9 +34,9 @@ pub struct Data {
     pub project_name: String,
     pub host: String,
     pub port: String,
-    pub git_dir: String,
-    pub live_root: String,
-    pub deploy_root: String,
+    pub repo_path: String,
+    pub project_root: String,
+    pub web_root: String,
     pub branch: String,
     pub deploy_on_push: bool,
 }
@@ -48,9 +48,9 @@ impl Default for Data {
             project_name: String::new(),
             host: String::new(),
             port: "22".into(),
-            git_dir: String::new(),
-            live_root: String::new(),
-            deploy_root: String::new(),
+            repo_path: String::new(),
+            project_root: String::new(),
+            web_root: String::new(),
             branch: "master".into(),
             deploy_on_push: true,
         }
@@ -61,12 +61,13 @@ impl Default for Data {
 #[serde(default)]
 pub struct Releases {
     pub keep: usize,
-    pub shared_paths: Vec<String>,
+    pub shared_files: Vec<String>,
+    pub shared_dirs: Vec<String>,
 }
 
 impl Default for Releases {
     fn default() -> Self {
-        Self { keep: 5, shared_paths: Vec::new() }
+        Self { keep: 5, shared_files: Vec::new(), shared_dirs: Vec::new() }
     }
 }
 
@@ -125,12 +126,27 @@ fn apply_derived_defaults(config: &mut BonesConfig) {
     if config.permissions.defaults.service_user.is_empty() {
         config.permissions.defaults.service_user = project_name.clone();
     }
-    if config.data.live_root.is_empty() {
-        config.data.live_root = format!("/var/www/{project_name}");
+    if config.data.repo_path.is_empty() {
+        config.data.repo_path = default_repo_path_for(project_name);
     }
-    if config.data.deploy_root.is_empty() {
-        config.data.deploy_root = format!("/srv/deployments/{project_name}");
+    if config.data.project_root.is_empty() {
+        config.data.project_root = default_project_root_for(project_name);
     }
+    if config.data.web_root.is_empty() {
+        config.data.web_root = default_web_root();
+    }
+}
+
+pub fn default_repo_path_for(project_name: &str) -> String {
+    format!("/home/git/{project_name}.git")
+}
+
+pub fn default_project_root_for(project_name: &str) -> String {
+    format!("/srv/deployments/{project_name}")
+}
+
+pub fn default_web_root() -> String {
+    String::from("public")
 }
 
 #[cfg(test)]
@@ -139,22 +155,20 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::load;
+    use super::{default_project_root_for, default_repo_path_for, default_web_root, load};
 
     fn temp_file_path(prefix: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
         std::env::temp_dir().join(format!("{prefix}_{}_{}.yaml", std::process::id(), nanos))
     }
 
-    // Confirms omitted ownership/location fields derive from project identity.
     #[test]
-    fn load_derives_service_user_and_roots_from_project_name() {
+    fn load_derives_service_user_project_root_repo_path_and_web_root() {
         let path = temp_file_path("bonesremote_config_derived_defaults");
         let yaml = r#"
 data:
   project_name: acme
   host: example.com
-  git_dir: /home/git/acme.git
 "#;
 
         fs::write(&path, yaml).unwrap_or_else(|error| panic!("failed to write test config: {error}"));
@@ -162,19 +176,20 @@ data:
         fs::remove_file(&path).ok();
 
         assert_eq!(cfg.permissions.defaults.service_user, "acme");
-        assert_eq!(cfg.data.live_root, "/var/www/acme");
-        assert_eq!(cfg.data.deploy_root, "/srv/deployments/acme");
+        assert_eq!(cfg.data.repo_path, default_repo_path_for("acme"));
+        assert_eq!(cfg.data.project_root, default_project_root_for("acme"));
+        assert_eq!(cfg.data.web_root, default_web_root());
     }
 
-    // Confirms explicit operator overrides are preserved and never replaced by derived defaults.
     #[test]
-    fn load_preserves_explicit_service_user_and_roots() {
+    fn load_preserves_explicit_service_user_and_paths() {
         let path = temp_file_path("bonesremote_config_explicit_values");
         let yaml = r#"
 data:
   project_name: acme
-  live_root: /custom/live
-  deploy_root: /custom/deploy
+  repo_path: /custom/repo.git
+  project_root: /custom/deploy
+  web_root: dist
 permissions:
   defaults:
     service_user: web
@@ -185,11 +200,11 @@ permissions:
         fs::remove_file(&path).ok();
 
         assert_eq!(cfg.permissions.defaults.service_user, "web");
-        assert_eq!(cfg.data.live_root, "/custom/live");
-        assert_eq!(cfg.data.deploy_root, "/custom/deploy");
+        assert_eq!(cfg.data.repo_path, "/custom/repo.git");
+        assert_eq!(cfg.data.project_root, "/custom/deploy");
+        assert_eq!(cfg.data.web_root, "dist");
     }
 
-    // Confirms baseline defaults keep config load resilient when optional sections are absent.
     #[test]
     fn load_uses_defaults_for_missing_fields() {
         let path = temp_file_path("bonesremote_config_missing_fields");
@@ -202,9 +217,10 @@ permissions:
         assert_eq!(cfg.data.branch, "master");
         assert_eq!(cfg.permissions.defaults.deploy_user, "git");
         assert_eq!(cfg.releases.keep, 5);
+        assert!(cfg.releases.shared_files.is_empty());
+        assert!(cfg.releases.shared_dirs.is_empty());
     }
 
-    // Invalid YAML must fail loudly so broken config does not proceed into deployment.
     #[test]
     fn load_fails_for_invalid_yaml() {
         let path = temp_file_path("bonesremote_config_invalid_yaml");
@@ -216,7 +232,6 @@ permissions:
         assert!(result.is_err());
     }
 
-    // Missing config path must be an immediate error to prevent implicit fallback behavior.
     #[test]
     fn load_fails_for_missing_file() {
         let path = temp_file_path("bonesremote_config_missing_file");
@@ -224,7 +239,6 @@ permissions:
         assert!(result.is_err());
     }
 
-    // Empty project name should not invent an invalid service user.
     #[test]
     fn load_keeps_default_service_user_when_project_name_is_empty() {
         let path = temp_file_path("bonesremote_config_empty_project");
@@ -237,8 +251,6 @@ data:
         let cfg = load(&path).unwrap_or_else(|error| panic!("failed to load test config: {error}"));
         fs::remove_file(&path).ok();
 
-        // This codifies intended behavior: service_user should stay explicit/default when
-        // project name is missing, instead of becoming an empty user.
         assert_eq!(cfg.permissions.defaults.service_user, "");
     }
 }

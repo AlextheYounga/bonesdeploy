@@ -8,7 +8,7 @@ pub struct RemoteConnectionDetails {
     pub user: String,
     pub host: String,
     pub port: String,
-    pub git_dir: String,
+    pub repo_path: String,
 }
 
 pub fn ensure_git_repository() -> Result<()> {
@@ -104,7 +104,7 @@ fn parse_ssh_style_url(url: &str) -> Option<RemoteConnectionDetails> {
         return None;
     }
 
-    Some(RemoteConnectionDetails { user: parse_user(authority), host, port, git_dir: path.to_string() })
+    Some(RemoteConnectionDetails { user: parse_user(authority), host, port, repo_path: path.to_string() })
 }
 
 fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
@@ -117,13 +117,18 @@ fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
     if !right.starts_with('/') {
         return None;
     }
-    let git_dir = right.to_string();
+    let repo_path = right.to_string();
 
-    if host.is_empty() || !has_git_extension(&git_dir) {
+    if host.is_empty() || !has_git_extension(&repo_path) {
         return None;
     }
 
-    Some(RemoteConnectionDetails { user: parse_user(left), host: host.to_string(), port: String::from("22"), git_dir })
+    Some(RemoteConnectionDetails {
+        user: parse_user(left),
+        host: host.to_string(),
+        port: String::from("22"),
+        repo_path,
+    })
 }
 
 fn parse_user(authority: &str) -> String {
@@ -140,14 +145,14 @@ mod tests {
 
     // Verifies full SSH URL parsing so deploy targets keep explicit host/port/git-dir wiring.
     #[test]
-    fn parse_ssh_style_url_parses_host_port_and_git_dir() {
+    fn parse_ssh_style_url_parses_host_port_and_repo_path() {
         let details = parse_ssh_style_url("ssh://git@example.com:2222/home/git/myapp.git");
         assert!(details.is_some());
         if let Some(details) = details {
             assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "2222");
-            assert_eq!(details.git_dir, "/home/git/myapp.git");
+            assert_eq!(details.repo_path, "/home/git/myapp.git");
         }
     }
 
@@ -160,20 +165,20 @@ mod tests {
             assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
-            assert_eq!(details.git_dir, "/home/git/myapp.git");
+            assert_eq!(details.repo_path, "/home/git/myapp.git");
         }
     }
 
     // Verifies SCP-style remotes are accepted only when they point at absolute git directories.
     #[test]
-    fn parse_scp_style_url_parses_absolute_git_dir() {
+    fn parse_scp_style_url_parses_absolute_repo_path() {
         let details = parse_scp_style_url("git@example.com:/home/git/myapp.git");
         assert!(details.is_some());
         if let Some(details) = details {
             assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
-            assert_eq!(details.git_dir, "/home/git/myapp.git");
+            assert_eq!(details.repo_path, "/home/git/myapp.git");
         }
     }
 
