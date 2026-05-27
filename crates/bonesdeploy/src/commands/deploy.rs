@@ -9,7 +9,7 @@ pub async fn run() -> Result<()> {
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
     let cfg = config::load(bones_yaml)?;
 
-    let git_dir = &cfg.data.git_dir;
+    let repo_path = &cfg.data.repo_path;
 
     println!("Deploying {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
 
@@ -19,7 +19,7 @@ pub async fn run() -> Result<()> {
     ssh::stream_cmd(
         &session,
         &format!(
-            "BONES_FORCE_DEPLOY=1 GIT_DIR='{git_dir}' '{git_dir}/{}/{}' </dev/null",
+            "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
             config::Constants::REMOTE_HOOKS_DIR,
             config::Constants::PRE_RECEIVE_HOOK
         ),
@@ -30,7 +30,7 @@ pub async fn run() -> Result<()> {
     ssh::stream_cmd(
         &session,
         &format!(
-            "BONES_FORCE_DEPLOY=1 GIT_DIR='{git_dir}' '{git_dir}/{}/{}' </dev/null",
+            "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
             config::Constants::REMOTE_HOOKS_DIR,
             config::Constants::POST_RECEIVE_HOOK
         ),

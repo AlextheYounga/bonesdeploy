@@ -19,7 +19,7 @@
 - name: Deploy per-site nginx config
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../nginx/site-nginx.conf.j2"
-    dest: "{{ git_dir }}/bones/nginx.conf"
+    dest: "{{ repo_path }}/bones/nginx.conf"
     owner: "{{ service_user }}"
     group: "{{ group }}"
     mode: "0640"

@@ -93,9 +93,9 @@ mod tests {
                 project_name: String::from("acme"),
                 host: String::from("example.com"),
                 port: String::from("22"),
-                git_dir: temp_root.join("repo.git").to_string_lossy().to_string(),
-                live_root: temp_root.join("live_root").to_string_lossy().to_string(),
-                deploy_root: temp_root.join("deploy_root").to_string_lossy().to_string(),
+                repo_path: temp_root.join("repo.git").to_string_lossy().to_string(),
+                project_root: temp_root.join("project_root").to_string_lossy().to_string(),
+                web_root: String::from("public"),
                 branch: String::from("main"),
                 deploy_on_push: true,
             },
@@ -109,21 +109,25 @@ mod tests {
                 },
                 paths: Vec::new(),
             },
-            releases: config::Releases { keep, shared_paths: vec![String::from(".env")] },
+            releases: config::Releases {
+                keep,
+                shared_files: vec![String::from(".env")],
+                shared_dirs: vec![String::from("storage")],
+            },
         }
     }
 
     fn make_release(root: &std::path::Path, name: &str) {
-        fs::create_dir_all(root.join("deploy_root/runtime").join(name))
+        fs::create_dir_all(root.join("project_root/releases").join(name))
             .unwrap_or_else(|error| panic!("failed to create release dir: {error}"));
     }
 
     fn set_current_release(root: &std::path::Path, name: &str) {
-        let deploy_root = root.join("deploy_root");
-        let runtime = deploy_root.join("runtime");
-        fs::create_dir_all(&runtime).unwrap_or_else(|error| panic!("failed to create runtime dir: {error}"));
-        let target = runtime.join(name);
-        std::os::unix::fs::symlink(&target, deploy_root.join("current"))
+        let project_root = root.join("project_root");
+        let releases = project_root.join("releases");
+        fs::create_dir_all(&releases).unwrap_or_else(|error| panic!("failed to create releases dir: {error}"));
+        let target = releases.join(name);
+        std::os::unix::fs::symlink(&target, project_root.join("current"))
             .unwrap_or_else(|error| panic!("failed to create current symlink: {error}"));
     }
 
@@ -141,9 +145,9 @@ mod tests {
         let pruned = prune_old_releases(&cfg).unwrap_or_else(|error| panic!("prune_old_releases failed: {error}"));
 
         assert_eq!(pruned, vec!["20260101_000000"]);
-        assert!(!root.join("deploy_root/runtime/20260101_000000").exists());
-        assert!(root.join("deploy_root/runtime/20260102_000000").exists());
-        assert!(root.join("deploy_root/runtime/20260103_000000").exists());
+        assert!(!root.join("project_root/releases/20260101_000000").exists());
+        assert!(root.join("project_root/releases/20260102_000000").exists());
+        assert!(root.join("project_root/releases/20260103_000000").exists());
 
         fs::remove_dir_all(root).ok();
     }
@@ -161,8 +165,8 @@ mod tests {
         let pruned = prune_old_releases(&cfg).unwrap_or_else(|error| panic!("prune_old_releases failed: {error}"));
 
         assert!(pruned.is_empty());
-        assert!(root.join("deploy_root/runtime/20260101_000000").exists());
-        assert!(root.join("deploy_root/runtime/20260102_000000").exists());
+        assert!(root.join("project_root/releases/20260101_000000").exists());
+        assert!(root.join("project_root/releases/20260102_000000").exists());
 
         fs::remove_dir_all(root).ok();
     }

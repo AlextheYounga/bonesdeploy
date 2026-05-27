@@ -104,7 +104,7 @@ let status = Command::new("git")
     .arg("--work-tree")
     .arg(&build_root)
     .arg("--git-dir")
-    .arg(&cfg.data.git_dir)
+    .arg(&cfg.data.repo_path)
     .arg("checkout")
     .arg("-f")
     .arg(checkout_target)
@@ -238,7 +238,7 @@ When run as a Git hook, the following environment variables are available:
 ssh::stream_cmd(
     &session,
     &format!(
-        "BONES_FORCE_DEPLOY=1 GIT_DIR='{git_dir}' '{git_dir}/{}/{}' </dev/null",
+        "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
         config::Constants::REMOTE_HOOKS_DIR,
         config::Constants::POST_RECEIVE_HOOK
     ),
@@ -292,7 +292,7 @@ data:
 /srv/deployments/myapp/
 ├── build/
 │   └── workspace/           # Empty
-├── runtime/
+├── releases/
 │   └── 20260507_150432/     # Staged, empty
 └── shared/
     ├── .env
@@ -311,7 +311,7 @@ data:
 │       ├── public/
 │       ├── package.json
 │       └── ... (all project files)
-├── runtime/
+├── releases/
 │   └── 20260507_150432/     # Still empty, waiting for deployment
 └── shared/
     ├── .env

@@ -46,20 +46,21 @@ Loads `bones.yaml` to get site configuration.
 
 ---
 
-### 3. Resolve Active Runtime Root
+### 3. Resolve Active Web Root
 
 **Source:** `landlock_nginx.rs:17-18`
 
 ```rust
-let active_runtime_root = fs::canonicalize(&cfg.data.live_root)
-    .with_context(|| format!("Failed to resolve live_root: {}", cfg.data.live_root))?;
+let current_release_root = release_state::current_release_dir(&cfg)?;
+let active_web_root = fs::canonicalize(current_release_root.join(&cfg.data.web_root))
+    .with_context(|| format!("Failed to resolve web_root: {}", current_release_root.join(&cfg.data.web_root).display()))?;
 ```
 
-Resolves the `live_root` symlink to the actual release directory.
+Resolves the configured web root inside the active release directory.
 
 **Example:**
-- `live_root`: `/var/www/myapp` (symlink)
-- `active_runtime_root`: `/srv/deployments/myapp/runtime/20260507_150000` (resolved)
+- `web_root`: `public`
+- `active_web_root`: `/srv/deployments/myapp/releases/20260507_150000/public`
 
 ---
 
@@ -69,7 +70,7 @@ Resolves the `live_root` symlink to the actual release directory.
 
 ```rust
 let socket_dir = PathBuf::from("/run").join(&cfg.data.project_name);
-let policy = build_policy(&active_runtime_root, &socket_dir);
+let policy = build_policy(&active_web_root, &socket_dir);
 ```
 
 #### 4.1 Define Read-Only Paths
@@ -84,7 +85,7 @@ for system_path in landlock::default_system_read_paths() {
 ```
 
 **Read-only access granted to:**
-1. **Runtime root** - Application code and assets (e.g., `/srv/deployments/myapp/runtime/20260507_150000`)
+1. **Web root** - Application code and assets (e.g., `/srv/deployments/myapp/releases/20260507_150000/public`)
 2. **System paths** - Essential system directories:
    - `/usr` - User programs
    - `/lib`, `/lib64` - Shared libraries
@@ -143,7 +144,7 @@ Applies the Landlock policy to the current process.
 3. All future filesystem operations are restricted
 
 **After this point, nginx can only:**
-- Read from: site's release directory, system paths
+- Read from: site's active release directory, system paths
 - Write to: `/run/{project_name}/`
 - All other filesystem access is denied
 
@@ -154,7 +155,7 @@ Applies the Landlock policy to the current process.
 **Source:** `landlock_nginx.rs:25-29`
 
 ```rust
-let nginx_conf = format!("{}/bones/nginx.conf", cfg.data.git_dir);
+let nginx_conf = format!("{}/bones/nginx.conf", cfg.data.repo_path);
 let mut command = Command::new("nginx");
 command.args(["-c", &nginx_conf, "-g", "daemon off;"]);
 
@@ -168,7 +169,7 @@ Creates a `Command` to run nginx with:
 - `-c {path}`: Path to per-site nginx config
 - `-g "daemon off;"`: Run in foreground (required for systemd)
 
-**Config location:** `{git_dir}/bones/nginx.conf` (e.g., `/home/git/myapp.git/bones/nginx.conf`)
+**Config location:** `{repo_path}/bones/nginx.conf` (e.g., `/home/git/myapp.git/bones/nginx.conf`)
 
 #### 6.2 Execute (exec)
 
@@ -230,8 +231,8 @@ Even if nginx is compromised:
 **Before Landlock:**
 ```
 nginx can access:
-  ✅ /srv/deployments/site-a/runtime/20260507_150000
-  ✅ /srv/deployments/site-b/runtime/20260507_140000 ❌ (should not be accessible)
+  ✅ /srv/deployments/site-a/releases/20260507_150000
+  ✅ /srv/deployments/site-b/releases/20260507_140000 ❌ (should not be accessible)
   ✅ /etc/shadow ❌ (should not be accessible)
   ✅ /home/user ❌ (should not be accessible)
 ```
@@ -239,7 +240,7 @@ nginx can access:
 **After Landlock:**
 ```
 nginx can access:
-  ✅ /srv/deployments/site-a/runtime/20260507_150000 (read-only)
+  ✅ /srv/deployments/site-a/releases/20260507_150000 (read-only)
   ✅ /run/site-a/ (read-write)
   ✅ /usr, /lib, /etc (read-only)
   ❌ /srv/deployments/site-b (denied)
@@ -282,7 +283,7 @@ WantedBy=multi-user.target
 
 ## Nginx Configuration
 
-Per-site nginx config is stored at `{git_dir}/bones/nginx.conf`:
+Per-site nginx config is stored at `{repo_path}/bones/nginx.conf`:
 
 ```nginx
 daemon off;
@@ -318,7 +319,7 @@ http {
 - Listens on unix socket (not port)
 - All temp paths under `/run/{project}/`
 - Logs to stderr (for systemd/journald)
-- Serves from `live_root`
+- Serves from `web_root`
 
 ---
 

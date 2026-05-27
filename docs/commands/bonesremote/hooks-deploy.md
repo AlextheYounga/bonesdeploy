@@ -51,7 +51,7 @@ Loads deployment configuration.
 let release_name = release_state::read_staged_release(&cfg)?;
 ```
 
-Reads the staged release from `<git_dir>/bones/.staged_release`.
+Reads the staged release from `<repo_path>/bones/.staged_release`.
 
 **Example:** `20260507_150432`
 
@@ -62,13 +62,13 @@ Reads the staged release from `<git_dir>/bones/.staged_release`.
 **Source:** `deploy.rs:19-21`
 
 ```rust
-let runtime_path = release_state::release_dir(&cfg, &release_name);
+let release_path = release_state::release_dir(&cfg, &release_name);
 let build_root = release_state::build_root(&cfg);
-let deployment_dir = Path::new(&cfg.data.git_dir).join("bones").join("deployment");
+let deployment_dir = Path::new(&cfg.data.repo_path).join("bones").join("deployment");
 ```
 
 **Paths:**
-- `runtime_path`: `/srv/deployments/myapp/runtime/20260507_150432`
+- `release_path`: `/srv/deployments/myapp/releases/20260507_150432`
 - `build_root`: `/srv/deployments/myapp/build/workspace`
 - `deployment_dir`: `/home/git/myapp.git/bones/deployment`
 
@@ -79,8 +79,8 @@ let deployment_dir = Path::new(&cfg.data.git_dir).join("bones").join("deployment
 **Source:** `deploy.rs:23-29`
 
 ```rust
-if !runtime_path.exists() {
-    bail!("Staged runtime directory does not exist: {}", runtime_path.display());
+if !release_path.exists() {
+    bail!("Staged release directory does not exist: {}", release_path.display());
 }
 
 if !build_root.exists() {
@@ -283,42 +283,42 @@ fn clear_directory(path: &Path) -> Result<()> {
 **Source:** `deploy.rs:61-79`
 
 ```rust
-fn publish_runtime_tree(build_root: &Path, runtime_path: &Path) -> Result<()> {
-    clear_directory(runtime_path)?;
+fn publish_release_tree(build_root: &Path, release_path: &Path) -> Result<()> {
+    clear_directory(release_path)?;
 
     let copy_source = build_root.join(".");
     let status = Command::new("cp")
         .arg("-a")
         .arg(&copy_source)
-        .arg(runtime_path)
+        .arg(release_path)
         .status()
         .with_context(|| {
-            format!("Failed to copy build workspace {} to runtime tree {}", build_root.display(), runtime_path.display())
+            format!("Failed to copy build workspace {} to release tree {}", build_root.display(), release_path.display())
         })?;
 
     if !status.success() {
         bail!(
-            "Failed to publish runtime tree from {} to {}: status {status}",
+            "Failed to publish release tree from {} to {}: status {status}",
             build_root.display(),
-            runtime_path.display()
+            release_path.display()
         );
     }
 
-    println!("Published runtime tree: {}", runtime_path.display());
+    println!("Published release tree: {}", release_path.display());
     Ok(())
 }
 ```
 
 **Command executed:**
 ```bash
-cp -a /srv/deployments/myapp/build/workspace/. /srv/deployments/myapp/runtime/20260507_150432/
+cp -a /srv/deployments/myapp/build/workspace/. /srv/deployments/myapp/releases/20260507_150432/
 ```
 
 **`cp -a` flags:**
 - `-a`: Archive mode (preserves permissions, ownership, symlinks, timestamps)
 - `source/.`: Copy contents of directory (not the directory itself)
 
-**Result:** All files from `build/workspace/` are copied to `runtime/20260507_150432/`.
+**Result:** All files from `build/workspace/` are copied to `releases/20260507_150432/`.
 
 **Preserved:**
 - Symlinks to shared paths
@@ -483,10 +483,10 @@ bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
 # - 04_clear_cache.sh
 
 # 4. Deploy publishes to release directory
-# cp -a build/workspace/. runtime/20260507_150432/
+# cp -a build/workspace/. releases/20260507_150432/
 
 # 5. Deploy activates release
-# current -> runtime/20260507_150432
+# current -> releases/20260507_150432
 
 # 6. Post-deploy runs (separate command)
 sudo bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.yaml
@@ -500,13 +500,13 @@ sudo bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.yaml
 /srv/deployments/myapp/
 ├── build/
 │   └── workspace/           # Build artifacts (retained for debugging)
-├── runtime/
+├── releases/
 │   ├── 20260507_140000/     # Previous release
 │   └── 20260507_150432/     # New release (populated)
 ├── shared/
 │   ├── .env
 │   └── storage/
-└── current -> runtime/20260507_150432/  # Activated
+└── current -> releases/20260507_150432/  # Activated
 
 /var/www/myapp -> /srv/deployments/myapp/current
 ```

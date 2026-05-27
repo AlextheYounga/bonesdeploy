@@ -55,7 +55,7 @@
       - "{{ ssl_email }}"
       - --webroot
       - -w
-      - "{{ live_root }}"
+      - "{{ project_root }}/current/{{ web_root }}"
       - -d
       - "{{ ssl_domain }}"
       - --keep-until-expiring

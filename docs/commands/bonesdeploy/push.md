@@ -17,7 +17,7 @@ let cfg = config::load(bones_yaml)?;
 
 Loads the deployment configuration from `.bones/bones.yaml`. Required for:
 - Remote server connection details (`host`, `port`)
-- Git directory path (`git_dir`)
+- Git directory path (`repo_path`)
 - Deploy user (`deploy_user`)
 
 ---
@@ -27,13 +27,13 @@ Loads the deployment configuration from `.bones/bones.yaml`. Required for:
 **Source:** `push.rs:14-15`
 
 ```rust
-let git_dir = &cfg.data.git_dir;
-let remote_bones = format!("{git_dir}/{}/", config::Constants::REMOTE_BONES_DIR);
+let repo_path = &cfg.data.repo_path;
+let remote_bones = format!("{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);
 ```
 
 Constructs the destination path on the remote server:
-- `git_dir`: Path to bare Git repository (e.g., `/home/git/myapp.git`)
-- `remote_bones`: `<git_dir>/bones/` (e.g., `/home/git/myapp.git/bones/`)
+- `repo_path`: Path to bare Git repository (e.g., `/home/git/myapp.git`)
+- `remote_bones`: `<repo_path>/bones/` (e.g., `/home/git/myapp.git/bones/`)
 
 ---
 
@@ -73,7 +73,7 @@ let status = Command::new("rsync")
 - `-e "ssh -p {port}"`: Use SSH with custom port
 
 **Source Path:** `.bones/` (with trailing slash means "copy contents of")
-**Destination:** `{deploy_user}@{host}:{git_dir}/bones/`
+**Destination:** `{deploy_user}@{host}:{repo_path}/bones/`
 
 **Example:**
 ```bash
@@ -119,13 +119,13 @@ Opens an SSH session to the remote server for post-sync configuration.
 ```rust
 println!("Cleaning sample hooks from remote...");
 let cmd = format!(
-    "find {git_dir}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true",
+    "find {repo_path}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true",
     config::Constants::REMOTE_HOOKS_DIR
 );
 ssh::run_cmd(&session, &cmd).await?;
 ```
 
-Removes Git's default sample hook files from `<git_dir>/hooks/`:
+Removes Git's default sample hook files from `<repo_path>/hooks/`:
 - `pre-commit.sample`
 - `post-update.sample`
 - `pre-receive.sample`
@@ -148,9 +148,9 @@ Removes Git's default sample hook files from `<git_dir>/hooks/`:
 ```rust
 println!("Symlinking hooks...");
 let cmd = format!(
-    "for hook in {git_dir}/{}/{}/{}; do \
+    "for hook in {repo_path}/{}/{}/{}; do \
         name=$(basename \"$hook\"); \
-        ln -sf \"$hook\" \"{git_dir}/{}/$name\"; \
+        ln -sf \"$hook\" \"{repo_path}/{}/$name\"; \
       done",
     config::Constants::REMOTE_BONES_DIR,
     config::Constants::REMOTE_HOOKS_DIR,
@@ -174,7 +174,7 @@ done
 
 **For each hook in `bones/hooks/`:**
 1. Extracts the hook name (e.g., `pre-receive`)
-2. Creates symlink: `<git_dir>/hooks/<name>` -> `<git_dir>/bones/hooks/<name>`
+2. Creates symlink: `<repo_path>/hooks/<name>` -> `<repo_path>/bones/hooks/<name>`
 
 **`ln -sf` Flags:**
 - `-s`: Create symbolic link
@@ -194,7 +194,7 @@ done
 
 **Why Symlinks?**
 - Hooks are versioned in `bones/hooks/` (synced via rsync)
-- Git expects hooks in `<git_dir>/hooks/`
+- Git expects hooks in `<repo_path>/hooks/`
 - Symlinks allow hooks to be updated by running `push` without manual intervention
 - Hook changes are tracked in the project repository
 
@@ -248,14 +248,14 @@ println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
 ### Files Modified on Remote
 
 **Removed:**
-- `<git_dir>/hooks/*.sample` - Sample hooks
+- `<repo_path>/hooks/*.sample` - Sample hooks
 
 **Created/Updated:**
-- `<git_dir>/bones/**` - All files from local `.bones/`
+- `<repo_path>/bones/**` - All files from local `.bones/`
 
 **Symlinked:**
-- `<git_dir>/hooks/pre-receive` -> `../bones/hooks/pre-receive`
-- `<git_dir>/hooks/post-receive` -> `../bones/hooks/post-receive`
+- `<repo_path>/hooks/pre-receive` -> `../bones/hooks/pre-receive`
+- `<repo_path>/hooks/post-receive` -> `../bones/hooks/post-receive`
 - (Any other hooks in `bones/hooks/`)
 
 ---
@@ -301,7 +301,7 @@ The `bonesdeploy push` command is **different from** `git push`:
    Cannot connect to remote: ...
    ```
 
-3. **Permission denied**: Ensure deploy_user has write access to `git_dir`
+3. **Permission denied**: Ensure deploy_user has write access to `repo_path`
    ```
    rsync failed
    ```
