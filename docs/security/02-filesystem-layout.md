@@ -2,30 +2,33 @@
 
 ## Purpose
 
-This section defines the filesystem shape BonesDeploy should work toward.
+This section defines the current BonesDeploy filesystem shape.
 It keeps release code, runtime state, and public exposure separated.
 
 ## Preferred Layout
 
 ```text
 /srv/deployments/<project>/
-  build/workspace/
+  build/
+    workspace/
   current -> runtime/<release-id>
   runtime/
     <release-id>/
   shared/
-  staged state
+  bones/
+    .staged_release
 
 /var/www/<project> -> /srv/deployments/<project>/current
 ```
 
 ## Rules
 
-- `/srv` is preferred over `/var/www` for deployment data.
+- `/srv/deployments` is the deployment root.
 - `public_path` is the only user-facing path.
 - `current` is the deployment-managed symlink.
 - `runtime/<release-id>` is immutable after activation.
 - `shared/` holds explicit runtime state like `.env` and storage.
+- staged release state lives under the bare repo in `git_dir/bones/.staged_release`.
 
 ## Ownership Model
 

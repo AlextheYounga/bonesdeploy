@@ -9,7 +9,7 @@ The deploy identity can manage releases, but it should not become the runtime id
 
 - Deployment orchestration should run as `deploy_user`, not root.
 - Release work should use release directories and atomic symlink flips.
-- Build scripts should run in a staging or workspace directory, not in `public_path`.
+- Build scripts should run in `deploy_root/build/workspace`, not in `public_path`.
 - Build jobs should use the minimum secrets, permissions, and network access required.
 
 ## BonesDeploy Notes

@@ -9,7 +9,7 @@ This section summarizes the target hardened state BonesDeploy should reach on a 
 - one Unix service user per project
 - deploy user separate from service user
 - active release tree becomes service-owned after activation
-- `public_path` exposes only the public surface
+- `public_path` exposes only the public surface from `/var/www/<project>`
 - secrets are not web-accessible
 - systemd hardening is enabled per service
 - AppArmor is enforcing where supported

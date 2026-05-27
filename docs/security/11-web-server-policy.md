@@ -8,7 +8,7 @@ It should never become a back door into release trees, shared state, or deployme
 ## Rules
 
 - Web server users should stay separate from service users.
-- Static roots should point only at `public_path`.
+- Static roots should point only at `public_path`, which resolves to `/var/www/<project>` and then to `/srv/deployments/<project>/current`.
 - Upload directories should not execute code.
 - Sensitive files such as `.env`, `.git`, backups, and databases must not be web-accessible.
 
