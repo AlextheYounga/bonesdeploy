@@ -19,7 +19,7 @@ Ensures `.bones/` exists before syncing.
 Uses `rsync -av --delete` over SSH to copy:
 
 ```bash
-<user>@<host>:<git_dir>/bones/
+<user>@<host>:<repo_path>/bones/
 ```
 
 into local `.bones/`.

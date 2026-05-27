@@ -111,7 +111,7 @@ If `.bones/bones.yaml` exists and is complete (has required fields), loads it di
 - `remote_name` (e.g., "production")
 - `project_name` (e.g., "myapp")
 - `host` (e.g., "deploy.example.com")
-- `git_dir` (e.g., "/home/git/myapp.git")
+- `repo_path` (e.g., "/home/git/myapp.git")
 
 #### 4.2 Interactive Prompts
 
@@ -121,7 +121,7 @@ If configuration is incomplete, prompts for:
 
 1. **Project Name** (`init.rs:69`)
    - Default: Current directory name
-   - Used to derive default service user, public_path, and deploy_root
+   - Used to derive default service user, web_root, and project_root
 
 2. **Branch** (`init.rs:70`)
    - Default: `master`
@@ -191,7 +191,7 @@ println!("Saved config to {}", config::Constants::BONES_YAML);
 Writes the configuration to `.bones/bones.yaml` in YAML format.
 
 **Special handling:**
-- Omits `public_path` and `deploy_root` if they match project-derived defaults (keeps config clean)
+- Omits `web_root` and `project_root` if they match project-derived defaults (keeps config clean)
 - Includes runtime configuration comment block if runtime is default/empty
 - Preserves SSL settings if previously configured
 
@@ -209,7 +209,7 @@ Checks if the configured remote name exists in the local Git repository. If not,
 
 **Implementation:**
 1. Checks if remote exists via `git remote show <name>`
-2. If missing, constructs remote URL: `<deploy_user>@<host>:<git_dir>`
+2. If missing, constructs remote URL: `<deploy_user>@<host>:<repo_path>`
    - Example: `git@deploy.example.com:/home/git/myapp.git`
 3. Adds remote via `git remote add <name> <url>`
 4. Prints confirmation message

@@ -116,7 +116,7 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
         }
     };
 
-    let git_dir = &cfg.data.git_dir;
+    let repo_path = &cfg.data.repo_path;
 
     // Check bonesremote is globally available
     if ssh::run_cmd(&session, "command -v bonesremote").await.is_err() {
@@ -124,10 +124,10 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
     }
 
     // Check bones/ folder exists on remote
-    let check_bones = format!("test -d {git_dir}/{}", config::Constants::REMOTE_BONES_DIR);
+    let check_bones = format!("test -d {repo_path}/{}", config::Constants::REMOTE_BONES_DIR);
     if ssh::run_cmd(&session, &check_bones).await.is_err() {
         issues.push(format!(
-            "{git_dir}/{}/ does not exist on remote (run 'bonesdeploy push')",
+            "{repo_path}/{}/ does not exist on remote (run 'bonesdeploy push')",
             config::Constants::REMOTE_BONES_DIR
         ));
     }
@@ -137,9 +137,9 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
 
     // Check hooks are symlinked properly
     let check_hooks = format!(
-        "for hook in {git_dir}/{}/{}/{}; do \
+        "for hook in {repo_path}/{}/{}/{}; do \
             name=$(basename \"$hook\"); \
-            link=\"{git_dir}/{}/$name\"; \
+            link=\"{repo_path}/{}/$name\"; \
             if [ ! -L \"$link\" ] || [ \"$(readlink \"$link\")\" != \"$hook\" ]; then \
                 echo \"$name\"; \
             fi; \
@@ -155,7 +155,7 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
                 let hook = hook.trim();
                 if !hook.is_empty() {
                     issues.push(format!(
-                        "{git_dir}/{}/{hook} is not properly symlinked to {}/{}/{hook}",
+                        "{repo_path}/{}/{hook} is not properly symlinked to {}/{}/{hook}",
                         config::Constants::REMOTE_HOOKS_DIR,
                         config::Constants::REMOTE_BONES_DIR,
                         config::Constants::REMOTE_HOOKS_DIR
@@ -173,8 +173,8 @@ fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
     let user = &cfg.permissions.defaults.deploy_user;
     let host = &cfg.data.host;
     let port = &cfg.data.port;
-    let git_dir = &cfg.data.git_dir;
-    let dest = format!("{user}@{host}:{git_dir}/{}/", config::Constants::REMOTE_BONES_DIR);
+    let repo_path = &cfg.data.repo_path;
+    let dest = format!("{user}@{host}:{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);
 
     let output = Command::new("rsync")
         .args([

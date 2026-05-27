@@ -19,7 +19,7 @@ Loads deployment configuration to determine:
 - Remote server hostname (`host`)
 - SSH port (`port`)
 - Deploy user (`deploy_user`)
-- Git directory path (`git_dir`)
+- Git directory path (`repo_path`)
 
 ---
 
@@ -28,7 +28,7 @@ Loads deployment configuration to determine:
 **Source:** `manage.rs:12-13`
 
 ```rust
-let remote_bones_yaml = format!("{}/{}/bones.yaml", cfg.data.git_dir, config::Constants::REMOTE_BONES_DIR);
+let remote_bones_yaml = format!("{}/{}/bones.yaml", cfg.data.repo_path, config::Constants::REMOTE_BONES_DIR);
 let remote_command = format!("bonesremote manage --config {}", shell_quote_single(&remote_bones_yaml));
 ```
 
@@ -36,7 +36,7 @@ let remote_command = format!("bonesremote manage --config {}", shell_quote_singl
 
 The `bones.yaml` on the server is located at:
 ```
-<git_dir>/bones/bones.yaml
+<repo_path>/bones/bones.yaml
 ```
 
 **Example:** `/home/git/myapp.git/bones/bones.yaml`

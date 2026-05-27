@@ -17,7 +17,7 @@ http {
 
     server {
         listen unix:/run/{{ project_name }}/nginx.sock;
-        root {{ live_root }}/public;
+        root {{ project_root }}/current/{{ web_root }};
         index index.php;
 
         location / {

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Atomically activates the staged release by switching the `current` symlink to point to the new release directory. This makes the new release live and accessible via the `public_path` symlink. The command also clears the staged release state, marking the deployment as complete.
+Atomically activates the staged release by switching the `current` symlink to point to the new release directory. This makes the new release live through `current`. The command also clears the staged release state, marking the deployment as complete.
 
 ## Command Signature
 
@@ -51,7 +51,7 @@ Loads deployment configuration to determine paths.
 let release_name = release_state::read_staged_release(&cfg)?;
 ```
 
-Reads the staged release name from `<git_dir>/bones/.staged_release`.
+Reads the staged release name from `<repo_path>/bones/.staged_release`.
 
 **Example:** `20260507_150432`
 
@@ -63,12 +63,12 @@ Reads the staged release name from `<git_dir>/bones/.staged_release`.
 
 ```rust
 let release_dir = release_state::release_dir(&cfg, &release_name);
-let public_path = Path::new(&cfg.data.public_path);
+let current_link = release_state::current_link(&cfg);
 ```
 
 **Paths:**
-- `release_dir`: `/srv/deployments/myapp/runtime/20260507_150432`
-- `public_path`: `/var/www/myapp`
+- `release_dir`: `/srv/deployments/myapp/releases/20260507_150432`
+- `current_link`: `/srv/deployments/myapp/current`
 
 ---
 
@@ -88,26 +88,26 @@ Ensures the release directory was actually created and populated.
 
 ---
 
-### 6. Validate public_path State
+### 6. Validate Current Link State
 
 **Source:** `activate_release.rs:21-23`
 
 ```rust
-if public_path.exists() && !public_path.is_symlink() {
-    bail!("public_path exists and is not a symlink: {}", public_path.display());
+if current_link.exists() && !current_link.is_symlink() {
+    bail!("current exists and is not a symlink: {}", current_link.display());
 }
 ```
 
-**Validates:** If `public_path` exists, it must be a symlink.
+**Validates:** If `current` exists, it must be a symlink.
 
 **Why?**
-- `public_path` should always be a symlink to `current`
+- `current` should always be a symlink to the active release
 - If it's a real directory, activation would fail or have unexpected behavior
 - Indicates a configuration error or manual intervention
 
 **Example Error:**
 ```
-public_path exists and is not a symlink: /var/www/myapp
+current exists and is not a symlink: /srv/deployments/myapp/current
 ```
 
 **Solution:** Remove or rename the directory, then re-run.
@@ -126,38 +126,15 @@ let current_link = release_state::current_link(&cfg);
 
 ---
 
-### 8. Atomically Switch Symlinks
+### 8. Atomically Switch Current
 
 **Source:** `activate_release.rs:27-29`
 
 ```rust
-release_state::point_symlink_atomically(public_path, &current_link)?;
 release_state::point_symlink_atomically(&current_link, &release_dir)?;
 ```
 
-#### 8.1 First Symlink: public_path → current
-
-```rust
-release_state::point_symlink_atomically(public_path, &current_link)?;
-```
-
-**Creates:** `/var/www/myapp` → `/srv/deployments/myapp/current`
-
-**Purpose:** Ensures `public_path` points to the `current` symlink.
-
-**Why two symlinks?**
-- `public_path`: User-friendly path (`/var/www/myapp`)
-- `current`: Deployment-managed path (`/srv/deployments/myapp/current`)
-- Allows changing `current` without changing `public_path`
-- `public_path` can be managed separately (e.g., for SSL setup)
-
-#### 8.2 Second Symlink: current → release
-
-```rust
-release_state::point_symlink_atomically(&current_link, &release_dir)?;
-```
-
-**Creates:** `/srv/deployments/myapp/current` → `/srv/deployments/myapp/runtime/20260507_150432`
+**Creates:** `/srv/deployments/myapp/current` → `/srv/deployments/myapp/releases/20260507_150432`
 
 **Purpose:** Points `current` to the new release.
 
@@ -225,7 +202,7 @@ pub fn clear_staged_release(cfg: &BonesConfig) -> Result<()> {
 }
 ```
 
-**Deletes:** `<git_dir>/bones/.staged_release`
+**Deletes:** `<repo_path>/bones/.staged_release`
 
 **Purpose:** Marks the deployment as complete. No staged release exists anymore.
 
@@ -250,14 +227,14 @@ Activated release: 20260507_150432
 
 ```
 /srv/deployments/myapp/
-├── runtime/
+├── releases/
 │   ├── 20260507_130000/
 │   ├── 20260507_140000/
 │   └── 20260507_150432/    # New active release
 ├── shared/
 │   ├── .env
 │   └── storage/
-└── current -> runtime/20260507_150432/  # Switched!
+└── current -> releases/20260507_150432/  # Switched!
 
 /var/www/myapp -> /srv/deployments/myapp/current  # Updated!
 
@@ -273,17 +250,17 @@ Activated release: 20260507_150432
 After activation, the symlink chain is:
 
 ```
-/var/www/myapp (public_path)
+/var/www/myapp (web_root)
     ↓
 /srv/deployments/myapp/current (current link)
     ↓
-/srv/deployments/myapp/runtime/20260507_150432 (actual release)
+/srv/deployments/myapp/releases/20260507_150432 (actual release)
 ```
 
 **Why two levels?**
-1. **public_path**: User-facing path, typically in `/var/www/`
+1. **web_root**: User-facing path, typically in `/var/www/`
 2. **current**: Deployment path, in `/srv/deployments/`
-3. **Separation of concerns**: Web server uses `public_path`, deployment manages `current`
+3. **Separation of concerns**: Web server uses `web_root`, deployment manages `current`
 
 ---
 
@@ -314,22 +291,22 @@ After activation, the symlink chain is:
 ### Pre-activation Validation
 
 1. **Release directory exists**: Confirms deployment completed
-2. **public_path is symlink**: Prevents overwriting real directory
+2. **current is symlink**: Prevents overwriting a real directory
 
 ### Why These Matter
 
 **Missing release directory:**
 ```
-Staged release directory does not exist: /srv/deployments/myapp/runtime/20260507_150432
+Staged release directory does not exist: /srv/deployments/myapp/releases/20260507_150432
 ```
 - Deployment failed or didn't run
 - No release to activate
 
-**public_path is not symlink:**
+**current is not symlink:**
 ```
-public_path exists and is not a symlink: /var/www/myapp
+current exists and is not a symlink: /srv/deployments/myapp/current
 ```
-- Someone manually created directory
+- Someone manually created a directory
 - Would conflict with symlink creation
 - Indicates configuration issue
 
@@ -350,7 +327,7 @@ git --work-tree=/srv/deployments/myapp/build/workspace \
 sudo bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
 
 # 4. Run deployment scripts
-# (scripts populate build/workspace and runtime/release)
+# (scripts populate build/workspace and releases/<release-id>/)
 
 # 5. Activate release
 bonesremote release activate --config /home/git/myapp.git/bones/bones.yaml
@@ -374,7 +351,7 @@ Failed to read staged release state at /home/git/myapp.git/bones/.staged_release
 ### Release Directory Missing
 
 ```
-Staged release directory does not exist: /srv/deployments/myapp/runtime/20260507_150432
+Staged release directory does not exist: /srv/deployments/myapp/releases/20260507_150432
 ```
 
 **Solution:** Deployment scripts didn't complete. Check deployment logs.
@@ -382,7 +359,7 @@ Staged release directory does not exist: /srv/deployments/myapp/runtime/20260507
 ### Symlink Creation Failed
 
 ```
-Failed to atomically switch symlink /srv/deployments/myapp/current -> /srv/deployments/myapp/runtime/20260507_150432
+Failed to atomically switch symlink /srv/deployments/myapp/current -> /srv/deployments/myapp/releases/20260507_150432
 ```
 
 **Possible causes:**

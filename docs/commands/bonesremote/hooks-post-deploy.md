@@ -90,11 +90,11 @@ if status.success() {
 
 If the service is active, restarts it. This causes nginx to:
 1. Stop serving the old release
-2. Re-read the `public_path` symlink (now pointing to new release)
+2. Re-read the `current` symlink (now pointing to the new release)
 3. Start serving the new release
 
 **Why restart instead of reload?**
-- Ensures nginx picks up the new `public_path` symlink
+- Ensures nginx picks up the new release via `current`
 - Cleaner than trying to reload with changed paths
 - Minimal downtime (typically < 1 second)
 
@@ -122,7 +122,7 @@ Restricts permissions on the active release to the service user.
 
 **Why harden?**
 - Deploy user (`git`) has write access during deployment
-- Service user (`myapp`) should own the runtime files
+- Service user (`myapp`) should own the release files
 - Restricts access to application code and data
 - Security best practice
 
@@ -269,13 +269,13 @@ permissions:
 
 data:
   project_name: myapp
-  public_path: /var/www/myapp
-  git_dir: /home/git/myapp.git
+  web_root: public
+  repo_path: /home/git/myapp.git
 ```
 
 **Generated service:**
 - User: `myapp`
-- WorkingDirectory: `/var/www/myapp`
+- WorkingDirectory: `/srv/deployments/myapp/current/public`
 - ExecStart: `bonesremote landlock exec --config /home/git/myapp.git/bones/bones.yaml`
 
 ---
@@ -394,7 +394,7 @@ systemctl command failed with status 1
 ### Permission Hardening Failed
 
 ```
-Failed to chown path: /srv/deployments/myapp/runtime/20260507_150000
+Failed to chown path: /srv/deployments/myapp/releases/20260507_150000
 ```
 
 **Possible causes:**
@@ -405,7 +405,7 @@ Failed to chown path: /srv/deployments/myapp/runtime/20260507_150000
 ### Pruning Failed
 
 ```
-Failed to prune old release /srv/deployments/myapp/runtime/20260507_120000
+Failed to prune old release /srv/deployments/myapp/releases/20260507_120000
 ```
 
 **Possible causes:**

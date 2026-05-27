@@ -112,7 +112,7 @@ The exact values depend on the app, but unlimited memory and unlimited task crea
 
 Within the current BonesDeploy layout:
 
-- `WorkingDirectory` should point at `deploy_root/current`
+- `WorkingDirectory` should point at `project_root/current`
 - the active release should be read-only to the service after post-deploy hardening
 - writable runtime state should live under `shared/` or `/run/<project>`
 - build state should not be writable by the long-lived application service

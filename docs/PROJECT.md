@@ -50,7 +50,7 @@ We create a `bonesremote` executable that does not require a password and allows
 │       ├── common/
 │       ├── firewall/
 │       ├── nginx/
-│       ├── runtime/
+│       ├── releases/
 │       ├── ssh/
 │       ├── ssl/
 │       └── users/
@@ -72,11 +72,11 @@ Collects the following project information from the user:
 - `remote_name`: existing remote selection when available, otherwise prompted name
 - `host`: prompted when not inferable from selected remote
 - `port`: defaults to `22`, prompt shown when remote inference is unavailable
-- `git_dir`: inferred from selected remote URL when possible, else defaults to `/home/git/{project_name}.git`
+- `repo_path`: inferred from selected remote URL when possible, else defaults to `/home/git/{project_name}.git`
 
 Everything else is defaulted for Debian/Ubuntu-first usability:
-- `public_path`: defaults to `/var/www/{project_name}`
-- `deploy_root`: defaults to `/srv/deployments/{project_name}`
+- `project_root`: defaults to `/srv/deployments/{project_name}`
+- `web_root`: defaults to `public`
 - `deploy_on_push`: defaults to `true`
 - `permissions.defaults.deploy_user`: defaults to `git`
 - `permissions.defaults.service_user`: defaults to `{project_name}` and should be created on the server as that exact project-named user
@@ -84,7 +84,8 @@ Everything else is defaulted for Debian/Ubuntu-first usability:
 - `permissions.defaults.dir_mode`: defaults to `750`
 - `permissions.defaults.file_mode`: defaults to `640`
 - `releases.keep`: defaults to `5`
-- `releases.shared_paths`: defaults to [`.env`, `storage`]
+- `releases.shared_files`: defaults to [`.env`]
+- `releases.shared_dirs`: defaults to [`storage`]
 
 Users can override any default by editing `.bones/bones.yaml` after init.
 
@@ -95,9 +96,9 @@ data:
   project_name: "lawsnipe"
   host: "deploy.example.com"
   port: "22"
-  git_dir: "/home/git/lawsnipe.git"
-  public_path: "/var/www/lawsnipe"
-  deploy_root: "/srv/deployments/lawsnipe"
+  repo_path: "/home/git/lawsnipe.git"
+  project_root: "/srv/deployments/lawsnipe"
+  web_root: "public"
   branch: "master"
   deploy_on_push: true
 
@@ -129,7 +130,8 @@ permissions:
 
 releases:
   keep: 5
-  shared_paths: [".env", "storage"]
+  shared_files: [".env"]
+  shared_dirs: ["storage"]
 
 # Optional runtime launcher settings (removed in current version).
 # Per-site nginx with landlock isolation is now configured automatically.
@@ -144,8 +146,8 @@ ssl:
 Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor --local` and we fail if the doctor command expresses any warning or errors.
-- `pre-receive` => Short-circuits when `deploy_on_push = false`. Otherwise it resolves the configured deployment branch from stdin's pushed refs (skipping deletes and pushes to other branches), then runs `bonesremote doctor` and `sudo bonesremote release stage --config ...` to prepare build/runtime directories and write staged release state.
-- `post-receive` => Re-resolves the deployment ref, then runs the full deployment pipeline by calling, in order: `bonesremote hooks post-receive --config ... --revision <newrev>` (checkout into `build/workspace`), `sudo bonesremote release wire --config ...` (just-in-time shared-path wiring), `bonesremote hooks deploy --config ...`, and `sudo bonesremote hooks post-deploy --config ...`.
+- `pre-receive` => Short-circuits when `deploy_on_push = false`. Otherwise it resolves the configured deployment branch from stdin's pushed refs (skipping deletes and pushes to other branches), then runs `bonesremote doctor` and `sudo bonesremote release stage --config ...` to prepare build and release directories and write staged release state.
+- `post-receive` => Re-resolves the deployment ref, then runs the full deployment pipeline by calling, in order: `bonesremote hooks post-receive --config ... --revision <newrev>` (checkout into `build/workspace`), `sudo bonesremote release wire --config ...` (just-in-time shared file and directory wiring), `bonesremote hooks deploy --config ...`, and `sudo bonesremote hooks post-deploy --config ...`.
 
 ### Deployment Folder
 This folder stores deployment scripts that are run by `bonesremote hooks deploy`. Files in this folder must be ordered sequentially like `01_run_deployment_concerns.sh` and `02_lockup_permissions.sh`. They are named in numerical order and all of these scripts are always run.
@@ -228,7 +230,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Gets or creates the `.bones` folder with our default scaffolding.
   - Updates `.gitignore` to add .bones folder.
   - Loads existing config from `.bones/bones.yaml` or collects user input via prompts.
-  - Creates local deployment remote if missing using `{deploy_user}@{host}:{git_dir}`.
+  - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`.
   - Prints next-step guidance to run `bonesdeploy remote setup` before first deploy.
   - Saves config to `.bones/bones.yaml`.
 
@@ -260,8 +262,8 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 
 - ****remote setup****
   - Runs `.bones/remote/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
-  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `public_path_parent`, `public_path`, `deploy_root`, and `git_dir` from `bones.yaml` as playbook variables.
-  - Initializes bare git repository at `git_dir`.
+  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `project_root_parent`, `web_root`, `project_root`, and `repo_path` from `bones.yaml` as playbook variables.
+  - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
   - Sets up per-site nginx with Landlock isolation.
   - Configures main router nginx to proxy domains to per-site unix sockets.
@@ -289,7 +291,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
     - `bonesremote` is globally available.
     - Landlock support is available on the host.
 - **release stage**
-	- Creates a staged runtime tree under `runtime/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout.
+	- Creates a staged release tree under `releases/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout.
 - **release wire**
 	- Wires shared paths into `build/workspace` after checkout.
 - **release activate**
@@ -301,9 +303,9 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 - **hooks post-receive**
 	- Checks out the resolved revision (or the configured branch if `--revision` is omitted) into `build/workspace`. Wiring is performed by a separate `release wire` call so it can run with elevated privileges just-in-time.
 - **hooks deploy**
-	- Runs deployment scripts in `build/workspace`, copies runtime-ready output into staged `runtime/<timestamp>`, drops failed staged releases on error, and activates release on success.
+	- Runs deployment scripts in `build/workspace`, copies release-ready output into staged `releases/<timestamp>`, drops failed staged releases on error, and activates release on success.
 - **landlock nginx**
-  - Resolves `public_path` to the active runtime tree, applies Landlock policy, and `exec`s per-site nginx.
+  - Resolves `web_root` to the active release tree, applies Landlock policy, and `exec`s per-site nginx.
 - **hooks post-deploy**
 	- Restarts the per-site nginx service to pick up the new release.
   - Runs a permissions hardening function setting the active release back to the layout configured in `bones.yaml`, including service-user ownership, then prunes old releases.

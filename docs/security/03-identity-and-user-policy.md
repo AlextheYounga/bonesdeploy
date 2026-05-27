@@ -88,7 +88,7 @@ This separation is necessary so a compromised app does not inherit deploy-wide a
 Within BonesDeploy's flow:
 
 - `deploy_user` stages releases and writes deployment metadata
-- `deploy_user` or root-managed helpers flip `public_path` and `current`
+- `deploy_user` or root-managed helpers flip `web_root` and `current`
 - `service_user` runs the app after activation
 - `service_user` should not mutate old releases, deploy state, or the bare repo
 

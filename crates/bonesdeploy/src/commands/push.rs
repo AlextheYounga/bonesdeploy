@@ -11,8 +11,8 @@ pub async fn run() -> Result<()> {
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
     let cfg = config::load(bones_yaml)?;
 
-    let git_dir = &cfg.data.git_dir;
-    let remote_bones = format!("{git_dir}/{}/", config::Constants::REMOTE_BONES_DIR);
+    let repo_path = &cfg.data.repo_path;
+    let remote_bones = format!("{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);
 
     // rsync .bones/ to remote
     println!("Syncing .bones/ to {remote_bones}...");
@@ -24,7 +24,7 @@ pub async fn run() -> Result<()> {
     // Delete sample hooks from bare repo
     println!("Cleaning sample hooks from remote...");
     let cmd = format!(
-        "find {git_dir}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true",
+        "find {repo_path}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true",
         config::Constants::REMOTE_HOOKS_DIR
     );
     ssh::run_cmd(&session, &cmd).await?;
@@ -32,9 +32,9 @@ pub async fn run() -> Result<()> {
     // Symlink bones hooks into bare repo hooks
     println!("Symlinking hooks...");
     let cmd = format!(
-        "for hook in {git_dir}/{}/{}/{}; do \
+        "for hook in {repo_path}/{}/{}/{}; do \
             name=$(basename \"$hook\"); \
-            ln -sf \"$hook\" \"{git_dir}/{}/$name\"; \
+            ln -sf \"$hook\" \"{repo_path}/{}/$name\"; \
           done",
         config::Constants::REMOTE_BONES_DIR,
         config::Constants::REMOTE_HOOKS_DIR,
@@ -54,8 +54,8 @@ fn rsync_bones(cfg: &config::BonesConfig) -> Result<()> {
     let user = &cfg.permissions.defaults.deploy_user;
     let host = &cfg.data.host;
     let port = &cfg.data.port;
-    let git_dir = &cfg.data.git_dir;
-    let dest = format!("{user}@{host}:{git_dir}/{}/", config::Constants::REMOTE_BONES_DIR);
+    let repo_path = &cfg.data.repo_path;
+    let dest = format!("{user}@{host}:{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);
 
     let status = Command::new("rsync")
         .args([

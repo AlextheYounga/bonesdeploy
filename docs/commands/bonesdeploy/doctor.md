@@ -222,10 +222,10 @@ Verifies that `bonesremote` binary is installed globally on the remote server.
 **Source:** `doctor.rs:126-133`
 
 ```rust
-let check_bones = format!("test -d {git_dir}/{}", config::Constants::REMOTE_BONES_DIR);
+let check_bones = format!("test -d {repo_path}/{}", config::Constants::REMOTE_BONES_DIR);
 if ssh::run_cmd(&session, &check_bones).await.is_err() {
     issues.push(format!(
-        "{git_dir}/{}/ does not exist on remote (run 'bonesdeploy push')",
+        "{repo_path}/{}/ does not exist on remote (run 'bonesdeploy push')",
         config::Constants::REMOTE_BONES_DIR
     ));
 }
@@ -233,7 +233,7 @@ if ssh::run_cmd(&session, &check_bones).await.is_err() {
 
 Verifies that the `.bones/` directory exists in the bare Git repository on the remote.
 
-**Location:** `<git_dir>/bones/` (e.g., `/home/git/myapp.git/bones/`)
+**Location:** `<repo_path>/bones/` (e.g., `/home/git/myapp.git/bones/`)
 
 **Why this matters:** The remote `bones/` directory contains:
 - Server-side hooks (`hooks/pre-receive`, `hooks/post-receive`)
@@ -252,7 +252,7 @@ If missing, `bonesdeploy push` needs to be run to sync local `.bones/` to remote
 check_rsync_sync(cfg, issues);
 ```
 
-Compares local `.bones/` with remote `<git_dir>/bones/` to detect drift.
+Compares local `.bones/` with remote `<repo_path>/bones/` to detect drift.
 
 **Implementation:**
 1. Runs `rsync` in dry-run mode with delete flag:
@@ -307,9 +307,9 @@ Verifies that Git hooks in the bare repository are properly symlinked to the `bo
 **Implementation:**
 1. Runs shell command to check all hooks in `bones/hooks/`:
    ```bash
-   for hook in <git_dir>/bones/hooks/*; do
+   for hook in <repo_path>/bones/hooks/*; do
        name=$(basename "$hook")
-       link="<git_dir>/hooks/$name"
+       link="<repo_path>/hooks/$name"
        if [ ! -L "$link" ] || [ "$(readlink "$link")" != "$hook" ]; then
            echo "$name"
        fi
@@ -318,12 +318,12 @@ Verifies that Git hooks in the bare repository are properly symlinked to the `bo
 
 2. For each hook that's not properly symlinked, adds an issue:
    ```
-   <git_dir>/hooks/pre-receive is not properly symlinked to bones/hooks/pre-receive
+   <repo_path>/hooks/pre-receive is not properly symlinked to bones/hooks/pre-receive
    ```
 
 **Expected State:**
 ```
-<git_dir>/
+<repo_path>/
 ├── hooks/
 │   ├── pre-receive -> ../bones/hooks/pre-receive
 │   └── post-receive -> ../bones/hooks/post-receive

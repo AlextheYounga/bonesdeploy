@@ -12,7 +12,7 @@ no service users with sudo, docker, or root access
 service users cannot write immutable release code
 only project-specific writable directories are writable
 secrets readable only by intended service users
-public_path exposes only the active release through the current symlink
+web_root exposes only the active release through the current symlink
 systemd hardening enabled per service
 capabilities dropped by default
 NoNewPrivileges enabled

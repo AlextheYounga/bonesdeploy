@@ -55,7 +55,7 @@ println!("Running pre-receive...");
 ssh::stream_cmd(
     &session,
     &format!(
-        "BONES_FORCE_DEPLOY=1 GIT_DIR='{git_dir}' '{git_dir}/{}/{}' </dev/null",
+        "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
         config::Constants::REMOTE_HOOKS_DIR,
         config::Constants::PRE_RECEIVE_HOOK
     ),
@@ -67,7 +67,7 @@ ssh::stream_cmd(
 
 **Environment Variables:**
 - `BONES_FORCE_DEPLOY=1`: Signals to hooks that this is a forced/manual deployment (bypasses normal checks)
-- `GIT_DIR='{git_dir}'`: Sets the Git directory for the bare repository
+- `GIT_DIR='{repo_path}'`: Sets the Git directory for the bare repository
 
 #### 4.2 Hook Execution
 
@@ -102,7 +102,7 @@ println!("Running post-receive...");
 ssh::stream_cmd(
     &session,
     &format!(
-        "BONES_FORCE_DEPLOY=1 GIT_DIR='{git_dir}' '{git_dir}/{}/{}' </dev/null",
+        "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
         config::Constants::REMOTE_HOOKS_DIR,
         config::Constants::POST_RECEIVE_HOOK
     ),
@@ -229,28 +229,28 @@ bonesdeploy deploy
 ```
 /srv/deployments/myapp/
 ├── build/workspace/     # Previous build workspace
-├── runtime/
+├── releases/
 │   ├── 20260507_120000/ # Old release
 │   ├── 20260507_130000/ # Old release
 │   └── 20260507_140000/ # Current release
 ├── shared/
 │   ├── .env
 │   └── storage/
-└── current -> runtime/20260507_140000/
+└── current -> releases/20260507_140000/
 ```
 
 ### Directory State After Deploy
 ```
 /srv/deployments/myapp/
 ├── build/workspace/     # New build (overwritten)
-├── runtime/
+├── releases/
 │   ├── 20260507_130000/ # Old release
 │   ├── 20260507_140000/ # Previous current
 │   └── 20260507_150000/ # New release
 ├── shared/
 │   ├── .env
 │   └── storage/
-└── current -> runtime/20260507_150000/  # Switched
+└── current -> releases/20260507_150000/  # Switched
 ```
 
 ---

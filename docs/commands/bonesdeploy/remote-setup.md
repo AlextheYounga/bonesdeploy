@@ -240,7 +240,7 @@ Ensures both the playbook and roles directory exist before proceeding.
 **Source:** `remote_setup.rs:48-57`
 
 ```rust
-let public_path_parent = resolve_public_path_parent(&cfg.data.public_path);
+let project_root_parent = resolve_project_root_parent(&cfg.data.project_root);
 let inventory = format!("{},", cfg.data.host);
 let roles_path = env::var("ANSIBLE_ROLES_PATH")
     .ok()
@@ -249,7 +249,7 @@ let roles_path = env::var("ANSIBLE_ROLES_PATH")
 ```
 
 **Variables:**
-- `public_path_parent`: Parent directory of public path (e.g., `/var/www` from `/var/www/myapp`)
+- `project_root_parent`: Parent directory of the deployment root (e.g., `/srv/deployments` from `/srv/deployments/myapp`)
 - `inventory`: Comma-separated host list (trailing comma required for single host)
 - `roles_path`: Colon-separated path to Ansible roles (respects existing `ANSIBLE_ROLES_PATH`)
 
@@ -277,15 +277,15 @@ command
     .arg("-e")
     .arg(format!("group={}", cfg.permissions.defaults.group))
     .arg("-e")
-    .arg(format!("public_path_parent={public_path_parent}"))
+    .arg(format!("project_root_parent={project_root_parent}"))
     .arg("-e")
-    .arg(format!("public_path={}", cfg.data.public_path))
+    .arg(format!("web_root={}", cfg.data.web_root))
     .arg("-e")
-    .arg(format!("deploy_root={}", cfg.data.deploy_root))
+    .arg(format!("project_root={}", cfg.data.project_root))
     .arg("-e")
     .arg(format!("project_name={}", cfg.data.project_name))
     .arg("-e")
-    .arg(format!("git_dir={}", cfg.data.git_dir));
+    .arg(format!("repo_path={}", cfg.data.repo_path));
 ```
 
 #### 7.1 Ansible Flags
@@ -302,11 +302,11 @@ command
 | `deploy_user` | `git` (default) | User that runs deployments |
 | `service_user` | `{project_name}` | User that runs the application |
 | `group` | `www-data` | Group for files |
-| `public_path_parent` | `/var/www` | Parent of public path |
-| `public_path` | `/var/www/{project}` | Symlink to active release |
-| `deploy_root` | `/srv/deployments/{project}` | All releases directory |
+| `project_root_parent` | `/srv/deployments` | Parent of deployment root |
+| `web_root` | `public` | Relative path served from `current` |
+| `project_root` | `/srv/deployments/{project}` | Deployment root with `current`, `releases`, `shared`, and `build` |
 | `project_name` | `{project}` | Project identifier |
-| `git_dir` | `/home/git/{project}.git` | Bare repository path |
+| `repo_path` | `/home/git/{project}.git` | Bare repository path |
 
 ---
 
@@ -353,11 +353,11 @@ ansible-playbook \
   -e "deploy_user=git" \
   -e "service_user=myapp" \
   -e "group=www-data" \
-  -e "public_path_parent=/var/www" \
-  -e "public_path=/var/www/myapp" \
-  -e "deploy_root=/srv/deployments/myapp" \
+  -e "project_root_parent=/var/www" \
+  -e "web_root=/var/www/myapp" \
+  -e "project_root=/srv/deployments/myapp" \
   -e "project_name=myapp" \
-  -e "git_dir=/home/git/myapp.git" \
+  -e "repo_path=/home/git/myapp.git" \
   .bones/remote/playbooks/setup.yml
 ```
 
@@ -371,12 +371,12 @@ The playbook typically includes tasks for:
    - Configure sudoers for passwordless execution
 
 2. **Git Repository**
-   - Initialize bare git repository at `git_dir`
+   - Initialize bare git repository at `repo_path`
    - Set up directory structure for hooks
 
 3. **Directory Structure**
-   - Create `deploy_root` (`/srv/deployments/myapp`)
-    - Create `public_path` parent (`/var/www`)
+    - Create `project_root` (`/srv/deployments/myapp`)
+    - Create `current` and `releases` directories
    - Create initial placeholder release
    - Set up shared directory
    - Configure permissions
