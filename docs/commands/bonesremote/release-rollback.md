@@ -76,7 +76,7 @@ pub fn list_releases_sorted(cfg: &BonesConfig) -> Result<Vec<String>> {
 ```
 
 **Process:**
-1. List all directories in `/srv/deployments/myapp/runtime/`
+1. List all directories in `/srv/deployments/myapp/releases/`
 2. Filter to only directories
 3. Sort chronologically (oldest first)
 
@@ -117,7 +117,7 @@ let current_name = release_state::current_release_name(&cfg)?;
 let current_idx = releases
     .iter()
     .position(|name| name == &current_name)
-    .with_context(|| format!("Current release '{current_name}' was not found in runtime/"))?;
+    .with_context(|| format!("Current release '{current_name}' was not found in releases/"))?;
 ```
 
 #### 5.1 Read Current Release Name
@@ -136,7 +136,7 @@ pub fn current_release_name(cfg: &BonesConfig) -> Result<String> {
 
 **Process:**
 1. Read `current` symlink: `/srv/deployments/myapp/current`
-2. Resolve to actual directory: `/srv/deployments/myapp/runtime/20260507_150000`
+2. Resolve to actual directory: `/srv/deployments/myapp/releases/20260507_150000`
 3. Extract directory name: `20260507_150000`
 
 #### 5.2 Find Current Index
@@ -197,7 +197,7 @@ release_state::point_symlink_atomically(&current_link, &previous_dir)?;
 ```
 
 **Process:**
-1. Define previous release directory: `/srv/deployments/myapp/runtime/20260507_140000`
+1. Define previous release directory: `/srv/deployments/myapp/releases/20260507_140000`
 2. Define current link path: `/srv/deployments/myapp/current`
 3. Atomically switch symlink: `current` → `20260507_140000`
 
@@ -228,12 +228,12 @@ Rollback complete: 20260507_150000 -> 20260507_140000
 
 ```
 /srv/deployments/myapp/
-├── runtime/
+├── releases/
 │   ├── 20260507_120000/
 │   ├── 20260507_130000/
 │   ├── 20260507_140000/    # Previous (to rollback to)
 │   └── 20260507_150000/    # Current (has bug)
-└── current -> runtime/20260507_150000/
+└── current -> releases/20260507_150000/
 
 /var/www/myapp -> /srv/deployments/myapp/current
 ```
@@ -242,12 +242,12 @@ Rollback complete: 20260507_150000 -> 20260507_140000
 
 ```
 /srv/deployments/myapp/
-├── runtime/
+├── releases/
 │   ├── 20260507_120000/
 │   ├── 20260507_130000/
 │   ├── 20260507_140000/    # Now active
 │   └── 20260507_150000/    # Still exists, not active
-└── current -> runtime/20260507_140000/  # Switched!
+└── current -> releases/20260507_140000/  # Switched!
 
 /var/www/myapp -> /srv/deployments/myapp/current
 ```

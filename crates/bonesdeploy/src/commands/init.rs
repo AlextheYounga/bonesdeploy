@@ -73,14 +73,10 @@ fn collect_from_seed(project_name_hint: &str, seed: Option<&config::BonesConfig>
         if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
     let host = prompts::prompt_host(seed, inferred_remote.as_ref())?;
     let port = prompts::prompt_port(seed, inferred_remote.as_ref())?;
-    let git_dir = resolve_git_dir(&project_name, seed, inferred_remote.as_ref());
-    // live_root and deploy_root are intentionally not collected here. They are
-    // hidden from the init flow and resolved to project-derived defaults at
-    // load time. If a previous bones.yaml carried a user override, pass it
-    // through verbatim so it survives re-init.
-    let live_root = seed_path_override(seed, |cfg| &cfg.data.live_root, &project_name, config::default_live_root_for);
-    let deploy_root =
-        seed_path_override(seed, |cfg| &cfg.data.deploy_root, &project_name, config::default_deploy_root_for);
+    let repo_path = resolve_repo_path(&project_name, seed, inferred_remote.as_ref());
+    let project_root =
+        seed_path_override(seed, |cfg| &cfg.data.project_root, &project_name, config::default_project_root_for);
+    let web_root = seed_string(seed, |cfg| &cfg.data.web_root, config::default_web_root().as_str());
     let deploy_on_push = seed.is_none_or(|cfg| cfg.data.deploy_on_push);
     let deploy_user = seed_string(seed, |cfg| &cfg.permissions.defaults.deploy_user, "git");
     let service_user = seed_string(seed, |cfg| &cfg.permissions.defaults.service_user, &project_name);
@@ -88,10 +84,14 @@ fn collect_from_seed(project_name_hint: &str, seed: Option<&config::BonesConfig>
     let dir_mode = seed_string(seed, |cfg| &cfg.permissions.defaults.dir_mode, "750");
     let file_mode = seed_string(seed, |cfg| &cfg.permissions.defaults.file_mode, "640");
     let releases_keep = seed.map_or(5, |cfg| cfg.releases.keep.max(1));
-    let shared_paths = seed
-        .map(|cfg| cfg.releases.shared_paths.clone())
+    let shared_files = seed
+        .map(|cfg| cfg.releases.shared_files.clone())
         .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| vec![String::from(".env"), String::from("storage")]);
+        .unwrap_or_else(|| vec![String::from(".env")]);
+    let shared_dirs = seed
+        .map(|cfg| cfg.releases.shared_dirs.clone())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| vec![String::from("storage")]);
     let path_overrides = seed.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
 
     Ok(config::BonesConfig {
@@ -100,9 +100,9 @@ fn collect_from_seed(project_name_hint: &str, seed: Option<&config::BonesConfig>
             project_name,
             host,
             port,
-            git_dir,
-            live_root,
-            deploy_root,
+            repo_path,
+            project_root,
+            web_root,
             branch,
             deploy_on_push,
         },
@@ -110,7 +110,7 @@ fn collect_from_seed(project_name_hint: &str, seed: Option<&config::BonesConfig>
             defaults: config::PermissionDefaults { deploy_user, service_user, group, dir_mode, file_mode },
             paths: path_overrides,
         },
-        releases: config::Releases { keep: releases_keep, shared_paths },
+        releases: config::Releases { keep: releases_keep, shared_files, shared_dirs },
         ssl: seed.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
     })
 }
@@ -123,16 +123,16 @@ fn seed_string(
     seed.map(field).filter(|value| !value.is_empty()).map_or_else(|| fallback.to_string(), Clone::clone)
 }
 
-fn resolve_git_dir(
+fn resolve_repo_path(
     project_name: &str,
     seed: Option<&config::BonesConfig>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> String {
     if let Some(details) = inferred_remote {
-        return details.git_dir.clone();
+        return details.repo_path.clone();
     }
 
-    seed.map(|cfg| cfg.data.git_dir.as_str())
+    seed.map(|cfg| cfg.data.repo_path.as_str())
         .filter(|value| !value.is_empty())
         .map_or_else(|| format!("/home/git/{project_name}.git"), |value| value.replace("<project_name>", project_name))
 }
@@ -221,7 +221,7 @@ fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
         return Ok(());
     }
 
-    let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, cfg.data.host, cfg.data.git_dir);
+    let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, cfg.data.host, cfg.data.repo_path);
     git::add_remote(&cfg.data.remote_name, &remote_url)?;
     println!("Configured local git remote {} -> {}", cfg.data.remote_name, remote_url);
     Ok(())

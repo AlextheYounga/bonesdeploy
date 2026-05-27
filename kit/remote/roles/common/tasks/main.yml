@@ -124,7 +124,7 @@
 
 - name: Ensure bare repo parent directory exists
   ansible.builtin.file:
-    path: "{{ git_dir | dirname }}"
+    path: "{{ repo_path | dirname }}"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
@@ -138,14 +138,14 @@
       - git
       - init
       - --bare
-      - "{{ git_dir }}"
+      - "{{ repo_path }}"
   args:
-    creates: "{{ git_dir }}/HEAD"
+    creates: "{{ repo_path }}/HEAD"
   tags: [common, git]
 
 - name: Ensure bare repo bones directory exists
   ansible.builtin.file:
-    path: "{{ git_dir }}/bones"
+    path: "{{ repo_path }}/bones"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
@@ -154,7 +154,7 @@
 
 - name: Ensure placeholder release directory exists
   ansible.builtin.file:
-    path: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}"
+    path: "{{ project_root }}/releases/{{ common_placeholder_release_name }}"
     state: directory
     owner: "{{ service_user }}"
     group: "{{ group }}"
@@ -164,7 +164,7 @@
 - name: Seed placeholder index page into initial release
   ansible.builtin.template:
     src: "{{ common_placeholder_template_path }}"
-    dest: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}/index.html"
+    dest: "{{ project_root }}/releases/{{ common_placeholder_release_name }}/index.html"
     owner: "{{ service_user }}"
     group: "{{ group }}"
     mode: "0640"
@@ -172,16 +172,8 @@
 
 - name: Point current symlink at placeholder release
   ansible.builtin.file:
-    src: "{{ deploy_root }}/runtime/{{ common_placeholder_release_name }}"
-    dest: "{{ deploy_root }}/current"
-    state: link
-    force: true
-  tags: [common, placeholder]
-
-- name: Point live root symlink at current
-  ansible.builtin.file:
-    src: "{{ deploy_root }}/current"
-    dest: "{{ live_root }}"
+    src: "{{ project_root }}/releases/{{ common_placeholder_release_name }}"
+    dest: "{{ project_root }}/current"
     state: link
     force: true
   tags: [common, placeholder]

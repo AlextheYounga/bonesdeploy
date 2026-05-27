@@ -57,7 +57,7 @@ Loads deployment configuration to get:
 let release_name = release_state::read_staged_release(&cfg)?;
 ```
 
-Reads the release name from `<git_dir>/bones/.staged_release`.
+Reads the release name from `<repo_path>/bones/.staged_release`.
 
 **Example:** `20260507_150432`
 
@@ -83,23 +83,28 @@ let shared_dir = release_state::shared_dir(&cfg);
 
 ---
 
-### 5. Wire Each Shared Path
+### 5. Wire Shared Files and Directories
 
 **Source:** `wire_release.rs:20-23`
 
 ```rust
-for shared_path in &cfg.releases.shared_paths {
-    wire_path(&cfg, &build_root, &shared_dir, shared_path)?;
+for shared_file in &cfg.releases.shared_files {
+    wire_path(&cfg, &build_root, &shared_dir, shared_file)?;
+}
+
+for shared_dir_path in &cfg.releases.shared_dirs {
+    wire_path(&cfg, &build_root, &shared_dir, shared_dir_path)?;
 }
 ```
 
-Iterates through each path in `releases.shared_paths` and wires it.
+Iterates through `releases.shared_files` and `releases.shared_dirs` and wires each entry.
 
-**Example shared_paths:**
+**Example shared files and directories:**
 ```yaml
 releases:
-  shared_paths:
+  shared_files:
     - .env
+  shared_dirs:
     - storage
     - logs
 ```
@@ -268,14 +273,14 @@ println!("Linked shared path: {} -> {}", release_path.display(), shared_path.dis
 **Source:** `wire_release.rs:24`
 
 ```rust
-println!("Wired build workspace for staged runtime: {release_name}");
+println!("Wired build workspace for staged release: {release_name}");
 ```
 
 **Example Output:**
 ```
 Linked shared path: /srv/deployments/myapp/build/workspace/.env -> /srv/deployments/myapp/shared/.env
 Linked shared path: /srv/deployments/myapp/build/workspace/storage -> /srv/deployments/myapp/shared/storage
-Wired build workspace for staged runtime: 20260507_150432
+Wired build workspace for staged release: 20260507_150432
 ```
 
 ---
@@ -290,13 +295,13 @@ Wired build workspace for staged runtime: 20260507_150432
 │       ├── storage -> ../../shared/storage     # Symlink
 │       ├── logs -> ../../shared/logs           # Symlink
 │       └── (other files from git checkout)
-├── runtime/
+├── releases/
 │   └── 20260507_150432/    # (empty, waiting for build)
 ├── shared/
 │   ├── .env                # Actual file
 │   ├── storage/            # Actual directory
 │   └── logs/               # Actual directory
-└── current -> runtime/20260507_140000/
+└── current -> releases/20260507_140000/
 ```
 
 ---

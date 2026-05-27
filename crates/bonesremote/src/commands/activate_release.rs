@@ -9,20 +9,16 @@ pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
     let release_dir = release_state::release_dir(&cfg, &release_name);
-    let live_root = Path::new(&cfg.data.live_root);
+    let current_link = release_state::current_link(&cfg);
 
     if !release_dir.exists() {
         anyhow::bail!("Staged release directory does not exist: {}", release_dir.display());
     }
 
-    if live_root.exists() && !live_root.is_symlink() {
-        bail!("live_root exists and is not a symlink: {}", live_root.display());
+    if current_link.exists() && !current_link.is_symlink() {
+        bail!("current exists and is not a symlink: {}", current_link.display());
     }
 
-    let current_link = release_state::current_link(&cfg);
-
-    // Enforce runtime entrypoint wiring just-in-time during activation.
-    release_state::point_symlink_atomically(live_root, &current_link)?;
     release_state::point_symlink_atomically(&current_link, &release_dir)?;
 
     release_state::clear_staged_release(&cfg)?;

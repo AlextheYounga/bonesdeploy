@@ -27,12 +27,12 @@ Loads deployment configuration to determine:
 **Source:** `rollback.rs:13`
 
 ```rust
-let remote_bones_yaml = format!("{}/{}/bones.yaml", cfg.data.git_dir, config::Constants::REMOTE_BONES_DIR);
+let remote_bones_yaml = format!("{}/{}/bones.yaml", cfg.data.repo_path, config::Constants::REMOTE_BONES_DIR);
 ```
 
 Builds the path to `bones.yaml` on the remote server:
 ```
-<git_dir>/bones/bones.yaml
+<repo_path>/bones/bones.yaml
 ```
 
 **Example:** `/home/git/myapp.git/bones/bones.yaml`
@@ -139,7 +139,7 @@ Loads `bones.yaml` from the bare repository.
 let releases = release_state::list_releases_sorted(&cfg)?;
 ```
 
-Lists all release directories in `<deploy_root>/runtime/`, sorted chronologically (oldest first).
+Lists all release directories in `<project_root>/releases/`, sorted chronologically (oldest first).
 
 **Example:**
 ```
@@ -171,7 +171,7 @@ let current_name = release_state::current_release_name(&cfg)?;
 let current_idx = releases
     .iter()
     .position(|name| name == &current_name)
-    .with_context(|| format!("Current release '{current_name}' was not found in runtime/"))?;
+    .with_context(|| format!("Current release '{current_name}' was not found in releases/"))?;
 ```
 
 Finds the current release by:
@@ -251,11 +251,11 @@ Rollback complete: 20260507_150000 -> 20260507_140000
 
 ```
 /srv/deployments/myapp/
-├── runtime/
+├── releases/
 │   ├── 20260507_130000/
 │   ├── 20260507_140000/
 │   └── 20260507_150000/  # Current (has bug)
-└── current -> runtime/20260507_150000/
+└── current -> releases/20260507_150000/
 
 /var/www/myapp -> /srv/deployments/myapp/current
 ```
@@ -264,11 +264,11 @@ Rollback complete: 20260507_150000 -> 20260507_140000
 
 ```
 /srv/deployments/myapp/
-├── runtime/
+├── releases/
 │   ├── 20260507_130000/
 │   ├── 20260507_140000/  # Now active
 │   └── 20260507_150000/  # Still exists, just not active
-└── current -> runtime/20260507_140000/  # Switched!
+└── current -> releases/20260507_140000/  # Switched!
 
 /var/www/myapp -> /srv/deployments/myapp/current
 ```
@@ -339,7 +339,7 @@ curl https://app.example.com/health
 
 # Debug the issue
 ssh git@app.example.com
-cd /srv/deployments/myapp/runtime/20260507_150000
+cd /srv/deployments/myapp/releases/20260507_150000
 # Investigate...
 
 # Fix and redeploy
@@ -396,7 +396,7 @@ After rolling back, you may need to:
 4. **Investigate the failed release**:
    ```bash
    ssh git@app.example.com
-   cd /srv/deployments/myapp/runtime/20260507_150000
+   cd /srv/deployments/myapp/releases/20260507_150000
    # Check deployment logs, app logs, etc.
    ```
 

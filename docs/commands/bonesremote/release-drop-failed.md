@@ -37,7 +37,7 @@ Loads deployment configuration to determine paths.
 let staged_path = release_state::staged_release_path(&cfg);
 ```
 
-**Path:** `<git_dir>/bones/.staged_release`
+**Path:** `<repo_path>/bones/.staged_release`
 
 **Example:** `/home/git/myapp.git/bones/.staged_release`
 
@@ -82,7 +82,7 @@ Reads the failed release name from the state file.
 let release_dir = release_state::release_dir(&cfg, &release_name);
 ```
 
-**Path:** `/srv/deployments/myapp/runtime/20260507_150432`
+**Path:** `/srv/deployments/myapp/releases/20260507_150432`
 
 ---
 
@@ -120,7 +120,7 @@ if release_dir.exists() {
 release_state::clear_staged_release(&cfg)?;
 ```
 
-Deletes the `<git_dir>/bones/.staged_release` file.
+Deletes the `<repo_path>/bones/.staged_release` file.
 
 ---
 
@@ -184,10 +184,10 @@ Can be run manually to clean up after:
 
 ```
 /srv/deployments/myapp/
-├── runtime/
+├── releases/
 │   ├── 20260507_140000/    # Previous release (still current)
 │   └── 20260507_150432/    # Failed release (partial/incomplete)
-└── current -> runtime/20260507_140000/
+└── current -> releases/20260507_140000/
 
 /home/git/myapp.git/bones/
 ├── bones.yaml
@@ -198,9 +198,9 @@ Can be run manually to clean up after:
 
 ```
 /srv/deployments/myapp/
-├── runtime/
+├── releases/
 │   └── 20260507_140000/    # Still current
-└── current -> runtime/20260507_140000/
+└── current -> releases/20260507_140000/
 
 /home/git/myapp.git/bones/
 ├── bones.yaml
@@ -238,7 +238,7 @@ Can be run manually to clean up after:
 ```bash
 # 1. Deployment starts
 sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
-# Created: /srv/deployments/myapp/runtime/20260507_150432/
+# Created: /srv/deployments/myapp/releases/20260507_150432/
 
 # 2. Checkout and wire
 # ...
@@ -248,7 +248,7 @@ bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
 # Script: 03_migrate.sh fails
 
 # 4. Automatic cleanup
-# - Removes /srv/deployments/myapp/runtime/20260507_150432/
+# - Removes /srv/deployments/myapp/releases/20260507_150432/
 # - Removes .staged_release
 
 # 5. Deployment aborts
@@ -317,7 +317,7 @@ bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.yaml
 ### Permission Denied
 
 ```
-Failed to remove failed release /srv/deployments/myapp/runtime/20260507_150432
+Failed to remove failed release /srv/deployments/myapp/releases/20260507_150432
 ```
 
 **Possible causes:**
