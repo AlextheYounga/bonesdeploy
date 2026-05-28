@@ -66,8 +66,10 @@ Compare each application service to the policy baseline.
 
 ```bash
 aa-status
+aa-status --profiled bonesdeploy-<project>-nginx
 cat /sys/module/apparmor/parameters/enabled 2>/dev/null
 ls -lah /etc/apparmor.d
+systemctl cat <service> | grep -E 'AppArmorProfile|After=|Requires='
 ```
 
 Check whether application services are confined and enforcing.

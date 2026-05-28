@@ -1,0 +1,40 @@
+#include <tunables/global>
+
+profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-nginx") }} flags=(attach_disconnected,mediate_deleted) {
+  # Base runtime abstractions and libc/loader paths.
+  #include <abstractions/base>
+
+  network unix stream,
+
+  /usr/local/bin/bonesremote mr,
+  /usr/local/bin/bonesremote ix,
+  /usr/sbin/nginx mr,
+  /usr/sbin/nginx ix,
+
+  /usr/** r,
+  /bin/** r,
+  /sbin/** r,
+  /lib/** r,
+  /lib64/** r,
+  /etc/nginx/** r,
+  /etc/ssl/** r,
+  /etc/hosts r,
+  /etc/resolv.conf r,
+  /etc/nsswitch.conf r,
+  /etc/passwd r,
+  /etc/group r,
+  /proc/** r,
+  /sys/devices/system/cpu/online r,
+
+  {{ project_root }}/current/{{ web_root }}/** r,
+  {{ repo_path }}/bones/bones.yaml r,
+  {{ repo_path }}/bones/nginx.conf r,
+
+  /run/{{ project_name }}/ rw,
+  /run/{{ project_name }}/** rwk,
+
+  # repo_path defaults to /home/{{ deploy_user }}/<project>.git, so global /home denies
+  # would block bonesremote reading config and nginx config from repo-local bones files.
+  deny /root/** r,
+  deny /etc/ssh/** r,
+}

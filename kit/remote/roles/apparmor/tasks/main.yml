@@ -1,0 +1,90 @@
+---
+- name: Install apparmor packages
+  ansible.builtin.apt:
+    name: "{{ apparmor_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  tags: [apparmor, packages]
+
+- name: Ensure apparmor service is enabled and started
+  ansible.builtin.service:
+    name: "{{ apparmor_service_name }}"
+    enabled: true
+    state: started
+  tags: [apparmor]
+
+- name: Read apparmor kernel enabled parameter
+  ansible.builtin.command:
+    argv:
+      - cat
+      - /sys/module/apparmor/parameters/enabled
+  register: apparmor_kernel_enabled_output
+  changed_when: false
+  tags: [apparmor]
+
+- name: Verify apparmor kernel enabled parameter
+  ansible.builtin.assert:
+    that:
+      - apparmor_kernel_enabled_output.stdout | trim | lower in ['y', 'yes', '1']
+    fail_msg: "AppArmor kernel parameter is not enabled (expected y/yes/1)"
+  tags: [apparmor]
+
+- name: Deploy per-project apparmor profile
+  ansible.builtin.template:
+    src: "{{ apparmor_profile_template_path }}"
+    dest: "{{ apparmor_profile_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload apparmor service
+  tags: [apparmor]
+
+- name: Load updated apparmor profile
+  ansible.builtin.command:
+    argv:
+      - apparmor_parser
+      - -r
+      - "{{ apparmor_profile_path }}"
+  changed_when: false
+  tags: [apparmor]
+
+- name: Ensure project profile is in enforce mode
+  ansible.builtin.command:
+    argv:
+      - aa-enforce
+      - "{{ apparmor_profile_path }}"
+  changed_when: false
+  tags: [apparmor]
+
+- name: Read apparmor profile status
+  ansible.builtin.command:
+    argv:
+      - aa-status
+  register: apparmor_status_output
+  changed_when: false
+  tags: [apparmor]
+
+- name: Verify project apparmor profile is loaded
+  ansible.builtin.assert:
+    that:
+      - apparmor_status_output.stdout is search(apparmor_profile_name)
+    fail_msg: "AppArmor profile {{ apparmor_profile_name }} is not loaded according to aa-status"
+  tags: [apparmor]
+
+- name: Read project profile apparmor status
+  ansible.builtin.command:
+    argv:
+      - aa-status
+      - --profiled
+      - "{{ apparmor_profile_name }}"
+  register: apparmor_profile_status_output
+  changed_when: false
+  tags: [apparmor]
+
+- name: Verify project profile apparmor enforce mode
+  ansible.builtin.assert:
+    that:
+      - apparmor_profile_status_output.stdout is search("is in enforce mode")
+    fail_msg: "AppArmor profile {{ apparmor_profile_name }} is not in enforce mode"
+  tags: [apparmor]

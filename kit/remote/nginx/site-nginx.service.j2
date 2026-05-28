@@ -1,12 +1,14 @@
 [Unit]
 Description=Per-site nginx for {{ project_name }}
-After=network.target
+After=network.target apparmor.service
+Requires=apparmor.service
 
 [Service]
 Type=simple
 User={{ service_user }}
 WorkingDirectory={{ project_root }}/current
 ExecStart=/usr/local/bin/bonesremote landlock nginx --config {{ repo_path }}/bones/bones.yaml
+AppArmorProfile={{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-nginx") }}
 NoNewPrivileges=yes
 RestrictNamespaces=yes
 LockPersonality=yes

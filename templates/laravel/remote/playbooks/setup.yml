@@ -9,6 +9,9 @@
     - role: users
       tags: [users]
 
+    - role: apparmor
+      tags: [apparmor]
+
     - role: common
       tags: [common]
 
