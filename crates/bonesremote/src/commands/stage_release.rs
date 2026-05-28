@@ -17,16 +17,16 @@ pub fn run(config_path: &str) -> Result<()> {
 
     let cfg = config::load(Path::new(config_path))?;
 
-    let deploy_root = Path::new(&cfg.data.deploy_root);
-    let build_dir = deploy_root.join(config::Constants::BUILD_DIR);
+    let project_root = Path::new(&cfg.data.project_root);
+    let build_dir = project_root.join(config::Constants::BUILD_DIR);
     let build_root = release_state::build_root(&cfg);
     let releases_dir = release_state::releases_dir(&cfg);
     let shared_dir = release_state::shared_dir(&cfg);
 
-    fs::create_dir_all(deploy_root)
-        .with_context(|| format!("Failed to create deploy_root: {}", deploy_root.display()))?;
+    fs::create_dir_all(project_root)
+        .with_context(|| format!("Failed to create project_root: {}", project_root.display()))?;
     fs::create_dir_all(&releases_dir)
-        .with_context(|| format!("Failed to create runtime dir: {}", releases_dir.display()))?;
+        .with_context(|| format!("Failed to create releases dir: {}", releases_dir.display()))?;
     fs::create_dir_all(&build_dir).with_context(|| format!("Failed to create build dir: {}", build_dir.display()))?;
     fs::create_dir_all(&build_root)
         .with_context(|| format!("Failed to create build workspace: {}", build_root.display()))?;
@@ -38,12 +38,12 @@ pub fn run(config_path: &str) -> Result<()> {
     fs::create_dir_all(&staged_release_dir)
         .with_context(|| format!("Failed to create release dir: {}", staged_release_dir.display()))?;
 
-    permissions::chown_paths_to_deploy_user(&cfg, &[deploy_root, releases_dir.as_path(), build_dir.as_path()], false)?;
+    permissions::chown_paths_to_deploy_user(&cfg, &[project_root, releases_dir.as_path(), build_dir.as_path()], false)?;
     permissions::chown_paths_to_deploy_user(&cfg, &[build_root.as_path()], true)?;
     permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path()], true)?;
 
-    ensure_deploy_user_can_traverse(deploy_root)
-        .with_context(|| format!("Failed to set traverse permission on {}", deploy_root.display()))?;
+    ensure_deploy_user_can_traverse(project_root)
+        .with_context(|| format!("Failed to set traverse permission on {}", project_root.display()))?;
     ensure_deploy_user_can_traverse(&build_dir)
         .with_context(|| format!("Failed to set traverse permission on {}", build_dir.display()))?;
     ensure_deploy_user_can_traverse(&build_root)

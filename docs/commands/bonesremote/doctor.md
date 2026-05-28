@@ -2,7 +2,7 @@
 
 ## Overview
 
-Validates the server environment to ensure all prerequisites and configurations are correct for `bonesremote` to function properly. Performs checks for OS compatibility, binary availability, sudoers configuration, and Landlock support.
+Validates the server environment to ensure all prerequisites and configurations are correct for `bonesremote` to function properly. Performs checks for OS compatibility, binary availability, sudoers configuration, AppArmor enforcement, and Landlock support.
 
 ## Command Signature
 
@@ -178,7 +178,25 @@ sudo bonesremote init --deploy-user git
 
 ---
 
-### 6. Check Landlock Support
+### 6. Check AppArmor Support
+
+`bonesremote doctor` validates AppArmor as the primary confinement layer by checking:
+
+1. `/sys/module/apparmor/parameters/enabled` reports enabled (`Y/yes/1`)
+2. `systemctl is-active apparmor` is `active`
+3. `aa-status` indicates at least one profile is in enforce mode
+
+Example failures:
+
+```text
+AppArmor check failed: kernel module is not enabled
+AppArmor check failed: apparmor service is not active (status: inactive)
+AppArmor check failed: no profiles appear to be in enforce mode
+```
+
+---
+
+### 7. Check Landlock Support
 
 **Source:** `doctor.rs:19`, `doctor.rs:83-88`
 
@@ -218,7 +236,7 @@ Landlock support check failed: Kernel does not support Landlock
 
 ---
 
-### 7. Report Results
+### 8. Report Results
 
 **Source:** `doctor.rs:25-34`
 
@@ -260,6 +278,7 @@ Doctor found 2 issues
 | **Supported distribution** | Debian/Ubuntu OS | Use supported OS |
 | **Global availability** | `bonesremote` in PATH | Install globally |
 | **Passwordless sudo** | Sudoers configured | Run `sudo bonesremote init` |
+| **AppArmor support** | Kernel + service + enforcing profiles | Enable and enforce AppArmor |
 | **Landlock support** | Kernel supports Landlock | Upgrade kernel |
 
 ---

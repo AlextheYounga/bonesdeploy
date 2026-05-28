@@ -20,7 +20,7 @@ pub fn run(config_path: &str, revision: Option<&str>) -> Result<()> {
         .arg("--work-tree")
         .arg(&build_root)
         .arg("--git-dir")
-        .arg(&cfg.data.git_dir)
+        .arg(&cfg.data.repo_path)
         .arg("checkout")
         .arg("-f")
         .arg(checkout_target)
@@ -81,12 +81,11 @@ mod tests {
         Ok(())
     }
 
-    fn write_config(path: &Path, git_dir: &Path, deploy_root: &Path, branch: &str) -> Result<()> {
+    fn write_config(path: &Path, repo_path: &Path, project_root: &Path, branch: &str) -> Result<()> {
         let yaml = format!(
-            "data:\n  remote_name: production\n  project_name: postreceive\n  host: localhost\n  port: \"22\"\n  git_dir: {}\n  live_root: {}\n  deploy_root: {}\n  branch: {branch}\n  deploy_on_push: true\npermissions:\n  defaults:\n    deploy_user: git\n    service_user: postreceive\n    group: www-data\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\n  shared_paths:\n    - .env\n",
-            git_dir.display(),
-            deploy_root.join("live").display(),
-            deploy_root.display()
+            "data:\n  remote_name: production\n  project_name: postreceive\n  host: localhost\n  port: \"22\"\n  repo_path: {}\n  project_root: {}\n  web_root: public\n  branch: {branch}\n  deploy_on_push: true\npermissions:\n  defaults:\n    deploy_user: git\n    service_user: postreceive\n    group: www-data\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\n  shared_files:\n    - .env\n  shared_dirs:\n    - storage\n",
+            repo_path.display(),
+            project_root.display()
         );
         fs::write(path, yaml)?;
         Ok(())
@@ -145,9 +144,9 @@ mod tests {
         fs::create_dir_all(&root)?;
 
         let bare = create_remote_with_master_commit(&root)?;
-        let deploy_root = root.join("deploy");
+        let project_root = root.join("deploy");
         let config_path = root.join("bones.yaml");
-        write_config(&config_path, &bare, &deploy_root, "master")?;
+        write_config(&config_path, &bare, &project_root, "master")?;
 
         let result = run(config_path.to_string_lossy().as_ref(), None);
         assert!(result.is_err());
@@ -163,12 +162,12 @@ mod tests {
         fs::create_dir_all(&root)?;
 
         let bare = create_remote_with_master_commit(&root)?;
-        let deploy_root = root.join("deploy");
-        let build_root = deploy_root.join(Constants::BUILD_DIR).join(Constants::BUILD_WORKSPACE_DIR);
+        let project_root = root.join("deploy");
+        let build_root = project_root.join(Constants::BUILD_DIR).join(Constants::BUILD_WORKSPACE_DIR);
         fs::create_dir_all(&build_root)?;
 
         let config_path = root.join("bones.yaml");
-        write_config(&config_path, &bare, &deploy_root, "master")?;
+        write_config(&config_path, &bare, &project_root, "master")?;
 
         let config_yaml_path = config_path.to_string_lossy().to_string();
         let result = run(&config_yaml_path, Some("master"));
@@ -188,13 +187,13 @@ mod tests {
         fs::create_dir_all(&root)?;
 
         let bare = create_remote_with_master_commit(&root)?;
-        let deploy_root = root.join("deploy");
-        let build_dir = deploy_root.join(Constants::BUILD_DIR);
+        let project_root = root.join("deploy");
+        let build_dir = project_root.join(Constants::BUILD_DIR);
         let build_root = build_dir.join(Constants::BUILD_WORKSPACE_DIR);
         fs::create_dir_all(&build_root)?;
 
         let config_path = root.join("bones.yaml");
-        write_config(&config_path, &bare, &deploy_root, "master")?;
+        write_config(&config_path, &bare, &project_root, "master")?;
 
         let mut perms = fs::metadata(&build_dir)?.permissions();
         perms.set_mode(0o000);

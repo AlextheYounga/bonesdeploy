@@ -14,7 +14,7 @@ struct PullTarget {
     user: String,
     host: String,
     port: String,
-    git_dir: String,
+    repo_path: String,
 }
 
 pub fn run() -> Result<()> {
@@ -22,7 +22,7 @@ pub fn run() -> Result<()> {
 
     let target = resolve_pull_target()?;
     let remote_bones =
-        format!("{}@{}:{}/{}/", target.user, target.host, target.git_dir, config::Constants::REMOTE_BONES_DIR);
+        format!("{}@{}:{}/{}/", target.user, target.host, target.repo_path, config::Constants::REMOTE_BONES_DIR);
 
     println!("Pulling .bones/ from {remote_bones}...");
 
@@ -44,7 +44,7 @@ fn resolve_pull_target() -> Result<PullTarget> {
             user: cfg.permissions.defaults.deploy_user,
             host: cfg.data.host,
             port: cfg.data.port,
-            git_dir: cfg.data.git_dir,
+            repo_path: cfg.data.repo_path,
         });
     }
 
@@ -52,7 +52,7 @@ fn resolve_pull_target() -> Result<PullTarget> {
     let details = git::infer_remote_connection_details(&remote_name)?
         .with_context(|| format!("Remote '{remote_name}' must use an SSH-style URL ending in .git"))?;
 
-    Ok(PullTarget { user: details.user, host: details.host, port: details.port, git_dir: details.git_dir })
+    Ok(PullTarget { user: details.user, host: details.host, port: details.port, repo_path: details.repo_path })
 }
 
 fn resolve_remote_name() -> Result<String> {
@@ -71,7 +71,8 @@ fn resolve_remote_name() -> Result<String> {
 }
 
 fn rsync_bones(target: &PullTarget) -> Result<()> {
-    let source = format!("{}@{}:{}/{}/", target.user, target.host, target.git_dir, config::Constants::REMOTE_BONES_DIR);
+    let source =
+        format!("{}@{}:{}/{}/", target.user, target.host, target.repo_path, config::Constants::REMOTE_BONES_DIR);
     let status = Command::new("rsync")
         .args([
             "-av",

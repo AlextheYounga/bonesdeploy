@@ -51,7 +51,7 @@ Loads deployment configuration from `bones.yaml`.
 **Source:** `stage_release.rs:19-22`
 
 ```rust
-let deploy_root = Path::new(&cfg.data.deploy_root);
+let project_root = Path::new(&cfg.data.project_root);
 let build_root = release_state::build_root(&cfg);
 let releases_dir = release_state::releases_dir(&cfg);
 let shared_dir = release_state::shared_dir(&cfg);
@@ -61,7 +61,7 @@ let shared_dir = release_state::shared_dir(&cfg);
 
 | Variable | Path | Purpose |
 |----------|------|---------|
-| `deploy_root` | `/srv/deployments/myapp` | Root for all deployment data |
+| `project_root` | `/srv/deployments/myapp` | Root for all deployment data |
 | `build_root` | `/srv/deployments/myapp/build/workspace` | Where code is checked out |
 | `releases_dir` | `/srv/deployments/myapp/runtime` | Contains all releases |
 | `shared_dir` | `/srv/deployments/myapp/shared` | Shared files across releases |
@@ -73,10 +73,10 @@ let shared_dir = release_state::shared_dir(&cfg);
 **Source:** `stage_release.rs:24-31`
 
 ```rust
-fs::create_dir_all(deploy_root)
-    .with_context(|| format!("Failed to create deploy_root: {}", deploy_root.display()))?;
+fs::create_dir_all(project_root)
+    .with_context(|| format!("Failed to create project_root: {}", project_root.display()))?;
 fs::create_dir_all(&releases_dir)
-    .with_context(|| format!("Failed to create runtime dir: {}", releases_dir.display()))?;
+    .with_context(|| format!("Failed to create release dir: {}", releases_dir.display()))?;
 fs::create_dir_all(&build_root)
     .with_context(|| format!("Failed to create build workspace: {}", build_root.display()))?;
 fs::create_dir_all(&shared_dir)
@@ -88,7 +88,7 @@ fs::create_dir_all(&shared_dir)
 /srv/deployments/myapp/
 ├── build/
 │   └── workspace/
-├── runtime/
+├── releases/
 └── shared/
 ```
 
@@ -136,7 +136,7 @@ fs::create_dir_all(&staged_release_dir)
     .with_context(|| format!("Failed to create release dir: {}", staged_release_dir.display()))?;
 ```
 
-**Creates:** `/srv/deployments/myapp/runtime/20260507_150432/`
+**Creates:** `/srv/deployments/myapp/releases/20260507_150432/`
 
 This directory will hold the final runtime after the build is complete.
 
@@ -147,7 +147,7 @@ This directory will hold the final runtime after the build is complete.
 **Source:** `stage_release.rs:38-40`
 
 ```rust
-permissions::chown_paths_to_deploy_user(&cfg, &[deploy_root, releases_dir.as_path()], false)?;
+permissions::chown_paths_to_deploy_user(&cfg, &[project_root, releases_dir.as_path()], false)?;
 permissions::chown_paths_to_deploy_user(&cfg, &[build_root.as_path()], true)?;
 permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path()], true)?;
 ```
@@ -159,14 +159,14 @@ Changes ownership to `deploy_user:group` (e.g., `git:www-data`).
 **First call:** `chown_paths_to_deploy_user(..., false)`
 - Changes owner of directories themselves
 - Does NOT change contents recursively
-- For: `deploy_root`, `releases_dir`
+- For: `project_root`, `releases_dir`
 
 **Second call:** `chown_paths_to_deploy_user(..., true)`
 - Changes owner recursively
 - For: `build_root`, `staged_release_dir`
 
 **Why different?**
-- `deploy_root` and `releases_dir` may contain existing releases owned by other users
+- `project_root` and `releases_dir` may contain existing releases owned by other users
 - Don't want to change ownership of those
 - `build_root` and `staged_release_dir` are new/empty, safe to chown recursively
 
@@ -203,7 +203,7 @@ pub fn write_staged_release(cfg: &BonesConfig, release: &str) -> Result<()> {
 }
 ```
 
-**Creates:** `<git_dir>/bones/.staged_release`
+**Creates:** `<repo_path>/bones/.staged_release`
 
 **Example:** `/home/git/myapp.git/bones/.staged_release`
 
@@ -240,14 +240,14 @@ Staged release: 20260507_150432
 /srv/deployments/myapp/
 ├── build/
 │   └── workspace/          # (empty, ready for checkout)
-├── runtime/
+├── releases/
 │   ├── 20260507_130000/    # (existing release)
 │   ├── 20260507_140000/    # (existing release)
 │   └── 20260507_150432/    # (newly staged, empty)
 ├── shared/
 │   ├── .env
 │   └── storage/
-└── current -> runtime/20260507_140000/
+└── current -> releases/20260507_140000/
 
 /home/git/myapp.git/bones/
 ├── bones.yaml
@@ -258,7 +258,7 @@ Staged release: 20260507_150432
 
 ## State File
 
-**Location:** `<git_dir>/bones/.staged_release`
+**Location:** `<repo_path>/bones/.staged_release`
 
 **Contents:** Release name (timestamp)
 
@@ -320,7 +320,7 @@ bonesremote release activate --config /home/git/myapp.git/bones/bones.yaml
 ### Directory Creation Failed
 
 ```
-Failed to create deploy_root: /srv/deployments/myapp
+Failed to create project_root: /srv/deployments/myapp
 ```
 
 **Possible causes:**

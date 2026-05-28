@@ -98,7 +98,7 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
 
     ensure_remote_python3_available(cfg, ssh_user)?;
 
-    let live_root_parent = resolve_live_root_parent(&cfg.data.live_root);
+    let project_root_parent = resolve_project_root_parent(&cfg.data.project_root);
     let inventory = format!("{},", cfg.data.host);
     let roles_path = env::var("ANSIBLE_ROLES_PATH")
         .ok()
@@ -122,15 +122,15 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
         .arg("-e")
         .arg(format!("group={}", cfg.permissions.defaults.group))
         .arg("-e")
-        .arg(format!("live_root_parent={live_root_parent}"))
+        .arg(format!("project_root_parent={project_root_parent}"))
         .arg("-e")
-        .arg(format!("live_root={}", cfg.data.live_root))
+        .arg(format!("project_root={}", cfg.data.project_root))
         .arg("-e")
-        .arg(format!("deploy_root={}", cfg.data.deploy_root))
+        .arg(format!("web_root={}", cfg.data.web_root))
         .arg("-e")
         .arg(format!("project_name={}", cfg.data.project_name))
         .arg("-e")
-        .arg(format!("git_dir={}", cfg.data.git_dir));
+        .arg(format!("repo_path={}", cfg.data.repo_path));
 
     if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
         command
@@ -310,43 +310,43 @@ fn user_ansible_playbook_path() -> Result<Option<PathBuf>> {
     Ok(Some(Path::new(&user_base).join("bin").join("ansible-playbook")))
 }
 
-pub(crate) fn resolve_live_root_parent(live_root: &str) -> String {
-    Path::new(live_root)
+pub(crate) fn resolve_project_root_parent(project_root: &str) -> String {
+    Path::new(project_root)
         .parent()
         .filter(|path| !path.as_os_str().is_empty())
-        .map_or_else(|| String::from("/var/www"), |path| path.to_string_lossy().to_string())
+        .map_or_else(|| String::from("/srv/deployments"), |path| path.to_string_lossy().to_string())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{build_extra_var_json, resolve_bootstrap_ssh_user_from, resolve_live_root_parent};
+    use super::{build_extra_var_json, resolve_bootstrap_ssh_user_from, resolve_project_root_parent};
 
-    // Verifies parent extraction for normal live_root paths used by playbook variables.
+    // Verifies parent extraction for normal project_root paths used by playbook variables.
     #[test]
-    fn resolve_live_root_parent_uses_parent_directory_for_nested_absolute_path() {
-        let parent = resolve_live_root_parent("/var/www/my-app/current");
-        assert_eq!(parent, "/var/www/my-app");
+    fn resolve_project_root_parent_uses_parent_directory_for_nested_absolute_path() {
+        let parent = resolve_project_root_parent("/srv/deployments/my-app/current");
+        assert_eq!(parent, "/srv/deployments/my-app");
     }
 
-    // Verifies root-level live_root values keep '/' parent instead of fallback.
+    // Verifies root-level project_root values keep '/' parent instead of fallback.
     #[test]
-    fn resolve_live_root_parent_uses_root_for_single_segment_absolute_path() {
-        let parent = resolve_live_root_parent("/my-app");
+    fn resolve_project_root_parent_uses_root_for_single_segment_absolute_path() {
+        let parent = resolve_project_root_parent("/my-app");
         assert_eq!(parent, "/");
     }
 
-    // Verifies relative live_root input still derives a usable parent path.
+    // Verifies relative project_root input still derives a usable parent path.
     #[test]
-    fn resolve_live_root_parent_uses_relative_parent_for_relative_path() {
-        let parent = resolve_live_root_parent("deploy/live");
+    fn resolve_project_root_parent_uses_relative_parent_for_relative_path() {
+        let parent = resolve_project_root_parent("deploy/project");
         assert_eq!(parent, "deploy");
     }
 
     // Empty input should hit safe fallback to documented default parent.
     #[test]
-    fn resolve_live_root_parent_falls_back_for_empty_path() {
-        let parent = resolve_live_root_parent("");
-        assert_eq!(parent, "/var/www");
+    fn resolve_project_root_parent_falls_back_for_empty_path() {
+        let parent = resolve_project_root_parent("");
+        assert_eq!(parent, "/srv/deployments");
     }
 
     #[test]

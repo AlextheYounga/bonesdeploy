@@ -9,7 +9,7 @@ use anyhow::{Context, Result, bail};
 use crate::config::{BonesConfig, Constants};
 
 pub fn staged_release_path(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.git_dir).join("bones").join(Constants::STAGED_RELEASE_FILE)
+    Path::new(&cfg.data.repo_path).join("bones").join(Constants::STAGED_RELEASE_FILE)
 }
 
 pub fn read_staged_release(cfg: &BonesConfig) -> Result<String> {
@@ -49,19 +49,19 @@ pub fn release_dir(cfg: &BonesConfig, release: &str) -> PathBuf {
 }
 
 pub fn releases_dir(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.deploy_root).join(Constants::RUNTIME_DIR)
+    Path::new(&cfg.data.project_root).join(Constants::RELEASES_DIR)
 }
 
 pub fn build_root(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.deploy_root).join(Constants::BUILD_DIR).join(Constants::BUILD_WORKSPACE_DIR)
+    Path::new(&cfg.data.project_root).join(Constants::BUILD_DIR).join(Constants::BUILD_WORKSPACE_DIR)
 }
 
 pub fn shared_dir(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.deploy_root).join(Constants::SHARED_DIR)
+    Path::new(&cfg.data.project_root).join(Constants::SHARED_DIR)
 }
 
 pub fn current_link(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.deploy_root).join(Constants::CURRENT_LINK)
+    Path::new(&cfg.data.project_root).join(Constants::CURRENT_LINK)
 }
 
 pub fn current_release_dir(cfg: &BonesConfig) -> Result<PathBuf> {
@@ -158,9 +158,9 @@ mod tests {
                 project_name: String::from(project),
                 host: String::from("deploy.example.com"),
                 port: String::from("22"),
-                git_dir: root.join("repo.git").to_string_lossy().to_string(),
-                live_root: root.join("live").to_string_lossy().to_string(),
-                deploy_root: root.join("deploy").to_string_lossy().to_string(),
+                repo_path: root.join("repo.git").to_string_lossy().to_string(),
+                project_root: root.join("deploy").to_string_lossy().to_string(),
+                web_root: String::from("public"),
                 branch: String::from("master"),
                 deploy_on_push: true,
             },
@@ -174,11 +174,10 @@ mod tests {
                 },
                 paths: Vec::new(),
             },
-            releases: Releases { keep: 5, shared_paths: Vec::new() },
+            releases: Releases { keep: 5, shared_files: Vec::new(), shared_dirs: Vec::new() },
         }
     }
 
-    // Verifies staged release state is persisted and readable, which is the handoff between hooks.
     #[test]
     fn write_then_read_staged_release_round_trips() -> Result<()> {
         let root = temp_dir_path("round_trip");
@@ -193,7 +192,6 @@ mod tests {
         Ok(())
     }
 
-    // Ensures empty staged state is treated as invalid to prevent ambiguous deploy targets.
     #[test]
     fn read_staged_release_rejects_empty_file() -> Result<()> {
         let root = temp_dir_path("empty_state");
@@ -213,7 +211,6 @@ mod tests {
         Ok(())
     }
 
-    // Ensures failed/finished flows can clear staged state cleanly before next deployment.
     #[test]
     fn clear_staged_release_removes_state_file() -> Result<()> {
         let root = temp_dir_path("clear_state");
@@ -228,7 +225,6 @@ mod tests {
         Ok(())
     }
 
-    // Verifies atomic symlink helper can create missing parents for first-time activation paths.
     #[test]
     fn point_symlink_atomically_creates_parent_dirs_and_points_to_target() -> Result<()> {
         let root = temp_dir_path("point_symlink_parent");
@@ -248,7 +244,6 @@ mod tests {
         Ok(())
     }
 
-    // Verifies atomic symlink updates repoint current release without leaving stale link targets.
     #[test]
     fn point_symlink_atomically_repoints_existing_link() -> Result<()> {
         let root = temp_dir_path("point_symlink_repoint");
@@ -270,38 +265,36 @@ mod tests {
         Ok(())
     }
 
-    // Ensures release listing is deterministic and excludes non-release files.
     #[test]
     fn list_releases_sorted_returns_only_directories_in_order() -> Result<()> {
         let root = temp_dir_path("list_releases");
         fs::create_dir_all(&root)?;
         let cfg = sample_config(&root);
 
-        let runtime = releases_dir(&cfg);
-        fs::create_dir_all(&runtime)?;
-        fs::create_dir_all(runtime.join("20260507_120000"))?;
-        fs::create_dir_all(runtime.join("20260507_110000"))?;
-        fs::write(runtime.join("notes.txt"), "not a release")?;
+        let releases = releases_dir(&cfg);
+        fs::create_dir_all(&releases)?;
+        fs::create_dir_all(releases.join("20260507_120000"))?;
+        fs::create_dir_all(releases.join("20260507_110000"))?;
+        fs::write(releases.join("notes.txt"), "not a release")?;
 
-        let releases = list_releases_sorted(&cfg)?;
-        assert_eq!(releases, vec![String::from("20260507_110000"), String::from("20260507_120000")]);
+        let items = list_releases_sorted(&cfg)?;
+        assert_eq!(items, vec![String::from("20260507_110000"), String::from("20260507_120000")]);
 
         fs::remove_dir_all(root)?;
         Ok(())
     }
 
-    // Verifies current release name resolves from the active symlink used by runtime operations.
     #[test]
     fn current_release_name_resolves_from_current_symlink() -> Result<()> {
         let root = temp_dir_path("current_release_name");
         fs::create_dir_all(&root)?;
         let cfg = sample_config(&root);
 
-        let runtime_dir = releases_dir(&cfg);
-        let release = runtime_dir.join("20260507_170000");
+        let releases_dir = releases_dir(&cfg);
+        let release = releases_dir.join("20260507_170000");
         fs::create_dir_all(&release)?;
 
-        let current = Path::new(&cfg.data.deploy_root).join("current");
+        let current = Path::new(&cfg.data.project_root).join("current");
         point_symlink_atomically(&current, &release)?;
 
         let name = current_release_name(&cfg)?;

@@ -1,6 +1,6 @@
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result};
 
@@ -17,15 +17,19 @@ pub fn run(config_path: &str) -> Result<()> {
     let build_root = release_state::build_root(&cfg);
     let shared_dir = release_state::shared_dir(&cfg);
 
-    for shared_path in &cfg.releases.shared_paths {
-        wire_path(&cfg, &build_root, &shared_dir, shared_path)?;
+    for shared_file in &cfg.releases.shared_files {
+        wire_path(&cfg, (&build_root, &shared_dir), shared_file, true)?;
+    }
+    for shared_dir_path in &cfg.releases.shared_dirs {
+        wire_path(&cfg, (&build_root, &shared_dir), shared_dir_path, false)?;
     }
 
-    println!("Wired build workspace for staged runtime: {release_name}");
+    println!("Wired build workspace for staged release: {release_name}");
     Ok(())
 }
 
-fn wire_path(cfg: &config::BonesConfig, release_dir: &Path, shared_dir: &Path, relative_path: &str) -> Result<()> {
+fn wire_path(cfg: &config::BonesConfig, roots: (&Path, &Path), relative_path: &str, create_file: bool) -> Result<()> {
+    let (release_dir, shared_dir) = roots;
     let release_path = release_dir.join(relative_path);
     let shared_path = shared_dir.join(relative_path);
 
@@ -41,7 +45,7 @@ fn wire_path(cfg: &config::BonesConfig, release_dir: &Path, shared_dir: &Path, r
     }
 
     if !path_exists(&shared_path) {
-        create_default_shared_target(&shared_path, relative_path)?;
+        create_default_shared_target(&shared_path, create_file)?;
     }
 
     permissions::chown_paths_to_deploy_user(cfg, &[shared_path.as_path()], true)?;
@@ -60,10 +64,10 @@ fn wire_path(cfg: &config::BonesConfig, release_dir: &Path, shared_dir: &Path, r
     Ok(())
 }
 
-fn create_default_shared_target(shared_path: &Path, relative_path: &str) -> Result<()> {
+fn create_default_shared_target(shared_path: &Path, create_file: bool) -> Result<()> {
     ensure_parent_exists(shared_path)?;
 
-    if looks_like_file(relative_path) {
+    if create_file {
         fs::File::create(shared_path)
             .with_context(|| format!("Failed to create shared file: {}", shared_path.display()))?;
     } else {
@@ -72,13 +76,6 @@ fn create_default_shared_target(shared_path: &Path, relative_path: &str) -> Resu
     }
 
     Ok(())
-}
-
-fn looks_like_file(relative_path: &str) -> bool {
-    PathBuf::from(relative_path).file_name().is_some_and(|name| {
-        let name = name.to_string_lossy();
-        name.starts_with('.') || name.contains('.')
-    })
 }
 
 fn ensure_parent_exists(path: &Path) -> Result<()> {
@@ -115,39 +112,20 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{create_default_shared_target, looks_like_file, remove_path};
+    use super::{create_default_shared_target, remove_path};
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
         std::env::temp_dir().join(format!("bonesremote_wire_release_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
-    // Dotfiles like .env are file semantics and must be symlinked as files.
+    // Explicit file declarations must be bootstrapped as files.
     #[test]
-    fn looks_like_file_treats_dotfiles_as_files() {
-        assert!(looks_like_file(".env"));
-    }
-
-    // Paths with extensions are treated as files to avoid accidental directory creation.
-    #[test]
-    fn looks_like_file_treats_extensions_as_files() {
-        assert!(looks_like_file("config/app.json"));
-    }
-
-    // Plain segment paths are treated as directories for shared-folder wiring.
-    #[test]
-    fn looks_like_file_treats_plain_names_as_directories() {
-        assert!(!looks_like_file("storage"));
-        assert!(!looks_like_file("logs/archive"));
-    }
-
-    // Ensures missing shared file targets are bootstrapped as files for first deploy.
-    #[test]
-    fn create_default_shared_target_creates_file_for_file_like_paths() -> Result<()> {
+    fn create_default_shared_target_creates_file_for_explicit_file_paths() -> Result<()> {
         let root = temp_dir_path("default_file");
         let shared_file = root.join("shared").join(".env");
 
-        create_default_shared_target(&shared_file, ".env")?;
+        create_default_shared_target(&shared_file, true)?;
 
         assert!(shared_file.exists());
         assert!(shared_file.is_file());
@@ -156,13 +134,13 @@ mod tests {
         Ok(())
     }
 
-    // Ensures missing shared directory targets are bootstrapped as directories for first deploy.
+    // Explicit directory declarations must be bootstrapped as directories.
     #[test]
-    fn create_default_shared_target_creates_directory_for_directory_like_paths() -> Result<()> {
+    fn create_default_shared_target_creates_directory_for_explicit_directory_paths() -> Result<()> {
         let root = temp_dir_path("default_directory");
         let shared_dir = root.join("shared").join("storage");
 
-        create_default_shared_target(&shared_dir, "storage")?;
+        create_default_shared_target(&shared_dir, false)?;
 
         assert!(shared_dir.exists());
         assert!(shared_dir.is_dir());

@@ -5,14 +5,15 @@ data:
   deploy_on_push: true
 
   # Optional path overrides. Leave commented out to use the defaults.
-  # live_root defaults to /var/www/<project_name>
-  #   The public path your web server points to.
-  #   Should remain a symlink to deploy_root/current.
-  # live_root: '/var/www/<project_name>'
+  # project_root defaults to /srv/deployments/<project_name>
+  #   Stores deployment state: build/, releases/, shared/, current.
+  # project_root: '/srv/deployments/<project_name>'
   #
-  # deploy_root defaults to /srv/deployments/<project_name>
-  #   Stores deployment/runtime data: build/workspace, runtime/, shared/, current (symlink).
-  # deploy_root: '/srv/deployments/<project_name>'
+  # repo_path defaults to /home/git/<project_name>.git
+  # repo_path: '/home/git/<project_name>.git'
+  #
+  # web_root defaults to public
+  # web_root: 'public'
 
 # Permissions for deployment
 permissions:
@@ -27,9 +28,12 @@ releases:
   # Number of old releases to keep after each successful activation.
   keep: 5
 
-  # Paths that are persisted in deploy_root/shared and symlinked into each release.
-  shared_paths:
+  # Files persisted in shared/ and symlinked into each release.
+  shared_files:
     - '.env'
+
+  # Directories persisted in shared/ and symlinked into each release.
+  shared_dirs:
     - 'storage'
 
 ssl:

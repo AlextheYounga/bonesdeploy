@@ -2,7 +2,7 @@
 
 ## Overview
 
-Launches per-site nginx within a Landlock sandbox that restricts filesystem access to only the site's release directory and socket directory. This provides mandatory access control (MAC) isolation, preventing nginx from accessing files outside its designated workspace. The command is invoked by systemd as part of the per-site nginx service.
+Launches per-site nginx within a Landlock sandbox that restricts filesystem access to only the site's release directory and socket directory. This command runs under a project-specific AppArmor profile provisioned during `bonesdeploy remote setup`, so runtime confinement is AppArmor-first with Landlock as an additional job-time/filesystem layer. The command is invoked by systemd as part of the per-site nginx service.
 
 ## Command Signature
 
@@ -46,37 +46,41 @@ Loads `bones.yaml` to get site configuration.
 
 ---
 
-### 3. Resolve Active Runtime Root
+### 3. Resolve Active Web Root
 
-**Source:** `landlock_nginx.rs:17-18`
+**Source:** `landlock_nginx.rs:17-21`
 
 ```rust
-let active_runtime_root = fs::canonicalize(&cfg.data.live_root)
-    .with_context(|| format!("Failed to resolve live_root: {}", cfg.data.live_root))?;
+let active_release_root =
+    fs::canonicalize(release_state::current_release_dir(&cfg)?).context("Failed to resolve current release")?;
+let active_web_root = fs::canonicalize(active_release_root.join(&cfg.data.web_root))
+    .with_context(|| format!("Failed to resolve web_root: {}", cfg.data.web_root))?;
 ```
 
-Resolves the `live_root` symlink to the actual release directory.
+Resolves the configured web root inside the active release directory.
 
 **Example:**
-- `live_root`: `/var/www/myapp` (symlink)
-- `active_runtime_root`: `/srv/deployments/myapp/runtime/20260507_150000` (resolved)
+- `web_root`: `public`
+- `active_web_root`: `/srv/deployments/myapp/releases/20260507_150000/public`
 
 ---
 
 ### 4. Build Landlock Policy
 
-**Source:** `landlock_nginx.rs:20-21`, `landlock_nginx.rs:24-41`
+**Source:** `landlock_nginx.rs:20-22`, `landlock_nginx.rs:35-47`
 
 ```rust
 let socket_dir = PathBuf::from("/run").join(&cfg.data.project_name);
-let policy = build_policy(&active_runtime_root, &socket_dir);
+let nginx_conf = PathBuf::from(&cfg.data.repo_path).join("bones").join("nginx.conf");
+let policy = build_policy(&active_web_root, &socket_dir, &nginx_conf);
 ```
 
 #### 4.1 Define Read-Only Paths
 
 ```rust
 let mut read_only_paths = BTreeSet::new();
-read_only_paths.insert(runtime_root.to_path_buf());
+read_only_paths.insert(web_root.to_path_buf());
+read_only_paths.insert(nginx_conf.to_path_buf());
 
 for system_path in landlock::default_system_read_paths() {
     read_only_paths.insert(system_path);
@@ -84,8 +88,9 @@ for system_path in landlock::default_system_read_paths() {
 ```
 
 **Read-only access granted to:**
-1. **Runtime root** - Application code and assets (e.g., `/srv/deployments/myapp/runtime/20260507_150000`)
-2. **System paths** - Essential system directories:
+1. **Web root** - Application code and assets (e.g., `/srv/deployments/myapp/releases/20260507_150000/public`)
+2. **Repo nginx config** - `{repo_path}/bones/nginx.conf` (e.g., `/home/git/myapp.git/bones/nginx.conf`)
+3. **System paths** - Essential system directories:
    - `/usr` - User programs
    - `/lib`, `/lib64` - Shared libraries
    - `/bin`, `/sbin` - System binaries
@@ -143,7 +148,7 @@ Applies the Landlock policy to the current process.
 3. All future filesystem operations are restricted
 
 **After this point, nginx can only:**
-- Read from: site's release directory, system paths
+- Read from: site's active release directory, system paths
 - Write to: `/run/{project_name}/`
 - All other filesystem access is denied
 
@@ -151,12 +156,11 @@ Applies the Landlock policy to the current process.
 
 ### 6. Execute Nginx
 
-**Source:** `landlock_nginx.rs:25-29`
+**Source:** `landlock_nginx.rs:26-30`
 
 ```rust
-let nginx_conf = format!("{}/bones/nginx.conf", cfg.data.git_dir);
 let mut command = Command::new("nginx");
-command.args(["-c", &nginx_conf, "-g", "daemon off;"]);
+command.args(["-c", &nginx_conf.display().to_string(), "-g", "daemon off;"]);
 
 let exec_error = command.exec();
 bail!("Failed to exec nginx: {exec_error}")
@@ -168,7 +172,7 @@ Creates a `Command` to run nginx with:
 - `-c {path}`: Path to per-site nginx config
 - `-g "daemon off;"`: Run in foreground (required for systemd)
 
-**Config location:** `{git_dir}/bones/nginx.conf` (e.g., `/home/git/myapp.git/bones/nginx.conf`)
+**Config location:** `{repo_path}/bones/nginx.conf` (e.g., `/home/git/myapp.git/bones/nginx.conf`)
 
 #### 6.2 Execute (exec)
 
@@ -230,8 +234,8 @@ Even if nginx is compromised:
 **Before Landlock:**
 ```
 nginx can access:
-  ✅ /srv/deployments/site-a/runtime/20260507_150000
-  ✅ /srv/deployments/site-b/runtime/20260507_140000 ❌ (should not be accessible)
+  ✅ /srv/deployments/site-a/releases/20260507_150000
+  ✅ /srv/deployments/site-b/releases/20260507_140000 ❌ (should not be accessible)
   ✅ /etc/shadow ❌ (should not be accessible)
   ✅ /home/user ❌ (should not be accessible)
 ```
@@ -239,7 +243,7 @@ nginx can access:
 **After Landlock:**
 ```
 nginx can access:
-  ✅ /srv/deployments/site-a/runtime/20260507_150000 (read-only)
+  ✅ /srv/deployments/site-a/releases/20260507_150000 (read-only)
   ✅ /run/site-a/ (read-write)
   ✅ /usr, /lib, /etc (read-only)
   ❌ /srv/deployments/site-b (denied)
@@ -257,7 +261,8 @@ Invoked via systemd service:
 ```ini
 [Unit]
 Description=Per-site nginx for myapp
-After=network.target
+After=network.target apparmor.service
+Requires=apparmor.service
 
 [Service]
 Type=simple
@@ -282,7 +287,7 @@ WantedBy=multi-user.target
 
 ## Nginx Configuration
 
-Per-site nginx config is stored at `{git_dir}/bones/nginx.conf`:
+Per-site nginx config is stored at `{repo_path}/bones/nginx.conf`:
 
 ```nginx
 daemon off;
@@ -318,7 +323,7 @@ http {
 - Listens on unix socket (not port)
 - All temp paths under `/run/{project}/`
 - Logs to stderr (for systemd/journald)
-- Serves from `live_root`
+- Serves from `web_root`
 
 ---
 

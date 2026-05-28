@@ -50,11 +50,12 @@ pub struct Data {
     pub project_name: String,
     pub host: String,
     pub port: String,
-    pub git_dir: String,
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub live_root: String,
+    pub repo_path: String,
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub deploy_root: String,
+    pub project_root: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub web_root: String,
     pub branch: String,
     pub deploy_on_push: bool,
 }
@@ -66,9 +67,9 @@ impl Default for Data {
             project_name: String::new(),
             host: String::new(),
             port: "22".into(),
-            git_dir: String::new(),
-            live_root: String::new(),
-            deploy_root: String::new(),
+            repo_path: String::new(),
+            project_root: String::new(),
+            web_root: String::new(),
             branch: "master".into(),
             deploy_on_push: true,
         }
@@ -79,16 +80,18 @@ impl Default for Data {
 #[serde(default)]
 pub struct Releases {
     pub keep: usize,
-    pub shared_paths: Vec<String>,
+    pub shared_files: Vec<String>,
+    pub shared_dirs: Vec<String>,
 }
 
 impl Default for Releases {
     fn default() -> Self {
-        Self { keep: 5, shared_paths: Vec::new() }
+        Self { keep: 5, shared_files: Vec::new(), shared_dirs: Vec::new() }
     }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Ssl {
     #[serde(default)]
     pub enabled: bool,
@@ -139,15 +142,19 @@ pub struct PathOverride {
 
 pub fn is_configured(config: &BonesConfig) -> bool {
     let d = &config.data;
-    !d.remote_name.is_empty() && !d.project_name.is_empty() && !d.host.is_empty() && !d.git_dir.is_empty()
+    !d.remote_name.is_empty() && !d.project_name.is_empty() && !d.host.is_empty() && !d.repo_path.is_empty()
 }
 
-pub fn default_live_root_for(project_name: &str) -> String {
-    format!("/var/www/{project_name}")
+pub fn default_repo_path_for(project_name: &str) -> String {
+    format!("/home/git/{project_name}.git")
 }
 
-pub fn default_deploy_root_for(project_name: &str) -> String {
+pub fn default_project_root_for(project_name: &str) -> String {
     format!("/srv/deployments/{project_name}")
+}
+
+pub fn default_web_root() -> String {
+    String::from("public")
 }
 
 pub fn load(path: &Path) -> Result<BonesConfig> {
@@ -167,32 +174,34 @@ pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
     Ok(())
 }
 
-// Fill in fields intentionally absent from bones.yaml so the rest of the app
-// can read them as plain strings.
 fn apply_derived_defaults(config: &mut BonesConfig) {
     let project_name = &config.data.project_name;
 
     if config.permissions.defaults.service_user.is_empty() {
         config.permissions.defaults.service_user = project_name.clone();
     }
-    if config.data.live_root.is_empty() {
-        config.data.live_root = default_live_root_for(project_name);
+    if config.data.repo_path.is_empty() {
+        config.data.repo_path = default_repo_path_for(project_name);
     }
-    if config.data.deploy_root.is_empty() {
-        config.data.deploy_root = default_deploy_root_for(project_name);
+    if config.data.project_root.is_empty() {
+        config.data.project_root = default_project_root_for(project_name);
+    }
+    if config.data.web_root.is_empty() {
+        config.data.web_root = default_web_root();
     }
 }
 
-// Inverse of apply_derived_defaults: clear paths that match the project-derived
-// defaults so a freshly saved bones.yaml stays free of redundant overrides.
 fn hide_derived_defaults(config: &mut BonesConfig) {
     let project_name = &config.data.project_name;
 
-    if config.data.live_root == default_live_root_for(project_name) {
-        config.data.live_root.clear();
+    if config.data.repo_path == default_repo_path_for(project_name) {
+        config.data.repo_path.clear();
     }
-    if config.data.deploy_root == default_deploy_root_for(project_name) {
-        config.data.deploy_root.clear();
+    if config.data.project_root == default_project_root_for(project_name) {
+        config.data.project_root.clear();
+    }
+    if config.data.web_root == default_web_root() {
+        config.data.web_root.clear();
     }
 }
 
@@ -207,8 +216,8 @@ mod tests {
     use anyhow::Result;
 
     use super::{
-        BonesConfig, Data, PermissionDefaults, Permissions, Releases, Ssl, default_deploy_root_for,
-        default_live_root_for, load, save,
+        BonesConfig, Data, PermissionDefaults, Permissions, Releases, Ssl, default_project_root_for,
+        default_repo_path_for, default_web_root, load, save,
     };
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -218,7 +227,7 @@ mod tests {
 
     fn minimal_yaml(project_name: &str) -> String {
         format!(
-            "data:\n  remote_name: production\n  project_name: {project_name}\n  host: deploy.example.com\n  port: \"22\"\n  git_dir: /home/git/{project_name}.git\n  branch: master\n  deploy_on_push: true\n"
+            "data:\n  remote_name: production\n  project_name: {project_name}\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: /home/git/{project_name}.git\n  branch: master\n  deploy_on_push: true\n"
         )
     }
 
@@ -229,9 +238,9 @@ mod tests {
                 project_name: String::from(project_name),
                 host: String::from("deploy.example.com"),
                 port: String::from("22"),
-                git_dir: format!("/home/git/{project_name}.git"),
-                live_root: default_live_root_for(project_name),
-                deploy_root: default_deploy_root_for(project_name),
+                repo_path: default_repo_path_for(project_name),
+                project_root: default_project_root_for(project_name),
+                web_root: default_web_root(),
                 branch: String::from("master"),
                 deploy_on_push: true,
             },
@@ -245,12 +254,11 @@ mod tests {
                 },
                 paths: Vec::new(),
             },
-            releases: Releases { keep: 5, shared_paths: Vec::new() },
+            releases: Releases { keep: 5, shared_files: Vec::new(), shared_dirs: Vec::new() },
             ssl: Ssl::default(),
         }
     }
 
-    // Confirms service user derives from project name when omitted to keep init output minimal.
     #[test]
     fn load_applies_default_service_user_from_project_name() -> Result<()> {
         let path = temp_path("service_user.yaml");
@@ -263,49 +271,58 @@ mod tests {
         Ok(())
     }
 
-    // Confirms live_root default matches documented project-scoped runtime location.
     #[test]
-    fn load_applies_default_live_root_from_project_name() -> Result<()> {
-        let path = temp_path("live_root.yaml");
+    fn load_applies_default_repo_path_from_project_name() -> Result<()> {
+        let path = temp_path("repo_path.yaml");
         fs::write(&path, minimal_yaml("atlas"))?;
 
         let cfg = load(&path)?;
-        assert_eq!(cfg.data.live_root, "/var/www/atlas");
+        assert_eq!(cfg.data.repo_path, "/home/git/atlas.git");
 
         fs::remove_file(path)?;
         Ok(())
     }
 
-    // Confirms deploy_root default matches documented project-scoped release location.
     #[test]
-    fn load_applies_default_deploy_root_from_project_name() -> Result<()> {
-        let path = temp_path("deploy_root.yaml");
+    fn load_applies_default_project_root_from_project_name() -> Result<()> {
+        let path = temp_path("project_root.yaml");
         fs::write(&path, minimal_yaml("atlas"))?;
 
         let cfg = load(&path)?;
-        assert_eq!(cfg.data.deploy_root, "/srv/deployments/atlas");
+        assert_eq!(cfg.data.project_root, "/srv/deployments/atlas");
 
         fs::remove_file(path)?;
         Ok(())
     }
 
-    // Ensures save omits derived values so config stays concise and portable across renames.
     #[test]
-    fn save_omits_derived_live_and_deploy_roots() -> Result<()> {
+    fn load_applies_default_web_root() -> Result<()> {
+        let path = temp_path("web_root.yaml");
+        fs::write(&path, minimal_yaml("atlas"))?;
+
+        let cfg = load(&path)?;
+        assert_eq!(cfg.data.web_root, "public");
+
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn save_omits_derived_repo_project_and_web_roots() -> Result<()> {
         let config = sample_config("phoenix");
         let path = temp_path("save_derived_defaults.yaml");
 
         save(&config, &path)?;
         let content = fs::read_to_string(&path)?;
 
-        assert!(!content.contains("live_root:"));
-        assert!(!content.contains("deploy_root:"));
+        assert!(!content.contains("repo_path:"));
+        assert!(!content.contains("project_root:"));
+        assert!(!content.contains("web_root:"));
 
         fs::remove_file(path)?;
         Ok(())
     }
 
-    // Ensures SSL settings are serialized so SSL setup can round-trip user intent.
     #[test]
     fn save_persists_ssl_settings() -> Result<()> {
         let mut config = sample_config("phoenix");
@@ -325,17 +342,17 @@ mod tests {
         Ok(())
     }
 
-    // Protects explicit user overrides so load never clobbers intentional non-default paths.
     #[test]
-    fn load_preserves_explicit_live_and_deploy_root_overrides() -> Result<()> {
+    fn load_preserves_explicit_repo_project_and_web_root_overrides() -> Result<()> {
         let path = temp_path("overrides.yaml");
-        let yaml = "data:\n  remote_name: production\n  project_name: app\n  host: deploy.example.com\n  port: \"22\"\n  git_dir: /home/git/app.git\n  live_root: /custom/live\n  deploy_root: /custom/deploy\n  branch: master\n  deploy_on_push: true\n";
+        let yaml = "data:\n  remote_name: production\n  project_name: app\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: /home/git/app.git\n  project_root: /custom/deploy\n  web_root: dist\n  branch: master\n  deploy_on_push: true\n";
 
         fs::write(&path, yaml)?;
         let cfg = load(Path::new(&path))?;
 
-        assert_eq!(cfg.data.live_root, "/custom/live");
-        assert_eq!(cfg.data.deploy_root, "/custom/deploy");
+        assert_eq!(cfg.data.repo_path, "/home/git/app.git");
+        assert_eq!(cfg.data.project_root, "/custom/deploy");
+        assert_eq!(cfg.data.web_root, "dist");
 
         fs::remove_file(path)?;
         Ok(())
