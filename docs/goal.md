@@ -40,9 +40,9 @@ Key Decisions
 - Missing/incorrect AppArmor should be reported as doctor issues, not optional warning.
 Next Steps
 - Run Linux validation:
-1. `bonesdeploy remote setup --tags apparmor,nginx` against a Linux host.
+1. `bonesdeploy remote setup` against a Linux host.
 2. Verify `systemctl is-active apparmor` and `/sys/module/apparmor/parameters/enabled`.
-3. Verify `aa-status --profiled bonesdeploy-<project>-nginx` reports enforce mode.
+3. Verify `aa-status` shows `bonesdeploy-<project>-nginx` in the enforce-mode section.
 4. Verify `<project>-nginx.service` contains `AppArmorProfile=`, `After=... apparmor.service`, and `Requires=apparmor.service`.
 5. Verify `systemctl is-active <project>-nginx`.
 6. Run `cargo test -p bonesremote` and `cargo clippy -p bonesremote --all-targets` on Linux.

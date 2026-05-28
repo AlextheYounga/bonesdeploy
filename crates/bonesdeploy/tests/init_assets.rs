@@ -221,12 +221,8 @@ fn apparmor_role_verifies_profile_enforce_mode() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("aa-status") && content.contains("--profiled"),
-        "apparmor role must query aa-status for a specific profile before asserting enforce mode\n{content}"
-    );
-    assert!(
-        content.contains("is in enforce mode"),
-        "apparmor role must assert the target profile is in enforce mode\n{content}"
+        content.contains("profiles are in enforce mode") && content.contains("apparmor_profile_name | regex_escape"),
+        "apparmor role must verify the target profile appears in the enforce-mode section of aa-status output\n{content}"
     );
 }
 
