@@ -62,6 +62,11 @@ deny:             /home/git/**
 
 The exact syntax may vary by profile, but the access intent should stay narrow.
 
+Note: if runtime configuration is intentionally stored under a deploy-user home path
+(for example `/home/git/<project>.git/bones/*.yaml`), profile denies must not
+contradict those required reads. Keep denies narrow enough to preserve required
+project-scoped reads.
+
 ## Deployment and Worker Coverage
 
 Where practical, AppArmor should also cover risky non-service processes such as:

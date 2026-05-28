@@ -50,6 +50,7 @@ pub struct Data {
     pub project_name: String,
     pub host: String,
     pub port: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub repo_path: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub project_root: String,
