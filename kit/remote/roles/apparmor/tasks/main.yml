@@ -72,19 +72,12 @@
     fail_msg: "AppArmor profile {{ apparmor_profile_name }} is not loaded according to aa-status"
   tags: [apparmor]
 
-- name: Read project profile apparmor status
-  ansible.builtin.command:
-    argv:
-      - aa-status
-      - --profiled
-      - "{{ apparmor_profile_name }}"
-  register: apparmor_profile_status_output
-  changed_when: false
-  tags: [apparmor]
-
 - name: Verify project profile apparmor enforce mode
   ansible.builtin.assert:
     that:
-      - apparmor_profile_status_output.stdout is search("is in enforce mode")
+      - >-
+        apparmor_status_output.stdout | regex_search(
+          'profiles are in enforce mode:(.|\n)*\n\s+' ~ (apparmor_profile_name | regex_escape) ~ '(\n|$)'
+        )
     fail_msg: "AppArmor profile {{ apparmor_profile_name }} is not in enforce mode"
   tags: [apparmor]

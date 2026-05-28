@@ -463,12 +463,13 @@ mod tests {
         let content = content.unwrap_or_default();
 
         assert!(
-            content.contains("aa-status") && content.contains("--profiled"),
-            "apparmor role must query aa-status for a specific profile before asserting enforce mode\n{content}"
+            !content.contains("--profiled"),
+            "apparmor role must not rely on unsupported aa-status --profiled\n{content}"
         );
         assert!(
-            content.contains("is in enforce mode"),
-            "apparmor role must assert the target profile is in enforce mode\n{content}"
+            content.contains("profiles are in enforce mode")
+                && content.contains("apparmor_profile_name | regex_escape"),
+            "apparmor role must verify the target profile appears in the enforce-mode section of aa-status output\n{content}"
         );
     }
 
@@ -507,8 +508,8 @@ mod tests {
             "remote setup docs must include an AppArmor Linux verification runbook section\n{content}"
         );
         assert!(
-            content.contains("aa-status --profiled bonesdeploy-<project>-nginx"),
-            "runbook must include profile-specific AppArmor verification command\n{content}"
+            content.contains("profiles are in enforce mode") && content.contains("grep 'bonesdeploy-<project>-nginx'"),
+            "runbook must include a compatible profile-specific AppArmor enforce verification command\n{content}"
         );
         assert!(
             content.contains("systemctl cat <project>-nginx.service"),
@@ -550,8 +551,8 @@ mod tests {
             "apparmor role readme must include kernel enabled verification command\n{content}"
         );
         assert!(
-            content.contains("aa-status --profiled bonesdeploy-<project>-nginx"),
-            "apparmor role readme must include profile enforce verification command\n{content}"
+            content.contains("profiles are in enforce mode") && content.contains("grep 'bonesdeploy-<project>-nginx'"),
+            "apparmor role readme must include a compatible profile enforce verification command\n{content}"
         );
         assert!(
             content.contains("systemctl cat <project>-nginx.service"),
@@ -586,8 +587,8 @@ mod tests {
         let content = content.unwrap_or_default();
 
         assert!(
-            content.contains("aa-status --profiled"),
-            "security audit checklist must include profile-specific apparmor status command\n{content}"
+            content.contains("profiles are in enforce mode") && content.contains("grep 'bonesdeploy-<project>-nginx'"),
+            "security audit checklist must include a compatible profile-specific apparmor status command\n{content}"
         );
         assert!(
             content.contains("systemctl cat <service>"),
