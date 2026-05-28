@@ -48,8 +48,6 @@ pub fn run() -> Result<()> {
     // Symlink pre-push hook
     symlink_pre_push()?;
 
-    println!("\n{} This prepares the remote host for deploys.", style("Next:").cyan().bold());
-
     if prompts::confirm_remote_setup()? {
         remote_setup::run()?;
     } else {

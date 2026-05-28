@@ -13,7 +13,7 @@ fn e2e_bonesdeploy_init_reuses_existing_scaffold_and_symlinks_pre_push_hook() ->
     let output = cli::run_bonesdeploy_with_input(&sandbox.path, ["init"], "n\n")?;
     cli::assert_success(&output)?;
     repo::assert_pre_push_symlink_exists(&sandbox.path)?;
-    cli::assert_stdout_contains(&output, "Set up the server now?")?;
+    cli::assert_stdout_contains(&output, "Would you like to set up the remote server now?")?;
 
     Ok(())
 }

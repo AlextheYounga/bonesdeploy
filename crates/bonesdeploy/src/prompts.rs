@@ -92,7 +92,12 @@ pub fn prompt_port(
 }
 
 pub fn confirm_remote_setup() -> Result<bool> {
-    println!("This prepares the remote host for deploys.");
+    println!(
+        "Would you like to set up the remote server now? This is intended for a fresh server, as we cannot guarantee security on servers with existing setups."
+    );
+    println!(
+        "If you continue, we will install bonesremote, set up users, roles, firewalls, add your git repo to the server, and set up bonesdeploy resources."
+    );
     print!("Set up the server now? [y/N] ");
     io::stdout().flush().context("Failed to flush confirmation prompt")?;
 
