@@ -85,16 +85,11 @@ BonesDeploy assumes opinionated server defaults unless you change them in `.bone
 - `service_user = "<project_name>"`
 - `group = "www-data"`
 
-Before first deploy, run remote setup:
-
-```sh
-bonesdeploy remote setup
-```
-
-This runs `.bones/remote/playbooks/setup.yml` locally with Ansible against your configured remote host.
+The `init` command runs the Ansible setup playbook against your configured remote host.
 If `ansible-playbook` is missing, BonesDeploy installs Ansible automatically with `python3 -m pip install --user ansible`.
 Template-based projects also scaffold language-specific setup roles (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install global PM2/PNPM tools).
 Every setup also installs nginx and provisions a default project vhost that serves `.bones/remote/roles/nginx/defaults/index.html.j2` until your first deployment is live.
+Per-site nginx is confined under AppArmor with unix-socket-only network access.
 
 To customize nginx behavior, edit `.bones/remote/nginx/site.conf.j2` and re-run `bonesdeploy remote setup`.
 
@@ -153,6 +148,16 @@ bonesdeploy rollback
 bonesdeploy doctor          # check local + remote
 bonesdeploy doctor --local  # check local only
 ```
+
+### Updating
+
+Update BonesDeploy binaries to the latest release:
+
+```sh
+bonesdeploy update
+```
+
+This atomically updates both local (`bonesdeploy`) and remote (`bonesremote`) using symlink flipping for zero-downtime updates with instant rollback capability.
 
 ## Configuration
 
