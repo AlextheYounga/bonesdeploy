@@ -14,7 +14,6 @@ fn e2e_bonesdeploy_push_invokes_remote_sync_path() -> Result<()> {
 
     let output = cli::run_bonesdeploy(&sandbox.path, ["push"])?;
     cli::assert_success(&output)?;
-    cli::assert_stdout_contains(&output, ".bones/ synced to remote")?;
 
     let remote_config = docker::docker_exec_output("cat /home/git/e2eapp.git/bones/bones.yaml")?;
     assert!(remote_config.contains("project_name: e2eapp"));

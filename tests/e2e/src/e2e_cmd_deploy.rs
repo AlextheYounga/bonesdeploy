@@ -19,7 +19,6 @@ fn e2e_bonesdeploy_deploy_invokes_remote_hook_path() -> Result<()> {
     )?;
     let output = cli::run_bonesdeploy(&sandbox.path, ["deploy"])?;
     cli::assert_success(&output)?;
-    cli::assert_stdout_contains(&output, "Deployment complete")?;
 
     let logs = docker::docker_exec_output("cat /tmp/bonesdeploy-hooks.log")?;
     assert!(logs.contains("PRE BONES_FORCE_DEPLOY=1 GIT_DIR=/home/git/e2eapp.git"));

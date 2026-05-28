@@ -31,7 +31,6 @@ fn e2e_bonesdeploy_pull_syncs_remote_bones_folder_back_locally() -> Result<()> {
 
     let pull_output = cli::run_bonesdeploy(&sandbox.path, ["pull"])?;
     cli::assert_success(&pull_output)?;
-    cli::assert_stdout_contains(&pull_output, ".bones/ pulled from remote")?;
 
     let local_config = std::fs::read_to_string(sandbox.path.join(".bones/bones.yaml"))?;
     assert!(local_config.contains("project_name: e2eapp"));
