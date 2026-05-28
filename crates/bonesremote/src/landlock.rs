@@ -4,8 +4,11 @@ use anyhow::Result;
 
 pub struct Policy {
     pub read_only_paths: Vec<PathBuf>,
-    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     pub writable_paths: Vec<PathBuf>,
+}
+
+fn policy_path_counts(policy: &Policy) -> (usize, usize) {
+    (policy.read_only_paths.len(), policy.writable_paths.len())
 }
 
 #[cfg(target_os = "linux")]
@@ -79,7 +82,8 @@ mod platform {
         bail!("Landlock is only available on Linux")
     }
 
-    pub fn restrict_self(_policy: &Policy) -> Result<()> {
+    pub fn restrict_self(policy: &Policy) -> Result<()> {
+        let _ = super::policy_path_counts(policy);
         bail!("Landlock is only available on Linux")
     }
 }
@@ -98,4 +102,20 @@ pub fn default_system_read_paths() -> Vec<PathBuf> {
         .map(PathBuf::from)
         .filter(|path| path.exists())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Policy, policy_path_counts};
+    use std::path::PathBuf;
+
+    #[test]
+    fn policy_path_counts_reports_read_and_write_lengths() {
+        let policy = Policy {
+            read_only_paths: vec![PathBuf::from("/usr"), PathBuf::from("/etc")],
+            writable_paths: vec![PathBuf::from("/run/acme")],
+        };
+
+        assert_eq!(policy_path_counts(&policy), (2, 1));
+    }
 }
