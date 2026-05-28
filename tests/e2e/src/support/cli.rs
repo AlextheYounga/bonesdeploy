@@ -1,6 +1,7 @@
 use std::ffi::{OsStr, OsString};
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::sync::OnceLock;
 
 use anyhow::{Context, Result, bail};
@@ -13,6 +14,42 @@ where
     S: AsRef<OsStr>,
 {
     run_bonesdeploy_with_env(cwd, args, std::iter::empty::<(OsString, OsString)>())
+}
+
+pub fn run_bonesdeploy_with_input<I, S>(cwd: &Path, args: I, input: &str) -> Result<Output>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    run_bonesdeploy_with_input_and_env(cwd, args, input, std::iter::empty::<(OsString, OsString)>())
+}
+
+pub fn run_bonesdeploy_with_input_and_env<I, S, E, K, V>(cwd: &Path, args: I, input: &str, envs: E) -> Result<Output>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+    E: IntoIterator<Item = (K, V)>,
+    K: AsRef<OsStr>,
+    V: AsRef<OsStr>,
+{
+    let binary = bonesdeploy_binary_path()?;
+    let mut child = Command::new(binary)
+        .args(args)
+        .envs(envs)
+        .current_dir(cwd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("Failed to execute bonesdeploy binary")?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(input.as_bytes()).context("Failed to write bonesdeploy stdin")?;
+    }
+
+    let output = child.wait_with_output().context("Failed to collect bonesdeploy output")?;
+
+    Ok(output)
 }
 
 pub fn run_bonesdeploy_with_env<I, S, E, K, V>(cwd: &Path, args: I, envs: E) -> Result<Output>
