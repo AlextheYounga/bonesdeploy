@@ -7,6 +7,7 @@ mod push;
 mod remote_setup;
 mod remote_ssl;
 mod rollback;
+mod update;
 mod version;
 
 use anyhow::Result;
@@ -35,6 +36,15 @@ enum Command {
     Pull,
     /// Run deployment hooks manually without pushing commits
     Deploy,
+    /// Update bonesdeploy and bonesremote to the latest version
+    Update {
+        /// Skip local update
+        #[arg(long)]
+        skip_local: bool,
+        /// Skip remote update
+        #[arg(long)]
+        skip_remote: bool,
+    },
     /// Remote operations
     Remote {
         #[command(subcommand)]
@@ -70,6 +80,9 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Push => push::run().await,
         Command::Pull => pull::run(),
         Command::Deploy => deploy::run().await,
+        Command::Update { skip_local, skip_remote } => {
+            update::run(update::UpdateOptions { skip_local: *skip_local, skip_remote: *skip_remote }).await
+        }
         Command::Manage => manage::run(),
         Command::Remote { command } => match command {
             RemoteCommand::Setup => remote_setup::run(),

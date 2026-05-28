@@ -1,0 +1,123 @@
+---
+- name: Update bonesremote binary
+  hosts: all
+  become: true
+
+  vars:
+    bonesremote_staging_path: ""
+    bonesremote_target_version: ""
+    bonesremote_install_root: "/opt/bonesdeploy"
+    bonesremote_stable_link: "/opt/bonesdeploy/current"
+
+  tasks:
+    - name: Validate required variables
+      ansible.builtin.assert:
+        that:
+          - bonesremote_staging_path is defined and bonesremote_staging_path | length > 0
+          - bonesremote_target_version is defined and bonesremote_target_version | length > 0
+        fail_msg: "bonesremote_staging_path and bonesremote_target_version are required"
+        quiet: true
+
+    - name: Ensure install root exists
+      ansible.builtin.file:
+        path: "{{ bonesremote_install_root }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Ensure versions directory exists
+      ansible.builtin.file:
+        path: "{{ bonesremote_install_root }}/versions"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Ensure target version directory exists
+      ansible.builtin.file:
+        path: "{{ bonesremote_install_root }}/versions/{{ bonesremote_target_version }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Copy staged bonesremote binary to versioned directory
+      ansible.builtin.copy:
+        src: "{{ bonesremote_staging_path }}"
+        dest: "{{ bonesremote_install_root }}/versions/{{ bonesremote_target_version }}/bonesremote"
+        owner: root
+        group: root
+        mode: "0755"
+        remote_src: true
+      register: copy_result
+
+    - name: Verify staged binary
+      ansible.builtin.command:
+        argv:
+          - "{{ bonesremote_install_root }}/versions/{{ bonesremote_target_version }}/bonesremote"
+          - version
+      changed_when: false
+      register: version_check
+
+    - name: Assert binary version matches target
+      ansible.builtin.assert:
+        that:
+          - version_check.stdout is search(bonesremote_target_version)
+        fail_msg: "Binary version mismatch: expected {{ bonesremote_target_version }}, got {{ version_check.stdout }}"
+        quiet: true
+
+    - name: Create stable symlink directory
+      ansible.builtin.file:
+        path: "{{ bonesremote_stable_link }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create atomic temp symlink
+      ansible.builtin.file:
+        src: "{{ bonesremote_install_root }}/versions/{{ bonesremote_target_version }}/bonesremote"
+        dest: "{{ bonesremote_stable_link }}/.bonesremote_swap_{{ ansible_date_time.epoch }}"
+        state: link
+        force: true
+
+    - name: Atomically switch bonesremote symlink
+      ansible.builtin.command:
+        argv:
+          - mv
+          - "-T"
+          - "{{ bonesremote_stable_link }}/.bonesremote_swap_{{ ansible_date_time.epoch }}"
+          - "{{ bonesremote_stable_link }}/bonesremote"
+      changed_when: true
+
+    - name: Ensure global bin link exists
+      ansible.builtin.file:
+        src: "{{ bonesremote_stable_link }}/bonesremote"
+        dest: "/usr/local/bin/bonesremote"
+        state: link
+        force: true
+
+    - name: Verify global bonesremote works
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/bonesremote
+          - version
+      changed_when: false
+
+    - name: Discover managed projects
+      ansible.builtin.find:
+        paths: /srv/deployments
+        file_type: directory
+        depth: 1
+      register: managed_projects
+
+    - name: Run bonesremote doctor for each project
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/bonesremote
+          - doctor
+        chdir: "{{ item.path }}"
+      loop: "{{ managed_projects.files }}"
+      changed_when: false
+      when: managed_projects.matched > 0

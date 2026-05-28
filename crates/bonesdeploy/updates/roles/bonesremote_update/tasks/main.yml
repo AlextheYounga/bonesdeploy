@@ -1,0 +1,3 @@
+---
+- name: Update bonesremote binary
+  ansible.builtin.include_tasks: update-bonesremote.yml
