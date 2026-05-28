@@ -26,6 +26,8 @@ When you are done working, please run and address all warnings/errors:
 - `cargo clippy`
 - `cargo fmt`
 
+DO NOT RUN THE e2e tests!
+
 ## Principles
 
 - **Above all, Clean Code is non-negotiable.** Utilize "Clean Code" principles, clear code is clear thinking.
