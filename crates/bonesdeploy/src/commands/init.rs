@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use console::style;
 
+use crate::commands::remote_setup;
 use crate::config;
 use crate::embedded;
 use crate::git;
@@ -47,11 +48,16 @@ pub fn run() -> Result<()> {
     // Symlink pre-push hook
     symlink_pre_push()?;
 
-    println!(
-        "\n{} Run {} before your first deploy.",
-        style("Next:").cyan().bold(),
-        style("bonesdeploy remote setup").cyan()
-    );
+    if prompts::confirm_remote_setup()? {
+        remote_setup::run()?;
+    } else {
+        println!(
+            "{} Run {} before your first deploy.",
+            style("Next:").cyan().bold(),
+            style("bonesdeploy remote setup").cyan()
+        );
+    }
+
     println!(
         "{} Run {} after setup to sync .bones/ to the remote.",
         style("Done!").green().bold(),

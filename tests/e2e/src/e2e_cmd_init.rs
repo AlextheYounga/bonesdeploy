@@ -10,9 +10,10 @@ fn e2e_bonesdeploy_init_reuses_existing_scaffold_and_symlinks_pre_push_hook() ->
     let sandbox = repo::create_temp_git_repo()?;
     repo::write_minimal_bones_project(&sandbox.path)?;
 
-    let output = cli::run_bonesdeploy(&sandbox.path, ["init"])?;
+    let output = cli::run_bonesdeploy_with_input(&sandbox.path, ["init"], "n\n")?;
     cli::assert_success(&output)?;
     repo::assert_pre_push_symlink_exists(&sandbox.path)?;
+    cli::assert_stdout_contains(&output, "Would you like to set up the remote server now?")?;
 
     Ok(())
 }
@@ -36,7 +37,7 @@ fn e2e_bonesdeploy_init_does_not_claim_to_create_the_remote_user() -> Result<()>
         bail!("Failed to remove test remote");
     }
 
-    let output = cli::run_bonesdeploy(&sandbox.path, ["init"])?;
+    let output = cli::run_bonesdeploy_with_input(&sandbox.path, ["init"], "n\n")?;
     cli::assert_success(&output)?;
     cli::assert_stdout_contains(
         &output,
