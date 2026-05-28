@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 
 use anyhow::{Context, Result, anyhow};
+use console::style;
 use inquire::{Select, Text};
 
 use crate::config::BonesConfig;
@@ -92,12 +93,15 @@ pub fn prompt_port(
 }
 
 pub fn confirm_remote_setup() -> Result<bool> {
-    println!(
-        "Would you like to set up the remote server now? This is intended for a fresh server, as we cannot guarantee security on servers with existing setups."
-    );
-    println!(
-        "If you continue, we will install bonesremote, set up users, roles, firewalls, add your git repo to the server, and set up bonesdeploy resources."
-    );
+    println!();
+    let mut lines = remote_setup_prompt_lines().into_iter();
+    if let Some(header) = lines.next() {
+        println!("{}", style(header).cyan().bold());
+    }
+    for line in lines {
+        println!("{line}");
+    }
+    println!();
     print!("Set up the server now? [y/N] ");
     io::stdout().flush().context("Failed to flush confirmation prompt")?;
 
@@ -111,6 +115,18 @@ pub fn confirm_remote_setup() -> Result<bool> {
 
 fn is_affirmative(answer: &str) -> bool {
     matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
+}
+
+fn remote_setup_prompt_lines() -> [&'static str; 7] {
+    [
+        "Remote setup",
+        "This step is for fresh servers only.",
+        "It will:",
+        "  - install bonesremote",
+        "  - configure users, roles, firewalls, and AppArmor",
+        "  - add your git repo to the server",
+        "  - provision bonesdeploy resources",
+    ]
 }
 
 fn prompt_remote_name_text(seed: Option<&BonesConfig>) -> Result<String> {

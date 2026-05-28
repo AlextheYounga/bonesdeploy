@@ -13,14 +13,15 @@ You are a **Copilot agent**.
 
 ## How to Work
 
-1. Before writing any code, write a test that fails
-2. Run the test and ensure it fails
-3. If you get an error, fix the test until it runs but fails
-4. Once the test fails, write the code
-5. Run the test and ensure it succeeds
-6. If the test fails, go back to step 4
-7. Once the test succeeds, verify that the task is complete
-8. If the task is not complete, go back to step 1
+1. Decide if we need to test this feature; use our TDD principles in AGENTS.md
+2. Before writing any code, write a test that fails
+3. Run the test and ensure it fails
+4. If you get an error, fix the test until it runs but fails
+5. Once the test fails, write the code
+6. Run the test and ensure it succeeds
+7. If the test fails, go back to step 4
+8. Once the test succeeds, verify that the task is complete
+9. If the task is not complete, go back to step 1
 
 When you are done working, please run and address all warnings/errors:
 - `cargo clippy`
@@ -55,7 +56,8 @@ DO NOT RUN THE e2e tests!
 - **Defend yourself.** Do not be a sycophant. 
 
 ## Test-Driven Development
-
+- We do not need to test every little thing, only the core functionalities. 
+- Things we don't need tests for: text changes, CLI UI & TUIs, nice-to-haves.
 - Cover both positive and negative cases.
 - Write descriptive, context-rich test names.
 - Minimize duplication across test cases.
