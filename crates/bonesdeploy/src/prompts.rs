@@ -1,4 +1,6 @@
-use anyhow::{Result, anyhow};
+use std::io::{self, Write};
+
+use anyhow::{Context, Result, anyhow};
 use inquire::{Select, Text};
 
 use crate::config::BonesConfig;
@@ -89,6 +91,23 @@ pub fn prompt_port(
     Text::new("SSH port:").with_default(default_port).prompt().map_err(|err| anyhow!(err))
 }
 
+pub fn confirm_remote_setup() -> Result<bool> {
+    println!("This prepares the remote host for deploys.");
+    print!("Set up the server now? [y/N] ");
+    io::stdout().flush().context("Failed to flush confirmation prompt")?;
+
+    let mut answer = String::new();
+    if io::stdin().read_line(&mut answer).is_err() {
+        return Ok(false);
+    }
+
+    Ok(is_affirmative(&answer))
+}
+
+fn is_affirmative(answer: &str) -> bool {
+    matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
+}
+
 fn prompt_remote_name_text(seed: Option<&BonesConfig>) -> Result<String> {
     let default_remote =
         seed.map(|cfg| cfg.data.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
@@ -115,6 +134,8 @@ fn order_remotes_with_default(remotes: Vec<String>, default_remote: Option<Strin
 
 #[cfg(test)]
 mod tests {
+    use super::is_affirmative;
+
     use super::order_remotes_with_default;
 
     // Without a preferred remote, the existing order should remain stable for user familiarity.
@@ -139,5 +160,19 @@ mod tests {
         let remotes = vec![String::from("origin"), String::from("production"), String::from("staging")];
         let ordered = order_remotes_with_default(remotes, Some(String::from("production")));
         assert_eq!(ordered, vec!["production", "origin", "staging"]);
+    }
+
+    #[test]
+    fn confirmation_parser_accepts_common_yes_values() {
+        assert!(is_affirmative("y"));
+        assert!(is_affirmative(" yes "));
+        assert!(is_affirmative("YES"));
+    }
+
+    #[test]
+    fn confirmation_parser_rejects_non_affirmative_values() {
+        assert!(!is_affirmative(""));
+        assert!(!is_affirmative("n"));
+        assert!(!is_affirmative("no"));
     }
 }
