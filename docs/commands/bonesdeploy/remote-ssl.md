@@ -323,7 +323,7 @@ bonesdeploy remote ssl --domain app.example.com --email admin@example.com
 bonesdeploy push
 
 # Re-run remote setup to apply SSL configuration to Nginx
-bonesdeploy remote setup --tags nginx
+bonesdeploy remote setup
 ```
 
 ### SSL During Initial Setup

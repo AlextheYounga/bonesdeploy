@@ -46,7 +46,7 @@ This playbook is responsible for:
 - Deploying a per-project AppArmor profile for per-site nginx
 - Loading the profile and setting it to enforce mode
 - Verifying the profile is loaded using `aa-status`
-- Verifying the specific project profile reports enforce mode (`aa-status --profiled <profile>`)
+- Verifying the specific project profile appears in the enforce-mode section of `aa-status`
 - Setting up directory structure
 - Configuring permissions
 - Installing dependencies
@@ -321,10 +321,10 @@ command
 After `bonesdeploy remote setup` succeeds, verify AppArmor provisioning and service binding:
 
 ```bash
-bonesdeploy remote setup --tags apparmor,nginx
+bonesdeploy remote setup
 ssh -p <port> <bootstrap-user>@<host> "systemctl is-active apparmor"
 ssh -p <port> <bootstrap-user>@<host> "cat /sys/module/apparmor/parameters/enabled"
-ssh -p <port> <bootstrap-user>@<host> "aa-status --profiled bonesdeploy-<project>-nginx"
+ssh -p <port> <bootstrap-user>@<host> "aa-status | awk '/profiles are in enforce mode:/{flag=1; next} /profiles are in complain mode:/{flag=0} flag' | grep 'bonesdeploy-<project>-nginx'"
 ssh -p <port> <bootstrap-user>@<host> "systemctl cat <project>-nginx.service | grep -E 'AppArmorProfile|After=|Requires='"
 ssh -p <port> <bootstrap-user>@<host> "systemctl is-active <project>-nginx"
 ```
@@ -332,7 +332,7 @@ ssh -p <port> <bootstrap-user>@<host> "systemctl is-active <project>-nginx"
 Expected:
 - `apparmor` service is `active`
 - kernel parameter reports enabled (`Y`, `y`, `1`, or `yes`)
-- `aa-status --profiled bonesdeploy-<project>-nginx` reports enforce mode
+- `aa-status` shows `bonesdeploy-<project>-nginx` inside the enforce-mode section
 - `<project>-nginx.service` includes `AppArmorProfile=...`, `After=... apparmor.service`, and `Requires=apparmor.service`
 - `<project>-nginx` is `active`
 

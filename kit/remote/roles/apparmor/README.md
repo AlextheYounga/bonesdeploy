@@ -26,7 +26,7 @@ bonesdeploy-{{ project_name }}-nginx
 ```bash
 systemctl is-active apparmor
 cat /sys/module/apparmor/parameters/enabled
-aa-status --profiled bonesdeploy-<project>-nginx
+aa-status | awk '/profiles are in enforce mode:/{flag=1; next} /profiles are in complain mode:/{flag=0} flag' | grep 'bonesdeploy-<project>-nginx'
 systemctl cat <project>-nginx.service | grep -E 'AppArmorProfile|After=|Requires='
 ```
 
