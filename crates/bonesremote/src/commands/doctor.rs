@@ -113,7 +113,7 @@ fn check_apparmor_service(issues: &mut Vec<String>) {
             ));
         }
         Err(error) => {
-            issues.push(format!("AppArmor check failed: could not run systemctl is-active apparmor ({error})"))
+            issues.push(format!("AppArmor check failed: could not run systemctl is-active apparmor ({error})"));
         }
     }
 }

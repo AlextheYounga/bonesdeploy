@@ -18,23 +18,18 @@ pub fn run(config_path: &str) -> Result<()> {
     let shared_dir = release_state::shared_dir(&cfg);
 
     for shared_file in &cfg.releases.shared_files {
-        wire_path(&cfg, &build_root, &shared_dir, shared_file, true)?;
+        wire_path(&cfg, (&build_root, &shared_dir), shared_file, true)?;
     }
     for shared_dir_path in &cfg.releases.shared_dirs {
-        wire_path(&cfg, &build_root, &shared_dir, shared_dir_path, false)?;
+        wire_path(&cfg, (&build_root, &shared_dir), shared_dir_path, false)?;
     }
 
     println!("Wired build workspace for staged release: {release_name}");
     Ok(())
 }
 
-fn wire_path(
-    cfg: &config::BonesConfig,
-    release_dir: &Path,
-    shared_dir: &Path,
-    relative_path: &str,
-    create_file: bool,
-) -> Result<()> {
+fn wire_path(cfg: &config::BonesConfig, roots: (&Path, &Path), relative_path: &str, create_file: bool) -> Result<()> {
+    let (release_dir, shared_dir) = roots;
     let release_path = release_dir.join(relative_path);
     let shared_path = shared_dir.join(relative_path);
 
