@@ -23,7 +23,7 @@ Done
 - check_apparmor_support
 - check_apparmor_kernel_enabled (/sys/module/apparmor/parameters/enabled)
 - check_apparmor_service (systemctl is-active apparmor)
-- check_apparmor_profiles_enforcing (aa-status)
+- check_apparmor_profiles_enforcing (/sys/kernel/security/apparmor/profiles)
 - parsing helpers: apparmor_kernel_enabled, aa_status_has_enforcing_profiles
 - Kept existing Landlock validation in doctor: check_landlock_support via landlock::verify_support().
 - Added unit tests in crates/bonesremote/src/commands/doctor.rs for AppArmor parsing logic.
@@ -42,13 +42,13 @@ Next Steps
 - Run Linux validation:
 1. `bonesdeploy remote setup` against a Linux host.
 2. Verify `systemctl is-active apparmor` and `/sys/module/apparmor/parameters/enabled`.
-3. Verify `aa-status` shows `bonesdeploy-<project>-nginx` in the enforce-mode section.
+3. Verify `/sys/kernel/security/apparmor/profiles` contains `bonesdeploy-<project>-nginx (enforce)`.
 4. Verify `<project>-nginx.service` contains `AppArmorProfile=`, `After=... apparmor.service`, and `Requires=apparmor.service`.
 5. Verify `systemctl is-active <project>-nginx`.
 6. Run `cargo test -p bonesremote` and `cargo clippy -p bonesremote --all-targets` on Linux.
 Critical Context
 - doctor now includes AppArmor checks before Landlock checks.
-- aa-status enforcement parsing now requires positive enforce count (rejects "0 profiles are in enforce mode.").
+- doctor enforces AppArmor profile presence by reading `/sys/kernel/security/apparmor/profiles`.
 - AppArmor Ansible provisioning now exists in `kit/remote/roles/apparmor` and is wired into `kit/remote/playbooks/setup.yml` and template playbooks.
 - Per-site systemd unit now binds AppArmor profile and requires startup ordering with `apparmor.service`.
 - Command docs now include Linux verification runbook for AppArmor setup.

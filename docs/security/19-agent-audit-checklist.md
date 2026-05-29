@@ -65,7 +65,6 @@ Compare each application service to the policy baseline.
 ## AppArmor
 
 ```bash
-aa-status
 grep '^bonesdeploy-<project>-nginx (enforce)$' /sys/kernel/security/apparmor/profiles
 cat /sys/module/apparmor/parameters/enabled 2>/dev/null
 ls -lah /etc/apparmor.d

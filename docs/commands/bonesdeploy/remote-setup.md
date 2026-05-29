@@ -45,8 +45,8 @@ This playbook is responsible for:
 - Verifying kernel AppArmor is enabled (`/sys/module/apparmor/parameters/enabled`)
 - Deploying a per-project AppArmor profile for per-site nginx
 - Loading the profile and setting it to enforce mode
-- Verifying the profile is loaded using `aa-status`
-- Verifying the specific project profile appears in the enforce-mode section of `aa-status`
+- Verifying the profile is loaded via `/sys/kernel/security/apparmor/profiles`
+- Verifying the specific project profile line appears as `(enforce)` in `/sys/kernel/security/apparmor/profiles`
 - Setting up directory structure
 - Configuring permissions
 - Installing dependencies

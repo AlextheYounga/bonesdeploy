@@ -205,7 +205,10 @@ fn apparmor_role_verifies_profile_loaded() {
     assert!(content.is_ok(), "failed to read {}", tasks_file.display());
     let content = content.unwrap_or_default();
 
-    assert!(content.contains("aa-status"), "apparmor role must check loaded profiles via aa-status\n{content}");
+    assert!(
+        content.contains("/sys/kernel/security/apparmor/profiles"),
+        "apparmor role must check loaded profiles via kernel apparmor profile list\n{content}"
+    );
     assert!(
         content.contains("apparmor_profile_name"),
         "apparmor role must verify the expected project profile name is present\n{content}"

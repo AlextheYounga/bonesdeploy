@@ -184,7 +184,7 @@ sudo bonesremote init --deploy-user git
 
 1. `/sys/module/apparmor/parameters/enabled` reports enabled (`Y/yes/1`)
 2. `systemctl is-active apparmor` is `active`
-3. `aa-status` indicates at least one profile is in enforce mode
+3. `/sys/kernel/security/apparmor/profiles` includes at least one `(enforce)` profile entry
 
 Example failures:
 
