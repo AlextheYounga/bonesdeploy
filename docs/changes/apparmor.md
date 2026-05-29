@@ -171,7 +171,7 @@ On a Linux host after `bonesdeploy remote setup`:
 ```bash
 systemctl is-active apparmor
 cat /sys/module/apparmor/parameters/enabled
-aa-status | awk '/profiles are in enforce mode:/{flag=1; next} /profiles are in complain mode:/{flag=0} flag' | grep 'bonesdeploy-<project>-nginx'
+grep '^bonesdeploy-<project>-nginx (enforce)$' /sys/kernel/security/apparmor/profiles
 systemctl cat <project>-nginx.service | grep -E 'AppArmorProfile|After=|Requires='
 systemctl is-active <project>-nginx
 ```

@@ -66,7 +66,7 @@ Compare each application service to the policy baseline.
 
 ```bash
 aa-status
-aa-status | awk '/profiles are in enforce mode:/{flag=1; next} /profiles are in complain mode:/{flag=0} flag' | grep 'bonesdeploy-<project>-nginx'
+grep '^bonesdeploy-<project>-nginx (enforce)$' /sys/kernel/security/apparmor/profiles
 cat /sys/module/apparmor/parameters/enabled 2>/dev/null
 ls -lah /etc/apparmor.d
 systemctl cat <service> | grep -E 'AppArmorProfile|After=|Requires='
