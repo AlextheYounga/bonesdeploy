@@ -16,7 +16,8 @@ mod platform {
     use super::Policy;
 
     use ::landlock::{
-        ABI, Access, AccessFs, CompatLevel, Compatible, LandlockStatus, PathBeneath, PathFd, Ruleset, RulesetStatus,
+        ABI, Access, AccessFs, CompatLevel, Compatible, LandlockStatus, PathBeneath, PathFd, Ruleset, RulesetAttr,
+        RulesetStatus,
     };
     use anyhow::{Context, Result, bail};
 
@@ -108,6 +109,21 @@ pub fn default_system_read_paths() -> Vec<PathBuf> {
 mod tests {
     use super::{Policy, policy_path_counts};
     use std::path::PathBuf;
+
+    #[test]
+    fn linux_landlock_module_imports_ruleset_attr_trait() {
+        let source = include_str!("landlock.rs");
+        let production_source = source.split("#[cfg(test)]").next().unwrap_or(source);
+
+        assert!(
+            production_source
+                .contains("CompatLevel, Compatible, LandlockStatus, PathBeneath, PathFd, Ruleset, RulesetAttr,")
+                || production_source.contains(
+                    "CompatLevel, Compatible, LandlockStatus, PathBeneath, PathFd, Ruleset, RulesetAttr, RulesetStatus,"
+                ),
+            "linux landlock module must import RulesetAttr so handle_access compiles with landlock 0.4.x\n{production_source}"
+        );
+    }
 
     #[test]
     fn policy_path_counts_reports_read_and_write_lengths() {
