@@ -221,8 +221,10 @@ fn apparmor_role_verifies_profile_enforce_mode() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("profiles are in enforce mode") && content.contains("apparmor_profile_name | regex_escape"),
-        "apparmor role must verify the target profile appears in the enforce-mode section of aa-status output\n{content}"
+        content.contains("profiles are in enforce mode")
+            && content.contains("apparmor_profile_name | regex_escape")
+            && content.contains("is not none"),
+        "apparmor role must verify the target profile appears in the enforce-mode section of aa-status output with an explicit boolean assertion\n{content}"
     );
 }
 
