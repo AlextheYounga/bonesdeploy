@@ -17,7 +17,7 @@ mod platform {
 
     use ::landlock::{
         ABI, Access, AccessFs, CompatLevel, Compatible, LandlockStatus, PathBeneath, PathFd, Ruleset, RulesetAttr,
-        RulesetStatus,
+        RulesetCreatedAttr, RulesetStatus,
     };
     use anyhow::{Context, Result, bail};
 
@@ -122,6 +122,17 @@ mod tests {
                     "CompatLevel, Compatible, LandlockStatus, PathBeneath, PathFd, Ruleset, RulesetAttr, RulesetStatus,"
                 ),
             "linux landlock module must import RulesetAttr so handle_access compiles with landlock 0.4.x\n{production_source}"
+        );
+    }
+
+    #[test]
+    fn linux_landlock_module_imports_ruleset_created_attr_trait() {
+        let source = include_str!("landlock.rs");
+        let production_source = source.split("#[cfg(test)]").next().unwrap_or(source);
+
+        assert!(
+            production_source.contains("RulesetCreatedAttr") && production_source.contains("set_no_new_privs(true)"),
+            "linux landlock module must import RulesetCreatedAttr so set_no_new_privs compiles with landlock 0.4.x\n{production_source}"
         );
     }
 
