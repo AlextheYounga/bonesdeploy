@@ -57,21 +57,6 @@
   changed_when: false
   tags: [apparmor]
 
-- name: Read apparmor profile status
-  ansible.builtin.command:
-    argv:
-      - aa-status
-  register: apparmor_status_output
-  changed_when: false
-  tags: [apparmor]
-
-- name: Verify project apparmor profile is loaded
-  ansible.builtin.assert:
-    that:
-      - apparmor_status_output.stdout is search(apparmor_profile_name)
-    fail_msg: "AppArmor profile {{ apparmor_profile_name }} is not loaded according to aa-status"
-  tags: [apparmor]
-
 - name: Read kernel apparmor profiles
   ansible.builtin.command:
     argv:

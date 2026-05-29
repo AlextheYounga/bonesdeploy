@@ -18,8 +18,8 @@ New Ansible role that provisions AppArmor for each project:
 - Deploys per-project profile from template
 - Loads profile with `apparmor_parser -r`
 - Enforces profile with `aa-enforce`
-- Verifies profile is loaded using `aa-status`
-- Verifies the project profile appears in the enforce-mode section of `aa-status`
+- Verifies profile is loaded via `/sys/kernel/security/apparmor/profiles`
+- Verifies the project profile appears as `(enforce)` in `/sys/kernel/security/apparmor/profiles`
 
 **Profile naming:**
 ```
@@ -100,7 +100,7 @@ AppArmor runs before nginx to ensure profile is loaded before service starts.
 New AppArmor validation checks:
 - `check_apparmor_kernel_enabled` - reads `/sys/module/apparmor/parameters/enabled`
 - `check_apparmor_service` - runs `systemctl is-active apparmor`
-- `check_apparmor_profiles_enforcing` - runs `aa-status` and parses for enforcing profiles
+- `check_apparmor_profiles_enforcing` - reads `/sys/kernel/security/apparmor/profiles` and verifies enforce-mode entries
 
 Doctor now checks AppArmor before Landlock, reflecting the AppArmor-first policy.
 

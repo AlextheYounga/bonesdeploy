@@ -119,16 +119,18 @@ fn check_apparmor_service(issues: &mut Vec<String>) {
 }
 
 fn check_apparmor_profiles_enforcing(issues: &mut Vec<String>) {
-    let result = Command::new("aa-status").output();
-    match result {
-        Ok(output) if output.status.success() => {
-            let status_output = String::from_utf8_lossy(&output.stdout);
-            if !aa_status_has_enforcing_profiles(&status_output) {
+    let profiles = fs::read_to_string("/sys/kernel/security/apparmor/profiles");
+    match profiles {
+        Ok(contents) => {
+            if !kernel_profiles_have_enforce_mode(&contents) {
                 issues.push("AppArmor check failed: no profiles appear to be in enforce mode".to_string());
             }
         }
-        Ok(_) => issues.push("AppArmor check failed: aa-status returned non-zero status".to_string()),
-        Err(error) => issues.push(format!("AppArmor check failed: could not run aa-status ({error})")),
+        Err(error) => {
+            issues.push(format!(
+                "AppArmor check failed: could not read /sys/kernel/security/apparmor/profiles ({error})"
+            ));
+        }
     }
 }
 
@@ -136,22 +138,13 @@ fn apparmor_kernel_enabled(contents: &str) -> bool {
     matches!(contents.trim().to_ascii_lowercase().as_str(), "y" | "yes" | "1")
 }
 
-fn aa_status_has_enforcing_profiles(contents: &str) -> bool {
-    contents.lines().any(|line| {
-        let trimmed = line.trim().to_ascii_lowercase();
-        if let Some(count) = trimmed.split_whitespace().next().and_then(|token| token.parse::<u32>().ok()) {
-            return count > 0
-                && (trimmed.contains("profiles are in enforce mode")
-                    || trimmed.contains("profile is in enforce mode"));
-        }
-
-        false
-    })
+fn kernel_profiles_have_enforce_mode(contents: &str) -> bool {
+    contents.lines().any(|line| line.trim_end().ends_with(" (enforce)"))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{aa_status_has_enforcing_profiles, apparmor_kernel_enabled};
+    use super::{apparmor_kernel_enabled, kernel_profiles_have_enforce_mode};
 
     #[test]
     fn apparmor_kernel_enabled_accepts_yes() {
@@ -164,17 +157,25 @@ mod tests {
     }
 
     #[test]
-    fn aa_status_detects_enforce_plural_line() {
-        assert!(aa_status_has_enforcing_profiles("42 profiles are in enforce mode."));
+    fn kernel_profiles_detects_enforce_mode() {
+        assert!(kernel_profiles_have_enforce_mode("bonesdeploy-demo-nginx (enforce)\n"));
     }
 
     #[test]
-    fn aa_status_detects_enforce_singular_line() {
-        assert!(aa_status_has_enforcing_profiles("1 profile is in enforce mode."));
+    fn kernel_profiles_rejects_non_enforce_mode() {
+        assert!(!kernel_profiles_have_enforce_mode("bonesdeploy-demo-nginx (complain)\n"));
     }
 
     #[test]
-    fn aa_status_rejects_when_no_enforced_profiles_present() {
-        assert!(!aa_status_has_enforcing_profiles("0 profiles are in enforce mode."));
+    fn doctor_source_uses_kernel_profile_list_for_enforce_check() {
+        let source = include_str!("doctor.rs");
+        let production_source = source.split("#[cfg(test)]").next().unwrap_or(source);
+        let apparmor_check =
+            production_source.split("fn check_apparmor_profiles_enforcing").nth(1).unwrap_or(production_source);
+
+        assert!(
+            apparmor_check.contains("/sys/kernel/security/apparmor/profiles") && !apparmor_check.contains("aa-status"),
+            "doctor should use only kernel apparmor profile list for enforce check\n{apparmor_check}"
+        );
     }
 }

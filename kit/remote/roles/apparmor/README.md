@@ -10,7 +10,7 @@ Installs and validates per-project AppArmor confinement for per-site nginx.
 4. Deploys `/etc/apparmor.d/{{ apparmor_profile_name }}` from template.
 5. Reloads profile with `apparmor_parser -r`.
 6. Enforces profile with `aa-enforce`.
-7. Verifies profile is loaded and in enforce mode with `aa-status`.
+7. Verifies profile is loaded and in enforce mode via `/sys/kernel/security/apparmor/profiles`.
 8. Limits per-site nginx network allowance to unix stream sockets by default.
 
 ## Expected profile name
