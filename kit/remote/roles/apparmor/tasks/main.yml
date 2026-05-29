@@ -78,6 +78,6 @@
       - >-
         apparmor_status_output.stdout | regex_search(
           'profiles are in enforce mode:(.|\n)*\n\s+' ~ (apparmor_profile_name | regex_escape) ~ '(\n|$)'
-        )
+        ) is not none
     fail_msg: "AppArmor profile {{ apparmor_profile_name }} is not in enforce mode"
   tags: [apparmor]
