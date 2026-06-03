@@ -3,20 +3,39 @@
   hosts: all
   become: true
 
-  roles:
-    - role: users
+  vars_files:
+    - "{{ playbook_dir }}/../vars/setup.yml"
+
+  tasks:
+    - name: Run users role
+      ansible.builtin.include_role:
+        name: users
       tags: [users]
 
-    - role: apparmor
+    - name: Run AppArmor role
+      ansible.builtin.include_role:
+        name: apparmor
       tags: [apparmor]
 
-    - role: common
+    - name: Run common role
+      ansible.builtin.include_role:
+        name: common
       tags: [common]
 
-    - role: nginx
+    - name: Run runtime role
+      ansible.builtin.include_role:
+        name: "{{ runtime_role }}"
+      when: runtime_role | length > 0
+      tags: [runtime]
+
+    - name: Run nginx role
+      ansible.builtin.include_role:
+        name: nginx
       tags: [nginx]
 
-    - role: ssl
+    - name: Run ssl role
+      ansible.builtin.include_role:
+        name: ssl
       tags: [ssl]
 
   post_tasks:
@@ -34,7 +53,7 @@
     - name: Display setup completion
       ansible.builtin.debug:
         msg: |
-          Bones remote setup completed.
+          Bones {{ setup_label }} setup completed.
           Deploy user: {{ deploy_user }}
           Service user: {{ service_user }}
           Group: {{ group }}

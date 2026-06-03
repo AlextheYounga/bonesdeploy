@@ -1,0 +1,3 @@
+---
+runtime_role: django_runtime
+setup_label: Django

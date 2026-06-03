@@ -11,6 +11,16 @@ const TEMPLATES: [&str; 7] = [
     "templates/vue/bones.yaml",
 ];
 
+const TEMPLATE_SETUP_VARS_FILES: [&str; 7] = [
+    "templates/django/remote/vars/setup.yml",
+    "templates/laravel/remote/vars/setup.yml",
+    "templates/next/remote/vars/setup.yml",
+    "templates/nuxt/remote/vars/setup.yml",
+    "templates/rails/remote/vars/setup.yml",
+    "templates/sveltekit/remote/vars/setup.yml",
+    "templates/vue/remote/vars/setup.yml",
+];
+
 const TEMPLATE_SETUP_PLAYBOOKS: [&str; 7] = [
     "templates/django/remote/playbooks/setup.yml",
     "templates/laravel/remote/playbooks/setup.yml",
@@ -43,8 +53,30 @@ fn remote_setup_playbook_includes_apparmor_role() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("- role: apparmor"),
-        "remote setup playbook must include apparmor role before runtime service provisioning\n{content}"
+        content.contains("name: apparmor") && content.contains("include_role"),
+        "remote setup playbook must include apparmor through shared role composition\n{content}"
+    );
+}
+
+#[test]
+fn remote_setup_playbook_loads_shared_template_vars_and_doctor_task() {
+    let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    assert!(content.contains("vars_files:"), "remote setup playbook should load shared template vars\n{content}");
+    assert!(
+        content.contains("../vars/setup.yml"),
+        "remote setup playbook should load template override vars from a dedicated file\n{content}"
+    );
+    assert!(
+        content.contains("include_role:"),
+        "remote setup playbook should compose runtime roles from shared logic\n{content}"
+    );
+    assert!(
+        content.contains("Run bonesremote doctor as deploy user"),
+        "remote setup playbook must keep the doctor validation in the shared playbook\n{content}"
     );
 }
 
@@ -142,35 +174,50 @@ fn apparmor_profile_template_limits_network_to_unix_stream() {
 fn template_playbooks_include_apparmor_role() {
     for playbook in TEMPLATE_SETUP_PLAYBOOKS {
         let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(playbook);
+        assert!(!path.exists(), "template playbook {playbook} should be removed in favor of shared kit setup logic");
+    }
+}
+
+#[test]
+fn template_setup_vars_files_define_runtime_metadata() {
+    for vars_file in TEMPLATE_SETUP_VARS_FILES {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(vars_file);
         let content = fs::read_to_string(&path);
         assert!(content.is_ok(), "failed to read {}", path.display());
         let content = content.unwrap_or_default();
 
         assert!(
-            content.contains("- role: apparmor"),
-            "template playbook {playbook} must include apparmor role\n{content}"
+            content.contains("runtime_role:"),
+            "template vars file {vars_file} must define the runtime role\n{content}"
+        );
+        assert!(
+            content.contains("setup_label:"),
+            "template vars file {vars_file} must define the setup label\n{content}"
         );
     }
 }
 
 #[test]
-fn playbooks_apply_apparmor_before_nginx_role() {
-    let mut playbooks = Vec::from(TEMPLATE_SETUP_PLAYBOOKS);
-    playbooks.push("kit/remote/playbooks/setup.yml");
+fn shared_setup_playbook_applies_apparmor_before_nginx_role() {
+    let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
 
-    for playbook in playbooks {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(playbook);
-        let content = fs::read_to_string(&path);
-        assert!(content.is_ok(), "failed to read {}", path.display());
-        let content = content.unwrap_or_default();
+    let apparmor_idx = content.find("Run AppArmor role");
+    let nginx_idx = content.find("Run nginx role");
 
-        let apparmor_idx = content.find("- role: apparmor");
-        let nginx_idx = content.find("- role: nginx");
+    assert!(apparmor_idx.is_some(), "shared setup playbook must include apparmor include_role\n{content}");
+    assert!(nginx_idx.is_some(), "shared setup playbook must include nginx include_role\n{content}");
+    assert!(apparmor_idx < nginx_idx, "shared setup playbook must apply apparmor before nginx\n{content}");
 
-        assert!(apparmor_idx.is_some(), "playbook {playbook} must include apparmor role\n{content}");
-        assert!(nginx_idx.is_some(), "playbook {playbook} must include nginx role\n{content}");
-        assert!(apparmor_idx < nginx_idx, "playbook {playbook} must apply apparmor role before nginx role\n{content}");
-    }
+    let common_idx = content.find("Run common role");
+    let runtime_idx = content.find("Run runtime role");
+
+    assert!(common_idx.is_some(), "shared setup playbook must include common role\n{content}");
+    assert!(runtime_idx.is_some(), "shared setup playbook must include optional runtime role hook\n{content}");
+    assert!(common_idx < runtime_idx, "runtime role hook must run after common role\n{content}");
+    assert!(runtime_idx < nginx_idx, "runtime role hook must run before nginx role\n{content}");
 }
 
 #[test]

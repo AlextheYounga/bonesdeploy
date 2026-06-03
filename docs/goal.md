@@ -49,7 +49,7 @@ Next Steps
 Critical Context
 - doctor now includes AppArmor checks before Landlock checks.
 - doctor enforces AppArmor profile presence by reading `/sys/kernel/security/apparmor/profiles`.
-- AppArmor Ansible provisioning now exists in `kit/remote/roles/apparmor` and is wired into `kit/remote/playbooks/setup.yml` and template playbooks.
+- AppArmor Ansible provisioning now exists in `kit/remote/roles/apparmor` and is wired into the shared `kit/remote/playbooks/setup.yml` with template-specific overrides in `templates/*/remote/vars/setup.yml`.
 - Per-site systemd unit now binds AppArmor profile and requires startup ordering with `apparmor.service`.
 - Command docs now include Linux verification runbook for AppArmor setup.
 Relevant Files
@@ -63,4 +63,4 @@ Relevant Files
 - /Users/alexyounger/Development/Code/Rust/bonesdeploy/.worktrees/feat/apparmor/crates/bonesremote/src/landlock.rs: Landlock support verification and restriction code.
 - /Users/alexyounger/Development/Code/Rust/bonesdeploy/.worktrees/feat/apparmor/kit/remote/nginx/site-nginx.service.j2: currently uses bonesremote landlock nginx in ExecStart.
 - /Users/alexyounger/Development/Code/Rust/bonesdeploy/.worktrees/feat/apparmor/kit/remote/roles/nginx/tasks/main.yml: nginx/systemd provisioning path; no AppArmor provisioning observed.
-- /Users/alexyounger/Development/Code/Rust/bonesdeploy/.worktrees/feat/apparmor/kit/remote/playbooks/setup.yml: role orchestration; no dedicated AppArmor role observed.
+- /Users/alexyounger/Development/Code/Rust/bonesdeploy/.worktrees/feat/apparmor/kit/remote/playbooks/setup.yml: shared setup orchestration; template-specific runtime metadata now lives in `remote/vars/setup.yml`.
