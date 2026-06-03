@@ -20,6 +20,7 @@
     - name: Run common role
       ansible.builtin.include_role:
         name: common
+        public: true
       tags: [common]
 
     - name: Run runtime role

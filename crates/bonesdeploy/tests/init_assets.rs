@@ -221,6 +221,19 @@ fn shared_setup_playbook_applies_apparmor_before_nginx_role() {
 }
 
 #[test]
+fn shared_setup_playbook_exposes_common_role_defaults_to_runtime_role() {
+    let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("name: Run common role") && content.contains("public: true"),
+        "shared setup playbook must expose common role defaults for later runtime roles like nvm_dir\n{content}"
+    );
+}
+
+#[test]
 fn apparmor_role_assets_exist() {
     let role_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/apparmor");
 
