@@ -20,6 +20,17 @@
       tags: [ssl]
 
   post_tasks:
+    - name: Run bonesremote doctor as deploy user
+      become_user: "{{ deploy_user }}"
+      ansible.builtin.command:
+        argv:
+          - bonesremote
+          - doctor
+      environment:
+        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+      changed_when: false
+      tags: [common, bonesremote]
+
     - name: Display setup completion
       ansible.builtin.debug:
         msg: |
