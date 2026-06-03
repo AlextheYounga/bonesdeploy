@@ -8,23 +8,24 @@ use crate::config::BonesConfig;
 use crate::git;
 
 pub fn choose_template(available_templates: &[String]) -> Result<Option<String>> {
-    let mut options = Vec::with_capacity(available_templates.len() + 1);
-    options.push(String::from("Build from scratch"));
-    options.extend(available_templates.iter().map(|name| format!("Use template: {name}")));
+    if available_templates.is_empty() {
+        return Ok(None);
+    }
 
-    let choice = Select::new("How would you like to initialize this project?", options)
-        .with_help_message("Choose scratch for the current flow, or pick a template scaffold")
-        .prompt()?;
+    let choice = Select::new(
+        "Would you like to use a template or build from scratch?",
+        vec![String::from("Use a template"), String::from("Build from scratch")],
+    )
+    .with_help_message("Pick a stack to scaffold, or start from scratch")
+    .prompt()?;
 
     if choice == "Build from scratch" {
         return Ok(None);
     }
 
-    let template_name = choice.strip_prefix("Use template: ").unwrap_or_default().to_string();
-
-    if template_name.is_empty() {
-        return Ok(None);
-    }
+    let template_name = Select::new("Which template stack would you like to use?", available_templates.to_vec())
+        .with_help_message("Choose the framework stack to scaffold")
+        .prompt()?;
 
     Ok(Some(template_name))
 }
