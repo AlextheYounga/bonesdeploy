@@ -180,18 +180,21 @@ sudo bonesremote init --deploy-user git
 
 ### 6. Check AppArmor Support
 
-`bonesremote doctor` validates AppArmor as the primary confinement layer by checking:
+`bonesremote doctor` validates AppArmor with read-only checks by checking:
 
 1. `/sys/module/apparmor/parameters/enabled` reports enabled (`Y/yes/1`)
 2. `systemctl is-active apparmor` is `active`
-3. `/sys/kernel/security/apparmor/profiles` includes at least one `(enforce)` profile entry
+3. `/etc/apparmor.d/` contains one or more `bonesdeploy-*-nginx` profiles
+4. For each installed `bonesdeploy-<project>-nginx` profile, `/etc/systemd/system/<project>-nginx.service` exists, includes `AppArmorProfile=bonesdeploy-<project>-nginx`, and declares `apparmor.service` in both `After=` and `Requires=`
 
 Example failures:
 
 ```text
 AppArmor check failed: kernel module is not enabled
 AppArmor check failed: apparmor service is not active (status: inactive)
-AppArmor check failed: no profiles appear to be in enforce mode
+AppArmor check failed: no bonesdeploy AppArmor profile found under /etc/apparmor.d
+AppArmor check failed: expected /etc/systemd/system/demo-nginx.service for installed bonesdeploy profile
+AppArmor check failed: /etc/systemd/system/demo-nginx.service references unknown AppArmor profile bonesdeploy-demo-ngnix
 ```
 
 ---

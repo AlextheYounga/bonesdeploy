@@ -23,7 +23,32 @@ pub struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Set up bonesdeploy in the current repository
-    Init,
+    Init {
+        /// Skip all interactive prompts; required fields must be provided via flags
+        #[arg(long)]
+        non_interactive: bool,
+        /// Run remote setup after init (instead of prompting)
+        #[arg(long)]
+        setup_remote: bool,
+        /// Project name (default: current directory name)
+        #[arg(long)]
+        project_name: Option<String>,
+        /// Git branch to deploy
+        #[arg(long)]
+        branch: Option<String>,
+        /// Deployment remote name (default: production)
+        #[arg(short = 'r', long)]
+        remote: Option<String>,
+        /// Server hostname or IP
+        #[arg(short = 'H', long)]
+        host: Option<String>,
+        /// SSH port (default: 22)
+        #[arg(long)]
+        port: Option<String>,
+        /// Template name (e.g. laravel, django)
+        #[arg(long)]
+        template: Option<String>,
+    },
     /// Check local and remote environment health
     Doctor {
         /// Skip remote checks
@@ -75,7 +100,18 @@ enum RemoteCommand {
 
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init => init::run(),
+        Command::Init { non_interactive, setup_remote, project_name, branch, remote, host, port, template } => {
+            init::run(&init::InitArgs {
+                non_interactive: *non_interactive,
+                setup_remote: *setup_remote,
+                project_name: project_name.clone(),
+                branch: branch.clone(),
+                remote: remote.clone(),
+                host: host.clone(),
+                port: port.clone(),
+                template: template.clone(),
+            })
+        }
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,
         Command::Pull => pull::run(),

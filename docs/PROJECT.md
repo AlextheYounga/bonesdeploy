@@ -69,7 +69,7 @@ This stores crucial data we will need and is collected on running `bonesdeploy i
 Collects the following project information from the user:
 - `project_name`: str
 - `branch`: str
-- `remote_name`: existing remote selection when available, otherwise prompted name
+- `remote_name`: existing remote selection when available, otherwise prompted; defaults to `production`. Must point to a fresh VPS, not a code host like GitHub.
 - `host`: prompted when not inferable from selected remote
 - `port`: defaults to `22`, prompt shown when remote inference is unavailable
 - `repo_path`: inferred from selected remote URL when possible, else defaults to `/home/git/{project_name}.git`
@@ -230,7 +230,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Gets or creates the `.bones` folder with our default scaffolding.
   - Updates `.gitignore` to add .bones folder.
   - Loads existing config from `.bones/bones.yaml` or collects user input via prompts.
-  - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`.
+  - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy remote setup` before first deploy.
   - Saves config to `.bones/bones.yaml`.
 

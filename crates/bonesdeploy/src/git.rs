@@ -11,6 +11,12 @@ pub struct RemoteConnectionDetails {
     pub repo_path: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct RemoteInfo {
+    pub name: String,
+    pub url: String,
+}
+
 pub fn ensure_git_repository() -> Result<()> {
     let output =
         Command::new("git").args(["rev-parse", "--is-inside-work-tree"]).output().context("Failed to run git")?;
@@ -54,6 +60,16 @@ pub fn list_remotes() -> Result<Vec<String>> {
         .map(ToOwned::to_owned)
         .collect::<Vec<_>>();
 
+    Ok(remotes)
+}
+
+pub fn list_remotes_with_urls() -> Result<Vec<RemoteInfo>> {
+    let names = list_remotes()?;
+    let mut remotes = Vec::with_capacity(names.len());
+    for name in names {
+        let url = remote_url(&name)?;
+        remotes.push(RemoteInfo { name, url });
+    }
     Ok(remotes)
 }
 

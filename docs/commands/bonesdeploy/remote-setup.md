@@ -324,7 +324,7 @@ After `bonesdeploy remote setup` succeeds, verify AppArmor provisioning and serv
 bonesdeploy remote setup
 ssh -p <port> <bootstrap-user>@<host> "systemctl is-active apparmor"
 ssh -p <port> <bootstrap-user>@<host> "cat /sys/module/apparmor/parameters/enabled"
-ssh -p <port> <bootstrap-user>@<host> "grep '^bonesdeploy-<project>-nginx (enforce)$' /sys/kernel/security/apparmor/profiles"
+ssh -p <port> <bootstrap-user>@<host> "grep '^profile bonesdeploy-<project>-nginx ' /etc/apparmor.d/bonesdeploy-<project>-nginx"
 ssh -p <port> <bootstrap-user>@<host> "systemctl cat <project>-nginx.service | grep -E 'AppArmorProfile|After=|Requires='"
 ssh -p <port> <bootstrap-user>@<host> "systemctl is-active <project>-nginx"
 ```
@@ -332,8 +332,8 @@ ssh -p <port> <bootstrap-user>@<host> "systemctl is-active <project>-nginx"
 Expected:
 - `apparmor` service is `active`
 - kernel parameter reports enabled (`Y`, `y`, `1`, or `yes`)
-- `/sys/kernel/security/apparmor/profiles` contains `bonesdeploy-<project>-nginx (enforce)`
-- `<project>-nginx.service` includes `AppArmorProfile=...`, `After=... apparmor.service`, and `Requires=apparmor.service`
+- `/etc/apparmor.d/bonesdeploy-<project>-nginx` exists and defines the profile
+- `<project>-nginx.service` includes `AppArmorProfile=bonesdeploy-<project>-nginx` and declares `apparmor.service` in both `After=` and `Requires=`
 - `<project>-nginx` is `active`
 
 ---
