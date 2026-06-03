@@ -2,13 +2,50 @@
 
 ## Overview
 
-Initializes bonesdeploy in the current Git repository by creating the `.bones/` scaffold structure, configuring deployment settings through interactive prompts, and setting up Git integration. This command must be run from within a Git repository and serves as the entry point for setting up deployment infrastructure.
+Initializes bonesdeploy in the current Git repository by creating the `.bones/` scaffold structure, configuring deployment settings (interactively or non-interactively), and setting up Git integration. This command must be run from within a Git repository and serves as the entry point for setting up deployment infrastructure.
+
+## Non-Interactive Mode
+
+For CI/CD pipelines, agents, or scripted setups, use `--non-interactive` to skip all TTY prompts:
+
+```bash
+bonesdeploy init \
+  --non-interactive \
+  --project-name myapp \
+  --host 203.0.113.10
+```
+
+Required flags in non-interactive mode:
+- `--project-name` — project name (defaults to directory name if omitted, but explicit is preferred for agents)
+- `--host` — server hostname or IP
+
+Optional flags:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--remote`, `-r` | `production` | Deployment remote name |
+| `--branch` | `main` | Git branch to deploy |
+| `--port` | `22` | SSH port |
+| `--template` | — | Template name (e.g. `laravel`, `django`); absent = scratch |
+| `--setup-remote` | `false` | Run `bonesdeploy remote setup` after init (skips confirmation prompt) |
+
+Example with template and automatic remote setup:
+```bash
+bonesdeploy init \
+  --non-interactive \
+  --project-name myapp \
+  --host 203.0.113.10 \
+  --template laravel \
+  --setup-remote
+```
+
+In interactive mode (no `--non-interactive`), these flags pre-fill prompt defaults. `--setup-remote` skips the final confirmation and goes straight to remote provisioning.
 
 ## Detailed Execution Steps
 
 ### 1. Git Repository Verification
 
-**Source:** `init.rs:15`
+**Source:** `init.rs:29`
 
 ```rust
 git::ensure_git_repository()?;
@@ -22,7 +59,7 @@ Validates that the current directory is a Git repository. This check ensures the
 
 ### 2. Scaffold Extraction
 
-**Source:** `init.rs:17-34`
+**Source:** `init.rs:31-52`
 
 #### 2.1 Check for Existing `.bones/` Directory
 
@@ -39,7 +76,7 @@ If `.bones/` already exists, skips the scaffold extraction step entirely. This p
 
 ```rust
 let available_templates = embedded::available_templates();
-let selected_template = prompts::choose_template(&available_templates)?;
+let selected_template = resolve_template(args.template.as_deref(), &available_templates, args.non_interactive)?;
 ```
 
 Presents the user with available templates (e.g., "node", "laravel", etc.) or allows choosing "none" for a build-from-scratch approach. Templates provide pre-configured hooks and deployment scripts for common frameworks.
@@ -96,7 +133,7 @@ Ensures `.bones/` is added to `.gitignore` to prevent committing deployment conf
 
 ### 4. Configuration Collection
 
-**Source:** `init.rs:39-40`, `init.rs:163-176`
+**Source:** `init.rs:54-55`
 
 ```rust
 let bones_yaml = Path::new(config::Constants::BONES_YAML);
@@ -115,20 +152,20 @@ If `.bones/bones.yaml` exists and is complete (has required fields), loads it di
 
 #### 4.2 Interactive Prompts
 
-**Source:** `init.rs:64-116`
+**Source:** `init.rs:161-218`
 
 If configuration is incomplete, prompts for:
 
-1. **Project Name** (`init.rs:69`)
+1. **Project Name**
    - Default: Current directory name
    - Used to derive default service user, web_root, and project_root
 
-2. **Branch** (`init.rs:70`)
-   - Default: `master`
+2. **Branch**
+   - Default: `main` (interactive) / `main` (non-interactive default)
    - The Git branch to deploy
 
-3. **Remote Name** (`init.rs:71`)
-    - Default: Pre-selects `production` if it exists among existing git remotes
+3. **Remote Name**
+   - Default: Pre-selects `production` if it exists among existing git remotes
     - The remote you choose must point to a **fresh VPS** that will serve as your production deployment target
     - Each remote is shown with its URL so you can distinguish code hosts from deployment targets
     - `origin` is marked with `— not a deployment remote` because it typically points to GitHub/GitLab/etc., not to your VPS
@@ -136,41 +173,41 @@ If configuration is incomplete, prompts for:
     - This is the name of the Git remote that `bonesdeploy` will manage. It will be created locally if it doesn't exist, constructed from the deploy user, host, and repo path you provide
     - Example: choosing `production` creates `git@<host>:/home/git/<project>.git`
 
-4. **Host** (`init.rs:72-74`)
+4. **Host**
    - Default: Inferred from existing remote URL (if available)
    - The deployment server hostname/IP
 
-5. **Port** (`init.rs:75`)
+5. **Port**
    - Default: Inferred from existing remote URL (if available), otherwise `22`
    - SSH port for connecting to the server
 
-6. **Git Directory** (`init.rs:76`, `init.rs:127-139`)
+6. **Git Directory**
    - Default: `/home/git/<project_name>.git`
    - Path to the bare Git repository on the remote server
    - If remote already exists, infers from remote URL
 
-7. **Public Path** (`init.rs:81`, `init.rs:144-161`)
-    - Default: `/var/www/<project_name>`
-    - Symlink pointing to the active release
-    - Only stored in config if explicitly overridden
+7. **Public Path**
+   - Default: `public`
+   - Symlink pointing to the active release
+   - Only stored in config if explicitly overridden
 
-8. **Deploy Root** (`init.rs:82-83`)
+8. **Deploy Root**
    - Default: `/srv/deployments/<project_name>`
    - Directory containing all releases, build workspace, and shared files
    - Only stored in config if explicitly overridden
 
-9. **Deploy on Push** (`init.rs:84`)
+9. **Deploy on Push**
    - Default: `true`
    - Whether to trigger deployment on every push
 
-10. **Permission Defaults** (`init.rs:85-89`)
+10. **Permission Defaults**
     - Deploy User: `git` (user that runs deployment)
     - Service User: `<project_name>` (user that runs the application)
     - Group: `www-data`
     - Directory Mode: `750`
     - File Mode: `640`
 
-11. **Releases** (`init.rs:90-94`)
+11. **Releases**
     - Keep: `5` (number of releases to retain)
     - Shared Paths: `[".env", "storage"]` (paths to share across releases)
 
@@ -186,7 +223,7 @@ If `bones.yaml` already exists and is incomplete, the command:
 
 ### 5. Save Configuration
 
-**Source:** `init.rs:42-44`
+**Source:** `init.rs:57-59`
 
 ```rust
 config::save(&cfg, bones_yaml)?;
@@ -204,7 +241,7 @@ Writes the configuration to `.bones/bones.yaml` in YAML format.
 
 ### 6. Configure Local Git Remote
 
-**Source:** `init.rs:45`, `init.rs:220-229`
+**Source:** `init.rs:60`, `init.rs:311-320`
 
 ```rust
 ensure_local_remote(&cfg)?;
@@ -225,7 +262,7 @@ This does not create the server-side git user or bare repository. That still hap
 
 ### 7. Symlink Pre-Push Hook
 
-**Source:** `init.rs:48`, `init.rs:197-212`
+**Source:** `init.rs:62`, `init.rs:286-294`
 
 ```rust
 symlink_pre_push()?;
@@ -245,9 +282,22 @@ Creates a symlink from `.git/hooks/pre-push` to `../../.bones/hooks/pre-push`.
 
 ---
 
-### 8. Print Next Steps
+### 8. Remote Setup Decision
 
-**Source:** `init.rs:50-59`
+**Source:** `init.rs:64-70`
+
+```rust
+if args.setup_remote || (!args.non_interactive && prompts::confirm_remote_setup()?) {
+    remote_setup::run()?;
+} else {
+    print_follow_up_hint();
+}
+```
+
+Three paths:
+1. **`--setup-remote` flag** → runs remote setup automatically (no prompt)
+2. **Interactive, no flag** → prompts "Set up the server now? [y/N]"
+3. **Non-interactive, no flag** → skips remote setup, prints follow-up hint
 
 Prints user guidance:
 1. Run `bonesdeploy remote setup` before the first deploy (to provision the server)
