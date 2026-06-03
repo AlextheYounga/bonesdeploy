@@ -100,7 +100,8 @@ AppArmor runs before nginx to ensure profile is loaded before service starts.
 New AppArmor validation checks:
 - `check_apparmor_kernel_enabled` - reads `/sys/module/apparmor/parameters/enabled`
 - `check_apparmor_service` - runs `systemctl is-active apparmor`
-- `check_apparmor_profiles_enforcing` - reads `/sys/kernel/security/apparmor/profiles` and verifies enforce-mode entries
+- `check_apparmor_profile_installed` - scans `/etc/apparmor.d/` for the project profile
+- `check_apparmor_unit_wiring` - scans `/etc/systemd/system/*-nginx.service` for AppArmor wiring
 
 Doctor now checks AppArmor before Landlock, reflecting the AppArmor-first policy.
 
@@ -171,7 +172,7 @@ On a Linux host after `bonesdeploy remote setup`:
 ```bash
 systemctl is-active apparmor
 cat /sys/module/apparmor/parameters/enabled
-grep '^bonesdeploy-<project>-nginx (enforce)$' /sys/kernel/security/apparmor/profiles
+grep '^profile bonesdeploy-<project>-nginx ' /etc/apparmor.d/bonesdeploy-<project>-nginx
 systemctl cat <project>-nginx.service | grep -E 'AppArmorProfile|After=|Requires='
 systemctl is-active <project>-nginx
 ```
@@ -179,8 +180,8 @@ systemctl is-active <project>-nginx
 Expected:
 - `apparmor` service is `active`
 - kernel parameter is `Y`/`yes`/`1`
-- profile reports enforce mode
-- service unit includes AppArmor binding and ordering
+- profile file exists and defines `bonesdeploy-<project>-nginx`
+- service unit binds `AppArmorProfile=bonesdeploy-<project>-nginx` and declares `apparmor.service` in both `After=` and `Requires=`
 - per-site nginx is `active`
 
 ## Design Rationale
