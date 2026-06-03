@@ -43,25 +43,52 @@ pub fn prompt_branch(seed: Option<&BonesConfig>) -> Result<String> {
 pub fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
     const CREATE_REMOTE_OPTION: &str = "Create new deployment remote";
 
-    let remotes = git::list_remotes()?;
+    let remotes = git::list_remotes_with_urls()?;
     if remotes.is_empty() {
         return prompt_remote_name_text(seed);
     }
 
     let default_remote = seed.map(|cfg| cfg.data.remote_name.clone()).filter(|value| !value.is_empty());
-    let mut options = order_remotes_with_default(remotes, default_remote);
-    options.push(String::from(CREATE_REMOTE_OPTION));
 
-    let choice = Select::new("Deployment remote:", options)
-        .with_help_message("Choose the local git remote bonesdeploy will manage")
-        .prompt()
+    let preferred = default_remote.or_else(|| {
+        let has_production = remotes.iter().any(|r| r.name == "production");
+        if has_production { Some(String::from("production")) } else { None }
+    });
+
+    let mut ordered_remotes = Vec::with_capacity(remotes.len());
+    if let Some(ref pref) = preferred
+        && let Some(pos) = remotes.iter().position(|r| r.name == *pref)
+    {
+        ordered_remotes.push(remotes[pos].clone());
+        ordered_remotes.extend(remotes.iter().enumerate().filter(|(i, _)| *i != pos).map(|(_, r)| r.clone()));
+    }
+    if ordered_remotes.is_empty() {
+        ordered_remotes = remotes;
+    }
+
+    let mut display_options: Vec<String> = ordered_remotes.iter().map(remote_display_label).collect();
+    display_options.push(String::from(CREATE_REMOTE_OPTION));
+
+    let choice = Select::new("Deployment remote:", display_options)
+        .with_help_message(
+            "Choose the git remote that points to a fresh VPS for production deployment. Do not use 'origin' — that is your code host, not a deployment target.",
+        )
+        .raw_prompt()
         .map_err(|err| anyhow!(err))?;
 
-    if choice == CREATE_REMOTE_OPTION {
+    if choice.index == ordered_remotes.len() {
         return prompt_remote_name_text(seed);
     }
 
-    Ok(choice)
+    Ok(ordered_remotes[choice.index].name.clone())
+}
+
+fn remote_display_label(remote: &git::RemoteInfo) -> String {
+    if remote.name == "origin" {
+        format!("{} ({}) — not a deployment remote", remote.name, remote.url)
+    } else {
+        format!("{} ({})", remote.name, remote.url)
+    }
 }
 
 pub fn prompt_host(
@@ -139,48 +166,30 @@ fn prompt_remote_name_text(seed: Option<&BonesConfig>) -> Result<String> {
         .map_err(|err| anyhow!(err))
 }
 
-fn order_remotes_with_default(remotes: Vec<String>, default_remote: Option<String>) -> Vec<String> {
-    let Some(default_remote) = default_remote else {
-        return remotes;
-    };
-    if !remotes.contains(&default_remote) {
-        return remotes;
-    }
-
-    let mut ordered = Vec::with_capacity(remotes.len());
-    ordered.push(default_remote.clone());
-    ordered.extend(remotes.into_iter().filter(|name| name != &default_remote));
-    ordered
-}
-
 #[cfg(test)]
 mod tests {
     use super::is_affirmative;
 
-    use super::order_remotes_with_default;
+    use crate::git::RemoteInfo;
 
-    // Without a preferred remote, the existing order should remain stable for user familiarity.
+    use super::remote_display_label;
+
     #[test]
-    fn order_remotes_keeps_original_order_when_no_default_is_provided() {
-        let remotes = vec![String::from("origin"), String::from("production")];
-        let ordered = order_remotes_with_default(remotes.clone(), None);
-        assert_eq!(ordered, remotes);
+    fn remote_display_labels_origin_as_non_deployment() {
+        let label = remote_display_label(&RemoteInfo {
+            name: String::from("origin"),
+            url: String::from("git@github.com:user/repo.git"),
+        });
+        assert_eq!(label, "origin (git@github.com:user/repo.git) — not a deployment remote");
     }
 
-    // Missing defaults should not reorder remotes unexpectedly.
     #[test]
-    fn order_remotes_keeps_original_order_when_default_is_missing() {
-        let remotes = vec![String::from("origin"), String::from("staging")];
-        let ordered = order_remotes_with_default(remotes.clone(), Some(String::from("production")));
-        assert_eq!(ordered, remotes);
-    }
-
-    // Preferred default must be promoted while preserving all other options.
-    #[test]
-    fn order_remotes_places_default_first_without_losing_other_remotes() {
-        let remotes = vec![String::from("origin"), String::from("production"), String::from("staging")];
-        let ordered = order_remotes_with_default(remotes, Some(String::from("production")));
-        assert_eq!(ordered, vec!["production", "origin", "staging"]);
+    fn remote_display_labels_non_origin_plainly() {
+        let label = remote_display_label(&RemoteInfo {
+            name: String::from("production"),
+            url: String::from("git@vps.example.com:/home/git/app.git"),
+        });
+        assert_eq!(label, "production (git@vps.example.com:/home/git/app.git)");
     }
 
     #[test]

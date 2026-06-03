@@ -128,8 +128,13 @@ If configuration is incomplete, prompts for:
    - The Git branch to deploy
 
 3. **Remote Name** (`init.rs:71`)
-   - Default: `production`
-   - Name of the Git remote to configure
+    - Default: Pre-selects `production` if it exists among existing git remotes
+    - The remote you choose must point to a **fresh VPS** that will serve as your production deployment target
+    - Each remote is shown with its URL so you can distinguish code hosts from deployment targets
+    - `origin` is marked with `— not a deployment remote` because it typically points to GitHub/GitLab/etc., not to your VPS
+    - If a suitable remote doesn't exist yet, select `Create new deployment remote` at the bottom
+    - This is the name of the Git remote that `bonesdeploy` will manage. It will be created locally if it doesn't exist, constructed from the deploy user, host, and repo path you provide
+    - Example: choosing `production` creates `git@<host>:/home/git/<project>.git`
 
 4. **Host** (`init.rs:72-74`)
    - Default: Inferred from existing remote URL (if available)
