@@ -1,4 +1,6 @@
+use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::Result;
@@ -86,7 +88,12 @@ fn check_landlock_support(issues: &mut Vec<String>) {
 fn check_apparmor_support(issues: &mut Vec<String>) {
     check_apparmor_kernel_enabled(issues);
     check_apparmor_service(issues);
-    check_apparmor_profiles_enforcing(issues);
+
+    let Some(profile_names) = check_apparmor_profiles_installed(issues) else {
+        return;
+    };
+
+    check_apparmor_unit_wiring(&profile_names, issues);
 }
 
 fn check_apparmor_kernel_enabled(issues: &mut Vec<String>) {
@@ -118,18 +125,81 @@ fn check_apparmor_service(issues: &mut Vec<String>) {
     }
 }
 
-fn check_apparmor_profiles_enforcing(issues: &mut Vec<String>) {
-    let profiles = fs::read_to_string("/sys/kernel/security/apparmor/profiles");
-    match profiles {
-        Ok(contents) => {
-            if !kernel_profiles_have_enforce_mode(&contents) {
-                issues.push("AppArmor check failed: no profiles appear to be in enforce mode".to_string());
-            }
-        }
-        Err(error) => {
+fn check_apparmor_profiles_installed(issues: &mut Vec<String>) -> Option<Vec<String>> {
+    let profiles = fs::read_dir("/etc/apparmor.d");
+    let Ok(profiles) = profiles else {
+        issues.push("AppArmor check failed: could not read /etc/apparmor.d".to_string());
+        return None;
+    };
+
+    let profile_files: Vec<String> = profiles
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .filter(|name| apparmor_profile_filename(name))
+        .collect();
+
+    if profile_files.is_empty() {
+        issues.push("AppArmor check failed: no bonesdeploy AppArmor profile found under /etc/apparmor.d".to_string());
+        return None;
+    }
+
+    Some(profile_files)
+}
+
+fn check_apparmor_unit_wiring(profile_names: &[String], issues: &mut Vec<String>) {
+    let units = fs::read_dir("/etc/systemd/system");
+    let Ok(units) = units else {
+        issues.push("AppArmor check failed: could not read /etc/systemd/system".to_string());
+        return;
+    };
+
+    let installed_profiles: HashSet<&str> = profile_names.iter().map(String::as_str).collect();
+    let expected_unit_names: Vec<String> =
+        profile_names.iter().filter_map(|profile_name| apparmor_unit_name_for_profile(profile_name)).collect();
+
+    if expected_unit_names.is_empty() {
+        issues.push("AppArmor check failed: no bonesdeploy AppArmor profile matched an expected unit name".to_string());
+        return;
+    }
+
+    let unit_entries: HashMap<String, PathBuf> = units
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().into_string().ok().map(|name| (name, entry.path())))
+        .collect();
+
+    for expected_unit_name in expected_unit_names {
+        let Some(path) = unit_entries.get(&expected_unit_name) else {
             issues.push(format!(
-                "AppArmor check failed: could not read /sys/kernel/security/apparmor/profiles ({error})"
+                "AppArmor check failed: expected /etc/systemd/system/{expected_unit_name} for installed bonesdeploy profile"
             ));
+            continue;
+        };
+
+        let contents = fs::read_to_string(path);
+
+        match contents {
+            Ok(contents) => match apparmor_unit_wiring_status(&contents, &installed_profiles) {
+                AppArmorUnitWiringStatus::Ok => {}
+                AppArmorUnitWiringStatus::MissingOrdering => {
+                    issues.push(format!(
+                        "AppArmor check failed: {} is missing apparmor.service ordering or dependency",
+                        path.display()
+                    ));
+                }
+                AppArmorUnitWiringStatus::MissingProfile => {
+                    issues.push(format!("AppArmor check failed: {} is missing AppArmorProfile=", path.display()));
+                }
+                AppArmorUnitWiringStatus::UnknownProfile(profile_name) => {
+                    issues.push(format!(
+                        "AppArmor check failed: {} references unknown AppArmor profile {}",
+                        path.display(),
+                        profile_name
+                    ));
+                }
+            },
+            Err(error) => {
+                issues.push(format!("AppArmor check failed: could not read {} ({error})", path.display()));
+            }
         }
     }
 }
@@ -138,13 +208,72 @@ fn apparmor_kernel_enabled(contents: &str) -> bool {
     matches!(contents.trim().to_ascii_lowercase().as_str(), "y" | "yes" | "1")
 }
 
-fn kernel_profiles_have_enforce_mode(contents: &str) -> bool {
-    contents.lines().any(|line| line.trim_end().ends_with(" (enforce)"))
+fn apparmor_profile_filename(name: &str) -> bool {
+    name.starts_with("bonesdeploy-") && name.ends_with("-nginx")
+}
+
+fn apparmor_unit_name_for_profile(profile_name: &str) -> Option<String> {
+    profile_name
+        .strip_prefix("bonesdeploy-")
+        .and_then(|name| name.strip_suffix("-nginx"))
+        .map(|project_name| format!("{project_name}-nginx.service"))
+}
+
+fn systemd_directive_values<'a>(contents: &'a str, directive: &str) -> Vec<&'a str> {
+    contents
+        .lines()
+        .filter_map(|line| line.strip_prefix(directive))
+        .filter_map(|value| value.strip_prefix('='))
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .collect()
+}
+
+fn systemd_directive_contains_token(contents: &str, directive: &str, token: &str) -> bool {
+    systemd_directive_values(contents, directive)
+        .into_iter()
+        .flat_map(|value| value.split_ascii_whitespace())
+        .any(|value| value == token)
+}
+
+fn apparmor_profile_binding(contents: &str) -> Option<&str> {
+    systemd_directive_values(contents, "AppArmorProfile").into_iter().next()
+}
+
+enum AppArmorUnitWiringStatus {
+    Ok,
+    MissingOrdering,
+    MissingProfile,
+    UnknownProfile(String),
+}
+
+fn apparmor_unit_wiring_status(contents: &str, installed_profiles: &HashSet<&str>) -> AppArmorUnitWiringStatus {
+    let has_apparmor_after = systemd_directive_contains_token(contents, "After", "apparmor.service");
+    let has_apparmor_requires = systemd_directive_contains_token(contents, "Requires", "apparmor.service");
+
+    if !has_apparmor_after || !has_apparmor_requires {
+        return AppArmorUnitWiringStatus::MissingOrdering;
+    }
+
+    let Some(profile_name) = apparmor_profile_binding(contents) else {
+        return AppArmorUnitWiringStatus::MissingProfile;
+    };
+
+    if installed_profiles.contains(profile_name) {
+        AppArmorUnitWiringStatus::Ok
+    } else {
+        AppArmorUnitWiringStatus::UnknownProfile(profile_name.to_string())
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{apparmor_kernel_enabled, kernel_profiles_have_enforce_mode};
+    use std::collections::HashSet;
+
+    use super::{
+        AppArmorUnitWiringStatus, apparmor_kernel_enabled, apparmor_profile_binding, apparmor_profile_filename,
+        apparmor_unit_name_for_profile, apparmor_unit_wiring_status,
+    };
 
     #[test]
     fn apparmor_kernel_enabled_accepts_yes() {
@@ -157,25 +286,64 @@ mod tests {
     }
 
     #[test]
-    fn kernel_profiles_detects_enforce_mode() {
-        assert!(kernel_profiles_have_enforce_mode("bonesdeploy-demo-nginx (enforce)\n"));
+    fn apparmor_profile_filename_accepts_bonesdeploy_profile() {
+        assert!(apparmor_profile_filename("bonesdeploy-demo-nginx"));
     }
 
     #[test]
-    fn kernel_profiles_rejects_non_enforce_mode() {
-        assert!(!kernel_profiles_have_enforce_mode("bonesdeploy-demo-nginx (complain)\n"));
+    fn apparmor_profile_filename_rejects_unrelated_file() {
+        assert!(!apparmor_profile_filename("default"));
     }
 
     #[test]
-    fn doctor_source_uses_kernel_profile_list_for_enforce_check() {
-        let source = include_str!("doctor.rs");
-        let production_source = source.split("#[cfg(test)]").next().unwrap_or(source);
-        let apparmor_check =
-            production_source.split("fn check_apparmor_profiles_enforcing").nth(1).unwrap_or(production_source);
+    fn apparmor_unit_name_for_profile_maps_project_unit() {
+        assert_eq!(apparmor_unit_name_for_profile("bonesdeploy-demo-nginx"), Some("demo-nginx.service".to_string()));
+    }
 
-        assert!(
-            apparmor_check.contains("/sys/kernel/security/apparmor/profiles") && !apparmor_check.contains("aa-status"),
-            "doctor should use only kernel apparmor profile list for enforce check\n{apparmor_check}"
+    #[test]
+    fn apparmor_unit_wiring_accepts_expected_unit_with_reordered_after_tokens() {
+        let installed_profiles = HashSet::from(["bonesdeploy-demo-nginx"]);
+
+        assert!(matches!(
+            apparmor_unit_wiring_status(
+                "[Unit]\nAfter=apparmor.service network.target\nRequires=apparmor.service\n[Service]\nAppArmorProfile=bonesdeploy-demo-nginx\n",
+                &installed_profiles,
+            ),
+            AppArmorUnitWiringStatus::Ok
+        ));
+    }
+
+    #[test]
+    fn apparmor_unit_wiring_rejects_missing_profile_binding() {
+        let installed_profiles = HashSet::from(["bonesdeploy-demo-nginx"]);
+
+        assert!(matches!(
+            apparmor_unit_wiring_status(
+                "[Unit]\nAfter=network.target apparmor.service\nRequires=apparmor.service\n[Service]\nType=simple\n",
+                &installed_profiles,
+            ),
+            AppArmorUnitWiringStatus::MissingProfile
+        ));
+    }
+
+    #[test]
+    fn apparmor_unit_wiring_rejects_unknown_profile_binding() {
+        let installed_profiles = HashSet::from(["bonesdeploy-demo-nginx"]);
+
+        assert!(matches!(
+            apparmor_unit_wiring_status(
+                "[Unit]\nAfter=network.target apparmor.service\nRequires=apparmor.service\n[Service]\nAppArmorProfile=bonesdeploy-demo-ngnix\n",
+                &installed_profiles,
+            ),
+            AppArmorUnitWiringStatus::UnknownProfile(profile_name) if profile_name == "bonesdeploy-demo-ngnix"
+        ));
+    }
+
+    #[test]
+    fn apparmor_profile_binding_reads_first_profile_assignment() {
+        assert_eq!(
+            apparmor_profile_binding("[Service]\nAppArmorProfile=bonesdeploy-demo-nginx\n"),
+            Some("bonesdeploy-demo-nginx")
         );
     }
 }
