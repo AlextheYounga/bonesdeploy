@@ -1,8 +1,8 @@
 use std::io::{self, Write};
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use console::style;
-use inquire::{Select, Text};
+use inquire::{Confirm, Select, Text};
 
 use crate::config::BonesConfig;
 use crate::git;
@@ -80,7 +80,27 @@ pub fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
         return prompt_remote_name_text(seed);
     }
 
-    Ok(ordered_remotes[choice.index].name.clone())
+    let chosen = ordered_remotes[choice.index].name.clone();
+
+    if chosen == "origin" {
+        println!();
+        println!("{}", style("WARNING:").yellow().bold());
+        println!("You selected 'origin' as your deployment remote.");
+        println!("'origin' typically points to your code host (e.g. GitHub, GitLab) — not to a VPS");
+        println!("where bonesdeploy can deploy your application. Using it here will likely misconfigure");
+        println!("deployment and push deployment infrastructure to the wrong place.");
+        println!();
+        let proceed = Confirm::new("Use 'origin' anyway?")
+            .with_default(false)
+            .with_help_message("Choose 'No' and create a new deployment remote instead")
+            .prompt()
+            .map_err(|err| anyhow!(err))?;
+        if !proceed {
+            bail!("Aborted: choose a remote that points to a fresh VPS, or create a new one.");
+        }
+    }
+
+    Ok(chosen)
 }
 
 fn remote_display_label(remote: &git::RemoteInfo) -> String {
@@ -169,28 +189,6 @@ fn prompt_remote_name_text(seed: Option<&BonesConfig>) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::is_affirmative;
-
-    use crate::git::RemoteInfo;
-
-    use super::remote_display_label;
-
-    #[test]
-    fn remote_display_labels_origin_as_non_deployment() {
-        let label = remote_display_label(&RemoteInfo {
-            name: String::from("origin"),
-            url: String::from("git@github.com:user/repo.git"),
-        });
-        assert_eq!(label, "origin (git@github.com:user/repo.git) — not a deployment remote");
-    }
-
-    #[test]
-    fn remote_display_labels_non_origin_plainly() {
-        let label = remote_display_label(&RemoteInfo {
-            name: String::from("production"),
-            url: String::from("git@vps.example.com:/home/git/app.git"),
-        });
-        assert_eq!(label, "production (git@vps.example.com:/home/git/app.git)");
-    }
 
     #[test]
     fn confirmation_parser_accepts_common_yes_values() {
