@@ -1,6 +1,6 @@
-use anyhow::Result;
-
 use super::{InitArgs, collect_non_interactive};
+
+use anyhow::{Result, bail};
 
 use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Ssl};
 
@@ -58,7 +58,7 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
 }
 
 #[test]
-fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() {
+fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() -> Result<()> {
     let seed = incomplete_seed("atlas");
     let args = InitArgs {
         non_interactive: true,
@@ -71,9 +71,10 @@ fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() {
         template: None,
     };
 
-    let result = collect_non_interactive("workspace", Some(&seed), &args);
-    assert!(result.is_err());
+    let Err(err) = collect_non_interactive("workspace", Some(&seed), &args) else {
+        bail!("missing host should fail");
+    };
+    assert!(err.to_string().contains("--host is required"));
 
-    let err = result.err().map(|err| err.to_string()).unwrap_or_default();
-    assert!(err.contains("--host is required"));
+    Ok(())
 }

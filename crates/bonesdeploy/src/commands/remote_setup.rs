@@ -7,6 +7,7 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result, bail};
 use console::style;
 
+use crate::commands::remote_setup_output;
 use crate::config;
 use crate::embedded;
 
@@ -24,17 +25,10 @@ pub fn run() -> Result<()> {
     let ssh_user = resolve_bootstrap_ssh_user();
     let deploy_authorized_key = resolve_deploy_authorized_key()?;
 
-    println!(
-        "Running {} against {} as {}...",
-        style("remote setup").cyan().bold(),
-        style(&cfg.data.host).cyan(),
-        style(&ssh_user).cyan(),
-    );
-
     let extra_args = vec![String::from("-e"), build_extra_var_json("deploy_authorized_key", &deploy_authorized_key)];
     run_ansible_playbook(&cfg, &ssh_user, &extra_args)?;
 
-    println!("\n{} Remote setup complete.", style("Done!").green().bold());
+    println!("{} Remote setup complete.", style("Done!").green().bold());
 
     Ok(())
 }
@@ -86,81 +80,12 @@ fn resolve_bootstrap_ssh_user_from(value: Option<String>) -> String {
 }
 
 pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<()> {
-    let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
-    if !playbook.is_file() {
-        bail!("Missing remote setup playbook: {}", playbook.display());
-    }
-
-    let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
-    if !roles_dir.is_dir() {
-        bail!("Missing remote roles directory: {}", roles_dir.display());
-    }
-
-    ensure_remote_python3_available(cfg, ssh_user)?;
-
-    let project_root_parent = resolve_project_root_parent(&cfg.data.project_root);
-    let inventory = format!("{},", cfg.data.host);
-    let roles_path = env::var("ANSIBLE_ROLES_PATH")
-        .ok()
-        .filter(|value| !value.is_empty())
-        .map_or_else(|| roles_dir.display().to_string(), |existing| format!("{}:{existing}", roles_dir.display()));
-
-    let ansible_playbook_binary = resolve_ansible_playbook_binary()?;
-    let mut command = Command::new(&ansible_playbook_binary);
-    command.env("ANSIBLE_ROLES_PATH", roles_path);
-    command
-        .arg("-i")
-        .arg(&inventory)
-        .arg("-u")
-        .arg(ssh_user)
-        .arg("-e")
-        .arg(format!("ansible_port={}", cfg.data.port))
-        .arg("-e")
-        .arg(format!("deploy_user={}", cfg.permissions.defaults.deploy_user))
-        .arg("-e")
-        .arg(format!("service_user={}", cfg.permissions.defaults.service_user))
-        .arg("-e")
-        .arg(format!("group={}", cfg.permissions.defaults.group))
-        .arg("-e")
-        .arg(format!("project_root_parent={project_root_parent}"))
-        .arg("-e")
-        .arg(format!("project_root={}", cfg.data.project_root))
-        .arg("-e")
-        .arg(format!("web_root={}", cfg.data.web_root))
-        .arg("-e")
-        .arg(format!("project_name={}", cfg.data.project_name))
-        .arg("-e")
-        .arg(format!("repo_path={}", cfg.data.repo_path));
-
-    if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
-        command
-            .arg("-e")
-            .arg(format!("nginx_server_name={}", cfg.ssl.domain))
-            .arg("-e")
-            .arg("nginx_ssl_enabled=true")
-            .arg("-e")
-            .arg(format!("nginx_ssl_certificate_path=/etc/letsencrypt/live/{}/fullchain.pem", cfg.ssl.domain))
-            .arg("-e")
-            .arg(format!("nginx_ssl_certificate_key_path=/etc/letsencrypt/live/{}/privkey.pem", cfg.ssl.domain));
-    }
-
-    command.args(extra_args);
-    command.arg(playbook);
-
-    let status = command.status().context("Failed to run ansible-playbook")?;
-
-    if !status.success() {
-        bail!("ansible-playbook failed with status {status}");
-    }
-
-    Ok(())
+    remote_setup_output::run(cfg, ssh_user, extra_args)
 }
 
-fn ensure_remote_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {
+pub(crate) fn ensure_remote_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {
     let host = format!("{ssh_user}@{}", cfg.data.host);
     let script = embedded::read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASSET)?;
-
-    println!("Ensuring python3 is available on remote host...");
 
     let mut child = Command::new("ssh")
         .arg("-p")
@@ -192,7 +117,7 @@ pub(crate) fn ensure_ansible_playbook_installed() -> Result<()> {
     Ok(())
 }
 
-fn resolve_ansible_playbook_binary() -> Result<PathBuf> {
+pub(crate) fn resolve_ansible_playbook_binary() -> Result<PathBuf> {
     if ansible_playbook_available(Path::new("ansible-playbook"))? {
         return Ok(PathBuf::from("ansible-playbook"));
     }
