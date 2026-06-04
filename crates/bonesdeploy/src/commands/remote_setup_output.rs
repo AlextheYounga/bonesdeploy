@@ -146,6 +146,8 @@ fn classify_output_line(line: &str) -> Option<OutputLine> {
 
 pub(crate) fn clean_task_line(line: &str) -> Option<String> {
     let task = line.trim().strip_prefix("TASK [")?.strip_suffix(']')?.trim();
+    let task = task.rsplit_once(" : ").map_or(task, |(_, description)| description).trim();
+
     (!task.is_empty()).then(|| task.to_string())
 }
 
@@ -180,7 +182,14 @@ mod tests {
     fn clean_task_line_removes_ansible_task_wrapper() {
         let cleaned = clean_task_line("TASK [users : Create deploy user]");
 
-        assert_eq!(cleaned.as_deref(), Some("users : Create deploy user"));
+        assert_eq!(cleaned.as_deref(), Some("Create deploy user"));
+    }
+
+    #[test]
+    fn clean_task_line_keeps_plain_task_name_without_group_prefix() {
+        let cleaned = clean_task_line("TASK [Create deploy user]");
+
+        assert_eq!(cleaned.as_deref(), Some("Create deploy user"));
     }
 
     #[test]
@@ -202,7 +211,7 @@ mod tests {
         let task = classify_output_line("TASK [users : Create deploy user]");
         let error = classify_output_line("fatal: [203.0.113.10]: FAILED! => {\"msg\":\"boom\"}");
 
-        assert_eq!(task, Some(OutputLine::Task(String::from("users : Create deploy user"))));
+        assert_eq!(task, Some(OutputLine::Task(String::from("Create deploy user"))));
         assert_eq!(
             error,
             Some(OutputLine::Error(String::from("fatal: [203.0.113.10]: FAILED! => {\"msg\":\"boom\"}")))
