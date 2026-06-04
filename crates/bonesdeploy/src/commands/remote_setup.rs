@@ -146,7 +146,7 @@ pub(crate) fn resolve_ansible_playbook_binary() -> Result<PathBuf> {
 }
 
 fn ansible_playbook_available(binary: &Path) -> Result<bool> {
-    let status = Command::new(binary).arg("--version").status();
+    let status = Command::new(binary).arg("--version").stdout(Stdio::null()).stderr(Stdio::null()).status();
     if status.as_ref().is_err_and(|error| error.kind() == ErrorKind::NotFound) {
         return Ok(false);
     }
