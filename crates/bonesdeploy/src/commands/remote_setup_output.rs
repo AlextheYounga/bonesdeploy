@@ -58,7 +58,8 @@ pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[Strin
     renderer.print_brand()?;
     renderer.set_task(format!("running remote setup on {}", cfg.data.host))?;
 
-    let mut child = build_ansible_command(cfg, ssh_user, extra_args)?.spawn().context("Failed to run ansible-playbook")?;
+    let mut child =
+        build_ansible_command(cfg, ssh_user, extra_args)?.spawn().context("Failed to run ansible-playbook")?;
     let stdout = child.stdout.take().ok_or_else(|| anyhow!("stdout was not piped"))?;
     let stderr = child.stderr.take().ok_or_else(|| anyhow!("stderr was not piped"))?;
 
@@ -134,7 +135,12 @@ fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: 
     Ok(command)
 }
 
-fn stream_ansible_output(mut child: Child, stdout: ChildStdout, stderr: ChildStderr, renderer: &mut LiveStatusRenderer<io::Stdout>) -> Result<ExitStatus> {
+fn stream_ansible_output(
+    mut child: Child,
+    stdout: ChildStdout,
+    stderr: ChildStderr,
+    renderer: &mut LiveStatusRenderer<io::Stdout>,
+) -> Result<ExitStatus> {
     let (tx, rx) = mpsc::channel();
     spawn_stream_reader(stdout, StreamKind::Stdout, tx.clone());
     spawn_stream_reader(stderr, StreamKind::Stderr, tx);
@@ -159,7 +165,9 @@ fn stream_ansible_output(mut child: Child, stdout: ChildStdout, stderr: ChildStd
     }
 
     let status = child.wait().context("Failed to wait for ansible-playbook")?;
-    if !status.success() && let Some(error) = last_error {
+    if !status.success()
+        && let Some(error) = last_error
+    {
         renderer.set_error(error)?;
     }
 

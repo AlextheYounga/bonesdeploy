@@ -81,17 +81,18 @@ Profile characteristics:
 
 **Location:** `kit/remote/playbooks/setup.yml`
 
-Role ordering:
+Shared orchestration:
 ```yaml
-roles:
-  - role: users
-  - role: apparmor    # Before nginx
-  - role: common
-  - role: nginx
-  - role: ssl
+tasks:
+  - include_role: users
+  - include_role: apparmor    # Before nginx
+  - include_role: common
+  - include_role: runtime      # Optional per-template role from vars
+  - include_role: nginx
+  - include_role: ssl
 ```
 
-AppArmor runs before nginx to ensure profile is loaded before service starts.
+AppArmor runs before nginx to ensure profile is loaded before service starts. Template-specific setup now comes from `templates/*/remote/vars/setup.yml` instead of duplicated playbooks.
 
 ### 5. bonesremote Doctor AppArmor Checks
 
@@ -130,11 +131,11 @@ This ensures:
 - Clear runtime error if Landlock APIs are called outside Linux
 - Policy struct remains consistent across platforms
 
-### 7. Template Playbooks
+### 7. Template Overrides
 
-**Locations:** `templates/*/remote/playbooks/setup.yml`
+**Locations:** `templates/*/remote/vars/setup.yml`
 
-All framework templates now include the `apparmor` role with proper ordering before `nginx`.
+Framework templates now only override setup metadata such as runtime role name and completion label; the shared playbook owns the execution order.
 
 ## Documentation Updates
 
@@ -222,7 +223,7 @@ kit/remote/roles/apparmor/tasks/main.yml
 kit/remote/roles/apparmor/defaults/main.yml
 kit/remote/roles/apparmor/handlers/main.yml
 kit/remote/roles/apparmor/README.md
-templates/*/remote/playbooks/setup.yml
+templates/*/remote/vars/setup.yml
 crates/bonesdeploy/src/commands/init.rs
 crates/bonesdeploy/src/config.rs
 crates/bonesremote/src/landlock.rs
