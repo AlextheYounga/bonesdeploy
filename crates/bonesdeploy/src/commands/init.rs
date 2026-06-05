@@ -14,7 +14,11 @@ use crate::embedded;
 use crate::git;
 use crate::prompts;
 
-pub fn run(args: &InitArgs) -> Result<()> {
+pub struct InitOutcome {
+    pub remote_setup_ran: bool,
+}
+
+pub fn run(args: &InitArgs) -> Result<InitOutcome> {
     git::ensure_git_repository()?;
 
     let bones_dir = Path::new(config::Constants::BONES_DIR);
@@ -46,13 +50,14 @@ pub fn run(args: &InitArgs) -> Result<()> {
 
     symlink_pre_push()?;
 
-    if args.setup_remote || (!args.non_interactive && prompts::confirm_remote_setup()?) {
+    let remote_setup_ran = args.setup_remote || (!args.non_interactive && prompts::confirm_remote_setup()?);
+    if remote_setup_ran {
         remote_setup::run()?;
     } else {
         print_follow_up_hint();
     }
 
-    Ok(())
+    Ok(InitOutcome { remote_setup_ran })
 }
 
 fn print_follow_up_hint() {
