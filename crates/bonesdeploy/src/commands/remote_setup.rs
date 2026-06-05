@@ -84,6 +84,7 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
 }
 
 pub(crate) fn ensure_remote_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {
+    // Use bootstrap user (root by default) for initial SSH connection during setup
     let host = format!("{ssh_user}@{}", cfg.data.host);
     let script = embedded::read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASSET)?;
 
@@ -146,7 +147,7 @@ pub(crate) fn resolve_ansible_playbook_binary() -> Result<PathBuf> {
 }
 
 fn ansible_playbook_available(binary: &Path) -> Result<bool> {
-    let status = Command::new(binary).arg("--version").status();
+    let status = Command::new(binary).arg("--version").stdout(Stdio::null()).stderr(Stdio::null()).status();
     if status.as_ref().is_err_and(|error| error.kind() == ErrorKind::NotFound) {
         return Ok(false);
     }

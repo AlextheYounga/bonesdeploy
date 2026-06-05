@@ -1,7 +1,5 @@
-use std::env;
 use std::fs;
-use std::os::unix::fs::{PermissionsExt, symlink};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
@@ -10,15 +8,10 @@ use serde::Deserialize;
 use sha2::Digest;
 use tempfile::TempDir;
 
-use crate::commands::remote_setup::resolve_bootstrap_ssh_user;
-use crate::config;
-use crate::update_assets;
+use crate::commands::update_release;
 
 const GITHUB_API_RELEASES_URL: &str = "https://api.github.com/repos/anomalyco/bonesdeploy/releases/latest";
 const GITHUB_RELEASES_URL: &str = "https://github.com/anomalyco/bonesdeploy/releases/download";
-
-const LOCAL_INSTALL_ROOT: &str = "/opt/bonesdeploy";
-const LOCAL_BIN_LINK: &str = "/usr/local/bin/bonesdeploy";
 
 pub struct UpdateOptions {
     pub skip_local: bool,
@@ -28,8 +21,8 @@ pub struct UpdateOptions {
 pub async fn run(options: UpdateOptions) -> Result<()> {
     println!("{}", style("bonesdeploy update").bold());
 
-    let current_local = get_current_local_version();
-    let current_remote = get_current_remote_version();
+    let current_local = update_release::current_local_version();
+    let current_remote = update_release::current_remote_version();
 
     println!("Current local version: {}", style(&current_local).cyan());
     println!("Current remote version: {}", style(&current_remote).cyan());
@@ -58,44 +51,19 @@ pub async fn run(options: UpdateOptions) -> Result<()> {
 
     if local_needs_update {
         println!("{}", style("Updating local bonesdeploy...").cyan());
-        update_local_binary(temp_path, &target_version)?;
+        update_release::update_local_binary(temp_path, &target_version)?;
         println!("{} Local update complete.", style("Done!").green());
     }
 
     if remote_needs_update {
         println!("{}", style("Updating remote bonesremote...").cyan());
-        update_remote_binary(temp_path, &target_version)?;
+        update_release::update_remote_binary(temp_path, &target_version)?;
         println!("{} Remote update complete.", style("Done!").green());
     }
 
     println!("\n{} All updates complete.", style("Done!").green());
 
     Ok(())
-}
-
-fn get_current_local_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
-}
-
-fn get_current_remote_version() -> String {
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    if !bones_yaml.exists() {
-        return "unknown".to_string();
-    }
-
-    let Ok(cfg) = config::load(bones_yaml) else {
-        return "unknown".to_string();
-    };
-
-    let host = format!("{}@{}", cfg.permissions.defaults.deploy_user, cfg.data.host);
-    let output = Command::new("ssh").args(["-p", &cfg.data.port]).args([&host, "bonesremote", "version"]).output();
-
-    match output {
-        Ok(output) if output.status.success() => {
-            String::from_utf8_lossy(&output.stdout).trim().strip_prefix("bonesremote ").unwrap_or("unknown").to_string()
-        }
-        _ => "unknown".to_string(),
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -123,7 +91,7 @@ async fn fetch_latest_release() -> Result<GitHubRelease> {
 }
 
 async fn download_release_assets(release: &GitHubRelease, temp_path: &Path) -> Result<()> {
-    let target = get_target_triple();
+    let target = update_release::target_triple();
     let version = release.tag_name.trim_start_matches('v');
 
     let bonesdeploy_asset_name = format!("bonesdeploy-{target}-{version}.tar.gz");
@@ -177,12 +145,8 @@ fn extract_tarball(archive_path: &Path, dest: &Path) -> Result<()> {
     Ok(())
 }
 
-fn get_target_triple() -> String {
-    env::consts::ARCH.to_string() + "-" + env::consts::OS
-}
-
 fn verify_downloads(temp_path: &Path) -> Result<()> {
-    let target = get_target_triple();
+    let target = update_release::target_triple();
 
     let version_files: Vec<_> = fs::read_dir(temp_path)
         .context("Failed to read temp directory")?
@@ -228,182 +192,6 @@ fn verify_downloads(temp_path: &Path) -> Result<()> {
         if actual_hash != expected_hash {
             bail!("Checksum mismatch for {filename}");
         }
-    }
-
-    Ok(())
-}
-
-fn update_local_binary(temp_path: &Path, version: &str) -> Result<()> {
-    let target = get_target_triple();
-    let binary_name = format!("bonesdeploy-{target}-{version}");
-
-    let source_binary = temp_path.join(&binary_name);
-    if !source_binary.exists() {
-        let extracted_name = format!("bonesdeploy-{target}-{version}");
-        let possible_path = temp_path.join(&extracted_name);
-        if possible_path.exists() {
-            return update_local_binary(temp_path, version);
-        }
-        bail!("Local binary not found in release: {binary_name}");
-    }
-
-    let install_root = Path::new(LOCAL_INSTALL_ROOT);
-    let versions_dir = install_root.join("versions");
-    let target_version_dir = versions_dir.join(version);
-    let current_dir = install_root.join("current");
-
-    fs::create_dir_all(&target_version_dir)
-        .with_context(|| format!("Failed to create {}", target_version_dir.display()))?;
-
-    let dest_binary = target_version_dir.join("bonesdeploy");
-    fs::copy(&source_binary, &dest_binary)
-        .with_context(|| format!("Failed to copy binary to {}", dest_binary.display()))?;
-
-    fs::set_permissions(&dest_binary, fs::Permissions::from_mode(0o755))
-        .with_context(|| format!("Failed to set permissions on {}", dest_binary.display()))?;
-
-    verify_binary(&dest_binary)?;
-
-    let temp_link = current_dir.join(".bonesdeploy_swap");
-    if temp_link.exists() {
-        fs::remove_file(&temp_link)?;
-    }
-    symlink_file(&target_version_dir, &temp_link)?;
-
-    fs::rename(&temp_link, current_dir.join("bonesdeploy")).context("Failed to atomically switch local symlink")?;
-
-    let global_link = Path::new(LOCAL_BIN_LINK);
-    if global_link.exists() {
-        fs::remove_file(global_link)?;
-    }
-    symlink_file(&current_dir.join("bonesdeploy"), global_link)?;
-
-    println!("Local version: {}", style(get_current_local_version()).cyan());
-
-    Ok(())
-}
-
-fn update_remote_binary(temp_path: &Path, version: &str) -> Result<()> {
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    if !bones_yaml.exists() {
-        bail!("No .bones/bones.yaml found. Run from a bonesdeploy project directory.");
-    }
-
-    let cfg = config::load(bones_yaml)?;
-
-    let target = get_target_triple();
-    let binary_name = format!("bonesremote-{target}-{version}");
-    let source_binary = temp_path.join(&binary_name);
-
-    if !source_binary.exists() {
-        bail!("Remote binary not found in release: {binary_name}");
-    }
-
-    verify_binary(&source_binary)?;
-
-    let ansible_temp = TempDir::new().context("Failed to create Ansible temp directory")?;
-    let playbook_path = update_assets::materialize_playbook(ansible_temp.path())?;
-
-    let remote_staging = format!("/tmp/bonesremote-{version}");
-
-    println!("Uploading bonesremote to remote host...");
-    let host = format!("{}@{}", cfg.permissions.defaults.deploy_user, cfg.data.host);
-    let status = Command::new("scp")
-        .args(["-P", &cfg.data.port])
-        .arg(&source_binary)
-        .arg(format!("{host}:{remote_staging}"))
-        .status()
-        .context("Failed to upload bonesremote via scp")?;
-
-    if !status.success() {
-        bail!("Failed to upload bonesremote binary");
-    }
-
-    println!("Running remote update playbook...");
-    run_update_playbook(&cfg, &playbook_path, &remote_staging, version)?;
-
-    Ok(())
-}
-
-fn run_update_playbook(cfg: &config::BonesConfig, playbook: &Path, staging_path: &str, version: &str) -> Result<()> {
-    let roles_dir = playbook
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|p| p.join("roles"))
-        .ok_or_else(|| anyhow::anyhow!("Invalid playbook path structure"))?;
-
-    let inventory = format!("{},", cfg.data.host);
-    let ssh_user = resolve_bootstrap_ssh_user();
-
-    let ansible_playbook = resolve_ansible_playbook()?;
-
-    let mut command = Command::new(&ansible_playbook);
-    command
-        .env("ANSIBLE_ROLES_PATH", roles_dir.display().to_string())
-        .arg("-i")
-        .arg(&inventory)
-        .arg("-u")
-        .arg(&ssh_user)
-        .arg("-e")
-        .arg(format!("ansible_port={}", cfg.data.port))
-        .arg("-e")
-        .arg(format!("bonesremote_staging_path={staging_path}"))
-        .arg("-e")
-        .arg(format!("bonesremote_target_version={version}"))
-        .arg(playbook);
-
-    println!("Running: {command:?}");
-
-    let status = command.status().context("Failed to run ansible-playbook")?;
-
-    if !status.success() {
-        bail!("Remote update playbook failed with status {status}");
-    }
-
-    Ok(())
-}
-
-fn resolve_ansible_playbook() -> Result<PathBuf> {
-    if ansible_playbook_available(Path::new("ansible-playbook")) {
-        return Ok(PathBuf::from("ansible-playbook"));
-    }
-
-    let home = env::var("HOME").context("HOME is not set")?;
-    let local_ansible = Path::new(&home).join(".local/bin/ansible-playbook");
-
-    if ansible_playbook_available(&local_ansible) {
-        return Ok(local_ansible);
-    }
-
-    bail!("ansible-playbook not found. Install Ansible first.");
-}
-
-fn ansible_playbook_available(binary: &Path) -> bool {
-    Command::new(binary).arg("--version").status().is_ok_and(|s| s.success())
-}
-
-fn verify_binary(path: &Path) -> Result<()> {
-    let output = Command::new(path)
-        .arg("version")
-        .output()
-        .with_context(|| format!("Failed to run {} version", path.display()))?;
-
-    if !output.status.success() {
-        bail!("Binary verification failed: {}", path.display());
-    }
-
-    Ok(())
-}
-
-fn symlink_file(target: &Path, link: &Path) -> Result<()> {
-    #[cfg(unix)]
-    {
-        symlink(target, link)
-            .with_context(|| format!("Failed to create symlink {} -> {}", link.display(), target.display()))?;
-    }
-    #[cfg(not(unix))]
-    {
-        bail!("Symlinks are only supported on Unix systems");
     }
 
     Ok(())

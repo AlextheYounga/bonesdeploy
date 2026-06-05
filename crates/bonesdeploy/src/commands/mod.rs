@@ -1,6 +1,7 @@
 mod deploy;
 mod doctor;
 mod init;
+mod init_config;
 mod manage;
 mod pull;
 mod push;
@@ -9,6 +10,7 @@ mod remote_setup_output;
 mod remote_ssl;
 mod rollback;
 mod update;
+mod update_release;
 mod version;
 
 use anyhow::Result;

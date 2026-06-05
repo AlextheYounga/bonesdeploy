@@ -14,8 +14,10 @@ rust-embed = "8.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yml = "0.0.12"
 sha2 = "0.10"
+spinners = "4.2.0"
 tempfile = "3.0"
 tokio = { version = "1.52.1", features = ["rt", "rt-multi-thread", "macros"] }
+shared = { path = "../shared" }
 
 [lints.clippy]
 # broad groups (lower priority so individual lint overrides take effect)

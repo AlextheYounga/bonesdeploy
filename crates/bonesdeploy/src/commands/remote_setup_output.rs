@@ -1,72 +1,42 @@
 use std::env;
 use std::io::{self, BufRead, BufReader, IsTerminal, Write};
 use std::path::Path;
-use std::process::{Child, ChildStderr, ChildStdout, Command, ExitStatus, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::result::Result as StdResult;
-use std::sync::mpsc::{self, RecvTimeoutError, Sender};
+use std::sync::mpsc::{self, Sender};
 use std::thread;
-use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
+use spinners::{Spinner, Spinners, Stream};
 
 use crate::commands::remote_setup;
 use crate::config;
 
 const BRAND: &str = "☠ bonesdeploy";
-const SPINNER_FRAMES: [char; 4] = ['|', '/', '-', '\\'];
-const EVENT_POLL_INTERVAL: Duration = Duration::from_millis(120);
+const CLEAR_LINE: &str = "\r\u{1b}[2K";
+const RESET: &str = "\u{1b}[0m";
+const BOLD: &str = "\u{1b}[1m";
+const DIM: &str = "\u{1b}[2m";
+const GREEN: &str = "\u{1b}[32m";
+const RED: &str = "\u{1b}[31m";
 
-#[cfg(test)]
-mod tests {
-    use super::{clean_error_line, clean_task_line, format_status_line};
-
-    #[test]
-    fn clean_task_line_removes_ansible_task_wrapper() {
-        let cleaned = clean_task_line("TASK [users : Create deploy user]");
-
-        assert_eq!(cleaned.as_deref(), Some("users : Create deploy user"));
-    }
-
-    #[test]
-    fn clean_task_line_ignores_non_task_lines() {
-        assert_eq!(clean_task_line("ok: [host]"), None);
-        assert_eq!(clean_task_line("PLAY [all]"), None);
-    }
-
-    #[test]
-    fn clean_error_line_detects_ansible_failures() {
-        let cleaned = clean_error_line("fatal: [203.0.113.10]: FAILED! => {\"msg\":\"boom\"}");
-
-        assert_eq!(cleaned.as_deref(), Some("fatal: [203.0.113.10]: FAILED! => {\"msg\":\"boom\"}"));
-        assert_eq!(clean_error_line("ok: [host]"), None);
-    }
-
-    #[test]
-    fn format_status_line_clears_previous_content() {
-        let rendered = format_status_line('|', "users : Create deploy user", false);
-
-        assert_eq!(rendered, "\r\u{1b}[2K[|] users : Create deploy user");
-    }
+#[derive(Debug, PartialEq, Eq)]
+enum OutputLine {
+    Task(String),
+    Error(String),
 }
 
 pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<()> {
     remote_setup::ensure_remote_python3_available(cfg, ssh_user)?;
 
     let interactive = io::stdout().is_terminal();
-    let stdout = io::stdout();
-    let mut renderer = LiveStatusRenderer::new(stdout, interactive);
-    renderer.print_brand()?;
-    renderer.set_task(format!("running remote setup on {}", cfg.data.host))?;
+    let mut stdout = io::stdout();
+    writeln!(stdout, "{BRAND}")?;
+    stdout.flush()?;
 
-    let mut child =
-        build_ansible_command(cfg, ssh_user, extra_args)?.spawn().context("Failed to run ansible-playbook")?;
-    let stdout = child.stdout.take().ok_or_else(|| anyhow!("stdout was not piped"))?;
-    let stderr = child.stderr.take().ok_or_else(|| anyhow!("stderr was not piped"))?;
+    let child = build_ansible_command(cfg, ssh_user, extra_args)?.spawn().context("Failed to run ansible-playbook")?;
 
-    renderer.set_task(format!("running ansible playbook on {}", cfg.data.host))?;
-    let status = stream_ansible_output(child, stdout, stderr, &mut renderer)?;
-    renderer.finish()?;
-
+    let status = stream_ansible_output(&mut stdout, interactive, child)?;
     if !status.success() {
         bail!("ansible-playbook failed with status {status}");
     }
@@ -75,6 +45,19 @@ pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[Strin
 }
 
 fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<Command> {
+    validate_playbook_and_roles_directories()?;
+
+    let ansible_playbook_binary = remote_setup::resolve_ansible_playbook_binary()?;
+    let mut command = Command::new(&ansible_playbook_binary);
+
+    add_base_ansible_args(&mut command, cfg, ssh_user);
+    add_ssl_config_args(&mut command, cfg);
+    add_final_args(&mut command, extra_args);
+
+    Ok(command)
+}
+
+fn validate_playbook_and_roles_directories() -> Result<()> {
     let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
     if !playbook.is_file() {
         bail!("Missing remote setup playbook: {}", playbook.display());
@@ -85,12 +68,15 @@ fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: 
         bail!("Missing remote roles directory: {}", roles_dir.display());
     }
 
+    Ok(())
+}
+
+fn add_base_ansible_args(command: &mut Command, cfg: &config::BonesConfig, ssh_user: &str) {
+    let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
     let project_root_parent = remote_setup::resolve_project_root_parent(&cfg.data.project_root);
     let inventory = format!("{},", cfg.data.host);
     let roles_path = env_ansible_roles_path(roles_dir);
 
-    let ansible_playbook_binary = remote_setup::resolve_ansible_playbook_binary()?;
-    let mut command = Command::new(&ansible_playbook_binary);
     command.env("ANSIBLE_ROLES_PATH", roles_path);
     command
         .arg("-i")
@@ -115,7 +101,9 @@ fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: 
         .arg(format!("project_name={}", cfg.data.project_name))
         .arg("-e")
         .arg(format!("repo_path={}", cfg.data.repo_path));
+}
 
+fn add_ssl_config_args(command: &mut Command, cfg: &config::BonesConfig) {
     if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
         command
             .arg("-e")
@@ -127,51 +115,125 @@ fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: 
             .arg("-e")
             .arg(format!("nginx_ssl_certificate_key_path=/etc/letsencrypt/live/{}/privkey.pem", cfg.ssl.domain));
     }
+}
 
+fn add_final_args(command: &mut Command, extra_args: &[String]) {
+    let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
     command.args(extra_args);
     command.arg(playbook);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
-
-    Ok(command)
 }
 
-fn stream_ansible_output(
-    mut child: Child,
-    stdout: ChildStdout,
-    stderr: ChildStderr,
-    renderer: &mut LiveStatusRenderer<io::Stdout>,
-) -> Result<ExitStatus> {
+fn stream_ansible_output<W: Write>(writer: &mut W, interactive: bool, mut child: Child) -> Result<ExitStatus> {
+    let stdout = child.stdout.take().ok_or_else(|| anyhow!("stdout was not piped"))?;
+    let stderr = child.stderr.take().ok_or_else(|| anyhow!("stderr was not piped"))?;
     let (tx, rx) = mpsc::channel();
-    spawn_stream_reader(stdout, StreamKind::Stdout, tx.clone());
-    spawn_stream_reader(stderr, StreamKind::Stderr, tx);
+    spawn_stream_reader(stdout, tx.clone());
+    spawn_stream_reader(stderr, tx);
+    let mut progress = Progress::new(interactive);
 
-    let mut last_error: Option<String> = None;
-
-    loop {
-        match rx.recv_timeout(EVENT_POLL_INTERVAL) {
-            Ok(StreamEvent::Line { kind, line }) => {
-                if let Some(task) = clean_task_line(&line) {
-                    renderer.set_task(task)?;
-                } else if let Some(error) = clean_error_line(&line) {
-                    last_error = Some(error.clone());
-                    renderer.set_error(error)?;
-                } else if matches!(kind, StreamKind::Stderr) {
-                    renderer.set_error(line.trim().to_string())?;
-                }
-            }
-            Err(RecvTimeoutError::Timeout) => renderer.tick()?,
-            Err(RecvTimeoutError::Disconnected) => break,
+    for line in rx {
+        if let Some(output) = classify_output_line(&line) {
+            write_output_line(writer, &mut progress, output)?;
         }
     }
 
-    let status = child.wait().context("Failed to wait for ansible-playbook")?;
-    if !status.success()
-        && let Some(error) = last_error
-    {
-        renderer.set_error(error)?;
+    progress.finish(writer)?;
+    child.wait().context("Failed to wait for ansible-playbook")
+}
+
+struct Progress {
+    interactive: bool,
+    rendered: bool,
+    spinner: Option<Spinner>,
+    task: String,
+    failed: bool,
+}
+
+impl Progress {
+    fn new(interactive: bool) -> Self {
+        Self { interactive, rendered: false, spinner: None, task: String::from("running remote setup"), failed: false }
     }
 
-    Ok(status)
+    fn set_task<W: Write>(&mut self, writer: &mut W, task: String) -> Result<()> {
+        if self.failed {
+            return Ok(());
+        }
+
+        self.task = task;
+        if self.interactive {
+            self.restart_spinner();
+            self.rendered = true;
+            return Ok(());
+        }
+
+        writeln!(writer, "{}", self.task)?;
+        writer.flush()?;
+        Ok(())
+    }
+
+    fn set_error<W: Write>(&mut self, writer: &mut W, error: String) -> Result<()> {
+        if !self.interactive {
+            writeln!(writer, "error: {error}")?;
+            writer.flush()?;
+            return Ok(());
+        }
+
+        self.stop_spinner();
+        self.task = error;
+        self.failed = true;
+        write!(writer, "{}", format_error_line(&self.task))?;
+        writer.flush()?;
+        self.rendered = true;
+        Ok(())
+    }
+
+    fn finish<W: Write>(&mut self, writer: &mut W) -> Result<()> {
+        if let Some(mut spinner) = self.spinner.take() {
+            spinner.stop_with_newline();
+            self.rendered = false;
+            return Ok(());
+        }
+
+        if self.rendered {
+            writeln!(writer)?;
+            writer.flush()?;
+            self.rendered = false;
+        }
+
+        Ok(())
+    }
+
+    fn restart_spinner(&mut self) {
+        self.stop_spinner();
+        self.spinner =
+            Some(Spinner::with_stream(Spinners::Dots8Bit, format_progress_message(&self.task), Stream::Stdout));
+    }
+
+    fn stop_spinner(&mut self) {
+        if let Some(mut spinner) = self.spinner.take() {
+            spinner.stop();
+        }
+    }
+}
+
+fn format_progress_message(task: &str) -> String {
+    format!("{DIM}Setting up remote:{RESET} {GREEN}{BOLD}{task}{RESET}\u{1b}[K")
+}
+
+fn format_error_line(error: &str) -> String {
+    format!("{CLEAR_LINE}{RED}{BOLD}error{RESET} {RED}{error}{RESET}")
+}
+
+fn write_output_line<W: Write>(writer: &mut W, progress: &mut Progress, line: OutputLine) -> Result<()> {
+    match line {
+        OutputLine::Task(task) if progress.interactive => progress.set_task(writer, task)?,
+        OutputLine::Task(task) => writeln!(writer, "{task}")?,
+        OutputLine::Error(error) => progress.set_error(writer, error)?,
+    }
+
+    writer.flush()?;
+    Ok(())
 }
 
 fn env_ansible_roles_path(roles_dir: &Path) -> String {
@@ -181,135 +243,108 @@ fn env_ansible_roles_path(roles_dir: &Path) -> String {
         .map_or_else(|| roles_dir.display().to_string(), |existing| format!("{}:{existing}", roles_dir.display()))
 }
 
+fn classify_output_line(line: &str) -> Option<OutputLine> {
+    if let Some(task) = clean_task_line(line) {
+        return Some(OutputLine::Task(task));
+    }
+
+    clean_error_line(line).map(OutputLine::Error)
+}
+
 pub(crate) fn clean_task_line(line: &str) -> Option<String> {
-    let task = line.trim().strip_prefix("TASK [")?.strip_suffix(']')?.trim();
+    let line = line.trim().strip_prefix("TASK [")?;
+    let (task, _) = line.split_once(']')?;
+    let task = task.rsplit_once(" : ").map_or(task, |(_, description)| description).trim();
+
     (!task.is_empty()).then(|| task.to_string())
 }
 
 pub(crate) fn clean_error_line(line: &str) -> Option<String> {
     let trimmed = line.trim();
     if trimmed.contains("fatal:") || trimmed.contains("FAILED!") || trimmed.contains("UNREACHABLE!") {
-        Some(trimmed.to_string())
-    } else {
-        None
+        return Some(trimmed.to_string());
     }
+
+    None
 }
 
-pub(crate) fn format_status_line(spinner: char, text: &str, failed: bool) -> String {
-    let indicator = if failed { 'x' } else { spinner };
-    format!("\r\u{1b}[2K[{indicator}] {text}")
-}
-
-struct LiveStatusRenderer<W: Write> {
-    writer: W,
-    interactive: bool,
-    spinner_index: usize,
-    current: String,
-    failed: bool,
-    rendered: bool,
-}
-
-impl<W: Write> LiveStatusRenderer<W> {
-    fn new(writer: W, interactive: bool) -> Self {
-        Self { writer, interactive, spinner_index: 0, current: String::new(), failed: false, rendered: false }
-    }
-
-    fn print_brand(&mut self) -> Result<()> {
-        writeln!(self.writer, "{BRAND}")?;
-        self.rendered = true;
-        self.writer.flush()?;
-        Ok(())
-    }
-
-    fn set_task(&mut self, text: impl Into<String>) -> Result<()> {
-        let text = text.into();
-        if self.current == text && !self.failed && self.rendered {
-            return Ok(());
-        }
-
-        self.current = text;
-        self.failed = false;
-        self.render()
-    }
-
-    fn set_error(&mut self, text: impl Into<String>) -> Result<()> {
-        let text = text.into();
-        if self.current == text && self.failed && self.rendered {
-            return Ok(());
-        }
-
-        self.current = text;
-        self.failed = true;
-        self.render()
-    }
-
-    fn tick(&mut self) -> Result<()> {
-        if !self.interactive || self.current.is_empty() {
-            return Ok(());
-        }
-
-        self.spinner_index = (self.spinner_index + 1) % SPINNER_FRAMES.len();
-        self.render_live()
-    }
-
-    fn finish(&mut self) -> Result<()> {
-        if self.interactive && self.rendered {
-            writeln!(self.writer)?;
-            self.writer.flush()?;
-        }
-
-        Ok(())
-    }
-
-    fn render(&mut self) -> Result<()> {
-        if self.interactive { self.render_live() } else { self.render_plain() }
-    }
-
-    fn render_live(&mut self) -> Result<()> {
-        self.rendered = true;
-        let frame = SPINNER_FRAMES[self.spinner_index];
-        write!(self.writer, "{}", format_status_line(frame, &self.current, self.failed))?;
-        self.writer.flush()?;
-        Ok(())
-    }
-
-    fn render_plain(&mut self) -> Result<()> {
-        if !self.rendered {
-            self.rendered = true;
-            writeln!(self.writer, "{BRAND}")?;
-        }
-
-        if self.failed {
-            writeln!(self.writer, "error: {}", self.current)?;
-        } else {
-            writeln!(self.writer, "task: {}", self.current)?;
-        }
-
-        self.writer.flush()?;
-        Ok(())
-    }
-}
-
-#[derive(Clone, Copy)]
-enum StreamKind {
-    Stdout,
-    Stderr,
-}
-
-enum StreamEvent {
-    Line { kind: StreamKind, line: String },
-}
-
-fn spawn_stream_reader<T>(reader: T, kind: StreamKind, sender: Sender<StreamEvent>)
+fn spawn_stream_reader<T>(reader: T, sender: Sender<String>)
 where
     T: io::Read + Send + 'static,
 {
     thread::spawn(move || {
         let reader = BufReader::new(reader);
         for line in reader.lines().map_while(StdResult::ok) {
-            if sender.send(StreamEvent::Line { kind, line }).is_err() {
+            if sender.send(line).is_err() {
                 break;
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{OutputLine, classify_output_line, clean_error_line, clean_task_line, format_progress_message};
+
+    #[test]
+    fn clean_task_line_removes_ansible_task_wrapper() {
+        let cleaned = clean_task_line("TASK [users : Create deploy user]");
+
+        assert_eq!(cleaned.as_deref(), Some("Create deploy user"));
+    }
+
+    #[test]
+    fn clean_task_line_accepts_ansible_decorated_task_headers() {
+        let cleaned =
+            clean_task_line("TASK [common : Install packages] ************************************************");
+
+        assert_eq!(cleaned.as_deref(), Some("Install packages"));
+    }
+
+    #[test]
+    fn clean_task_line_keeps_plain_task_name_without_group_prefix() {
+        let cleaned = clean_task_line("TASK [Create deploy user]");
+
+        assert_eq!(cleaned.as_deref(), Some("Create deploy user"));
+    }
+
+    #[test]
+    fn clean_task_line_ignores_non_task_lines() {
+        assert_eq!(clean_task_line("ok: [host]"), None);
+        assert_eq!(clean_task_line("PLAY [all]"), None);
+    }
+
+    #[test]
+    fn clean_error_line_detects_ansible_failures() {
+        let cleaned = clean_error_line("fatal: [203.0.113.10]: FAILED! => {\"msg\":\"boom\"}");
+
+        assert_eq!(cleaned.as_deref(), Some("fatal: [203.0.113.10]: FAILED! => {\"msg\":\"boom\"}"));
+        assert_eq!(clean_error_line("ok: [host]"), None);
+    }
+
+    #[test]
+    fn classify_output_line_prefers_tasks_and_failures() {
+        let task = classify_output_line("TASK [users : Create deploy user]");
+        let error = classify_output_line("fatal: [203.0.113.10]: FAILED! => {\"msg\":\"boom\"}");
+
+        assert_eq!(task, Some(OutputLine::Task(String::from("Create deploy user"))));
+        assert_eq!(
+            error,
+            Some(OutputLine::Error(String::from("fatal: [203.0.113.10]: FAILED! => {\"msg\":\"boom\"}")))
+        );
+    }
+
+    #[test]
+    fn classify_output_line_ignores_warnings_and_noise() {
+        assert_eq!(classify_output_line("[WARNING]: discovered interpreter"), None);
+        assert_eq!(classify_output_line("ansible-playbook [core 2.20.5]"), None);
+    }
+
+    #[test]
+    fn format_progress_message_styles_current_task() {
+        assert_eq!(
+            format_progress_message("Ensure deploy user exists"),
+            "\u{1b}[2mSetting up remote:\u{1b}[0m \u{1b}[32m\u{1b}[1mEnsure deploy user exists\u{1b}[0m\u{1b}[K"
+        );
+    }
 }
