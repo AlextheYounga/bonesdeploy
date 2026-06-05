@@ -170,10 +170,11 @@ fn is_affirmative(answer: &str) -> bool {
     matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
-fn remote_setup_prompt_lines() -> [&'static str; 7] {
+fn remote_setup_prompt_lines() -> [&'static str; 8] {
     [
         "Remote setup",
-        "This step is for fresh servers only.",
+        "This is intended for a fresh VPS, but is idempotent (can be run multiple times).",
+        "You can use this to set up as many sites on your VPS as you would like. Run this once per site.",
         "It will:",
         "  - install bonesremote",
         "  - configure users, roles, firewalls, and AppArmor",
