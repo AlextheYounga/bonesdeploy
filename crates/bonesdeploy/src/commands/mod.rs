@@ -25,7 +25,7 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Set up bonesdeploy in the current repository
+    /// Set up bonesdeploy in the current repository. Run this once per project.
     Init {
         /// Skip all interactive prompts; required fields must be provided via flags
         #[arg(long)]

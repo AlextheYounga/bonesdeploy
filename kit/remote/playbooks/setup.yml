@@ -50,12 +50,3 @@
         PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
       changed_when: false
       tags: [common, bonesremote]
-
-    - name: Display setup completion
-      ansible.builtin.debug:
-        msg: |
-          Bones {{ setup_label }} setup completed.
-          Deploy user: {{ deploy_user }}
-          Service user: {{ service_user }}
-          Group: {{ group }}
-      tags: always
