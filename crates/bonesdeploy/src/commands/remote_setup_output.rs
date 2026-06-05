@@ -5,16 +5,20 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::result::Result as StdResult;
 use std::sync::mpsc::{self, Sender};
 use std::thread;
-use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
+use spinners::{Spinner, Spinners, Stream};
 
 use crate::commands::remote_setup;
 use crate::config;
 
 const BRAND: &str = "☠ bonesdeploy";
-const SPINNER_FRAMES: [char; 4] = ['|', '/', '-', '\\'];
-const SPINNER_INTERVAL: Duration = Duration::from_millis(120);
+const CLEAR_LINE: &str = "\r\u{1b}[2K";
+const RESET: &str = "\u{1b}[0m";
+const BOLD: &str = "\u{1b}[1m";
+const DIM: &str = "\u{1b}[2m";
+const GREEN: &str = "\u{1b}[32m";
+const RED: &str = "\u{1b}[31m";
 
 #[derive(Debug, PartialEq, Eq)]
 enum OutputLine {
@@ -26,7 +30,7 @@ pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[Strin
     remote_setup::ensure_remote_python3_available(cfg, ssh_user)?;
 
     let interactive = io::stdout().is_terminal();
-    let mut stdout = io::stdout().lock();
+    let mut stdout = io::stdout();
     writeln!(stdout, "{BRAND}")?;
     stdout.flush()?;
 
@@ -109,66 +113,104 @@ fn stream_ansible_output<W: Write>(writer: &mut W, interactive: bool, mut child:
     spawn_stream_reader(stderr, tx);
     let mut progress = Progress::new(interactive);
 
-    loop {
-        match rx.recv_timeout(SPINNER_INTERVAL) {
-            Ok(line) => {
-                if let Some(output) = classify_output_line(&line) {
-                    progress.clear(writer)?;
-                    write_output_line(writer, output)?;
-                }
-            }
-            Err(mpsc::RecvTimeoutError::Timeout) => progress.tick(writer)?,
-            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+    for line in rx {
+        if let Some(output) = classify_output_line(&line) {
+            write_output_line(writer, &mut progress, output)?;
         }
     }
 
-    progress.clear(writer)?;
+    progress.finish(writer)?;
     child.wait().context("Failed to wait for ansible-playbook")
 }
 
 struct Progress {
     interactive: bool,
-    spinner_index: usize,
     rendered: bool,
+    spinner: Option<Spinner>,
+    task: String,
+    failed: bool,
 }
 
 impl Progress {
     fn new(interactive: bool) -> Self {
-        Self { interactive, spinner_index: 0, rendered: false }
+        Self { interactive, rendered: false, spinner: None, task: String::from("running remote setup"), failed: false }
     }
 
-    fn tick<W: Write>(&mut self, writer: &mut W) -> Result<()> {
-        if !self.interactive {
+    fn set_task<W: Write>(&mut self, writer: &mut W, task: String) -> Result<()> {
+        if self.failed {
             return Ok(());
         }
 
-        let frame = SPINNER_FRAMES[self.spinner_index];
-        self.spinner_index = (self.spinner_index + 1) % SPINNER_FRAMES.len();
-        write!(writer, "{}", format_progress_line(frame))?;
+        self.task = task;
+        if self.interactive {
+            self.restart_spinner();
+            self.rendered = true;
+            return Ok(());
+        }
+
+        writeln!(writer, "{}", self.task)?;
+        writer.flush()?;
+        Ok(())
+    }
+
+    fn set_error<W: Write>(&mut self, writer: &mut W, error: String) -> Result<()> {
+        if !self.interactive {
+            writeln!(writer, "error: {error}")?;
+            writer.flush()?;
+            return Ok(());
+        }
+
+        self.stop_spinner();
+        self.task = error;
+        self.failed = true;
+        write!(writer, "{}", format_error_line(&self.task))?;
         writer.flush()?;
         self.rendered = true;
         Ok(())
     }
 
-    fn clear<W: Write>(&mut self, writer: &mut W) -> Result<()> {
+    fn finish<W: Write>(&mut self, writer: &mut W) -> Result<()> {
+        if let Some(mut spinner) = self.spinner.take() {
+            spinner.stop_with_newline();
+            self.rendered = false;
+            return Ok(());
+        }
+
         if self.rendered {
-            write!(writer, "\r\u{1b}[2K")?;
+            writeln!(writer)?;
             writer.flush()?;
             self.rendered = false;
         }
 
         Ok(())
     }
+
+    fn restart_spinner(&mut self) {
+        self.stop_spinner();
+        self.spinner =
+            Some(Spinner::with_stream(Spinners::Dots8Bit, format_progress_message(&self.task), Stream::Stdout));
+    }
+
+    fn stop_spinner(&mut self) {
+        if let Some(mut spinner) = self.spinner.take() {
+            spinner.stop();
+        }
+    }
 }
 
-fn format_progress_line(spinner: char) -> String {
-    format!("\r\u{1b}[2K[{spinner}] running remote setup")
+fn format_progress_message(task: &str) -> String {
+    format!("{DIM}remote setup{RESET} {GREEN}{BOLD}{task}{RESET}\u{1b}[K")
 }
 
-fn write_output_line<W: Write>(writer: &mut W, line: OutputLine) -> Result<()> {
+fn format_error_line(error: &str) -> String {
+    format!("{CLEAR_LINE}{RED}{BOLD}error{RESET} {RED}{error}{RESET}")
+}
+
+fn write_output_line<W: Write>(writer: &mut W, progress: &mut Progress, line: OutputLine) -> Result<()> {
     match line {
+        OutputLine::Task(task) if progress.interactive => progress.set_task(writer, task)?,
         OutputLine::Task(task) => writeln!(writer, "{task}")?,
-        OutputLine::Error(error) => writeln!(writer, "error: {error}")?,
+        OutputLine::Error(error) => progress.set_error(writer, error)?,
     }
 
     writer.flush()?;
@@ -223,7 +265,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{OutputLine, classify_output_line, clean_error_line, clean_task_line, format_progress_line};
+    use super::{OutputLine, classify_output_line, clean_error_line, clean_task_line, format_progress_message};
 
     #[test]
     fn clean_task_line_removes_ansible_task_wrapper() {
@@ -280,7 +322,10 @@ mod tests {
     }
 
     #[test]
-    fn format_progress_line_renders_single_live_status() {
-        assert_eq!(format_progress_line('|'), "\r\u{1b}[2K[|] running remote setup");
+    fn format_progress_message_styles_current_task() {
+        assert_eq!(
+            format_progress_message("Ensure deploy user exists"),
+            "\u{1b}[2mremote setup\u{1b}[0m \u{1b}[32m\u{1b}[1mEnsure deploy user exists\u{1b}[0m\u{1b}[K"
+        );
     }
 }
