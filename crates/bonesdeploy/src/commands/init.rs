@@ -61,8 +61,6 @@ pub fn run(args: &InitArgs) -> Result<()> {
         print_follow_up_hint();
     }
 
-    print_completion_hint();
-
     Ok(())
 }
 
@@ -70,11 +68,6 @@ fn print_follow_up_hint() {
     println!();
     println!("{}", style("Next:").cyan().bold());
     println!("Run {} to sync {} to the remote.", style("bonesdeploy push").cyan(), style(".bones/").cyan());
-}
-
-fn print_completion_hint() {
-    println!();
-    println!("{}", style("Done!").green().bold());
 }
 
 fn resolve_template(cli_value: Option<&str>, available: &[String], non_interactive: bool) -> Result<Option<String>> {
