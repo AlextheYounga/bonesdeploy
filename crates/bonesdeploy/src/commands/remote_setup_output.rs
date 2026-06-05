@@ -45,6 +45,19 @@ pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[Strin
 }
 
 fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<Command> {
+    validate_playbook_and_roles_directories()?;
+
+    let ansible_playbook_binary = remote_setup::resolve_ansible_playbook_binary()?;
+    let mut command = Command::new(&ansible_playbook_binary);
+
+    add_base_ansible_args(&mut command, cfg, ssh_user);
+    add_ssl_config_args(&mut command, cfg);
+    add_final_args(&mut command, extra_args);
+
+    Ok(command)
+}
+
+fn validate_playbook_and_roles_directories() -> Result<()> {
     let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
     if !playbook.is_file() {
         bail!("Missing remote setup playbook: {}", playbook.display());
@@ -55,12 +68,15 @@ fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: 
         bail!("Missing remote roles directory: {}", roles_dir.display());
     }
 
+    Ok(())
+}
+
+fn add_base_ansible_args(command: &mut Command, cfg: &config::BonesConfig, ssh_user: &str) {
+    let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
     let project_root_parent = remote_setup::resolve_project_root_parent(&cfg.data.project_root);
     let inventory = format!("{},", cfg.data.host);
     let roles_path = env_ansible_roles_path(roles_dir);
 
-    let ansible_playbook_binary = remote_setup::resolve_ansible_playbook_binary()?;
-    let mut command = Command::new(&ansible_playbook_binary);
     command.env("ANSIBLE_ROLES_PATH", roles_path);
     command
         .arg("-i")
@@ -85,7 +101,9 @@ fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: 
         .arg(format!("project_name={}", cfg.data.project_name))
         .arg("-e")
         .arg(format!("repo_path={}", cfg.data.repo_path));
+}
 
+fn add_ssl_config_args(command: &mut Command, cfg: &config::BonesConfig) {
     if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
         command
             .arg("-e")
@@ -97,12 +115,13 @@ fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: 
             .arg("-e")
             .arg(format!("nginx_ssl_certificate_key_path=/etc/letsencrypt/live/{}/privkey.pem", cfg.ssl.domain));
     }
+}
 
+fn add_final_args(command: &mut Command, extra_args: &[String]) {
+    let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
     command.args(extra_args);
     command.arg(playbook);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
-
-    Ok(command)
 }
 
 fn stream_ansible_output<W: Write>(writer: &mut W, interactive: bool, mut child: Child) -> Result<ExitStatus> {
@@ -325,7 +344,7 @@ mod tests {
     fn format_progress_message_styles_current_task() {
         assert_eq!(
             format_progress_message("Ensure deploy user exists"),
-            "\u{1b}[2mremote setup\u{1b}[0m \u{1b}[32m\u{1b}[1mEnsure deploy user exists\u{1b}[0m\u{1b}[K"
+            "\u{1b}[2mSetting up remote:\u{1b}[0m \u{1b}[32m\u{1b}[1mEnsure deploy user exists\u{1b}[0m\u{1b}[K"
         );
     }
 }

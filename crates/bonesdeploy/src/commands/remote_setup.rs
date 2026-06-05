@@ -84,6 +84,7 @@ pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_arg
 }
 
 pub(crate) fn ensure_remote_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {
+    // Use bootstrap user (root by default) for initial SSH connection during setup
     let host = format!("{ssh_user}@{}", cfg.data.host);
     let script = embedded::read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASSET)?;
 
