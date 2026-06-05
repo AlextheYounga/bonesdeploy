@@ -25,7 +25,8 @@ pub fn run() -> Result<()> {
     let ssh_user = resolve_bootstrap_ssh_user();
     let deploy_authorized_key = resolve_deploy_authorized_key()?;
 
-    let extra_args = vec![String::from("-e"), build_extra_var_json("deploy_authorized_key", &deploy_authorized_key)];
+    let extra_args =
+        vec![String::from("-e"), build_extra_var_json_string("deploy_authorized_key", &deploy_authorized_key)];
     run_ansible_playbook(&cfg, &ssh_user, &extra_args)?;
 
     println!("{} Remote setup complete.", style("Done!").green().bold());
@@ -63,8 +64,12 @@ fn read_public_key(path: &Path) -> Result<String> {
     Ok(key)
 }
 
-fn build_extra_var_json(name: &str, value: &str) -> String {
+pub(crate) fn build_extra_var_json_string(name: &str, value: &str) -> String {
     format!("{{\"{}\":\"{}\"}}", escape_json_string(name), escape_json_string(value))
+}
+
+pub(crate) fn build_extra_var_json_bool(name: &str, value: bool) -> String {
+    format!("{{\"{}\":{}}}", escape_json_string(name), value)
 }
 
 fn escape_json_string(value: &str) -> String {
@@ -245,7 +250,10 @@ pub(crate) fn resolve_project_root_parent(project_root: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{build_extra_var_json, resolve_bootstrap_ssh_user_from, resolve_project_root_parent};
+    use super::{
+        build_extra_var_json_bool, build_extra_var_json_string, resolve_bootstrap_ssh_user_from,
+        resolve_project_root_parent,
+    };
 
     // Verifies parent extraction for normal project_root paths used by playbook variables.
     #[test]
@@ -298,9 +306,18 @@ mod tests {
 
     #[test]
     fn build_extra_var_json_preserves_spaces_in_ssh_public_key() {
-        let extra_var =
-            build_extra_var_json("deploy_authorized_key", "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFoo comment@host");
+        let extra_var = build_extra_var_json_string(
+            "deploy_authorized_key",
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFoo comment@host",
+        );
 
         assert_eq!(extra_var, "{\"deploy_authorized_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFoo comment@host\"}");
+    }
+
+    #[test]
+    fn build_extra_var_json_bool_preserves_boolean_type() {
+        let extra_var = build_extra_var_json_bool("ssl_enabled", true);
+
+        assert_eq!(extra_var, "{\"ssl_enabled\":true}");
     }
 }

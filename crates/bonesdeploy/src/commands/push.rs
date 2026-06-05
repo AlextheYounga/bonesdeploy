@@ -16,7 +16,7 @@ pub async fn run() -> Result<()> {
 
     // rsync .bones/ to remote
     println!("Syncing .bones/ to {remote_bones}...");
-    rsync_bones(&cfg)?;
+    sync_bones_directory(&cfg)?;
 
     // Connect via SSH for post-rsync setup
     let session = ssh::connect(&cfg).await?;
@@ -50,7 +50,7 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
-fn rsync_bones(cfg: &config::BonesConfig) -> Result<()> {
+pub(crate) fn sync_bones_directory(cfg: &config::BonesConfig) -> Result<()> {
     let user = &cfg.permissions.defaults.deploy_user;
     let host = &cfg.data.host;
     let port = &cfg.data.port;

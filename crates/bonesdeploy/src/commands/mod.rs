@@ -104,7 +104,7 @@ enum RemoteCommand {
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init { non_interactive, setup_remote, project_name, branch, remote, host, port, template } => {
-            init::run(&init::InitArgs {
+            let outcome = init::run(&init::InitArgs {
                 non_interactive: *non_interactive,
                 setup_remote: *setup_remote,
                 project_name: project_name.clone(),
@@ -113,7 +113,11 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 host: host.clone(),
                 port: port.clone(),
                 template: template.clone(),
-            })
+            })?;
+            if outcome.remote_setup_ran {
+                push::run().await?;
+            }
+            Ok(())
         }
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push::run().await,

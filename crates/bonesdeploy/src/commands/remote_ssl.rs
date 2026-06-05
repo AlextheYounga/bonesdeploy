@@ -3,6 +3,7 @@ use std::path::Path;
 use anyhow::{Result, bail};
 use console::style;
 
+use crate::commands::push;
 use crate::commands::remote_setup;
 use crate::config;
 
@@ -37,16 +38,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
         style(&cfg.ssl.domain).cyan(),
     );
 
-    let extra_args = vec![
-        String::from("--tags"),
-        String::from("nginx,ssl"),
-        String::from("-e"),
-        String::from("ssl_enabled=true"),
-        String::from("-e"),
-        format!("ssl_domain={}", cfg.ssl.domain),
-        String::from("-e"),
-        format!("ssl_email={}", cfg.ssl.email),
-    ];
+    let extra_args = ssl_extra_args(&cfg.ssl.domain, &cfg.ssl.email);
 
     let mut cfg_for_run = cfg.clone();
     cfg_for_run.ssl.enabled = false;
@@ -56,8 +48,35 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
 
     cfg.ssl.enabled = true;
     config::save(&cfg, bones_yaml)?;
+    push::sync_bones_directory(&cfg)?;
 
     println!("\n{} SSL setup complete.", style("Done!").green().bold());
 
     Ok(())
+}
+
+fn ssl_extra_args(domain: &str, email: &str) -> Vec<String> {
+    vec![
+        String::from("--tags"),
+        String::from("nginx,ssl"),
+        String::from("-e"),
+        remote_setup::build_extra_var_json_bool("ssl_enabled", true),
+        String::from("-e"),
+        remote_setup::build_extra_var_json_string("ssl_domain", domain),
+        String::from("-e"),
+        remote_setup::build_extra_var_json_string("ssl_email", email),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ssl_extra_args;
+
+    #[test]
+    fn ssl_extra_args_pass_enabled_as_typed_json_boolean() {
+        let args = ssl_extra_args("app.example.com", "ops@example.com");
+
+        assert!(args.contains(&String::from("{\"ssl_enabled\":true}")));
+        assert!(!args.contains(&String::from("ssl_enabled=true")));
+    }
 }

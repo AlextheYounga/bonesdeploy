@@ -234,6 +234,17 @@ fn shared_setup_playbook_exposes_common_role_defaults_to_runtime_role() {
 }
 
 #[test]
+fn ssl_role_treats_ssl_enabled_as_explicit_boolean() {
+    let role = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/ssl/tasks/main.yml");
+    let content = fs::read_to_string(&role);
+    assert!(content.is_ok(), "failed to read {}", role.display());
+    let content = content.unwrap_or_default();
+
+    assert!(!content.contains("when: ssl_enabled\n"), "ssl role must not rely on string truthiness\n{content}");
+    assert!(content.contains("when: ssl_enabled | bool"), "ssl role should cast CLI vars explicitly\n{content}");
+}
+
+#[test]
 fn apparmor_role_assets_exist() {
     let role_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/apparmor");
 

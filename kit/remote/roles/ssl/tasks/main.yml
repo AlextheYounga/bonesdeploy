@@ -6,7 +6,7 @@
       - ssl_domain | length > 0
       - ssl_email | length > 0
     fail_msg: "ssl_domain and ssl_email are required when ssl_enabled=true"
-  when: ssl_enabled
+  when: ssl_enabled | bool
   tags: [ssl]
 
 - name: Ensure certbot is installed
@@ -15,7 +15,7 @@
     state: present
     update_cache: true
     cache_valid_time: 3600
-  when: ssl_enabled
+  when: ssl_enabled | bool
   tags: [ssl, packages]
 
 - name: Render nginx HTTP challenge config
@@ -28,20 +28,20 @@
   vars:
     nginx_server_name: "{{ ssl_domain }}"
     nginx_ssl_enabled: false
-  when: ssl_enabled
+  when: ssl_enabled | bool
   tags: [ssl]
 
 - name: Validate nginx configuration before certbot
   ansible.builtin.command: nginx -t
   changed_when: false
-  when: ssl_enabled
+  when: ssl_enabled | bool
   tags: [ssl]
 
 - name: Reload nginx before certbot challenge
   ansible.builtin.service:
     name: "{{ nginx_service_name }}"
     state: reloaded
-  when: ssl_enabled
+  when: ssl_enabled | bool
   tags: [ssl]
 
 - name: Obtain or renew certificate
@@ -59,7 +59,7 @@
       - -d
       - "{{ ssl_domain }}"
       - --keep-until-expiring
-  when: ssl_enabled
+  when: ssl_enabled | bool
   tags: [ssl]
 
 - name: Render nginx HTTPS config
@@ -74,18 +74,18 @@
     nginx_ssl_enabled: true
     nginx_ssl_certificate_path: "{{ ssl_cert_path }}"
     nginx_ssl_certificate_key_path: "{{ ssl_key_path }}"
-  when: ssl_enabled
+  when: ssl_enabled | bool
   tags: [ssl]
 
 - name: Validate nginx configuration after SSL enable
   ansible.builtin.command: nginx -t
   changed_when: false
-  when: ssl_enabled
+  when: ssl_enabled | bool
   tags: [ssl]
 
 - name: Reload nginx with SSL configuration
   ansible.builtin.service:
     name: "{{ nginx_service_name }}"
     state: reloaded
-  when: ssl_enabled
+  when: ssl_enabled | bool
   tags: [ssl]
