@@ -71,7 +71,8 @@ fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() -> R
         template: None,
     };
 
-    let Err(err) = collect_non_interactive("workspace", Some(&seed), &args) else {
+    let result = collect_non_interactive("workspace", Some(&seed), &args);
+    let Err(err) = result else {
         bail!("missing host should fail");
     };
     assert!(err.to_string().contains("--host is required"));

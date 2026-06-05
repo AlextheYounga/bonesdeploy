@@ -13,6 +13,7 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_yml = "0.0.12"
 time = { version = "0.3.47", features = ["formatting", "macros"] }
 walkdir = "2.5.0"
+shared = { path = "../shared" }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 landlock = "0.4.4"

@@ -30,26 +30,29 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
     Ok(Some(template_name))
 }
 
-pub fn prompt_project_name(project_name_hint: &str, seed: Option<&BonesConfig>) -> Result<String> {
-    let default_project_name =
-        seed.map(|cfg| cfg.data.project_name.as_str()).filter(|value| !value.is_empty()).unwrap_or(project_name_hint);
+pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&BonesConfig>) -> Result<String> {
+    let default_project_name = existing_config
+        .map(|cfg| cfg.data.project_name.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(project_name_hint);
     Text::new("Project name:").with_default(default_project_name).prompt().map_err(|err| anyhow!(err))
 }
 
-pub fn prompt_branch(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_branch = seed.map(|cfg| cfg.data.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("main");
+pub fn prompt_branch(existing_config: Option<&BonesConfig>) -> Result<String> {
+    let default_branch =
+        existing_config.map(|cfg| cfg.data.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("main");
     Text::new("Branch:").with_default(default_branch).prompt().map_err(|err| anyhow!(err))
 }
 
-pub fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
+pub fn prompt_remote_name(existing_config: Option<&BonesConfig>) -> Result<String> {
     const CREATE_REMOTE_OPTION: &str = "Create new deployment remote";
 
     let remotes = git::list_remotes_with_urls()?;
     if remotes.is_empty() {
-        return prompt_remote_name_text(seed);
+        return prompt_remote_name_text(existing_config);
     }
 
-    let default_remote = seed.map(|cfg| cfg.data.remote_name.clone()).filter(|value| !value.is_empty());
+    let default_remote = existing_config.map(|cfg| cfg.data.remote_name.clone()).filter(|value| !value.is_empty());
 
     let preferred = default_remote.or_else(|| {
         let has_production = remotes.iter().any(|r| r.name == "production");
@@ -78,7 +81,7 @@ pub fn prompt_remote_name(seed: Option<&BonesConfig>) -> Result<String> {
         .map_err(|err| anyhow!(err))?;
 
     if choice.index == ordered_remotes.len() {
-        return prompt_remote_name_text(seed);
+        return prompt_remote_name_text(existing_config);
     }
 
     let chosen = ordered_remotes[choice.index].name.clone();
@@ -113,14 +116,15 @@ fn remote_display_label(remote: &git::RemoteInfo) -> String {
 }
 
 pub fn prompt_host(
-    seed: Option<&BonesConfig>,
+    existing_config: Option<&BonesConfig>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> Result<String> {
     if let Some(details) = inferred_remote {
         return Ok(details.host.clone());
     }
 
-    let default_host = seed.map(|cfg| cfg.data.host.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
+    let default_host =
+        existing_config.map(|cfg| cfg.data.host.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
     Text::new("Server host or IP:")
         .with_default(default_host)
         .with_help_message("e.g. deploy.example.com or 203.0.113.10")
@@ -129,14 +133,15 @@ pub fn prompt_host(
 }
 
 pub fn prompt_port(
-    seed: Option<&BonesConfig>,
+    existing_config: Option<&BonesConfig>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> Result<String> {
     if let Some(details) = inferred_remote {
         return Ok(details.port.clone());
     }
 
-    let default_port = seed.map(|cfg| cfg.data.port.as_str()).filter(|value| !value.is_empty()).unwrap_or("22");
+    let default_port =
+        existing_config.map(|cfg| cfg.data.port.as_str()).filter(|value| !value.is_empty()).unwrap_or("22");
     Text::new("SSH port:").with_default(default_port).prompt().map_err(|err| anyhow!(err))
 }
 
@@ -177,9 +182,11 @@ fn remote_setup_prompt_lines() -> [&'static str; 7] {
     ]
 }
 
-fn prompt_remote_name_text(seed: Option<&BonesConfig>) -> Result<String> {
-    let default_remote =
-        seed.map(|cfg| cfg.data.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
+fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<String> {
+    let default_remote = existing_config
+        .map(|cfg| cfg.data.remote_name.as_str())
+        .filter(|value| !value.is_empty())
+        .unwrap_or("production");
     Text::new("Deployment remote name:")
         .with_default(default_remote)
         .with_help_message("bonesdeploy will add this local git remote if it does not exist")

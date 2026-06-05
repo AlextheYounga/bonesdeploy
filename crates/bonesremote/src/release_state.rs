@@ -111,6 +111,7 @@ pub fn point_symlink_atomically(link_path: &Path, target_path: &Path) -> Result<
 
     fs::create_dir_all(parent).with_context(|| format!("Failed to create symlink parent: {}", parent.display()))?;
 
+    // Generate unique temp symlink name to avoid collisions in concurrent deployments
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).context("System clock is before UNIX_EPOCH")?.as_nanos();
     let temp_name = format!(".tmp_current_{}_{}", process::id(), nanos);
     let temp_link = parent.join(temp_name);

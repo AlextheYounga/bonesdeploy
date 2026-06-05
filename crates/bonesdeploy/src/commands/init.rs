@@ -3,25 +3,16 @@ use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, bail};
 use console::style;
 
+use crate::commands::init_config;
+pub use crate::commands::init_config::InitArgs;
 use crate::commands::remote_setup;
 use crate::config;
 use crate::embedded;
 use crate::git;
 use crate::prompts;
-
-pub struct InitArgs {
-    pub non_interactive: bool,
-    pub setup_remote: bool,
-    pub project_name: Option<String>,
-    pub branch: Option<String>,
-    pub remote: Option<String>,
-    pub host: Option<String>,
-    pub port: Option<String>,
-    pub template: Option<String>,
-}
 
 pub fn run(args: &InitArgs) -> Result<()> {
     git::ensure_git_repository()?;
@@ -83,165 +74,49 @@ fn resolve_template(cli_value: Option<&str>, available: &[String], non_interacti
     prompts::choose_template(available)
 }
 
-fn collect_non_interactive(
-    project_name_hint: &str,
-    seed: Option<&config::BonesConfig>,
-    args: &InitArgs,
-) -> Result<config::BonesConfig> {
-    let project_name = args
-        .project_name
-        .clone()
-        .filter(|v| !v.is_empty())
-        .or_else(|| seed.and_then(|cfg| non_empty(&cfg.data.project_name)))
-        .or_else(|| {
-            let name = project_name_hint.to_string();
-            (!name.is_empty()).then_some(name)
-        })
-        .ok_or_else(|| {
-            anyhow!(
-                "{} --project-name is required in non-interactive mode.\n\
-                 Usage: bonesdeploy init --non-interactive --project-name <name> --host <host>",
-                style("Error:").red().bold(),
-            )
-        })?;
-
-    let remote_name = args
-        .remote
-        .clone()
-        .filter(|v| !v.is_empty())
-        .or_else(|| seed.and_then(|cfg| non_empty(&cfg.data.remote_name)))
-        .unwrap_or_else(|| String::from("production"));
-
-    let inferred_remote =
-        if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
-
-    let host = args
-        .host
-        .clone()
-        .filter(|v| !v.is_empty())
-        .or_else(|| seed.and_then(|cfg| non_empty(&cfg.data.host)))
-        .or_else(|| inferred_remote.as_ref().map(|details| details.host.clone()))
-        .ok_or_else(|| {
-            anyhow!(
-                "{} --host is required in non-interactive mode.\n\
-                 Usage: bonesdeploy init --non-interactive --project-name <name> --host <host>",
-                style("Error:").red().bold(),
-            )
-        })?;
-
-    let branch = args
-        .branch
-        .clone()
-        .filter(|v| !v.is_empty())
-        .or_else(|| seed.and_then(|cfg| non_empty(&cfg.data.branch)))
-        .unwrap_or_else(|| String::from("main"));
-
-    let port = args
-        .port
-        .clone()
-        .filter(|v| !v.is_empty())
-        .or_else(|| seed.and_then(|cfg| non_empty(&cfg.data.port)))
-        .or_else(|| inferred_remote.as_ref().map(|details| details.port.clone()))
-        .unwrap_or_else(|| String::from("22"));
-
-    let resolved = NonInteractiveValues { project_name, remote_name, branch, host, port };
-    Ok(build_non_interactive_config(resolved, seed, inferred_remote.as_ref()))
-}
-
-struct NonInteractiveValues {
-    project_name: String,
-    remote_name: String,
-    branch: String,
-    host: String,
-    port: String,
-}
-
-fn build_non_interactive_config(
-    values: NonInteractiveValues,
-    seed: Option<&config::BonesConfig>,
-    inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> config::BonesConfig {
-    let NonInteractiveValues { project_name, remote_name, branch, host, port } = values;
-
-    let repo_path = resolve_repo_path(&project_name, seed, inferred_remote);
-    let project_root =
-        seed_path_override(seed, |cfg| &cfg.data.project_root, &project_name, config::default_project_root_for);
-    let web_root = seed_string(seed, |cfg| &cfg.data.web_root, config::default_web_root().as_str());
-    let deploy_on_push = seed.is_none_or(|cfg| cfg.data.deploy_on_push);
-    let deploy_user = seed_string(seed, |cfg| &cfg.permissions.defaults.deploy_user, "git");
-    let service_user = seed_string(seed, |cfg| &cfg.permissions.defaults.service_user, &project_name);
-    let group = seed_string(seed, |cfg| &cfg.permissions.defaults.group, "www-data");
-    let dir_mode = seed_string(seed, |cfg| &cfg.permissions.defaults.dir_mode, "750");
-    let file_mode = seed_string(seed, |cfg| &cfg.permissions.defaults.file_mode, "640");
-    let releases_keep = seed.map_or(5, |cfg| cfg.releases.keep.max(1));
-    let shared_files = seed
-        .map(|cfg| cfg.releases.shared_files.clone())
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| vec![String::from(".env")]);
-    let shared_dirs = seed
-        .map(|cfg| cfg.releases.shared_dirs.clone())
-        .filter(|value| !value.is_empty())
-        .unwrap_or_else(|| vec![String::from("storage")]);
-    let path_overrides = seed.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
-
-    config::BonesConfig {
-        data: config::Data {
-            remote_name,
-            project_name,
-            host,
-            port,
-            repo_path,
-            project_root,
-            web_root,
-            branch,
-            deploy_on_push,
-        },
-        permissions: config::Permissions {
-            defaults: config::PermissionDefaults { deploy_user, service_user, group, dir_mode, file_mode },
-            paths: path_overrides,
-        },
-        releases: config::Releases { keep: releases_keep, shared_files, shared_dirs },
-        ssl: seed.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
-    }
-}
-
 fn collect(project_name_hint: &str, args: &InitArgs) -> Result<config::BonesConfig> {
     collect_from_seed(project_name_hint, None, args)
 }
 
 fn collect_from_seed(
     project_name_hint: &str,
-    seed: Option<&config::BonesConfig>,
+    existing_config: Option<&config::BonesConfig>,
     args: &InitArgs,
 ) -> Result<config::BonesConfig> {
     let project_name =
-        cli_or_prompt(args.project_name.as_ref(), || prompts::prompt_project_name(project_name_hint, seed))?;
-    let branch = cli_or_prompt(args.branch.as_ref(), || prompts::prompt_branch(seed))?;
-    let remote_name = cli_or_prompt(args.remote.as_ref(), || prompts::prompt_remote_name(seed))?;
+        cli_or_prompt(args.project_name.as_ref(), || prompts::prompt_project_name(project_name_hint, existing_config))?;
+    let branch = cli_or_prompt(args.branch.as_ref(), || prompts::prompt_branch(existing_config))?;
+    let remote_name = cli_or_prompt(args.remote.as_ref(), || prompts::prompt_remote_name(existing_config))?;
     let inferred_remote =
         if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
-    let host = cli_or_prompt(args.host.as_ref(), || prompts::prompt_host(seed, inferred_remote.as_ref()))?;
-    let port = cli_or_prompt(args.port.as_ref(), || prompts::prompt_port(seed, inferred_remote.as_ref()))?;
-    let repo_path = resolve_repo_path(&project_name, seed, inferred_remote.as_ref());
-    let project_root =
-        seed_path_override(seed, |cfg| &cfg.data.project_root, &project_name, config::default_project_root_for);
-    let web_root = seed_string(seed, |cfg| &cfg.data.web_root, config::default_web_root().as_str());
-    let deploy_on_push = seed.is_none_or(|cfg| cfg.data.deploy_on_push);
-    let deploy_user = seed_string(seed, |cfg| &cfg.permissions.defaults.deploy_user, "git");
-    let service_user = seed_string(seed, |cfg| &cfg.permissions.defaults.service_user, &project_name);
-    let group = seed_string(seed, |cfg| &cfg.permissions.defaults.group, "www-data");
-    let dir_mode = seed_string(seed, |cfg| &cfg.permissions.defaults.dir_mode, "750");
-    let file_mode = seed_string(seed, |cfg| &cfg.permissions.defaults.file_mode, "640");
-    let releases_keep = seed.map_or(5, |cfg| cfg.releases.keep.max(1));
-    let shared_files = seed
+    let host = cli_or_prompt(args.host.as_ref(), || prompts::prompt_host(existing_config, inferred_remote.as_ref()))?;
+    let port = cli_or_prompt(args.port.as_ref(), || prompts::prompt_port(existing_config, inferred_remote.as_ref()))?;
+    let repo_path = init_config::resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
+    let project_root = init_config::seed_path_override(
+        existing_config,
+        |cfg| &cfg.data.project_root,
+        &project_name,
+        config::default_project_root_for,
+    );
+    let web_root =
+        init_config::seed_string(existing_config, |cfg| &cfg.data.web_root, config::default_web_root().as_str());
+    let deploy_on_push = existing_config.is_none_or(|cfg| cfg.data.deploy_on_push);
+    let deploy_user = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.deploy_user, "git");
+    let service_user =
+        init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.service_user, &project_name);
+    let group = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.group, "www-data");
+    let dir_mode = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.dir_mode, "750");
+    let file_mode = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.file_mode, "640");
+    let releases_keep = existing_config.map_or(5, |cfg| cfg.releases.keep.max(1));
+    let shared_files = existing_config
         .map(|cfg| cfg.releases.shared_files.clone())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| vec![String::from(".env")]);
-    let shared_dirs = seed
+    let shared_dirs = existing_config
         .map(|cfg| cfg.releases.shared_dirs.clone())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| vec![String::from("storage")]);
-    let path_overrides = seed.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
+    let path_overrides = existing_config.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
 
     Ok(config::BonesConfig {
         data: config::Data {
@@ -260,8 +135,17 @@ fn collect_from_seed(
             paths: path_overrides,
         },
         releases: config::Releases { keep: releases_keep, shared_files, shared_dirs },
-        ssl: seed.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
+        ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
     })
+}
+
+#[cfg(test)]
+fn collect_non_interactive(
+    project_name_hint: &str,
+    existing_config: Option<&config::BonesConfig>,
+    args: &InitArgs,
+) -> Result<config::BonesConfig> {
+    init_config::collect_non_interactive(project_name_hint, existing_config, args)
 }
 
 fn cli_or_prompt(cli_value: Option<&String>, prompt: impl FnOnce() -> Result<String>) -> Result<String> {
@@ -269,51 +153,6 @@ fn cli_or_prompt(cli_value: Option<&String>, prompt: impl FnOnce() -> Result<Str
         Some(v) if !v.is_empty() => Ok(v.clone()),
         _ => prompt(),
     }
-}
-
-fn non_empty(value: &str) -> Option<String> {
-    (!value.is_empty()).then(|| value.to_string())
-}
-
-fn seed_string(
-    seed: Option<&config::BonesConfig>,
-    field: impl Fn(&config::BonesConfig) -> &String,
-    fallback: &str,
-) -> String {
-    seed.map(field).filter(|value| !value.is_empty()).map_or_else(|| fallback.to_string(), Clone::clone)
-}
-
-fn resolve_repo_path(
-    project_name: &str,
-    seed: Option<&config::BonesConfig>,
-    inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> String {
-    if let Some(details) = inferred_remote {
-        return details.repo_path.clone();
-    }
-
-    seed.map(|cfg| cfg.data.repo_path.as_str())
-        .filter(|value| !value.is_empty())
-        .map_or_else(|| format!("/home/git/{project_name}.git"), |value| value.replace("<project_name>", project_name))
-}
-
-fn seed_path_override(
-    seed: Option<&config::BonesConfig>,
-    field: impl Fn(&config::BonesConfig) -> &String,
-    current_project_name: &str,
-    default_for: fn(&str) -> String,
-) -> String {
-    let Some(cfg) = seed else { return String::new() };
-    let value = field(cfg);
-    if value.is_empty() {
-        return String::new();
-    }
-
-    let resolved = value.replace("<project_name>", current_project_name);
-    if resolved == default_for(&cfg.data.project_name) || resolved == default_for(current_project_name) {
-        return String::new();
-    }
-    resolved
 }
 
 fn load_or_collect_config(bones_yaml: &Path, args: &InitArgs) -> Result<config::BonesConfig> {
@@ -326,7 +165,7 @@ fn load_or_collect_config(bones_yaml: &Path, args: &InitArgs) -> Result<config::
         println!("Config is incomplete, running prompts...");
         let project_name = repo_directory_name()?;
         if args.non_interactive {
-            return collect_non_interactive(&project_name, Some(&existing), args);
+            return init_config::collect_non_interactive(&project_name, Some(&existing), args);
         }
         return collect_from_seed(&project_name, Some(&existing), args);
     }
@@ -334,7 +173,7 @@ fn load_or_collect_config(bones_yaml: &Path, args: &InitArgs) -> Result<config::
     let project_name = repo_directory_name()?;
 
     if args.non_interactive {
-        return collect_non_interactive(&project_name, None, args);
+        return init_config::collect_non_interactive(&project_name, None, args);
     }
 
     collect(&project_name, args)

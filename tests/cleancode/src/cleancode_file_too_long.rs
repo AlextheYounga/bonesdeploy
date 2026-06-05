@@ -10,7 +10,7 @@ const MAX_LINES: usize = 400;
 
 #[test]
 fn source_files_stay_under_400_lines() {
-    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let project_root = workspace_root();
     let mut violations: Vec<String> = Vec::new();
     let mut file_count = 0;
 
@@ -19,6 +19,13 @@ fn source_files_stay_under_400_lines() {
     assert!(file_count > 0, "No source files found. This test should be run from the project root.");
 
     assert!(violations.is_empty(), "File(s) exceed {} line(s):\n{}", MAX_LINES, violations.join("\n"),);
+}
+
+fn workspace_root() -> &'static Path {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .expect("tests/cleancode should live under the workspace root")
 }
 
 fn visit_dirs(dir: &Path, file_count: &mut usize, violations: &mut Vec<String>) {
@@ -44,7 +51,7 @@ fn visit_dirs(dir: &Path, file_count: &mut usize, violations: &mut Vec<String>) 
             if let Ok(content) = fs::read_to_string(&path) {
                 let line_count = content.lines().count();
                 if line_count > MAX_LINES {
-                    let relative = path.strip_prefix(env!("CARGO_MANIFEST_DIR")).unwrap_or(&path);
+                    let relative = path.strip_prefix(workspace_root()).unwrap_or(&path);
                     violations.push(format!("  {}: {} lines (max {MAX_LINES})", relative.display(), line_count));
                 }
             }
