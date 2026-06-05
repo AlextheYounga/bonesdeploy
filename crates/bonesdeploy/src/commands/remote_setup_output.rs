@@ -199,7 +199,7 @@ impl Progress {
 }
 
 fn format_progress_message(task: &str) -> String {
-    format!("{DIM}remote setup{RESET} {GREEN}{BOLD}{task}{RESET}\u{1b}[K")
+    format!("{DIM}Setting up remote:{RESET} {GREEN}{BOLD}{task}{RESET}\u{1b}[K")
 }
 
 fn format_error_line(error: &str) -> String {
