@@ -6,8 +6,8 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-ngi
 
   network unix stream,
 
-  /usr/local/bin/bonesremote mr,
-  /usr/local/bin/bonesremote ix,
+  {{ paths.bonesremote_global_link }} mr,
+  {{ paths.bonesremote_global_link }} ix,
   /usr/sbin/nginx mr,
   /usr/sbin/nginx ix,
 

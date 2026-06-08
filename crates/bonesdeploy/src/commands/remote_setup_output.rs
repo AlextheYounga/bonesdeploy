@@ -13,7 +13,7 @@ use tempfile::NamedTempFile;
 
 use crate::commands::remote_setup;
 use crate::config;
-use shared::paths::DeploymentPaths;
+use shared::paths::{DeploymentPaths, ssl_certificate_key_path, ssl_certificate_path};
 
 const BRAND: &str = "☠ bonesdeploy";
 const CLEAR_LINE: &str = "\r\u{1b}[2K";
@@ -236,13 +236,10 @@ fn build_ansible_vars(cfg: &config::BonesConfig, extra_vars: Value) -> Result<Va
     if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
         vars.insert(String::from("nginx_server_name"), Value::String(cfg.ssl.domain.clone()));
         vars.insert(String::from("nginx_ssl_enabled"), Value::Bool(true));
-        vars.insert(
-            String::from("nginx_ssl_certificate_path"),
-            Value::String(format!("/etc/letsencrypt/live/{}/fullchain.pem", cfg.ssl.domain)),
-        );
+        vars.insert(String::from("nginx_ssl_certificate_path"), Value::String(ssl_certificate_path(&cfg.ssl.domain)));
         vars.insert(
             String::from("nginx_ssl_certificate_key_path"),
-            Value::String(format!("/etc/letsencrypt/live/{}/privkey.pem", cfg.ssl.domain)),
+            Value::String(ssl_certificate_key_path(&cfg.ssl.domain)),
         );
     }
 

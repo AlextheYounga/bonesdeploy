@@ -144,6 +144,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
+    use shared::paths;
 
     use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases};
 
@@ -261,7 +262,7 @@ mod tests {
         fs::create_dir_all(&target_a)?;
         fs::create_dir_all(&target_b)?;
 
-        let link_path = root.join("current");
+        let link_path = root.join(paths::CURRENT_LINK);
         point_symlink_atomically(&link_path, &target_a)?;
         point_symlink_atomically(&link_path, &target_b)?;
 

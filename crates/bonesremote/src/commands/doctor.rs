@@ -5,6 +5,7 @@ use std::process::Command;
 
 use anyhow::Result;
 use console::style;
+use shared::paths;
 
 use crate::config;
 use crate::landlock;
@@ -33,9 +34,9 @@ pub fn run() -> Result<()> {
 }
 
 fn check_supported_distribution(issues: &mut Vec<String>) {
-    let os_release = fs::read_to_string("/etc/os-release");
+    let os_release = fs::read_to_string(paths::ETC_OS_RELEASE);
     let Ok(os_release) = os_release else {
-        issues.push("Failed to read /etc/os-release; expected Debian or Ubuntu host".to_string());
+        issues.push(format!("Failed to read {}; expected Debian or Ubuntu host", paths::ETC_OS_RELEASE));
         return;
     };
 
@@ -97,9 +98,9 @@ fn check_apparmor_support(issues: &mut Vec<String>) {
 }
 
 fn check_apparmor_kernel_enabled(issues: &mut Vec<String>) {
-    let enabled_file = fs::read_to_string("/sys/module/apparmor/parameters/enabled");
+    let enabled_file = fs::read_to_string(paths::APPARMOR_ENABLED_PARAM);
     let Ok(enabled_value) = enabled_file else {
-        issues.push("AppArmor check failed: could not read /sys/module/apparmor/parameters/enabled".to_string());
+        issues.push(format!("AppArmor check failed: could not read {}", paths::APPARMOR_ENABLED_PARAM));
         return;
     };
 
@@ -126,9 +127,9 @@ fn check_apparmor_service(issues: &mut Vec<String>) {
 }
 
 fn check_apparmor_profiles_installed(issues: &mut Vec<String>) -> Option<Vec<String>> {
-    let profiles = fs::read_dir("/etc/apparmor.d");
+    let profiles = fs::read_dir(paths::ETC_APPARMOR_D);
     let Ok(profiles) = profiles else {
-        issues.push("AppArmor check failed: could not read /etc/apparmor.d".to_string());
+        issues.push(format!("AppArmor check failed: could not read {}", paths::ETC_APPARMOR_D));
         return None;
     };
 
@@ -139,7 +140,10 @@ fn check_apparmor_profiles_installed(issues: &mut Vec<String>) -> Option<Vec<Str
         .collect();
 
     if profile_files.is_empty() {
-        issues.push("AppArmor check failed: no bonesdeploy AppArmor profile found under /etc/apparmor.d".to_string());
+        issues.push(format!(
+            "AppArmor check failed: no bonesdeploy AppArmor profile found under {}",
+            paths::ETC_APPARMOR_D
+        ));
         return None;
     }
 
@@ -147,9 +151,9 @@ fn check_apparmor_profiles_installed(issues: &mut Vec<String>) -> Option<Vec<Str
 }
 
 fn check_apparmor_unit_wiring(profile_names: &[String], issues: &mut Vec<String>) {
-    let units = fs::read_dir("/etc/systemd/system");
+    let units = fs::read_dir(paths::ETC_SYSTEMD_SYSTEM);
     let Ok(units) = units else {
-        issues.push("AppArmor check failed: could not read /etc/systemd/system".to_string());
+        issues.push(format!("AppArmor check failed: could not read {}", paths::ETC_SYSTEMD_SYSTEM));
         return;
     };
 
@@ -170,7 +174,9 @@ fn check_apparmor_unit_wiring(profile_names: &[String], issues: &mut Vec<String>
     for expected_unit_name in expected_unit_names {
         let Some(path) = unit_entries.get(&expected_unit_name) else {
             issues.push(format!(
-                "AppArmor check failed: expected /etc/systemd/system/{expected_unit_name} for installed bonesdeploy profile"
+                "AppArmor check failed: expected {}/{} for installed bonesdeploy profile",
+                paths::ETC_SYSTEMD_SYSTEM,
+                expected_unit_name
             ));
             continue;
         };

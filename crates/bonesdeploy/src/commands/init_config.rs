@@ -2,6 +2,7 @@ use crate::config;
 use crate::git;
 
 use anyhow::{Result, anyhow};
+use shared::paths;
 
 pub struct InitArgs {
     pub non_interactive: bool,
@@ -189,10 +190,10 @@ pub fn resolve_repo_path(
         return details.repo_path.clone();
     }
 
-    existing_config
-        .map(|cfg| cfg.data.repo_path.as_str())
-        .filter(|value| !value.is_empty())
-        .map_or_else(|| format!("/home/git/{project_name}.git"), |value| value.replace("<project_name>", project_name))
+    existing_config.map(|cfg| cfg.data.repo_path.as_str()).filter(|value| !value.is_empty()).map_or_else(
+        || paths::default_repo_path_for(project_name),
+        |value| value.replace("<project_name>", project_name),
+    )
 }
 
 pub fn seed_path_override(

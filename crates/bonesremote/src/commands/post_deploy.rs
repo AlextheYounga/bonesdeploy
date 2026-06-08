@@ -81,6 +81,8 @@ mod tests {
 
     use anyhow::Result;
 
+    use shared::paths;
+
     use super::prune_old_releases;
     use crate::config;
 
@@ -123,16 +125,16 @@ mod tests {
     }
 
     fn make_release(root: &Path, name: &str) -> Result<()> {
-        fs::create_dir_all(root.join("project_root/releases").join(name))?;
+        fs::create_dir_all(root.join("project_root").join(paths::RELEASES_DIR).join(name))?;
         Ok(())
     }
 
     fn set_current_release(root: &Path, name: &str) -> Result<()> {
         let project_root = root.join("project_root");
-        let releases = project_root.join("releases");
+        let releases = project_root.join(paths::RELEASES_DIR);
         fs::create_dir_all(&releases)?;
         let target = releases.join(name);
-        symlink(&target, project_root.join("current"))?;
+        symlink(&target, project_root.join(paths::CURRENT_LINK))?;
         Ok(())
     }
 
@@ -150,9 +152,9 @@ mod tests {
         let pruned = prune_old_releases(&cfg)?;
 
         assert_eq!(pruned, vec!["20260101_000000"]);
-        assert!(!root.join("project_root/releases/20260101_000000").exists());
-        assert!(root.join("project_root/releases/20260102_000000").exists());
-        assert!(root.join("project_root/releases/20260103_000000").exists());
+        assert!(!root.join("project_root").join(paths::RELEASES_DIR).join("20260101_000000").exists());
+        assert!(root.join("project_root").join(paths::RELEASES_DIR).join("20260102_000000").exists());
+        assert!(root.join("project_root").join(paths::RELEASES_DIR).join("20260103_000000").exists());
 
         fs::remove_dir_all(root).ok();
         Ok(())
@@ -171,8 +173,8 @@ mod tests {
         let pruned = prune_old_releases(&cfg)?;
 
         assert!(pruned.is_empty());
-        assert!(root.join("project_root/releases/20260101_000000").exists());
-        assert!(root.join("project_root/releases/20260102_000000").exists());
+        assert!(root.join("project_root").join(paths::RELEASES_DIR).join("20260101_000000").exists());
+        assert!(root.join("project_root").join(paths::RELEASES_DIR).join("20260102_000000").exists());
 
         fs::remove_dir_all(root).ok();
         Ok(())

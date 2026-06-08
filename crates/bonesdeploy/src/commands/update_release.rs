@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use shared::paths;
 
 use crate::commands::remote_setup::resolve_bootstrap_ssh_user;
 use crate::config;
@@ -48,15 +49,14 @@ pub fn update_local_binary(temp_path: &Path, version: &str) -> Result<()> {
         bail!("Local binary not found in release: {binary_name}");
     }
 
-    let install_root = Path::new("/opt/bonesdeploy");
-    let versions_dir = install_root.join("versions");
+    let versions_dir = paths::install_versions_dir();
     let target_version_dir = versions_dir.join(version);
-    let current_dir = install_root.join("current");
+    let current_dir = paths::install_current_dir();
 
     fs::create_dir_all(&target_version_dir)
         .with_context(|| format!("Failed to create {}", target_version_dir.display()))?;
 
-    let dest_binary = target_version_dir.join("bonesdeploy");
+    let dest_binary = target_version_dir.join(paths::BONESDEPLOY_BINARY);
     fs::copy(&source_binary, &dest_binary)
         .with_context(|| format!("Failed to copy binary to {}", dest_binary.display()))?;
 
@@ -66,19 +66,20 @@ pub fn update_local_binary(temp_path: &Path, version: &str) -> Result<()> {
     verify_binary(&dest_binary)?;
 
     // Use atomic rename to prevent broken symlinks during update
-    let temp_link = current_dir.join(".bonesdeploy_swap");
+    let temp_link = current_dir.join(paths::BONESDEPLOY_SWAP_LINK);
     if temp_link.exists() {
         fs::remove_file(&temp_link)?;
     }
     symlink_file(&target_version_dir, &temp_link)?;
 
-    fs::rename(&temp_link, current_dir.join("bonesdeploy")).context("Failed to atomically switch local symlink")?;
+    fs::rename(&temp_link, current_dir.join(paths::BONESDEPLOY_BINARY))
+        .context("Failed to atomically switch local symlink")?;
 
-    let global_link = Path::new("/usr/local/bin/bonesdeploy");
+    let global_link = paths::bonesdeploy_global_link();
     if global_link.exists() {
-        fs::remove_file(global_link)?;
+        fs::remove_file(&global_link)?;
     }
-    symlink_file(&current_dir.join("bonesdeploy"), global_link)?;
+    symlink_file(&current_dir.join(paths::BONESDEPLOY_BINARY), &global_link)?;
 
     println!("Local version: {}", current_local_version());
 
@@ -106,7 +107,7 @@ pub fn update_remote_binary(temp_path: &Path, version: &str) -> Result<()> {
     let ansible_temp = tempfile::TempDir::new().context("Failed to create Ansible temp directory")?;
     let playbook_path = update_assets::materialize_playbook(ansible_temp.path())?;
 
-    let remote_staging = format!("/tmp/bonesremote-{version}");
+    let remote_staging = paths::bonesremote_staging_path(version);
 
     println!("Uploading bonesremote to remote host...");
     let host = format!("{}@{}", cfg.permissions.defaults.deploy_user, cfg.data.host);
@@ -157,6 +158,18 @@ pub fn run_update_playbook(
         .arg(format!("bonesremote_staging_path={staging_path}"))
         .arg("-e")
         .arg(format!("bonesremote_target_version={version}"))
+        .arg("-e")
+        .arg(format!("bonesremote_install_root={}", paths::install_root().display()))
+        .arg("-e")
+        .arg(format!("bonesremote_stable_link={}", paths::install_current_dir().display()))
+        .arg("-e")
+        .arg(format!("bonesremote_global_link={}", paths::bonesremote_global_link().display()))
+        .arg("-e")
+        .arg(format!("bonesremote_managed_projects_root={}", paths::DEFAULT_PROJECT_ROOT_PARENT))
+        .arg("-e")
+        .arg(format!("bonesremote_binary_name={}", paths::BONESREMOTE_BINARY))
+        .arg("-e")
+        .arg(format!("bonesremote_swap_link_prefix={}", paths::BONESREMOTE_SWAP_LINK_PREFIX))
         .arg(playbook);
 
     println!("Running: {command:?}");

@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use shared::paths;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BonesConfig {
@@ -146,15 +147,15 @@ pub fn is_configured(config: &BonesConfig) -> bool {
 }
 
 pub fn default_repo_path_for(project_name: &str) -> String {
-    format!("/home/git/{project_name}.git")
+    paths::default_repo_path_for(project_name)
 }
 
 pub fn default_project_root_for(project_name: &str) -> String {
-    format!("/srv/deployments/{project_name}")
+    paths::default_project_root_for(project_name)
 }
 
 pub fn default_web_root() -> String {
-    String::from("public")
+    paths::default_web_root()
 }
 
 pub fn load(path: &Path) -> Result<BonesConfig> {
@@ -214,6 +215,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
+    use shared::paths;
 
     use super::{
         BonesConfig, Data, PermissionDefaults, Permissions, Releases, Ssl, default_project_root_for,
@@ -227,7 +229,8 @@ mod tests {
 
     fn minimal_yaml(project_name: &str) -> String {
         format!(
-            "data:\n  remote_name: production\n  project_name: {project_name}\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: /home/git/{project_name}.git\n  branch: master\n  deploy_on_push: true\n"
+            "data:\n  remote_name: production\n  project_name: {project_name}\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: {}\n  branch: master\n  deploy_on_push: true\n",
+            paths::default_repo_path_for(project_name)
         )
     }
 
@@ -277,7 +280,7 @@ mod tests {
         fs::write(&path, minimal_yaml("atlas"))?;
 
         let cfg = load(&path)?;
-        assert_eq!(cfg.data.repo_path, "/home/git/atlas.git");
+        assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("atlas"));
 
         fs::remove_file(path)?;
         Ok(())
@@ -289,7 +292,7 @@ mod tests {
         fs::write(&path, minimal_yaml("atlas"))?;
 
         let cfg = load(&path)?;
-        assert_eq!(cfg.data.project_root, "/srv/deployments/atlas");
+        assert_eq!(cfg.data.project_root, paths::default_project_root_for("atlas"));
 
         fs::remove_file(path)?;
         Ok(())
@@ -345,12 +348,15 @@ mod tests {
     #[test]
     fn load_preserves_explicit_repo_project_and_web_root_overrides() -> Result<()> {
         let path = temp_path("overrides.yaml");
-        let yaml = "data:\n  remote_name: production\n  project_name: app\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: /home/git/app.git\n  project_root: /custom/deploy\n  web_root: dist\n  branch: master\n  deploy_on_push: true\n";
+        let yaml = format!(
+            "data:\n  remote_name: production\n  project_name: app\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: {}\n  project_root: /custom/deploy\n  web_root: dist\n  branch: master\n  deploy_on_push: true\n",
+            paths::default_repo_path_for("app")
+        );
 
         fs::write(&path, yaml)?;
         let cfg = load(Path::new(&path))?;
 
-        assert_eq!(cfg.data.repo_path, "/home/git/app.git");
+        assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("app"));
         assert_eq!(cfg.data.project_root, "/custom/deploy");
         assert_eq!(cfg.data.web_root, "dist");
 

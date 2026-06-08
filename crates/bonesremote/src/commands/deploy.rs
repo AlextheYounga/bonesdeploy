@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use shared::paths::DeploymentPaths;
 
 use crate::config;
 use crate::release_state;
@@ -15,7 +16,9 @@ pub fn run(config_path: &str) -> Result<()> {
     let release_name = release_state::read_staged_release(&cfg)?;
     let release_path = release_state::release_dir(&cfg, &release_name);
     let build_root = release_state::build_root(&cfg);
-    let deployment_dir = Path::new(&cfg.data.repo_path).join("bones").join("deployment");
+    let paths =
+        DeploymentPaths::new(&cfg.data.project_name, &cfg.data.repo_path, &cfg.data.project_root, &cfg.data.web_root);
+    let deployment_dir = PathBuf::from(paths.repo_deployment);
 
     if !release_path.exists() {
         bail!("Staged release directory does not exist: {}", release_path.display());

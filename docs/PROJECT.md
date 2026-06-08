@@ -153,7 +153,17 @@ Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are wr
 This folder stores deployment scripts that are run by `bonesremote hooks deploy`. Files in this folder must be ordered sequentially like `01_run_deployment_concerns.sh` and `02_lockup_permissions.sh`. They are named in numerical order and all of these scripts are always run.
 
 ## Crate Structure
-This Cargo workspace has two crates under `crates/`, each with its own dependencies. There is no shared lib crate; the `bones.yaml` structs are duplicated since each binary discovers and uses config differently.
+This Cargo workspace has three crates under `crates/`:
+- `bonesdeploy` for the local CLI binary
+- `bonesremote` for the server-side binary
+- `shared` for code that must be common to both binaries
+
+### Path Centralization
+All product-owned paths must live in `crates/shared/src/paths.rs`.
+
+Other modules may derive subpaths by joining values from `shared::paths`, but they must not introduce their own independent path roots, filenames, or install locations.
+
+This applies to Rust code, Ansible vars, Jinja templates, embedded playbooks, and docs examples that describe the system layout.
 
 ```
 bonesdeploy/

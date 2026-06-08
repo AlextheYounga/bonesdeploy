@@ -18,7 +18,7 @@
   ansible.builtin.command:
     argv:
       - cat
-      - /sys/module/apparmor/parameters/enabled
+      - "{{ paths.apparmor_enabled_param }}"
   register: apparmor_kernel_enabled_output
   changed_when: false
   tags: [apparmor]
@@ -33,7 +33,7 @@
 - name: Deploy per-project apparmor profile
   ansible.builtin.template:
     src: "{{ apparmor_profile_template_path }}"
-    dest: "{{ apparmor_profile_path }}"
+    dest: "{{ paths.apparmor_profile_path }}"
     owner: root
     group: root
     mode: "0644"
@@ -45,7 +45,7 @@
     argv:
       - apparmor_parser
       - -r
-      - "{{ apparmor_profile_path }}"
+      - "{{ paths.apparmor_profile_path }}"
   changed_when: false
   tags: [apparmor]
 
@@ -53,7 +53,7 @@
   ansible.builtin.command:
     argv:
       - aa-enforce
-      - "{{ apparmor_profile_path }}"
+      - "{{ paths.apparmor_profile_path }}"
   changed_when: false
   tags: [apparmor]
 
@@ -61,7 +61,7 @@
   ansible.builtin.command:
     argv:
       - cat
-      - /sys/kernel/security/apparmor/profiles
+      - "{{ paths.apparmor_profiles }}"
   register: apparmor_kernel_profiles_output
   changed_when: false
   tags: [apparmor]

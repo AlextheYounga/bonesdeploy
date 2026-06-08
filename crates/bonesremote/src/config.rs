@@ -3,6 +3,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use shared::paths;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BonesConfig {
@@ -17,10 +18,10 @@ pub struct BonesConfig {
 pub struct Constants;
 
 impl Constants {
-    pub const BINARY_NAME: &str = "bonesremote";
-    pub const SUDOERS_PATH: &str = "/etc/sudoers.d/bonesdeploy";
-    pub const STAGED_RELEASE_FILE: &str = ".staged_release";
-    pub const BUILD_DIR: &str = "build";
+    pub const BINARY_NAME: &str = paths::BONESREMOTE_BINARY;
+    pub const SUDOERS_PATH: &str = paths::SUDOERS_PATH;
+    pub const STAGED_RELEASE_FILE: &str = paths::STAGED_RELEASE_FILE;
+    pub const BUILD_DIR: &str = paths::BUILD_DIR;
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -134,15 +135,15 @@ fn apply_derived_defaults(config: &mut BonesConfig) {
 }
 
 pub fn default_repo_path_for(project_name: &str) -> String {
-    format!("/home/git/{project_name}.git")
+    paths::default_repo_path_for(project_name)
 }
 
 pub fn default_project_root_for(project_name: &str) -> String {
-    format!("/srv/deployments/{project_name}")
+    paths::default_project_root_for(project_name)
 }
 
 pub fn default_web_root() -> String {
-    String::from("public")
+    paths::default_web_root()
 }
 
 #[cfg(test)]

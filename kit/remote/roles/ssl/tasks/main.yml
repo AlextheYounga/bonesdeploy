@@ -72,8 +72,6 @@
   vars:
     nginx_server_name: "{{ ssl_domain }}"
     nginx_ssl_enabled: true
-    nginx_ssl_certificate_path: "{{ ssl_cert_path }}"
-    nginx_ssl_certificate_key_path: "{{ ssl_key_path }}"
   when: ssl_enabled | bool
   tags: [ssl]
 

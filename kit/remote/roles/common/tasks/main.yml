@@ -108,12 +108,12 @@
       - --deploy-user
       - "{{ deploy_user }}"
   environment:
-    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+    PATH: "{{ paths.usr_local_bin }}:{{ ansible_facts['env']['PATH'] }}"
   tags: [common, bonesremote]
 
 - name: Ensure bare repo parent directory exists
   ansible.builtin.file:
-    path: "{{ repo_path | dirname }}"
+    path: "{{ paths.repo_parent }}"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
@@ -127,14 +127,14 @@
       - git
       - init
       - --bare
-      - "{{ repo_path }}"
+      - "{{ paths.repo }}"
   args:
-    creates: "{{ repo_path }}/HEAD"
+    creates: "{{ paths.repo_head }}"
   tags: [common, git]
 
 - name: Ensure bare repo bones directory exists
   ansible.builtin.file:
-    path: "{{ repo_path }}/bones"
+    path: "{{ paths.repo_bones }}"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"

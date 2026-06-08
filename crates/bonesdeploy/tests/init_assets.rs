@@ -140,7 +140,7 @@ fn apparmor_profile_template_does_not_deny_repo_path_parent_home() {
 
     assert!(
         !content.contains("deny /home/** r,"),
-        "AppArmor template must not deny all /home reads because default repo_path lives under /home/git\n{content}"
+        "AppArmor template must not deny all /home reads because default repo_path is derived from the shared helper\n{content}"
     );
     assert!(
         !content.contains("deny /home/{{ deploy_user }}/** r,"),
@@ -354,7 +354,7 @@ fn apparmor_role_verifies_profile_loaded() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("/sys/kernel/security/apparmor/profiles"),
+        content.contains("{{ paths.apparmor_profiles }}"),
         "apparmor role must check loaded profiles via kernel apparmor profile list\n{content}"
     );
     assert!(content.contains("apparmor_profile_name"), "apparmor role must verify expected profile name\n{content}");
@@ -369,7 +369,7 @@ fn apparmor_role_verifies_profile_enforce_mode() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("/sys/kernel/security/apparmor/profiles")
+        content.contains("{{ paths.apparmor_profiles }}")
             && content.contains("\\(enforce\\)")
             && content.contains("apparmor_profile_name | regex_escape"),
         "apparmor role must verify enforce mode directly from kernel AppArmor profiles output\n{content}"
@@ -385,7 +385,7 @@ fn apparmor_role_verifies_kernel_enabled() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("/sys/module/apparmor/parameters/enabled"),
+        content.contains("{{ paths.apparmor_enabled_param }}"),
         "apparmor role must verify kernel apparmor enabled parameter\n{content}"
     );
     assert!(

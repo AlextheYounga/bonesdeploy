@@ -3,6 +3,7 @@ use std::path::Path;
 use anyhow::{Result, bail};
 use console::style;
 use serde_json::json;
+use shared::paths::{ssl_certificate_key_path, ssl_certificate_path};
 
 use crate::commands::push;
 use crate::commands::remote_setup;
@@ -66,6 +67,8 @@ fn ssl_extra_vars(domain: &str, email: &str) -> serde_json::Value {
         "ssl_enabled": true,
         "ssl_domain": domain,
         "ssl_email": email,
+        "nginx_ssl_certificate_path": ssl_certificate_path(domain),
+        "nginx_ssl_certificate_key_path": ssl_certificate_key_path(domain),
     })
 }
 

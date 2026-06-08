@@ -5,5 +5,4 @@ apparmor_packages:
 
 apparmor_service_name: apparmor
 apparmor_profile_name: "bonesdeploy-{{ project_name }}-nginx"
-apparmor_profile_path: "/etc/apparmor.d/{{ apparmor_profile_name }}"
 apparmor_profile_template_path: "{{ playbook_dir }}/../apparmor/project-nginx-profile.j2"

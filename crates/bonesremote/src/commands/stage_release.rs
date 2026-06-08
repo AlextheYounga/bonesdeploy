@@ -87,6 +87,8 @@ mod tests {
 
     use anyhow::Result;
 
+    use shared::paths;
+
     use super::ensure_deploy_user_can_traverse;
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
@@ -100,7 +102,7 @@ mod tests {
         let root = temp_dir_path("traverse_bits");
         fs::create_dir_all(&root)?;
 
-        let path = root.join("workspace");
+        let path = root.join(paths::WORKSPACE_DIR);
         fs::create_dir_all(&path)?;
 
         let mut permissions = fs::metadata(&path)?.permissions();

@@ -9,7 +9,7 @@
 
 - name: Ensure socket directory exists
   ansible.builtin.file:
-    path: "/run/{{ project_name }}"
+    path: "{{ paths.runtime_socket_dir }}"
     state: directory
     owner: "{{ service_user }}"
     group: "{{ group }}"
@@ -56,7 +56,7 @@
 
 - name: Disable default nginx site
   ansible.builtin.file:
-    path: /etc/nginx/sites-enabled/default
+    path: "{{ paths.nginx_default_site_enabled }}"
     state: absent
   when: nginx_disable_default_site
   notify: Reload nginx
@@ -76,7 +76,7 @@
 
 - name: Ensure per-site nginx service is enabled and started
   ansible.builtin.systemd:
-    name: "{{ project_name }}-nginx"
+    name: "{{ paths.systemd_site_nginx_service | basename | regex_replace('\\.service$', '') }}"
     enabled: true
     state: started
     daemon_reload: true

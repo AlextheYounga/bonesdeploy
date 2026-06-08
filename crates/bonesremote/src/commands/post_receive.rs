@@ -66,6 +66,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
+    use shared::paths;
 
     use super::run;
     use crate::config::Constants;
@@ -163,7 +164,7 @@ mod tests {
 
         let bare = create_remote_with_master_commit(&root)?;
         let project_root = root.join("deploy");
-        let build_root = project_root.join(Constants::BUILD_DIR).join("workspace");
+        let build_root = project_root.join(Constants::BUILD_DIR).join(paths::WORKSPACE_DIR);
         fs::create_dir_all(&build_root)?;
 
         let config_path = root.join("bones.yaml");
@@ -189,7 +190,7 @@ mod tests {
         let bare = create_remote_with_master_commit(&root)?;
         let project_root = root.join("deploy");
         let build_dir = project_root.join(Constants::BUILD_DIR);
-        let build_root = build_dir.join("workspace");
+        let build_root = build_dir.join(paths::WORKSPACE_DIR);
         fs::create_dir_all(&build_root)?;
 
         let config_path = root.join("bones.yaml");
