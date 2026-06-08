@@ -18,6 +18,7 @@ pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
 
     let project_root = Path::new(&cfg.data.project_root);
+    let project_root_parent = project_root.parent().unwrap_or(project_root);
     let build_dir = project_root.join(config::Constants::BUILD_DIR);
     let build_root = release_state::build_root(&cfg);
     let releases_dir = release_state::releases_dir(&cfg);
@@ -25,6 +26,8 @@ pub fn run(config_path: &str) -> Result<()> {
 
     fs::create_dir_all(project_root)
         .with_context(|| format!("Failed to create project_root: {}", project_root.display()))?;
+    ensure_non_owner_can_traverse(project_root_parent)
+        .with_context(|| format!("Failed to set traverse permission on {}", project_root_parent.display()))?;
     fs::create_dir_all(&releases_dir)
         .with_context(|| format!("Failed to create releases dir: {}", releases_dir.display()))?;
     fs::create_dir_all(&build_dir).with_context(|| format!("Failed to create build dir: {}", build_dir.display()))?;
@@ -70,6 +73,21 @@ fn ensure_deploy_user_can_traverse(path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn ensure_non_owner_can_traverse(path: &Path) -> Result<()> {
+    let metadata = fs::metadata(path).with_context(|| format!("Failed to read metadata for {}", path.display()))?;
+    let mut permissions = metadata.permissions();
+    let mode = permissions.mode();
+    let next_mode = mode | 0o001;
+
+    if next_mode != mode {
+        permissions.set_mode(next_mode);
+        fs::set_permissions(path, permissions)
+            .with_context(|| format!("Failed to set mode {:o} on {}", next_mode, path.display()))?;
+    }
+
+    Ok(())
+}
+
 fn create_release_name() -> Result<String> {
     static TIMESTAMP_FORMAT: &[FormatItem<'static>] = format_description!("[year][month][day]_[hour][minute][second]");
     let now = OffsetDateTime::now_utc();
@@ -89,7 +107,7 @@ mod tests {
 
     use shared::paths;
 
-    use super::ensure_deploy_user_can_traverse;
+    use super::{ensure_deploy_user_can_traverse, ensure_non_owner_can_traverse};
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -113,6 +131,28 @@ mod tests {
 
         let mode = fs::metadata(&path)?.permissions().mode() & 0o777;
         assert_eq!(mode, 0o750);
+
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    // Ensures root-owned project root parents still allow unprivileged hook traversal.
+    #[test]
+    fn ensure_non_owner_can_traverse_adds_other_execute_bit() -> Result<()> {
+        let root = temp_dir_path("other_traverse_bit");
+        fs::create_dir_all(&root)?;
+
+        let path = root.join("deployments");
+        fs::create_dir_all(&path)?;
+
+        let mut permissions = fs::metadata(&path)?.permissions();
+        permissions.set_mode(0o700);
+        fs::set_permissions(&path, permissions)?;
+
+        ensure_non_owner_can_traverse(&path)?;
+
+        let mode = fs::metadata(&path)?.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o701);
 
         fs::remove_dir_all(root)?;
         Ok(())

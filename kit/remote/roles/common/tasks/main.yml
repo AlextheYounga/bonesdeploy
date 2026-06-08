@@ -141,6 +141,15 @@
     mode: "0755"
   tags: [common, git]
 
+- name: Ensure project root parent directory is traversable by deploy hooks
+  ansible.builtin.file:
+    path: "{{ paths.project_root_parent }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0711"
+  tags: [common, placeholder]
+
 - name: Ensure placeholder release directory exists
   ansible.builtin.file:
     path: "{{ paths.placeholder_web_root }}"
