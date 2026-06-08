@@ -32,6 +32,7 @@
     - name: Run nginx role
       ansible.builtin.include_role:
         name: nginx
+        public: true
       tags: [nginx]
 
     - name: Run ssl role
