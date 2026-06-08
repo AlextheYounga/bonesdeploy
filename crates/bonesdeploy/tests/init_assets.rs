@@ -234,6 +234,22 @@ fn shared_setup_playbook_exposes_common_role_defaults_to_runtime_role() {
 }
 
 #[test]
+fn shared_setup_playbook_exposes_nginx_role_defaults_to_ssl_role() {
+    let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    let nginx_role =
+        "- name: Run nginx role\n      ansible.builtin.include_role:\n        name: nginx\n        public: true";
+
+    assert!(
+        content.contains(nginx_role),
+        "shared setup playbook must expose nginx defaults used by the later ssl role\n{content}"
+    );
+}
+
+#[test]
 fn ssl_role_treats_ssl_enabled_as_explicit_boolean() {
     let role = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/ssl/tasks/main.yml");
     let content = fs::read_to_string(&role);
