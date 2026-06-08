@@ -7,10 +7,13 @@ use std::sync::mpsc::{self, Sender};
 use std::thread;
 
 use anyhow::{Context, Result, anyhow, bail};
+use serde_json::{Map, Value};
 use spinners::{Spinner, Spinners, Stream};
+use tempfile::NamedTempFile;
 
 use crate::commands::remote_setup;
 use crate::config;
+use shared::paths::{DeploymentPaths, ssl_certificate_key_path, ssl_certificate_path};
 
 const BRAND: &str = "☠ bonesdeploy";
 const CLEAR_LINE: &str = "\r\u{1b}[2K";
@@ -26,7 +29,7 @@ enum OutputLine {
     Error(String),
 }
 
-pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<()> {
+pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_vars: Value, extra_args: &[String]) -> Result<()> {
     remote_setup::ensure_remote_python3_available(cfg, ssh_user)?;
 
     let interactive = io::stdout().is_terminal();
@@ -34,7 +37,10 @@ pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[Strin
     writeln!(stdout, "{BRAND}")?;
     stdout.flush()?;
 
-    let child = build_ansible_command(cfg, ssh_user, extra_args)?.spawn().context("Failed to run ansible-playbook")?;
+    let vars_file = write_vars_file(&build_ansible_vars(cfg, extra_vars)?)?;
+    let child = build_ansible_command(cfg, ssh_user, vars_file.path(), extra_args)?
+        .spawn()
+        .context("Failed to run ansible-playbook")?;
 
     let status = stream_ansible_output(&mut stdout, interactive, child)?;
     if !status.success() {
@@ -44,14 +50,19 @@ pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[Strin
     Ok(())
 }
 
-fn build_ansible_command(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<Command> {
+fn build_ansible_command(
+    cfg: &config::BonesConfig,
+    ssh_user: &str,
+    vars_file: &Path,
+    extra_args: &[String],
+) -> Result<Command> {
     validate_playbook_and_roles_directories()?;
 
     let ansible_playbook_binary = remote_setup::resolve_ansible_playbook_binary()?;
     let mut command = Command::new(&ansible_playbook_binary);
 
     add_base_ansible_args(&mut command, cfg, ssh_user);
-    add_ssl_config_args(&mut command, cfg);
+    command.arg("-e").arg(format!("@{}", vars_file.display()));
     add_final_args(&mut command, extra_args);
 
     Ok(command)
@@ -73,48 +84,11 @@ fn validate_playbook_and_roles_directories() -> Result<()> {
 
 fn add_base_ansible_args(command: &mut Command, cfg: &config::BonesConfig, ssh_user: &str) {
     let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
-    let project_root_parent = remote_setup::resolve_project_root_parent(&cfg.data.project_root);
     let inventory = format!("{},", cfg.data.host);
     let roles_path = env_ansible_roles_path(roles_dir);
 
     command.env("ANSIBLE_ROLES_PATH", roles_path);
-    command
-        .arg("-i")
-        .arg(&inventory)
-        .arg("-u")
-        .arg(ssh_user)
-        .arg("-e")
-        .arg(format!("ansible_port={}", cfg.data.port))
-        .arg("-e")
-        .arg(format!("deploy_user={}", cfg.permissions.defaults.deploy_user))
-        .arg("-e")
-        .arg(format!("service_user={}", cfg.permissions.defaults.service_user))
-        .arg("-e")
-        .arg(format!("group={}", cfg.permissions.defaults.group))
-        .arg("-e")
-        .arg(format!("project_root_parent={project_root_parent}"))
-        .arg("-e")
-        .arg(format!("project_root={}", cfg.data.project_root))
-        .arg("-e")
-        .arg(format!("web_root={}", cfg.data.web_root))
-        .arg("-e")
-        .arg(format!("project_name={}", cfg.data.project_name))
-        .arg("-e")
-        .arg(format!("repo_path={}", cfg.data.repo_path));
-}
-
-fn add_ssl_config_args(command: &mut Command, cfg: &config::BonesConfig) {
-    if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
-        command
-            .arg("-e")
-            .arg(format!("nginx_server_name={}", cfg.ssl.domain))
-            .arg("-e")
-            .arg("nginx_ssl_enabled=true")
-            .arg("-e")
-            .arg(format!("nginx_ssl_certificate_path=/etc/letsencrypt/live/{}/fullchain.pem", cfg.ssl.domain))
-            .arg("-e")
-            .arg(format!("nginx_ssl_certificate_key_path=/etc/letsencrypt/live/{}/privkey.pem", cfg.ssl.domain));
-    }
+    command.arg("-i").arg(&inventory).arg("-u").arg(ssh_user);
 }
 
 fn add_final_args(command: &mut Command, extra_args: &[String]) {
@@ -241,6 +215,56 @@ fn env_ansible_roles_path(roles_dir: &Path) -> String {
         .ok()
         .filter(|value| !value.is_empty())
         .map_or_else(|| roles_dir.display().to_string(), |existing| format!("{}:{existing}", roles_dir.display()))
+}
+
+fn build_ansible_vars(cfg: &config::BonesConfig, extra_vars: Value) -> Result<Value> {
+    let paths =
+        DeploymentPaths::new(&cfg.data.project_name, &cfg.data.repo_path, &cfg.data.project_root, &cfg.data.web_root);
+    let mut vars = Map::new();
+
+    vars.insert(String::from("ansible_port"), Value::String(cfg.data.port.clone()));
+    vars.insert(String::from("deploy_user"), Value::String(cfg.permissions.defaults.deploy_user.clone()));
+    vars.insert(String::from("service_user"), Value::String(cfg.permissions.defaults.service_user.clone()));
+    vars.insert(String::from("group"), Value::String(cfg.permissions.defaults.group.clone()));
+    vars.insert(String::from("project_root_parent"), Value::String(paths.project_root_parent.clone()));
+    vars.insert(String::from("project_root"), Value::String(cfg.data.project_root.clone()));
+    vars.insert(String::from("web_root"), Value::String(cfg.data.web_root.clone()));
+    vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
+    vars.insert(String::from("repo_path"), Value::String(cfg.data.repo_path.clone()));
+    vars.insert(String::from("paths"), serde_json::to_value(paths)?);
+
+    if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
+        vars.insert(String::from("nginx_server_name"), Value::String(cfg.ssl.domain.clone()));
+        vars.insert(String::from("nginx_ssl_enabled"), Value::Bool(true));
+        vars.insert(String::from("nginx_ssl_certificate_path"), Value::String(ssl_certificate_path(&cfg.ssl.domain)));
+        vars.insert(
+            String::from("nginx_ssl_certificate_key_path"),
+            Value::String(ssl_certificate_key_path(&cfg.ssl.domain)),
+        );
+    }
+
+    merge_extra_vars(&mut vars, extra_vars)?;
+    Ok(Value::Object(vars))
+}
+
+fn merge_extra_vars(vars: &mut Map<String, Value>, extra_vars: Value) -> Result<()> {
+    match extra_vars {
+        Value::Object(extra) => {
+            for (key, value) in extra {
+                vars.insert(key, value);
+            }
+            Ok(())
+        }
+        Value::Null => Ok(()),
+        other => bail!("extra vars must be a JSON object, got {other}"),
+    }
+}
+
+fn write_vars_file(vars: &Value) -> Result<NamedTempFile> {
+    let mut file = NamedTempFile::new().context("Failed to create temporary Ansible vars file")?;
+    serde_json::to_writer_pretty(file.as_file_mut(), vars).context("Failed to write Ansible vars file")?;
+    file.as_file_mut().write_all(b"\n").context("Failed to finish Ansible vars file")?;
+    Ok(file)
 }
 
 fn classify_output_line(line: &str) -> Option<OutputLine> {

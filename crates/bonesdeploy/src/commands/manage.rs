@@ -37,11 +37,13 @@ fn shell_quote_single(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::shell_quote_single;
+    use shared::paths;
 
     // Plain values still require shell quoting to prevent whitespace/token splitting.
     #[test]
     fn shell_quote_single_wraps_plain_value_in_single_quotes() {
-        assert_eq!(shell_quote_single("/srv/deployments/acme"), "'/srv/deployments/acme'");
+        let path = paths::default_project_root_for("acme");
+        assert_eq!(shell_quote_single(&path), format!("'{path}'"));
     }
 
     // Embedded single quotes must be escaped safely for remote shell execution.

@@ -108,12 +108,12 @@
       - --deploy-user
       - "{{ deploy_user }}"
   environment:
-    PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+    PATH: "{{ paths.usr_local_bin }}:{{ ansible_facts['env']['PATH'] }}"
   tags: [common, bonesremote]
 
 - name: Ensure bare repo parent directory exists
   ansible.builtin.file:
-    path: "{{ repo_path | dirname }}"
+    path: "{{ paths.repo_parent }}"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
@@ -127,23 +127,32 @@
       - git
       - init
       - --bare
-      - "{{ repo_path }}"
+      - "{{ paths.repo }}"
   args:
-    creates: "{{ repo_path }}/HEAD"
+    creates: "{{ paths.repo_head }}"
   tags: [common, git]
 
 - name: Ensure bare repo bones directory exists
   ansible.builtin.file:
-    path: "{{ repo_path }}/bones"
+    path: "{{ paths.repo_bones }}"
     state: directory
     owner: "{{ deploy_user }}"
     group: "{{ deploy_user }}"
     mode: "0755"
   tags: [common, git]
 
+- name: Ensure project root parent directory is traversable by deploy hooks
+  ansible.builtin.file:
+    path: "{{ paths.project_root_parent }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0711"
+  tags: [common, placeholder]
+
 - name: Ensure placeholder release directory exists
   ansible.builtin.file:
-    path: "{{ project_root }}/releases/{{ common_placeholder_release_name }}"
+    path: "{{ paths.placeholder_web_root }}"
     state: directory
     owner: "{{ service_user }}"
     group: "{{ group }}"
@@ -153,7 +162,7 @@
 - name: Seed placeholder index page into initial release
   ansible.builtin.template:
     src: "{{ common_placeholder_template_path }}"
-    dest: "{{ project_root }}/releases/{{ common_placeholder_release_name }}/index.html"
+    dest: "{{ paths.placeholder_index }}"
     owner: "{{ service_user }}"
     group: "{{ group }}"
     mode: "0640"
@@ -161,8 +170,8 @@
 
 - name: Point current symlink at placeholder release
   ansible.builtin.file:
-    src: "{{ project_root }}/releases/{{ common_placeholder_release_name }}"
-    dest: "{{ project_root }}/current"
+    src: "{{ paths.placeholder_release }}"
+    dest: "{{ paths.current }}"
     state: link
     force: true
   tags: [common, placeholder]

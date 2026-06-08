@@ -2,6 +2,8 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 use console::style;
+use serde_json::json;
+use shared::paths::{ssl_certificate_key_path, ssl_certificate_path};
 
 use crate::commands::push;
 use crate::commands::remote_setup;
@@ -38,13 +40,18 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
         style(&cfg.ssl.domain).cyan(),
     );
 
-    let extra_args = ssl_extra_args(&cfg.ssl.domain, &cfg.ssl.email);
+    let extra_vars = ssl_extra_vars(&cfg.ssl.domain, &cfg.ssl.email);
 
     let mut cfg_for_run = cfg.clone();
     cfg_for_run.ssl.enabled = false;
 
     let ssh_user = remote_setup::resolve_bootstrap_ssh_user();
-    remote_setup::run_ansible_playbook(&cfg_for_run, &ssh_user, &extra_args)?;
+    remote_setup::run_ansible_playbook(
+        &cfg_for_run,
+        &ssh_user,
+        extra_vars,
+        &[String::from("--tags"), String::from("nginx,ssl")],
+    )?;
 
     cfg.ssl.enabled = true;
     config::save(&cfg, bones_yaml)?;
@@ -55,28 +62,26 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     Ok(())
 }
 
-fn ssl_extra_args(domain: &str, email: &str) -> Vec<String> {
-    vec![
-        String::from("--tags"),
-        String::from("nginx,ssl"),
-        String::from("-e"),
-        remote_setup::build_extra_var_json_bool("ssl_enabled", true),
-        String::from("-e"),
-        remote_setup::build_extra_var_json_string("ssl_domain", domain),
-        String::from("-e"),
-        remote_setup::build_extra_var_json_string("ssl_email", email),
-    ]
+fn ssl_extra_vars(domain: &str, email: &str) -> serde_json::Value {
+    json!({
+        "ssl_enabled": true,
+        "ssl_domain": domain,
+        "ssl_email": email,
+        "nginx_ssl_certificate_path": ssl_certificate_path(domain),
+        "nginx_ssl_certificate_key_path": ssl_certificate_key_path(domain),
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ssl_extra_args;
+    use super::ssl_extra_vars;
 
     #[test]
-    fn ssl_extra_args_pass_enabled_as_typed_json_boolean() {
-        let args = ssl_extra_args("app.example.com", "ops@example.com");
+    fn ssl_extra_vars_pass_enabled_as_typed_json_boolean() {
+        let vars = ssl_extra_vars("app.example.com", "ops@example.com");
 
-        assert!(args.contains(&String::from("{\"ssl_enabled\":true}")));
-        assert!(!args.contains(&String::from("ssl_enabled=true")));
+        assert_eq!(vars.get("ssl_enabled"), Some(&serde_json::Value::Bool(true)));
+        assert_eq!(vars.get("ssl_domain"), Some(&serde_json::Value::String(String::from("app.example.com"))));
+        assert_eq!(vars.get("ssl_email"), Some(&serde_json::Value::String(String::from("ops@example.com"))));
     }
 }

@@ -18,7 +18,7 @@
   ansible.builtin.command:
     argv:
       - cat
-      - /sys/module/apparmor/parameters/enabled
+      - "{{ paths.apparmor_enabled_param }}"
   register: apparmor_kernel_enabled_output
   changed_when: false
   tags: [apparmor]
@@ -61,7 +61,7 @@
   ansible.builtin.command:
     argv:
       - cat
-      - /sys/kernel/security/apparmor/profiles
+      - "{{ paths.apparmor_profiles }}"
   register: apparmor_kernel_profiles_output
   changed_when: false
   tags: [apparmor]

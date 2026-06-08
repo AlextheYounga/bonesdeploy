@@ -4,7 +4,7 @@ server {
     server_name {{ nginx_server_name }};
 
     location / {
-        proxy_pass http://unix:/run/{{ project_name }}/nginx.sock;
+        proxy_pass http://unix:{{ paths.runtime_nginx_socket }};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -12,7 +12,7 @@ server {
     }
 
     location ^~ /.well-known/acme-challenge/ {
-        proxy_pass http://unix:/run/{{ project_name }}/nginx.sock;
+        proxy_pass http://unix:{{ paths.runtime_nginx_socket }};
     }
 }
 
@@ -26,7 +26,7 @@ server {
     ssl_certificate_key {{ nginx_ssl_certificate_key_path }};
 
     location / {
-        proxy_pass http://unix:/run/{{ project_name }}/nginx.sock;
+        proxy_pass http://unix:{{ paths.runtime_nginx_socket }};
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

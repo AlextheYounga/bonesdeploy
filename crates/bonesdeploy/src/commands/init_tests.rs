@@ -1,6 +1,7 @@
 use super::{InitArgs, collect_non_interactive};
 
 use anyhow::{Result, bail};
+use shared::paths;
 
 use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Ssl};
 
@@ -52,7 +53,7 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
     assert_eq!(cfg.data.host, "deploy.example.com");
     assert_eq!(cfg.data.branch, "main");
     assert_eq!(cfg.data.remote_name, "production");
-    assert_eq!(cfg.data.repo_path, "/home/git/atlas.git");
+    assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("atlas"));
 
     Ok(())
 }

@@ -125,7 +125,7 @@ fn apparmor_profile_template_allows_repo_nginx_conf() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("{{ repo_path }}/bones/nginx.conf r,"),
+        content.contains("{{ paths.repo_nginx_config }} r,"),
         "AppArmor template must allow reading repo-local nginx.conf used by bonesremote landlock nginx\n{content}"
     );
 }
@@ -140,7 +140,7 @@ fn apparmor_profile_template_does_not_deny_repo_path_parent_home() {
 
     assert!(
         !content.contains("deny /home/** r,"),
-        "AppArmor template must not deny all /home reads because default repo_path lives under /home/git\n{content}"
+        "AppArmor template must not deny all /home reads because default repo_path is derived from the shared helper\n{content}"
     );
     assert!(
         !content.contains("deny /home/{{ deploy_user }}/** r,"),
@@ -250,6 +250,68 @@ fn shared_setup_playbook_exposes_nginx_role_defaults_to_ssl_role() {
 }
 
 #[test]
+fn shared_setup_playbook_uses_placeholder_web_root_paths() {
+    let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/common/tasks/main.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("{{ paths.placeholder_web_root }}"),
+        "common role must seed placeholder release using the resolved placeholder web root\n{content}"
+    );
+    assert!(
+        content.contains("{{ paths.placeholder_index }}"),
+        "common role must write placeholder index through the resolved path manifest\n{content}"
+    );
+}
+
+#[test]
+fn ssl_role_uses_current_web_root_path_manifest() {
+    let role = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/ssl/tasks/main.yml");
+    let content = fs::read_to_string(&role);
+    assert!(content.is_ok(), "failed to read {}", role.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("{{ paths.current_web_root }}"),
+        "ssl role must use the resolved current web root for certbot webroot validation\n{content}"
+    );
+}
+
+#[test]
+fn nginx_and_apparmor_templates_use_resolved_paths() {
+    let nginx_site = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/nginx/site.conf.j2");
+    let nginx_conf = fs::read_to_string(&nginx_site);
+    assert!(nginx_conf.is_ok(), "failed to read {}", nginx_site.display());
+    let nginx_conf = nginx_conf.unwrap_or_default();
+
+    assert!(
+        nginx_conf.contains("{{ paths.current_web_root }}"),
+        "nginx site template must use resolved current web root\n{nginx_conf}"
+    );
+
+    let apparmor =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/apparmor/project-nginx-profile.j2");
+    let apparmor_conf = fs::read_to_string(&apparmor);
+    assert!(apparmor_conf.is_ok(), "failed to read {}", apparmor.display());
+    let apparmor_conf = apparmor_conf.unwrap_or_default();
+
+    assert!(
+        apparmor_conf.contains("{{ paths.current_web_root }}/** r,"),
+        "AppArmor profile must read the resolved current web root path\n{apparmor_conf}"
+    );
+    assert!(
+        apparmor_conf.contains("{{ paths.repo_bones_yaml }} r,"),
+        "AppArmor profile must read the resolved repo bones yaml path\n{apparmor_conf}"
+    );
+    assert!(
+        apparmor_conf.contains("{{ paths.repo_nginx_config }} r,"),
+        "AppArmor profile must read the resolved repo nginx config path\n{apparmor_conf}"
+    );
+}
+
+#[test]
 fn ssl_role_treats_ssl_enabled_as_explicit_boolean() {
     let role = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/ssl/tasks/main.yml");
     let content = fs::read_to_string(&role);
@@ -264,10 +326,9 @@ fn ssl_role_treats_ssl_enabled_as_explicit_boolean() {
 fn apparmor_role_assets_exist() {
     let role_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/apparmor");
 
-    assert!(role_root.join("tasks/main.yml").is_file(), "missing apparmor role tasks/main.yml");
-    assert!(role_root.join("defaults/main.yml").is_file(), "missing apparmor role defaults/main.yml");
-    assert!(role_root.join("handlers/main.yml").is_file(), "missing apparmor role handlers/main.yml");
-    assert!(role_root.join("README.md").is_file(), "missing apparmor role README.md");
+    for file in ["tasks/main.yml", "defaults/main.yml", "handlers/main.yml", "README.md"] {
+        assert!(role_root.join(file).is_file(), "missing apparmor role {file}");
+    }
 }
 
 #[test]
@@ -293,13 +354,10 @@ fn apparmor_role_verifies_profile_loaded() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("/sys/kernel/security/apparmor/profiles"),
+        content.contains("{{ paths.apparmor_profiles }}"),
         "apparmor role must check loaded profiles via kernel apparmor profile list\n{content}"
     );
-    assert!(
-        content.contains("apparmor_profile_name"),
-        "apparmor role must verify the expected project profile name is present\n{content}"
-    );
+    assert!(content.contains("apparmor_profile_name"), "apparmor role must verify expected profile name\n{content}");
 }
 
 #[test]
@@ -311,7 +369,7 @@ fn apparmor_role_verifies_profile_enforce_mode() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("/sys/kernel/security/apparmor/profiles")
+        content.contains("{{ paths.apparmor_profiles }}")
             && content.contains("\\(enforce\\)")
             && content.contains("apparmor_profile_name | regex_escape"),
         "apparmor role must verify enforce mode directly from kernel AppArmor profiles output\n{content}"
@@ -327,7 +385,7 @@ fn apparmor_role_verifies_kernel_enabled() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("/sys/module/apparmor/parameters/enabled"),
+        content.contains("{{ paths.apparmor_enabled_param }}"),
         "apparmor role must verify kernel apparmor enabled parameter\n{content}"
     );
     assert!(

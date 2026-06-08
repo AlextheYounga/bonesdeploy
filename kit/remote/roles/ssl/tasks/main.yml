@@ -21,7 +21,7 @@
 - name: Render nginx HTTP challenge config
   ansible.builtin.template:
     src: "{{ nginx_site_template_path }}"
-    dest: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
+    dest: "{{ paths.nginx_site_available }}"
     owner: root
     group: root
     mode: "0644"
@@ -55,7 +55,7 @@
       - "{{ ssl_email }}"
       - --webroot
       - -w
-      - "{{ project_root }}/current/{{ web_root }}"
+      - "{{ paths.current_web_root }}"
       - -d
       - "{{ ssl_domain }}"
       - --keep-until-expiring
@@ -65,15 +65,13 @@
 - name: Render nginx HTTPS config
   ansible.builtin.template:
     src: "{{ nginx_site_template_path }}"
-    dest: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
+    dest: "{{ paths.nginx_site_available }}"
     owner: root
     group: root
     mode: "0644"
   vars:
     nginx_server_name: "{{ ssl_domain }}"
     nginx_ssl_enabled: true
-    nginx_ssl_certificate_path: "{{ ssl_cert_path }}"
-    nginx_ssl_certificate_key_path: "{{ ssl_key_path }}"
   when: ssl_enabled | bool
   tags: [ssl]
 

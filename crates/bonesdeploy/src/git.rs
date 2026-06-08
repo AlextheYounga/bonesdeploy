@@ -157,52 +157,59 @@ fn has_git_extension(path: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use shared::paths;
+
     use super::{parse_remote_url, parse_scp_style_url, parse_ssh_style_url};
+
+    fn repo_path(name: &str) -> String {
+        paths::default_repo_path_for(name)
+    }
 
     // Verifies full SSH URL parsing so deploy targets keep explicit host/port/git-dir wiring.
     #[test]
     fn parse_ssh_style_url_parses_host_port_and_repo_path() {
-        let details = parse_ssh_style_url("ssh://git@example.com:2222/home/git/myapp.git");
+        let details = parse_ssh_style_url(&format!("ssh://git@example.com:2222{}", repo_path("myapp")));
         assert!(details.is_some());
         if let Some(details) = details {
             assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "2222");
-            assert_eq!(details.repo_path, "/home/git/myapp.git");
+            assert_eq!(details.repo_path, repo_path("myapp"));
         }
     }
 
     // Verifies default SSH port inference to avoid requiring :22 in normal remote URLs.
     #[test]
     fn parse_ssh_style_url_defaults_port_to_22() {
-        let details = parse_ssh_style_url("ssh://git@example.com/home/git/myapp.git");
+        let details = parse_ssh_style_url(&format!("ssh://git@example.com{}", repo_path("myapp")));
         assert!(details.is_some());
         if let Some(details) = details {
             assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
-            assert_eq!(details.repo_path, "/home/git/myapp.git");
+            assert_eq!(details.repo_path, repo_path("myapp"));
         }
     }
 
     // Verifies SCP-style remotes are accepted only when they point at absolute git directories.
     #[test]
     fn parse_scp_style_url_parses_absolute_repo_path() {
-        let details = parse_scp_style_url("git@example.com:/home/git/myapp.git");
+        let details = parse_scp_style_url(&format!("git@example.com:{}", repo_path("myapp")));
         assert!(details.is_some());
         if let Some(details) = details {
             assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
-            assert_eq!(details.repo_path, "/home/git/myapp.git");
+            assert_eq!(details.repo_path, repo_path("myapp"));
         }
     }
 
     // Guards against deploying to non-bare or malformed paths by requiring a .git suffix.
     #[test]
     fn parse_remote_url_rejects_non_git_paths() {
-        assert!(parse_remote_url("ssh://git@example.com:22/home/git/myapp").is_none());
-        assert!(parse_remote_url("git@example.com:/home/git/myapp").is_none());
+        let non_git_path = repo_path("myapp").trim_end_matches(".git").to_string();
+        assert!(parse_remote_url(&format!("ssh://git@example.com:22{non_git_path}")).is_none());
+        assert!(parse_remote_url(&format!("git@example.com:{non_git_path}")).is_none());
     }
 
     // Prevents ambiguous relative SCP paths that can resolve differently across hosts.

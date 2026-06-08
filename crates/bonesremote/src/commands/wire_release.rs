@@ -105,25 +105,27 @@ fn path_exists(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::fs;
     use std::path::PathBuf;
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
+    use shared::paths;
 
     use super::{create_default_shared_target, remove_path};
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-        std::env::temp_dir().join(format!("bonesremote_wire_release_test_{}_{}_{}", process::id(), nanos, test_name))
+        env::temp_dir().join(format!("bonesremote_wire_release_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
     // Explicit file declarations must be bootstrapped as files.
     #[test]
     fn create_default_shared_target_creates_file_for_explicit_file_paths() -> Result<()> {
         let root = temp_dir_path("default_file");
-        let shared_file = root.join("shared").join(".env");
+        let shared_file = root.join(paths::SHARED_DIR).join(".env");
 
         create_default_shared_target(&shared_file, true)?;
 
@@ -138,7 +140,7 @@ mod tests {
     #[test]
     fn create_default_shared_target_creates_directory_for_explicit_directory_paths() -> Result<()> {
         let root = temp_dir_path("default_directory");
-        let shared_dir = root.join("shared").join("storage");
+        let shared_dir = root.join(paths::SHARED_DIR).join("storage");
 
         create_default_shared_target(&shared_dir, false)?;
 

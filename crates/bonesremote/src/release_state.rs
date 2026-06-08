@@ -7,9 +7,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 
 use crate::config::{BonesConfig, Constants};
+use shared::paths::DeploymentPaths;
+
+fn deployment_paths(cfg: &BonesConfig) -> DeploymentPaths {
+    DeploymentPaths::new(&cfg.data.project_name, &cfg.data.repo_path, &cfg.data.project_root, &cfg.data.web_root)
+}
 
 pub fn staged_release_path(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.repo_path).join("bones").join(Constants::STAGED_RELEASE_FILE)
+    Path::new(&deployment_paths(cfg).repo_bones).join(Constants::STAGED_RELEASE_FILE)
 }
 
 pub fn read_staged_release(cfg: &BonesConfig) -> Result<String> {
@@ -49,19 +54,19 @@ pub fn release_dir(cfg: &BonesConfig, release: &str) -> PathBuf {
 }
 
 pub fn releases_dir(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.project_root).join(Constants::RELEASES_DIR)
+    PathBuf::from(deployment_paths(cfg).releases)
 }
 
 pub fn build_root(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.project_root).join(Constants::BUILD_DIR).join(Constants::BUILD_WORKSPACE_DIR)
+    PathBuf::from(deployment_paths(cfg).build_root)
 }
 
 pub fn shared_dir(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.project_root).join(Constants::SHARED_DIR)
+    PathBuf::from(deployment_paths(cfg).shared)
 }
 
 pub fn current_link(cfg: &BonesConfig) -> PathBuf {
-    Path::new(&cfg.data.project_root).join(Constants::CURRENT_LINK)
+    PathBuf::from(deployment_paths(cfg).current)
 }
 
 pub fn current_release_dir(cfg: &BonesConfig) -> Result<PathBuf> {
@@ -132,23 +137,25 @@ pub fn point_symlink_atomically(link_path: &Path, target_path: &Path) -> Result<
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
+    use shared::paths;
 
     use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases};
 
     use super::{
-        clear_staged_release, current_release_name, list_releases_sorted, point_symlink_atomically,
+        clear_staged_release, current_link, current_release_name, list_releases_sorted, point_symlink_atomically,
         read_staged_release, releases_dir, staged_release_path, write_staged_release,
     };
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-        std::env::temp_dir().join(format!("bonesremote_release_state_test_{}_{}_{}", process::id(), nanos, test_name))
+        env::temp_dir().join(format!("bonesremote_release_state_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
     fn sample_config(root: &Path) -> BonesConfig {
@@ -255,7 +262,7 @@ mod tests {
         fs::create_dir_all(&target_a)?;
         fs::create_dir_all(&target_b)?;
 
-        let link_path = root.join("current");
+        let link_path = root.join(paths::CURRENT_LINK);
         point_symlink_atomically(&link_path, &target_a)?;
         point_symlink_atomically(&link_path, &target_b)?;
 
@@ -295,7 +302,7 @@ mod tests {
         let release = releases_dir.join("20260507_170000");
         fs::create_dir_all(&release)?;
 
-        let current = Path::new(&cfg.data.project_root).join("current");
+        let current = current_link(&cfg);
         point_symlink_atomically(&current, &release)?;
 
         let name = current_release_name(&cfg)?;

@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use shared::paths::DeploymentPaths;
 
 use crate::config;
 use crate::landlock;
@@ -17,8 +18,10 @@ pub fn run(config_path: &str) -> Result<()> {
     let active_web_root = fs::canonicalize(active_release_root.join(&cfg.data.web_root))
         .with_context(|| format!("Failed to resolve web_root: {}", cfg.data.web_root))?;
 
-    let socket_dir = PathBuf::from("/run").join(&cfg.data.project_name);
-    let nginx_conf = PathBuf::from(&cfg.data.repo_path).join("bones").join("nginx.conf");
+    let paths =
+        DeploymentPaths::new(&cfg.data.project_name, &cfg.data.repo_path, &cfg.data.project_root, &cfg.data.web_root);
+    let socket_dir = PathBuf::from(paths.runtime_socket_dir);
+    let nginx_conf = PathBuf::from(paths.repo_nginx_config);
     let policy = build_policy(&active_web_root, &socket_dir, &nginx_conf);
 
     landlock::restrict_self(&policy)?;
@@ -50,19 +53,27 @@ fn build_policy(web_root: &Path, socket_dir: &Path, nginx_conf: &Path) -> landlo
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::path::PathBuf;
+
+    use shared::paths::{self, DeploymentPaths};
 
     use super::build_policy;
 
     #[test]
     fn build_policy_includes_nginx_conf_in_read_only_paths() {
-        let web_root = Path::new("/srv/deployments/acme/current/public");
-        let socket_dir = Path::new("/run/acme");
-        let nginx_conf = Path::new("/home/git/acme.git/bones/nginx.conf");
+        let paths = DeploymentPaths::new(
+            "acme",
+            &paths::default_repo_path_for("acme"),
+            &paths::default_project_root_for("acme"),
+            paths::DEFAULT_WEB_ROOT,
+        );
+        let web_root = PathBuf::from(paths.current_web_root);
+        let socket_dir = PathBuf::from(paths.runtime_socket_dir);
+        let nginx_conf = PathBuf::from(paths.repo_nginx_config);
 
-        let policy = build_policy(web_root, socket_dir, nginx_conf);
+        let policy = build_policy(&web_root, &socket_dir, &nginx_conf);
 
-        assert!(policy.read_only_paths.iter().any(|path| path == web_root));
-        assert!(policy.read_only_paths.iter().any(|path| path == nginx_conf));
+        assert!(policy.read_only_paths.iter().any(|path| path == &web_root));
+        assert!(policy.read_only_paths.iter().any(|path| path == &nginx_conf));
     }
 }

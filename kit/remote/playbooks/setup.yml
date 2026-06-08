@@ -48,6 +48,6 @@
           - bonesremote
           - doctor
       environment:
-        PATH: "/usr/local/bin:{{ ansible_env.PATH }}"
+        PATH: "{{ paths.usr_local_bin }}:{{ ansible_facts['env']['PATH'] }}"
       changed_when: false
       tags: [common, bonesremote]

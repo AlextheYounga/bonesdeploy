@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::paths;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Data {
@@ -87,15 +89,15 @@ pub struct PathOverride {
 }
 
 pub fn default_repo_path_for(project_name: &str) -> String {
-    format!("/home/git/{project_name}.git")
+    paths::default_repo_path_for(project_name)
 }
 
 pub fn default_project_root_for(project_name: &str) -> String {
-    format!("/srv/deployments/{project_name}")
+    paths::default_project_root_for(project_name)
 }
 
 pub fn default_web_root() -> String {
-    String::from("public")
+    paths::default_web_root()
 }
 
 pub fn apply_derived_defaults(data: &mut Data, permissions: &mut Permissions) {
