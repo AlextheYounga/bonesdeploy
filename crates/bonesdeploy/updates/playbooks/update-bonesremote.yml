@@ -19,7 +19,13 @@
         that:
           - bonesremote_staging_path is defined and bonesremote_staging_path | length > 0
           - bonesremote_target_version is defined and bonesremote_target_version | length > 0
-        fail_msg: "bonesremote_staging_path and bonesremote_target_version are required"
+          - bonesremote_install_root is defined and bonesremote_install_root | length > 0
+          - bonesremote_stable_link is defined and bonesremote_stable_link | length > 0
+          - bonesremote_global_link is defined and bonesremote_global_link | length > 0
+          - bonesremote_managed_projects_root is defined and bonesremote_managed_projects_root | length > 0
+          - bonesremote_binary_name is defined and bonesremote_binary_name | length > 0
+          - bonesremote_swap_link_prefix is defined and bonesremote_swap_link_prefix | length > 0
+        fail_msg: "bonesremote_staging_path, bonesremote_target_version, and all derived path vars are required"
         quiet: true
 
     - name: Ensure install root exists
