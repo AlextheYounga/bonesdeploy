@@ -105,6 +105,7 @@ fn path_exists(path: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::fs;
     use std::path::PathBuf;
     use std::process;
@@ -116,7 +117,7 @@ mod tests {
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-        std::env::temp_dir().join(format!("bonesremote_wire_release_test_{}_{}_{}", process::id(), nanos, test_name))
+        env::temp_dir().join(format!("bonesremote_wire_release_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
     // Explicit file declarations must be bootstrapped as files.

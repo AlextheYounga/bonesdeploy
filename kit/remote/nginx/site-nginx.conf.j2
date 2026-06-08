@@ -1,6 +1,6 @@
 daemon off;
 worker_processes 1;
-pid /run/{{ project_name }}/nginx.pid;
+pid {{ paths.runtime_socket_dir }}/nginx.pid;
 error_log stderr notice;
 
 events {
@@ -9,15 +9,15 @@ events {
 
 http {
     access_log stderr;
-    client_body_temp_path /run/{{ project_name }}/client_body;
-    proxy_temp_path /run/{{ project_name }}/proxy;
-    fastcgi_temp_path /run/{{ project_name }}/fastcgi;
-    uwsgi_temp_path /run/{{ project_name }}/uwsgi;
-    scgi_temp_path /run/{{ project_name }}/scgi;
+    client_body_temp_path {{ paths.runtime_socket_dir }}/client_body;
+    proxy_temp_path {{ paths.runtime_socket_dir }}/proxy;
+    fastcgi_temp_path {{ paths.runtime_socket_dir }}/fastcgi;
+    uwsgi_temp_path {{ paths.runtime_socket_dir }}/uwsgi;
+    scgi_temp_path {{ paths.runtime_socket_dir }}/scgi;
 
     server {
-        listen unix:/run/{{ project_name }}/nginx.sock;
-        root {{ project_root }}/current/{{ web_root }};
+        listen unix:{{ paths.runtime_nginx_socket }};
+        root {{ paths.current_web_root }};
         index index.html;
 
         location / {

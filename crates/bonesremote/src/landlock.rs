@@ -7,10 +7,6 @@ pub struct Policy {
     pub writable_paths: Vec<PathBuf>,
 }
 
-fn policy_path_counts(policy: &Policy) -> (usize, usize) {
-    (policy.read_only_paths.len(), policy.writable_paths.len())
-}
-
 #[cfg(target_os = "linux")]
 mod platform {
     use super::Policy;
@@ -84,7 +80,7 @@ mod platform {
     }
 
     pub fn restrict_self(policy: &Policy) -> Result<()> {
-        let _ = super::policy_path_counts(policy);
+        let _ = policy;
         bail!("Landlock is only available on Linux")
     }
 }
@@ -107,7 +103,7 @@ pub fn default_system_read_paths() -> Vec<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Policy, policy_path_counts};
+    use super::Policy;
     use std::path::PathBuf;
 
     #[test]
@@ -143,6 +139,6 @@ mod tests {
             writable_paths: vec![PathBuf::from("/run/acme")],
         };
 
-        assert_eq!(policy_path_counts(&policy), (2, 1));
+        assert_eq!((policy.read_only_paths.len(), policy.writable_paths.len()), (2, 1));
     }
 }

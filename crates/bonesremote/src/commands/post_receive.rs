@@ -163,7 +163,7 @@ mod tests {
 
         let bare = create_remote_with_master_commit(&root)?;
         let project_root = root.join("deploy");
-        let build_root = project_root.join(Constants::BUILD_DIR).join(Constants::BUILD_WORKSPACE_DIR);
+        let build_root = project_root.join(Constants::BUILD_DIR).join("workspace");
         fs::create_dir_all(&build_root)?;
 
         let config_path = root.join("bones.yaml");
@@ -189,7 +189,7 @@ mod tests {
         let bare = create_remote_with_master_commit(&root)?;
         let project_root = root.join("deploy");
         let build_dir = project_root.join(Constants::BUILD_DIR);
-        let build_root = build_dir.join(Constants::BUILD_WORKSPACE_DIR);
+        let build_root = build_dir.join("workspace");
         fs::create_dir_all(&build_root)?;
 
         let config_path = root.join("bones.yaml");
@@ -205,9 +205,7 @@ mod tests {
         restore.set_mode(0o755);
         fs::set_permissions(&build_dir, restore)?;
 
-        let error = if let Err(error) = result {
-            error
-        } else {
+        let Err(error) = result else {
             anyhow::bail!("post-receive should fail when workspace path is inaccessible");
         };
         assert!(error.to_string().to_lowercase().contains("permission denied"));

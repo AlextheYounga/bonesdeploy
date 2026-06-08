@@ -6,6 +6,7 @@ use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 use console::style;
+use serde_json::json;
 
 use crate::commands::remote_setup_output;
 use crate::config;
@@ -25,9 +26,8 @@ pub fn run() -> Result<()> {
     let ssh_user = resolve_bootstrap_ssh_user();
     let deploy_authorized_key = resolve_deploy_authorized_key()?;
 
-    let extra_args =
-        vec![String::from("-e"), build_extra_var_json_string("deploy_authorized_key", &deploy_authorized_key)];
-    run_ansible_playbook(&cfg, &ssh_user, &extra_args)?;
+    let extra_vars = json!({"deploy_authorized_key": deploy_authorized_key});
+    run_ansible_playbook(&cfg, &ssh_user, extra_vars, &[])?;
 
     println!("{} Remote setup complete.", style("Done!").green().bold());
 
@@ -64,18 +64,6 @@ fn read_public_key(path: &Path) -> Result<String> {
     Ok(key)
 }
 
-pub(crate) fn build_extra_var_json_string(name: &str, value: &str) -> String {
-    format!("{{\"{}\":\"{}\"}}", escape_json_string(name), escape_json_string(value))
-}
-
-pub(crate) fn build_extra_var_json_bool(name: &str, value: bool) -> String {
-    format!("{{\"{}\":{}}}", escape_json_string(name), value)
-}
-
-fn escape_json_string(value: &str) -> String {
-    value.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r").replace('\t', "\\t")
-}
-
 pub(crate) fn resolve_bootstrap_ssh_user() -> String {
     resolve_bootstrap_ssh_user_from(env::var("BONES_BOOTSTRAP_SSH_USER").ok())
 }
@@ -84,8 +72,13 @@ fn resolve_bootstrap_ssh_user_from(value: Option<String>) -> String {
     value.map(|raw| raw.trim().to_string()).filter(|raw| !raw.is_empty()).unwrap_or_else(|| String::from("root"))
 }
 
-pub fn run_ansible_playbook(cfg: &config::BonesConfig, ssh_user: &str, extra_args: &[String]) -> Result<()> {
-    remote_setup_output::run(cfg, ssh_user, extra_args)
+pub fn run_ansible_playbook(
+    cfg: &config::BonesConfig,
+    ssh_user: &str,
+    extra_vars: serde_json::Value,
+    extra_args: &[String],
+) -> Result<()> {
+    remote_setup_output::run(cfg, ssh_user, extra_vars, extra_args)
 }
 
 pub(crate) fn ensure_remote_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {
@@ -241,47 +234,9 @@ fn user_ansible_playbook_path() -> Result<Option<PathBuf>> {
     Ok(Some(Path::new(&user_base).join("bin").join("ansible-playbook")))
 }
 
-pub(crate) fn resolve_project_root_parent(project_root: &str) -> String {
-    Path::new(project_root)
-        .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-        .map_or_else(|| String::from("/srv/deployments"), |path| path.to_string_lossy().to_string())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        build_extra_var_json_bool, build_extra_var_json_string, resolve_bootstrap_ssh_user_from,
-        resolve_project_root_parent,
-    };
-
-    // Verifies parent extraction for normal project_root paths used by playbook variables.
-    #[test]
-    fn resolve_project_root_parent_uses_parent_directory_for_nested_absolute_path() {
-        let parent = resolve_project_root_parent("/srv/deployments/my-app/current");
-        assert_eq!(parent, "/srv/deployments/my-app");
-    }
-
-    // Verifies root-level project_root values keep '/' parent instead of fallback.
-    #[test]
-    fn resolve_project_root_parent_uses_root_for_single_segment_absolute_path() {
-        let parent = resolve_project_root_parent("/my-app");
-        assert_eq!(parent, "/");
-    }
-
-    // Verifies relative project_root input still derives a usable parent path.
-    #[test]
-    fn resolve_project_root_parent_uses_relative_parent_for_relative_path() {
-        let parent = resolve_project_root_parent("deploy/project");
-        assert_eq!(parent, "deploy");
-    }
-
-    // Empty input should hit safe fallback to documented default parent.
-    #[test]
-    fn resolve_project_root_parent_falls_back_for_empty_path() {
-        let parent = resolve_project_root_parent("");
-        assert_eq!(parent, "/srv/deployments");
-    }
+    use super::resolve_bootstrap_ssh_user_from;
 
     #[test]
     fn resolve_bootstrap_ssh_user_defaults_to_root() {
@@ -302,22 +257,5 @@ mod tests {
 
         let user = resolve_bootstrap_ssh_user_from(Some(String::from("  ubuntu  ")));
         assert_eq!(user, "ubuntu");
-    }
-
-    #[test]
-    fn build_extra_var_json_preserves_spaces_in_ssh_public_key() {
-        let extra_var = build_extra_var_json_string(
-            "deploy_authorized_key",
-            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFoo comment@host",
-        );
-
-        assert_eq!(extra_var, "{\"deploy_authorized_key\":\"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFoo comment@host\"}");
-    }
-
-    #[test]
-    fn build_extra_var_json_bool_preserves_boolean_type() {
-        let extra_var = build_extra_var_json_bool("ssl_enabled", true);
-
-        assert_eq!(extra_var, "{\"ssl_enabled\":true}");
     }
 }

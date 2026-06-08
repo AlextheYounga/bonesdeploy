@@ -1,7 +1,7 @@
 //! Integration test: all `.rs` source files must stay at or below 400 lines.
 //!
 //! This is a structural scan — no type inference needed.
-//! Skips `target/`, `vendor/`, and `node_modules/` by convention.
+//! Skips generated/dependency directories and local Git worktrees by convention.
 
 use std::fs;
 use std::path::Path;
@@ -39,7 +39,7 @@ fn visit_dirs(dir: &Path, file_count: &mut usize, violations: &mut Vec<String>) 
         if path.is_dir() {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
-            if matches!(name_str.as_ref(), "target" | "vendor" | "node_modules" | ".git") {
+            if matches!(name_str.as_ref(), "target" | "vendor" | "node_modules" | ".git" | ".worktrees") {
                 continue;
             }
             visit_dirs(&path, file_count, violations);

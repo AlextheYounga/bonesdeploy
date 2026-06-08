@@ -19,7 +19,7 @@
 - name: Deploy per-site nginx config
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../nginx/site-nginx.conf.j2"
-    dest: "{{ repo_path }}/bones/nginx.conf"
+    dest: "{{ paths.repo_nginx_config }}"
     owner: "{{ service_user }}"
     group: "{{ group }}"
     mode: "0640"
@@ -28,7 +28,7 @@
 - name: Deploy per-site nginx systemd service
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../nginx/site-nginx.service.j2"
-    dest: "/etc/systemd/system/{{ project_name }}-nginx.service"
+    dest: "{{ paths.systemd_site_nginx_service }}"
     owner: root
     group: root
     mode: "0644"
@@ -38,7 +38,7 @@
 - name: Deploy router nginx config
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../nginx/router.conf.j2"
-    dest: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
+    dest: "{{ paths.nginx_site_available }}"
     owner: root
     group: root
     mode: "0644"
@@ -47,8 +47,8 @@
 
 - name: Enable router nginx site
   ansible.builtin.file:
-    src: "/etc/nginx/sites-available/{{ nginx_site_name }}.conf"
-    dest: "/etc/nginx/sites-enabled/{{ nginx_site_name }}.conf"
+    src: "{{ paths.nginx_site_available }}"
+    dest: "{{ paths.nginx_site_enabled }}"
     state: link
     force: true
   notify: Reload nginx

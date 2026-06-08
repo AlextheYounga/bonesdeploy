@@ -6,8 +6,8 @@ Requires=apparmor.service
 [Service]
 Type=simple
 User={{ service_user }}
-WorkingDirectory={{ project_root }}/current
-ExecStart=/usr/local/bin/bonesremote landlock nginx --config {{ repo_path }}/bones/bones.yaml
+WorkingDirectory={{ paths.current }}
+ExecStart=/usr/local/bin/bonesremote landlock nginx --config {{ paths.repo_bones_yaml }}
 AppArmorProfile={{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-nginx") }}
 NoNewPrivileges=yes
 RestrictNamespaces=yes

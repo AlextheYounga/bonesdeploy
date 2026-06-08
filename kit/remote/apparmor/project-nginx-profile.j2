@@ -26,12 +26,12 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-ngi
   /proc/** r,
   /sys/devices/system/cpu/online r,
 
-  {{ project_root }}/current/{{ web_root }}/** r,
-  {{ repo_path }}/bones/bones.yaml r,
-  {{ repo_path }}/bones/nginx.conf r,
+  {{ paths.current_web_root }}/** r,
+  {{ paths.repo_bones_yaml }} r,
+  {{ paths.repo_nginx_config }} r,
 
-  /run/{{ project_name }}/ rw,
-  /run/{{ project_name }}/** rwk,
+  {{ paths.runtime_socket_dir }}/ rw,
+  {{ paths.runtime_socket_dir }}/** rwk,
 
   # repo_path defaults to /home/{{ deploy_user }}/<project>.git, so global /home denies
   # would block bonesremote reading config and nginx config from repo-local bones files.
