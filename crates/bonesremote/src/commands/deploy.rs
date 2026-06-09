@@ -148,7 +148,7 @@ mod tests {
         Ok(())
     }
 
-    // Ensures publish prep always starts from a clean runtime dir with no stale artifacts.
+    /// Removes all direct children of a directory without removing the directory itself.
     #[test]
     fn clear_directory_removes_all_direct_children() -> Result<()> {
         let root = temp_dir("bonesremote_deploy_clear")?;
@@ -163,7 +163,7 @@ mod tests {
         Ok(())
     }
 
-    // Ensures deployment scripts execute in deterministic order and ignore non-script directories.
+    /// Returns deployment script files sorted and excludes subdirectories.
     #[test]
     fn list_deployment_scripts_returns_sorted_files_only() -> Result<()> {
         let deployment_dir = temp_dir("bonesremote_deploy_scripts")?;
@@ -187,7 +187,7 @@ mod tests {
         Ok(())
     }
 
-    // Verifies release publish is a full replacement copy, preserving expected hidden files.
+    /// Replaces the release tree contents with a fresh copy from the build workspace.
     #[test]
     fn publish_release_tree_replaces_release_contents_with_build_workspace() -> Result<()> {
         let root = temp_dir("bonesremote_deploy_publish")?;

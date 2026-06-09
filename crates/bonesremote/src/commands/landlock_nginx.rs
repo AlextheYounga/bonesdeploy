@@ -59,6 +59,7 @@ mod tests {
 
     use super::build_policy;
 
+    /// Includes the nginx configuration path in the Landlock read-only policy set.
     #[test]
     fn build_policy_includes_nginx_conf_in_read_only_paths() {
         let paths = DeploymentPaths::new(

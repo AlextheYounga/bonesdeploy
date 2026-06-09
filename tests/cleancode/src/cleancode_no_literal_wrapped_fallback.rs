@@ -82,6 +82,7 @@ fn collect_source_files(project_root: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// Detects provably unnecessary fallback calls on `Some` or `Ok` wrappers.
 #[test]
 fn no_literal_wrapped_fallback() {
     let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));

@@ -131,12 +131,14 @@ fn parse_version_line(line: &str) -> Option<String> {
 mod tests {
     use super::{SOURCE_BRANCH, SOURCE_REPO_URL, parse_package_version};
 
+    /// Verifies the update source repository and branch constants are set to the canonical values.
     #[test]
     fn update_uses_master_branch_source_repository() {
         assert_eq!(SOURCE_REPO_URL, "https://github.com/AlextheYounga/bonesdeploy.git");
         assert_eq!(SOURCE_BRANCH, "master");
     }
 
+    /// Extracts the package version from the `[package]` section of a Cargo manifest.
     #[test]
     fn parses_package_version_from_manifest_package_section() -> anyhow::Result<()> {
         let manifest = r#"
@@ -153,6 +155,7 @@ version = "not-this"
         Ok(())
     }
 
+    /// Returns an error when the manifest has no `[package]` section with a version field.
     #[test]
     fn rejects_manifest_without_package_version() {
         let result = parse_package_version("[dependencies]\nversion = \"0.2.8\"\n");

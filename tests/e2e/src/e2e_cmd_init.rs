@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::support::{cli, repo};
 
+/// Verifies that `bonesdeploy init` reuses an existing scaffold and creates the pre-push symlink.
 #[test]
 #[ignore = "e2e test"]
 fn e2e_bonesdeploy_init_reuses_existing_scaffold_and_symlinks_pre_push_hook() -> Result<()> {

@@ -3,6 +3,7 @@ use std::process::Command;
 
 use crate::support::{cli, docker, repo};
 
+/// Verifies that `bonesdeploy pull` syncs the remote `.bones` folder back into the local project.
 #[test]
 #[ignore = "e2e test"]
 fn e2e_bonesdeploy_pull_syncs_remote_bones_folder_back_locally() -> Result<()> {

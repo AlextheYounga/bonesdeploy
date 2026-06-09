@@ -163,6 +163,7 @@ mod tests {
         env::temp_dir().join(format!("{prefix}_{}_{}.yaml", process::id(), nanos))
     }
 
+    /// Derives service user, project root, repo path, and web root from the project name.
     #[test]
     fn load_derives_service_user_project_root_repo_path_and_web_root() -> Result<()> {
         let path = temp_file_path("bonesremote_config_derived_defaults");
@@ -183,6 +184,7 @@ data:
         Ok(())
     }
 
+    /// Preserves explicitly configured service user and path overrides.
     #[test]
     fn load_preserves_explicit_service_user_and_paths() -> Result<()> {
         let path = temp_file_path("bonesremote_config_explicit_values");
@@ -208,6 +210,7 @@ permissions:
         Ok(())
     }
 
+    /// Applies default values for port, branch, deploy user, and releases when fields are missing.
     #[test]
     fn load_uses_defaults_for_missing_fields() -> Result<()> {
         let path = temp_file_path("bonesremote_config_missing_fields");
@@ -225,6 +228,7 @@ permissions:
         Ok(())
     }
 
+    /// Returns an error when the config file contains invalid YAML.
     #[test]
     fn load_fails_for_invalid_yaml() -> Result<()> {
         let path = temp_file_path("bonesremote_config_invalid_yaml");
@@ -237,6 +241,7 @@ permissions:
         Ok(())
     }
 
+    /// Returns an error when the config file does not exist.
     #[test]
     fn load_fails_for_missing_file() {
         let path = temp_file_path("bonesremote_config_missing_file");
@@ -244,6 +249,7 @@ permissions:
         assert!(result.is_err());
     }
 
+    /// Keeps the default service user as an empty string when project name is empty.
     #[test]
     fn load_keeps_default_service_user_when_project_name_is_empty() -> Result<()> {
         let path = temp_file_path("bonesremote_config_empty_project");

@@ -138,7 +138,7 @@ mod tests {
         Ok(bare)
     }
 
-    // Ensures post-receive fails fast when build workspace is missing instead of checking out into nowhere.
+    /// `post-receive` fails when the build workspace does not exist.
     #[test]
     fn post_receive_requires_existing_build_workspace() -> Result<()> {
         let root = temp_dir_path("build_workspace_missing");
@@ -156,7 +156,7 @@ mod tests {
         Ok(())
     }
 
-    // Verifies post-receive can materialize requested revision in build workspace before privileged steps.
+    /// `post-receive` checks out the requested revision into the staged build workspace.
     #[test]
     fn post_receive_checks_out_requested_revision_into_build_workspace() -> Result<()> {
         let root = temp_dir_path("checkout_revision");
@@ -181,7 +181,7 @@ mod tests {
         Ok(())
     }
 
-    // Ensures permission issues are reported as permission errors, not as missing workspace.
+    /// `post-receive` fails with a permission error when the build workspace is inaccessible.
     #[test]
     fn post_receive_reports_permission_denied_for_inaccessible_workspace() -> Result<()> {
         let root = temp_dir_path("workspace_permission_denied");

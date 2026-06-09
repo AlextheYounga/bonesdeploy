@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::Path;
 
+/// Verifies the update-bonesremote playbook uses `cargo install --git` instead of staging binaries.
+/// Verifies the update-bonesremote playbook uses `cargo install --git` instead of staging binaries.
 #[test]
 fn update_bonesremote_playbook_installs_from_git_like_init() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("updates/playbooks/update-bonesremote.yml");
@@ -32,6 +34,7 @@ fn update_bonesremote_playbook_installs_from_git_like_init() {
     );
 }
 
+/// Ensures `AppArmor` role defaults and tasks use `apparmor_profile_path` consistently.
 #[test]
 fn apparmor_role_keeps_profile_path_derived_from_profile_name_override() {
     let defaults =

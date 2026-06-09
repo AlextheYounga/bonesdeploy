@@ -49,6 +49,7 @@ fn terms_in_line(line: &str) -> Vec<&'static str> {
     matches
 }
 
+/// Detects legacy-language smell terms like legacy, hack, or workaround in source code.
 #[test]
 fn no_legacy_terms() {
     let project_root = Path::new(env!("CARGO_MANIFEST_DIR"))

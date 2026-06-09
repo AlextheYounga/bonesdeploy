@@ -186,6 +186,7 @@ mod tests {
         }
     }
 
+    /// Round-trips a staged release name through write and read.
     #[test]
     fn write_then_read_staged_release_round_trips() -> Result<()> {
         let root = temp_dir_path("round_trip");
@@ -200,6 +201,7 @@ mod tests {
         Ok(())
     }
 
+    /// Returns an error when the staged release file is empty.
     #[test]
     fn read_staged_release_rejects_empty_file() -> Result<()> {
         let root = temp_dir_path("empty_state");
@@ -219,6 +221,7 @@ mod tests {
         Ok(())
     }
 
+    /// Removes the staged release state file from disk.
     #[test]
     fn clear_staged_release_removes_state_file() -> Result<()> {
         let root = temp_dir_path("clear_state");
@@ -233,6 +236,7 @@ mod tests {
         Ok(())
     }
 
+    /// Creates parent directories and atomically points a symlink to its target.
     #[test]
     fn point_symlink_atomically_creates_parent_dirs_and_points_to_target() -> Result<()> {
         let root = temp_dir_path("point_symlink_parent");
@@ -252,6 +256,7 @@ mod tests {
         Ok(())
     }
 
+    /// Atomically repoints an existing symlink to a new target.
     #[test]
     fn point_symlink_atomically_repoints_existing_link() -> Result<()> {
         let root = temp_dir_path("point_symlink_repoint");
@@ -273,6 +278,7 @@ mod tests {
         Ok(())
     }
 
+    /// Returns only directories sorted chronologically, excluding files.
     #[test]
     fn list_releases_sorted_returns_only_directories_in_order() -> Result<()> {
         let root = temp_dir_path("list_releases");
@@ -292,6 +298,7 @@ mod tests {
         Ok(())
     }
 
+    /// Resolves the current release name from the `current` symlink target.
     #[test]
     fn current_release_name_resolves_from_current_symlink() -> Result<()> {
         let root = temp_dir_path("current_release_name");

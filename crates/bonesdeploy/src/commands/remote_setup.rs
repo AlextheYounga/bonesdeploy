@@ -238,18 +238,21 @@ fn user_ansible_playbook_path() -> Result<Option<PathBuf>> {
 mod tests {
     use super::resolve_bootstrap_ssh_user_from;
 
+    /// Defaults the bootstrap SSH user to root when no override is provided.
     #[test]
     fn resolve_bootstrap_ssh_user_defaults_to_root() {
         let user = resolve_bootstrap_ssh_user_from(None);
         assert_eq!(user, "root");
     }
 
+    /// Uses the environment override when provided for the bootstrap SSH user.
     #[test]
     fn resolve_bootstrap_ssh_user_uses_env_override() {
         let user = resolve_bootstrap_ssh_user_from(Some(String::from("ubuntu")));
         assert_eq!(user, "ubuntu");
     }
 
+    /// Trims whitespace and falls back to root when the bootstrap SSH user is blank.
     #[test]
     fn resolve_bootstrap_ssh_user_trims_and_rejects_blank_values() {
         let user = resolve_bootstrap_ssh_user_from(Some(String::from("   ")));

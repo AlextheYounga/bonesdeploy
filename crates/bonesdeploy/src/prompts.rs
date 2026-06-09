@@ -199,6 +199,7 @@ fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<Stri
 mod tests {
     use super::is_affirmative;
 
+    /// Accepts common yes values like y, yes, and YES.
     #[test]
     fn confirmation_parser_accepts_common_yes_values() {
         assert!(is_affirmative("y"));
@@ -206,6 +207,7 @@ mod tests {
         assert!(is_affirmative("YES"));
     }
 
+    /// Rejects non-affirmative values like empty string, n, and no.
     #[test]
     fn confirmation_parser_rejects_non_affirmative_values() {
         assert!(!is_affirmative(""));

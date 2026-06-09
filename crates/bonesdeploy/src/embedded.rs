@@ -98,7 +98,7 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 mod tests {
     use super::read_asset;
 
-    // The remote doctor hook should invoke the command without a config flag.
+    /// Does not pass a `--config` flag to the doctor command in the hooks script.
     #[test]
     fn hooks_script_does_not_pass_config_to_doctor() {
         let hooks_script = read_asset("hooks.sh");

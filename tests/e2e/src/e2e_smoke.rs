@@ -1,6 +1,6 @@
 use crate::support::docker;
 
-// Verifies secure bootstrap default: setup should target root unless explicitly overridden.
+/// Verifies that the e2e harness bootstrap SSH user defaults to root for secure provisioning.
 #[test]
 #[ignore = "e2e test"]
 fn e2e_harness_bootstrap_user_defaults_to_root() {
@@ -8,7 +8,7 @@ fn e2e_harness_bootstrap_user_defaults_to_root() {
     assert_eq!(user, "root");
 }
 
-// Verifies harness supports custom bootstrap users for non-root provisioning environments.
+/// Verifies that the e2e harness bootstrap SSH user can be overridden via environment variable.
 #[test]
 #[ignore = "e2e test"]
 fn e2e_harness_bootstrap_user_can_be_overridden() {

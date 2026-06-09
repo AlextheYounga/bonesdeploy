@@ -31,6 +31,7 @@ const TEMPLATE_SETUP_PLAYBOOKS: [&str; 7] = [
     "templates/vue/remote/playbooks/setup.yml",
 ];
 
+/// Uses the project name as the default service user instead of a hardcoded value.
 #[test]
 fn template_service_user_defaults_to_project_name_not_applications() {
     for template in TEMPLATES {
@@ -45,6 +46,7 @@ fn template_service_user_defaults_to_project_name_not_applications() {
     }
 }
 
+/// Includes the `AppArmor` role in the shared remote setup playbook.
 #[test]
 fn remote_setup_playbook_includes_apparmor_role() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
@@ -58,6 +60,7 @@ fn remote_setup_playbook_includes_apparmor_role() {
     );
 }
 
+/// Loads shared template variables and includes the doctor validation task in the remote setup playbook.
 #[test]
 fn remote_setup_playbook_loads_shared_template_vars_and_doctor_task() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
@@ -80,6 +83,7 @@ fn remote_setup_playbook_loads_shared_template_vars_and_doctor_task() {
     );
 }
 
+/// Sets an `AppArmor` profile in the per-site nginx systemd service template.
 #[test]
 fn nginx_service_template_sets_apparmor_profile() {
     let service_template =
@@ -91,6 +95,7 @@ fn nginx_service_template_sets_apparmor_profile() {
     assert!(content.contains("AppArmorProfile="), "per-site systemd service must pin an AppArmor profile\n{content}");
 }
 
+/// Requires the `AppArmor` service in the nginx systemd service template.
 #[test]
 fn nginx_service_template_waits_for_apparmor_service() {
     let service_template =
@@ -109,6 +114,7 @@ fn nginx_service_template_waits_for_apparmor_service() {
     );
 }
 
+/// Ensures the `AppArmor` profile template file exists at the expected path.
 #[test]
 fn apparmor_profile_template_exists() {
     let profile_template =
@@ -116,6 +122,7 @@ fn apparmor_profile_template_exists() {
     assert!(profile_template.exists(), "expected AppArmor profile template at {}", profile_template.display());
 }
 
+/// Allows reading the repo-level nginx configuration in the `AppArmor` profile template.
 #[test]
 fn apparmor_profile_template_allows_repo_nginx_conf() {
     let profile_template =
@@ -130,6 +137,7 @@ fn apparmor_profile_template_allows_repo_nginx_conf() {
     );
 }
 
+/// Does not deny the parent home path when the repo path is derived from the shared helper.
 #[test]
 fn apparmor_profile_template_does_not_deny_repo_path_parent_home() {
     let profile_template =
@@ -148,6 +156,7 @@ fn apparmor_profile_template_does_not_deny_repo_path_parent_home() {
     );
 }
 
+/// Limits network access to unix stream sockets and denies inet sockets.
 #[test]
 fn apparmor_profile_template_limits_network_to_unix_stream() {
     let profile_template =
@@ -170,6 +179,7 @@ fn apparmor_profile_template_limits_network_to_unix_stream() {
     );
 }
 
+/// Verifies template-specific playbooks are removed in favor of shared kit setup logic.
 #[test]
 fn template_playbooks_include_apparmor_role() {
     for playbook in TEMPLATE_SETUP_PLAYBOOKS {
@@ -178,6 +188,7 @@ fn template_playbooks_include_apparmor_role() {
     }
 }
 
+/// Defines runtime role and setup label metadata in template vars files.
 #[test]
 fn template_setup_vars_files_define_runtime_metadata() {
     for vars_file in TEMPLATE_SETUP_VARS_FILES {
@@ -197,6 +208,7 @@ fn template_setup_vars_files_define_runtime_metadata() {
     }
 }
 
+/// Installs pnpm only after nvm activates the project Node version in the Nuxt deployment script.
 #[test]
 fn nuxt_deployment_script_installs_pnpm_after_nvm() {
     let script = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -227,6 +239,7 @@ fn nuxt_deployment_script_installs_pnpm_after_nvm() {
     );
 }
 
+/// Does not install global npm packages in the Nuxt runtime role.
 #[test]
 fn nuxt_runtime_role_does_not_install_global_npm_packages() {
     let defaults = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -247,6 +260,7 @@ fn nuxt_runtime_role_does_not_install_global_npm_packages() {
     );
 }
 
+/// Does not use pm2 in SPA template deployment scripts.
 #[test]
 fn spa_template_deploy_scripts_do_not_use_pm2() {
     for template in ["nuxt", "next", "sveltekit", "vue"] {
@@ -264,6 +278,7 @@ fn spa_template_deploy_scripts_do_not_use_pm2() {
     }
 }
 
+/// Does not use unsafe `PROJECT_NAME` fallback patterns in any deployment script.
 #[test]
 fn deployment_scripts_have_no_unsafe_project_name_fallbacks() {
     let patterns = ["${PROJECT_NAME:-", "${PROJECT_NAME-", ":-${PROJECT_NAME}", ":-${PROJECT_NAME:-"];
@@ -284,6 +299,7 @@ fn deployment_scripts_have_no_unsafe_project_name_fallbacks() {
     }
 }
 
+/// Restarts the project systemd service from app server deployment scripts.
 #[test]
 fn app_server_templates_restart_project_service_from_deployment_scripts() {
     for template in ["rails", "django"] {
@@ -305,6 +321,7 @@ fn app_server_templates_restart_project_service_from_deployment_scripts() {
     }
 }
 
+/// Ends after the build step without process restart for the static Vue SPA.
 #[test]
 fn vue_deployment_script_ends_after_build() {
     let script = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -320,6 +337,7 @@ fn vue_deployment_script_ends_after_build() {
     );
 }
 
+/// Does not install global npm packages in SPA template runtime roles.
 #[test]
 fn spa_template_runtime_roles_do_not_install_global_npm_packages() {
     for template in ["next", "sveltekit", "vue"] {
@@ -342,6 +360,7 @@ fn spa_template_runtime_roles_do_not_install_global_npm_packages() {
     }
 }
 
+/// Applies the `AppArmor` role before the nginx role in the shared setup playbook.
 #[test]
 fn shared_setup_playbook_applies_apparmor_before_nginx_role() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
@@ -365,6 +384,7 @@ fn shared_setup_playbook_applies_apparmor_before_nginx_role() {
     assert!(runtime_idx < nginx_idx, "runtime role hook must run before nginx role\n{content}");
 }
 
+/// Exposes common role defaults publicly for later runtime roles.
 #[test]
 fn shared_setup_playbook_exposes_common_role_defaults_to_runtime_role() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
@@ -378,6 +398,7 @@ fn shared_setup_playbook_exposes_common_role_defaults_to_runtime_role() {
     );
 }
 
+/// Exposes nginx role defaults publicly for the later SSL role.
 #[test]
 fn shared_setup_playbook_exposes_nginx_role_defaults_to_ssl_role() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
@@ -394,6 +415,7 @@ fn shared_setup_playbook_exposes_nginx_role_defaults_to_ssl_role() {
     );
 }
 
+/// Uses resolved placeholder web root paths in the common role.
 #[test]
 fn shared_setup_playbook_uses_placeholder_web_root_paths() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/common/tasks/main.yml");
@@ -411,6 +433,7 @@ fn shared_setup_playbook_uses_placeholder_web_root_paths() {
     );
 }
 
+/// Uses the resolved current web root for certbot validation in the SSL role.
 #[test]
 fn ssl_role_uses_current_web_root_path_manifest() {
     let role = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/ssl/tasks/main.yml");
@@ -424,6 +447,7 @@ fn ssl_role_uses_current_web_root_path_manifest() {
     );
 }
 
+/// Uses resolved paths in both nginx site and `AppArmor` templates.
 #[test]
 fn nginx_and_apparmor_templates_use_resolved_paths() {
     let nginx_site = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/nginx/site.conf.j2");
@@ -456,6 +480,7 @@ fn nginx_and_apparmor_templates_use_resolved_paths() {
     );
 }
 
+/// Treats SSL enabled as an explicit boolean rather than relying on string truthiness.
 #[test]
 fn ssl_role_treats_ssl_enabled_as_explicit_boolean() {
     let role = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/ssl/tasks/main.yml");
@@ -467,6 +492,7 @@ fn ssl_role_treats_ssl_enabled_as_explicit_boolean() {
     assert!(content.contains("when: ssl_enabled | bool"), "ssl role should cast CLI vars explicitly\n{content}");
 }
 
+/// Ensures all expected `AppArmor` role asset files exist.
 #[test]
 fn apparmor_role_assets_exist() {
     let role_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/apparmor");
@@ -476,6 +502,7 @@ fn apparmor_role_assets_exist() {
     }
 }
 
+/// Enforces the project `AppArmor` profile into enforce mode.
 #[test]
 fn apparmor_role_enforces_project_profile() {
     let tasks_file =
@@ -490,6 +517,7 @@ fn apparmor_role_enforces_project_profile() {
     );
 }
 
+/// Verifies the `AppArmor` profile is loaded in the kernel.
 #[test]
 fn apparmor_role_verifies_profile_loaded() {
     let tasks_file =
@@ -505,6 +533,7 @@ fn apparmor_role_verifies_profile_loaded() {
     assert!(content.contains("apparmor_profile_name"), "apparmor role must verify expected profile name\n{content}");
 }
 
+/// Verifies the `AppArmor` profile is in enforce mode via kernel output.
 #[test]
 fn apparmor_role_verifies_profile_enforce_mode() {
     let tasks_file =
@@ -521,6 +550,7 @@ fn apparmor_role_verifies_profile_enforce_mode() {
     );
 }
 
+/// Verifies `AppArmor` is enabled in the kernel parameters.
 #[test]
 fn apparmor_role_verifies_kernel_enabled() {
     let tasks_file =

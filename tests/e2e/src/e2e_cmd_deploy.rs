@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::support::{cli, docker, repo};
 
+/// Verifies that `bonesdeploy deploy` triggers the remote hook path end-to-end.
 #[test]
 #[ignore = "e2e test"]
 fn e2e_bonesdeploy_deploy_invokes_remote_hook_path() -> Result<()> {
