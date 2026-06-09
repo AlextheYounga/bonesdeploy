@@ -124,7 +124,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Pull => pull::run(),
         Command::Deploy => deploy::run().await,
         Command::Update { skip_local, skip_remote } => {
-            update::run(update::UpdateOptions { skip_local: *skip_local, skip_remote: *skip_remote }).await
+            update::run(update::UpdateOptions { skip_local: *skip_local, skip_remote: *skip_remote })
         }
         Command::Manage => manage::run(),
         Command::Remote { command } => match command {
