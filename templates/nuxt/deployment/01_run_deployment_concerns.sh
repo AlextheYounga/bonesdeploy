@@ -15,14 +15,13 @@ if [ -f "./.nvmrc" ]; then
   nvm install
 fi
 
+npm install -g pm2
+
 # Clean install and build
 rm -rf node_modules
 
 if [ -f "./pnpm-lock.yaml" ]; then
-  command -v pnpm >/dev/null 2>&1 || {
-    echo "pnpm not found. Install it globally or enable it via corepack before deploy."
-    exit 1
-  }
+  npm install -g pnpm
   pnpm install --frozen-lockfile
   pnpm build
 elif [ -f "./yarn.lock" ]; then
@@ -30,7 +29,7 @@ elif [ -f "./yarn.lock" ]; then
   yarn install --frozen-lockfile
   yarn build
 elif [ -f "./package-lock.json" ]; then
-  npm ci
+  npm install --include=optional
   npm run build
 else
   echo "No lockfile found. Run your package manager locally first."
