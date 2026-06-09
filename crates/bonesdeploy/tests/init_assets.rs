@@ -261,6 +261,59 @@ fn nuxt_runtime_role_does_not_install_global_npm_packages() {
 }
 
 #[test]
+fn spa_template_deploy_scripts_install_globals_under_active_node_version() {
+    for template in ["next", "sveltekit", "vue"] {
+        let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
+        let content = fs::read_to_string(&script);
+        assert!(content.is_ok(), "failed to read {}", script.display());
+        let content = content.unwrap_or_default();
+
+        let nvm_install = content.find("nvm install");
+        let pm2_install = content.find("npm install -g pm2");
+        let pnpm_install = content.find("npm install -g pnpm");
+
+        assert!(
+            nvm_install.is_some(),
+            "{template} must load the project Node version before installing globals\n{content}"
+        );
+        assert!(pm2_install.is_some(), "{template} must install pm2 under the active project Node version\n{content}");
+        assert!(
+            pnpm_install.is_some(),
+            "{template} must install pnpm under the active project Node version when pnpm is the package manager\n{content}"
+        );
+        assert!(
+            nvm_install < pm2_install,
+            "{template} must install pm2 only after nvm activates the project Node version\n{content}"
+        );
+        assert!(pm2_install < pnpm_install, "{template} must install pm2 before pnpm-specific work\n{content}");
+    }
+}
+
+#[test]
+fn spa_template_runtime_roles_do_not_install_global_npm_packages() {
+    for template in ["next", "sveltekit", "vue"] {
+        let defaults = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(format!("templates/{template}/remote/roles/{template}_runtime/defaults/main.yml"));
+        assert!(!defaults.exists(), "{template} runtime role should not define setup-time global npm packages");
+
+        let tasks = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(format!("templates/{template}/remote/roles/{template}_runtime/tasks/main.yml"));
+        let content = fs::read_to_string(&tasks);
+        assert!(content.is_ok(), "failed to read {}", tasks.display());
+        let content = content.unwrap_or_default();
+
+        assert!(
+            !content.contains("npm install -g"),
+            "{template} runtime role should not install globals during setup because the project Node version is resolved later\n{content}"
+        );
+    }
+}
+
+#[test]
 fn shared_setup_playbook_applies_apparmor_before_nginx_role() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
