@@ -13,15 +13,17 @@ You are a **Copilot agent**.
 
 ## How to Work
 
-1. Decide if we need to test this feature; use our TDD principles in AGENTS.md
-2. Before writing any code, write a test that fails
-3. Run the test and ensure it fails
-4. If you get an error, fix the test until it runs but fails
-5. Once the test fails, write the code
-6. Run the test and ensure it succeeds
-7. If the test fails, go back to step 4
-8. Once the test succeeds, verify that the task is complete
-9. If the task is not complete, go back to step 1
+1. Before writing any code, understand the requested change and check the relevant docs/code before assuming requirements.
+2. Decide whether the change needs tests using the TDD principles below.
+3. Before writing any tests, write high-fidelity test assertions inline with our intended aims in `tests/ASSERTIONS.md`.
+4. For each assertion, write an associated, failing test which meaningfully satisfies the assertion.
+5. Run the test and ensure it fails
+6. If you get an error, fix the test until it runs but fails
+7. Once the test fails, write the code
+8. Run the test and ensure it succeeds
+9. If the test fails, go back to step 4
+10. Once the test succeeds, verify that the task is complete
+11. If the task is not complete, go back to step 1
 
 When you are done working, please run and address all warnings/errors:
 - `cargo clippy`
