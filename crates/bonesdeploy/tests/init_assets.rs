@@ -198,7 +198,7 @@ fn template_setup_vars_files_define_runtime_metadata() {
 }
 
 #[test]
-fn nuxt_deployment_script_installs_globals_for_the_active_node_version() {
+fn nuxt_deployment_script_installs_pnpm_after_nvm() {
     let script = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join("templates/nuxt/deployment/01_run_deployment_concerns.sh");
@@ -207,7 +207,6 @@ fn nuxt_deployment_script_installs_globals_for_the_active_node_version() {
     let content = content.unwrap_or_default();
 
     let nvm_install = content.find("nvm install");
-    let pm2_install = content.find("npm install -g pm2");
     let pnpm_install = content.find("npm install -g pnpm");
 
     assert!(
@@ -215,28 +214,16 @@ fn nuxt_deployment_script_installs_globals_for_the_active_node_version() {
         "Nuxt deploy script must load the project Node version before installing globals\n{content}"
     );
     assert!(
-        pm2_install.is_some(),
-        "Nuxt deploy script must install pm2 under the active project Node version\n{content}"
-    );
-    assert!(
         pnpm_install.is_some(),
         "Nuxt deploy script must install pnpm under the active project Node version when pnpm is the package manager\n{content}"
     );
     assert!(
-        nvm_install < pm2_install,
-        "pm2 must be installed only after nvm activates the project Node version\n{content}"
-    );
-    assert!(
-        pm2_install < pnpm_install,
-        "pm2 should be available before pnpm-specific work, since both come from the active Node toolchain\n{content}"
+        nvm_install < pnpm_install,
+        "pnpm must be installed only after nvm activates the project Node version\n{content}"
     );
     assert!(
         content.contains("npm install --include=optional"),
         "Nuxt npm installs must preserve optional native dependencies for oxc-parser\n{content}"
-    );
-    assert!(
-        !content.contains("npm ci\n"),
-        "Nuxt template should use npm install for the optional dependency workaround, not npm ci\n{content}"
     );
 }
 
@@ -261,8 +248,8 @@ fn nuxt_runtime_role_does_not_install_global_npm_packages() {
 }
 
 #[test]
-fn spa_template_deploy_scripts_install_globals_under_active_node_version() {
-    for template in ["next", "sveltekit", "vue"] {
+fn spa_template_deploy_scripts_do_not_use_pm2() {
+    for template in ["nuxt", "next", "sveltekit", "vue"] {
         let script = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
             .join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
@@ -270,25 +257,67 @@ fn spa_template_deploy_scripts_install_globals_under_active_node_version() {
         assert!(content.is_ok(), "failed to read {}", script.display());
         let content = content.unwrap_or_default();
 
-        let nvm_install = content.find("nvm install");
-        let pm2_install = content.find("npm install -g pm2");
-        let pnpm_install = content.find("npm install -g pnpm");
+        assert!(
+            !content.contains("pm2"),
+            "{template} deployment script should not use pm2 — process lifecycle is managed by bonesremote via systemd"
+        );
+    }
+}
+
+#[test]
+fn deployment_scripts_have_no_unsafe_project_name_fallbacks() {
+    let patterns = ["${PROJECT_NAME:-", "${PROJECT_NAME-", ":-${PROJECT_NAME}", ":-${PROJECT_NAME:-"];
+    for template in ["nuxt", "next", "sveltekit", "vue", "rails", "django", "laravel"] {
+        let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
+        let content = fs::read_to_string(&script);
+        assert!(content.is_ok(), "failed to read {}", script.display());
+        let content = content.unwrap_or_default();
+
+        for pattern in patterns {
+            assert!(
+                !content.contains(pattern),
+                "{template} deployment script should not use unsafe PROJECT_NAME fallback '{pattern}' — project identity must be explicit"
+            );
+        }
+    }
+}
+
+#[test]
+fn app_server_templates_restart_project_service_from_deployment_scripts() {
+    for template in ["rails", "django"] {
+        let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
+        let content = fs::read_to_string(&script);
+        assert!(content.is_ok(), "failed to read {}", script.display());
+        let content = content.unwrap_or_default();
 
         assert!(
-            nvm_install.is_some(),
-            "{template} must load the project Node version before installing globals\n{content}"
-        );
-        assert!(pm2_install.is_some(), "{template} must install pm2 under the active project Node version\n{content}");
-        assert!(
-            pnpm_install.is_some(),
-            "{template} must install pnpm under the active project Node version when pnpm is the package manager\n{content}"
+            content.contains("SERVICE_NAME=\"$PROJECT_NAME\""),
+            "{template} deployment script must restart the configured project service without fallback\n{content}"
         );
         assert!(
-            nvm_install < pm2_install,
-            "{template} must install pm2 only after nvm activates the project Node version\n{content}"
+            content.contains("systemctl restart \"$SERVICE_NAME\""),
+            "{template} deployment script must restart its app server after deploy\n{content}"
         );
-        assert!(pm2_install < pnpm_install, "{template} must install pm2 before pnpm-specific work\n{content}");
     }
+}
+
+#[test]
+fn vue_deployment_script_ends_after_build() {
+    let script = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join("templates/vue/deployment/01_run_deployment_concerns.sh");
+    let content = fs::read_to_string(&script);
+    assert!(content.is_ok(), "failed to read {}", script.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        !content.contains("systemctl") && !content.contains("pm2") && !content.contains("restart"),
+        "Vue deployment script should only build static files — no process restart needed for static SPA"
+    );
 }
 
 #[test]

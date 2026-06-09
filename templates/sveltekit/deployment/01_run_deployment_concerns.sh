@@ -15,8 +15,6 @@ if [ -f "./.nvmrc" ]; then
   nvm install
 fi
 
-npm install -g pm2
-
 # Clean install and build
 rm -rf node_modules
 
@@ -33,18 +31,5 @@ elif [ -f "./package-lock.json" ]; then
   npm run build
 else
   echo "No lockfile found. Run your package manager locally first."
-  exit 1
-fi
-
-# Restart the application via pm2
-if command -v pm2 >/dev/null 2>&1; then
-  if pm2 describe "$PROJECT_NAME" >/dev/null 2>&1; then
-    pm2 restart "$PROJECT_NAME"
-  else
-    pm2 start build/index.js --name "$PROJECT_NAME"
-  fi
-  pm2 save
-else
-  echo "pm2 not found. Install it globally: npm install -g pm2"
   exit 1
 fi

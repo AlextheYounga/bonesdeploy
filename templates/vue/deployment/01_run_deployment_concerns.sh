@@ -15,8 +15,6 @@ if [ -f "./.nvmrc" ]; then
   nvm install
 fi
 
-npm install -g pm2
-
 # Clean install and build
 rm -rf node_modules
 
