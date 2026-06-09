@@ -1,37 +1,35 @@
 #!/usr/bin/env bash
 
-# Basic deployment concerns for Node.js applications
+set -Eeuo pipefail
 
-check_for_nvm() {
-	# Check for .nvmrc and install the specified Node.js version
-	if [ -f "./.nvmrc" ]; then
-		export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-		if [ -s "$NVM_DIR/nvm.sh" ]; then
-			source "$NVM_DIR/nvm.sh"
-		elif [ -s "$HOME/.config/nvm/nvm.sh" ]; then
-			source "$HOME/.config/nvm/nvm.sh"
-		fi
-		nvm install
-	fi
-}
+# Load nvm if .nvmrc is present
+if [ -f "./.nvmrc" ]; then
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [ -s "$NVM_DIR/nvm.sh" ]; then
+    # shellcheck disable=SC1090
+    source "$NVM_DIR/nvm.sh"
+  elif [ -s "$HOME/.config/nvm/nvm.sh" ]; then
+    # shellcheck disable=SC1090
+    source "$HOME/.config/nvm/nvm.sh"
+  fi
+  nvm install
+fi
 
-run_node_build() {
-	# Check for yarn.lock or package-lock.json and install dependencies accordingly
-	if [ -f "./yarn.lock" ]; then
-		npm install -g yarn
-		yarn
-		yarn build
-	fi
+# Clean install and build
+rm -rf node_modules
 
-	if [ -f "./package-lock.json" ]; then
-		npm install
-		npm run build
-	fi
-}
-
-main() {
-	check_for_nvm
-	run_node_build
-}
-
-main
+if [ -f "./pnpm-lock.yaml" ]; then
+  npm install -g pnpm
+  pnpm install --frozen-lockfile
+  pnpm build
+elif [ -f "./yarn.lock" ]; then
+  command -v corepack >/dev/null 2>&1 && corepack enable || true
+  yarn install --frozen-lockfile
+  yarn build
+elif [ -f "./package-lock.json" ]; then
+  npm install --include=optional
+  npm run build
+else
+  echo "No lockfile found. Run your package manager locally first."
+  exit 1
+fi

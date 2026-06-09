@@ -39,6 +39,13 @@ pub fn run(config_path: &str) -> Result<()> {
             let status = Command::new("bash")
                 .arg(&script)
                 .current_dir(&build_root)
+                .env("PROJECT_NAME", &cfg.data.project_name)
+                .env("PROJECT_ROOT", &cfg.data.project_root)
+                .env("REPO_PATH", &cfg.data.repo_path)
+                .env("WEB_ROOT", &cfg.data.web_root)
+                .env("SERVICE_USER", &cfg.permissions.defaults.service_user)
+                .env("DEPLOY_USER", &cfg.permissions.defaults.deploy_user)
+                .env("GROUP", &cfg.permissions.defaults.group)
                 .status()
                 .with_context(|| format!("Failed to execute deployment script {}", script.display()))?;
 

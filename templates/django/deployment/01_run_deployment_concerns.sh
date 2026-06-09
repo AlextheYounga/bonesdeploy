@@ -29,8 +29,7 @@ python3 manage.py migrate --noinput
 python3 manage.py collectstatic --noinput
 
 # Restart gunicorn via systemd
-# Adjust the service name to match your systemd unit
-SERVICE_NAME="${PROJECT_NAME:-gunicorn}"
+SERVICE_NAME="$PROJECT_NAME"
 if ! command -v systemctl >/dev/null 2>&1; then
   echo "systemctl not found. Restart your app server manually."
 elif systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
