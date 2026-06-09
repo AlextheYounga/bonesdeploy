@@ -165,7 +165,7 @@ mod tests {
         paths::default_repo_path_for(name)
     }
 
-    // Verifies full SSH URL parsing so deploy targets keep explicit host/port/git-dir wiring.
+    /// Parses the host, port, and repository path from a full SSH-style URL.
     #[test]
     fn parse_ssh_style_url_parses_host_port_and_repo_path() {
         let details = parse_ssh_style_url(&format!("ssh://git@example.com:2222{}", repo_path("myapp")));
@@ -178,7 +178,7 @@ mod tests {
         }
     }
 
-    // Verifies default SSH port inference to avoid requiring :22 in normal remote URLs.
+    /// Defaults the SSH port to 22 when not explicitly provided in the URL.
     #[test]
     fn parse_ssh_style_url_defaults_port_to_22() {
         let details = parse_ssh_style_url(&format!("ssh://git@example.com{}", repo_path("myapp")));
@@ -191,7 +191,7 @@ mod tests {
         }
     }
 
-    // Verifies SCP-style remotes are accepted only when they point at absolute git directories.
+    /// Parses an absolute repo path from an SCP-style remote URL.
     #[test]
     fn parse_scp_style_url_parses_absolute_repo_path() {
         let details = parse_scp_style_url(&format!("git@example.com:{}", repo_path("myapp")));
@@ -204,7 +204,7 @@ mod tests {
         }
     }
 
-    // Guards against deploying to non-bare or malformed paths by requiring a .git suffix.
+    /// Rejects repo paths that do not end with `.git`.
     #[test]
     fn parse_remote_url_rejects_non_git_paths() {
         let non_git_path = repo_path("myapp").trim_end_matches(".git").to_string();
@@ -212,13 +212,13 @@ mod tests {
         assert!(parse_remote_url(&format!("git@example.com:{non_git_path}")).is_none());
     }
 
-    // Prevents ambiguous relative SCP paths that can resolve differently across hosts.
+    /// Rejects relative SCP paths that can resolve differently across hosts.
     #[test]
     fn parse_remote_url_rejects_relative_scp_paths() {
         assert!(parse_remote_url("git@example.com:myapp.git").is_none());
     }
 
-    // Ensures only SSH remotes are accepted by deployment connection inference.
+    /// Rejects non-SSH URLs that cannot be used with SSH deployment connections.
     #[test]
     fn parse_remote_url_rejects_non_ssh_urls() {
         assert!(parse_remote_url("https://example.com/org/repo.git").is_none());

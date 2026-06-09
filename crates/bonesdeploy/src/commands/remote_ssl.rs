@@ -76,6 +76,7 @@ fn ssl_extra_vars(domain: &str, email: &str) -> serde_json::Value {
 mod tests {
     use super::ssl_extra_vars;
 
+    /// Passes the SSL enabled flag as a typed JSON boolean in extra vars.
     #[test]
     fn ssl_extra_vars_pass_enabled_as_typed_json_boolean() {
         let vars = ssl_extra_vars("app.example.com", "ops@example.com");

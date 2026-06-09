@@ -121,7 +121,7 @@ mod tests {
         env::temp_dir().join(format!("bonesremote_wire_release_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
-    // Explicit file declarations must be bootstrapped as files.
+    /// Creates a default file when the shared target path is declared as a file.
     #[test]
     fn create_default_shared_target_creates_file_for_explicit_file_paths() -> Result<()> {
         let root = temp_dir_path("default_file");
@@ -136,7 +136,7 @@ mod tests {
         Ok(())
     }
 
-    // Explicit directory declarations must be bootstrapped as directories.
+    /// Creates a default directory when the shared target path is declared as a directory.
     #[test]
     fn create_default_shared_target_creates_directory_for_explicit_directory_paths() -> Result<()> {
         let root = temp_dir_path("default_directory");
@@ -151,7 +151,7 @@ mod tests {
         Ok(())
     }
 
-    // Verifies cleanup helper removes both file and directory paths before relinking.
+    /// Removes both files and directories, including nested contents.
     #[test]
     fn remove_path_removes_files_and_directories() -> Result<()> {
         let root = temp_dir_path("remove_path");

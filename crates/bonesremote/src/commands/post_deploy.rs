@@ -138,7 +138,7 @@ mod tests {
         Ok(())
     }
 
-    // Verifies retention policy prunes only the oldest inactive releases beyond keep count.
+    /// Prunes the oldest inactive releases when the active release count exceeds the keep limit.
     #[test]
     fn prune_old_releases_removes_oldest_inactive_releases_up_to_keep_limit() -> Result<()> {
         let root = temp_dir("bonesremote_post_deploy_prune")?;
@@ -160,7 +160,7 @@ mod tests {
         Ok(())
     }
 
-    // Verifies active release is preserved when retention limit is already satisfied.
+    /// Keeps all releases when the active release count is within the keep limit.
     #[test]
     fn prune_old_releases_keeps_active_release_when_within_keep_limit() -> Result<()> {
         let root = temp_dir("bonesremote_post_deploy_prune_active")?;
