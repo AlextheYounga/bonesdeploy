@@ -87,7 +87,7 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "anyhow",
  "clap",
@@ -116,7 +116,7 @@ dependencies = [
 
 [[package]]
 name = "bonesremote"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "anyhow",
  "clap",

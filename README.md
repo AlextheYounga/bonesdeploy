@@ -2,6 +2,8 @@
 
 ## Git Deployments with a Spine in a Barebones Framework 🏴‍☠️
 
+<div style="margin:0 auto; display: block;"><img width=600 height=600 src="docs/images/bonesdeploy.png" alt="BonesDeploy" /></div>
+
 > WARNING: BonesDeploy is still under active development. There may be some cool bugs!
 
 A drop-in Rust deployment system for git-based deployments over SSH. BonesDeploy scaffolds hook scripts and deployment configs into your repo, syncs them to a remote bare repository, and manages file ownership and permissions across deploys without forcing containers, a control plane, or a platform layer.
