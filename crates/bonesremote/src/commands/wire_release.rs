@@ -17,6 +17,11 @@ pub fn run(config_path: &str) -> Result<()> {
     let build_root = release_state::build_root(&cfg);
     let shared_dir = release_state::shared_dir(&cfg);
 
+    // Grant deploy-user traversal access to shared/ before wiring individual paths.
+    // post-deploy hardens shared/ to service_user:www-data, locking out the next deploy's
+    // build unless we re-open it here.
+    permissions::chown_paths_to_deploy_user(&cfg, &[shared_dir.as_path()], false)?;
+
     for shared_file in &cfg.releases.shared_files {
         wire_path(&cfg, (&build_root, &shared_dir), shared_file, true)?;
     }
