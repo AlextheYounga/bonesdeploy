@@ -2,25 +2,34 @@ use std::fs;
 use std::path::Path;
 
 #[test]
-fn update_bonesremote_playbook_validates_all_required_path_vars() {
+fn update_bonesremote_playbook_installs_from_git_like_init() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("updates/playbooks/update-bonesremote.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
 
     for required_var in [
+        "bonesremote_repo_url is defined and bonesremote_repo_url | length > 0",
         "bonesremote_install_root is defined and bonesremote_install_root | length > 0",
-        "bonesremote_stable_link is defined and bonesremote_stable_link | length > 0",
-        "bonesremote_global_link is defined and bonesremote_global_link | length > 0",
+        "bonesremote_binary_path is defined and bonesremote_binary_path | length > 0",
         "bonesremote_managed_projects_root is defined and bonesremote_managed_projects_root | length > 0",
-        "bonesremote_binary_name is defined and bonesremote_binary_name | length > 0",
-        "bonesremote_swap_link_prefix is defined and bonesremote_swap_link_prefix | length > 0",
+        "cargo_binary_path is defined and cargo_binary_path | length > 0",
     ] {
         assert!(
             content.contains(required_var),
             "update-bonesremote playbook must fail fast when {required_var} is missing\n{content}"
         );
     }
+
+    assert!(
+        content.contains("- uninstall") && content.contains("- install") && content.contains("- --git"),
+        "update-bonesremote playbook must use cargo uninstall/install --git instead of staged binaries\n{content}"
+    );
+
+    assert!(
+        !content.contains("bonesremote_staging_path") && !content.contains("remote_src: true"),
+        "update-bonesremote playbook must not use release-style staged binary uploads\n{content}"
+    );
 }
 
 #[test]

@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
@@ -36,20 +36,30 @@ pub fn run(options: UpdateOptions) -> Result<()> {
     let temp_dir = TempDir::new().context("Failed to create temp directory")?;
     let temp_path = temp_dir.path();
 
-    println!("Building binaries from {}...", style(SOURCE_REPO_URL).cyan());
-    let target_version = build_master_binaries(temp_path)?;
-    println!("Built master version: {}", style(&target_version).cyan());
+    println!("Checking master version from {}...", style(SOURCE_REPO_URL).cyan());
+    let source_dir = clone_master_source(temp_path)?;
+    let master_versions = read_master_versions(&source_dir)?;
+    println!("Master bonesdeploy version: {}", style(&master_versions.bonesdeploy).cyan());
+    println!("Master bonesremote version: {}", style(&master_versions.bonesremote).cyan());
 
     if !options.skip_local {
-        println!("{}", style("Updating local bonesdeploy...").cyan());
-        update_release::update_local_binary(temp_path, &target_version)?;
-        println!("{} Local update complete.", style("Done!").green());
+        if current_local == master_versions.bonesdeploy {
+            println!("{} Local bonesdeploy is already current.", style("Done!").green());
+        } else {
+            println!("{}", style("Updating local bonesdeploy...").cyan());
+            update_release::update_local_from_source(SOURCE_REPO_URL)?;
+            println!("{} Local update complete.", style("Done!").green());
+        }
     }
 
     if !options.skip_remote {
-        println!("{}", style("Updating remote bonesremote...").cyan());
-        update_release::update_remote_binary(temp_path, &target_version)?;
-        println!("{} Remote update complete.", style("Done!").green());
+        if current_remote == master_versions.bonesremote {
+            println!("{} Remote bonesremote is already current.", style("Done!").green());
+        } else {
+            println!("{}", style("Updating remote bonesremote...").cyan());
+            update_release::update_remote_from_source(SOURCE_REPO_URL, &master_versions.bonesremote)?;
+            println!("{} Remote update complete.", style("Done!").green());
+        }
     }
 
     println!("\n{} All updates complete.", style("Done!").green());
@@ -57,8 +67,7 @@ pub fn run(options: UpdateOptions) -> Result<()> {
     Ok(())
 }
 
-fn build_master_binaries(temp_path: &Path) -> Result<String> {
-    let target = update_release::target_triple();
+fn clone_master_source(temp_path: &Path) -> Result<PathBuf> {
     let source_dir = temp_path.join("source");
 
     let clone_status = Command::new("git")
@@ -71,73 +80,56 @@ fn build_master_binaries(temp_path: &Path) -> Result<String> {
         bail!("Failed to clone {SOURCE_REPO_URL} branch {SOURCE_BRANCH}");
     }
 
-    let build_status = Command::new("cargo")
-        .args(["build", "--release", "-p", "bonesdeploy", "-p", "bonesremote"])
-        .current_dir(&source_dir)
-        .status()
-        .context("Failed to build bonesdeploy binaries")?;
+    Ok(source_dir)
+}
 
-    if !build_status.success() {
-        bail!("Failed to build bonesdeploy binaries from {SOURCE_BRANCH}");
+struct MasterVersions {
+    bonesdeploy: String,
+    bonesremote: String,
+}
+
+fn read_master_versions(source_dir: &Path) -> Result<MasterVersions> {
+    let bonesdeploy = read_package_version(&source_dir.join("crates/bonesdeploy/Cargo.toml"))?;
+    let bonesremote = read_package_version(&source_dir.join("crates/bonesremote/Cargo.toml"))?;
+
+    Ok(MasterVersions { bonesdeploy, bonesremote })
+}
+
+fn read_package_version(manifest: &Path) -> Result<String> {
+    let content = fs::read_to_string(manifest).with_context(|| format!("Failed to read {}", manifest.display()))?;
+    parse_package_version(&content)
+        .with_context(|| format!("Failed to parse package version from {}", manifest.display()))
+}
+
+fn parse_package_version(manifest: &str) -> Result<String> {
+    let mut in_package_section = false;
+
+    for line in manifest.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[package]" {
+            in_package_section = true;
+            continue;
+        }
+        if in_package_section && trimmed.starts_with('[') {
+            break;
+        }
+        if in_package_section && let Some(version) = parse_version_line(trimmed) {
+            return Ok(version);
+        }
     }
 
-    let built_version = read_built_version(&source_dir.join("target").join("release").join("bonesdeploy"))?;
-
-    copy_built_binary(
-        &source_dir,
-        temp_path,
-        "bonesdeploy",
-        &binary_asset_name("bonesdeploy", &target, &built_version),
-    )?;
-    copy_built_binary(
-        &source_dir,
-        temp_path,
-        "bonesremote",
-        &binary_asset_name("bonesremote", &target, &built_version),
-    )?;
-
-    Ok(built_version)
+    bail!("missing [package] version")
 }
 
-fn read_built_version(binary: &Path) -> Result<String> {
-    let output = Command::new(binary)
-        .arg("version")
-        .output()
-        .with_context(|| format!("Failed to run {} version", binary.display()))?;
-
-    if !output.status.success() {
-        bail!("Failed to read built bonesdeploy version from {}", binary.display());
-    }
-
-    parse_bonesdeploy_version(&String::from_utf8_lossy(&output.stdout))
-}
-
-fn parse_bonesdeploy_version(output: &str) -> Result<String> {
-    output
-        .trim()
-        .strip_prefix("bonesdeploy ")
-        .map(ToOwned::to_owned)
-        .filter(|version| !version.is_empty())
-        .ok_or_else(|| anyhow::anyhow!("Unexpected bonesdeploy version output: {output:?}"))
-}
-
-fn copy_built_binary(source_dir: &Path, temp_path: &Path, binary: &str, asset_name: &str) -> Result<()> {
-    let source = source_dir.join("target").join("release").join(binary);
-    let destination = temp_path.join(asset_name);
-
-    fs::copy(&source, &destination)
-        .with_context(|| format!("Failed to copy built binary {} to {}", source.display(), destination.display()))?;
-
-    Ok(())
-}
-
-fn binary_asset_name(binary: &str, target: &str, version: &str) -> String {
-    format!("{binary}-{target}-{version}")
+fn parse_version_line(line: &str) -> Option<String> {
+    let value = line.strip_prefix("version")?.trim_start().strip_prefix('=')?.trim();
+    let version = value.strip_prefix('"')?.strip_suffix('"')?;
+    (!version.is_empty()).then(|| version.to_string())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{SOURCE_BRANCH, SOURCE_REPO_URL, binary_asset_name, parse_bonesdeploy_version};
+    use super::{SOURCE_BRANCH, SOURCE_REPO_URL, parse_package_version};
 
     #[test]
     fn update_uses_master_branch_source_repository() {
@@ -146,20 +138,24 @@ mod tests {
     }
 
     #[test]
-    fn built_binary_asset_names_match_existing_install_layout() {
-        assert_eq!(binary_asset_name("bonesdeploy", "x86_64-linux", "0.2.7"), "bonesdeploy-x86_64-linux-0.2.7");
-        assert_eq!(binary_asset_name("bonesremote", "x86_64-linux", "0.2.7"), "bonesremote-x86_64-linux-0.2.7");
-    }
+    fn parses_package_version_from_manifest_package_section() -> anyhow::Result<()> {
+        let manifest = r#"
+[package]
+name = "bonesdeploy"
+version = "0.2.8"
+edition = "2024"
 
-    #[test]
-    fn parses_built_master_version_from_bonesdeploy_binary_output() -> anyhow::Result<()> {
-        assert_eq!(parse_bonesdeploy_version("bonesdeploy 0.2.8\n")?, "0.2.8");
+[dependencies]
+version = "not-this"
+"#;
+
+        assert_eq!(parse_package_version(manifest)?, "0.2.8");
         Ok(())
     }
 
     #[test]
-    fn rejects_unexpected_bonesdeploy_binary_version_output() {
-        let result = parse_bonesdeploy_version("0.2.8\n");
+    fn rejects_manifest_without_package_version() {
+        let result = parse_package_version("[dependencies]\nversion = \"0.2.8\"\n");
         assert!(result.is_err());
     }
 }

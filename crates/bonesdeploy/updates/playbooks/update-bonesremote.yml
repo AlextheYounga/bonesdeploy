@@ -4,28 +4,24 @@
   become: true
 
   vars:
-    bonesremote_staging_path: ""
+    bonesremote_repo_url: ""
     bonesremote_target_version: ""
-    bonesremote_install_root: ""
-    bonesremote_stable_link: ""
-    bonesremote_global_link: ""
+    bonesremote_install_root: "/usr/local"
+    bonesremote_binary_path: "/usr/local/bin/bonesremote"
     bonesremote_managed_projects_root: ""
-    bonesremote_binary_name: "bonesremote"
-    bonesremote_swap_link_prefix: ""
+    cargo_binary_path: "/root/.cargo/bin/cargo"
 
   tasks:
     - name: Validate required variables
       ansible.builtin.assert:
         that:
-          - bonesremote_staging_path is defined and bonesremote_staging_path | length > 0
+          - bonesremote_repo_url is defined and bonesremote_repo_url | length > 0
           - bonesremote_target_version is defined and bonesremote_target_version | length > 0
           - bonesremote_install_root is defined and bonesremote_install_root | length > 0
-          - bonesremote_stable_link is defined and bonesremote_stable_link | length > 0
-          - bonesremote_global_link is defined and bonesremote_global_link | length > 0
+          - bonesremote_binary_path is defined and bonesremote_binary_path | length > 0
           - bonesremote_managed_projects_root is defined and bonesremote_managed_projects_root | length > 0
-          - bonesremote_binary_name is defined and bonesremote_binary_name | length > 0
-          - bonesremote_swap_link_prefix is defined and bonesremote_swap_link_prefix | length > 0
-        fail_msg: "bonesremote_staging_path, bonesremote_target_version, and all derived path vars are required"
+          - cargo_binary_path is defined and cargo_binary_path | length > 0
+        fail_msg: "bonesremote repo, target version, install root, binary path, managed project root, and cargo path are required"
         quiet: true
 
     - name: Ensure install root exists
@@ -36,36 +32,34 @@
         group: root
         mode: "0755"
 
-    - name: Ensure versions directory exists
-      ansible.builtin.file:
-        path: "{{ bonesremote_install_root }}/versions"
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
-
-    - name: Ensure target version directory exists
-      ansible.builtin.file:
-        path: "{{ bonesremote_install_root }}/versions/{{ bonesremote_target_version }}"
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
-
-    - name: Copy staged bonesremote binary to versioned directory
-      ansible.builtin.copy:
-        src: "{{ bonesremote_staging_path }}"
-        dest: "{{ bonesremote_install_root }}/versions/{{ bonesremote_target_version }}/{{ bonesremote_binary_name }}"
-        owner: root
-        group: root
-        mode: "0755"
-        remote_src: true
-      register: copy_result
-
-    - name: Verify staged binary
+    - name: Uninstall existing bonesremote package
       ansible.builtin.command:
         argv:
-          - "{{ bonesremote_install_root }}/versions/{{ bonesremote_target_version }}/{{ bonesremote_binary_name }}"
+          - "{{ cargo_binary_path }}"
+          - uninstall
+          - --root
+          - "{{ bonesremote_install_root }}"
+          - bonesremote
+      register: bonesremote_uninstall
+      changed_when: bonesremote_uninstall.rc == 0
+      failed_when: false
+
+    - name: Install bonesremote from master
+      ansible.builtin.command:
+        argv:
+          - "{{ cargo_binary_path }}"
+          - install
+          - --root
+          - "{{ bonesremote_install_root }}"
+          - --git
+          - "{{ bonesremote_repo_url }}"
+          - bonesremote
+      changed_when: true
+
+    - name: Verify installed bonesremote version
+      ansible.builtin.command:
+        argv:
+          - "{{ bonesremote_binary_path }}"
           - version
       changed_when: false
       register: version_check
@@ -77,44 +71,6 @@
         fail_msg: "Binary version mismatch: expected {{ bonesremote_target_version }}, got {{ version_check.stdout }}"
         quiet: true
 
-    - name: Create stable symlink directory
-      ansible.builtin.file:
-        path: "{{ bonesremote_stable_link }}"
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
-
-    - name: Create atomic temp symlink
-      ansible.builtin.file:
-        src: "{{ bonesremote_install_root }}/versions/{{ bonesremote_target_version }}/{{ bonesremote_binary_name }}"
-        dest: "{{ bonesremote_stable_link }}/{{ bonesremote_swap_link_prefix }}{{ ansible_date_time.epoch }}"
-        state: link
-        force: true
-
-    - name: Atomically switch bonesremote symlink
-      ansible.builtin.command:
-        argv:
-          - mv
-          - "-T"
-          - "{{ bonesremote_stable_link }}/{{ bonesremote_swap_link_prefix }}{{ ansible_date_time.epoch }}"
-          - "{{ bonesremote_stable_link }}/{{ bonesremote_binary_name }}"
-      changed_when: true
-
-    - name: Ensure global bin link exists
-      ansible.builtin.file:
-        src: "{{ bonesremote_stable_link }}/{{ bonesremote_binary_name }}"
-        dest: "{{ bonesremote_global_link }}"
-        state: link
-        force: true
-
-    - name: Verify global bonesremote works
-      ansible.builtin.command:
-        argv:
-          - "{{ bonesremote_global_link }}"
-          - version
-      changed_when: false
-
     - name: Discover managed projects
       ansible.builtin.find:
         paths: "{{ bonesremote_managed_projects_root }}"
@@ -125,7 +81,7 @@
     - name: Run bonesremote doctor for each project
       ansible.builtin.command:
         argv:
-          - "{{ bonesremote_global_link }}"
+          - "{{ bonesremote_binary_path }}"
           - doctor
         chdir: "{{ item.path }}"
       loop: "{{ managed_projects.files }}"
