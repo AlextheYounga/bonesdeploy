@@ -15,8 +15,8 @@ You are a **Copilot agent**.
 
 1. Before writing any code, understand the requested change and check the relevant docs/code before assuming requirements.
 2. Decide whether the change needs tests using the TDD principles below.
-3. Before writing any tests, write high-fidelity test assertions inline with our intended aims in `tests/ASSERTIONS.md`.
-4. For each assertion, write an associated, failing test which meaningfully satisfies the assertion.
+3. Before writing any tests, write high-fidelity test assertion descriptions and confirm them with me.
+4. For each assertion, write an associated, failing test which meaningfully satisfies the assertion. Ensure every test has a description.
 5. Run the test and ensure it fails
 6. If you get an error, fix the test until it runs but fails
 7. Once the test fails, write the code
