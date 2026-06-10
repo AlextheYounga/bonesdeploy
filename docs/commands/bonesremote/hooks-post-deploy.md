@@ -276,7 +276,7 @@ data:
 **Generated service:**
 - User: `myapp`
 - WorkingDirectory: `/srv/deployments/myapp/current/public`
-- ExecStart: `bonesremote landlock exec --config /home/git/myapp.git/bones/bones.yaml`
+- ExecStart: `/usr/sbin/nginx -c /srv/conf/myapp/nginx.conf -g 'daemon off;'`
 
 ---
 
@@ -418,6 +418,5 @@ Failed to prune old release /srv/deployments/myapp/releases/20260507_120000
 ## Related Commands
 
 - `bonesremote hooks deploy` - Deployment and activation
-- `bonesremote landlock exec` - Runtime sandbox
 - `bonesremote release activate` - Activate release
 - `bonesremote doctor` - Validate environment

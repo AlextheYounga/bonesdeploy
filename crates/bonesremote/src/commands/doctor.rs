@@ -8,7 +8,6 @@ use console::style;
 use shared::paths;
 
 use crate::config;
-use crate::landlock;
 
 pub fn run() -> Result<()> {
     println!("{}", style(format!("{} doctor", config::Constants::BINARY_NAME)).bold());
@@ -19,7 +18,8 @@ pub fn run() -> Result<()> {
     check_globally_available(&mut issues);
     check_passwordless_sudo(&mut issues);
     check_apparmor_support(&mut issues);
-    check_landlock_support(&mut issues);
+    check_algif_aead_disabled(&mut issues);
+    check_per_site_nginx_config(&mut issues);
 
     if issues.is_empty() {
         println!("\n{} All checks passed.", style("OK").green().bold());
@@ -76,13 +76,6 @@ fn check_passwordless_sudo(issues: &mut Vec<String>) {
                 config::Constants::BINARY_NAME
             )),
         }
-    }
-}
-
-fn check_landlock_support(issues: &mut Vec<String>) {
-    match landlock::verify_support() {
-        Ok(()) => {}
-        Err(error) => issues.push(format!("Landlock support check failed: {error}")),
     }
 }
 
@@ -272,93 +265,78 @@ fn apparmor_unit_wiring_status(contents: &str, installed_profiles: &HashSet<&str
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::collections::HashSet;
-
-    use super::{
-        AppArmorUnitWiringStatus, apparmor_kernel_enabled, apparmor_profile_binding, apparmor_profile_filename,
-        apparmor_unit_name_for_profile, apparmor_unit_wiring_status,
+fn check_algif_aead_disabled(issues: &mut Vec<String>) {
+    let modules = fs::read_to_string(paths::PROC_MODULES);
+    let Ok(modules) = modules else {
+        issues.push(format!("Kernel module check failed: could not read {}", paths::PROC_MODULES));
+        return;
     };
 
-    /// Accepts a yes value as indicating `AppArmor` is enabled in the kernel.
-    #[test]
-    fn apparmor_kernel_enabled_accepts_yes() {
-        assert!(apparmor_kernel_enabled("Y\n"));
+    if algif_aead_is_loaded(&modules) {
+        issues.push(
+            "Kernel module check failed: algif_aead is loaded; disable it to mitigate CVE-2026-31431 \
+             (run: echo 'install algif_aead /bin/false' > /etc/modprobe.d/disable-algif.conf && rmmod algif_aead)"
+                .to_string(),
+        );
+        return;
     }
 
-    /// Rejects a no value as indicating `AppArmor` is not enabled in the kernel.
-    #[test]
-    fn apparmor_kernel_enabled_rejects_no() {
-        assert!(!apparmor_kernel_enabled("N\n"));
-    }
-
-    /// Accepts a valid bonesdeploy `AppArmor` profile filename.
-    #[test]
-    fn apparmor_profile_filename_accepts_bonesdeploy_profile() {
-        assert!(apparmor_profile_filename("bonesdeploy-demo-nginx"));
-    }
-
-    /// Rejects a filename that does not match the bonesdeploy profile naming convention.
-    #[test]
-    fn apparmor_profile_filename_rejects_unrelated_file() {
-        assert!(!apparmor_profile_filename("default"));
-    }
-
-    /// Maps a bonesdeploy `AppArmor` profile name to its corresponding systemd unit name.
-    #[test]
-    fn apparmor_unit_name_for_profile_maps_project_unit() {
-        assert_eq!(apparmor_unit_name_for_profile("bonesdeploy-demo-nginx"), Some("demo-nginx.service".to_string()));
-    }
-
-    /// Accepts a systemd unit with correctly wired `AppArmor` dependency and profile.
-    #[test]
-    fn apparmor_unit_wiring_accepts_expected_unit_with_reordered_after_tokens() {
-        let installed_profiles = HashSet::from(["bonesdeploy-demo-nginx"]);
-
-        assert!(matches!(
-            apparmor_unit_wiring_status(
-                "[Unit]\nAfter=apparmor.service network.target\nRequires=apparmor.service\n[Service]\nAppArmorProfile=bonesdeploy-demo-nginx\n",
-                &installed_profiles,
-            ),
-            AppArmorUnitWiringStatus::Ok
-        ));
-    }
-
-    /// Rejects a systemd unit that is missing the `AppArmor` profile binding.
-    #[test]
-    fn apparmor_unit_wiring_rejects_missing_profile_binding() {
-        let installed_profiles = HashSet::from(["bonesdeploy-demo-nginx"]);
-
-        assert!(matches!(
-            apparmor_unit_wiring_status(
-                "[Unit]\nAfter=network.target apparmor.service\nRequires=apparmor.service\n[Service]\nType=simple\n",
-                &installed_profiles,
-            ),
-            AppArmorUnitWiringStatus::MissingProfile
-        ));
-    }
-
-    /// Rejects a systemd unit that binds an unknown `AppArmor` profile.
-    #[test]
-    fn apparmor_unit_wiring_rejects_unknown_profile_binding() {
-        let installed_profiles = HashSet::from(["bonesdeploy-demo-nginx"]);
-
-        assert!(matches!(
-            apparmor_unit_wiring_status(
-                "[Unit]\nAfter=network.target apparmor.service\nRequires=apparmor.service\n[Service]\nAppArmorProfile=bonesdeploy-demo-ngnix\n",
-                &installed_profiles,
-            ),
-            AppArmorUnitWiringStatus::UnknownProfile(profile_name) if profile_name == "bonesdeploy-demo-ngnix"
-        ));
-    }
-
-    /// Reads the first `AppArmor` profile assignment from a systemd unit file.
-    #[test]
-    fn apparmor_profile_binding_reads_first_profile_assignment() {
-        assert_eq!(
-            apparmor_profile_binding("[Service]\nAppArmorProfile=bonesdeploy-demo-nginx\n"),
-            Some("bonesdeploy-demo-nginx")
+    if !algif_aead_is_blocked() {
+        issues.push(
+            "Kernel module check failed: algif_aead is not blocked from loading; block it to mitigate CVE-2026-31431 \
+             (run: echo 'install algif_aead /bin/false' > /etc/modprobe.d/disable-algif.conf)"
+                .to_string(),
         );
     }
 }
+
+fn algif_aead_is_loaded(proc_modules: &str) -> bool {
+    proc_modules.lines().any(|line| line.split_whitespace().next() == Some("algif_aead"))
+}
+
+fn algif_aead_is_blocked() -> bool {
+    let Ok(entries) = fs::read_dir(paths::ETC_MODPROBE_D) else {
+        return false;
+    };
+
+    entries.filter_map(Result::ok).any(|entry| {
+        let Ok(contents) = fs::read_to_string(entry.path()) else { return false };
+        contents.lines().any(|line| {
+            let trimmed = line.trim();
+            !trimmed.starts_with('#') && trimmed.starts_with("install algif_aead")
+        })
+    })
+}
+
+fn check_per_site_nginx_config(issues: &mut Vec<String>) {
+    let Ok(units) = fs::read_dir(paths::ETC_SYSTEMD_SYSTEM) else {
+        return;
+    };
+
+    let site_nginx_units: Vec<(String, PathBuf)> = units
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            if name.ends_with("-nginx.service") { Some((name, entry.path())) } else { None }
+        })
+        .collect();
+
+    for (unit_name, _unit_path) in site_nginx_units {
+        let Some(project_name) = unit_name.strip_suffix("-nginx.service") else {
+            continue;
+        };
+
+        let nginx_conf_path = PathBuf::from(paths::DEFAULT_CONF_ROOT_PARENT).join(project_name).join("nginx.conf");
+
+        if !nginx_conf_path.exists() {
+            issues.push(format!(
+                "Per-site nginx config check failed: {} does not exist (re-run remote setup with --tags nginx)",
+                nginx_conf_path.display()
+            ));
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "doctor_tests.rs"]
+mod tests;

@@ -134,7 +134,7 @@ releases:
   shared_dirs: ["storage"]
 
 # Optional runtime launcher settings (removed in current version).
-# Per-site nginx with landlock isolation is now configured automatically.
+# Per-site nginx with AppArmor and systemd sandboxing is now configured automatically.
 
 ssl:
   enabled: true
@@ -212,13 +212,11 @@ bonesdeploy/
 │           │   ├── post_receive.rs
 │           │   ├── deploy.rs
 │           │   ├── post_deploy.rs
-          │   │   ├── landlock_nginx.rs
-          │   │   └── version.rs
+│           │   └── version.rs
 │           ├── config.rs       # bones.yaml structs + remote file discovery
 │           ├── permissions.rs  # chown/chmod logic
 │           ├── privileges.rs   # sudoers drop-in install + privilege checks
-│           ├── release_state.rs # staged-release state file read/write
-│           └── landlock.rs     # landlock ruleset construction + exec
+│           └── release_state.rs # staged-release state file read/write
 └── docs/
 ```
 
@@ -275,7 +273,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Passes `project_name`, `deploy_user`, `service_user`, `group`, `project_root_parent`, `web_root`, `project_root`, and `repo_path` from `bones.yaml` as playbook variables.
   - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
-  - Sets up per-site nginx with Landlock isolation.
+  - Sets up per-site nginx with AppArmor and systemd sandboxing.
   - Configures main router nginx to proxy domains to per-site unix sockets.
 
 - ****remote ssl****
@@ -299,7 +297,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Checks to see if the server is set up properly:
     - `bonesremote` can be run without requiring password
     - `bonesremote` is globally available.
-    - Landlock support is available on the host.
+    - AppArmor support is available on the host.
 - **release stage**
 	- Creates a staged release tree under `releases/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout.
 - **release wire**
@@ -314,8 +312,6 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 	- Checks out the resolved revision (or the configured branch if `--revision` is omitted) into `build/workspace`. Wiring is performed by a separate `release wire` call so it can run with elevated privileges just-in-time.
 - **hooks deploy**
 	- Runs deployment scripts in `build/workspace`, copies release-ready output into staged `releases/<timestamp>`, drops failed staged releases on error, and activates release on success.
-- **landlock nginx**
-  - Resolves `web_root` to the active release tree, applies Landlock policy, and `exec`s per-site nginx.
 - **hooks post-deploy**
 	- Restarts the per-site nginx service to pick up the new release.
   - Runs a permissions hardening function setting the active release back to the layout configured in `bones.yaml`, including service-user ownership, then prunes old releases.

@@ -34,8 +34,6 @@ const TEMPLATE_SETUP_PLAYBOOKS: [&str; 7] = [
 
 #[path = "init_assets/apparmor.rs"]
 mod apparmor;
-#[path = "init_assets/deployment.rs"]
-mod deployment;
 #[path = "init_assets/firewall.rs"]
 mod firewall;
 #[path = "init_assets/paths.rs"]

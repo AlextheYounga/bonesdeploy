@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_REPO_PARENT: &str = "/home/git";
 pub const DEFAULT_PROJECT_ROOT_PARENT: &str = "/srv/deployments";
+pub const DEFAULT_CONF_ROOT_PARENT: &str = "/srv/conf";
 pub const DEFAULT_WEB_ROOT: &str = "public";
 
 pub const ETC_NGINX: &str = "/etc/nginx";
@@ -16,6 +17,8 @@ pub const ETC_SUDOERS_D: &str = "/etc/sudoers.d";
 pub const ETC_OS_RELEASE: &str = "/etc/os-release";
 pub const APPARMOR_ENABLED_PARAM: &str = "/sys/module/apparmor/parameters/enabled";
 pub const APPARMOR_PROFILES: &str = "/sys/kernel/security/apparmor/profiles";
+pub const PROC_MODULES: &str = "/proc/modules";
+pub const ETC_MODPROBE_D: &str = "/etc/modprobe.d";
 pub const USR_LOCAL_BIN: &str = "/usr/local/bin";
 pub const OPT_BONESDEPLOY: &str = "/opt/bonesdeploy";
 pub const TMP_ROOT: &str = "/tmp";
@@ -99,8 +102,9 @@ pub struct DeploymentPaths {
     pub repo_head: String,
     pub repo_bones: String,
     pub repo_bones_yaml: String,
-    pub repo_nginx_config: String,
     pub repo_deployment: String,
+    pub site_nginx_config: String,
+    pub conf_root: String,
     pub project_root: String,
     pub project_root_parent: String,
     pub releases: String,
@@ -136,6 +140,7 @@ impl DeploymentPaths {
         let current = Path::new(&project_root).join(CURRENT_LINK);
         let runtime_socket_dir = Path::new(RUNTIME_SOCKET_PARENT).join(project_name);
         let repo_bones = Path::new(&repo).join(BONES_DIR);
+        let conf_root = Path::new(DEFAULT_CONF_ROOT_PARENT).join(project_name);
 
         Self {
             repo: repo.clone(),
@@ -143,8 +148,9 @@ impl DeploymentPaths {
             repo_head: Path::new(&repo).join(GIT_HEAD).display().to_string(),
             repo_bones: repo_bones.display().to_string(),
             repo_bones_yaml: repo_bones.join(BONES_YAML).display().to_string(),
-            repo_nginx_config: repo_bones.join(NGINX_CONF).display().to_string(),
+            site_nginx_config: conf_root.join(NGINX_CONF).display().to_string(),
             repo_deployment: repo_bones.join(DEPLOYMENT_DIR).display().to_string(),
+            conf_root: conf_root.display().to_string(),
             project_root: project_root.clone(),
             project_root_parent: parent_or_default(&project_root, DEFAULT_PROJECT_ROOT_PARENT),
             releases: Path::new(&project_root).join(RELEASES_DIR).display().to_string(),

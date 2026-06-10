@@ -1,4 +1,17 @@
 ---
+- name: Create per-project runtime group
+  ansible.builtin.group:
+    name: "{{ project_name }}"
+    system: true
+  tags: [nginx]
+
+- name: Add service user to project group
+  ansible.builtin.user:
+    name: "{{ service_user }}"
+    groups: "{{ project_name }}"
+    append: true
+  tags: [nginx]
+
 - name: Ensure socket directory exists
   ansible.builtin.file:
     path: "{{ paths.runtime_socket_dir }}"
@@ -8,11 +21,20 @@
     mode: "0750"
   tags: [nginx]
 
+- name: Ensure conf directory exists
+  ansible.builtin.file:
+    path: "{{ paths.conf_root }}"
+    state: directory
+    owner: root
+    group: "{{ group }}"
+    mode: "0750"
+  tags: [nginx]
+
 - name: Deploy per-site nginx config
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../nginx/site-nginx.conf.j2"
-    dest: "{{ paths.repo_nginx_config }}"
-    owner: "{{ service_user }}"
+    dest: "{{ paths.site_nginx_config }}"
+    owner: root
     group: "{{ group }}"
     mode: "0640"
   tags: [nginx]

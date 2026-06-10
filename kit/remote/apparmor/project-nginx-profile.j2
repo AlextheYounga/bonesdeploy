@@ -28,7 +28,7 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-ngi
 
   {{ paths.current_web_root }}/** r,
   {{ paths.repo_bones_yaml }} r,
-  {{ paths.repo_nginx_config }} r,
+  {{ paths.site_nginx_config }} r,
 
   {{ paths.runtime_socket_dir }}/ rw,
   {{ paths.runtime_socket_dir }}/** rwk,

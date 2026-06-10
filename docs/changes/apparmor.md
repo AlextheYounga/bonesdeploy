@@ -2,7 +2,7 @@
 
 ## Overview
 
-This branch implements per-project AppArmor confinement for per-site nginx, replacing broad runtime network access with explicit unix-socket-only permissions. The changes maintain Landlock as a supplemental job-time sandbox while making AppArmor the primary confinement mechanism for the nginx service boundary.
+This branch implements per-project AppArmor confinement for per-site nginx, replacing broad runtime network access with explicit unix-socket-only permissions. The nginx service now relies on AppArmor plus systemd sandboxing.
 
 ## What Changed
 
@@ -104,34 +104,7 @@ New AppArmor validation checks:
 - `check_apparmor_profile_installed` - scans `/etc/apparmor.d/` for the project profile
 - `check_apparmor_unit_wiring` - scans `/etc/systemd/system/*-nginx.service` for AppArmor wiring
 
-Doctor now checks AppArmor before Landlock, reflecting the AppArmor-first policy.
-
-### 6. Linux-Only Landlock Gating
-
-**Location:** `crates/bonesremote/src/landlock.rs`
-
-Fixed macOS clippy failure by removing the `allow(dead_code)` workaround and making the non-Linux stub explicitly use the policy fields:
-
-```rust
-fn policy_path_counts(policy: &Policy) -> (usize, usize) {
-    (policy.read_only_paths.len(), policy.writable_paths.len())
-}
-
-#[cfg(not(target_os = "linux"))]
-mod platform {
-    pub fn restrict_self(policy: &Policy) -> Result<()> {
-        let _ = super::policy_path_counts(policy);
-        bail!("Landlock is only available on Linux")
-    }
-}
-```
-
-This ensures:
-- No dead code warnings on non-Linux platforms
-- Clear runtime error if Landlock APIs are called outside Linux
-- Policy struct remains consistent across platforms
-
-### 7. Template Overrides
+### 6. Template Overrides
 
 **Locations:** `templates/*/remote/vars/setup.yml`
 
@@ -141,7 +114,6 @@ Framework templates now only override setup metadata such as runtime role name a
 
 - `docs/commands/bonesdeploy/remote-setup.md` - Added AppArmor verification runbook for Linux hosts
 - `docs/commands/bonesremote/doctor.md` - Documented AppArmor checks and updated summary table
-- `docs/commands/bonesremote/landlock-nginx.md` - Updated to reflect repo-local nginx.conf as allowed read path
 - `docs/security/05-apparmor-policy.md` - AppArmor-first policy intent
 - `docs/security/19-agent-audit-checklist.md` - Added AppArmor service binding verification commands
 
@@ -194,12 +166,6 @@ Expected:
 - AppArmor provides kernel-enforced confinement independent of application cooperation
 - Simpler to reason about than Landlock for service boundaries
 
-### Why Landlock Remains
-
-- Supplemental job-time sandbox during deployment operations
-- Defense-in-depth for bonesremote execution context
-- Already implemented and tested on Linux hosts
-
 ### Why No `/home` Deny
 
 - Default `repo_path` is `/home/{{ deploy_user }}/{{ project_name }}.git`
@@ -213,7 +179,6 @@ Expected:
 docs/goal.md
 docs/commands/bonesdeploy/remote-setup.md
 docs/commands/bonesremote/doctor.md
-docs/commands/bonesremote/landlock-nginx.md
 docs/security/05-apparmor-policy.md
 docs/security/19-agent-audit-checklist.md
 kit/remote/playbooks/setup.yml
@@ -226,9 +191,7 @@ kit/remote/roles/apparmor/README.md
 templates/*/remote/vars/setup.yml
 crates/bonesdeploy/src/commands/init.rs
 crates/bonesdeploy/src/config.rs
-crates/bonesremote/src/landlock.rs
 crates/bonesremote/src/commands/doctor.rs
-crates/bonesremote/src/commands/landlock_nginx.rs
 crates/bonesremote/src/commands/wire_release.rs
 crates/bonesremote/Cargo.toml
 ```

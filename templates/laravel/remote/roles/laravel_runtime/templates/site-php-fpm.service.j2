@@ -1,5 +1,5 @@
 [Unit]
-Description=Per-site nginx for {{ project_name }}
+Description=Per-site PHP-FPM for {{ project_name }}
 After=network.target apparmor.service
 Requires=apparmor.service
 
@@ -9,9 +9,9 @@ User={{ service_user }}
 Group={{ group }}
 WorkingDirectory={{ paths.current }}
 
-ExecStart=/usr/sbin/nginx -c {{ paths.site_nginx_config }} -g 'daemon off;'
+ExecStart=/usr/sbin/php-fpm{{ laravel_php_version_resolved }} --nodaemonize --fpm-config {{ laravel_php_fpm_pool_config_path }}
 
-AppArmorProfile={{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-nginx") }}
+AppArmorProfile={{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-php-fpm") }}
 
 NoNewPrivileges=yes
 RestrictNamespaces=yes
@@ -30,8 +30,8 @@ PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=strict
 
-ReadWritePaths={{ paths.runtime_socket_dir }}
-ReadOnlyPaths={{ paths.current }} {{ paths.site_nginx_config }}
+ReadWritePaths={{ paths.runtime_socket_dir }} {{ paths.current }}/storage
+ReadOnlyPaths={{ paths.current }}
 
 Restart=always
 RestartSec=2

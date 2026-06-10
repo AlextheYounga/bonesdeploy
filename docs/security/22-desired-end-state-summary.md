@@ -18,7 +18,6 @@ capabilities dropped by default
 NoNewPrivileges enabled
 cgroup limits set
 AppArmor enabled and enforcing where supported
-Landlock used for risky child jobs where practical
 seccomp used where practical
 logs and backups protected
 no public databases, caches, or admin services
