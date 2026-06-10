@@ -197,7 +197,7 @@ fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<Stri
 
 #[cfg(test)]
 mod tests {
-    use super::is_affirmative;
+    use super::{is_affirmative, remote_setup_prompt_lines};
 
     /// Accepts common yes values like y, yes, and YES.
     #[test]
@@ -213,5 +213,13 @@ mod tests {
         assert!(!is_affirmative(""));
         assert!(!is_affirmative("n"));
         assert!(!is_affirmative("no"));
+    }
+
+    /// Describes firewall configuration in the remote setup prompt.
+    #[test]
+    fn remote_setup_prompt_lines_include_firewall_configuration() {
+        let joined = remote_setup_prompt_lines().join("\n");
+
+        assert!(joined.contains("firewalls"), "remote setup prompt should describe firewall configuration\n{joined}");
     }
 }

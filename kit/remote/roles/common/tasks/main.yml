@@ -1,22 +1,4 @@
 ---
-- name: Check for rustup
-  ansible.builtin.stat:
-    path: "{{ rustup_install_prefix }}/rustup"
-  register: common_rustup_binary
-  tags: [common, bonesremote]
-
-- name: Start rustup and cargo install
-  ansible.builtin.shell: |
-    set -euo pipefail
-    curl --proto '=https' --tlsv1.2 -sSf {{ rustup_install_script_url }} | sh -s -- -y --profile minimal
-  args:
-    creates: "{{ rustup_install_prefix }}/cargo"
-  when: not common_rustup_binary.stat.exists
-  async: 1800
-  poll: 0
-  register: common_rustup_job
-  tags: [common, bonesremote]
-
 - name: Start nvm install for deploy user
   become_user: "{{ deploy_user }}"
   ansible.builtin.shell: |
@@ -138,6 +120,7 @@
   tags: [common, bonesremote]
 
 - name: Wait for nvm install
+  become_user: "{{ deploy_user }}"
   ansible.builtin.async_status:
     jid: "{{ common_nvm_job.ansible_job_id }}"
   register: common_nvm_result
@@ -200,6 +183,7 @@
   tags: [common, bonesremote]
 
 - name: Wait for latest LTS Node install
+  become_user: "{{ deploy_user }}"
   ansible.builtin.async_status:
     jid: "{{ common_node_lts_job.ansible_job_id }}"
   register: common_node_lts_result

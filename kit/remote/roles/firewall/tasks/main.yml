@@ -1,12 +1,6 @@
 ---
 # Firewall role main tasks
 
-- name: Install UFW
-  ansible.builtin.apt:
-    name: ufw
-    state: present
-  tags: [firewall, security, packages]
-
 - name: Allow SSH from all sources
   community.general.ufw:
     rule: "{{ 'limit' if firewall_ssh_rate_limit else 'allow' }}"
