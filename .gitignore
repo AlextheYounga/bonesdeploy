@@ -41,4 +41,5 @@ __trash__
 .dylint
 bin
 !tests/**/bin
-docs/logs/*
+docs/references/*
+__trash__
