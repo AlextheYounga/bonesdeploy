@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use std::path::Path;
 
 const TEMPLATES: [&str; 7] = [
@@ -34,6 +36,8 @@ const TEMPLATE_SETUP_PLAYBOOKS: [&str; 7] = [
 mod apparmor;
 #[path = "init_assets/deployment.rs"]
 mod deployment;
+#[path = "init_assets/firewall.rs"]
+mod firewall;
 #[path = "init_assets/paths.rs"]
 mod paths;
 #[path = "init_assets/setup_playbook.rs"]
@@ -41,6 +45,6 @@ mod setup_playbook;
 #[path = "init_assets/templates.rs"]
 mod templates;
 
-fn project_root() -> std::path::PathBuf {
+fn project_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }

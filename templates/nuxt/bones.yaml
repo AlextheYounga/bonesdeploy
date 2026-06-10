@@ -5,7 +5,7 @@ data:
   port: '22'
   repo_path: '/home/git/<project_name>.git'
   project_root: '/srv/deployments/<project_name>'
-  web_root: 'public'
+  web_root: '.output/public'
   branch: 'master'
 
 permissions:

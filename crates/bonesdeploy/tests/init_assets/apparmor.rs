@@ -35,11 +35,7 @@ fn nginx_service_template_waits_for_apparmor_service() {
 #[test]
 fn apparmor_profile_template_exists() {
     let profile_template = project_root().join("kit/remote/apparmor/project-nginx-profile.j2");
-    assert!(
-        profile_template.exists(),
-        "expected AppArmor profile template at {}",
-        profile_template.display()
-    );
+    assert!(profile_template.exists(), "expected AppArmor profile template at {}", profile_template.display());
 }
 
 /// Allows reading the repo-level nginx configuration in the `AppArmor` profile template.
