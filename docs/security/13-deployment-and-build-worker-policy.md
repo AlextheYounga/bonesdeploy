@@ -38,7 +38,6 @@ Build scripts should run with:
 - dropped capabilities where possible
 - cgroup limits
 - AppArmor profile where available
-- Landlock restrictions where practical
 - minimal secrets
 - controlled network access
 

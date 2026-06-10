@@ -48,7 +48,7 @@ fn apparmor_profile_template_allows_site_nginx_conf() {
 
     assert!(
         content.contains("{{ paths.site_nginx_config }} r,"),
-        "AppArmor template must allow reading site nginx.conf used by bonesremote landlock nginx\n{content}"
+        "AppArmor template must allow reading site nginx.conf used by the per-site nginx service\n{content}"
     );
 }
 

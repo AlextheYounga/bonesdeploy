@@ -2,7 +2,7 @@
 
 ## Overview
 
-Validates the server environment to ensure all prerequisites and configurations are correct for `bonesremote` to function properly. Performs checks for OS compatibility, binary availability, sudoers configuration, AppArmor enforcement, and Landlock support.
+Validates the server environment to ensure all prerequisites and configurations are correct for `bonesremote` to function properly. Performs checks for OS compatibility, binary availability, sudoers configuration, AppArmor enforcement, and per-site nginx wiring.
 
 ## Command Signature
 
@@ -199,47 +199,7 @@ AppArmor check failed: /etc/systemd/system/demo-nginx.service references unknown
 
 ---
 
-### 7. Check Landlock Support
-
-**Source:** `doctor.rs:19`, `doctor.rs:83-88`
-
-```rust
-check_landlock_support(&mut issues);
-```
-
-Verifies the kernel supports Landlock LSM for runtime isolation.
-
-**Implementation:**
-```rust
-fn check_landlock_support(issues: &mut Vec<String>) {
-    match landlock::verify_support() {
-        Ok(()) => {}
-        Err(error) => issues.push(format!("Landlock support check failed: {error}")),
-    }
-}
-```
-
-**Landlock Requirements:**
-- Linux kernel 5.13+ (for full feature support)
-- Landlock LSM enabled in kernel config
-- May require kernel boot parameters
-
-**Why Landlock?**
-- Provides mandatory access control (MAC)
-- Sandboxes runtime processes
-- Limits filesystem access to specific directories
-- Enhances security without requiring root
-
-**Example Issue:**
-```
-Landlock support check failed: Kernel does not support Landlock
-```
-
-**Solution:** Upgrade kernel or enable Landlock in kernel configuration.
-
----
-
-### 8. Report Results
+### 7. Report Results
 
 **Source:** `doctor.rs:25-34`
 
@@ -282,7 +242,6 @@ Doctor found 2 issues
 | **Global availability** | `bonesremote` in PATH | Install globally |
 | **Passwordless sudo** | Sudoers configured | Run `sudo bonesremote init` |
 | **AppArmor support** | Kernel + service + enforcing profiles | Enable and enforce AppArmor |
-| **Landlock support** | Kernel supports Landlock | Upgrade kernel |
 
 ---
 

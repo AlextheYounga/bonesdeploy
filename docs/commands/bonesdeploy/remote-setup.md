@@ -416,7 +416,7 @@ The playbook typically includes tasks for:
 
 5. **Per-Site Nginx**
    - Install Nginx
-   - Configure per-site nginx with Landlock isolation
+    - Configure per-site nginx with AppArmor and systemd sandboxing
    - Set up socket directory (`/run/{project}/`)
    - Create nginx systemd service
    - Configure main router nginx

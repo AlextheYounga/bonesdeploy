@@ -18,7 +18,7 @@
 - Trims whitespace and falls back to root when the bootstrap SSH user is blank. (resolve_bootstrap_ssh_user_trims_and_rejects_blank_values)
 - Uses the environment override when provided for the bootstrap SSH user. (resolve_bootstrap_ssh_user_uses_env_override)
 
-## `crates/bonesdeploy/src/commands/remote_setup_output.rs`
+## `crates/bonesdeploy/src/commands/remote_setup_output_tests.rs`
 - Includes the merged `setup_apt_packages` list in generated Ansible vars for remote setup. (build_ansible_vars_includes_merged_setup_apt_packages)
 - Ignores warning and noise lines from Ansible output. (classify_output_line_ignores_warnings_and_noise)
 - Classifies task and failure lines over other output types. (classify_output_line_prefers_tasks_and_failures)
@@ -71,7 +71,7 @@
 - Creates the project root parent directory with traversable permissions before the placeholder release. (common_role_creates_project_root_parent_before_placeholder_release)
 
 ## `crates/bonesdeploy/tests/init_assets/apparmor.rs`
-- Allows reading the repo-level nginx configuration in the `AppArmor` profile template. (apparmor_profile_template_allows_repo_nginx_conf)
+- Allows reading the site nginx configuration in the `AppArmor` profile template. (apparmor_profile_template_allows_site_nginx_conf)
 - Does not deny the parent home path when the repo path is derived from the shared helper. (apparmor_profile_template_does_not_deny_repo_path_parent_home)
 - Ensures the `AppArmor` profile template file exists at the expected path. (apparmor_profile_template_exists)
 - Limits network access to unix stream sockets and denies inet sockets. (apparmor_profile_template_limits_network_to_unix_stream)
@@ -82,14 +82,6 @@
 - Verifies the `AppArmor` profile is loaded in the kernel. (apparmor_role_verifies_profile_loaded)
 - Sets an `AppArmor` profile in the per-site nginx systemd service template. (nginx_service_template_sets_apparmor_profile)
 - Requires the `AppArmor` service in the nginx systemd service template. (nginx_service_template_waits_for_apparmor_service)
-
-## `crates/bonesdeploy/tests/init_assets/deployment.rs`
-- Restarts the project systemd service from app server deployment scripts. (app_server_templates_restart_project_service_from_deployment_scripts)
-- Does not use unsafe `PROJECT_NAME` fallback patterns in any deployment script. (deployment_scripts_have_no_unsafe_project_name_fallbacks)
-- Installs pnpm only after nvm activates the project Node version in the Nuxt deployment script. (nuxt_deployment_script_installs_pnpm_after_nvm)
-- Does not install global npm packages in the Nuxt runtime role. (nuxt_runtime_role_does_not_install_global_npm_packages)
-- Does not use pm2 in SPA template deployment scripts. (spa_template_deploy_scripts_do_not_use_pm2)
-- Ends after the build step without process restart for the static Vue SPA. (vue_deployment_script_ends_after_build)
 
 ## `crates/bonesdeploy/tests/init_assets/firewall.rs`
 - Applies all UFW rules in a single shell task instead of multiple module calls. (firewall_role_applies_all_rules_in_a_single_shell_task)
@@ -135,7 +127,10 @@
 - Returns deployment script files sorted and excludes subdirectories. (list_deployment_scripts_returns_sorted_files_only)
 - Replaces the release tree contents with a fresh copy from the build workspace. (publish_release_tree_replaces_release_contents_with_build_workspace)
 
-## `crates/bonesremote/src/commands/doctor.rs`
+## `crates/bonesremote/src/commands/doctor_tests.rs`
+- Detects `algif_aead` in loaded kernel module list. (algif_aead_is_loaded_detects_module)
+- Rejects module list without `algif_aead`. (algif_aead_is_loaded_rejects_absent_module)
+- Rejects module names that only contain `algif_aead` as a prefix. (algif_aead_is_loaded_rejects_prefix_match)
 - Accepts a yes value as indicating `AppArmor` is enabled in the kernel. (apparmor_kernel_enabled_accepts_yes)
 - Rejects a no value as indicating `AppArmor` is not enabled in the kernel. (apparmor_kernel_enabled_rejects_no)
 - Reads the first `AppArmor` profile assignment from a systemd unit file. (apparmor_profile_binding_reads_first_profile_assignment)
@@ -145,9 +140,6 @@
 - Accepts a systemd unit with correctly wired `AppArmor` dependency and profile. (apparmor_unit_wiring_accepts_expected_unit_with_reordered_after_tokens)
 - Rejects a systemd unit that is missing the `AppArmor` profile binding. (apparmor_unit_wiring_rejects_missing_profile_binding)
 - Rejects a systemd unit that binds an unknown `AppArmor` profile. (apparmor_unit_wiring_rejects_unknown_profile_binding)
-
-## `crates/bonesremote/src/commands/landlock_nginx.rs`
-- Includes the nginx configuration path in the Landlock read-only policy set. (build_policy_includes_nginx_conf_in_read_only_paths)
 
 ## `crates/bonesremote/src/commands/post_deploy.rs`
 - Keeps all releases when the active release count is within the keep limit. (prune_old_releases_keeps_active_release_when_within_keep_limit)
@@ -174,11 +166,6 @@
 - Keeps the default service user as an empty string when project name is empty. (load_keeps_default_service_user_when_project_name_is_empty)
 - Preserves explicitly configured service user and path overrides. (load_preserves_explicit_service_user_and_paths)
 - Applies default values for port, branch, deploy user, and releases when fields are missing. (load_uses_defaults_for_missing_fields)
-
-## `crates/bonesremote/src/landlock.rs`
-- Imports the `RulesetAttr` trait required by `handle_access` in landlock 0.4.x. (linux_landlock_module_imports_ruleset_attr_trait)
-- Imports the `RulesetCreatedAttr` trait required by `set_no_new_privs` in landlock 0.4.x. (linux_landlock_module_imports_ruleset_created_attr_trait)
-- Reports the count of read-only and writable paths in a policy. (policy_path_counts_reports_read_and_write_lengths)
 
 ## `crates/bonesremote/src/release_state.rs`
 - Removes the staged release state file from disk. (clear_staged_release_removes_state_file)
