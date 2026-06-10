@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use super::{
-    AppArmorUnitWiringStatus, algif_aead_is_loaded, apparmor_kernel_enabled, apparmor_profile_binding,
-    apparmor_profile_filename, apparmor_unit_name_for_profile, apparmor_unit_wiring_status,
+    AppArmorUnitWiringStatus, apparmor_kernel_enabled, apparmor_profile_binding, apparmor_profile_filename,
+    apparmor_unit_name_for_profile, apparmor_unit_wiring_status,
 };
 
 /// Accepts a yes value as indicating `AppArmor` is enabled in the kernel.
@@ -84,22 +84,4 @@ fn apparmor_profile_binding_reads_first_profile_assignment() {
         apparmor_profile_binding("[Service]\nAppArmorProfile=bonesdeploy-demo-nginx\n"),
         Some("bonesdeploy-demo-nginx")
     );
-}
-
-/// Detects `algif_aead` in loaded kernel module list.
-#[test]
-fn algif_aead_is_loaded_detects_module() {
-    assert!(algif_aead_is_loaded("algif_aead 20480 0\next4 1000000 3\n"));
-}
-
-/// Rejects module list without `algif_aead`.
-#[test]
-fn algif_aead_is_loaded_rejects_absent_module() {
-    assert!(!algif_aead_is_loaded("ext4 1000000 3\n"));
-}
-
-/// Rejects module names that only contain `algif_aead` as a prefix.
-#[test]
-fn algif_aead_is_loaded_rejects_prefix_match() {
-    assert!(!algif_aead_is_loaded("algif_aead_other 20480 0\n"));
 }
