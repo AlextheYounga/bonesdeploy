@@ -93,9 +93,9 @@
 - Sets default policies and enables UFW. (firewall_role_shell_sets_default_policies_and_enables_ufw)
 
 ## `crates/bonesdeploy/tests/init_assets/paths.rs`
-- Uses resolved paths in both nginx site and `AppArmor` templates. (nginx_and_apparmor_templates_use_resolved_paths)
+- Uses resolved paths in both router nginx and `AppArmor` templates. (nginx_and_apparmor_templates_use_resolved_paths)
 - Uses resolved placeholder web root paths in the common role. (shared_setup_playbook_uses_placeholder_web_root_paths)
-- Defines nginx template and service defaults to allow tag-based execution without the nginx role. (ssl_role_defines_nginx_defaults_for_tag_based_execution)
+- Defines router template and service defaults to allow tag-based execution without the nginx role. (ssl_role_defines_nginx_defaults_for_tag_based_execution)
 - Treats SSL enabled as an explicit boolean rather than relying on string truthiness. (ssl_role_treats_ssl_enabled_as_explicit_boolean)
 - Uses the resolved current web root for certbot validation in the SSL role. (ssl_role_uses_current_web_root_path_manifest)
 
