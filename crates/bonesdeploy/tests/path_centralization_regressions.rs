@@ -1,8 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-/// Verifies the update-bonesremote playbook uses `cargo install --git` instead of staging binaries.
-/// Verifies the update-bonesremote playbook uses `cargo install --git` instead of staging binaries.
+/// Verifies the update-bonesremote playbook force-installs from git instead of uninstalling first or staging binaries.
 #[test]
 fn update_bonesremote_playbook_installs_from_git_like_init() {
     let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("updates/playbooks/update-bonesremote.yml");
@@ -24,8 +23,11 @@ fn update_bonesremote_playbook_installs_from_git_like_init() {
     }
 
     assert!(
-        content.contains("- uninstall") && content.contains("- install") && content.contains("- --git"),
-        "update-bonesremote playbook must use cargo uninstall/install --git instead of staged binaries\n{content}"
+        !content.contains("- uninstall")
+            && content.contains("- install")
+            && content.contains("- --git")
+            && content.contains("- --force"),
+        "update-bonesremote playbook must use cargo install --git --force without a prior uninstall\n{content}"
     );
 
     assert!(

@@ -1,0 +1,11 @@
+build-essential
+ca-certificates
+curl
+git
+rsync
+sudo
+nginx
+apparmor
+apparmor-utils
+certbot
+ufw

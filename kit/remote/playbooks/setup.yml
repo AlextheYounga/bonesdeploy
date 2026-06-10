@@ -7,6 +7,14 @@
     - "{{ playbook_dir }}/../vars/setup.yml"
 
   tasks:
+    - name: Install setup apt packages
+      ansible.builtin.apt:
+        name: "{{ setup_apt_packages }}"
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      tags: [setup, packages]
+
     - name: Run users role
       ansible.builtin.include_role:
         name: users

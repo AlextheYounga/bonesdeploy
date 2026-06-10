@@ -83,6 +83,46 @@ fn remote_setup_playbook_loads_shared_template_vars_and_doctor_task() {
     );
 }
 
+/// Ensures the shared scaffold embeds `kit/remote/Aptfile` as the base setup package manifest.
+#[test]
+fn shared_remote_scaffold_embeds_base_aptfile() {
+    let aptfile = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/Aptfile");
+    assert!(aptfile.is_file(), "expected shared remote Aptfile at {}", aptfile.display());
+}
+
+/// Uses a single shared apt package list variable in the setup playbook instead of per-role apt package definitions.
+#[test]
+fn shared_setup_playbook_uses_single_setup_apt_packages_manifest() {
+    let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("setup_apt_packages"),
+        "shared setup playbook must drive package installation from setup_apt_packages\n{content}"
+    );
+}
+
+/// Starts the slow toolchain installers with Ansible async/poll orchestration after package installation.
+#[test]
+fn common_role_runs_toolchain_installers_as_async_jobs() {
+    let tasks = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/common/tasks/main.yml");
+    let content = fs::read_to_string(&tasks);
+    assert!(content.is_ok(), "failed to read {}", tasks.display());
+    let content = content.unwrap_or_default();
+
+    assert!(content.contains("async:"), "common role should use ansible async jobs for slow installers\n{content}");
+    assert!(
+        content.contains("poll: 0"),
+        "common role should launch async installers without polling inline\n{content}"
+    );
+    assert!(
+        content.contains("ansible.builtin.async_status"),
+        "common role should wait on async installers with async_status\n{content}"
+    );
+}
+
 /// Sets an `AppArmor` profile in the per-site nginx systemd service template.
 #[test]
 fn nginx_service_template_sets_apparmor_profile() {

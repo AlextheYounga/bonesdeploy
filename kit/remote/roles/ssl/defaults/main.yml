@@ -2,6 +2,5 @@
 ssl_enabled: false
 ssl_domain: ""
 ssl_email: ""
-ssl_certbot_package: certbot
 ssl_cert_path: ""
 ssl_key_path: ""

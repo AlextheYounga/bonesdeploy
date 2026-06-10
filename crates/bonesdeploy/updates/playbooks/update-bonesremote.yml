@@ -32,18 +32,6 @@
         group: root
         mode: "0755"
 
-    - name: Uninstall existing bonesremote package
-      ansible.builtin.command:
-        argv:
-          - "{{ cargo_binary_path }}"
-          - uninstall
-          - --root
-          - "{{ bonesremote_install_root }}"
-          - bonesremote
-      register: bonesremote_uninstall
-      changed_when: bonesremote_uninstall.rc == 0
-      failed_when: false
-
     - name: Install bonesremote from master
       ansible.builtin.command:
         argv:
@@ -53,6 +41,7 @@
           - "{{ bonesremote_install_root }}"
           - --git
           - "{{ bonesremote_repo_url }}"
+          - --force
           - bonesremote
       changed_when: true
 
