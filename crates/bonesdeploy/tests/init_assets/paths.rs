@@ -1,0 +1,85 @@
+use std::fs;
+
+use super::project_root;
+
+/// Uses resolved placeholder web root paths in the common role.
+#[test]
+fn shared_setup_playbook_uses_placeholder_web_root_paths() {
+    let playbook = project_root().join("kit/remote/roles/common/tasks/main.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("{{ paths.placeholder_web_root }}"),
+        "common role must seed placeholder release using the resolved placeholder web root\n{content}"
+    );
+    assert!(
+        content.contains("{{ paths.placeholder_index }}"),
+        "common role must write placeholder index through the resolved path manifest\n{content}"
+    );
+}
+
+/// Uses the resolved current web root for certbot validation in the SSL role.
+#[test]
+fn ssl_role_uses_current_web_root_path_manifest() {
+    let role = project_root().join("kit/remote/roles/ssl/tasks/main.yml");
+    let content = fs::read_to_string(&role);
+    assert!(content.is_ok(), "failed to read {}", role.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("{{ paths.current_web_root }}"),
+        "ssl role must use the resolved current web root for certbot webroot validation\n{content}"
+    );
+}
+
+/// Uses resolved paths in both nginx site and `AppArmor` templates.
+#[test]
+fn nginx_and_apparmor_templates_use_resolved_paths() {
+    let nginx_site = project_root().join("kit/remote/nginx/site.conf.j2");
+    let nginx_conf = fs::read_to_string(&nginx_site);
+    assert!(nginx_conf.is_ok(), "failed to read {}", nginx_site.display());
+    let nginx_conf = nginx_conf.unwrap_or_default();
+
+    assert!(
+        nginx_conf.contains("{{ paths.current_web_root }}"),
+        "nginx site template must use resolved current web root\n{nginx_conf}"
+    );
+
+    let apparmor = project_root().join("kit/remote/apparmor/project-nginx-profile.j2");
+    let apparmor_conf = fs::read_to_string(&apparmor);
+    assert!(apparmor_conf.is_ok(), "failed to read {}", apparmor.display());
+    let apparmor_conf = apparmor_conf.unwrap_or_default();
+
+    assert!(
+        apparmor_conf.contains("{{ paths.current_web_root }}/** r,"),
+        "AppArmor profile must read the resolved current web root path\n{apparmor_conf}"
+    );
+    assert!(
+        apparmor_conf.contains("{{ paths.repo_bones_yaml }} r,"),
+        "AppArmor profile must read the resolved repo bones yaml path\n{apparmor_conf}"
+    );
+    assert!(
+        apparmor_conf.contains("{{ paths.repo_nginx_config }} r,"),
+        "AppArmor profile must read the resolved repo nginx config path\n{apparmor_conf}"
+    );
+}
+
+/// Treats SSL enabled as an explicit boolean rather than relying on string truthiness.
+#[test]
+fn ssl_role_treats_ssl_enabled_as_explicit_boolean() {
+    let role = project_root().join("kit/remote/roles/ssl/tasks/main.yml");
+    let content = fs::read_to_string(&role);
+    assert!(content.is_ok(), "failed to read {}", role.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        !content.contains("when: ssl_enabled\n"),
+        "ssl role must not rely on string truthiness\n{content}"
+    );
+    assert!(
+        content.contains("when: ssl_enabled | bool"),
+        "ssl role should cast CLI vars explicitly\n{content}"
+    );
+}
