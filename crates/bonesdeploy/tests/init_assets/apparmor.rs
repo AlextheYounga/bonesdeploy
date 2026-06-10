@@ -38,17 +38,17 @@ fn apparmor_profile_template_exists() {
     assert!(profile_template.exists(), "expected AppArmor profile template at {}", profile_template.display());
 }
 
-/// Allows reading the repo-level nginx configuration in the `AppArmor` profile template.
+/// Allows reading the site nginx configuration in the `AppArmor` profile template.
 #[test]
-fn apparmor_profile_template_allows_repo_nginx_conf() {
+fn apparmor_profile_template_allows_site_nginx_conf() {
     let profile_template = project_root().join("kit/remote/apparmor/project-nginx-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("{{ paths.repo_nginx_config }} r,"),
-        "AppArmor template must allow reading repo-local nginx.conf used by bonesremote landlock nginx\n{content}"
+        content.contains("{{ paths.site_nginx_config }} r,"),
+        "AppArmor template must allow reading site nginx.conf used by bonesremote landlock nginx\n{content}"
     );
 }
 

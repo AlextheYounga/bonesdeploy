@@ -330,39 +330,20 @@ fn check_per_site_nginx_config(issues: &mut Vec<String>) {
         })
         .collect();
 
-    for (_unit_name, unit_path) in site_nginx_units {
-        let Ok(contents) = fs::read_to_string(&unit_path) else {
+    for (unit_name, _unit_path) in site_nginx_units {
+        let Some(project_name) = unit_name.strip_suffix("-nginx.service") else {
             continue;
         };
 
-        let Some(nginx_conf_path) = exec_start_nginx_conf_path(&contents) else {
-            issues.push(format!(
-                "Per-site nginx config check failed: could not derive nginx.conf path from {}",
-                unit_path.display()
-            ));
-            continue;
-        };
+        let nginx_conf_path = PathBuf::from(paths::DEFAULT_CONF_ROOT_PARENT).join(project_name).join("nginx.conf");
 
-        if !PathBuf::from(&nginx_conf_path).exists() {
+        if !nginx_conf_path.exists() {
             issues.push(format!(
-                "Per-site nginx config check failed: {nginx_conf_path} does not exist (re-run remote setup with --tags nginx)"
+                "Per-site nginx config check failed: {} does not exist (re-run remote setup with --tags nginx)",
+                nginx_conf_path.display()
             ));
         }
     }
-}
-
-fn exec_start_nginx_conf_path(contents: &str) -> Option<String> {
-    for line in contents.lines() {
-        let Some(rest) = line.strip_prefix("ExecStart=") else { continue };
-        let mut args = rest.split_whitespace();
-        while let Some(arg) = args.next() {
-            if arg == "--config" {
-                let config_path = args.next()?;
-                return PathBuf::from(config_path).parent().map(|p| p.join("nginx.conf").display().to_string());
-            }
-        }
-    }
-    None
 }
 
 #[cfg(test)]
@@ -372,7 +353,6 @@ mod tests {
     use super::{
         AppArmorUnitWiringStatus, algif_aead_is_loaded, apparmor_kernel_enabled, apparmor_profile_binding,
         apparmor_profile_filename, apparmor_unit_name_for_profile, apparmor_unit_wiring_status,
-        exec_start_nginx_conf_path,
     };
 
     /// Accepts a yes value as indicating `AppArmor` is enabled in the kernel.
@@ -472,19 +452,5 @@ mod tests {
     #[test]
     fn algif_aead_is_loaded_rejects_prefix_match() {
         assert!(!algif_aead_is_loaded("algif_aead_other 20480 0\n"));
-    }
-
-    /// Derives `nginx.conf` path from `ExecStart` `--config` argument.
-    #[test]
-    fn exec_start_nginx_conf_path_parses_config_arg() {
-        let contents = "[Service]\nExecStart=/usr/local/bin/bonesremote landlock nginx --config /home/git/myapp.git/bones/bones.yaml\n";
-        assert_eq!(exec_start_nginx_conf_path(contents), Some("/home/git/myapp.git/bones/nginx.conf".to_string()));
-    }
-
-    /// Returns `None` when `ExecStart` has no `--config` argument.
-    #[test]
-    fn exec_start_nginx_conf_path_returns_none_without_config() {
-        let contents = "[Service]\nExecStart=/usr/local/bin/bonesremote landlock nginx\n";
-        assert_eq!(exec_start_nginx_conf_path(contents), None);
     }
 }

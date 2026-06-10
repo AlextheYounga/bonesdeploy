@@ -21,7 +21,7 @@ pub fn run(config_path: &str) -> Result<()> {
     let paths =
         DeploymentPaths::new(&cfg.data.project_name, &cfg.data.repo_path, &cfg.data.project_root, &cfg.data.web_root);
     let socket_dir = PathBuf::from(paths.runtime_socket_dir);
-    let nginx_conf = PathBuf::from(paths.repo_nginx_config);
+    let nginx_conf = PathBuf::from(paths.site_nginx_config);
     let policy = build_policy(&active_web_root, &socket_dir, &nginx_conf);
 
     landlock::restrict_self(&policy)?;
@@ -70,7 +70,7 @@ mod tests {
         );
         let web_root = PathBuf::from(paths.current_web_root);
         let socket_dir = PathBuf::from(paths.runtime_socket_dir);
-        let nginx_conf = PathBuf::from(paths.repo_nginx_config);
+        let nginx_conf = PathBuf::from(paths.site_nginx_config);
 
         let policy = build_policy(&web_root, &socket_dir, &nginx_conf);
 

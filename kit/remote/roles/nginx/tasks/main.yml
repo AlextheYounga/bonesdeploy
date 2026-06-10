@@ -8,10 +8,19 @@
     mode: "0750"
   tags: [nginx]
 
+- name: Ensure conf directory exists
+  ansible.builtin.file:
+    path: "{{ paths.conf_root }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ group }}"
+    mode: "0750"
+  tags: [nginx]
+
 - name: Deploy per-site nginx config
   ansible.builtin.template:
     src: "{{ playbook_dir }}/../nginx/site-nginx.conf.j2"
-    dest: "{{ paths.repo_nginx_config }}"
+    dest: "{{ paths.site_nginx_config }}"
     owner: "{{ service_user }}"
     group: "{{ group }}"
     mode: "0640"
