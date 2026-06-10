@@ -20,6 +20,8 @@ pub fn run() -> Result<()> {
     check_passwordless_sudo(&mut issues);
     check_apparmor_support(&mut issues);
     check_landlock_support(&mut issues);
+    check_algif_aead_disabled(&mut issues);
+    check_per_site_nginx_config(&mut issues);
 
     if issues.is_empty() {
         println!("\n{} All checks passed.", style("OK").green().bold());
@@ -272,13 +274,105 @@ fn apparmor_unit_wiring_status(contents: &str, installed_profiles: &HashSet<&str
     }
 }
 
+fn check_algif_aead_disabled(issues: &mut Vec<String>) {
+    let modules = fs::read_to_string(paths::PROC_MODULES);
+    let Ok(modules) = modules else {
+        issues.push(format!("Kernel module check failed: could not read {}", paths::PROC_MODULES));
+        return;
+    };
+
+    if algif_aead_is_loaded(&modules) {
+        issues.push(
+            "Kernel module check failed: algif_aead is loaded; disable it to mitigate CVE-2026-31431 \
+             (run: echo 'install algif_aead /bin/false' > /etc/modprobe.d/disable-algif.conf && rmmod algif_aead)"
+                .to_string(),
+        );
+        return;
+    }
+
+    if !algif_aead_is_blocked() {
+        issues.push(
+            "Kernel module check failed: algif_aead is not blocked from loading; block it to mitigate CVE-2026-31431 \
+             (run: echo 'install algif_aead /bin/false' > /etc/modprobe.d/disable-algif.conf)"
+                .to_string(),
+        );
+    }
+}
+
+fn algif_aead_is_loaded(proc_modules: &str) -> bool {
+    proc_modules.lines().any(|line| line.split_whitespace().next() == Some("algif_aead"))
+}
+
+fn algif_aead_is_blocked() -> bool {
+    let Ok(entries) = fs::read_dir(paths::ETC_MODPROBE_D) else {
+        return false;
+    };
+
+    entries.filter_map(Result::ok).any(|entry| {
+        let Ok(contents) = fs::read_to_string(entry.path()) else { return false };
+        contents.lines().any(|line| {
+            let trimmed = line.trim();
+            !trimmed.starts_with('#') && trimmed.starts_with("install algif_aead")
+        })
+    })
+}
+
+fn check_per_site_nginx_config(issues: &mut Vec<String>) {
+    let Ok(units) = fs::read_dir(paths::ETC_SYSTEMD_SYSTEM) else {
+        return;
+    };
+
+    let site_nginx_units: Vec<(String, PathBuf)> = units
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let name = entry.file_name().into_string().ok()?;
+            if name.ends_with("-nginx.service") { Some((name, entry.path())) } else { None }
+        })
+        .collect();
+
+    for (_unit_name, unit_path) in site_nginx_units {
+        let Ok(contents) = fs::read_to_string(&unit_path) else {
+            continue;
+        };
+
+        let Some(nginx_conf_path) = exec_start_nginx_conf_path(&contents) else {
+            issues.push(format!(
+                "Per-site nginx config check failed: could not derive nginx.conf path from {}",
+                unit_path.display()
+            ));
+            continue;
+        };
+
+        if !PathBuf::from(&nginx_conf_path).exists() {
+            issues.push(format!(
+                "Per-site nginx config check failed: {nginx_conf_path} does not exist (re-run remote setup with --tags nginx)"
+            ));
+        }
+    }
+}
+
+fn exec_start_nginx_conf_path(contents: &str) -> Option<String> {
+    for line in contents.lines() {
+        let Some(rest) = line.strip_prefix("ExecStart=") else { continue };
+        let mut args = rest.split_whitespace();
+        while let Some(arg) = args.next() {
+            if arg == "--config" {
+                let config_path = args.next()?;
+                return PathBuf::from(config_path).parent().map(|p| p.join("nginx.conf").display().to_string());
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
 
     use super::{
-        AppArmorUnitWiringStatus, apparmor_kernel_enabled, apparmor_profile_binding, apparmor_profile_filename,
-        apparmor_unit_name_for_profile, apparmor_unit_wiring_status,
+        AppArmorUnitWiringStatus, algif_aead_is_loaded, apparmor_kernel_enabled, apparmor_profile_binding,
+        apparmor_profile_filename, apparmor_unit_name_for_profile, apparmor_unit_wiring_status,
+        exec_start_nginx_conf_path,
     };
 
     /// Accepts a yes value as indicating `AppArmor` is enabled in the kernel.
@@ -360,5 +454,37 @@ mod tests {
             apparmor_profile_binding("[Service]\nAppArmorProfile=bonesdeploy-demo-nginx\n"),
             Some("bonesdeploy-demo-nginx")
         );
+    }
+
+    /// Detects `algif_aead` in loaded kernel module list.
+    #[test]
+    fn algif_aead_is_loaded_detects_module() {
+        assert!(algif_aead_is_loaded("algif_aead 20480 0\next4 1000000 3\n"));
+    }
+
+    /// Rejects module list without `algif_aead`.
+    #[test]
+    fn algif_aead_is_loaded_rejects_absent_module() {
+        assert!(!algif_aead_is_loaded("ext4 1000000 3\n"));
+    }
+
+    /// Rejects module names that only contain `algif_aead` as a prefix.
+    #[test]
+    fn algif_aead_is_loaded_rejects_prefix_match() {
+        assert!(!algif_aead_is_loaded("algif_aead_other 20480 0\n"));
+    }
+
+    /// Derives `nginx.conf` path from `ExecStart` `--config` argument.
+    #[test]
+    fn exec_start_nginx_conf_path_parses_config_arg() {
+        let contents = "[Service]\nExecStart=/usr/local/bin/bonesremote landlock nginx --config /home/git/myapp.git/bones/bones.yaml\n";
+        assert_eq!(exec_start_nginx_conf_path(contents), Some("/home/git/myapp.git/bones/nginx.conf".to_string()));
+    }
+
+    /// Returns `None` when `ExecStart` has no `--config` argument.
+    #[test]
+    fn exec_start_nginx_conf_path_returns_none_without_config() {
+        let contents = "[Service]\nExecStart=/usr/local/bin/bonesremote landlock nginx\n";
+        assert_eq!(exec_start_nginx_conf_path(contents), None);
     }
 }

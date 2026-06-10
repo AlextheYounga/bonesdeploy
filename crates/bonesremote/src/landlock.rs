@@ -93,12 +93,26 @@ pub fn restrict_self(policy: &Policy) -> Result<()> {
     platform::restrict_self(policy)
 }
 
+const SYSTEM_READ_PATHS: &[&str] = &[
+    "/usr",
+    "/lib",
+    "/lib64",
+    "/bin",
+    "/sbin",
+    "/dev",
+    "/proc",
+    "/etc/nginx",
+    "/etc/ssl",
+    "/etc/hosts",
+    "/etc/resolv.conf",
+    "/etc/nsswitch.conf",
+    "/etc/passwd",
+    "/etc/group",
+    "/etc/localtime",
+];
+
 pub fn default_system_read_paths() -> Vec<PathBuf> {
-    ["/usr", "/lib", "/lib64", "/bin", "/sbin", "/etc", "/dev", "/proc"]
-        .into_iter()
-        .map(PathBuf::from)
-        .filter(|path| path.exists())
-        .collect()
+    SYSTEM_READ_PATHS.iter().map(PathBuf::from).filter(|path| path.exists()).collect()
 }
 
 #[cfg(test)]
@@ -138,10 +152,21 @@ mod tests {
     #[test]
     fn policy_path_counts_reports_read_and_write_lengths() {
         let policy = Policy {
-            read_only_paths: vec![PathBuf::from("/usr"), PathBuf::from("/etc")],
+            read_only_paths: vec![PathBuf::from("/usr"), PathBuf::from("/etc/nginx")],
             writable_paths: vec![PathBuf::from("/run/acme")],
         };
 
         assert_eq!((policy.read_only_paths.len(), policy.writable_paths.len()), (2, 1));
+    }
+
+    /// Ensures the system read paths list does not include `/etc` as a broad directory.
+    #[test]
+    fn system_read_paths_excludes_broad_etc() {
+        use crate::landlock::SYSTEM_READ_PATHS;
+
+        assert!(
+            !SYSTEM_READ_PATHS.contains(&"/etc"),
+            "SYSTEM_READ_PATHS must not include /etc as a whole; use specific subpaths instead"
+        );
     }
 }
