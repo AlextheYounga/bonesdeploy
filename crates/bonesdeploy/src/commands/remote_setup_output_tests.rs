@@ -77,7 +77,6 @@ fn build_ansible_vars_includes_merged_setup_apt_packages() -> Result<()> {
         data: config::Data {
             remote_name: String::from("production"),
             project_name: String::from("acme"),
-            host: String::from("example.com"),
             port: String::from("22"),
             repo_path: String::from("/home/git/acme.git"),
             project_root: String::from("/srv/deployments/acme"),

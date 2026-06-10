@@ -52,7 +52,7 @@ pub async fn run() -> Result<()> {
 
 pub(crate) fn sync_bones_directory(cfg: &config::BonesConfig) -> Result<()> {
     let user = &cfg.permissions.defaults.deploy_user;
-    let host = &cfg.data.host;
+    let host = config::resolve_host(cfg)?;
     let port = &cfg.data.port;
     let repo_path = &cfg.data.repo_path;
     let dest = format!("{user}@{host}:{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);

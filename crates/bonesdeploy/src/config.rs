@@ -5,6 +5,8 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use shared::paths;
 
+use crate::git;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BonesConfig {
     #[serde(default)]
@@ -51,7 +53,6 @@ impl Constants {
 pub struct Data {
     pub remote_name: String,
     pub project_name: String,
-    pub host: String,
     pub port: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub repo_path: String,
@@ -68,7 +69,6 @@ impl Default for Data {
         Self {
             remote_name: String::new(),
             project_name: String::new(),
-            host: String::new(),
             port: "22".into(),
             repo_path: String::new(),
             project_root: String::new(),
@@ -145,7 +145,13 @@ pub struct PathOverride {
 
 pub fn is_configured(config: &BonesConfig) -> bool {
     let d = &config.data;
-    !d.remote_name.is_empty() && !d.project_name.is_empty() && !d.host.is_empty() && !d.repo_path.is_empty()
+    !d.remote_name.is_empty() && !d.project_name.is_empty() && !d.repo_path.is_empty()
+}
+
+pub fn resolve_host(config: &BonesConfig) -> Result<String> {
+    let details = git::infer_remote_connection_details(&config.data.remote_name)?
+        .context("Selected git remote URL does not contain a host")?;
+    Ok(details.host)
 }
 
 pub fn default_repo_path_for(project_name: &str) -> String {
@@ -231,7 +237,7 @@ mod tests {
 
     fn minimal_yaml(project_name: &str) -> String {
         format!(
-            "data:\n  remote_name: production\n  project_name: {project_name}\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: {}\n  branch: master\n  deploy_on_push: true\n",
+            "data:\n  remote_name: production\n  project_name: {project_name}\n  port: \"22\"\n  repo_path: {}\n  branch: master\n  deploy_on_push: true\n",
             paths::default_repo_path_for(project_name)
         )
     }
@@ -241,7 +247,6 @@ mod tests {
             data: Data {
                 remote_name: String::from("production"),
                 project_name: String::from(project_name),
-                host: String::from("deploy.example.com"),
                 port: String::from("22"),
                 repo_path: default_repo_path_for(project_name),
                 project_root: default_project_root_for(project_name),
@@ -358,7 +363,7 @@ mod tests {
     fn load_preserves_explicit_repo_project_and_web_root_overrides() -> Result<()> {
         let path = temp_path("overrides.yaml");
         let yaml = format!(
-            "data:\n  remote_name: production\n  project_name: app\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: {}\n  project_root: /custom/deploy\n  web_root: dist\n  branch: master\n  deploy_on_push: true\n",
+            "data:\n  remote_name: production\n  project_name: app\n  port: \"22\"\n  repo_path: {}\n  project_root: /custom/deploy\n  web_root: dist\n  branch: master\n  deploy_on_push: true\n",
             paths::default_repo_path_for("app")
         );
 

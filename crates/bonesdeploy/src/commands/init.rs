@@ -94,7 +94,6 @@ fn collect_from_seed(
     let remote_name = cli_or_prompt(args.remote.as_ref(), || prompts::prompt_remote_name(existing_config))?;
     let inferred_remote =
         if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
-    let host = cli_or_prompt(args.host.as_ref(), || prompts::prompt_host(existing_config, inferred_remote.as_ref()))?;
     let port = cli_or_prompt(args.port.as_ref(), || prompts::prompt_port(existing_config, inferred_remote.as_ref()))?;
     let repo_path = init_config::resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
     let project_root = init_config::seed_path_override(
@@ -127,7 +126,6 @@ fn collect_from_seed(
         data: config::Data {
             remote_name,
             project_name,
-            host,
             port,
             repo_path,
             project_root,
@@ -231,7 +229,10 @@ fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
         return Ok(());
     }
 
-    let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, cfg.data.host, cfg.data.repo_path);
+    let details = git::infer_remote_connection_details(&cfg.data.remote_name)?
+        .context("Cannot determine host from git remote URL")?;
+    let host = &details.host;
+    let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, host, cfg.data.repo_path);
     git::add_remote(&cfg.data.remote_name, &remote_url)?;
     println!("Configured local git remote {} -> {}", cfg.data.remote_name, remote_url);
     Ok(())

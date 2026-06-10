@@ -149,8 +149,7 @@ fn merge_apt_packages(package_lists: Vec<Vec<String>>) -> Vec<String> {
 }
 
 pub(crate) fn ensure_remote_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {
-    // Use bootstrap user (root by default) for initial SSH connection during setup
-    let host = format!("{ssh_user}@{}", cfg.data.host);
+    let host = format!("{ssh_user}@{}", config::resolve_host(cfg)?);
     let script = embedded::read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASSET)?;
 
     let mut child = Command::new("ssh")

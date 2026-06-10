@@ -1,7 +1,6 @@
 data:
   remote_name: 'production'
   project_name: ''
-  host: ''
   port: '22'
   repo_path: '/home/git/<project_name>.git'
   project_root: '/srv/deployments/<project_name>'

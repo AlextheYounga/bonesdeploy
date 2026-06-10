@@ -23,7 +23,7 @@ pub fn current_remote_version() -> String {
         return String::from("unknown");
     };
 
-    let host = format!("{}@{}", cfg.permissions.defaults.deploy_user, cfg.data.host);
+    let host = format!("{}@{}", cfg.permissions.defaults.deploy_user, config::resolve_host(&cfg).unwrap_or_default());
     let output = Command::new("ssh").args(["-p", &cfg.data.port]).args([&host, "bonesremote", "version"]).output();
 
     match output {
@@ -71,7 +71,7 @@ pub fn run_update_playbook(cfg: &config::BonesConfig, playbook: &Path, repo_url:
         .map(|p| p.join("roles"))
         .ok_or_else(|| anyhow::anyhow!("Invalid playbook path structure"))?;
 
-    let inventory = format!("{},", cfg.data.host);
+    let inventory = format!("{},", config::resolve_host(cfg)?);
     let ssh_user = resolve_bootstrap_ssh_user();
 
     let ansible_playbook = resolve_ansible_playbook()?;

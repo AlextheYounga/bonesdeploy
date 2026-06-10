@@ -84,7 +84,8 @@ fn validate_playbook_and_roles_directories() -> Result<()> {
 
 fn add_base_ansible_args(command: &mut Command, cfg: &config::BonesConfig, ssh_user: &str) {
     let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
-    let inventory = format!("{},", cfg.data.host);
+    let host = config::resolve_host(cfg).unwrap_or_else(|_| String::new());
+    let inventory = format!("{host},");
     let roles_path = env_ansible_roles_path(roles_dir);
 
     command.env("ANSIBLE_ROLES_PATH", roles_path);

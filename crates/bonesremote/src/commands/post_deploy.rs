@@ -98,7 +98,6 @@ mod tests {
             data: config::Data {
                 remote_name: String::from("production"),
                 project_name: String::from("acme"),
-                host: String::from("example.com"),
                 port: String::from("22"),
                 repo_path: temp_root.join("repo.git").to_string_lossy().to_string(),
                 project_root: temp_root.join("project_root").to_string_lossy().to_string(),

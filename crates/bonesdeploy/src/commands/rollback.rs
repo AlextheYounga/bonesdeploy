@@ -12,7 +12,11 @@ pub async fn run() -> Result<()> {
 
     let remote_bones_yaml = format!("{}/{}/bones.yaml", cfg.data.repo_path, config::Constants::REMOTE_BONES_DIR);
 
-    println!("Rolling back {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
+    println!(
+        "Rolling back {} on {}...",
+        style(&cfg.data.project_name).cyan().bold(),
+        style(&config::resolve_host(&cfg)?).cyan()
+    );
 
     let session = ssh::connect(&cfg).await?;
     let command = format!("bonesremote release rollback --config '{remote_bones_yaml}'");

@@ -171,7 +171,13 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
 
 fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
     let user = &cfg.permissions.defaults.deploy_user;
-    let host = &cfg.data.host;
+    let host = match config::resolve_host(cfg) {
+        Ok(h) => h,
+        Err(e) => {
+            issues.push(format!("Cannot resolve host: {e}"));
+            return;
+        }
+    };
     let port = &cfg.data.port;
     let repo_path = &cfg.data.repo_path;
     let dest = format!("{user}@{host}:{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);

@@ -43,7 +43,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     println!(
         "Running {} against {} for {}...",
         style("remote ssl").cyan().bold(),
-        style(&cfg.data.host).cyan(),
+        style(&config::resolve_host(&cfg)?).cyan(),
         style(&cfg.ssl.domain).cyan(),
     );
 

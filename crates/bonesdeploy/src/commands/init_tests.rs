@@ -10,7 +10,6 @@ fn incomplete_seed(project_name: &str) -> BonesConfig {
         data: Data {
             remote_name: String::from("production"),
             project_name: String::from(project_name),
-            host: String::new(),
             port: String::from("22"),
             repo_path: String::new(),
             project_root: String::new(),
@@ -43,7 +42,6 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
         project_name: None,
         branch: None,
         remote: None,
-        host: Some(String::from("deploy.example.com")),
         port: None,
         template: None,
     };
@@ -51,7 +49,6 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
     let cfg = collect_non_interactive("workspace", Some(&seed), &args)?;
 
     assert_eq!(cfg.data.project_name, "atlas");
-    assert_eq!(cfg.data.host, "deploy.example.com");
     assert_eq!(cfg.data.branch, "main");
     assert_eq!(cfg.data.remote_name, "production");
     assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("atlas"));
@@ -59,26 +56,27 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
     Ok(())
 }
 
-/// Requires a host when neither seed config nor CLI provide one.
+/// Fails when --project-name is missing in non-interactive mode.
 #[test]
-fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() -> Result<()> {
-    let seed = incomplete_seed("atlas");
+fn collect_non_interactive_requires_project_name_in_non_interactive_mode() -> Result<()> {
     let args = InitArgs {
         non_interactive: true,
         setup_remote: false,
         project_name: None,
         branch: None,
         remote: None,
-        host: None,
         port: None,
         template: None,
     };
 
-    let result = collect_non_interactive("workspace", Some(&seed), &args);
+    let result = collect_non_interactive("", None, &args);
     let Err(err) = result else {
-        bail!("missing host should fail");
+        bail!("missing project name should fail");
     };
-    assert!(err.to_string().contains("--host is required"));
+    assert!(
+        err.to_string().contains("--project-name is required"),
+        "expected '--project-name is required' message, got '{err}'"
+    );
 
     Ok(())
 }

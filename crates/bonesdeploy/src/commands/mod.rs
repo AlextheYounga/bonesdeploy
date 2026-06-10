@@ -42,9 +42,6 @@ enum Command {
         /// Deployment remote name (default: production)
         #[arg(short = 'r', long)]
         remote: Option<String>,
-        /// Server hostname or IP
-        #[arg(short = 'H', long)]
-        host: Option<String>,
         /// SSH port (default: 22)
         #[arg(long)]
         port: Option<String>,
@@ -103,14 +100,13 @@ enum RemoteCommand {
 
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init { non_interactive, setup_remote, project_name, branch, remote, host, port, template } => {
+        Command::Init { non_interactive, setup_remote, project_name, branch, remote, port, template } => {
             let outcome = init::run(&init::InitArgs {
                 non_interactive: *non_interactive,
                 setup_remote: *setup_remote,
                 project_name: project_name.clone(),
                 branch: branch.clone(),
                 remote: remote.clone(),
-                host: host.clone(),
                 port: port.clone(),
                 template: template.clone(),
             })?;

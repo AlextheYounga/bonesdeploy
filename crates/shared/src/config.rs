@@ -7,7 +7,6 @@ use crate::paths;
 pub struct Data {
     pub remote_name: String,
     pub project_name: String,
-    pub host: String,
     pub port: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub repo_path: String,
@@ -24,7 +23,6 @@ impl Default for Data {
         Self {
             remote_name: String::new(),
             project_name: String::new(),
-            host: String::new(),
             port: "22".into(),
             repo_path: String::new(),
             project_root: String::new(),

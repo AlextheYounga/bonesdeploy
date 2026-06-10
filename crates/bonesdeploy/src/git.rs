@@ -2,6 +2,7 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use git_url_parse::GitUrl;
 
 #[derive(Debug, Clone)]
 pub struct RemoteConnectionDetails {
@@ -97,58 +98,39 @@ pub fn infer_remote_connection_details(remote_name: &str) -> Result<Option<Remot
 }
 
 fn parse_remote_url(url: &str) -> Option<RemoteConnectionDetails> {
-    parse_ssh_style_url(url).or_else(|| parse_scp_style_url(url))
-}
+    let git_url = GitUrl::parse(url).ok()?;
 
-fn parse_ssh_style_url(url: &str) -> Option<RemoteConnectionDetails> {
-    if !url.starts_with("ssh://") {
+    if git_url.scheme() != Some("ssh") {
         return None;
     }
 
-    let without_scheme = &url[6..];
-    let slash_index = without_scheme.find('/')?;
-    let authority = &without_scheme[..slash_index];
-    let path = &without_scheme[slash_index..];
-
-    let host_port = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
-    let (host, port) = match host_port.split_once(':') {
-        Some((host, port)) if !host.is_empty() && !port.is_empty() => (host.to_string(), port.to_string()),
-        _ => (host_port.to_string(), String::from("22")),
-    };
-
-    if host.is_empty() || !has_git_extension(path) {
+    let host = git_url.host()?.to_string();
+    if host.is_empty() {
         return None;
     }
 
-    Some(RemoteConnectionDetails { user: parse_user(authority), host, port, repo_path: path.to_string() })
-}
+    let raw_path = git_url.path();
+    let path = if raw_path.starts_with('/') { raw_path.to_string() } else { format!("/{raw_path}") };
 
-fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
-    if url.contains("://") {
-        return None;
+    // Reject relative SCP paths (e.g. git@host:repo.git with no leading / after colon)
+    let is_scp = !url.contains("://");
+    if is_scp {
+        let after_colon = url.split_once(':').map_or("", |(_, right)| right);
+        if !after_colon.starts_with('/') {
+            return None;
+        }
     }
 
-    let (left, right) = url.split_once(':')?;
-    let host = left.rsplit_once('@').map_or(left, |(_, host)| host);
-    if !right.starts_with('/') {
-        return None;
-    }
-    let repo_path = right.to_string();
-
-    if host.is_empty() || !has_git_extension(&repo_path) {
+    if !has_git_extension(&path) {
         return None;
     }
 
     Some(RemoteConnectionDetails {
-        user: parse_user(left),
-        host: host.to_string(),
-        port: String::from("22"),
-        repo_path,
+        user: git_url.user().map_or_else(|| String::from("git"), ToString::to_string),
+        host,
+        port: git_url.port().map_or_else(|| String::from("22"), |p| p.to_string()),
+        repo_path: path,
     })
-}
-
-fn parse_user(authority: &str) -> String {
-    authority.rsplit_once('@').map_or_else(|| String::from("git"), |(user, _)| user.to_string())
 }
 
 fn has_git_extension(path: &str) -> bool {
@@ -159,7 +141,7 @@ fn has_git_extension(path: &str) -> bool {
 mod tests {
     use shared::paths;
 
-    use super::{parse_remote_url, parse_scp_style_url, parse_ssh_style_url};
+    use super::parse_remote_url;
 
     fn repo_path(name: &str) -> String {
         paths::default_repo_path_for(name)
@@ -168,7 +150,7 @@ mod tests {
     /// Parses the host, port, and repository path from a full SSH-style URL.
     #[test]
     fn parse_ssh_style_url_parses_host_port_and_repo_path() {
-        let details = parse_ssh_style_url(&format!("ssh://git@example.com:2222{}", repo_path("myapp")));
+        let details = parse_remote_url(&format!("ssh://git@example.com:2222{}", repo_path("myapp")));
         assert!(details.is_some());
         if let Some(details) = details {
             assert_eq!(details.user, "git");
@@ -181,7 +163,7 @@ mod tests {
     /// Defaults the SSH port to 22 when not explicitly provided in the URL.
     #[test]
     fn parse_ssh_style_url_defaults_port_to_22() {
-        let details = parse_ssh_style_url(&format!("ssh://git@example.com{}", repo_path("myapp")));
+        let details = parse_remote_url(&format!("ssh://git@example.com{}", repo_path("myapp")));
         assert!(details.is_some());
         if let Some(details) = details {
             assert_eq!(details.user, "git");
@@ -194,7 +176,7 @@ mod tests {
     /// Parses an absolute repo path from an SCP-style remote URL.
     #[test]
     fn parse_scp_style_url_parses_absolute_repo_path() {
-        let details = parse_scp_style_url(&format!("git@example.com:{}", repo_path("myapp")));
+        let details = parse_remote_url(&format!("git@example.com:{}", repo_path("myapp")));
         assert!(details.is_some());
         if let Some(details) = details {
             assert_eq!(details.user, "git");

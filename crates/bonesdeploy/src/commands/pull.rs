@@ -40,12 +40,9 @@ fn resolve_pull_target() -> Result<PullTarget> {
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
     if bones_yaml.exists() {
         let cfg = config::load(bones_yaml)?;
-        return Ok(PullTarget {
-            user: cfg.permissions.defaults.deploy_user,
-            host: cfg.data.host,
-            port: cfg.data.port,
-            repo_path: cfg.data.repo_path,
-        });
+        let host = config::resolve_host(&cfg)?;
+        let user = cfg.permissions.defaults.deploy_user.clone();
+        return Ok(PullTarget { user, host, port: cfg.data.port, repo_path: cfg.data.repo_path });
     }
 
     let remote_name = resolve_remote_name()?;

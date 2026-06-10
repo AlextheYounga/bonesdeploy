@@ -12,7 +12,7 @@ pub fn run() -> Result<()> {
     let remote_bones_yaml = format!("{}/{}/bones.yaml", cfg.data.repo_path, config::Constants::REMOTE_BONES_DIR);
     let remote_command = format!("bonesremote manage --config {}", shell_quote_single(&remote_bones_yaml));
 
-    let target = format!("{}@{}", cfg.permissions.defaults.deploy_user, cfg.data.host);
+    let target = format!("{}@{}", cfg.permissions.defaults.deploy_user, config::resolve_host(&cfg)?);
 
     let status = Command::new("ssh")
         .arg("-t")

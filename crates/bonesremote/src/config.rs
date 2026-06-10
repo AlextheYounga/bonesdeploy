@@ -29,7 +29,6 @@ impl Constants {
 pub struct Data {
     pub remote_name: String,
     pub project_name: String,
-    pub host: String,
     pub port: String,
     pub repo_path: String,
     pub project_root: String,
@@ -43,7 +42,6 @@ impl Default for Data {
         Self {
             remote_name: String::new(),
             project_name: String::new(),
-            host: String::new(),
             port: "22".into(),
             repo_path: String::new(),
             project_root: String::new(),
@@ -167,10 +165,9 @@ mod tests {
     #[test]
     fn load_derives_service_user_project_root_repo_path_and_web_root() -> Result<()> {
         let path = temp_file_path("bonesremote_config_derived_defaults");
-        let yaml = r"
+        let yaml = "
 data:
   project_name: acme
-  host: example.com
 ";
 
         fs::write(&path, yaml)?;

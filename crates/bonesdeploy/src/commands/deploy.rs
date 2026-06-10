@@ -11,7 +11,11 @@ pub async fn run() -> Result<()> {
 
     let repo_path = &cfg.data.repo_path;
 
-    println!("Deploying {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
+    println!(
+        "Deploying {} on {}...",
+        style(&cfg.data.project_name).cyan().bold(),
+        style(&config::resolve_host(&cfg)?).cyan()
+    );
 
     let session = ssh::connect(&cfg).await?;
 

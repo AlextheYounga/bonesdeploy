@@ -17,6 +17,7 @@ spinners = "4.2.0"
 tempfile = "3.0"
 tokio = { version = "1.52.1", features = ["rt", "rt-multi-thread", "macros"] }
 shared = { path = "../shared" }
+git-url-parse = "0.6.0"
 
 [lints.clippy]
 # broad groups (lower priority so individual lint overrides take effect)
