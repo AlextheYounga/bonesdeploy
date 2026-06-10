@@ -45,6 +45,7 @@
     - name: Run runtime role
       ansible.builtin.include_role:
         name: "{{ runtime_role }}"
+        public: true
       when: runtime_role | length > 0
       tags: [runtime]
 
