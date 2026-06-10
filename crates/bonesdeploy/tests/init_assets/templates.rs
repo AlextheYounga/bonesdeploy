@@ -37,10 +37,10 @@ fn template_setup_vars_files_define_runtime_metadata() {
     }
 }
 
-/// Ensures the shared scaffold embeds `kit/remote/Aptfile` as the base setup package manifest.
+/// Ensures the shared scaffold embeds `kit/.lib/remote/Aptfile` as the base setup package manifest.
 #[test]
 fn shared_remote_scaffold_embeds_base_aptfile() {
-    let aptfile = project_root().join("kit/remote/Aptfile");
+    let aptfile = project_root().join("kit/.lib/remote/Aptfile");
     assert!(aptfile.is_file(), "expected shared remote Aptfile at {}", aptfile.display());
 }
 

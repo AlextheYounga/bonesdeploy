@@ -42,8 +42,8 @@ impl Constants {
 
     pub const ASSET_HOOKS_DIR: &'static str = "hooks/";
     pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
-    pub const ASSET_SCRIPTS_DIR: &'static str = "scripts/";
-    pub const PYTHON_BOOTSTRAP_SCRIPT_ASSET: &'static str = "scripts/bootstrap_python3.sh";
+    pub const ASSET_SCRIPTS_DIR: &'static str = ".lib/scripts/";
+    pub const PYTHON_BOOTSTRAP_SCRIPT_ASSET: &'static str = ".lib/scripts/bootstrap_python3.sh";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -101,7 +101,7 @@ mod tests {
     /// Does not pass a `--config` flag to the doctor command in the hooks script.
     #[test]
     fn hooks_script_does_not_pass_config_to_doctor() {
-        let hooks_script = read_asset("hooks.sh");
+        let hooks_script = read_asset(".lib/hooks.sh");
         assert!(hooks_script.is_ok(), "hooks.sh should be embedded");
 
         let hooks_script = hooks_script.unwrap_or_default();

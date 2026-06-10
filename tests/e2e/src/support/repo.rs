@@ -28,17 +28,18 @@ pub fn create_temp_git_repo() -> Result<TempGitRepo> {
 
 pub fn write_minimal_bones_project(repo_root: &Path) -> Result<()> {
     let bones_dir = repo_root.join(".bones");
+    let lib_dir = bones_dir.join(".lib");
     let hooks_dir = bones_dir.join("hooks");
     let deployment_dir = bones_dir.join("deployment");
-    let playbook_dir = bones_dir.join("remote/playbooks");
-    let roles_dir = bones_dir.join("remote/roles");
+    let playbook_dir = lib_dir.join("remote/playbooks");
+    let roles_dir = lib_dir.join("remote/roles");
 
     fs::create_dir_all(&hooks_dir)?;
     fs::create_dir_all(&deployment_dir)?;
     fs::create_dir_all(&playbook_dir)?;
     fs::create_dir_all(&roles_dir)?;
 
-    fs::write(bones_dir.join("hooks.sh"), "#!/usr/bin/env bash\n")?;
+    fs::write(lib_dir.join("hooks.sh"), "#!/usr/bin/env bash\n")?;
     let pre_push = hooks_dir.join("pre-push");
     let pre_receive = hooks_dir.join("pre-receive");
     let post_receive = hooks_dir.join("post-receive");
@@ -87,8 +88,8 @@ pub fn assert_bones_yaml_contains(repo_root: &Path, needle: &str) -> Result<()> 
 }
 
 pub fn install_real_site_assets(repo_root: &Path, workspace_root: &Path) -> Result<()> {
-    let source = workspace_root.join("kit/remote");
-    let target = repo_root.join(".bones/remote");
+    let source = workspace_root.join("kit/.lib/remote");
+    let target = repo_root.join(".bones/.lib/remote");
 
     if !source.is_dir() {
         bail!("Missing source remote assets directory: {}", source.display());

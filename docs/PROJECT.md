@@ -170,11 +170,12 @@ bonesdeploy/
 ├── Cargo.toml                  # workspace root
 ├── kit/                        # embedded assets (scaffolding templates)
 │   ├── bones.yaml
-│   ├── hooks.sh
+│   ├── .lib/                   # CLI library files (hooks, scripts, remote)
+│   │   ├── hooks.sh
+│   │   ├── scripts/
+│   │   └── remote/             # nginx + ansible roles for `bonesdeploy remote setup`
 │   ├── deployment/
-│   ├── hooks/
-│   ├── scripts/
-│   └── site/                   # nginx + ansible roles for `bonesdeploy remote setup`
+│   └── hooks/
 ├── templates/                  # per-framework starter overlays (see below)
 ├── crates/
 │   ├── bonesdeploy/               # local CLI binary

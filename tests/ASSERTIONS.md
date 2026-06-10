@@ -113,7 +113,7 @@
 - Verifies template-specific playbooks are removed in favor of shared kit setup logic. (template_playbooks_include_apparmor_role)
 
 ## `crates/bonesdeploy/tests/init_assets/templates.rs`
-- Ensures the shared scaffold embeds `kit/remote/Aptfile` as the base setup package manifest. (shared_remote_scaffold_embeds_base_aptfile)
+- Ensures the shared scaffold embeds `kit/.lib/remote/Aptfile` as the base setup package manifest. (shared_remote_scaffold_embeds_base_aptfile)
 - Does not install global npm packages in SPA template runtime roles. (spa_template_runtime_roles_do_not_install_global_npm_packages)
 - Uses the project name as the default service user instead of a hardcoded value. (template_service_user_defaults_to_project_name_not_applications)
 - Defines runtime role and setup label metadata in template vars files. (template_setup_vars_files_define_runtime_metadata)

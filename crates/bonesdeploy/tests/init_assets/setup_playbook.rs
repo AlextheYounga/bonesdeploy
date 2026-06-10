@@ -5,7 +5,7 @@ use super::{TEMPLATE_SETUP_PLAYBOOKS, project_root};
 /// Includes the `AppArmor` role in the shared remote setup playbook.
 #[test]
 fn remote_setup_playbook_includes_apparmor_role() {
-    let playbook = project_root().join("kit/remote/playbooks/setup.yml");
+    let playbook = project_root().join("kit/.lib/remote/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
@@ -19,7 +19,7 @@ fn remote_setup_playbook_includes_apparmor_role() {
 /// Includes the firewall role in the shared remote setup playbook.
 #[test]
 fn remote_setup_playbook_includes_firewall_role() {
-    let playbook = project_root().join("kit/remote/playbooks/setup.yml");
+    let playbook = project_root().join("kit/.lib/remote/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
@@ -33,7 +33,7 @@ fn remote_setup_playbook_includes_firewall_role() {
 /// Loads shared template variables and includes the doctor validation task in the remote setup playbook.
 #[test]
 fn remote_setup_playbook_loads_shared_template_vars_and_doctor_task() {
-    let playbook = project_root().join("kit/remote/playbooks/setup.yml");
+    let playbook = project_root().join("kit/.lib/remote/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
@@ -56,7 +56,7 @@ fn remote_setup_playbook_loads_shared_template_vars_and_doctor_task() {
 /// Uses a single shared apt package list variable in the setup playbook instead of per-role apt package definitions.
 #[test]
 fn shared_setup_playbook_uses_single_setup_apt_packages_manifest() {
-    let playbook = project_root().join("kit/remote/playbooks/setup.yml");
+    let playbook = project_root().join("kit/.lib/remote/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
@@ -70,7 +70,7 @@ fn shared_setup_playbook_uses_single_setup_apt_packages_manifest() {
 /// Starts setup apt installation before rustup bootstrap and user setup.
 #[test]
 fn shared_setup_playbook_starts_setup_apt_packages_before_rustup_and_users() {
-    let playbook = project_root().join("kit/remote/playbooks/setup.yml");
+    let playbook = project_root().join("kit/.lib/remote/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
@@ -89,7 +89,7 @@ fn shared_setup_playbook_starts_setup_apt_packages_before_rustup_and_users() {
 /// Starts the slow toolchain installers with Ansible async/poll orchestration after package installation.
 #[test]
 fn common_role_runs_toolchain_installers_as_async_jobs() {
-    let tasks = project_root().join("kit/remote/roles/common/tasks/main.yml");
+    let tasks = project_root().join("kit/.lib/remote/roles/common/tasks/main.yml");
     let content = fs::read_to_string(&tasks);
     assert!(content.is_ok(), "failed to read {}", tasks.display());
     let content = content.unwrap_or_default();
@@ -108,7 +108,7 @@ fn common_role_runs_toolchain_installers_as_async_jobs() {
 /// Waits for deploy-user async jobs under the deploy user context.
 #[test]
 fn common_role_waits_for_deploy_user_async_jobs_as_deploy_user() {
-    let tasks = project_root().join("kit/remote/roles/common/tasks/main.yml");
+    let tasks = project_root().join("kit/.lib/remote/roles/common/tasks/main.yml");
     let content = fs::read_to_string(&tasks);
     assert!(content.is_ok(), "failed to read {}", tasks.display());
     let content = content.unwrap_or_default();
@@ -135,7 +135,7 @@ fn template_playbooks_include_apparmor_role() {
 /// Applies the `AppArmor` role before the nginx role in the shared setup playbook.
 #[test]
 fn shared_setup_playbook_applies_apparmor_before_nginx_role() {
-    let playbook = project_root().join("kit/remote/playbooks/setup.yml");
+    let playbook = project_root().join("kit/.lib/remote/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
@@ -159,7 +159,7 @@ fn shared_setup_playbook_applies_apparmor_before_nginx_role() {
 /// Exposes common role defaults publicly for later runtime roles.
 #[test]
 fn shared_setup_playbook_exposes_common_role_defaults_to_runtime_role() {
-    let playbook = project_root().join("kit/remote/playbooks/setup.yml");
+    let playbook = project_root().join("kit/.lib/remote/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
@@ -173,7 +173,7 @@ fn shared_setup_playbook_exposes_common_role_defaults_to_runtime_role() {
 /// Exposes nginx role defaults publicly for the later SSL role.
 #[test]
 fn shared_setup_playbook_exposes_nginx_role_defaults_to_ssl_role() {
-    let playbook = project_root().join("kit/remote/playbooks/setup.yml");
+    let playbook = project_root().join("kit/.lib/remote/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
