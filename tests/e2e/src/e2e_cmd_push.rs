@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::support::{cli, docker, repo};
 
+/// Verifies that `bonesdeploy push` invokes the remote sync path end-to-end.
 #[test]
 #[ignore = "e2e test"]
 fn e2e_bonesdeploy_push_invokes_remote_sync_path() -> Result<()> {

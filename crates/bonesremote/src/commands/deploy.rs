@@ -39,6 +39,13 @@ pub fn run(config_path: &str) -> Result<()> {
             let status = Command::new("bash")
                 .arg(&script)
                 .current_dir(&build_root)
+                .env("PROJECT_NAME", &cfg.data.project_name)
+                .env("PROJECT_ROOT", &cfg.data.project_root)
+                .env("REPO_PATH", &cfg.data.repo_path)
+                .env("WEB_ROOT", &cfg.data.web_root)
+                .env("SERVICE_USER", &cfg.permissions.defaults.service_user)
+                .env("DEPLOY_USER", &cfg.permissions.defaults.deploy_user)
+                .env("GROUP", &cfg.permissions.defaults.group)
                 .status()
                 .with_context(|| format!("Failed to execute deployment script {}", script.display()))?;
 
@@ -141,7 +148,7 @@ mod tests {
         Ok(())
     }
 
-    // Ensures publish prep always starts from a clean runtime dir with no stale artifacts.
+    /// Removes all direct children of a directory without removing the directory itself.
     #[test]
     fn clear_directory_removes_all_direct_children() -> Result<()> {
         let root = temp_dir("bonesremote_deploy_clear")?;
@@ -156,7 +163,7 @@ mod tests {
         Ok(())
     }
 
-    // Ensures deployment scripts execute in deterministic order and ignore non-script directories.
+    /// Returns deployment script files sorted and excludes subdirectories.
     #[test]
     fn list_deployment_scripts_returns_sorted_files_only() -> Result<()> {
         let deployment_dir = temp_dir("bonesremote_deploy_scripts")?;
@@ -180,7 +187,7 @@ mod tests {
         Ok(())
     }
 
-    // Verifies release publish is a full replacement copy, preserving expected hidden files.
+    /// Replaces the release tree contents with a fresh copy from the build workspace.
     #[test]
     fn publish_release_tree_replaces_release_contents_with_build_workspace() -> Result<()> {
         let root = temp_dir("bonesremote_deploy_publish")?;

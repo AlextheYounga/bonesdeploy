@@ -8,6 +8,7 @@ use std::path::Path;
 
 const MAX_LINES: usize = 400;
 
+/// Verifies all Rust source files stay at or below 400 lines.
 #[test]
 fn source_files_stay_under_400_lines() {
     let project_root = workspace_root();

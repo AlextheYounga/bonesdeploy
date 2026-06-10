@@ -39,20 +39,20 @@ mod tests {
     use super::shell_quote_single;
     use shared::paths;
 
-    // Plain values still require shell quoting to prevent whitespace/token splitting.
+    /// Wraps a plain value in single quotes to prevent whitespace and token splitting.
     #[test]
     fn shell_quote_single_wraps_plain_value_in_single_quotes() {
         let path = paths::default_project_root_for("acme");
         assert_eq!(shell_quote_single(&path), format!("'{path}'"));
     }
 
-    // Embedded single quotes must be escaped safely for remote shell execution.
+    /// Escapes embedded single quotes safely for remote shell execution.
     #[test]
     fn shell_quote_single_escapes_embedded_single_quotes() {
         assert_eq!(shell_quote_single("it'works"), "'it'\"'\"'works'");
     }
 
-    // Empty args must remain explicit empty strings, not disappear from command argv.
+    /// Returns an explicit empty string for empty input, not a zero-length argument.
     #[test]
     fn shell_quote_single_handles_empty_string() {
         assert_eq!(shell_quote_single(""), "''");

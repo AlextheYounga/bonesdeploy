@@ -33,6 +33,7 @@ fn incomplete_seed(project_name: &str) -> BonesConfig {
     }
 }
 
+/// Uses seed config and CLI values without prompting when non-interactive mode is active.
 #[test]
 fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Result<()> {
     let seed = incomplete_seed("atlas");
@@ -58,6 +59,7 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
     Ok(())
 }
 
+/// Requires a host when neither seed config nor CLI provide one.
 #[test]
 fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() -> Result<()> {
     let seed = incomplete_seed("atlas");

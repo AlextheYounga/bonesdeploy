@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::support::{cli, docker, repo};
 
+/// Verifies that `bonesdeploy rollback` invokes the remote release rollback command.
 #[test]
 #[ignore = "e2e test"]
 fn e2e_bonesdeploy_rollback_invokes_remote_release_rollback() -> Result<()> {

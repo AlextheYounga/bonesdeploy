@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::support::{cli, docker, repo};
 
+/// Verifies that `bonesdeploy remote ssl` executes the full Ansible SSL provisioning flow.
 #[test]
 #[ignore = "e2e test"]
 fn e2e_bonesdeploy_remote_ssl_reaches_real_ssl_ansible_flow() -> Result<()> {

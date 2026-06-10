@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::support::{cli, repo};
 
+/// Verifies that `bonesdeploy doctor --local` passes for a minimal valid project layout.
 #[test]
 #[ignore = "e2e test"]
 fn e2e_bonesdeploy_doctor_local_passes_for_minimal_valid_layout() -> Result<()> {

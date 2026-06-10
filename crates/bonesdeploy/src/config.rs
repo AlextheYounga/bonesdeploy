@@ -262,6 +262,7 @@ mod tests {
         }
     }
 
+    /// Applies the project name as the default service user.
     #[test]
     fn load_applies_default_service_user_from_project_name() -> Result<()> {
         let path = temp_path("service_user.yaml");
@@ -274,6 +275,7 @@ mod tests {
         Ok(())
     }
 
+    /// Derives the default repo path from the project name.
     #[test]
     fn load_applies_default_repo_path_from_project_name() -> Result<()> {
         let path = temp_path("repo_path.yaml");
@@ -286,6 +288,7 @@ mod tests {
         Ok(())
     }
 
+    /// Derives the default project root from the project name.
     #[test]
     fn load_applies_default_project_root_from_project_name() -> Result<()> {
         let path = temp_path("project_root.yaml");
@@ -298,6 +301,7 @@ mod tests {
         Ok(())
     }
 
+    /// Applies the default web root when not explicitly configured.
     #[test]
     fn load_applies_default_web_root() -> Result<()> {
         let path = temp_path("web_root.yaml");
@@ -310,6 +314,7 @@ mod tests {
         Ok(())
     }
 
+    /// Omits derived repo, project root, and web root fields when saving.
     #[test]
     fn save_omits_derived_repo_project_and_web_roots() -> Result<()> {
         let config = sample_config("phoenix");
@@ -326,6 +331,7 @@ mod tests {
         Ok(())
     }
 
+    /// Persists SSL settings (enabled, domain, email) when saving.
     #[test]
     fn save_persists_ssl_settings() -> Result<()> {
         let mut config = sample_config("phoenix");
@@ -345,6 +351,7 @@ mod tests {
         Ok(())
     }
 
+    /// Preserves explicitly configured repo, project root, and web root overrides.
     #[test]
     fn load_preserves_explicit_repo_project_and_web_root_overrides() -> Result<()> {
         let path = temp_path("overrides.yaml");

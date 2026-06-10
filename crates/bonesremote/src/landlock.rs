@@ -106,6 +106,7 @@ mod tests {
     use super::Policy;
     use std::path::PathBuf;
 
+    /// Imports the `RulesetAttr` trait required by `handle_access` in landlock 0.4.x.
     #[test]
     fn linux_landlock_module_imports_ruleset_attr_trait() {
         let source = include_str!("landlock.rs");
@@ -121,6 +122,7 @@ mod tests {
         );
     }
 
+    /// Imports the `RulesetCreatedAttr` trait required by `set_no_new_privs` in landlock 0.4.x.
     #[test]
     fn linux_landlock_module_imports_ruleset_created_attr_trait() {
         let source = include_str!("landlock.rs");
@@ -132,6 +134,7 @@ mod tests {
         );
     }
 
+    /// Reports the count of read-only and writable paths in a policy.
     #[test]
     fn policy_path_counts_reports_read_and_write_lengths() {
         let policy = Policy {

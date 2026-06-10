@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::Path;
 
+/// Creates the project root parent directory with traversable permissions before the placeholder release.
 #[test]
 fn common_role_creates_project_root_parent_before_placeholder_release() {
     let tasks = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/common/tasks/main.yml");

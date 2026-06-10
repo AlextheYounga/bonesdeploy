@@ -78,6 +78,7 @@ fn collect_source_files(project_root: &Path) -> Vec<PathBuf> {
     files
 }
 
+/// Detects match arms that construct success values from error paths.
 #[test]
 fn no_suspicious_fallback() {
     let project_root = Path::new(env!("CARGO_MANIFEST_DIR"));

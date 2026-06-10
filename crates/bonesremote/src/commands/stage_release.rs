@@ -114,7 +114,7 @@ mod tests {
         env::temp_dir().join(format!("bonesremote_stage_release_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
-    // Ensures restricted directories are normalized so deploy user can traverse build paths.
+    /// Adds owner and group execute bits so the deploy user can traverse the build workspace.
     #[test]
     fn ensure_deploy_user_can_traverse_adds_required_owner_group_bits() -> Result<()> {
         let root = temp_dir_path("traverse_bits");
@@ -136,7 +136,7 @@ mod tests {
         Ok(())
     }
 
-    // Ensures root-owned project root parents still allow unprivileged hook traversal.
+    /// Adds the other execute bit so non-owner processes can traverse project root parents.
     #[test]
     fn ensure_non_owner_can_traverse_adds_other_execute_bit() -> Result<()> {
         let root = temp_dir_path("other_traverse_bit");

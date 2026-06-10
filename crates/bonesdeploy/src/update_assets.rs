@@ -46,11 +46,13 @@ pub fn materialize_playbook(temp_dir: &Path) -> Result<PathBuf> {
 mod tests {
     use super::UpdateAssets;
 
+    /// Ensures the update playbook is embedded as an asset.
     #[test]
     fn update_playbook_is_embedded() {
         assert!(UpdateAssets::get("playbooks/update-bonesremote.yml").is_some(), "update playbook should be embedded");
     }
 
+    /// Ensures the migration manifest is embedded as an asset.
     #[test]
     fn migration_manifest_is_embedded() {
         assert!(UpdateAssets::get("migrations/manifest.yml").is_some(), "migration manifest should be embedded");
