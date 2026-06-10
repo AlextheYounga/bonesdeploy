@@ -1,4 +1,3 @@
-use std::env;
 use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::Path;
@@ -22,27 +21,58 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
     git::ensure_git_repository()?;
 
     let bones_dir = Path::new(config::Constants::BONES_DIR);
+
+    let mut initial_project_name: Option<String> = None;
+
     if bones_dir.exists() {
         println!(".bones/ already exists, skipping scaffold extraction.");
     } else {
         let available_templates = embedded::available_templates();
         let selected_template = resolve_template(args.template.as_deref(), &available_templates, args.non_interactive)?;
 
-        println!("Creating .bones/ scaffold...");
-        embedded::scaffold(bones_dir)?;
+        let project_name = resolve_project_name(args)?;
+        let config_dir = config::bones_config_dir(&project_name);
+
+        println!("Creating {}...", config_dir.display());
+        fs::create_dir_all(&config_dir)?;
+        embedded::scaffold(&config_dir)?;
 
         if let Some(ref template_name) = selected_template {
-            embedded::scaffold_template(template_name, bones_dir)?;
+            embedded::scaffold_template(template_name, &config_dir)?;
             println!("Applied template: {template_name}");
         } else {
             println!("Using build-from-scratch scaffold.");
         }
+
+        unix_fs::symlink(&config_dir, bones_dir)?;
+        println!("Symlinked .bones -> {}", config_dir.display());
+
+        let seed = config::BonesConfig {
+            data: config::Data { project_name: project_name.clone(), ..Default::default() },
+            permissions: config::Permissions::default(),
+            releases: config::Releases::default(),
+            ssl: config::Ssl::default(),
+        };
+        config::save(&seed, Path::new(config::Constants::BONES_YAML))?;
+
+        initial_project_name = Some(project_name);
     }
 
     update_gitignore()?;
 
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
     let cfg = load_or_collect_config(bones_yaml, args)?;
+
+    if let Some(ref initial) = initial_project_name
+        && cfg.data.project_name != *initial
+    {
+        let old_dir = config::bones_config_dir(initial);
+        let new_dir = config::bones_config_dir(&cfg.data.project_name);
+        fs::rename(&old_dir, &new_dir)?;
+        fs::remove_file(bones_dir)?;
+        unix_fs::symlink(&new_dir, bones_dir)?;
+        println!("Renamed centralized folder to {}.bones", cfg.data.project_name);
+    }
 
     config::save(&cfg, bones_yaml)?;
     println!("Saved config to {}", config::Constants::BONES_YAML);
@@ -153,9 +183,22 @@ fn collect_non_interactive(
     init_config::collect_non_interactive(project_name_hint, existing_config, args)
 }
 
+fn resolve_project_name(args: &InitArgs) -> Result<String> {
+    if let Some(name) = args.project_name.as_ref().filter(|v| !v.is_empty()) {
+        return Ok(name.trim().to_string());
+    }
+    if args.non_interactive {
+        bail!(
+            "--project-name is required in non-interactive mode.\nUsage: bonesdeploy init --non-interactive --project-name <name> --host <host>"
+        );
+    }
+    let hint = config::repo_directory_name()?;
+    prompts::prompt_project_name(&hint, None)
+}
+
 fn cli_or_prompt(cli_value: Option<&String>, prompt: impl FnOnce() -> Result<String>) -> Result<String> {
     match cli_value {
-        Some(v) if !v.is_empty() => Ok(v.clone()),
+        Some(v) if !v.is_empty() => Ok(v.trim().to_string()),
         _ => prompt(),
     }
 }
@@ -168,14 +211,14 @@ fn load_or_collect_config(bones_yaml: &Path, args: &InitArgs) -> Result<config::
             return Ok(existing);
         }
         println!("Config is incomplete, running prompts...");
-        let project_name = repo_directory_name()?;
+        let project_name = config::repo_directory_name()?;
         if args.non_interactive {
             return init_config::collect_non_interactive(&project_name, Some(&existing), args);
         }
         return collect_from_seed(&project_name, Some(&existing), args);
     }
 
-    let project_name = repo_directory_name()?;
+    let project_name = config::repo_directory_name()?;
 
     if args.non_interactive {
         return init_config::collect_non_interactive(&project_name, None, args);
@@ -218,12 +261,6 @@ pub(crate) fn symlink_pre_push() -> Result<()> {
 
     println!("Symlinked {} -> {}", config::Constants::GIT_PRE_PUSH_HOOK_PATH, config::Constants::PRE_PUSH_HOOK_TARGET);
     Ok(())
-}
-
-fn repo_directory_name() -> Result<String> {
-    let cwd = env::current_dir()?;
-    let name = cwd.file_name().map_or_else(|| "project".into(), |n| n.to_string_lossy().to_string());
-    Ok(name)
 }
 
 fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {

@@ -41,7 +41,15 @@ fn check_bones_structure(issues: &mut Vec<String>) {
     let bones_dir = Path::new(config::Constants::BONES_DIR);
 
     if !bones_dir.exists() {
-        issues.push(format!("{}/ directory does not exist", config::Constants::BONES_DIR));
+        issues.push(format!("{}/ does not exist", config::Constants::BONES_DIR));
+        return;
+    }
+
+    if !bones_dir.is_symlink() {
+        issues.push(format!(
+            "{}/ is not a symlink — expected a symlink to ~/.config/bonesdeploy/<project>.bones/",
+            config::Constants::BONES_DIR
+        ));
         return;
     }
 
