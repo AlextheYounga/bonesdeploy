@@ -37,6 +37,36 @@ fn template_setup_vars_files_define_runtime_metadata() {
     }
 }
 
+/// Pins the Laravel PHP version in the template setup vars file so sites can override it per template.
+#[test]
+fn laravel_template_setup_vars_file_defines_php_version() {
+    let path = project_root().join("templates/laravel/.lib/remote/vars/setup.yml");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("laravel_php_version: \"8.3\""),
+        "laravel template setup vars must define the PHP version override
+{content}"
+    );
+}
+
+/// Keeps the Laravel runtime role defaults focused on runtime layout instead of PHP version selection.
+#[test]
+fn laravel_runtime_role_defaults_do_not_define_php_version() {
+    let path = project_root().join("templates/laravel/.lib/remote/roles/laravel_runtime/defaults/main.yml");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        !content.contains("laravel_php_version:"),
+        "laravel runtime role defaults should not hardcode PHP version selection
+{content}"
+    );
+}
+
 /// Ensures the shared scaffold embeds `kit/.lib/remote/Aptfile` as the base setup package manifest.
 #[test]
 fn shared_remote_scaffold_embeds_base_aptfile() {

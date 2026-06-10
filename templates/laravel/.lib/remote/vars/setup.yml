@@ -1,3 +1,4 @@
 ---
 runtime_role: laravel_runtime
 setup_label: Laravel
+laravel_php_version: "8.3"
