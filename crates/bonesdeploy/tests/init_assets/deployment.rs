@@ -35,10 +35,7 @@ fn nuxt_deployment_script_installs_pnpm_after_nvm() {
 #[test]
 fn nuxt_runtime_role_does_not_install_global_npm_packages() {
     let defaults = project_root().join("templates/nuxt/remote/roles/nuxt_runtime/defaults/main.yml");
-    assert!(
-        !defaults.exists(),
-        "Nuxt runtime role should not define setup-time global npm packages"
-    );
+    assert!(!defaults.exists(), "Nuxt runtime role should not define setup-time global npm packages");
 
     let tasks = project_root().join("templates/nuxt/remote/roles/nuxt_runtime/tasks/main.yml");
     let content = fs::read_to_string(&tasks);
@@ -55,8 +52,7 @@ fn nuxt_runtime_role_does_not_install_global_npm_packages() {
 #[test]
 fn spa_template_deploy_scripts_do_not_use_pm2() {
     for template in ["nuxt", "next", "sveltekit", "vue"] {
-        let script = project_root()
-            .join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
+        let script = project_root().join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
         let content = fs::read_to_string(&script);
         assert!(content.is_ok(), "failed to read {}", script.display());
         let content = content.unwrap_or_default();
@@ -71,15 +67,9 @@ fn spa_template_deploy_scripts_do_not_use_pm2() {
 /// Does not use unsafe `PROJECT_NAME` fallback patterns in any deployment script.
 #[test]
 fn deployment_scripts_have_no_unsafe_project_name_fallbacks() {
-    let patterns = [
-        "${PROJECT_NAME:-",
-        "${PROJECT_NAME-",
-        ":-${PROJECT_NAME}",
-        ":-${PROJECT_NAME:-",
-    ];
+    let patterns = ["${PROJECT_NAME:-", "${PROJECT_NAME-", ":-${PROJECT_NAME}", ":-${PROJECT_NAME:-"];
     for template in ["nuxt", "next", "sveltekit", "vue", "rails", "django", "laravel"] {
-        let script = project_root()
-            .join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
+        let script = project_root().join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
         let content = fs::read_to_string(&script);
         assert!(content.is_ok(), "failed to read {}", script.display());
         let content = content.unwrap_or_default();
@@ -97,8 +87,7 @@ fn deployment_scripts_have_no_unsafe_project_name_fallbacks() {
 #[test]
 fn app_server_templates_restart_project_service_from_deployment_scripts() {
     for template in ["rails", "django"] {
-        let script = project_root()
-            .join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
+        let script = project_root().join(format!("templates/{template}/deployment/01_run_deployment_concerns.sh"));
         let content = fs::read_to_string(&script);
         assert!(content.is_ok(), "failed to read {}", script.display());
         let content = content.unwrap_or_default();

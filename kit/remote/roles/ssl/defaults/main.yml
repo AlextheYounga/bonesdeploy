@@ -4,3 +4,5 @@ ssl_domain: ""
 ssl_email: ""
 ssl_cert_path: ""
 ssl_key_path: ""
+nginx_site_template_path: "{{ playbook_dir }}/../nginx/site.conf.j2"
+nginx_service_name: nginx

@@ -12,11 +12,14 @@
 - Wraps a plain value in single quotes to prevent whitespace and token splitting. (shell_quote_single_wraps_plain_value_in_single_quotes)
 
 ## `crates/bonesdeploy/src/commands/remote_setup.rs`
+- Ignores blank lines and comments when parsing `Aptfile` package lists. (aptfile_parser_ignores_blank_lines_and_comments)
+- Merges shared and template-specific `Aptfile` packages without duplicates while preserving first-seen order. (merge_apt_packages_deduplicates_and_preserves_order)
 - Defaults the bootstrap SSH user to root when no override is provided. (resolve_bootstrap_ssh_user_defaults_to_root)
 - Trims whitespace and falls back to root when the bootstrap SSH user is blank. (resolve_bootstrap_ssh_user_trims_and_rejects_blank_values)
 - Uses the environment override when provided for the bootstrap SSH user. (resolve_bootstrap_ssh_user_uses_env_override)
 
 ## `crates/bonesdeploy/src/commands/remote_setup_output.rs`
+- Includes the merged `setup_apt_packages` list in generated Ansible vars for remote setup. (build_ansible_vars_includes_merged_setup_apt_packages)
 - Ignores warning and noise lines from Ansible output. (classify_output_line_ignores_warnings_and_noise)
 - Classifies task and failure lines over other output types. (classify_output_line_prefers_tasks_and_failures)
 - Detects Ansible fatal failure lines and extracts the error message. (clean_error_line_detects_ansible_failures)
@@ -27,6 +30,7 @@
 - Styles the current task name with ANSI formatting for the progress display. (format_progress_message_styles_current_task)
 
 ## `crates/bonesdeploy/src/commands/remote_ssl.rs`
+- Runs `remote ssl` through the SSL-only Ansible tag path instead of replaying the nginx setup tag path. (remote_ssl_uses_ssl_only_ansible_tags)
 - Passes the SSL enabled flag as a typed JSON boolean in extra vars. (ssl_extra_vars_pass_enabled_as_typed_json_boolean)
 
 ## `crates/bonesdeploy/src/commands/update.rs`
@@ -57,6 +61,7 @@
 ## `crates/bonesdeploy/src/prompts.rs`
 - Accepts common yes values like y, yes, and YES. (confirmation_parser_accepts_common_yes_values)
 - Rejects non-affirmative values like empty string, n, and no. (confirmation_parser_rejects_non_affirmative_values)
+- Describes firewall configuration in the remote setup prompt. (remote_setup_prompt_lines_include_firewall_configuration)
 
 ## `crates/bonesdeploy/src/update_assets.rs`
 - Ensures the migration manifest is embedded as an asset. (migration_manifest_is_embedded)
@@ -65,8 +70,7 @@
 ## `crates/bonesdeploy/tests/deployment_path_permissions.rs`
 - Creates the project root parent directory with traversable permissions before the placeholder release. (common_role_creates_project_root_parent_before_placeholder_release)
 
-## `crates/bonesdeploy/tests/init_assets.rs`
-- Restarts the project systemd service from app server deployment scripts. (app_server_templates_restart_project_service_from_deployment_scripts)
+## `crates/bonesdeploy/tests/init_assets/apparmor.rs`
 - Allows reading the repo-level nginx configuration in the `AppArmor` profile template. (apparmor_profile_template_allows_repo_nginx_conf)
 - Does not deny the parent home path when the repo path is derived from the shared helper. (apparmor_profile_template_does_not_deny_repo_path_parent_home)
 - Ensures the `AppArmor` profile template file exists at the expected path. (apparmor_profile_template_exists)
@@ -76,30 +80,55 @@
 - Verifies `AppArmor` is enabled in the kernel parameters. (apparmor_role_verifies_kernel_enabled)
 - Verifies the `AppArmor` profile is in enforce mode via kernel output. (apparmor_role_verifies_profile_enforce_mode)
 - Verifies the `AppArmor` profile is loaded in the kernel. (apparmor_role_verifies_profile_loaded)
-- Does not use unsafe `PROJECT_NAME` fallback patterns in any deployment script. (deployment_scripts_have_no_unsafe_project_name_fallbacks)
-- Uses resolved paths in both nginx site and `AppArmor` templates. (nginx_and_apparmor_templates_use_resolved_paths)
 - Sets an `AppArmor` profile in the per-site nginx systemd service template. (nginx_service_template_sets_apparmor_profile)
 - Requires the `AppArmor` service in the nginx systemd service template. (nginx_service_template_waits_for_apparmor_service)
+
+## `crates/bonesdeploy/tests/init_assets/deployment.rs`
+- Restarts the project systemd service from app server deployment scripts. (app_server_templates_restart_project_service_from_deployment_scripts)
+- Does not use unsafe `PROJECT_NAME` fallback patterns in any deployment script. (deployment_scripts_have_no_unsafe_project_name_fallbacks)
 - Installs pnpm only after nvm activates the project Node version in the Nuxt deployment script. (nuxt_deployment_script_installs_pnpm_after_nvm)
 - Does not install global npm packages in the Nuxt runtime role. (nuxt_runtime_role_does_not_install_global_npm_packages)
+- Does not use pm2 in SPA template deployment scripts. (spa_template_deploy_scripts_do_not_use_pm2)
+- Ends after the build step without process restart for the static Vue SPA. (vue_deployment_script_ends_after_build)
+
+## `crates/bonesdeploy/tests/init_assets/firewall.rs`
+- Applies all UFW rules in a single shell task instead of multiple module calls. (firewall_role_applies_all_rules_in_a_single_shell_task)
+- Keeps status check and debug output behind `show_status` flag. (firewall_role_keeps_status_check_and_debug_gated_by_show_status)
+- Filters 'ssh' from allowed ports list to avoid double-allowing. (firewall_role_shell_filters_ssh_from_allowed_ports)
+- Handles SSH allowance with and without CIDR restrictions. (firewall_role_shell_handles_manage_ssh_with_and_without_cidrs)
+- Resolves port aliases like 'http' to numeric ports. (firewall_role_shell_resolves_port_aliases)
+- Only runs when `firewall_enabled` is true. (firewall_role_shell_runs_only_when_firewall_enabled)
+- Sets default policies and enables UFW. (firewall_role_shell_sets_default_policies_and_enables_ufw)
+
+## `crates/bonesdeploy/tests/init_assets/paths.rs`
+- Uses resolved paths in both nginx site and `AppArmor` templates. (nginx_and_apparmor_templates_use_resolved_paths)
+- Uses resolved placeholder web root paths in the common role. (shared_setup_playbook_uses_placeholder_web_root_paths)
+- Defines nginx template and service defaults to allow tag-based execution without the nginx role. (ssl_role_defines_nginx_defaults_for_tag_based_execution)
+- Treats SSL enabled as an explicit boolean rather than relying on string truthiness. (ssl_role_treats_ssl_enabled_as_explicit_boolean)
+- Uses the resolved current web root for certbot validation in the SSL role. (ssl_role_uses_current_web_root_path_manifest)
+
+## `crates/bonesdeploy/tests/init_assets/setup_playbook.rs`
+- Starts the slow toolchain installers with Ansible async/poll orchestration after package installation. (common_role_runs_toolchain_installers_as_async_jobs)
+- Waits for deploy-user async jobs under the deploy user context. (common_role_waits_for_deploy_user_async_jobs_as_deploy_user)
 - Includes the `AppArmor` role in the shared remote setup playbook. (remote_setup_playbook_includes_apparmor_role)
+- Includes the firewall role in the shared remote setup playbook. (remote_setup_playbook_includes_firewall_role)
 - Loads shared template variables and includes the doctor validation task in the remote setup playbook. (remote_setup_playbook_loads_shared_template_vars_and_doctor_task)
 - Applies the `AppArmor` role before the nginx role in the shared setup playbook. (shared_setup_playbook_applies_apparmor_before_nginx_role)
 - Exposes common role defaults publicly for later runtime roles. (shared_setup_playbook_exposes_common_role_defaults_to_runtime_role)
 - Exposes nginx role defaults publicly for the later SSL role. (shared_setup_playbook_exposes_nginx_role_defaults_to_ssl_role)
-- Uses resolved placeholder web root paths in the common role. (shared_setup_playbook_uses_placeholder_web_root_paths)
-- Does not use pm2 in SPA template deployment scripts. (spa_template_deploy_scripts_do_not_use_pm2)
-- Does not install global npm packages in SPA template runtime roles. (spa_template_runtime_roles_do_not_install_global_npm_packages)
-- Treats SSL enabled as an explicit boolean rather than relying on string truthiness. (ssl_role_treats_ssl_enabled_as_explicit_boolean)
-- Uses the resolved current web root for certbot validation in the SSL role. (ssl_role_uses_current_web_root_path_manifest)
+- Starts setup apt installation before rustup bootstrap and user setup. (shared_setup_playbook_starts_setup_apt_packages_before_rustup_and_users)
+- Uses a single shared apt package list variable in the setup playbook instead of per-role apt package definitions. (shared_setup_playbook_uses_single_setup_apt_packages_manifest)
 - Verifies template-specific playbooks are removed in favor of shared kit setup logic. (template_playbooks_include_apparmor_role)
+
+## `crates/bonesdeploy/tests/init_assets/templates.rs`
+- Ensures the shared scaffold embeds `kit/remote/Aptfile` as the base setup package manifest. (shared_remote_scaffold_embeds_base_aptfile)
+- Does not install global npm packages in SPA template runtime roles. (spa_template_runtime_roles_do_not_install_global_npm_packages)
 - Uses the project name as the default service user instead of a hardcoded value. (template_service_user_defaults_to_project_name_not_applications)
 - Defines runtime role and setup label metadata in template vars files. (template_setup_vars_files_define_runtime_metadata)
-- Ends after the build step without process restart for the static Vue SPA. (vue_deployment_script_ends_after_build)
 
 ## `crates/bonesdeploy/tests/path_centralization_regressions.rs`
 - Ensures `AppArmor` role defaults and tasks use `apparmor_profile_path` consistently. (apparmor_role_keeps_profile_path_derived_from_profile_name_override)
-- Verifies the update-bonesremote playbook uses `cargo install --git` instead of staging binaries. Verifies the update-bonesremote playbook uses `cargo install --git` instead of staging binaries. (update_bonesremote_playbook_installs_from_git_like_init)
+- Verifies the update-bonesremote playbook force-installs from git instead of uninstalling first or staging binaries. (update_bonesremote_playbook_installs_from_git_like_init)
 
 ## `crates/bonesremote/src/commands/deploy.rs`
 - Removes all direct children of a directory without removing the directory itself. (clear_directory_removes_all_direct_children)

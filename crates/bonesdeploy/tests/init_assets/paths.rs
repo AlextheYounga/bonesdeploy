@@ -74,12 +74,24 @@ fn ssl_role_treats_ssl_enabled_as_explicit_boolean() {
     assert!(content.is_ok(), "failed to read {}", role.display());
     let content = content.unwrap_or_default();
 
+    assert!(!content.contains("when: ssl_enabled\n"), "ssl role must not rely on string truthiness\n{content}");
+    assert!(content.contains("when: ssl_enabled | bool"), "ssl role should cast CLI vars explicitly\n{content}");
+}
+
+/// Defines nginx template and service defaults to allow tag-based execution without the nginx role.
+#[test]
+fn ssl_role_defines_nginx_defaults_for_tag_based_execution() {
+    let defaults = project_root().join("kit/remote/roles/ssl/defaults/main.yml");
+    let content = fs::read_to_string(&defaults);
+    assert!(content.is_ok(), "failed to read {}", defaults.display());
+    let content = content.unwrap_or_default();
+
     assert!(
-        !content.contains("when: ssl_enabled\n"),
-        "ssl role must not rely on string truthiness\n{content}"
+        content.contains("nginx_site_template_path:"),
+        "ssl role must define nginx_site_template_path for self-contained tag execution\n{content}"
     );
     assert!(
-        content.contains("when: ssl_enabled | bool"),
-        "ssl role should cast CLI vars explicitly\n{content}"
+        content.contains("nginx_service_name:"),
+        "ssl role must define nginx_service_name for self-contained tag execution\n{content}"
     );
 }
