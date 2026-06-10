@@ -8,6 +8,7 @@ use shared::paths::{ssl_certificate_key_path, ssl_certificate_path};
 use crate::commands::push;
 use crate::commands::remote_setup;
 use crate::config;
+use crate::prompts;
 
 const SSL_PLAYBOOK_TAGS: [&str; 2] = ["--tags", "ssl"];
 
@@ -17,10 +18,14 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
 
     if let Some(value) = domain {
         cfg.ssl.domain = value;
+    } else if cfg.ssl.domain.is_empty() {
+        cfg.ssl.domain = prompts::prompt_ssl_domain(Some(&cfg))?;
     }
 
     if let Some(value) = email {
         cfg.ssl.email = value;
+    } else if cfg.ssl.email.is_empty() {
+        cfg.ssl.email = prompts::prompt_ssl_email(Some(&cfg))?;
     }
 
     if cfg.ssl.domain.is_empty() {

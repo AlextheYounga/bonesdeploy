@@ -195,6 +195,26 @@ fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<Stri
         .map_err(|err| anyhow!(err))
 }
 
+pub fn prompt_ssl_domain(existing_config: Option<&BonesConfig>) -> Result<String> {
+    let default_domain =
+        existing_config.map(|cfg| cfg.ssl.domain.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
+    Text::new("SSL domain:")
+        .with_default(default_domain)
+        .with_help_message("e.g. app.example.com")
+        .prompt()
+        .map_err(|err| anyhow!(err))
+}
+
+pub fn prompt_ssl_email(existing_config: Option<&BonesConfig>) -> Result<String> {
+    let default_email =
+        existing_config.map(|cfg| cfg.ssl.email.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
+    Text::new("SSL email:")
+        .with_default(default_email)
+        .with_help_message("e.g. ops@example.com")
+        .prompt()
+        .map_err(|err| anyhow!(err))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{is_affirmative, remote_setup_prompt_lines};
