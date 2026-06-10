@@ -156,6 +156,20 @@ fn shared_setup_playbook_applies_apparmor_before_nginx_role() {
     assert!(runtime_idx < nginx_idx, "runtime role hook must run before nginx role\n{content}");
 }
 
+/// Exposes runtime role defaults publicly so later roles can use stack-specific variables.
+#[test]
+fn shared_setup_playbook_exposes_runtime_role_defaults_to_later_roles() {
+    let playbook = project_root().join("kit/.lib/remote/playbooks/setup.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("name: \"{{ runtime_role }}\"") && content.contains("public: true"),
+        "shared setup playbook must expose runtime role defaults for later roles like nginx\n{content}"
+    );
+}
+
 /// Exposes common role defaults publicly for later runtime roles.
 #[test]
 fn shared_setup_playbook_exposes_common_role_defaults_to_runtime_role() {

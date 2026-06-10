@@ -18,8 +18,6 @@ pub fn run() -> Result<()> {
     check_globally_available(&mut issues);
     check_passwordless_sudo(&mut issues);
     check_apparmor_support(&mut issues);
-    check_algif_aead_disabled(&mut issues);
-    check_per_site_nginx_config(&mut issues);
 
     if issues.is_empty() {
         println!("\n{} All checks passed.", style("OK").green().bold());
@@ -262,78 +260,6 @@ fn apparmor_unit_wiring_status(contents: &str, installed_profiles: &HashSet<&str
         AppArmorUnitWiringStatus::Ok
     } else {
         AppArmorUnitWiringStatus::UnknownProfile(profile_name.to_string())
-    }
-}
-
-fn check_algif_aead_disabled(issues: &mut Vec<String>) {
-    let modules = fs::read_to_string(paths::PROC_MODULES);
-    let Ok(modules) = modules else {
-        issues.push(format!("Kernel module check failed: could not read {}", paths::PROC_MODULES));
-        return;
-    };
-
-    if algif_aead_is_loaded(&modules) {
-        issues.push(
-            "Kernel module check failed: algif_aead is loaded; disable it to mitigate CVE-2026-31431 \
-             (run: echo 'install algif_aead /bin/false' > /etc/modprobe.d/disable-algif.conf && rmmod algif_aead)"
-                .to_string(),
-        );
-        return;
-    }
-
-    if !algif_aead_is_blocked() {
-        issues.push(
-            "Kernel module check failed: algif_aead is not blocked from loading; block it to mitigate CVE-2026-31431 \
-             (run: echo 'install algif_aead /bin/false' > /etc/modprobe.d/disable-algif.conf)"
-                .to_string(),
-        );
-    }
-}
-
-fn algif_aead_is_loaded(proc_modules: &str) -> bool {
-    proc_modules.lines().any(|line| line.split_whitespace().next() == Some("algif_aead"))
-}
-
-fn algif_aead_is_blocked() -> bool {
-    let Ok(entries) = fs::read_dir(paths::ETC_MODPROBE_D) else {
-        return false;
-    };
-
-    entries.filter_map(Result::ok).any(|entry| {
-        let Ok(contents) = fs::read_to_string(entry.path()) else { return false };
-        contents.lines().any(|line| {
-            let trimmed = line.trim();
-            !trimmed.starts_with('#') && trimmed.starts_with("install algif_aead")
-        })
-    })
-}
-
-fn check_per_site_nginx_config(issues: &mut Vec<String>) {
-    let Ok(units) = fs::read_dir(paths::ETC_SYSTEMD_SYSTEM) else {
-        return;
-    };
-
-    let site_nginx_units: Vec<(String, PathBuf)> = units
-        .filter_map(Result::ok)
-        .filter_map(|entry| {
-            let name = entry.file_name().into_string().ok()?;
-            if name.ends_with("-nginx.service") { Some((name, entry.path())) } else { None }
-        })
-        .collect();
-
-    for (unit_name, _unit_path) in site_nginx_units {
-        let Some(project_name) = unit_name.strip_suffix("-nginx.service") else {
-            continue;
-        };
-
-        let nginx_conf_path = PathBuf::from(paths::DEFAULT_CONF_ROOT_PARENT).join(project_name).join("nginx.conf");
-
-        if !nginx_conf_path.exists() {
-            issues.push(format!(
-                "Per-site nginx config check failed: {} does not exist (re-run remote setup with --tags nginx)",
-                nginx_conf_path.display()
-            ));
-        }
     }
 }
 
