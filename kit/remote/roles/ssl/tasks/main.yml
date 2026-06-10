@@ -9,15 +9,6 @@
   when: ssl_enabled | bool
   tags: [ssl]
 
-- name: Ensure certbot is installed
-  ansible.builtin.apt:
-    name: "{{ ssl_certbot_package }}"
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
-  when: ssl_enabled | bool
-  tags: [ssl, packages]
-
 - name: Render nginx HTTP challenge config
   ansible.builtin.template:
     src: "{{ nginx_site_template_path }}"

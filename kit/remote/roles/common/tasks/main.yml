@@ -1,36 +1,23 @@
 ---
-- name: Install base packages
-  ansible.builtin.apt:
-    name: "{{ common_base_packages }}"
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
-  tags: [common, packages]
-
 - name: Check for rustup
   ansible.builtin.stat:
     path: "{{ rustup_install_prefix }}/rustup"
   register: common_rustup_binary
   tags: [common, bonesremote]
 
-- name: Install rustup and cargo
+- name: Start rustup and cargo install
   ansible.builtin.shell: |
     set -euo pipefail
     curl --proto '=https' --tlsv1.2 -sSf {{ rustup_install_script_url }} | sh -s -- -y --profile minimal
   args:
     creates: "{{ rustup_install_prefix }}/cargo"
   when: not common_rustup_binary.stat.exists
+  async: 1800
+  poll: 0
+  register: common_rustup_job
   tags: [common, bonesremote]
 
-- name: Verify cargo installation
-  ansible.builtin.command:
-    argv:
-      - "{{ cargo_binary_path }}"
-      - --version
-  changed_when: false
-  tags: [common, bonesremote]
-
-- name: Install nvm for deploy user
+- name: Start nvm install for deploy user
   become_user: "{{ deploy_user }}"
   ansible.builtin.shell: |
     set -euo pipefail
@@ -40,76 +27,10 @@
     creates: "{{ nvm_dir }}/nvm.sh"
   environment:
     HOME: "/home/{{ deploy_user }}"
+  async: 1800
+  poll: 0
+  register: common_nvm_job
   tags: [common, nvm]
-
-- name: Ensure nvm initialization is present for deploy user
-  ansible.builtin.lineinfile:
-    path: "/home/{{ deploy_user }}/.bashrc"
-    line: "{{ item }}"
-    state: present
-    create: true
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: "0644"
-  loop: "{{ nvm_init_snippet }}"
-  tags: [common, nvm]
-
-- name: Verify nvm for deploy user
-  become_user: "{{ deploy_user }}"
-  ansible.builtin.shell: |
-    set -euo pipefail
-    export NVM_DIR="{{ nvm_dir }}"
-    . "${NVM_DIR}/nvm.sh"
-    nvm --version
-  args:
-    executable: /bin/bash
-  environment:
-    HOME: "/home/{{ deploy_user }}"
-  changed_when: false
-  tags: [common, nvm]
-
-- name: Install latest LTS Node with nvm for deploy user
-  become_user: "{{ deploy_user }}"
-  ansible.builtin.shell: |
-    set -euo pipefail
-    export NVM_DIR="{{ nvm_dir }}"
-    . "${NVM_DIR}/nvm.sh"
-    nvm install --lts
-  args:
-    executable: /bin/bash
-  environment:
-    HOME: "/home/{{ deploy_user }}"
-  tags: [common, nvm]
-
-- name: Check for bonesremote binary
-  ansible.builtin.stat:
-    path: "{{ bonesremote_binary_path }}"
-  register: common_bonesremote_binary
-  tags: [common, bonesremote]
-
-- name: Install bonesremote binary
-  ansible.builtin.command:
-    argv:
-      - "{{ cargo_binary_path }}"
-      - install
-      - --root
-      - "{{ bonesremote_install_root }}"
-      - --git
-      - "{{ bonesremote_repo_url }}"
-      - bonesremote
-  when: not common_bonesremote_binary.stat.exists
-  tags: [common, bonesremote]
-
-- name: Run bonesremote init
-  ansible.builtin.command:
-    argv:
-      - bonesremote
-      - init
-      - --deploy-user
-      - "{{ deploy_user }}"
-  environment:
-    PATH: "{{ paths.usr_local_bin }}:{{ ansible_facts['env']['PATH'] }}"
-  tags: [common, bonesremote]
 
 - name: Ensure bare repo parent directory exists
   ansible.builtin.file:
@@ -175,3 +96,126 @@
     state: link
     force: true
   tags: [common, placeholder]
+
+- name: Wait for rustup and cargo install
+  ansible.builtin.async_status:
+    jid: "{{ common_rustup_job.ansible_job_id }}"
+  register: common_rustup_result
+  until: common_rustup_result.finished
+  retries: 180
+  delay: 10
+  when: common_rustup_job is defined and common_rustup_job.ansible_job_id is defined
+  tags: [common, bonesremote]
+
+- name: Verify cargo installation
+  ansible.builtin.command:
+    argv:
+      - "{{ cargo_binary_path }}"
+      - --version
+  changed_when: false
+  tags: [common, bonesremote]
+
+- name: Check for bonesremote binary
+  ansible.builtin.stat:
+    path: "{{ bonesremote_binary_path }}"
+  register: common_bonesremote_binary
+  tags: [common, bonesremote]
+
+- name: Start bonesremote binary install
+  ansible.builtin.command:
+    argv:
+      - "{{ cargo_binary_path }}"
+      - install
+      - --root
+      - "{{ bonesremote_install_root }}"
+      - --git
+      - "{{ bonesremote_repo_url }}"
+      - bonesremote
+  when: not common_bonesremote_binary.stat.exists
+  async: 1800
+  poll: 0
+  register: common_bonesremote_job
+  tags: [common, bonesremote]
+
+- name: Wait for nvm install
+  ansible.builtin.async_status:
+    jid: "{{ common_nvm_job.ansible_job_id }}"
+  register: common_nvm_result
+  until: common_nvm_result.finished
+  retries: 180
+  delay: 10
+  when: common_nvm_job is defined and common_nvm_job.ansible_job_id is defined
+  tags: [common, nvm]
+
+- name: Ensure nvm initialization is present for deploy user
+  ansible.builtin.lineinfile:
+    path: "/home/{{ deploy_user }}/.bashrc"
+    line: "{{ item }}"
+    state: present
+    create: true
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_user }}"
+    mode: "0644"
+  loop: "{{ nvm_init_snippet }}"
+  tags: [common, nvm]
+
+- name: Verify nvm for deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_dir }}"
+    . "${NVM_DIR}/nvm.sh"
+    nvm --version
+  args:
+    executable: /bin/bash
+  environment:
+    HOME: "/home/{{ deploy_user }}"
+  changed_when: false
+  tags: [common, nvm]
+
+- name: Start latest LTS Node install with nvm for deploy user
+  become_user: "{{ deploy_user }}"
+  ansible.builtin.shell: |
+    set -euo pipefail
+    export NVM_DIR="{{ nvm_dir }}"
+    . "${NVM_DIR}/nvm.sh"
+    nvm install --lts
+  args:
+    executable: /bin/bash
+  environment:
+    HOME: "/home/{{ deploy_user }}"
+  async: 1800
+  poll: 0
+  register: common_node_lts_job
+  tags: [common, nvm]
+
+- name: Wait for bonesremote binary install
+  ansible.builtin.async_status:
+    jid: "{{ common_bonesremote_job.ansible_job_id }}"
+  register: common_bonesremote_result
+  until: common_bonesremote_result.finished
+  retries: 180
+  delay: 10
+  when: common_bonesremote_job is defined and common_bonesremote_job.ansible_job_id is defined
+  tags: [common, bonesremote]
+
+- name: Wait for latest LTS Node install
+  ansible.builtin.async_status:
+    jid: "{{ common_node_lts_job.ansible_job_id }}"
+  register: common_node_lts_result
+  until: common_node_lts_result.finished
+  retries: 180
+  delay: 10
+  when: common_node_lts_job is defined and common_node_lts_job.ansible_job_id is defined
+  tags: [common, nvm]
+
+- name: Run bonesremote init
+  ansible.builtin.command:
+    argv:
+      - bonesremote
+      - init
+      - --deploy-user
+      - "{{ deploy_user }}"
+  environment:
+    PATH: "{{ paths.usr_local_bin }}:{{ ansible_facts['env']['PATH'] }}"
+  tags: [common, bonesremote]

@@ -1,12 +1,4 @@
 ---
-common_base_packages:
-  - build-essential
-  - ca-certificates
-  - curl
-  - git
-  - rsync
-  - sudo
-
 bonesremote_repo_url: https://github.com/AlextheYounga/bonesdeploy.git
 bonesremote_install_root: /usr/local
 bonesremote_binary_path: "{{ bonesremote_install_root }}/bin/bonesremote"

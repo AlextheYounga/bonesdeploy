@@ -1,12 +1,4 @@
 ---
-- name: Install nginx
-  ansible.builtin.apt:
-    name: "{{ nginx_package_name }}"
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
-  tags: [nginx, packages]
-
 - name: Ensure socket directory exists
   ansible.builtin.file:
     path: "{{ paths.runtime_socket_dir }}"

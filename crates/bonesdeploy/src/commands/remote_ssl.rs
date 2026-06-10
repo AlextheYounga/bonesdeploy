@@ -9,6 +9,8 @@ use crate::commands::push;
 use crate::commands::remote_setup;
 use crate::config;
 
+const SSL_PLAYBOOK_TAGS: [&str; 2] = ["--tags", "ssl"];
+
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
     let mut cfg = config::load(bones_yaml)?;
@@ -46,12 +48,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     cfg_for_run.ssl.enabled = false;
 
     let ssh_user = remote_setup::resolve_bootstrap_ssh_user();
-    remote_setup::run_ansible_playbook(
-        &cfg_for_run,
-        &ssh_user,
-        extra_vars,
-        &[String::from("--tags"), String::from("nginx,ssl")],
-    )?;
+    remote_setup::run_ansible_playbook(&cfg_for_run, &ssh_user, extra_vars, &ssl_playbook_args())?;
 
     cfg.ssl.enabled = true;
     config::save(&cfg, bones_yaml)?;
@@ -72,9 +69,13 @@ fn ssl_extra_vars(domain: &str, email: &str) -> serde_json::Value {
     })
 }
 
+fn ssl_playbook_args() -> Vec<String> {
+    SSL_PLAYBOOK_TAGS.iter().map(|value| String::from(*value)).collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ssl_extra_vars;
+    use super::{ssl_extra_vars, ssl_playbook_args};
 
     /// Passes the SSL enabled flag as a typed JSON boolean in extra vars.
     #[test]
@@ -84,5 +85,11 @@ mod tests {
         assert_eq!(vars.get("ssl_enabled"), Some(&serde_json::Value::Bool(true)));
         assert_eq!(vars.get("ssl_domain"), Some(&serde_json::Value::String(String::from("app.example.com"))));
         assert_eq!(vars.get("ssl_email"), Some(&serde_json::Value::String(String::from("ops@example.com"))));
+    }
+
+    /// Runs `remote ssl` through the SSL-only Ansible tag path instead of replaying the nginx setup tag path.
+    #[test]
+    fn remote_ssl_uses_ssl_only_ansible_tags() {
+        assert_eq!(ssl_playbook_args(), vec![String::from("--tags"), String::from("ssl")]);
     }
 }

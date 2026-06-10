@@ -1,12 +1,4 @@
 ---
-- name: Install apparmor packages
-  ansible.builtin.apt:
-    name: "{{ apparmor_packages }}"
-    state: present
-    update_cache: true
-    cache_valid_time: 3600
-  tags: [apparmor, packages]
-
 - name: Ensure apparmor service is enabled and started
   ansible.builtin.service:
     name: "{{ apparmor_service_name }}"

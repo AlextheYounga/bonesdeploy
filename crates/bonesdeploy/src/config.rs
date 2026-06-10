@@ -25,8 +25,10 @@ impl Constants {
     pub const BONES_HOOKS_SCRIPT: &'static str = ".bones/hooks.sh";
     pub const BONES_HOOKS_DIR: &'static str = ".bones/hooks";
     pub const BONES_DEPLOYMENT_DIR: &'static str = ".bones/deployment";
+    pub const BONES_REMOTE_DIR: &'static str = ".bones/remote";
     pub const BONES_REMOTE_SETUP_PLAYBOOK: &'static str = ".bones/remote/playbooks/setup.yml";
     pub const BONES_REMOTE_ROLES_DIR: &'static str = ".bones/remote/roles";
+    pub const BONES_REMOTE_APTFILE: &'static str = ".bones/remote/Aptfile";
 
     pub const GIT_HOOKS_DIR: &'static str = ".git/hooks";
     pub const GIT_PRE_PUSH_HOOK_PATH: &'static str = ".git/hooks/pre-push";
