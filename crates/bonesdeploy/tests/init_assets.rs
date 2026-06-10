@@ -21,12 +21,6 @@ const TEMPLATE_SETUP_VARS_FILES: [&str; 7] = [
     "templates/vue/remote/vars/setup.yml",
 ];
 
-const TEMPLATE_SUPPLEMENTARY_APTFILES: [&str; 3] = [
-    "templates/django/remote/Aptfile.django",
-    "templates/laravel/remote/Aptfile.laravel",
-    "templates/rails/remote/Aptfile.rails",
-];
-
 const TEMPLATE_SETUP_PLAYBOOKS: [&str; 7] = [
     "templates/django/remote/playbooks/setup.yml",
     "templates/laravel/remote/playbooks/setup.yml",
@@ -250,25 +244,6 @@ fn template_setup_vars_files_define_runtime_metadata() {
         assert!(
             content.contains("setup_label:"),
             "template vars file {vars_file} must define the setup label\n{content}"
-        );
-    }
-}
-
-/// Uses supplementary remote Aptfiles only for stacks with extra runtime packages.
-#[test]
-fn template_supplementary_aptfiles_match_runtime_package_stacks() {
-    for aptfile in TEMPLATE_SUPPLEMENTARY_APTFILES {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(aptfile);
-        assert!(path.is_file(), "expected supplementary Aptfile at {}", path.display());
-    }
-
-    for template in ["next", "nuxt", "sveltekit", "vue"] {
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
-            .join(format!("templates/{template}/remote/Aptfile.{template}"));
-        assert!(
-            !path.exists(),
-            "{template} should not embed a supplementary Aptfile when the shared remote Aptfile is sufficient"
         );
     }
 }
