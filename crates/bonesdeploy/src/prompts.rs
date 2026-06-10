@@ -115,6 +115,17 @@ fn remote_display_label(remote: &git::RemoteInfo) -> String {
     }
 }
 
+pub fn prompt_host(inferred_remote: Option<&git::RemoteConnectionDetails>) -> Result<String> {
+    if let Some(details) = inferred_remote {
+        return Ok(details.host.clone());
+    }
+
+    Text::new("Server host or IP:")
+        .with_help_message("e.g. deploy.example.com or 203.0.113.10")
+        .prompt()
+        .map_err(|err| anyhow!(err))
+}
+
 pub fn prompt_port(
     existing_config: Option<&BonesConfig>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,

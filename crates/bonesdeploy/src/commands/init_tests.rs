@@ -42,6 +42,7 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
         project_name: None,
         branch: None,
         remote: None,
+        host: Some(String::from("deploy.example.com")),
         port: None,
         template: None,
     };
@@ -56,27 +57,25 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
     Ok(())
 }
 
-/// Fails when --project-name is missing in non-interactive mode.
+/// Requires a host when neither seed config remote nor CLI provide one in non-interactive mode.
 #[test]
-fn collect_non_interactive_requires_project_name_in_non_interactive_mode() -> Result<()> {
+fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() -> Result<()> {
     let args = InitArgs {
         non_interactive: true,
         setup_remote: false,
-        project_name: None,
+        project_name: Some(String::from("acme")),
         branch: None,
         remote: None,
+        host: None,
         port: None,
         template: None,
     };
 
-    let result = collect_non_interactive("", None, &args);
+    let result = collect_non_interactive("workspace", None, &args);
     let Err(err) = result else {
-        bail!("missing project name should fail");
+        bail!("missing host should fail");
     };
-    assert!(
-        err.to_string().contains("--project-name is required"),
-        "expected '--project-name is required' message, got '{err}'"
-    );
+    assert!(err.to_string().contains("--host is required"), "expected '--host is required' message, got '{err}'");
 
     Ok(())
 }

@@ -10,6 +10,7 @@ pub struct InitArgs {
     pub project_name: Option<String>,
     pub branch: Option<String>,
     pub remote: Option<String>,
+    pub host: Option<String>,
     pub port: Option<String>,
     pub template: Option<String>,
 }
@@ -18,14 +19,15 @@ pub fn collect_non_interactive(
     project_name_hint: &str,
     existing_config: Option<&config::BonesConfig>,
     args: &InitArgs,
-) -> Result<config::BonesConfig> {
+) -> Result<(config::BonesConfig, Option<String>)> {
     let project_name = resolve_project_name(args, existing_config, project_name_hint)?;
     let remote_name = resolve_remote_name(args, existing_config);
     let inferred_remote = infer_remote_details(&remote_name)?;
+    let host = resolve_host(args, inferred_remote.as_ref())?;
     let branch = resolve_branch(args, existing_config);
     let port = resolve_port(args, existing_config, inferred_remote.as_ref());
 
-    let values = NonInteractiveValues { project_name, remote_name, branch, port };
+    let values = NonInteractiveValues { project_name, remote_name, branch, host, port };
     Ok(build_config(values, existing_config, inferred_remote.as_ref()))
 }
 
@@ -63,6 +65,20 @@ fn infer_remote_details(remote_name: &str) -> Result<Option<git::RemoteConnectio
     if git::remote_exists(remote_name)? { git::infer_remote_connection_details(remote_name) } else { Ok(None) }
 }
 
+fn resolve_host(args: &InitArgs, inferred_remote: Option<&git::RemoteConnectionDetails>) -> Result<String> {
+    args.host
+        .clone()
+        .filter(|v| !v.is_empty())
+        .or_else(|| inferred_remote.map(|details| details.host.clone()))
+        .ok_or_else(|| {
+            anyhow!(
+                "{} --host is required in non-interactive mode.\n\
+                 Usage: bonesdeploy init --non-interactive --project-name <name> --host <host>",
+                console::style("Error:").red().bold(),
+            )
+        })
+}
+
 fn resolve_branch(args: &InitArgs, existing_config: Option<&config::BonesConfig>) -> String {
     args.branch
         .clone()
@@ -88,6 +104,7 @@ struct NonInteractiveValues {
     project_name: String,
     remote_name: String,
     branch: String,
+    host: String,
     port: String,
 }
 
@@ -95,8 +112,8 @@ fn build_config(
     values: NonInteractiveValues,
     existing_config: Option<&config::BonesConfig>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> config::BonesConfig {
-    let NonInteractiveValues { project_name, remote_name, branch, port } = values;
+) -> (config::BonesConfig, Option<String>) {
+    let NonInteractiveValues { project_name, remote_name, branch, host, port } = values;
 
     let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote);
     let project_root = seed_path_override(
@@ -123,7 +140,7 @@ fn build_config(
         .unwrap_or_else(|| vec![String::from("storage")]);
     let path_overrides = existing_config.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
 
-    config::BonesConfig {
+    let cfg = config::BonesConfig {
         data: config::Data {
             remote_name,
             project_name,
@@ -140,7 +157,9 @@ fn build_config(
         },
         releases: config::Releases { keep: releases_keep, shared_files, shared_dirs },
         ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
-    }
+    };
+
+    (cfg, Some(host))
 }
 
 pub fn non_empty(value: &str) -> Option<String> {

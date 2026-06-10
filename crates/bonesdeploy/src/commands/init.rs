@@ -42,11 +42,11 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
     update_gitignore()?;
 
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    let cfg = load_or_collect_config(bones_yaml, args)?;
+    let (cfg, host) = load_or_collect_config(bones_yaml, args)?;
 
     config::save(&cfg, bones_yaml)?;
     println!("Saved config to {}", config::Constants::BONES_YAML);
-    ensure_local_remote(&cfg)?;
+    ensure_local_remote(&cfg, host.as_deref())?;
 
     symlink_pre_push()?;
 
@@ -79,7 +79,7 @@ fn resolve_template(cli_value: Option<&str>, available: &[String], non_interacti
     prompts::choose_template(available)
 }
 
-fn collect(project_name_hint: &str, args: &InitArgs) -> Result<config::BonesConfig> {
+fn collect(project_name_hint: &str, args: &InitArgs) -> Result<(config::BonesConfig, Option<String>)> {
     collect_from_seed(project_name_hint, None, args)
 }
 
@@ -87,13 +87,14 @@ fn collect_from_seed(
     project_name_hint: &str,
     existing_config: Option<&config::BonesConfig>,
     args: &InitArgs,
-) -> Result<config::BonesConfig> {
+) -> Result<(config::BonesConfig, Option<String>)> {
     let project_name =
         cli_or_prompt(args.project_name.as_ref(), || prompts::prompt_project_name(project_name_hint, existing_config))?;
     let branch = cli_or_prompt(args.branch.as_ref(), || prompts::prompt_branch(existing_config))?;
     let remote_name = cli_or_prompt(args.remote.as_ref(), || prompts::prompt_remote_name(existing_config))?;
     let inferred_remote =
         if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
+    let host = cli_or_prompt(args.host.as_ref(), || prompts::prompt_host(inferred_remote.as_ref()))?;
     let port = cli_or_prompt(args.port.as_ref(), || prompts::prompt_port(existing_config, inferred_remote.as_ref()))?;
     let repo_path = init_config::resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
     let project_root = init_config::seed_path_override(
@@ -122,24 +123,27 @@ fn collect_from_seed(
         .unwrap_or_else(|| vec![String::from("storage")]);
     let path_overrides = existing_config.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
 
-    Ok(config::BonesConfig {
-        data: config::Data {
-            remote_name,
-            project_name,
-            port,
-            repo_path,
-            project_root,
-            web_root,
-            branch,
-            deploy_on_push,
+    Ok((
+        config::BonesConfig {
+            data: config::Data {
+                remote_name,
+                project_name,
+                port,
+                repo_path,
+                project_root,
+                web_root,
+                branch,
+                deploy_on_push,
+            },
+            permissions: config::Permissions {
+                defaults: config::PermissionDefaults { deploy_user, service_user, group, dir_mode, file_mode },
+                paths: path_overrides,
+            },
+            releases: config::Releases { keep: releases_keep, shared_files, shared_dirs },
+            ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
         },
-        permissions: config::Permissions {
-            defaults: config::PermissionDefaults { deploy_user, service_user, group, dir_mode, file_mode },
-            paths: path_overrides,
-        },
-        releases: config::Releases { keep: releases_keep, shared_files, shared_dirs },
-        ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
-    })
+        Some(host),
+    ))
 }
 
 #[cfg(test)]
@@ -148,7 +152,7 @@ fn collect_non_interactive(
     existing_config: Option<&config::BonesConfig>,
     args: &InitArgs,
 ) -> Result<config::BonesConfig> {
-    init_config::collect_non_interactive(project_name_hint, existing_config, args)
+    init_config::collect_non_interactive(project_name_hint, existing_config, args).map(|(cfg, _)| cfg)
 }
 
 fn cli_or_prompt(cli_value: Option<&String>, prompt: impl FnOnce() -> Result<String>) -> Result<String> {
@@ -158,12 +162,12 @@ fn cli_or_prompt(cli_value: Option<&String>, prompt: impl FnOnce() -> Result<Str
     }
 }
 
-fn load_or_collect_config(bones_yaml: &Path, args: &InitArgs) -> Result<config::BonesConfig> {
+fn load_or_collect_config(bones_yaml: &Path, args: &InitArgs) -> Result<(config::BonesConfig, Option<String>)> {
     if bones_yaml.exists() {
         let existing = config::load(bones_yaml)?;
         if config::is_configured(&existing) {
             println!("Loading existing config from {}...", config::Constants::BONES_YAML);
-            return Ok(existing);
+            return Ok((existing, None));
         }
         println!("Config is incomplete, running prompts...");
         let project_name = repo_directory_name()?;
@@ -224,14 +228,19 @@ fn repo_directory_name() -> Result<String> {
     Ok(name)
 }
 
-fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
+fn ensure_local_remote(cfg: &config::BonesConfig, host: Option<&str>) -> Result<()> {
     if git::remote_exists(&cfg.data.remote_name)? {
         return Ok(());
     }
 
-    let details = git::infer_remote_connection_details(&cfg.data.remote_name)?
-        .context("Cannot determine host from git remote URL")?;
-    let host = &details.host;
+    let host = if let Some(h) = host {
+        h.to_string()
+    } else {
+        git::infer_remote_connection_details(&cfg.data.remote_name)?
+            .context("Cannot determine host to create git remote")?
+            .host
+    };
+
     let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, host, cfg.data.repo_path);
     git::add_remote(&cfg.data.remote_name, &remote_url)?;
     println!("Configured local git remote {} -> {}", cfg.data.remote_name, remote_url);
