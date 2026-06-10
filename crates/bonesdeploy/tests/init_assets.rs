@@ -60,6 +60,20 @@ fn remote_setup_playbook_includes_apparmor_role() {
     );
 }
 
+/// Includes the firewall role in the shared remote setup playbook.
+#[test]
+fn remote_setup_playbook_includes_firewall_role() {
+    let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("name: firewall") && content.contains("include_role"),
+        "remote setup playbook must include firewall through shared role composition\n{content}"
+    );
+}
+
 /// Loads shared template variables and includes the doctor validation task in the remote setup playbook.
 #[test]
 fn remote_setup_playbook_loads_shared_template_vars_and_doctor_task() {
@@ -104,6 +118,25 @@ fn shared_setup_playbook_uses_single_setup_apt_packages_manifest() {
     );
 }
 
+/// Starts setup apt installation before rustup bootstrap and user setup.
+#[test]
+fn shared_setup_playbook_starts_setup_apt_packages_before_rustup_and_users() {
+    let playbook = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/playbooks/setup.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    let apt_idx = content.find("Install setup apt packages");
+    let rustup_idx = content.find("Run common rustup bootstrap");
+    let users_idx = content.find("Run users role");
+
+    assert!(apt_idx.is_some(), "shared setup playbook must install setup apt packages\n{content}");
+    assert!(rustup_idx.is_some(), "shared setup playbook must start rustup bootstrap\n{content}");
+    assert!(users_idx.is_some(), "shared setup playbook must include users role\n{content}");
+    assert!(apt_idx < rustup_idx, "setup apt packages should run before rustup bootstrap\n{content}");
+    assert!(rustup_idx < users_idx, "rustup bootstrap should run before users role\n{content}");
+}
+
 /// Starts the slow toolchain installers with Ansible async/poll orchestration after package installation.
 #[test]
 fn common_role_runs_toolchain_installers_as_async_jobs() {
@@ -120,6 +153,24 @@ fn common_role_runs_toolchain_installers_as_async_jobs() {
     assert!(
         content.contains("ansible.builtin.async_status"),
         "common role should wait on async installers with async_status\n{content}"
+    );
+}
+
+/// Waits for deploy-user async jobs under the deploy user context.
+#[test]
+fn common_role_waits_for_deploy_user_async_jobs_as_deploy_user() {
+    let tasks = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/remote/roles/common/tasks/main.yml");
+    let content = fs::read_to_string(&tasks);
+    assert!(content.is_ok(), "failed to read {}", tasks.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("Wait for nvm install\n  become_user: \"{{ deploy_user }}\""),
+        "common role must wait for nvm install as deploy_user so async status reads the correct job file\n{content}"
+    );
+    assert!(
+        content.contains("Wait for latest LTS Node install\n  become_user: \"{{ deploy_user }}\""),
+        "common role must wait for node install as deploy_user so async status reads the correct job file\n{content}"
     );
 }
 
