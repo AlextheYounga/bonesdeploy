@@ -49,10 +49,11 @@ fn shared_remote_scaffold_embeds_base_aptfile() {
 fn spa_template_runtime_roles_do_not_install_global_npm_packages() {
     for template in ["next", "sveltekit", "vue"] {
         let defaults =
-            project_root().join(format!("templates/{template}/remote/roles/{template}_runtime/defaults/main.yml"));
+            project_root().join(format!("templates/{template}/.lib/remote/roles/{template}_runtime/defaults/main.yml"));
         assert!(!defaults.exists(), "{template} runtime role should not define setup-time global npm packages");
 
-        let tasks = project_root().join(format!("templates/{template}/remote/roles/{template}_runtime/tasks/main.yml"));
+        let tasks =
+            project_root().join(format!("templates/{template}/.lib/remote/roles/{template}_runtime/tasks/main.yml"));
         let content = fs::read_to_string(&tasks);
         assert!(content.is_ok(), "failed to read {}", tasks.display());
         let content = content.unwrap_or_default();

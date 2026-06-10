@@ -40,29 +40,29 @@ We create a `bonesremote` executable that does not require a password and allows
 ## Bones Scaffolding
 .bones
 ├── bones.yaml
-├── hooks.sh                          # shared hook library, sourced by every hook
-├── server
-│   ├── nginx
-│   │   └── router.conf.j2
-│   ├── playbooks
-│   │   └── setup.yml
-│   └── roles
-│       ├── common/
-│       ├── firewall/
-│       ├── nginx/
-│       ├── releases/
-│       ├── ssh/
-│       ├── ssl/
-│       └── users/
-├── scripts
-│   └── bootstrap_python3.sh          # ensures python3 is available before ansible runs
+├── hooks.sh                          # sourced by hooks (symlinked from .lib/hooks.sh)
 ├── deployment
 │   ├── 01_run_deployment_concerns.sh
 │   └── 02_permissions_lockup.sh (example)
-└── hooks
-    ├── post-receive
-    ├── pre-push
-    └── pre-receive
+├── hooks
+│   ├── post-receive
+│   ├── pre-push
+│   └── pre-receive
+└── .lib/                             # CLI-owned library files (not user-editable)
+    ├── hooks.sh                      # shared hook library, sourced by every hook
+    ├── scripts
+    │   └── bootstrap_python3.sh      # ensures python3 is available before ansible runs
+    └── remote                        # nginx + ansible roles for `bonesdeploy remote setup`
+        ├── nginx/
+        ├── playbooks/
+        ├── roles/
+        │   ├── common/
+        │   ├── firewall/
+        │   ├── nginx/
+        │   ├── ssh/
+        │   ├── ssl/
+        │   └── users/
+        └── vars/
 
 ### Bones YAML
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
@@ -222,7 +222,7 @@ bonesdeploy/
 ```
 
 ### Per-Framework Templates
-The `templates/` directory ships starter overlays that `bonesdeploy init` can use as a base when scaffolding into a project of the matching kind. Each template is a complete `.bones/` payload tuned for that stack and includes its own ansible role wired into `server/playbooks/setup.yml`:
+The `templates/` directory ships starter overlays that `bonesdeploy init` can use as a base when scaffolding into a project of the matching kind. Each template follows the same `.lib/` convention as `kit/` — framework-owned files (remote roles, site config, vars) live under `.lib/` while user-editable files (bones.yaml, deployment/) stay at the root:
 
 - `templates/django/`        → `django_runtime` role
 - `templates/laravel/`       → `laravel_runtime` role (PHP + PHP-FPM)
