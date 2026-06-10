@@ -93,7 +93,7 @@ Template-based projects also scaffold language-specific setup roles (for example
 Every setup also installs nginx and provisions a default project vhost that serves `.bones/remote/roles/nginx/defaults/index.html.j2` until your first deployment is live.
 Per-site nginx is confined under AppArmor with unix-socket-only network access.
 
-To customize nginx behavior, edit `.bones/remote/nginx/site.conf.j2` and re-run `bonesdeploy remote setup`.
+To customize nginx behavior, edit `.bones/remote/nginx/router.conf.j2` and re-run `bonesdeploy remote setup`.
 
 When DNS is ready, enable SSL with certbot:
 
@@ -101,7 +101,7 @@ When DNS is ready, enable SSL with certbot:
 bonesdeploy remote ssl --domain app.example.com --email ops@example.com
 ```
 
-This obtains a Let's Encrypt certificate and updates the managed nginx site to listen on 443 and redirect HTTP to HTTPS.
+This obtains a Let's Encrypt certificate and updates the managed nginx router config to listen on 443 and redirect HTTP to HTTPS.
 
 ### Syncing Configuration
 

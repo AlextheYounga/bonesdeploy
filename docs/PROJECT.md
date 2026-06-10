@@ -43,7 +43,7 @@ We create a `bonesremote` executable that does not require a password and allows
 ├── hooks.sh                          # shared hook library, sourced by every hook
 ├── server
 │   ├── nginx
-│   │   └── site.conf.j2
+│   │   └── router.conf.j2
 │   ├── playbooks
 │   │   └── setup.yml
 │   └── roles
@@ -280,7 +280,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 - ****remote ssl****
   - Runs the SSL Ansible role against the configured host.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
-  - Re-renders `.bones/remote/nginx/site.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
+  - Re-renders `.bones/remote/nginx/router.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
 
 - **rollback**
   - SSHes into the configured host and runs `bonesremote release rollback --config ...`, which repoints `current` to the previous release without rebuilding.
