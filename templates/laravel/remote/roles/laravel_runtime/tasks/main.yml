@@ -1,51 +1,84 @@
 ---
-- name: Gather running services
-  ansible.builtin.service_facts:
-  tags: [laravel, php]
-
-- name: Resolve php-fpm service name
+- name: Resolve PHP version
   ansible.builtin.set_fact:
-    laravel_php_fpm_service: >-
-      {{
-        (ansible_facts.services.keys() | list | select('match', '^php[0-9.]+-fpm\\.service$') | first | default('php-fpm.service'))
-        | regex_replace('\\.service$', '')
-      }}
+    laravel_php_version_resolved: "{{ laravel_php_version }}"
   tags: [laravel, php]
 
-- name: Resolve php-fpm version and pool config path
+- name: Set PHP-FPM pool config path
   ansible.builtin.set_fact:
-    laravel_php_fpm_pool_config_path: >-
-      {{
-        laravel_php_fpm_pool_config_path
-        if laravel_php_fpm_pool_config_path | length > 0
-        else '/etc/php/' ~ (laravel_php_fpm_service | regex_search('php([0-9.]+)-fpm', '\\1') | first) ~ '/fpm/pool.d/' ~ laravel_php_fpm_pool_name ~ '.conf'
-      }}
-  when: laravel_php_fpm_service is match('^php[0-9.]+-fpm$')
+    laravel_php_fpm_pool_config_path: "/srv/conf/{{ project_name }}/php-fpm.conf"
   tags: [laravel, php]
 
-- name: Ensure php-fpm runtime directory exists for project socket
+- name: Ensure conf directory exists
   ansible.builtin.file:
-    path: "/run/{{ project_name }}"
+    path: "{{ paths.conf_root }}"
     state: directory
-    owner: "{{ service_user }}"
+    owner: root
     group: "{{ group }}"
     mode: "0750"
   tags: [laravel, php]
 
-- name: Configure per-project php-fpm pool
+- name: Ensure storage directories exist
+  ansible.builtin.file:
+    path: "{{ paths.current }}/{{ item }}"
+    state: directory
+    owner: "{{ service_user }}"
+    group: "{{ group }}"
+    mode: "0775"
+  loop:
+    - storage/logs
+    - storage/framework/cache
+    - storage/framework/sessions
+    - storage/framework/views
+  tags: [laravel, php]
+
+- name: Deploy PHP-FPM pool config
   ansible.builtin.template:
     src: php-fpm-pool.conf.j2
     dest: "{{ laravel_php_fpm_pool_config_path }}"
     owner: root
     group: root
     mode: "0644"
-  when: laravel_php_fpm_service is match('^php[0-9.]+-fpm$')
   notify: Restart php-fpm
   tags: [laravel, php]
 
-- name: Ensure php-fpm is enabled and started
+- name: Deploy PHP-FPM systemd service
+  ansible.builtin.template:
+    src: site-php-fpm.service.j2
+    dest: "/etc/systemd/system/{{ project_name }}-php-fpm.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+  tags: [laravel, php]
+
+- name: Deploy PHP-FPM AppArmor profile
+  ansible.builtin.template:
+    src: site-php-fpm-profile.j2
+    dest: "/etc/apparmor.d/bonesdeploy-{{ project_name }}-php-fpm"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload AppArmor profiles
+    - Restart php-fpm
+  tags: [laravel, php]
+
+- name: Load PHP-FPM AppArmor profile
+  ansible.builtin.command:
+    argv:
+      - apparmor_parser
+      - -r
+      - -T
+      - -W
+      - "/etc/apparmor.d/bonesdeploy-{{ project_name }}-php-fpm"
+  changed_when: true
+  tags: [laravel, php]
+
+- name: Enable and start per-project PHP-FPM service
   ansible.builtin.systemd:
-    name: "{{ laravel_php_fpm_service }}"
+    name: "{{ project_name }}-php-fpm.service"
     enabled: true
     state: started
+    daemon_reload: true
   tags: [laravel, php]

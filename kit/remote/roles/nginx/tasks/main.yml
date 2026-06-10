@@ -1,4 +1,17 @@
 ---
+- name: Create per-project runtime group
+  ansible.builtin.group:
+    name: "{{ project_name }}"
+    system: true
+  tags: [nginx]
+
+- name: Add service user to project group
+  ansible.builtin.user:
+    name: "{{ service_user }}"
+    groups: "{{ project_name }}"
+    append: true
+  tags: [nginx]
+
 - name: Ensure socket directory exists
   ansible.builtin.file:
     path: "{{ paths.runtime_socket_dir }}"
