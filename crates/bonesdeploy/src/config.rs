@@ -1,5 +1,6 @@
+use std::env;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -158,6 +159,15 @@ pub fn default_project_root_for(project_name: &str) -> String {
 
 pub fn default_web_root() -> String {
     paths::default_web_root()
+}
+
+pub fn bones_config_dir(project_name: &str) -> PathBuf {
+    paths::bones_config_root().join(format!("{project_name}.bones"))
+}
+
+pub fn repo_directory_name() -> Result<String> {
+    let cwd = env::current_dir()?;
+    Ok(cwd.file_name().map_or_else(|| String::from("project"), |n| n.to_string_lossy().to_string()))
 }
 
 pub fn load(path: &Path) -> Result<BonesConfig> {

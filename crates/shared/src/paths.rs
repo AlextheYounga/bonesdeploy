@@ -1,3 +1,4 @@
+use std::env;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -199,4 +200,9 @@ fn parent_or_default(path: &str, fallback: &str) -> String {
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .map_or_else(|| fallback.to_string(), |parent| parent.display().to_string())
+}
+
+pub fn bones_config_root() -> PathBuf {
+    let home = env::var("HOME").unwrap_or_else(|_| "/root".into());
+    Path::new(&home).join(".config/bonesdeploy")
 }

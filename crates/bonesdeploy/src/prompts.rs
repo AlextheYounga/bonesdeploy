@@ -35,13 +35,21 @@ pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bon
         .map(|cfg| cfg.data.project_name.as_str())
         .filter(|value| !value.is_empty())
         .unwrap_or(project_name_hint);
-    Text::new("Project name:").with_default(default_project_name).prompt().map_err(|err| anyhow!(err))
+    Text::new("Project name:")
+        .with_default(default_project_name)
+        .prompt()
+        .map(|value| value.trim().to_string())
+        .map_err(|err| anyhow!(err))
 }
 
 pub fn prompt_branch(existing_config: Option<&BonesConfig>) -> Result<String> {
     let default_branch =
         existing_config.map(|cfg| cfg.data.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("main");
-    Text::new("Branch:").with_default(default_branch).prompt().map_err(|err| anyhow!(err))
+    Text::new("Branch:")
+        .with_default(default_branch)
+        .prompt()
+        .map(|value| value.trim().to_string())
+        .map_err(|err| anyhow!(err))
 }
 
 pub fn prompt_remote_name(existing_config: Option<&BonesConfig>) -> Result<String> {
@@ -129,6 +137,7 @@ pub fn prompt_host(
         .with_default(default_host)
         .with_help_message("e.g. deploy.example.com or 203.0.113.10")
         .prompt()
+        .map(|value| value.trim().to_string())
         .map_err(|err| anyhow!(err))
 }
 
@@ -142,7 +151,11 @@ pub fn prompt_port(
 
     let default_port =
         existing_config.map(|cfg| cfg.data.port.as_str()).filter(|value| !value.is_empty()).unwrap_or("22");
-    Text::new("SSH port:").with_default(default_port).prompt().map_err(|err| anyhow!(err))
+    Text::new("SSH port:")
+        .with_default(default_port)
+        .prompt()
+        .map(|value| value.trim().to_string())
+        .map_err(|err| anyhow!(err))
 }
 
 pub fn confirm_remote_setup() -> Result<bool> {
@@ -192,6 +205,7 @@ fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<Stri
         .with_default(default_remote)
         .with_help_message("bonesdeploy will add this local git remote if it does not exist")
         .prompt()
+        .map(|value| value.trim().to_string())
         .map_err(|err| anyhow!(err))
 }
 
@@ -202,6 +216,7 @@ pub fn prompt_ssl_domain(existing_config: Option<&BonesConfig>) -> Result<String
         .with_default(default_domain)
         .with_help_message("e.g. app.example.com")
         .prompt()
+        .map(|value| value.trim().to_string())
         .map_err(|err| anyhow!(err))
 }
 
@@ -212,6 +227,7 @@ pub fn prompt_ssl_email(existing_config: Option<&BonesConfig>) -> Result<String>
         .with_default(default_email)
         .with_help_message("e.g. ops@example.com")
         .prompt()
+        .map(|value| value.trim().to_string())
         .map_err(|err| anyhow!(err))
 }
 

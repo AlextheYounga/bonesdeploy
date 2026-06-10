@@ -17,13 +17,13 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let mut cfg = config::load(bones_yaml)?;
 
     if let Some(value) = domain {
-        cfg.ssl.domain = value;
+        cfg.ssl.domain = value.trim().to_string();
     } else if cfg.ssl.domain.is_empty() {
         cfg.ssl.domain = prompts::prompt_ssl_domain(Some(&cfg))?;
     }
 
     if let Some(value) = email {
-        cfg.ssl.email = value;
+        cfg.ssl.email = value.trim().to_string();
     } else if cfg.ssl.email.is_empty() {
         cfg.ssl.email = prompts::prompt_ssl_email(Some(&cfg))?;
     }

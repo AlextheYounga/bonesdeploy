@@ -1,4 +1,5 @@
 use std::fs;
+use std::os::unix::fs as unix_fs;
 use std::path::Path;
 use std::process::Command;
 
@@ -26,8 +27,13 @@ pub fn run() -> Result<()> {
 
     println!("Pulling .bones/ from {remote_bones}...");
 
-    fs::create_dir_all(config::Constants::BONES_DIR)
-        .with_context(|| format!("Failed to create {}", config::Constants::BONES_DIR))?;
+    let bones_dir = Path::new(config::Constants::BONES_DIR);
+    if !bones_dir.exists() {
+        let project_name = config::repo_directory_name()?;
+        let config_dir = config::bones_config_dir(&project_name);
+        fs::create_dir_all(&config_dir)?;
+        unix_fs::symlink(&config_dir, bones_dir)?;
+    }
 
     rsync_bones(&target)?;
     init::symlink_pre_push()?;
