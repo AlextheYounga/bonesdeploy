@@ -97,7 +97,7 @@ pub fn infer_remote_connection_details(remote_name: &str) -> Result<Option<Remot
 }
 
 fn parse_remote_url(url: &str) -> Option<RemoteConnectionDetails> {
-    parse_ssh_style_url(url).or_else(|| parse_scp_style_url(url))
+    parse_ssh_style_url(url.trim()).or_else(|| parse_scp_style_url(url.trim()))
 }
 
 fn parse_ssh_style_url(url: &str) -> Option<RemoteConnectionDetails> {
@@ -107,13 +107,15 @@ fn parse_ssh_style_url(url: &str) -> Option<RemoteConnectionDetails> {
 
     let without_scheme = &url[6..];
     let slash_index = without_scheme.find('/')?;
-    let authority = &without_scheme[..slash_index];
-    let path = &without_scheme[slash_index..];
+    let authority = without_scheme[..slash_index].trim();
+    let path = without_scheme[slash_index..].trim();
 
     let host_port = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
     let (host, port) = match host_port.split_once(':') {
-        Some((host, port)) if !host.is_empty() && !port.is_empty() => (host.to_string(), port.to_string()),
-        _ => (host_port.to_string(), String::from("22")),
+        Some((host, port)) if !host.trim().is_empty() && !port.trim().is_empty() => {
+            (host.trim().to_string(), port.trim().to_string())
+        }
+        _ => (host_port.trim().to_string(), String::from("22")),
     };
 
     if host.is_empty() || !has_git_extension(path) {
@@ -129,11 +131,12 @@ fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
     }
 
     let (left, right) = url.split_once(':')?;
-    let host = left.rsplit_once('@').map_or(left, |(_, host)| host);
-    if !right.starts_with('/') {
+    let host = left.rsplit_once('@').map_or(left, |(_, host)| host).trim();
+    let repo_path = right.trim();
+    if !repo_path.starts_with('/') {
         return None;
     }
-    let repo_path = right.to_string();
+    let repo_path = repo_path.to_string();
 
     if host.is_empty() || !has_git_extension(&repo_path) {
         return None;
@@ -201,6 +204,19 @@ mod tests {
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
             assert_eq!(details.repo_path, repo_path("myapp"));
+        }
+    }
+
+    /// Trims whitespace around the host and path in an SCP-style remote URL.
+    #[test]
+    fn parse_scp_style_url_trims_surrounding_whitespace() {
+        let details = parse_scp_style_url("git@example.com : /home/git/myapp.git");
+        assert!(details.is_some());
+        if let Some(details) = details {
+            assert_eq!(details.user, "git");
+            assert_eq!(details.host, "example.com");
+            assert_eq!(details.port, "22");
+            assert_eq!(details.repo_path, "/home/git/myapp.git");
         }
     }
 

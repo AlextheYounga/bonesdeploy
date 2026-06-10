@@ -118,8 +118,11 @@ fn collect_from_seed(
     existing_config: Option<&config::BonesConfig>,
     args: &InitArgs,
 ) -> Result<config::BonesConfig> {
-    let project_name =
-        cli_or_prompt(args.project_name.as_ref(), || prompts::prompt_project_name(project_name_hint, existing_config))?;
+    let project_name = cli_existing_or_prompt(
+        args.project_name.as_ref(),
+        existing_config.and_then(|cfg| init_config::non_empty(&cfg.data.project_name)),
+        || prompts::prompt_project_name(project_name_hint, existing_config),
+    )?;
     let branch = cli_or_prompt(args.branch.as_ref(), || prompts::prompt_branch(existing_config))?;
     let remote_name = cli_or_prompt(args.remote.as_ref(), || prompts::prompt_remote_name(existing_config))?;
     let inferred_remote =
@@ -203,6 +206,17 @@ fn cli_or_prompt(cli_value: Option<&String>, prompt: impl FnOnce() -> Result<Str
     }
 }
 
+fn cli_existing_or_prompt(
+    cli_value: Option<&String>,
+    existing_value: Option<String>,
+    prompt: impl FnOnce() -> Result<String>,
+) -> Result<String> {
+    match cli_value {
+        Some(v) if !v.is_empty() => Ok(v.trim().to_string()),
+        _ => existing_value.map_or_else(prompt, Ok),
+    }
+}
+
 fn load_or_collect_config(bones_yaml: &Path, args: &InitArgs) -> Result<config::BonesConfig> {
     if bones_yaml.exists() {
         let existing = config::load(bones_yaml)?;
@@ -210,7 +224,6 @@ fn load_or_collect_config(bones_yaml: &Path, args: &InitArgs) -> Result<config::
             println!("Loading existing config from {}...", config::Constants::BONES_YAML);
             return Ok(existing);
         }
-        println!("Config is incomplete, running prompts...");
         let project_name = config::repo_directory_name()?;
         if args.non_interactive {
             return init_config::collect_non_interactive(&project_name, Some(&existing), args);

@@ -167,6 +167,7 @@ fn build_config(
 }
 
 pub fn non_empty(value: &str) -> Option<String> {
+    let value = value.trim();
     (!value.is_empty()).then(|| value.to_string())
 }
 
