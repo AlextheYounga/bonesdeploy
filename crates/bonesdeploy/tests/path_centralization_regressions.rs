@@ -26,13 +26,13 @@ fn update_deploy_uses_cargo_install_from_git() {
 /// Ensures runtime deploy maintains apparmor_profile_path derived from profile name pattern.
 #[test]
 fn runtime_deploy_derives_profile_path_from_profile_name() {
-    let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/runtime/deploy.py");
+    let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/infra/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("bonesdeploy-{data['project_name']}-nginx"),
+        content.contains("bonesdeploy-{DEPLOY_DATA.project_name}-nginx"),
         "runtime deploy must derive profile name from project name\n{content}"
     );
     assert!(

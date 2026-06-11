@@ -1,0 +1,2 @@
+SETUP_LABEL = "Next.js"
+SETUP_APT_EXTRAS = []

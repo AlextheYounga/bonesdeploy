@@ -5,7 +5,7 @@ use super::project_root;
 /// Uses resolved placeholder web root paths in the setup deploy script.
 #[test]
 fn setup_deploy_uses_placeholder_web_root_paths() {
-    let deploy = project_root().join("kit/setup/deploy.py");
+    let deploy = project_root().join("kit/infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -23,7 +23,7 @@ fn setup_deploy_uses_placeholder_web_root_paths() {
 /// Uses the resolved current web root for certbot validation in the SSL deploy.
 #[test]
 fn ssl_deploy_uses_current_web_root_path_manifest() {
-    let deploy = project_root().join("kit/runtime/deploy_ssl.py");
+    let deploy = project_root().join("kit/infra/ssl.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -37,7 +37,7 @@ fn ssl_deploy_uses_current_web_root_path_manifest() {
 /// Uses resolved paths in both router nginx and AppArmor templates.
 #[test]
 fn nginx_and_apparmor_templates_use_resolved_paths() {
-    let nginx_site = project_root().join("kit/runtime/nginx/router.conf.j2");
+    let nginx_site = project_root().join("kit/infra/assets/nginx/router.conf.j2");
     let nginx_conf = fs::read_to_string(&nginx_site);
     assert!(nginx_conf.is_ok(), "failed to read {}", nginx_site.display());
     let nginx_conf = nginx_conf.unwrap_or_default();
@@ -51,7 +51,7 @@ fn nginx_and_apparmor_templates_use_resolved_paths() {
         "nginx router template must not claim the default server on shared hosts\n{nginx_conf}"
     );
 
-    let apparmor = project_root().join("kit/runtime/apparmor/project-nginx-profile.j2");
+    let apparmor = project_root().join("kit/infra/assets/apparmor/project-nginx-profile.j2");
     let apparmor_conf = fs::read_to_string(&apparmor);
     assert!(apparmor_conf.is_ok(), "failed to read {}", apparmor.display());
     let apparmor_conf = apparmor_conf.unwrap_or_default();
@@ -73,7 +73,7 @@ fn nginx_and_apparmor_templates_use_resolved_paths() {
 /// Defines router template and nginx_defaults in the SSL deploy as self-contained deployment.
 #[test]
 fn ssl_deploy_defines_nginx_defaults_inline() {
-    let deploy = project_root().join("kit/runtime/deploy_ssl.py");
+    let deploy = project_root().join("kit/infra/ssl.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();

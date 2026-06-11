@@ -4,7 +4,7 @@ use std::path::Path;
 /// Creates the project root parent directory with traversable permissions before the placeholder release.
 #[test]
 fn setup_deploy_creates_project_root_parent_before_placeholder() {
-    let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/setup/deploy.py");
+    let deploy = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();

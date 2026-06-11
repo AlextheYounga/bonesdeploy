@@ -33,11 +33,9 @@ def _load_optional_module(module_path, module_name):
 
 
 # Template-specific pre-package setup
-if DEPLOY_DATA.get("setup_pre_packages_enabled", False):
-    _load_optional_module(
-        os.path.join(os.path.dirname(__file__), "pre_packages.py"),
-        "pre_packages",
-    )
+pre_packages_path = os.path.join(os.path.dirname(__file__), "pre_packages.py")
+if os.path.exists(pre_packages_path):
+    _load_optional_module(pre_packages_path, "pre_packages")
 
 # Install setup apt packages
 apt.packages(

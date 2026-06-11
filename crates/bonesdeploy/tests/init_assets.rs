@@ -12,17 +12,6 @@ const TEMPLATES: [&str; 7] = [
     "templates/vue/bones.yaml",
 ];
 
-// These probably aren't necessary anymore
-const TEMPLATE_SETUP_VARS_FILES: [&str; 7] = [
-    "templates/django/runtime/vars/setup.yml",
-    "templates/laravel/runtime/vars/setup.yml",
-    "templates/next/runtime/vars/setup.yml",
-    "templates/nuxt/runtime/vars/setup.yml",
-    "templates/rails/runtime/vars/setup.yml",
-    "templates/sveltekit/runtime/vars/setup.yml",
-    "templates/vue/runtime/vars/setup.yml",
-];
-
 #[path = "init_assets/apparmor.rs"]
 mod apparmor;
 #[path = "init_assets/firewall.rs"]

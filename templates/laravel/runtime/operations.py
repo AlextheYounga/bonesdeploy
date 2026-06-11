@@ -1,8 +1,29 @@
+SETUP_LABEL = "Laravel"
+LARAVEL_PHP_VERSION = "8.3"
+SETUP_APT_EXTRAS = [
+    f"php{LARAVEL_PHP_VERSION}",
+    f"php{LARAVEL_PHP_VERSION}-cli",
+    f"php{LARAVEL_PHP_VERSION}-fpm",
+    f"php{LARAVEL_PHP_VERSION}-bcmath",
+    f"php{LARAVEL_PHP_VERSION}-curl",
+    f"php{LARAVEL_PHP_VERSION}-gd",
+    f"php{LARAVEL_PHP_VERSION}-intl",
+    f"php{LARAVEL_PHP_VERSION}-mbstring",
+    f"php{LARAVEL_PHP_VERSION}-mysql",
+    f"php{LARAVEL_PHP_VERSION}-sqlite3",
+    f"php{LARAVEL_PHP_VERSION}-xml",
+    f"php{LARAVEL_PHP_VERSION}-zip",
+    "composer",
+]
+
+
 import os
 
+from pyinfra import host
 from pyinfra.operations import files, server, systemd
 
 here = os.path.dirname(__file__)
+data = host.data
 
 pool_config_path = f"/srv/conf/{data['project_name']}/php-fpm.conf"
 
@@ -73,7 +94,7 @@ files.template(
     group="root",
     mode="0644",
     laravel_php_fpm_pool_config_path=pool_config_path,
-    laravel_php_version_resolved=data.get("laravel_php_version", "8.3"),
+    laravel_php_version_resolved=data.get("laravel_php_version", LARAVEL_PHP_VERSION),
     apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm",
     **data,
     _sudo=True,

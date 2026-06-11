@@ -21,7 +21,7 @@ if pkgs:
     )
 
 # Template-specific runtime setup
-if DEPLOY_DATA.get("runtime_role"):
+if DEPLOY_DATA.get("template"):
     ops_path = os.path.join(os.path.dirname(__file__), "operations.py")
     if os.path.exists(ops_path):
         spec = importlib.util.spec_from_file_location("operations", ops_path)
@@ -48,7 +48,7 @@ apparmor_profile_path = f"/etc/apparmor.d/{apparmor_profile_name}"
 
 files.template(
     name="Deploy per-project apparmor profile",
-    src=os.path.join(os.path.dirname(__file__), "apparmor/project-nginx-profile.j2"),
+    src=os.path.join(os.path.dirname(__file__), "assets/apparmor/project-nginx-profile.j2"),
     dest=apparmor_profile_path,
     user="root",
     group="root",
@@ -109,7 +109,7 @@ here = os.path.dirname(__file__)
 
 files.template(
     name="Deploy per-site nginx config",
-    src=os.path.join(here, "nginx/site-nginx.conf.j2"),
+    src=os.path.join(here, "assets/nginx/site-nginx.conf.j2"),
     dest=PATHS["site_nginx_config"],
     user="root",
     group=DEPLOY_DATA.group,
@@ -120,7 +120,7 @@ files.template(
 
 files.template(
     name="Deploy per-site nginx systemd service",
-    src=os.path.join(here, "nginx/site-nginx.service.j2"),
+    src=os.path.join(here, "assets/nginx/site-nginx.service.j2"),
     dest=PATHS["systemd_site_nginx_service"],
     user="root",
     group="root",
@@ -139,7 +139,7 @@ nginx_ssl_enabled = bool(DEPLOY_DATA.get("ssl_cert_path") and DEPLOY_DATA.get("s
 
 files.template(
     name="Deploy router nginx config",
-    src=os.path.join(here, "nginx/router.conf.j2"),
+    src=os.path.join(here, "assets/nginx/router.conf.j2"),
     dest=PATHS["nginx_site_available"],
     user="root",
     group="root",

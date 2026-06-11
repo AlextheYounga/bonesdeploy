@@ -74,7 +74,7 @@ fn ensure_runtime_assets_exist() -> Result<()> {
         bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
     }
 
-    let runtime_deploy = bones_dir.join("runtime/deploy.py");
+    let runtime_deploy = bones_dir.join("infra/runtime.py");
     if !runtime_deploy.is_file() {
         embedded::scaffold_runtime_base(bones_dir)?;
     }

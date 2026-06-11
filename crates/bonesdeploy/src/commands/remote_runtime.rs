@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, anyhow, bail};
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 use crate::commands::remote_setup;
 use crate::config;
@@ -42,7 +42,7 @@ pub fn run() -> Result<()> {
     embedded::scaffold_runtime_template(&template_name, bones_dir)?;
 
     if existing_template.as_deref() != Some(template_name.as_str()) || !runtime_yaml.is_file() {
-        let mut runtime = parse_runtime_defaults(&template_name)?;
+        let mut runtime = serde_json::Map::new();
         runtime.insert(String::from("template"), Value::String(template_name.clone()));
         config::save_runtime(&runtime, runtime_yaml)?;
         println!("Saved runtime config to {}", config::Constants::BONES_RUNTIME_YAML);
@@ -72,12 +72,8 @@ pub fn run() -> Result<()> {
 }
 
 fn build_runtime_data_vars(cfg: &config::BonesConfig, runtime_yaml: &Path) -> Result<Value> {
-    let paths = DeploymentPaths::new(
-        &cfg.data.project_name,
-        &cfg.data.repo_path,
-        &cfg.data.project_root,
-        &cfg.data.web_root,
-    );
+    let paths =
+        DeploymentPaths::new(&cfg.data.project_name, &cfg.data.repo_path, &cfg.data.project_root, &cfg.data.web_root);
     let mut vars = serde_json::Map::new();
 
     vars.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
@@ -99,16 +95,7 @@ fn build_runtime_data_vars(cfg: &config::BonesConfig, runtime_yaml: &Path) -> Re
     Ok(Value::Object(vars))
 }
 
-fn parse_runtime_defaults(template_name: &str) -> Result<Map<String, Value>> {
-    let content = embedded::read_template_runtime_vars(template_name)?;
-    let value: Value = serde_yml::from_str(&content)?;
-    match value {
-        Value::Object(map) => Ok(map),
-        _ => bail!("Template runtime vars for {template_name} must contain a YAML object"),
-    }
-}
-
-fn runtime_template_name(runtime: &Map<String, Value>) -> Option<String> {
+fn runtime_template_name(runtime: &serde_json::Map<String, Value>) -> Option<String> {
     runtime.get("template").and_then(Value::as_str).map(str::to_string)
 }
 

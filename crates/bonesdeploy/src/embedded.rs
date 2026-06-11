@@ -18,7 +18,7 @@ struct Templates;
 
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
-        if file_path.starts_with("runtime/") {
+        if file_path.starts_with("infra/") {
             continue;
         }
 
@@ -32,7 +32,7 @@ pub fn scaffold(bones_dir: &Path) -> Result<()> {
 
 pub fn scaffold_runtime_base(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
-        if !file_path.starts_with("runtime/") {
+        if !file_path.starts_with("infra/") {
             continue;
         }
 
@@ -45,8 +45,6 @@ pub fn scaffold_runtime_base(bones_dir: &Path) -> Result<()> {
 
     Ok(())
 }
-
-// What does this do?
 pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Result<()> {
     let prefix = format!("{template_name}/runtime/");
     let mut found = false;
@@ -62,10 +60,6 @@ pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Resul
 
         found = true;
         let relative_path = file_path.trim_start_matches(&prefix);
-        if relative_path == "vars/setup.yml" {
-            continue;
-        }
-		// Specifically, why are we checking that this exists? Why do we still need this?
 
         write_asset(bones_dir, &format!("runtime/{relative_path}"), asset.data.as_ref())?;
     }
@@ -78,18 +72,6 @@ pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Resul
     }
 
     Ok(())
-}
-
-pub fn read_template_runtime_vars(template_name: &str) -> Result<String> {
-    let path = format!("{template_name}/runtime/vars/setup.yml");
-    let Some(file) = Templates::get(&path) else {
-        bail!(
-            "Embedded runtime vars not found for template: {template_name}. Available templates: {}",
-            available_templates().join(", ")
-        );
-    };
-
-    Ok(String::from_utf8_lossy(file.data.as_ref()).to_string())
 }
 
 pub fn read_template_bones_config(template_name: &str) -> Result<String> {

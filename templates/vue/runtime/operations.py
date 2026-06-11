@@ -1,0 +1,2 @@
+SETUP_LABEL = "Vue"
+SETUP_APT_EXTRAS = []
