@@ -205,10 +205,6 @@ The setup process can be customized by editing `.bones/infra/setup.py`. The depl
 
 Edit the `SETUP_APT_PACKAGES` list in `.bones/infra/setup.py` or override via `setup_apt_packages` in your pyinfra data vars.
 
-### Adding Pre-Package Hooks
-
-Place a `pre_packages.py` file in `.bones/infra/` alongside `setup.py`. It will be loaded and its `pre_packages` function called before package installation.
-
 ---
 
 ## Error Scenarios

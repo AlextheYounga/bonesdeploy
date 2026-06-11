@@ -26,11 +26,6 @@ SETUP_APT_PACKAGES = [
 DEPLOY_DATA = unflatten(host.data.dict())
 PATHS = DEPLOY_DATA.get("paths", {})
 
-# Template-specific pre-package setup
-pre_packages_path = os.path.join(os.path.dirname(__file__), "pre_packages.py")
-if os.path.exists(pre_packages_path):
-    load_optional_module(pre_packages_path, "pre_packages")
-
 # Install setup apt packages
 apt.packages(
     name="Install setup apt packages",

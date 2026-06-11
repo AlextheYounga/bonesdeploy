@@ -77,20 +77,6 @@ fn shared_setup_deploy_starts_packages_before_users_and_rustup() {
     assert!(users_idx < rustup_idx, "user setup should run before rustup bootstrap\n{content}");
 }
 
-/// Runs template-specific pre-package setup before installing the shared apt package manifest.
-#[test]
-fn shared_setup_deploy_runs_pre_package_hook_before_setup_apt_packages() {
-    let deploy = project_root().join("infra/setup.py");
-    let content = fs::read_to_string(&deploy);
-    assert!(content.is_ok(), "failed to read {}", deploy.display());
-    let content = content.unwrap_or_default();
-
-    assert!(
-        content.contains("pre_packages.py"),
-        "shared setup deploy must load the template pre_packages module\n{content}"
-    );
-}
-
 /// Leaves per-site runtime roles out of the shared setup deploy.
 #[test]
 fn shared_setup_deploy_keeps_runtime_roles_out() {
