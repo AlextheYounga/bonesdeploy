@@ -1,19 +1,4 @@
 ---
-- name: Start nvm install for deploy user
-  become_user: "{{ deploy_user }}"
-  ansible.builtin.shell: |
-    set -euo pipefail
-    curl -o- {{ nvm_install_script_url }} | bash
-  args:
-    executable: /bin/bash
-    creates: "{{ nvm_dir }}/nvm.sh"
-  environment:
-    HOME: "/home/{{ deploy_user }}"
-  async: 1800
-  poll: 0
-  register: common_nvm_job
-  tags: [common, nvm]
-
 - name: Ensure bare repo parent directory exists
   ansible.builtin.file:
     path: "{{ paths.repo_parent }}"
@@ -119,59 +104,6 @@
   register: common_bonesremote_job
   tags: [common, bonesremote]
 
-- name: Wait for nvm install
-  become_user: "{{ deploy_user }}"
-  ansible.builtin.async_status:
-    jid: "{{ common_nvm_job.ansible_job_id }}"
-  register: common_nvm_result
-  until: common_nvm_result.finished
-  retries: 180
-  delay: 10
-  when: common_nvm_job is defined and common_nvm_job.ansible_job_id is defined
-  tags: [common, nvm]
-
-- name: Ensure nvm initialization is present for deploy user
-  ansible.builtin.lineinfile:
-    path: "/home/{{ deploy_user }}/.bashrc"
-    line: "{{ item }}"
-    state: present
-    create: true
-    owner: "{{ deploy_user }}"
-    group: "{{ deploy_user }}"
-    mode: "0644"
-  loop: "{{ nvm_init_snippet }}"
-  tags: [common, nvm]
-
-- name: Verify nvm for deploy user
-  become_user: "{{ deploy_user }}"
-  ansible.builtin.shell: |
-    set -euo pipefail
-    export NVM_DIR="{{ nvm_dir }}"
-    . "${NVM_DIR}/nvm.sh"
-    nvm --version
-  args:
-    executable: /bin/bash
-  environment:
-    HOME: "/home/{{ deploy_user }}"
-  changed_when: false
-  tags: [common, nvm]
-
-- name: Start latest LTS Node install with nvm for deploy user
-  become_user: "{{ deploy_user }}"
-  ansible.builtin.shell: |
-    set -euo pipefail
-    export NVM_DIR="{{ nvm_dir }}"
-    . "${NVM_DIR}/nvm.sh"
-    nvm install --lts
-  args:
-    executable: /bin/bash
-  environment:
-    HOME: "/home/{{ deploy_user }}"
-  async: 1800
-  poll: 0
-  register: common_node_lts_job
-  tags: [common, nvm]
-
 - name: Wait for bonesremote binary install
   ansible.builtin.async_status:
     jid: "{{ common_bonesremote_job.ansible_job_id }}"
@@ -181,17 +113,6 @@
   delay: 10
   when: common_bonesremote_job is defined and common_bonesremote_job.ansible_job_id is defined
   tags: [common, bonesremote]
-
-- name: Wait for latest LTS Node install
-  become_user: "{{ deploy_user }}"
-  ansible.builtin.async_status:
-    jid: "{{ common_node_lts_job.ansible_job_id }}"
-  register: common_node_lts_result
-  until: common_node_lts_result.finished
-  retries: 180
-  delay: 10
-  when: common_node_lts_job is defined and common_node_lts_job.ansible_job_id is defined
-  tags: [common, nvm]
 
 - name: Run bonesremote init
   ansible.builtin.command:

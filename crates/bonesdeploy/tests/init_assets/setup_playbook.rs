@@ -126,24 +126,6 @@ fn common_role_runs_toolchain_installers_as_async_jobs() {
     );
 }
 
-/// Waits for deploy-user async jobs under the deploy user context.
-#[test]
-fn common_role_waits_for_deploy_user_async_jobs_as_deploy_user() {
-    let tasks = project_root().join("kit/setup/roles/common/tasks/main.yml");
-    let content = fs::read_to_string(&tasks);
-    assert!(content.is_ok(), "failed to read {}", tasks.display());
-    let content = content.unwrap_or_default();
-
-    assert!(
-        content.contains("Wait for nvm install\n  become_user: \"{{ deploy_user }}\""),
-        "common role must wait for nvm install as deploy_user so async status reads the correct job file\n{content}"
-    );
-    assert!(
-        content.contains("Wait for latest LTS Node install\n  become_user: \"{{ deploy_user }}\""),
-        "common role must wait for node install as deploy_user so async status reads the correct job file\n{content}"
-    );
-}
-
 /// Verifies template-specific playbooks are removed in favor of shared kit setup logic.
 #[test]
 fn template_playbooks_include_apparmor_role() {
