@@ -141,6 +141,7 @@ mod tests {
         }
     }
 
+    /// Passes the SSL domain and email into the data vars sent to the pyinfra SSL deploy.
     #[test]
     fn ssl_data_vars_includes_domain_and_email() {
         let cfg = test_cfg();

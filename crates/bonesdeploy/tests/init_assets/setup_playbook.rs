@@ -91,23 +91,6 @@ fn shared_setup_deploy_runs_pre_package_hook_before_setup_apt_packages() {
     );
 }
 
-/// Verifies template-specific playbooks are removed in favor of shared kit setup logic.
-#[test]
-fn template_playbooks_do_not_exist() {
-    for path in [
-        "templates/django/runtime/playbooks/setup.yml",
-        "templates/laravel/runtime/playbooks/setup.yml",
-        "templates/next/runtime/playbooks/setup.yml",
-        "templates/nuxt/runtime/playbooks/setup.yml",
-        "templates/rails/runtime/playbooks/setup.yml",
-        "templates/sveltekit/runtime/playbooks/setup.yml",
-        "templates/vue/runtime/playbooks/setup.yml",
-    ] {
-        let p = project_root().join(path);
-        assert!(!p.exists(), "template playbook {path} should be removed in favor of shared kit setup logic");
-    }
-}
-
 /// Leaves per-site runtime roles out of the shared setup deploy.
 #[test]
 fn shared_setup_deploy_keeps_runtime_roles_out() {

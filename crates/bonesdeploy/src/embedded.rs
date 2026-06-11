@@ -98,14 +98,6 @@ pub fn available_templates() -> Vec<String> {
     templates.into_iter().collect()
 }
 
-pub fn read_asset(path: &str) -> Result<String> {
-    if let Some(file) = Kit::get(path) {
-        return Ok(String::from_utf8_lossy(file.data.as_ref()).to_string());
-    }
-
-    bail!("Embedded asset not found: {path}")
-}
-
 fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()> {
     let dest = bones_dir.join(relative_path);
 
@@ -127,15 +119,13 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::read_asset;
-
     /// Does not pass a `--config` flag to the doctor command in the hooks script.
     #[test]
     fn hooks_script_does_not_pass_config_to_doctor() {
-        let hooks_script = read_asset("hooks/hooks.sh");
-        assert!(hooks_script.is_ok(), "hooks.sh should be embedded");
+        let hooks_script = super::Kit::get("hooks/hooks.sh");
+        assert!(hooks_script.is_some(), "hooks.sh should be embedded");
 
-        let hooks_script = hooks_script.unwrap_or_default();
+        let hooks_script = String::from_utf8_lossy(hooks_script.unwrap().data.as_ref()).to_string();
         assert!(!hooks_script.contains("bonesremote doctor --config"));
     }
 }

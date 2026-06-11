@@ -1,28 +1,6 @@
 use std::fs;
 use std::path::Path;
 
-/// Verifies the update deploy uses cargo install --git like the setup deploy.
-#[test]
-fn update_deploy_uses_cargo_install_from_git() {
-    let src = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/commands/update_release.rs");
-    let content = fs::read_to_string(&src);
-    assert!(content.is_ok(), "failed to read {}", src.display());
-    let content = content.unwrap_or_default();
-
-    assert!(
-        content.contains("cargo install") && content.contains("--git"),
-        "update must use cargo install --git for bonesremote\n{content}"
-    );
-    assert!(
-        content.contains("write_update_deploy_file"),
-        "update must generate a pyinfra deploy file for remote update\n{content}"
-    );
-    assert!(
-        !content.contains("bonesremote_staging_path"),
-        "update must not use release-style staged binary uploads\n{content}"
-    );
-}
-
 /// Ensures runtime deploy maintains apparmor_profile_path derived from profile name pattern.
 #[test]
 fn runtime_deploy_derives_profile_path_from_profile_name() {
