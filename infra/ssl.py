@@ -2,19 +2,7 @@ import os
 
 from pyinfra import host
 from pyinfra.operations import files, server, systemd
-
-
-def _unflatten(data_dict):
-    result = {}
-    for key, value in data_dict.items():
-        parts = key.split(".")
-        node = result
-        for part in parts[:-1]:
-            if part not in node:
-                node[part] = {}
-            node = node[part]
-        node[parts[-1]] = value
-    return result
+from utils import unflatten
 
 
 here = os.path.dirname(__file__)

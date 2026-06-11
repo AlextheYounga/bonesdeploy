@@ -9,22 +9,34 @@ use rust_embed::Embed;
 use crate::config;
 
 #[derive(Embed)]
-#[folder = "../../kit/"]
+#[folder = "./embeds/kit/"]
+struct Kit;
+
+#[derive(Embed)]
+#[folder = "../../infra"]
 #[exclude = "infra/__pycache__/**"]
 #[exclude = "infra/.venv/**"]
 #[exclude = "infra/.gitignore"]
 #[exclude = "infra/.python-version"]
 #[exclude = "infra/pyproject.toml"]
 #[exclude = "infra/uv.lock"]
-struct Kit;
+struct Infra;
+
 
 #[derive(Embed)]
-#[folder = "../../templates/"]
+#[folder = "./embeds/templates/"]
 struct Templates;
 
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
         let Some(asset) = Kit::get(&file_path) else {
+            continue;
+        };
+        write_asset(bones_dir, file_path.as_ref(), asset.data.as_ref())?;
+    }
+
+    for file_path in Infra::iter() {
+        let Some(asset) = Infra::get(&file_path) else {
             continue;
         };
         write_asset(bones_dir, file_path.as_ref(), asset.data.as_ref())?;
