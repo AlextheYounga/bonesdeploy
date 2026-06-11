@@ -14,14 +14,14 @@ struct Kit;
 
 #[derive(Embed)]
 #[folder = "../../infra"]
-#[exclude = "infra/__pycache__/**"]
-#[exclude = "infra/.venv/**"]
-#[exclude = "infra/.gitignore"]
-#[exclude = "infra/.python-version"]
-#[exclude = "infra/pyproject.toml"]
-#[exclude = "infra/uv.lock"]
+#[exclude = "__pycache__/**"]
+#[exclude = ".venv/**"]
+#[exclude = ".gitignore"]
+#[exclude = "README.md"]
+#[exclude = ".python-version"]
+#[exclude = "pyproject.toml"]
+#[exclude = "uv.lock"]
 struct Infra;
-
 
 #[derive(Embed)]
 #[folder = "./embeds/templates/"]
@@ -39,22 +39,18 @@ pub fn scaffold(bones_dir: &Path) -> Result<()> {
         let Some(asset) = Infra::get(&file_path) else {
             continue;
         };
-        write_asset(bones_dir, file_path.as_ref(), asset.data.as_ref())?;
+        write_asset(bones_dir, &format!("infra/{file_path}"), asset.data.as_ref())?;
     }
     Ok(())
 }
 
 pub fn scaffold_runtime_base(bones_dir: &Path) -> Result<()> {
-    for file_path in Kit::iter() {
-        if !file_path.starts_with("infra/") {
-            continue;
-        }
-
-        let Some(asset) = Kit::get(&file_path) else {
+    for file_path in Infra::iter() {
+        let Some(asset) = Infra::get(&file_path) else {
             continue;
         };
 
-        write_asset(bones_dir, file_path.as_ref(), asset.data.as_ref())?;
+        write_asset(bones_dir, &format!("infra/{file_path}"), asset.data.as_ref())?;
     }
 
     Ok(())

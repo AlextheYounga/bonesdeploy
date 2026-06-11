@@ -1,11 +1,15 @@
 use std::fs;
 
-use super::project_root;
+use std::path::Path;
+
+fn templates_root() -> std::path::PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("embeds/templates")
+}
 
 /// Keeps the Laravel runtime operations using host.data instead of a bare data global.
 #[test]
 fn laravel_runtime_operations_uses_host_data() {
-    let path = project_root().join("templates/laravel/runtime/operations.py");
+    let path = templates_root().join("laravel/runtime/operations.py");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -16,7 +20,7 @@ fn laravel_runtime_operations_uses_host_data() {
 /// Runs the PHP-FPM master process without forcing the systemd service itself to the app user.
 #[test]
 fn laravel_php_fpm_service_template_leaves_privilege_dropping_to_the_pool() {
-    let path = project_root().join("templates/laravel/runtime/templates/site-php-fpm.service.j2");
+    let path = templates_root().join("laravel/runtime/templates/site-php-fpm.service.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -38,7 +42,7 @@ fn laravel_php_fpm_service_template_leaves_privilege_dropping_to_the_pool() {
 /// Uses an absolute nginx fastcgi params include because per-site configs run outside /etc/nginx.
 #[test]
 fn laravel_nginx_template_uses_absolute_fastcgi_params_include() {
-    let path = project_root().join("templates/laravel/runtime/nginx/site-nginx.conf.j2");
+    let path = templates_root().join("laravel/runtime/nginx/site-nginx.conf.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();

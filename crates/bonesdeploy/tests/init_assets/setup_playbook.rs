@@ -5,7 +5,7 @@ use super::project_root;
 /// Leaves per-site AppArmor out of the shared remote setup deploy script.
 #[test]
 fn remote_setup_deploy_excludes_apparmor_logic() {
-    let deploy = project_root().join("kit/infra/setup.py");
+    let deploy = project_root().join("infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -19,7 +19,7 @@ fn remote_setup_deploy_excludes_apparmor_logic() {
 /// Includes the firewall logic in the shared remote setup deploy script.
 #[test]
 fn remote_setup_deploy_includes_firewall_logic() {
-    let deploy = project_root().join("kit/infra/setup.py");
+    let deploy = project_root().join("infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -33,7 +33,7 @@ fn remote_setup_deploy_includes_firewall_logic() {
 /// Loads shared setup variables and keeps runtime validation out of the remote setup deploy.
 #[test]
 fn remote_setup_deploy_keeps_runtime_checks_out() {
-    let deploy = project_root().join("kit/infra/setup.py");
+    let deploy = project_root().join("infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -47,7 +47,7 @@ fn remote_setup_deploy_keeps_runtime_checks_out() {
 /// Uses a single shared apt package list in the setup deploy script.
 #[test]
 fn shared_setup_deploy_uses_single_setup_apt_packages_manifest() {
-    let deploy = project_root().join("kit/infra/setup.py");
+    let deploy = project_root().join("infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -61,7 +61,7 @@ fn shared_setup_deploy_uses_single_setup_apt_packages_manifest() {
 /// Starts setup apt installation before rustup bootstrap and user setup.
 #[test]
 fn shared_setup_deploy_starts_packages_before_rustup_and_users() {
-    let deploy = project_root().join("kit/infra/setup.py");
+    let deploy = project_root().join("infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -80,7 +80,7 @@ fn shared_setup_deploy_starts_packages_before_rustup_and_users() {
 /// Runs template-specific pre-package setup before installing the shared apt package manifest.
 #[test]
 fn shared_setup_deploy_runs_pre_package_hook_before_setup_apt_packages() {
-    let deploy = project_root().join("kit/infra/setup.py");
+    let deploy = project_root().join("infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -94,7 +94,7 @@ fn shared_setup_deploy_runs_pre_package_hook_before_setup_apt_packages() {
 /// Leaves per-site runtime roles out of the shared setup deploy.
 #[test]
 fn shared_setup_deploy_keeps_runtime_roles_out() {
-    let deploy = project_root().join("kit/infra/setup.py");
+    let deploy = project_root().join("infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -110,7 +110,7 @@ fn shared_setup_deploy_keeps_runtime_roles_out() {
 /// Applies runtime, AppArmor, and nginx through the dedicated runtime deploy script.
 #[test]
 fn remote_runtime_deploy_applies_runtime_apparmor_and_nginx() {
-    let deploy = project_root().join("kit/infra/runtime.py");
+    let deploy = project_root().join("infra/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -128,7 +128,7 @@ fn remote_runtime_deploy_applies_runtime_apparmor_and_nginx() {
 /// Installs runtime apt packages before applying runtime roles.
 #[test]
 fn remote_runtime_deploy_installs_packages_before_operations() {
-    let deploy = project_root().join("kit/infra/runtime.py");
+    let deploy = project_root().join("infra/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -144,7 +144,7 @@ fn remote_runtime_deploy_installs_packages_before_operations() {
 /// Leaves SSL role out of the runtime deploy since SSL has its own deploy script.
 #[test]
 fn remote_runtime_deploy_excludes_ssl_logic() {
-    let deploy = project_root().join("kit/infra/runtime.py");
+    let deploy = project_root().join("infra/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -158,7 +158,7 @@ fn remote_runtime_deploy_excludes_ssl_logic() {
 /// Applies SSL operations through the dedicated SSL deploy script.
 #[test]
 fn remote_ssl_deploy_applies_ssl_operations_only() {
-    let deploy = project_root().join("kit/infra/ssl.py");
+    let deploy = project_root().join("infra/ssl.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();

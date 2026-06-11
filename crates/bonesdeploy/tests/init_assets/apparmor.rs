@@ -1,11 +1,13 @@
 use std::fs;
 
+use std::path::Path;
+
 use super::project_root;
 
 /// Sets an AppArmor profile in the per-site nginx systemd service template.
 #[test]
 fn nginx_service_template_sets_apparmor_profile() {
-    let service_template = project_root().join("kit/infra/assets/nginx/site-nginx.service.j2");
+    let service_template = project_root().join("infra/assets/nginx/site-nginx.service.j2");
     let content = fs::read_to_string(&service_template);
     assert!(content.is_ok(), "failed to read {}", service_template.display());
     let content = content.unwrap_or_default();
@@ -16,7 +18,7 @@ fn nginx_service_template_sets_apparmor_profile() {
 /// Requires the AppArmor service in the nginx systemd service template.
 #[test]
 fn nginx_service_template_waits_for_apparmor_service() {
-    let service_template = project_root().join("kit/infra/assets/nginx/site-nginx.service.j2");
+    let service_template = project_root().join("infra/assets/nginx/site-nginx.service.j2");
     let content = fs::read_to_string(&service_template);
     assert!(content.is_ok(), "failed to read {}", service_template.display());
     let content = content.unwrap_or_default();
@@ -34,14 +36,14 @@ fn nginx_service_template_waits_for_apparmor_service() {
 /// Ensures the AppArmor profile template file exists at the expected path.
 #[test]
 fn apparmor_profile_template_exists() {
-    let profile_template = project_root().join("kit/infra/assets/apparmor/project-nginx-profile.j2");
+    let profile_template = project_root().join("infra/assets/apparmor/project-nginx-profile.j2");
     assert!(profile_template.exists(), "expected AppArmor profile template at {}", profile_template.display());
 }
 
 /// Allows reading the site nginx configuration in the AppArmor profile template.
 #[test]
 fn apparmor_profile_template_allows_site_nginx_conf() {
-    let profile_template = project_root().join("kit/infra/assets/apparmor/project-nginx-profile.j2");
+    let profile_template = project_root().join("infra/assets/apparmor/project-nginx-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -55,7 +57,7 @@ fn apparmor_profile_template_allows_site_nginx_conf() {
 /// Allows reading the per-site conf root in the Laravel PHP-FPM AppArmor profile.
 #[test]
 fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
-    let profile_template = project_root().join("templates/laravel/runtime/templates/site-php-fpm-profile.j2");
+    let profile_template = Path::new(env!("CARGO_MANIFEST_DIR")).join("embeds/templates/laravel/runtime/templates/site-php-fpm-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -73,7 +75,7 @@ fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
 /// Does not deny the parent home path when the repo path is derived from the shared helper.
 #[test]
 fn apparmor_profile_template_does_not_deny_repo_path_parent_home() {
-    let profile_template = project_root().join("kit/infra/assets/apparmor/project-nginx-profile.j2");
+    let profile_template = project_root().join("infra/assets/apparmor/project-nginx-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -91,7 +93,7 @@ fn apparmor_profile_template_does_not_deny_repo_path_parent_home() {
 /// Limits network access to unix stream sockets and denies inet sockets.
 #[test]
 fn apparmor_profile_template_limits_network_to_unix_stream() {
-    let profile_template = project_root().join("kit/infra/assets/apparmor/project-nginx-profile.j2");
+    let profile_template = project_root().join("infra/assets/apparmor/project-nginx-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -113,7 +115,7 @@ fn apparmor_profile_template_limits_network_to_unix_stream() {
 /// Verifies apparmor profile enforcement is handled by the runtime deploy script.
 #[test]
 fn runtime_deploy_enforces_apparmor_profile() {
-    let deploy = project_root().join("kit/infra/runtime.py");
+    let deploy = project_root().join("infra/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -127,7 +129,7 @@ fn runtime_deploy_enforces_apparmor_profile() {
 /// Verifies AppArmor profile loading is handled by the runtime deploy script.
 #[test]
 fn runtime_deploy_loads_apparmor_profile() {
-    let deploy = project_root().join("kit/infra/runtime.py");
+    let deploy = project_root().join("infra/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -141,7 +143,7 @@ fn runtime_deploy_loads_apparmor_profile() {
 /// Verifies AppArmor kernel enabled check is in the runtime deploy script.
 #[test]
 fn runtime_deploy_verifies_kernel_enabled() {
-    let deploy = project_root().join("kit/infra/runtime.py");
+    let deploy = project_root().join("infra/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
