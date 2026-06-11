@@ -159,24 +159,11 @@ pub fn prompt_port(
 }
 
 pub fn confirm_remote_setup() -> Result<bool> {
-    println!();
-    let mut lines = remote_setup_prompt_lines().into_iter();
-    if let Some(header) = lines.next() {
-        println!("{}", style(header).cyan().bold());
-    }
-    for line in lines {
-        println!("{line}");
-    }
-    println!();
-    print!("Set up the server now? [y/N] ");
-    io::stdout().flush().context("Failed to flush confirmation prompt")?;
+    confirm_with_lines(remote_setup_prompt_lines(), "Set up the server now?")
+}
 
-    let mut answer = String::new();
-    if io::stdin().read_line(&mut answer).is_err() {
-        return Ok(false);
-    }
-
-    Ok(is_affirmative(&answer))
+pub fn confirm_remote_runtime() -> Result<bool> {
+    confirm_with_lines(remote_runtime_prompt_lines(), "Apply the runtime on the server now?")
 }
 
 fn is_affirmative(answer: &str) -> bool {
@@ -190,10 +177,43 @@ fn remote_setup_prompt_lines() -> [&'static str; 8] {
         "You can use this to set up as many sites on your VPS as you would like. Run this once per site.",
         "It will:",
         "  - install bonesremote",
-        "  - configure users, roles, firewalls, and AppArmor",
+        "  - configure users, roles, and firewalls",
         "  - add your git repo to the server",
         "  - provision bonesdeploy resources",
     ]
+}
+
+fn remote_runtime_prompt_lines() -> [&'static str; 7] {
+    [
+        "Remote runtime",
+        "This applies per-site runtime assets after the local runtime scaffold is refreshed.",
+        "You can run it repeatedly whenever runtime templates or runtime config change.",
+        "It will:",
+        "  - install template-specific runtime packages",
+        "  - provision framework services like PHP-FPM",
+        "  - configure AppArmor and nginx for this site",
+    ]
+}
+
+fn confirm_with_lines<const N: usize>(lines: [&'static str; N], prompt: &str) -> Result<bool> {
+    println!();
+    let mut lines = lines.into_iter();
+    if let Some(header) = lines.next() {
+        println!("{}", style(header).cyan().bold());
+    }
+    for line in lines {
+        println!("{line}");
+    }
+    println!();
+    print!("{prompt} [y/N] ");
+    io::stdout().flush().context("Failed to flush confirmation prompt")?;
+
+    let mut answer = String::new();
+    if io::stdin().read_line(&mut answer).is_err() {
+        return Ok(false);
+    }
+
+    Ok(is_affirmative(&answer))
 }
 
 fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<String> {
@@ -233,7 +253,7 @@ pub fn prompt_ssl_email(existing_config: Option<&BonesConfig>) -> Result<String>
 
 #[cfg(test)]
 mod tests {
-    use super::{is_affirmative, remote_setup_prompt_lines};
+    use super::{is_affirmative, remote_runtime_prompt_lines, remote_setup_prompt_lines};
 
     /// Accepts common yes values like y, yes, and YES.
     #[test]
@@ -257,5 +277,13 @@ mod tests {
         let joined = remote_setup_prompt_lines().join("\n");
 
         assert!(joined.contains("firewalls"), "remote setup prompt should describe firewall configuration\n{joined}");
+    }
+
+    /// Describes AppArmor and nginx in the remote runtime prompt.
+    #[test]
+    fn remote_runtime_prompt_lines_include_site_runtime_concerns() {
+        let joined = remote_runtime_prompt_lines().join("\n");
+
+        assert!(joined.contains("AppArmor") || joined.contains("nginx"));
     }
 }

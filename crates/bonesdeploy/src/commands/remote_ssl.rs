@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use console::style;
@@ -53,7 +53,17 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     cfg_for_run.ssl.enabled = false;
 
     let ssh_user = remote_setup::resolve_bootstrap_ssh_user();
-    remote_setup::run_ansible_playbook(&cfg_for_run, &ssh_user, extra_vars, &ssl_playbook_args())?;
+    let playbook_args = ssl_playbook_args();
+    remote_setup::run_ansible_playbook(
+        &cfg_for_run,
+        &ssh_user,
+        extra_vars,
+        &remote_setup::AnsiblePlaybook {
+            extra_args: &playbook_args,
+            playbook: Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK),
+            roles_dirs: &[PathBuf::from(config::Constants::BONES_REMOTE_ROLES_DIR)],
+        },
+    )?;
 
     cfg.ssl.enabled = true;
     config::save(&cfg, bones_yaml)?;

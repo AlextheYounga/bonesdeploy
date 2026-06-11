@@ -12,7 +12,6 @@ pub struct InitArgs {
     pub remote: Option<String>,
     pub host: Option<String>,
     pub port: Option<String>,
-    pub template: Option<String>,
 }
 
 pub fn collect_non_interactive(

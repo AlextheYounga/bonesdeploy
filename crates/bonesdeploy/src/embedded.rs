@@ -22,6 +22,10 @@ struct Scripts;
 
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
+        if file_path.starts_with("runtime/") {
+            continue;
+        }
+
         let Some(asset) = Kit::get(&file_path) else {
             continue;
         };
@@ -30,8 +34,24 @@ pub fn scaffold(bones_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn scaffold_template(template_name: &str, bones_dir: &Path) -> Result<()> {
-    let prefix = format!("{template_name}/");
+pub fn scaffold_runtime_base(bones_dir: &Path) -> Result<()> {
+    for file_path in Kit::iter() {
+        if !file_path.starts_with("runtime/") {
+            continue;
+        }
+
+        let Some(asset) = Kit::get(&file_path) else {
+            continue;
+        };
+
+        write_asset(bones_dir, file_path.as_ref(), asset.data.as_ref())?;
+    }
+
+    Ok(())
+}
+
+pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Result<()> {
+    let prefix = format!("{template_name}/setup/");
     let mut found = false;
 
     for file_path in Templates::iter() {
@@ -44,18 +64,46 @@ pub fn scaffold_template(template_name: &str, bones_dir: &Path) -> Result<()> {
         };
 
         let relative_path = file_path.trim_start_matches(&prefix);
-        write_asset(bones_dir, relative_path, asset.data.as_ref())?;
+        if relative_path == "vars/setup.yml" {
+            continue;
+        }
+
+        write_asset(bones_dir, &format!("runtime/{relative_path}"), asset.data.as_ref())?;
         found = true;
     }
 
     if !found {
         bail!(
-            "Embedded template not found: {template_name}. Available templates: {}",
+            "Embedded runtime template not found: {template_name}. Available templates: {}",
             available_templates().join(", ")
         );
     }
 
     Ok(())
+}
+
+pub fn read_template_runtime_vars(template_name: &str) -> Result<String> {
+    let path = format!("{template_name}/setup/vars/setup.yml");
+    let Some(file) = Templates::get(&path) else {
+        bail!(
+            "Embedded runtime vars not found for template: {template_name}. Available templates: {}",
+            available_templates().join(", ")
+        );
+    };
+
+    Ok(String::from_utf8_lossy(file.data.as_ref()).to_string())
+}
+
+pub fn read_template_bones_config(template_name: &str) -> Result<String> {
+    let path = format!("{template_name}/bones.yaml");
+    let Some(file) = Templates::get(&path) else {
+        bail!(
+            "Embedded bones config not found for template: {template_name}. Available templates: {}",
+            available_templates().join(", ")
+        );
+    };
+
+    Ok(String::from_utf8_lossy(file.data.as_ref()).to_string())
 }
 
 pub fn available_templates() -> Vec<String> {

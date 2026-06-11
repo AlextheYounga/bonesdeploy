@@ -95,8 +95,8 @@ fn ssl_role_defines_nginx_defaults_for_tag_based_execution() {
         "ssl role must define nginx_site_template_path for self-contained tag execution\n{content}"
     );
     assert!(
-        content.contains("../nginx/router.conf.j2"),
-        "ssl role must default to the router nginx template for self-contained tag execution\n{content}"
+        content.contains("role_path") && content.contains("router.conf.j2"),
+        "ssl role must default to the router nginx template through the shared nginx role assets\n{content}"
     );
     assert!(
         content.contains("nginx_service_name:"),

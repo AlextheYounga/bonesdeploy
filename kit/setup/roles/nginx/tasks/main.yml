@@ -32,7 +32,7 @@
 
 - name: Deploy per-site nginx config
   ansible.builtin.template:
-    src: "{{ playbook_dir }}/../nginx/site-nginx.conf.j2"
+    src: "{{ nginx_site_template_path }}"
     dest: "{{ paths.site_nginx_config }}"
     owner: root
     group: "{{ group }}"
@@ -41,7 +41,7 @@
 
 - name: Deploy per-site nginx systemd service
   ansible.builtin.template:
-    src: "{{ playbook_dir }}/../nginx/site-nginx.service.j2"
+    src: "{{ nginx_site_service_template_path }}"
     dest: "{{ paths.systemd_site_nginx_service }}"
     owner: root
     group: root
@@ -51,7 +51,7 @@
 
 - name: Deploy router nginx config
   ansible.builtin.template:
-    src: "{{ playbook_dir }}/../nginx/router.conf.j2"
+    src: "{{ nginx_router_template_path }}"
     dest: "{{ paths.nginx_site_available }}"
     owner: root
     group: root

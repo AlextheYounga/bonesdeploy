@@ -1,0 +1,40 @@
+---
+- name: Remote runtime for bonesdeploy
+  hosts: all
+  become: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../runtime.yaml"
+
+  tasks:
+    - name: Run template-specific pre-package setup
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/pre_packages.yml"
+      when: runtime_pre_packages_enabled | default(false)
+      tags: [runtime, packages]
+
+    - name: Install runtime apt packages
+      ansible.builtin.apt:
+        name: "{{ runtime_apt_packages | default([]) }}"
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: runtime_apt_packages | default([]) | length > 0
+      tags: [runtime, packages]
+
+    - name: Run runtime role
+      ansible.builtin.include_role:
+        name: "{{ runtime_role }}"
+        public: true
+      when: runtime_role | default('') | length > 0
+      tags: [runtime]
+
+    - name: Run AppArmor role
+      ansible.builtin.include_role:
+        name: apparmor
+      tags: [apparmor]
+
+    - name: Run nginx role
+      ansible.builtin.include_role:
+        name: nginx
+        public: true
+      tags: [nginx]

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Initializes bonesdeploy in the current Git repository by creating the `.bones/` scaffold structure, configuring deployment settings (interactively or non-interactively), and setting up Git integration. This command must be run from within a Git repository and serves as the entry point for setting up deployment infrastructure.
+Initializes bonesdeploy in the current Git repository by creating the base `.bones/` scaffold structure, configuring deployment settings (interactively or non-interactively), and setting up Git integration. This command must be run from within a Git repository and serves as the entry point for setting up deployment infrastructure.
 
 ## Non-Interactive Mode
 
@@ -26,20 +26,18 @@ Optional flags:
 | `--remote`, `-r` | `production` | Deployment remote name |
 | `--branch` | `main` | Git branch to deploy |
 | `--port` | `22` | SSH port |
-| `--template` | — | Template name (e.g. `laravel`, `django`); absent = scratch |
 | `--setup-remote` | `false` | Run `bonesdeploy remote setup` after init (skips confirmation prompt) |
 
-Example with template and automatic remote setup:
+Example with automatic remote setup:
 ```bash
 bonesdeploy init \
   --non-interactive \
   --project-name myapp \
   --host 203.0.113.10 \
-  --template laravel \
   --setup-remote
 ```
 
-In interactive mode (no `--non-interactive`), these flags pre-fill prompt defaults. `--setup-remote` skips the final confirmation and goes straight to remote provisioning.
+In interactive mode (no `--non-interactive`), these flags pre-fill prompt defaults. `--setup-remote` skips the final confirmation and goes straight to machine bootstrap. Framework runtime selection now happens in `bonesdeploy remote runtime`.
 
 ## Detailed Execution Steps
 
@@ -72,16 +70,7 @@ if bones_dir.exists() {
 
 If `.bones/` already exists, skips the scaffold extraction step entirely. This prevents overwriting existing configuration.
 
-#### 2.2 Template Selection
-
-```rust
-let available_templates = embedded::available_templates();
-let selected_template = resolve_template(args.template.as_deref(), &available_templates, args.non_interactive)?;
-```
-
-Presents the user with available templates (e.g., "node", "laravel", etc.) or allows choosing "none" for a build-from-scratch approach. Templates provide pre-configured hooks and deployment scripts for common frameworks.
-
-#### 2.3 Scaffold Creation
+#### 2.2 Scaffold Creation
 
 ```rust
 println!("Creating .bones/ scaffold...");
@@ -96,20 +85,7 @@ Extracts embedded assets to `.bones/`:
   - `hooks/post-receive` - Server-side hook
   - `hooks/pre-push` - Client-side hook
 - `.bones/deployment/` - Directory for deployment scripts
-- `.bones/remote/` - Directory for Ansible site setup
-  - `site/playbooks/setup.yml` - Ansible playbook
-  - `site/roles/` - Ansible roles directory
-
-#### 2.4 Template Application
-
-```rust
-if let Some(template_name) = selected_template {
-    embedded::scaffold_template(&template_name, bones_dir)?;
-    println!("Applied template: {template_name}");
-}
-```
-
-If a template was selected, applies template-specific files that may override or extend the base scaffold with framework-specific configurations and scripts.
+This base scaffold contains hooks, deployment scripts, and shared config. Framework-specific runtime assets are created later by `bonesdeploy remote runtime`.
 
 ---
 

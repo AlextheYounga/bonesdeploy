@@ -36,29 +36,11 @@
         name: firewall
       tags: [firewall]
 
-    - name: Run AppArmor role
-      ansible.builtin.include_role:
-        name: apparmor
-      tags: [apparmor]
-
     - name: Run common role
       ansible.builtin.include_role:
         name: common
         public: true
       tags: [common]
-
-    - name: Run runtime role
-      ansible.builtin.include_role:
-        name: "{{ runtime_role }}"
-        public: true
-      when: runtime_role | length > 0
-      tags: [runtime]
-
-    - name: Run nginx role
-      ansible.builtin.include_role:
-        name: nginx
-        public: true
-      tags: [nginx]
 
     - name: Run ssl role
       ansible.builtin.include_role:

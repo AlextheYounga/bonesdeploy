@@ -27,22 +27,12 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
     if bones_dir.exists() {
         println!(".bones/ already exists, skipping scaffold extraction.");
     } else {
-        let available_templates = embedded::available_templates();
-        let selected_template = resolve_template(args.template.as_deref(), &available_templates, args.non_interactive)?;
-
         let project_name = resolve_project_name(args)?;
         let config_dir = config::bones_config_dir(&project_name);
 
         println!("Creating {}...", config_dir.display());
         fs::create_dir_all(&config_dir)?;
         embedded::scaffold(&config_dir)?;
-
-        if let Some(ref template_name) = selected_template {
-            embedded::scaffold_template(template_name, &config_dir)?;
-            println!("Applied template: {template_name}");
-        } else {
-            println!("Using build-from-scratch scaffold.");
-        }
 
         unix_fs::symlink(&config_dir, bones_dir)?;
         println!("Symlinked .bones -> {}", config_dir.display());
@@ -56,6 +46,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
         config::save(&seed, Path::new(config::Constants::BONES_YAML))?;
 
         initial_project_name = Some(project_name);
+        println!("Using build-from-scratch scaffold.");
     }
 
     update_gitignore()?;
@@ -94,19 +85,6 @@ fn print_follow_up_hint() {
     println!();
     println!("{}", style("Next:").cyan().bold());
     println!("Run {} to sync {} to the remote.", style("bonesdeploy push").cyan(), style(".bones/").cyan());
-}
-
-fn resolve_template(cli_value: Option<&str>, available: &[String], non_interactive: bool) -> Result<Option<String>> {
-    if let Some(value) = cli_value.filter(|v| !v.is_empty()) {
-        if !available.iter().any(|t| t == value) {
-            bail!("Template '{value}' not found. Available templates: {}", available.join(", "));
-        }
-        return Ok(Some(value.to_string()));
-    }
-    if non_interactive {
-        return Ok(None);
-    }
-    prompts::choose_template(available)
 }
 
 fn collect(project_name_hint: &str, args: &InitArgs) -> Result<config::BonesConfig> {

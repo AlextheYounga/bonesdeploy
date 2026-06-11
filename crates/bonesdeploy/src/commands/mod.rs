@@ -5,6 +5,7 @@ mod init_config;
 mod manage;
 mod pull;
 mod push;
+mod remote_runtime;
 mod remote_setup;
 mod remote_setup_output;
 mod remote_ssl;
@@ -48,9 +49,6 @@ enum Command {
         /// SSH port (default: 22)
         #[arg(long)]
         port: Option<String>,
-        /// Template name (e.g. laravel, django)
-        #[arg(long)]
-        template: Option<String>,
     },
     /// Check local and remote environment health
     Doctor {
@@ -90,6 +88,8 @@ enum Command {
 enum RemoteCommand {
     /// Run remote setup playbook against configured host
     Setup,
+    /// Apply the configured runtime playbook against configured host
+    Runtime,
     /// Obtain and configure SSL certificates with certbot
     Ssl {
         /// Domain name for the certificate (e.g. app.example.com)
@@ -103,7 +103,7 @@ enum RemoteCommand {
 
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init { non_interactive, setup_remote, project_name, branch, remote, host, port, template } => {
+        Command::Init { non_interactive, setup_remote, project_name, branch, remote, host, port } => {
             let outcome = init::run(&init::InitArgs {
                 non_interactive: *non_interactive,
                 setup_remote: *setup_remote,
@@ -112,7 +112,6 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 remote: remote.clone(),
                 host: host.clone(),
                 port: port.clone(),
-                template: template.clone(),
             })?;
             if outcome.remote_setup_ran {
                 push::run().await?;
@@ -129,6 +128,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Manage => manage::run(),
         Command::Remote { command } => match command {
             RemoteCommand::Setup => remote_setup::run(),
+            RemoteCommand::Runtime => remote_runtime::run(),
             RemoteCommand::Ssl { domain, email } => remote_ssl::run(domain.clone(), email.clone()),
         },
         Command::Rollback => rollback::run().await,

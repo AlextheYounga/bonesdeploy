@@ -1,19 +1,16 @@
 use std::fs;
 
-use super::{TEMPLATE_SETUP_PLAYBOOKS, project_root};
+use super::project_root;
 
-/// Includes the `AppArmor` role in the shared remote setup playbook.
+/// Leaves per-site AppArmor out of the shared remote setup playbook.
 #[test]
-fn remote_setup_playbook_includes_apparmor_role() {
+fn remote_setup_playbook_excludes_apparmor_role() {
     let playbook = project_root().join("kit/setup/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
 
-    assert!(
-        content.contains("name: apparmor") && content.contains("include_role"),
-        "remote setup playbook must include apparmor through shared role composition\n{content}"
-    );
+    assert!(!content.contains("name: apparmor"), "remote setup playbook must not include per-site AppArmor\n{content}");
 }
 
 /// Includes the firewall role in the shared remote setup playbook.
@@ -30,9 +27,9 @@ fn remote_setup_playbook_includes_firewall_role() {
     );
 }
 
-/// Loads shared template variables and includes the doctor validation task in the remote setup playbook.
+/// Loads shared setup variables and keeps the doctor validation task in the remote setup playbook.
 #[test]
-fn remote_setup_playbook_loads_shared_template_vars_and_doctor_task() {
+fn remote_setup_playbook_loads_shared_setup_vars_and_doctor_task() {
     let playbook = project_root().join("kit/setup/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
@@ -42,10 +39,6 @@ fn remote_setup_playbook_loads_shared_template_vars_and_doctor_task() {
     assert!(
         content.contains("../vars/setup.yml"),
         "remote setup playbook should load template override vars from a dedicated file\n{content}"
-    );
-    assert!(
-        content.contains("include_role:"),
-        "remote setup playbook should compose runtime roles from shared logic\n{content}"
     );
     assert!(
         content.contains("Run bonesremote doctor as deploy user"),
@@ -129,77 +122,66 @@ fn common_role_runs_toolchain_installers_as_async_jobs() {
 /// Verifies template-specific playbooks are removed in favor of shared kit setup logic.
 #[test]
 fn template_playbooks_include_apparmor_role() {
-    for playbook in TEMPLATE_SETUP_PLAYBOOKS {
+    for playbook in [
+        "templates/django/setup/playbooks/setup.yml",
+        "templates/laravel/setup/playbooks/setup.yml",
+        "templates/next/setup/playbooks/setup.yml",
+        "templates/nuxt/setup/playbooks/setup.yml",
+        "templates/rails/setup/playbooks/setup.yml",
+        "templates/sveltekit/setup/playbooks/setup.yml",
+        "templates/vue/setup/playbooks/setup.yml",
+    ] {
         let path = project_root().join(playbook);
         assert!(!path.exists(), "template playbook {playbook} should be removed in favor of shared kit setup logic");
     }
 }
 
-/// Applies the `AppArmor` role before the nginx role in the shared setup playbook.
+/// Leaves per-site runtime roles out of the shared setup playbook.
 #[test]
-fn shared_setup_playbook_applies_apparmor_before_nginx_role() {
+fn shared_setup_playbook_keeps_runtime_roles_out() {
     let playbook = project_root().join("kit/setup/playbooks/setup.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
 
-    let apparmor_idx = content.find("Run AppArmor role");
-    let nginx_idx = content.find("Run nginx role");
-
-    assert!(apparmor_idx.is_some(), "shared setup playbook must include apparmor include_role\n{content}");
-    assert!(nginx_idx.is_some(), "shared setup playbook must include nginx include_role\n{content}");
-    assert!(apparmor_idx < nginx_idx, "shared setup playbook must apply apparmor before nginx\n{content}");
-
-    let common_idx = content.find("Run common role");
-    let runtime_idx = content.find("Run runtime role");
-
-    assert!(common_idx.is_some(), "shared setup playbook must include common role\n{content}");
-    assert!(runtime_idx.is_some(), "shared setup playbook must include optional runtime role hook\n{content}");
-    assert!(common_idx < runtime_idx, "runtime role hook must run after common role\n{content}");
-    assert!(runtime_idx < nginx_idx, "runtime role hook must run before nginx role\n{content}");
+    assert!(
+        !content.contains("Run AppArmor role"),
+        "shared setup playbook must not apply per-site AppArmor\n{content}"
+    );
+    assert!(!content.contains("Run runtime role"), "shared setup playbook must not apply runtime roles\n{content}");
+    assert!(!content.contains("Run nginx role"), "shared setup playbook must not apply per-site nginx\n{content}");
 }
 
-/// Exposes runtime role defaults publicly so later roles can use stack-specific variables.
+/// Applies runtime, AppArmor, and nginx through the dedicated runtime playbook.
 #[test]
-fn shared_setup_playbook_exposes_runtime_role_defaults_to_later_roles() {
-    let playbook = project_root().join("kit/setup/playbooks/setup.yml");
+fn remote_runtime_playbook_applies_runtime_apparmor_and_nginx() {
+    let playbook = project_root().join("kit/runtime/playbooks/runtime.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
 
     assert!(
         content.contains("name: \"{{ runtime_role }}\"") && content.contains("public: true"),
-        "shared setup playbook must expose runtime role defaults for later roles like nginx\n{content}"
+        "runtime playbook must expose runtime role defaults for later roles like nginx\n{content}"
+    );
+    assert!(
+        content.contains("Run AppArmor role") && content.contains("Run nginx role"),
+        "runtime playbook must apply shared per-site AppArmor and nginx roles\n{content}"
     );
 }
 
-/// Exposes common role defaults publicly for later runtime roles.
+/// Installs runtime apt packages before applying runtime roles.
 #[test]
-fn shared_setup_playbook_exposes_common_role_defaults_to_runtime_role() {
-    let playbook = project_root().join("kit/setup/playbooks/setup.yml");
+fn remote_runtime_playbook_installs_runtime_packages_before_runtime_role() {
+    let playbook = project_root().join("kit/runtime/playbooks/runtime.yml");
     let content = fs::read_to_string(&playbook);
     assert!(content.is_ok(), "failed to read {}", playbook.display());
     let content = content.unwrap_or_default();
 
-    assert!(
-        content.contains("name: Run common role") && content.contains("public: true"),
-        "shared setup playbook must expose common role defaults for later runtime roles like nvm_dir\n{content}"
-    );
-}
+    let packages_idx = content.find("Install runtime apt packages");
+    let runtime_idx = content.find("Run runtime role");
 
-/// Exposes nginx role defaults publicly for the later SSL role.
-#[test]
-fn shared_setup_playbook_exposes_nginx_role_defaults_to_ssl_role() {
-    let playbook = project_root().join("kit/setup/playbooks/setup.yml");
-    let content = fs::read_to_string(&playbook);
-    assert!(content.is_ok(), "failed to read {}", playbook.display());
-    let content = content.unwrap_or_default();
-
-    let nginx_role =
-        "- name: Run nginx role\n      ansible.builtin.include_role:\n        name: nginx\n        public: true";
-
-    assert!(
-        content.contains(nginx_role),
-        "shared setup playbook must expose nginx defaults used by the later ssl role\n{content}"
-    );
+    assert!(packages_idx.is_some(), "runtime playbook must install runtime apt packages\n{content}");
+    assert!(runtime_idx.is_some(), "runtime playbook must apply the runtime role\n{content}");
+    assert!(packages_idx < runtime_idx, "runtime packages must install before runtime role execution\n{content}");
 }

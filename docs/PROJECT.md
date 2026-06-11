@@ -40,6 +40,7 @@ We create a `bonesremote` executable that does not require a password and allows
 ## Bones Scaffolding
 .bones
 ├── bones.yaml
+├── runtime.yaml
 ├── hooks
 │   ├── hooks.sh                      # shared hook library, sourced by every hook
 │   ├── post-receive
@@ -48,17 +49,25 @@ We create a `bonesremote` executable that does not require a password and allows
 ├── deployment
 │   ├── 01_run_deployment_concerns.sh
 │   └── 02_permissions_lockup.sh (example)
-└── setup                            # ansible assets used by `bonesdeploy remote setup`
-    ├── apparmor/
-    ├── nginx/
+├── setup                            # machine bootstrap assets used by `bonesdeploy remote setup`
+│   ├── playbooks/
+│   ├── roles/
+│   │   ├── common/
+│   │   ├── firewall/
+│   │   ├── ssh/
+│   │   ├── ssl/
+│   │   └── users/
+│   └── vars/
+└── runtime                          # per-site runtime assets used by `bonesdeploy remote runtime`
     ├── playbooks/
     ├── roles/
-    │   ├── common/
-    │   ├── firewall/
-    │   ├── nginx/
-    │   ├── ssh/
-    │   ├── ssl/
-    │   └── users/
+    │   ├── django_runtime/
+    │   ├── laravel_runtime/
+    │   ├── next_runtime/
+    │   ├── nuxt_runtime/
+    │   ├── rails_runtime/
+    │   ├── sveltekit_runtime/
+    │   └── vue_runtime/
     └── vars/
 
 ### Bones YAML
@@ -232,7 +241,7 @@ bonesdeploy/
 ```
 
 ### Per-Framework Templates
-The `templates/` directory ships starter overlays that `bonesdeploy init` can use as a base when scaffolding into a project of the matching kind. Each template follows the same convention as `kit/` — framework-owned setup assets live under `setup/` while user-editable files (`bones.yaml`, `deployment/`) stay at the root:
+The `templates/` directory ships starter overlays that `bonesdeploy init` can use as a base when scaffolding into a project of the matching kind. Each template follows the same convention as `kit/` — machine bootstrap assets live under `setup/`, framework runtime assets live under `runtime/`, and user-editable files (`bones.yaml`, `deployment/`) stay at the root:
 
 - `templates/django/`        → `django_runtime` role
 - `templates/laravel/`       → `laravel_runtime` role (PHP + PHP-FPM)
@@ -242,7 +251,7 @@ The `templates/` directory ships starter overlays that `bonesdeploy init` can us
 - `templates/sveltekit/`     → `sveltekit_runtime` role
 - `templates/vue/`           → `vue_runtime` role
 
-Templates inherit the same `bones.yaml` schema and only customize permissions paths, deployment scripts, and the runtime ansible role.
+Templates inherit the same `bones.yaml` schema and only customize permissions paths, deployment scripts, and the runtime assets captured in `.bones/runtime/`.
 
 ### BonesDeploy CLI Commands
 - **init**:
@@ -250,7 +259,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Updates `.gitignore` to add .bones folder.
   - Loads existing config from `.bones/bones.yaml` or collects user input via prompts.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
-  - Prints next-step guidance to run `bonesdeploy remote setup` before first deploy.
+  - Prints next-step guidance to run `bonesdeploy remote setup` and `bonesdeploy remote runtime` before first deploy.
   - Saves config to `.bones/bones.yaml`.
 
 - **doctor**
@@ -280,17 +289,22 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Sets `BONES_FORCE_DEPLOY=1` so manual deploy runs even when `deploy_on_push = false`.
 
 - ****remote setup****
-  - Runs `.bones/remote/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
-  - Passes `project_name`, `deploy_user`, `service_user`, `group`, `project_root_parent`, `web_root`, `project_root`, and `repo_path` from `bones.yaml` as playbook variables.
+  - Runs `.bones/setup/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
+  - Passes `bones.yaml` deployment values plus machine-bootstrap variables to the playbook.
   - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
-  - Sets up per-site nginx with AppArmor and systemd sandboxing.
-  - Configures main router nginx to proxy domains to per-site unix sockets.
+  - Provisions machine-level dependencies, users, and shared server bootstrap concerns.
 
-- ****remote ssl****
+- **remote runtime**:
+  - Prompts for a framework template, refreshes `.bones/runtime/`, and writes `.bones/runtime.yaml`.
+  - Reapplies template-specific defaults into `.bones/bones.yaml` only when they still match generic or previous-template values.
+  - After a `y/N` confirmation, runs `.bones/runtime/playbooks/runtime.yml` using `ansible-playbook` against the configured host.
+  - Configures per-site runtime assets such as framework services, AppArmor, and nginx.
+
+- **remote ssl**
   - Runs the SSL Ansible role against the configured host.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
-  - Re-renders `.bones/remote/nginx/router.conf.j2` with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
+  - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
 
 - **rollback**
   - SSHes into the configured host and runs `bonesremote release rollback --config ...`, which repoints `current` to the previous release without rebuilding.

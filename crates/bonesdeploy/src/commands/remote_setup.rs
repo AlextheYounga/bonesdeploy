@@ -12,6 +12,12 @@ use crate::commands::remote_setup_output;
 use crate::config;
 use crate::embedded;
 
+pub struct AnsiblePlaybook<'a> {
+    pub extra_args: &'a [String],
+    pub playbook: &'a Path,
+    pub roles_dirs: &'a [PathBuf],
+}
+
 pub fn run() -> Result<()> {
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
     let cfg = config::load(bones_yaml)?;
@@ -27,7 +33,16 @@ pub fn run() -> Result<()> {
     let deploy_authorized_key = resolve_deploy_authorized_key()?;
 
     let extra_vars = json!({"deploy_authorized_key": deploy_authorized_key});
-    run_ansible_playbook(&cfg, &ssh_user, extra_vars, &[])?;
+    run_ansible_playbook(
+        &cfg,
+        &ssh_user,
+        extra_vars,
+        &AnsiblePlaybook {
+            extra_args: &[],
+            playbook,
+            roles_dirs: &[PathBuf::from(config::Constants::BONES_REMOTE_ROLES_DIR)],
+        },
+    )?;
 
     println!("{} Remote setup complete.", style("Done!").green().bold());
 
@@ -76,9 +91,9 @@ pub fn run_ansible_playbook(
     cfg: &config::BonesConfig,
     ssh_user: &str,
     extra_vars: serde_json::Value,
-    extra_args: &[String],
+    playbook: &AnsiblePlaybook<'_>,
 ) -> Result<()> {
-    remote_setup_output::run(cfg, ssh_user, extra_vars, extra_args)
+    remote_setup_output::run(cfg, ssh_user, extra_vars, playbook)
 }
 
 pub(crate) fn ensure_remote_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {

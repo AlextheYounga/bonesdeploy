@@ -29,6 +29,10 @@ pub const LOCAL_BONES_YAML: &str = ".bones/bones.yaml";
 pub const LOCAL_BONES_HOOKS_DIR: &str = ".bones/hooks";
 pub const LOCAL_BONES_HOOKS_SCRIPT: &str = ".bones/hooks/hooks.sh";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
+pub const LOCAL_BONES_RUNTIME_DIR: &str = ".bones/runtime";
+pub const LOCAL_BONES_RUNTIME_YAML: &str = ".bones/runtime.yaml";
+pub const LOCAL_BONES_RUNTIME_PLAYBOOK: &str = ".bones/runtime/playbooks/runtime.yml";
+pub const LOCAL_BONES_RUNTIME_ROLES_DIR: &str = ".bones/runtime/roles";
 pub const LOCAL_BONES_SETUP_PLAYBOOK: &str = ".bones/setup/playbooks/setup.yml";
 pub const LOCAL_BONES_SETUP_ROLES_DIR: &str = ".bones/setup/roles";
 

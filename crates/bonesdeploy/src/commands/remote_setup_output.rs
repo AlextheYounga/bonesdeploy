@@ -1,6 +1,6 @@
 use std::env;
 use std::io::{self, BufRead, BufReader, IsTerminal, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::result::Result as StdResult;
 use std::sync::mpsc::{self, Sender};
@@ -29,7 +29,12 @@ enum OutputLine {
     Error(String),
 }
 
-pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_vars: Value, extra_args: &[String]) -> Result<()> {
+pub(crate) fn run(
+    cfg: &config::BonesConfig,
+    ssh_user: &str,
+    extra_vars: Value,
+    playbook: &remote_setup::AnsiblePlaybook<'_>,
+) -> Result<()> {
     remote_setup::ensure_remote_python3_available(cfg, ssh_user)?;
 
     let interactive = io::stdout().is_terminal();
@@ -38,7 +43,7 @@ pub(crate) fn run(cfg: &config::BonesConfig, ssh_user: &str, extra_vars: Value, 
     stdout.flush()?;
 
     let vars_file = write_vars_file(&build_ansible_vars(cfg, extra_vars)?)?;
-    let child = build_ansible_command(cfg, ssh_user, vars_file.path(), extra_args)?
+    let child = build_ansible_command(cfg, ssh_user, vars_file.path(), playbook)?
         .spawn()
         .context("Failed to run ansible-playbook")?;
 
@@ -54,47 +59,50 @@ fn build_ansible_command(
     cfg: &config::BonesConfig,
     ssh_user: &str,
     vars_file: &Path,
-    extra_args: &[String],
+    playbook: &remote_setup::AnsiblePlaybook<'_>,
 ) -> Result<Command> {
-    validate_playbook_and_roles_directories()?;
+    validate_playbook_and_roles_directories(playbook)?;
 
     let ansible_playbook_binary = remote_setup::resolve_ansible_playbook_binary()?;
     let mut command = Command::new(&ansible_playbook_binary);
 
-    add_base_ansible_args(&mut command, cfg, ssh_user);
+    add_base_ansible_args(&mut command, cfg, ssh_user, playbook);
     command.arg("-e").arg(format!("@{}", vars_file.display()));
-    add_final_args(&mut command, extra_args);
+    add_final_args(&mut command, playbook);
 
     Ok(command)
 }
 
-fn validate_playbook_and_roles_directories() -> Result<()> {
-    let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
-    if !playbook.is_file() {
-        bail!("Missing remote setup playbook: {}", playbook.display());
+fn validate_playbook_and_roles_directories(playbook: &remote_setup::AnsiblePlaybook<'_>) -> Result<()> {
+    if !playbook.playbook.is_file() {
+        bail!("Missing remote playbook: {}", playbook.playbook.display());
     }
 
-    let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
-    if !roles_dir.is_dir() {
-        bail!("Missing remote roles directory: {}", roles_dir.display());
+    for roles_dir in playbook.roles_dirs {
+        if !roles_dir.is_dir() {
+            bail!("Missing remote roles directory: {}", roles_dir.display());
+        }
     }
 
     Ok(())
 }
 
-fn add_base_ansible_args(command: &mut Command, cfg: &config::BonesConfig, ssh_user: &str) {
-    let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
+fn add_base_ansible_args(
+    command: &mut Command,
+    cfg: &config::BonesConfig,
+    ssh_user: &str,
+    playbook: &remote_setup::AnsiblePlaybook<'_>,
+) {
     let inventory = format!("{},", cfg.data.host);
-    let roles_path = env_ansible_roles_path(roles_dir);
+    let roles_path = env_ansible_roles_path(playbook.roles_dirs);
 
     command.env("ANSIBLE_ROLES_PATH", roles_path);
     command.arg("-i").arg(&inventory).arg("-u").arg(ssh_user);
 }
 
-fn add_final_args(command: &mut Command, extra_args: &[String]) {
-    let playbook = Path::new(config::Constants::BONES_REMOTE_SETUP_PLAYBOOK);
-    command.args(extra_args);
-    command.arg(playbook);
+fn add_final_args(command: &mut Command, playbook: &remote_setup::AnsiblePlaybook<'_>) {
+    command.args(playbook.extra_args);
+    command.arg(playbook.playbook);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
 }
 
@@ -210,11 +218,12 @@ fn write_output_line<W: Write>(writer: &mut W, progress: &mut Progress, line: Ou
     Ok(())
 }
 
-fn env_ansible_roles_path(roles_dir: &Path) -> String {
+fn env_ansible_roles_path(roles_dirs: &[PathBuf]) -> String {
+    let joined = roles_dirs.iter().map(|path| path.display().to_string()).collect::<Vec<_>>().join(":");
     env::var("ANSIBLE_ROLES_PATH")
         .ok()
         .filter(|value| !value.is_empty())
-        .map_or_else(|| roles_dir.display().to_string(), |existing| format!("{}:{existing}", roles_dir.display()))
+        .map_or_else(|| joined.clone(), |existing| format!("{joined}:{existing}"))
 }
 
 fn build_ansible_vars(cfg: &config::BonesConfig, extra_vars: Value) -> Result<Value> {

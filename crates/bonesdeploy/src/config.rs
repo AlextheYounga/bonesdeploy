@@ -4,8 +4,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use shared::paths;
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BonesConfig {
     #[serde(default)]
@@ -19,13 +19,16 @@ pub struct BonesConfig {
 }
 
 pub struct Constants;
-
 impl Constants {
     pub const BONES_DIR: &'static str = paths::LOCAL_BONES_DIR;
     pub const BONES_YAML: &'static str = paths::LOCAL_BONES_YAML;
     pub const BONES_HOOKS_SCRIPT: &'static str = paths::LOCAL_BONES_HOOKS_SCRIPT;
     pub const BONES_HOOKS_DIR: &'static str = paths::LOCAL_BONES_HOOKS_DIR;
     pub const BONES_DEPLOYMENT_DIR: &'static str = paths::LOCAL_BONES_DEPLOYMENT_DIR;
+    pub const BONES_RUNTIME_DIR: &'static str = paths::LOCAL_BONES_RUNTIME_DIR;
+    pub const BONES_RUNTIME_YAML: &'static str = paths::LOCAL_BONES_RUNTIME_YAML;
+    pub const BONES_REMOTE_RUNTIME_PLAYBOOK: &'static str = paths::LOCAL_BONES_RUNTIME_PLAYBOOK;
+    pub const BONES_REMOTE_RUNTIME_ROLES_DIR: &'static str = paths::LOCAL_BONES_RUNTIME_ROLES_DIR;
     pub const BONES_REMOTE_SETUP_PLAYBOOK: &'static str = paths::LOCAL_BONES_SETUP_PLAYBOOK;
     pub const BONES_REMOTE_ROLES_DIR: &'static str = paths::LOCAL_BONES_SETUP_ROLES_DIR;
 
@@ -60,7 +63,6 @@ pub struct Data {
     pub branch: String,
     pub deploy_on_push: bool,
 }
-
 impl Default for Data {
     fn default() -> Self {
         Self {
@@ -131,7 +133,7 @@ impl Default for PermissionDefaults {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PathOverride {
     pub path: String,
     pub mode: String,
@@ -180,6 +182,21 @@ pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
     hide_derived_defaults(&mut to_serialize);
 
     let yaml = serde_yml::to_string(&to_serialize).context("Failed to serialize bones config")?;
+    fs::write(path, yaml).with_context(|| format!("Failed to write {}", path.display()))?;
+    Ok(())
+}
+
+pub fn load_runtime(path: &Path) -> Result<Map<String, Value>> {
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let value: Value = serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    match value {
+        Value::Object(map) => Ok(map),
+        _ => anyhow::bail!("{} must contain a YAML object", path.display()),
+    }
+}
+
+pub fn save_runtime(runtime: &Map<String, Value>, path: &Path) -> Result<()> {
+    let yaml = serde_yml::to_string(runtime).context("Failed to serialize runtime config")?;
     fs::write(path, yaml).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }

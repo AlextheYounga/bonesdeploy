@@ -87,13 +87,12 @@ BonesDeploy assumes opinionated server defaults unless you change them in `.bone
 - `service_user = "<project_name>"`
 - `group = "www-data"`
 
-The `init` command runs the Ansible setup playbook against your configured remote host.
+The `init` command creates the local `.bones/` scaffold and records project settings.
 If `ansible-playbook` is missing, BonesDeploy installs Ansible automatically with `python3 -m pip install --user ansible`.
-Template-based projects also scaffold language-specific setup roles (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install global PM2/PNPM tools).
-Every setup also installs nginx and provisions a default project vhost that serves `.bones/remote/roles/nginx/defaults/index.html.j2` until your first deployment is live.
-Per-site nginx is confined under AppArmor with unix-socket-only network access.
+Template-based projects then use `bonesdeploy remote runtime` to prompt for a framework and scaffold runtime assets (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install global PM2/PNPM tools).
+`bonesdeploy remote setup` handles machine bootstrap, while `bonesdeploy remote runtime` applies per-site runtime assets such as AppArmor and nginx after a quick confirmation prompt.
 
-To customize nginx behavior, edit `.bones/remote/nginx/router.conf.j2` and re-run `bonesdeploy remote setup`.
+To customize nginx behavior, edit `.bones/runtime/nginx/router.conf.j2` and re-run `bonesdeploy remote runtime`.
 
 When DNS is ready, enable SSL with certbot:
 
@@ -101,7 +100,7 @@ When DNS is ready, enable SSL with certbot:
 bonesdeploy remote ssl --domain app.example.com --email ops@example.com
 ```
 
-This obtains a Let's Encrypt certificate and updates the managed nginx router config to listen on 443 and redirect HTTP to HTTPS.
+This obtains a Let's Encrypt certificate and updates the managed runtime nginx router config to listen on 443 and redirect HTTP to HTTPS.
 
 ### Syncing Configuration
 
@@ -207,9 +206,12 @@ ssl:
 ```
 .bones/
 ├── bones.yaml           # project configuration
+├── runtime.yaml         # framework runtime configuration
 ├── hooks.sh             # shared hook functions imported by hook entrypoints
 ├── deployment/
 │   └── 01_*.sh          # deployment scripts (run sequentially)
+├── runtime/
+│   └── ...              # framework runtime assets
 └── hooks/
     ├── pre-push         # symlinked to .git/hooks/pre-push
     ├── pre-receive

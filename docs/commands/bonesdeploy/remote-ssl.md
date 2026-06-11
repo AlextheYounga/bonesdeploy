@@ -2,7 +2,7 @@
 
 ## Overview
 
-Configures SSL/TLS certificates for the deployment using Let's Encrypt and certbot. This command runs the remote setup playbook with SSL-specific variables, obtaining certificates and configuring Nginx for HTTPS. It updates the `bones.yaml` configuration to mark SSL as enabled after successful setup.
+Configures SSL/TLS certificates for the deployment using Let's Encrypt and certbot. This command runs the remote setup playbook with SSL-specific variables, obtaining certificates and updating the runtime nginx router for HTTPS. It updates the `bones.yaml` configuration to mark SSL as enabled after successful setup.
 
 ## Command Signature
 
@@ -120,7 +120,7 @@ Displays the target host and domain being configured.
 ```rust
 let extra_args = vec![
     String::from("--tags"),
-    String::from("nginx,ssl"),
+        String::from("ssl"),
     String::from("-e"),
     String::from("ssl_enabled=true"),
     String::from("-e"),
@@ -131,7 +131,7 @@ let extra_args = vec![
 ```
 
 **Ansible Tags:**
-- `--tags nginx,ssl`: Only runs tasks tagged with `nginx` or `ssl` (skips other setup tasks)
+- `--tags ssl`: Only runs SSL tasks in the shared remote setup playbook
 
 **Extra Variables:**
 - `ssl_enabled=true`: Signals SSL should be configured
@@ -156,7 +156,7 @@ cfg_for_run.ssl.enabled = false;
 
 Temporarily disables the `ssl.enabled` flag for the Ansible run. This prevents the playbook from using existing SSL configuration during setup.
 
-**Why?** The Ansible playbook needs to configure Nginx for HTTP first (port 80) to allow certbot to validate the domain before setting up HTTPS (port 443).
+**Why?** The Ansible playbook needs the runtime router and certbot pieces in place before it can validate the domain and switch to HTTPS.
 
 ---
 

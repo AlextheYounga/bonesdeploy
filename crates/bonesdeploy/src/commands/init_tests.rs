@@ -45,7 +45,6 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
         remote: None,
         host: Some(String::from("deploy.example.com")),
         port: None,
-        template: None,
     };
 
     let cfg = collect_non_interactive("workspace", Some(&seed), &args)?;
@@ -71,7 +70,6 @@ fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() -> R
         remote: None,
         host: None,
         port: None,
-        template: None,
     };
 
     let result = collect_non_interactive("workspace", Some(&seed), &args);

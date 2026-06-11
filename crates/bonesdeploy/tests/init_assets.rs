@@ -22,16 +22,6 @@ const TEMPLATE_SETUP_VARS_FILES: [&str; 7] = [
     "templates/vue/setup/vars/setup.yml",
 ];
 
-const TEMPLATE_SETUP_PLAYBOOKS: [&str; 7] = [
-    "templates/django/setup/playbooks/setup.yml",
-    "templates/laravel/setup/playbooks/setup.yml",
-    "templates/next/setup/playbooks/setup.yml",
-    "templates/nuxt/setup/playbooks/setup.yml",
-    "templates/rails/setup/playbooks/setup.yml",
-    "templates/sveltekit/setup/playbooks/setup.yml",
-    "templates/vue/setup/playbooks/setup.yml",
-];
-
 #[path = "init_assets/apparmor.rs"]
 mod apparmor;
 #[path = "init_assets/firewall.rs"]

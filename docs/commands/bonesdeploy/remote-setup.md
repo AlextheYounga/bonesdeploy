@@ -2,7 +2,7 @@
 
 ## Overview
 
-Provisions the remote server for deployment by running an Ansible playbook that sets up the required infrastructure, including user accounts, directory structures, permissions, systemd services, and any application-specific dependencies. This command is typically run once per project during initial setup.
+Provisions the remote server for deployment by running an Ansible playbook that sets up the required infrastructure, including user accounts, directory structures, permissions, and machine-level dependencies. This command is typically run once per project during initial setup.
 
 ## Detailed Execution Steps
 
@@ -34,25 +34,17 @@ if !playbook.is_file() {
 }
 ```
 
-Checks for the existence of `.bones/remote/playbooks/setup.yml`.
+Checks for the existence of `.bones/setup/playbooks/setup.yml`.
 
-**Expected location:** `.bones/remote/playbooks/setup.yml`
+**Expected location:** `.bones/setup/playbooks/setup.yml`
 
 This playbook is responsible for:
 - Creating deploy user
 - Creating service user
-- Installing and enabling AppArmor
-- Verifying kernel AppArmor is enabled (`/sys/module/apparmor/parameters/enabled`)
-- Deploying a per-project AppArmor profile for per-site nginx
-- Loading the profile and setting it to enforce mode
-- Verifying the profile is loaded via `/sys/kernel/security/apparmor/profiles`
-- Verifying the specific project profile line appears as `(enforce)` in `/sys/kernel/security/apparmor/profiles`
 - Setting up directory structure
 - Configuring permissions
 - Installing dependencies
-- Setting up systemd service
-- Configuring Nginx
-- Setting up SSL (if enabled)
+- Bootstrapping shared machine roles like common tools, users, firewall, and SSL tooling
 
 ---
 
@@ -150,7 +142,7 @@ println!(
 );
 ```
 
-Displays target host and SSH user.
+Displays target host and deploy SSH user.
 
 ---
 
@@ -220,7 +212,7 @@ fi
 **Source:** `remote_setup.rs:30`, `remote_setup.rs:37-106`
 
 ```rust
-run_ansible_playbook(&cfg, &cfg.permissions.defaults.deploy_user, &[])?;
+run_ansible_playbook(&cfg, &cfg.permissions.defaults.deploy_user, extra_vars, &playbook_args)?;
 ```
 
 #### 6.1 Verify Playbook and Roles
@@ -233,10 +225,10 @@ if !playbook.is_file() {
     bail!("Missing remote setup playbook: {}", playbook.display());
 }
 
-let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
-if !roles_dir.is_dir() {
-    bail!("Missing site roles directory: {}", roles_dir.display());
-}
+    let roles_dir = Path::new(config::Constants::BONES_REMOTE_ROLES_DIR);
+    if !roles_dir.is_dir() {
+        bail!("Missing setup roles directory: {}", roles_dir.display());
+    }
 ```
 
 Ensures both the playbook and roles directory exist before proceeding.
@@ -318,7 +310,7 @@ command
 
 ### AppArmor Verification Runbook (Linux Host)
 
-After `bonesdeploy remote setup` succeeds, verify AppArmor provisioning and service binding:
+After `bonesdeploy remote setup` and `bonesdeploy remote runtime` succeed, verify AppArmor provisioning and service binding:
 
 ```bash
 bonesdeploy remote setup
@@ -373,7 +365,7 @@ let status = command.status().context("Failed to run ansible-playbook")?;
 
 **Example Command:**
 ```bash
-ANSIBLE_ROLES_PATH=/path/to/.bones/remote/roles \
+ANSIBLE_ROLES_PATH=/path/to/.bones/setup/roles \
 ansible-playbook \
   -i "deploy.example.com," \
   -u git \
@@ -386,7 +378,7 @@ ansible-playbook \
   -e "project_root=/srv/deployments/myapp" \
   -e "project_name=myapp" \
   -e "repo_path=/home/git/myapp.git" \
-  .bones/remote/playbooks/setup.yml
+   .bones/setup/playbooks/setup.yml
 ```
 
 #### 9.1 Playbook Execution
@@ -416,10 +408,7 @@ The playbook typically includes tasks for:
 
 5. **Per-Site Nginx**
    - Install Nginx
-    - Configure per-site nginx with AppArmor and systemd sandboxing
-   - Set up socket directory (`/run/{project}/`)
-   - Create nginx systemd service
-   - Configure main router nginx
+    - Configure machine-level dependencies and shared bootstrap roles
 
 6. **SSL (if enabled)**
    - Set up SSL certificates
@@ -483,7 +472,7 @@ The setup process is highly customizable through Ansible:
 
 ### Custom Playbooks
 
-Edit `.bones/remote/playbooks/setup.yml` to add custom setup tasks:
+Edit `.bones/setup/playbooks/setup.yml` to add custom setup tasks:
 ```yaml
 ---
 - hosts: all
@@ -492,7 +481,7 @@ Edit `.bones/remote/playbooks/setup.yml` to add custom setup tasks:
     - common
     - deploy_user
     - service_user
-    - nginx
+    - ssl
     - ssl
   tasks:
     - name: Custom task
@@ -501,9 +490,9 @@ Edit `.bones/remote/playbooks/setup.yml` to add custom setup tasks:
 
 ### Custom Roles
 
-Add roles to `.bones/remote/roles/`:
+Add roles to `.bones/setup/roles/`:
 ```
-.bones/remote/roles/
+.bones/setup/roles/
 ├── common/
 ├── deploy_user/
 ├── service_user/
