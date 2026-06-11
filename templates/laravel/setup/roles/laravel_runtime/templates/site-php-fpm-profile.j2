@@ -23,6 +23,9 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-php
   /proc/** r,
   /sys/devices/system/cpu/online r,
 
+  {{ paths.conf_root }}/ r,
+  {{ paths.conf_root }}/** r,
+
   {{ paths.current }}/** r,
   {{ paths.current }}/storage/** rw,
   {{ paths.current }}/bootstrap/cache/** rw,

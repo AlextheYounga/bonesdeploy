@@ -52,6 +52,25 @@ fn apparmor_profile_template_allows_site_nginx_conf() {
     );
 }
 
+/// Allows reading the per-site conf root in the Laravel PHP-FPM AppArmor profile.
+#[test]
+fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
+    let profile_template =
+        project_root().join("templates/laravel/setup/roles/laravel_runtime/templates/site-php-fpm-profile.j2");
+    let content = fs::read_to_string(&profile_template);
+    assert!(content.is_ok(), "failed to read {}", profile_template.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("{{ paths.conf_root }}/ r,"),
+        "Laravel PHP-FPM AppArmor profile must allow reading the site config directory itself\n{content}"
+    );
+    assert!(
+        content.contains("{{ paths.conf_root }}/** r,"),
+        "Laravel PHP-FPM AppArmor profile must allow reading files beneath the site config directory\n{content}"
+    );
+}
+
 /// Does not deny the parent home path when the repo path is derived from the shared helper.
 #[test]
 fn apparmor_profile_template_does_not_deny_repo_path_parent_home() {
