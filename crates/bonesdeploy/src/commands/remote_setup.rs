@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::env;
 use std::fs;
 use std::io::{ErrorKind, Write};
@@ -79,73 +78,7 @@ pub fn run_ansible_playbook(
     extra_vars: serde_json::Value,
     extra_args: &[String],
 ) -> Result<()> {
-    let extra_vars = merge_setup_apt_packages(extra_vars)?;
     remote_setup_output::run(cfg, ssh_user, extra_vars, extra_args)
-}
-
-fn merge_setup_apt_packages(extra_vars: serde_json::Value) -> Result<serde_json::Value> {
-    let mut extra_vars = match extra_vars {
-        serde_json::Value::Object(map) => map,
-        serde_json::Value::Null => serde_json::Map::new(),
-        other => bail!("extra vars must be a JSON object, got {other}"),
-    };
-
-    let packages = load_setup_apt_packages()?;
-    extra_vars.insert(
-        String::from("setup_apt_packages"),
-        serde_json::Value::Array(packages.into_iter().map(serde_json::Value::String).collect()),
-    );
-
-    Ok(serde_json::Value::Object(extra_vars))
-}
-
-fn load_setup_apt_packages() -> Result<Vec<String>> {
-    let mut package_lists = vec![parse_aptfile(Path::new(config::Constants::BONES_REMOTE_APTFILE))?];
-
-    for path in supplementary_aptfiles()? {
-        package_lists.push(parse_aptfile(&path)?);
-    }
-
-    Ok(merge_apt_packages(package_lists))
-}
-
-fn supplementary_aptfiles() -> Result<Vec<PathBuf>> {
-    let remote_dir = Path::new(config::Constants::BONES_REMOTE_DIR);
-    if !remote_dir.is_dir() {
-        return Ok(Vec::new());
-    }
-
-    let mut files = fs::read_dir(remote_dir)
-        .with_context(|| format!("Failed to read {}", remote_dir.display()))?
-        .filter_map(|entry| entry.ok().map(|item| item.path()))
-        .filter(|path| path.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.starts_with("Aptfile.")))
-        .collect::<Vec<_>>();
-    files.sort();
-    Ok(files)
-}
-
-fn parse_aptfile(path: &Path) -> Result<Vec<String>> {
-    let content = fs::read_to_string(path).with_context(|| format!("Failed to read Aptfile: {}", path.display()))?;
-
-    Ok(content
-        .lines()
-        .map(str::trim)
-        .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .map(String::from)
-        .collect())
-}
-
-fn merge_apt_packages(package_lists: Vec<Vec<String>>) -> Vec<String> {
-    let mut seen = BTreeSet::new();
-    let mut merged = Vec::new();
-
-    for package in package_lists.into_iter().flatten() {
-        if seen.insert(package.clone()) {
-            merged.push(package);
-        }
-    }
-
-    merged
 }
 
 pub(crate) fn ensure_remote_python3_available(cfg: &config::BonesConfig, ssh_user: &str) -> Result<()> {
@@ -303,15 +236,7 @@ fn user_ansible_playbook_path() -> Result<Option<PathBuf>> {
 
 #[cfg(test)]
 mod tests {
-    use std::env::temp_dir;
-    use std::fs;
-    use std::path::PathBuf;
-    use std::process;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    use anyhow::Result;
-
-    use super::{merge_apt_packages, parse_aptfile, resolve_bootstrap_ssh_user_from};
+    use super::resolve_bootstrap_ssh_user_from;
 
     /// Defaults the bootstrap SSH user to root when no override is provided.
     #[test]
@@ -335,36 +260,5 @@ mod tests {
 
         let user = resolve_bootstrap_ssh_user_from(Some(String::from("  ubuntu  ")));
         assert_eq!(user, "ubuntu");
-    }
-
-    /// Ignores blank lines and comments when parsing `Aptfile` package lists.
-    #[test]
-    fn aptfile_parser_ignores_blank_lines_and_comments() -> Result<()> {
-        let path = test_path("aptfile-parser");
-        fs::write(&path, "curl\n\n# comment\n git \n")?;
-
-        let packages = parse_aptfile(&path)?;
-
-        assert_eq!(packages, vec![String::from("curl"), String::from("git")]);
-        Ok(())
-    }
-
-    /// Merges shared and template-specific `Aptfile` packages without duplicates while preserving first-seen order.
-    #[test]
-    fn merge_apt_packages_deduplicates_and_preserves_order() {
-        let merged = merge_apt_packages(vec![
-            vec![String::from("curl"), String::from("git"), String::from("nginx")],
-            vec![String::from("git"), String::from("python3")],
-        ]);
-
-        assert_eq!(
-            merged,
-            vec![String::from("curl"), String::from("git"), String::from("nginx"), String::from("python3")]
-        );
-    }
-
-    fn test_path(label: &str) -> PathBuf {
-        let unique = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
-        temp_dir().join(format!("bonesdeploy-{label}-{}-{unique}", process::id()))
     }
 }

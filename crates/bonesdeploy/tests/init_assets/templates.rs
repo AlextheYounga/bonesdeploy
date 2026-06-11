@@ -17,9 +17,9 @@ fn template_service_user_defaults_to_project_name_not_applications() {
     }
 }
 
-/// Defines runtime role and setup label metadata in template vars files.
+/// Defines runtime role, setup label, and apt package metadata in template vars files.
 #[test]
-fn template_setup_vars_files_define_runtime_metadata() {
+fn template_setup_vars_files_define_runtime_and_package_metadata() {
     for vars_file in TEMPLATE_SETUP_VARS_FILES {
         let path = project_root().join(vars_file);
         let content = fs::read_to_string(&path);
@@ -34,9 +34,12 @@ fn template_setup_vars_files_define_runtime_metadata() {
             content.contains("setup_label:"),
             "template vars file {vars_file} must define the setup label\n{content}"
         );
+        assert!(
+            content.contains("setup_apt_packages:"),
+            "template vars file {vars_file} must define the apt package list\n{content}"
+        );
     }
 }
-
 /// Pins the Laravel PHP version in the template setup vars file so sites can override it per template.
 #[test]
 fn laravel_template_setup_vars_file_defines_php_version() {
@@ -49,6 +52,24 @@ fn laravel_template_setup_vars_file_defines_php_version() {
         content.contains("laravel_php_version: \"8.3\""),
         "laravel template setup vars must define the PHP version override
 {content}"
+    );
+}
+
+/// Templates PHP package names in Laravel setup apt packages so they match the configured PHP version.
+#[test]
+fn laravel_template_setup_apt_packages_use_versioned_php_packages() {
+    let path = project_root().join("templates/laravel/.lib/remote/vars/setup.yml");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("\"php{{ laravel_php_version }}\""),
+        "laravel template setup apt packages must use versioned PHP package names\n{content}"
+    );
+    assert!(
+        content.contains("\"php{{ laravel_php_version }}-fpm\""),
+        "laravel template setup apt packages must include versioned PHP-FPM\n{content}"
     );
 }
 
@@ -67,11 +88,20 @@ fn laravel_runtime_role_defaults_do_not_define_php_version() {
     );
 }
 
-/// Ensures the shared scaffold embeds `kit/.lib/remote/Aptfile` as the base setup package manifest.
+/// Defines the base apt packages in the shared scaffold vars file.
 #[test]
-fn shared_remote_scaffold_embeds_base_aptfile() {
-    let aptfile = project_root().join("kit/.lib/remote/Aptfile");
-    assert!(aptfile.is_file(), "expected shared remote Aptfile at {}", aptfile.display());
+fn shared_remote_scaffold_vars_file_defines_base_apt_packages() {
+    let vars_file = project_root().join("kit/.lib/remote/vars/setup.yml");
+    let content = fs::read_to_string(&vars_file);
+    assert!(content.is_ok(), "failed to read {}", vars_file.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("setup_apt_packages:"),
+        "shared remote vars file must define the base apt package list\n{content}"
+    );
+    assert!(content.contains("nginx"), "shared remote vars file must include nginx in apt packages\n{content}");
+    assert!(content.contains("certbot"), "shared remote vars file must include certbot in apt packages\n{content}");
 }
 
 /// Does not install global npm packages in SPA template runtime roles.

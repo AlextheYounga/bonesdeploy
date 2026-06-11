@@ -1,3 +1,15 @@
 ---
 runtime_role: vue_runtime
 setup_label: Vue
+setup_apt_packages:
+  - build-essential
+  - ca-certificates
+  - curl
+  - git
+  - rsync
+  - sudo
+  - nginx
+  - apparmor
+  - apparmor-utils
+  - certbot
+  - ufw

@@ -2,3 +2,28 @@
 runtime_role: laravel_runtime
 setup_label: Laravel
 laravel_php_version: "8.3"
+setup_apt_packages:
+  - build-essential
+  - ca-certificates
+  - curl
+  - git
+  - rsync
+  - sudo
+  - nginx
+  - apparmor
+  - apparmor-utils
+  - certbot
+  - ufw
+  - "php{{ laravel_php_version }}"
+  - "php{{ laravel_php_version }}-cli"
+  - "php{{ laravel_php_version }}-fpm"
+  - "php{{ laravel_php_version }}-bcmath"
+  - "php{{ laravel_php_version }}-curl"
+  - "php{{ laravel_php_version }}-gd"
+  - "php{{ laravel_php_version }}-intl"
+  - "php{{ laravel_php_version }}-mbstring"
+  - "php{{ laravel_php_version }}-mysql"
+  - "php{{ laravel_php_version }}-sqlite3"
+  - "php{{ laravel_php_version }}-xml"
+  - "php{{ laravel_php_version }}-zip"
+  - composer

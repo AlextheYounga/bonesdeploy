@@ -1,3 +1,15 @@
 ---
 runtime_role: nuxt_runtime
 setup_label: Nuxt
+setup_apt_packages:
+  - build-essential
+  - ca-certificates
+  - curl
+  - git
+  - rsync
+  - sudo
+  - nginx
+  - apparmor
+  - apparmor-utils
+  - certbot
+  - ufw
