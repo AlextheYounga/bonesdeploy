@@ -10,7 +10,7 @@ fn runtime_deploy_derives_profile_path_from_profile_name() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("bonesdeploy-{DEPLOY_DATA.project_name}-nginx"),
+        content.contains("DEPLOY_DATA[\"project_name\"]"),
         "runtime deploy must derive profile name from project name\n{content}"
     );
     assert!(

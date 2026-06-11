@@ -92,35 +92,7 @@ Unlike the Ansible era, no remote Python bootstrap is needed — pyinfra install
 
 **Source:** `remote_setup.rs`
 
-Constructs a JSON data object passed to pyinfra via `--data`:
-
-```json
-{
-  "ssh_port": "22",
-  "deploy_user": "git",
-  "service_user": "myapp",
-  "group": "www-data",
-  "project_root_parent": "/srv/deployments",
-  "project_root": "/srv/deployments/myapp",
-  "web_root": "public",
-  "project_name": "myapp",
-  "repo_path": "/home/git/myapp.git",
-  "deploy_authorized_key": "ssh-ed25519 AAAA...",
-  "setup_label": "BonesDeploy machine bootstrap",
-  "paths": {
-    "repo": "/home/git/myapp.git",
-    "repo_parent": "/home/git",
-    "repo_bones": "/home/git/myapp.git/bones",
-    "project_root_parent": "/srv/deployments",
-    "project_root": "/srv/deployments/myapp",
-    "placeholder_web_root": "/srv/deployments/myapp/releases/19700101_000000/public",
-    "placeholder_index": "/srv/deployments/myapp/releases/19700101_000000/public/index.html",
-    "placeholder_release": "/srv/deployments/myapp/releases/19700101_000000",
-    "current": "/srv/deployments/myapp/current",
-    ...
-  }
-}
-```
+Constructs data variables passed to pyinfra via repeated `--data key=value` CLI flags. Nested objects (like `DeploymentPaths`) are flattened into dotted keys (e.g. `--data paths.repo=/home/git/myapp.git`). The deploy scripts unflatten these back to nested dicts before use.
 
 The deploy user's public SSH key is resolved from `BONES_DEPLOY_PUBLIC_KEY_PATH` (falls back to `~/.ssh/id_ed25519.pub` → `id_ecdsa.pub` → `id_rsa.pub`). This key is installed as an authorized key for the deploy user so future connections (runtime, push, deploy) can connect without root.
 
@@ -130,10 +102,10 @@ The deploy user's public SSH key is resolved from `BONES_DEPLOY_PUBLIC_KEY_PATH`
 
 **Source:** `remote_setup.rs`
 
-Writes a temporary inventory file (one host per line) and data file, then invokes:
+Invokes pyinfra with the host directly (no temporary inventory file) and data passed as CLI flags:
 
 ```bash
-pyinfra <inventory_file> .bones/infra/setup.py --data <data_file> -vv
+pyinfra <host> .bones/infra/setup.py --ssh-user root --ssh-port 22 --data ssh_port=22 --data deploy_user=git --data paths.repo=/home/git/myapp.git --data paths.project_root=/srv/deployments/myapp ... -vv
 ```
 
 The pyinfra deploy script performs these operations in order:

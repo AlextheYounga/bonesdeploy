@@ -37,7 +37,7 @@ Prompts `y/N` before running the remote deploy. On confirmation:
 Connects as the deploy user (from `bones.yaml`) — root is not needed since service management and nginx config are handled via `sudo` inside the pyinfra operations.
 
 ```bash
-pyinfra <inventory_file> .bones/infra/runtime.py --data <data_file> -vv
+pyinfra <host> .bones/infra/runtime.py --ssh-user git --ssh-port 22 --data deploy_user=git --data project_name=myapp --data paths.repo=/home/git/myapp.git ... -vv
 ```
 
 The runtime pyinfra deploy performs these operations in order:

@@ -29,7 +29,7 @@ Per-project systemd service unit for the site-local nginx. Variables: `project_n
 
 ## Data Format
 
-All deploy scripts receive a flat JSON dictionary passed via pyinfra `--data`. The data is built in Rust from `bones.yaml` and computed `DeploymentPaths`. Scripts access values through: `host.data.<key>`.
+All deploy scripts receive data via pyinfra `--data key=value` CLI flags. Nested objects (like `DeploymentPaths`) are flattened to dotted keys (e.g. `--data paths.repo=/home/git/myapp.git`). Each script calls `_unflatten(host.data.dict())` to reconstruct nested dicts for template rendering. Direct access uses `DEPLOY_DATA["key"]` or `DEPLOY_DATA.get("key")`.
 
 ## Python Dependencies
 

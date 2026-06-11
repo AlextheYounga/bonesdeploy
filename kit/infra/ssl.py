@@ -3,10 +3,23 @@ import os
 from pyinfra import host
 from pyinfra.operations import files, server, systemd
 
+
+def _unflatten(data_dict):
+    result = {}
+    for key, value in data_dict.items():
+        parts = key.split(".")
+        node = result
+        for part in parts[:-1]:
+            if part not in node:
+                node[part] = {}
+            node = node[part]
+        node[parts[-1]] = value
+    return result
+
+
 here = os.path.dirname(__file__)
-DEPLOY_DATA = host.data
-PATHS = DEPLOY_DATA.paths
-TEMPLATE_DATA = DEPLOY_DATA.dict()
+DEPLOY_DATA = _unflatten(host.data.dict())
+PATHS = DEPLOY_DATA.get("paths", {})
 
 # Validate inputs
 assert DEPLOY_DATA.get("ssl_domain"), "ssl_domain is required"
@@ -20,9 +33,9 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    nginx_server_name=DEPLOY_DATA.ssl_domain,
+    nginx_server_name=DEPLOY_DATA["ssl_domain"],
     nginx_ssl_enabled=False,
-    **TEMPLATE_DATA,
+    **DEPLOY_DATA,
     _sudo=True,
 )
 
@@ -43,10 +56,10 @@ server.shell(
     name="Obtain or renew certificate",
     commands=[
         "certbot certonly --non-interactive --agree-tos "
-        f"--email {DEPLOY_DATA.ssl_email} "
+        f"--email {DEPLOY_DATA["ssl_email"]} "
         "--webroot "
         f"-w {PATHS['current_web_root']} "
-        f"-d {DEPLOY_DATA.ssl_domain} "
+        f"-d {DEPLOY_DATA["ssl_domain"]} "
         "--keep-until-expiring"
     ],
     _sudo=True,
@@ -60,11 +73,11 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    nginx_server_name=DEPLOY_DATA.ssl_domain,
+    nginx_server_name=DEPLOY_DATA["ssl_domain"],
     nginx_ssl_enabled=True,
-    nginx_ssl_certificate_path=f"/etc/letsencrypt/live/{DEPLOY_DATA.ssl_domain}/fullchain.pem",
-    nginx_ssl_certificate_key_path=f"/etc/letsencrypt/live/{DEPLOY_DATA.ssl_domain}/privkey.pem",
-    **TEMPLATE_DATA,
+    nginx_ssl_certificate_path=f"/etc/letsencrypt/live/{DEPLOY_DATA["ssl_domain"]}/fullchain.pem",
+    nginx_ssl_certificate_key_path=f"/etc/letsencrypt/live/{DEPLOY_DATA["ssl_domain"]}/privkey.pem",
+    **DEPLOY_DATA,
     _sudo=True,
 )
 

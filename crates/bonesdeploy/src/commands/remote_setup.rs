@@ -11,6 +11,34 @@ use serde_json::Value;
 use crate::config;
 use shared::paths::{self, DeploymentPaths};
 
+fn flatten_data_vars(value: &Value, out: &mut Vec<String>) {
+    if let Value::Object(map) = value {
+        for (key, val) in map {
+            flatten_data_entries(&key.clone(), val, out);
+        }
+    }
+}
+
+fn flatten_data_entries(prefix: &str, value: &Value, out: &mut Vec<String>) {
+    match value {
+        Value::Object(map) => {
+            for (key, val) in map {
+                flatten_data_entries(&format!("{prefix}.{key}"), val, out);
+            }
+        }
+        Value::String(s) => {
+            out.push(format!("{prefix}={s}"));
+        }
+        Value::Number(n) => {
+            out.push(format!("{prefix}={n}"));
+        }
+        Value::Bool(b) => {
+            out.push(format!("{prefix}={b}"));
+        }
+        _ => {}
+    }
+}
+
 pub struct PyinfraDeploy<'a> {
     pub deploy_file: &'a Path,
     pub extra_args: &'a [String],
@@ -103,9 +131,6 @@ pub fn run_pyinfra_deploy(
     data_vars: &serde_json::Value,
     deploy: &PyinfraDeploy<'_>,
 ) -> Result<()> {
-    let inventory_file = write_inventory_file(cfg, ssh_user)?;
-    let data_file = write_data_file(data_vars)?;
-
     let pyinfra = resolve_pyinfra_binary()?;
 
     println!(
@@ -115,14 +140,26 @@ pub fn run_pyinfra_deploy(
         style(ssh_user).cyan(),
     );
 
+    let mut data_args: Vec<String> = Vec::new();
+    flatten_data_vars(data_vars, &mut data_args);
+
     let mut command = Command::new(&pyinfra);
-    command.arg(&inventory_file).arg(deploy.deploy_file);
+    command
+        .arg(&cfg.data.host)
+        .arg(deploy.deploy_file)
+        .arg("--ssh-user")
+        .arg(ssh_user)
+        .arg("--ssh-port")
+        .arg(&cfg.data.port);
 
     for arg in deploy.extra_args {
         command.arg(arg);
     }
 
-    command.arg("--data").arg(&data_file);
+    for data_arg in data_args {
+        command.arg("--data").arg(data_arg);
+    }
+
     command.arg("-vv");
 
     let status = command.status().context("Failed to run pyinfra")?;
@@ -132,25 +169,6 @@ pub fn run_pyinfra_deploy(
     }
 
     Ok(())
-}
-
-fn write_inventory_file(cfg: &config::BonesConfig, _ssh_user: &str) -> Result<PathBuf> {
-    let temp = tempfile::NamedTempFile::new().context("Failed to create temp inventory file")?;
-    let content = format!(
-        r"# Auto-generated inventory
-{host}
-",
-        host = cfg.data.host
-    );
-    fs::write(temp.path(), content).context("Failed to write inventory file")?;
-    Ok(temp.path().to_path_buf())
-}
-
-fn write_data_file(data_vars: &serde_json::Value) -> Result<PathBuf> {
-    let temp = tempfile::NamedTempFile::new().context("Failed to create temp data file")?;
-    let content = serde_json::to_string_pretty(data_vars).context("Failed to serialize data vars")?;
-    fs::write(temp.path(), content).context("Failed to write data file")?;
-    Ok(temp.path().to_path_buf())
 }
 
 pub(crate) fn ensure_pyinfra_installed() -> Result<()> {

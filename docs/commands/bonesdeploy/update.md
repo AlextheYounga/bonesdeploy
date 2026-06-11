@@ -273,17 +273,7 @@ pub fn update_remote_from_source(repo_url: &str, version: &str) -> Result<()> {
 3. **Run pyinfra Deploy (as Root)** — invokes pyinfra against the remote host:
 
 ```bash
-pyinfra <inventory_file> <temp_dir>/update_bonesremote.py --data <data_file> -vv
-```
-
-Data vars passed:
-```json
-{
-  "ssh_port": "22",
-  "bonesremote_install_root": "/usr/local",
-  "bonesremote_binary_path": "/opt/bonesdeploy/current/bonesremote",
-  "bonesremote_managed_projects_root": "/srv/deployments"
-}
+pyinfra <host> <temp_dir>/update_bonesremote.py --ssh-user root --ssh-port 22 --data ssh_port=22 --data bonesremote_install_root=/usr/local --data bonesremote_binary_path=/opt/bonesdeploy/current/bonesremote --data bonesremote_managed_projects_root=/srv/deployments -vv
 ```
 
 The entire remote update is a single pyinfra deploy. No embedded playbooks or additional assets are shipped.

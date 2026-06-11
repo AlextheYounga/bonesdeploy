@@ -56,7 +56,7 @@ Scaffolds `.bones/infra/` and `.bones/runtime/` base assets if missing, ensuring
 Connects as root (or `BONES_BOOTSTRAP_SSH_USER`) since certbot and nginx configuration require elevated privileges:
 
 ```bash
-pyinfra <inventory_file> .bones/infra/ssl.py --data <data_file> -vv
+pyinfra <host> .bones/infra/ssl.py --ssh-user root --ssh-port 22 --data ssl_domain=app.example.com --data ssl_email=ops@example.com --data paths.repo=/home/git/myapp.git ... -vv
 ```
 
 **pyinfra Data Variables:**
@@ -65,7 +65,7 @@ pyinfra <inventory_file> .bones/infra/ssl.py --data <data_file> -vv
 - `nginx_ssl_certificate_path` — path to fullchain.pem
 - `nginx_ssl_certificate_key_path` — path to privkey.pem
 - `project_name`, `service_user`, `group` — deployment metadata
-- `paths` — computed `DeploymentPaths` struct
+- `paths.*` — computed `DeploymentPaths` fields, flattened as dotted keys (e.g. `paths.repo`, `paths.current`)
 
 ### 5. SSL Deploy Tasks
 

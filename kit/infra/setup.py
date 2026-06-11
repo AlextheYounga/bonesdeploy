@@ -21,8 +21,21 @@ SETUP_APT_PACKAGES = [
 ]
 
 
-DEPLOY_DATA = host.data
-PATHS = DEPLOY_DATA.paths
+def _unflatten(data_dict):
+    result = {}
+    for key, value in data_dict.items():
+        parts = key.split(".")
+        node = result
+        for part in parts[:-1]:
+            if part not in node:
+                node[part] = {}
+            node = node[part]
+        node[parts[-1]] = value
+    return result
+
+
+DEPLOY_DATA = _unflatten(host.data.dict())
+PATHS = DEPLOY_DATA.get("paths", {})
 
 
 def _load_optional_module(module_path, module_name):
@@ -52,8 +65,8 @@ apt.packages(
 files.directory(
     name="Ensure bare repo parent directory exists",
     path=PATHS["repo_parent"],
-    user=DEPLOY_DATA.deploy_user,
-    group=DEPLOY_DATA.deploy_user,
+    user=DEPLOY_DATA["deploy_user"],
+    group=DEPLOY_DATA["deploy_user"],
     mode="0755",
     _sudo=True,
 )
@@ -62,14 +75,14 @@ server.shell(
     name="Initialize bare git repo",
     commands=[f"git init --bare {PATHS['repo']}"],
     _sudo=True,
-    _sudo_user=DEPLOY_DATA.deploy_user,
+    _sudo_user=DEPLOY_DATA["deploy_user"],
 )
 
 files.directory(
     name="Ensure bare repo bones directory exists",
     path=PATHS["repo_bones"],
-    user=DEPLOY_DATA.deploy_user,
-    group=DEPLOY_DATA.deploy_user,
+    user=DEPLOY_DATA["deploy_user"],
+    group=DEPLOY_DATA["deploy_user"],
     mode="0755",
     _sudo=True,
 )
@@ -86,8 +99,8 @@ files.directory(
 files.directory(
     name="Ensure placeholder release directory exists",
     path=PATHS["placeholder_web_root"],
-    user=DEPLOY_DATA.service_user,
-    group=DEPLOY_DATA.group,
+    user=DEPLOY_DATA["service_user"],
+    group=DEPLOY_DATA["group"],
     mode="0750",
     _sudo=True,
 )
@@ -99,7 +112,7 @@ placeholder_html = f"""\
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{DEPLOY_DATA.project_name}</title>
+    <title>{DEPLOY_DATA["project_name"]}</title>
     <style>
         body {{ font-family: system-ui, sans-serif; display: flex; justify-content: center;
                align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }}
@@ -110,7 +123,7 @@ placeholder_html = f"""\
 </head>
 <body>
     <main>
-        <h1>{DEPLOY_DATA.project_name}</h1>
+        <h1>{DEPLOY_DATA["project_name"]}</h1>
         <p>{DEPLOY_DATA.get('setup_label', 'bonesdeploy')} deployment coming soon.</p>
     </main>
 </body>
@@ -120,8 +133,8 @@ files.put(
     name="Seed placeholder index page",
     src=io.StringIO(placeholder_html),
     dest=placeholder_index,
-    user=DEPLOY_DATA.service_user,
-    group=DEPLOY_DATA.group,
+    user=DEPLOY_DATA["service_user"],
+    group=DEPLOY_DATA["group"],
     mode="0640",
     _sudo=True,
 )
@@ -167,7 +180,7 @@ server.shell(
 
 server.shell(
     name="Run bonesremote init",
-    commands=[f"/usr/local/bin/bonesremote init --deploy-user {DEPLOY_DATA.deploy_user}"],
+    commands=[f"/usr/local/bin/bonesremote init --deploy-user {DEPLOY_DATA["deploy_user"]}"],
     _sudo=True,
 )
 
@@ -175,7 +188,7 @@ server.shell(
 
 server.user(
     name="Ensure deploy user exists",
-    user=DEPLOY_DATA.deploy_user,
+    user=DEPLOY_DATA["deploy_user"],
     shell="/bin/bash",
     ensure_home=True,
     _sudo=True,
@@ -183,7 +196,7 @@ server.user(
 
 server.user(
     name="Ensure service user exists",
-    user=DEPLOY_DATA.service_user,
+    user=DEPLOY_DATA["service_user"],
     system=True,
     home="/nonexistent",
     shell="/usr/sbin/nologin",
@@ -193,14 +206,14 @@ server.user(
 
 server.group(
     name="Ensure service group exists",
-    group=DEPLOY_DATA.group,
+    group=DEPLOY_DATA["group"],
     _sudo=True,
 )
 
 server.user(
     name="Ensure service user is in service group",
-    user=DEPLOY_DATA.service_user,
-    groups=[DEPLOY_DATA.group],
+    user=DEPLOY_DATA["service_user"],
+    groups=[DEPLOY_DATA["group"]],
     append=True,
     _sudo=True,
 )
@@ -209,7 +222,7 @@ files.directory(
     name="Ensure web root exists",
     path=DEPLOY_DATA.get("live_root_parent", "/var/www"),
     user="root",
-    group=DEPLOY_DATA.group,
+    group=DEPLOY_DATA["group"],
     mode="2775",
     _sudo=True,
 )
@@ -217,8 +230,8 @@ files.directory(
 if DEPLOY_DATA.get("deploy_authorized_key"):
     server.user(
         name="Ensure deploy user authorized key is installed",
-        user=DEPLOY_DATA.deploy_user,
-        public_keys=[DEPLOY_DATA.deploy_authorized_key],
+        user=DEPLOY_DATA["deploy_user"],
+        public_keys=[DEPLOY_DATA["deploy_authorized_key"]],
         _sudo=True,
     )
 
