@@ -27,7 +27,7 @@ http {
         location ~ ^/index\.php(/|$) {
             fastcgi_pass unix:{{ laravel_php_fpm_socket_path }};
             fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
-            include fastcgi_params;
+            include /etc/nginx/fastcgi_params;
             fastcgi_param DOCUMENT_ROOT $realpath_root;
             internal;
         }
