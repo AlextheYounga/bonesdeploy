@@ -58,23 +58,23 @@ fn shared_setup_deploy_uses_single_setup_apt_packages_manifest() {
     );
 }
 
-/// Starts setup apt installation before rustup bootstrap and user setup.
+/// Starts setup apt installation before user creation and rustup bootstrap.
 #[test]
-fn shared_setup_deploy_starts_packages_before_rustup_and_users() {
+fn shared_setup_deploy_starts_packages_before_users_and_rustup() {
     let deploy = project_root().join("infra/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
 
     let apt_idx = content.find("Install setup apt packages");
-    let rustup_idx = content.find("Install rustup and cargo");
     let users_idx = content.find("Ensure deploy user exists");
+    let rustup_idx = content.find("Install rustup and cargo");
 
     assert!(apt_idx.is_some(), "shared setup deploy must install setup apt packages\n{content}");
-    assert!(rustup_idx.is_some(), "shared setup deploy must start rustup bootstrap\n{content}");
     assert!(users_idx.is_some(), "shared setup deploy must include user setup\n{content}");
-    assert!(apt_idx < rustup_idx, "setup apt packages should run before rustup bootstrap\n{content}");
-    assert!(rustup_idx < users_idx, "rustup bootstrap should run before user setup\n{content}");
+    assert!(rustup_idx.is_some(), "shared setup deploy must start rustup bootstrap\n{content}");
+    assert!(apt_idx < users_idx, "setup apt packages should run before user setup\n{content}");
+    assert!(users_idx < rustup_idx, "user setup should run before rustup bootstrap\n{content}");
 }
 
 /// Runs template-specific pre-package setup before installing the shared apt package manifest.

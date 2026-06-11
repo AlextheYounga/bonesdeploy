@@ -26,10 +26,6 @@ SETUP_APT_PACKAGES = [
 DEPLOY_DATA = unflatten(host.data.dict())
 PATHS = DEPLOY_DATA.get("paths", {})
 
-
-
-
-
 # Template-specific pre-package setup
 pre_packages_path = os.path.join(os.path.dirname(__file__), "pre_packages.py")
 if os.path.exists(pre_packages_path):
@@ -42,6 +38,40 @@ apt.packages(
     present=True,
     update=True,
     cache_time=3600,
+    _sudo=True,
+)
+
+# --- Users ---
+
+server.user(
+    name="Ensure deploy user exists",
+    user=DEPLOY_DATA["deploy_user"],
+    shell="/bin/bash",
+    ensure_home=True,
+    _sudo=True,
+)
+
+server.user(
+    name="Ensure service user exists",
+    user=DEPLOY_DATA["service_user"],
+    system=True,
+    home="/nonexistent",
+    shell="/usr/sbin/nologin",
+    create_home=False,
+    _sudo=True,
+)
+
+server.group(
+    name="Ensure service group exists",
+    group=DEPLOY_DATA["group"],
+    _sudo=True,
+)
+
+server.user(
+    name="Ensure service user is in service group",
+    user=DEPLOY_DATA["service_user"],
+    groups=[DEPLOY_DATA["group"]],
+    append=True,
     _sudo=True,
 )
 
@@ -166,40 +196,6 @@ server.shell(
 server.shell(
     name="Run bonesremote init",
     commands=[f"/usr/local/bin/bonesremote init --deploy-user {DEPLOY_DATA["deploy_user"]}"],
-    _sudo=True,
-)
-
-# --- Users ---
-
-server.user(
-    name="Ensure deploy user exists",
-    user=DEPLOY_DATA["deploy_user"],
-    shell="/bin/bash",
-    ensure_home=True,
-    _sudo=True,
-)
-
-server.user(
-    name="Ensure service user exists",
-    user=DEPLOY_DATA["service_user"],
-    system=True,
-    home="/nonexistent",
-    shell="/usr/sbin/nologin",
-    create_home=False,
-    _sudo=True,
-)
-
-server.group(
-    name="Ensure service group exists",
-    group=DEPLOY_DATA["group"],
-    _sudo=True,
-)
-
-server.user(
-    name="Ensure service user is in service group",
-    user=DEPLOY_DATA["service_user"],
-    groups=[DEPLOY_DATA["group"]],
-    append=True,
     _sudo=True,
 )
 
