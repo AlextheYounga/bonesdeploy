@@ -300,4 +300,4 @@ After successful execution:
 
 - `bonesdeploy push` - Syncs `.bones/` to remote bare repository
 - `bonesdeploy doctor` - Validates local and remote setup
-- `bonesdeploy remote setup` - Provisions server with Ansible
+- `bonesdeploy remote setup` - Provisions server with pyinfra

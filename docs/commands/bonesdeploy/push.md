@@ -238,11 +238,7 @@ println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
 │   ├── 01_install.sh
 │   ├── 02_build.sh
 │   └── 03_migrate.sh
-└── site/                   # Ansible playbooks and roles
-    ├── playbooks/
-    │   └── setup.yml
-    └── roles/
-        └── ...
+└── site/                   # DEPRECATED — no longer used. See infra/ instead.
 ```
 
 ### Files Modified on Remote

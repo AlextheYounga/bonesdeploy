@@ -88,11 +88,11 @@ BonesDeploy assumes opinionated server defaults unless you change them in `.bone
 - `group = "www-data"`
 
 The `init` command creates the local `.bones/` scaffold and records project settings.
-If `ansible-playbook` is missing, BonesDeploy installs Ansible automatically with `python3 -m pip install --user ansible`.
-Template-based projects then use `bonesdeploy remote runtime` to prompt for a framework and scaffold runtime assets (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install global PM2/PNPM tools).
-`bonesdeploy remote setup` handles machine bootstrap, while `bonesdeploy remote runtime` applies per-site runtime assets such as AppArmor and nginx after a quick confirmation prompt.
+If `pyinfra` is missing, BonesDeploy installs it automatically with `python3 -m pip install --user pyinfra`.
+Template-based projects then use `bonesdeploy remote runtime` to prompt for a framework and scaffold runtime assets (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install Node.js).
+`bonesdeploy remote setup` handles machine bootstrap as root, while `bonesdeploy remote runtime` applies per-site runtime assets such as AppArmor and nginx after a quick confirmation prompt.
 
-To customize nginx behavior, edit `.bones/runtime/nginx/router.conf.j2` and re-run `bonesdeploy remote runtime`.
+To customize nginx behavior, edit `.bones/infra/assets/nginx/router.conf.j2` and re-run `bonesdeploy remote runtime`.
 
 When DNS is ready, enable SSL with certbot (separate from runtime):
 
@@ -100,7 +100,7 @@ When DNS is ready, enable SSL with certbot (separate from runtime):
 bonesdeploy remote ssl --domain app.example.com --email ops@example.com
 ```
 
-This runs the dedicated SSL playbook to obtain a Let's Encrypt certificate and configure the runtime nginx router for HTTPS. SSL is fully decoupled from runtime configuration.
+This runs the dedicated SSL deploy to obtain a Let's Encrypt certificate and configure the runtime nginx router for HTTPS. SSL is fully decoupled from runtime configuration.
 
 ### Syncing Configuration
 
@@ -210,8 +210,13 @@ ssl:
 ├── hooks.sh             # shared hook functions imported by hook entrypoints
 ├── deployment/
 │   └── 01_*.sh          # deployment scripts (run sequentially)
+├── infra/
+│   ├── setup.py         # machine bootstrap pyinfra deploy
+│   ├── runtime.py       # per-site runtime pyinfra deploy
+│   ├── ssl.py           # TLS certificate pyinfra deploy
+│   └── assets/          # Jinja2 templates for nginx + AppArmor
 ├── runtime/
-│   └── ...              # framework runtime assets
+│   └── operations.py    # template-specific operations (framework packages/services)
 └── hooks/
     ├── pre-push         # symlinked to .git/hooks/pre-push
     ├── pre-receive

@@ -251,159 +251,42 @@ if local_needs_update {
 
 ### 9. Update Remote Binary
 
-**Source:** `update.rs:67-70`, `update.rs:293-335`
+**Source:** `update_release.rs`
 
 ```rust
-if remote_needs_update {
-    update_remote_binary(temp_path, &target_version)?;
+pub fn update_remote_from_source(repo_url: &str, version: &str) -> Result<()> {
+    let cfg = config::load(bones_yaml)?;
+    // ...
+    run_pyinfra_deploy(&cfg, &ssh_user, &data_vars, &deploy)?;
 }
 ```
 
 **Remote Update Process:**
 
-1. **Load Configuration**
-   ```rust
-   let cfg = config::load(bones_yaml)?;
-   ```
-   Requires `.bones/bones.yaml` to exist.
+1. **Load Configuration** — requires `.bones/bones.yaml` to exist.
 
-2. **Verify Local Binary**
-   ```rust
-   verify_binary(&source_binary)?;
-   ```
-   Verify before upload to catch issues early.
+2. **Generate pyinfra Deploy Script** — dynamically writes a temporary `update_bonesremote.py` containing pyinfra operations:
+   - `cargo install --git <repo_url> bonesremote --force --root <install_root>` (with sudo)
+   - Symlink the installed binary into `/usr/local/bin/bonesremote`
+   - Ensure the managed projects root exists
 
-3. **Materialize Ansible Assets**
-   ```rust
-   let playbook_path = update_assets::materialize_playbook(ansible_temp.path())?;
-   ```
-   Extract embedded playbooks from the `bonesdeploy` binary.
+3. **Run pyinfra Deploy (as Root)** — invokes pyinfra against the remote host:
 
-4. **Upload Binary to Remote**
-   ```rust
-   let remote_staging = format!("/tmp/bonesremote-{version}");
-   Command::new("scp")
-       .args(["-P", &cfg.data.port])
-       .arg(&source_binary)
-       .arg(format!("{host}:{remote_staging}"))
-       .status()?;
-   ```
-
-5. **Run Ansible Playbook**
-   ```rust
-   run_update_playbook(&cfg, &playbook_path, &remote_staging, version)?;
-   ```
-
-**Ansible Playbook Execution:**
-
-The embedded playbook (`playbooks/update-bonesremote.yml`) performs:
-
-1. **Validate Inputs**
-   ```yaml
-   - name: Validate required variables
-     ansible.builtin.assert:
-       that:
-         - bonesremote_staging_path is defined
-         - bonesremote_target_version is defined
-   ```
-
-2. **Create Directory Structure**
-   ```yaml
-   - name: Ensure target version directory exists
-     ansible.builtin.file:
-       path: "{{ bonesremote_install_root }}/versions/{{ bonesremote_target_version }}"
-       state: directory
-   ```
-
-3. **Copy and Verify Binary**
-   ```yaml
-   - name: Copy staged bonesremote binary
-     ansible.builtin.copy:
-       src: "{{ bonesremote_staging_path }}"
-       dest: ".../bonesremote"
-       remote_src: true
-   
-   - name: Verify staged binary
-     ansible.builtin.command:
-       argv: [".../bonesremote", "version"]
-   ```
-
-4. **Atomic Symlink Flip**
-   ```yaml
-   - name: Create atomic temp symlink
-     ansible.builtin.file:
-       src: ".../bonesremote"
-       dest: "{{ bonesremote_stable_link }}/.bonesremote_swap_{{ epoch }}"
-       state: link
-   
-   - name: Atomically switch bonesremote symlink
-     ansible.builtin.command:
-       argv: ["mv", "-T", ".bonesremote_swap_...", "bonesremote"]
-   ```
-
-5. **Verify Global Link**
-   ```yaml
-   - name: Verify global bonesremote works
-     ansible.builtin.command:
-       argv: ["/usr/local/bin/bonesremote", "version"]
-   ```
-
-6. **Run Doctor for Each Project**
-   ```yaml
-   - name: Run bonesremote doctor for each project
-     ansible.builtin.command:
-       argv: ["/usr/local/bin/bonesremote", "doctor"]
-       chdir: "{{ item.path }}"
-     loop: "{{ managed_projects.files }}"
-   ```
-
----
-
-### 10. Report Completion
-
-**Source:** `update.rs:72`
-
-```rust
-println!("\n{} All updates complete.", style("Done!").green());
+```bash
+pyinfra <inventory_file> <temp_dir>/update_bonesremote.py --data <data_file> -vv
 ```
 
-## Embedded Update Assets
-
-**Location:** `crates/bonesdeploy/updates/`
-
-The `bonesdeploy` binary embeds all files under `updates/` using `rust-embed`. This includes:
-
-```
-updates/
-├── playbooks/
-│   └── update-bonesremote.yml    # Main update playbook
-├── roles/
-│   └── bonesremote_update/
-│       └── tasks/
-│           └── main.yml          # Role entrypoint
-└── migrations/
-    └── manifest.yml             # Future migration registry
-```
-
-**Why Embedded:**
-- Self-contained update: no external dependencies
-- Works offline for local updates
-- Atomic: assets versioned with the binary
-- Simple: one artifact to distribute
-
-**Materialization:**
-```rust
-pub fn materialize_playbook(temp_dir: &Path) -> Result<PathBuf> {
-    for file_path in UpdateAssets::iter() {
-        let Some(asset) = UpdateAssets::get(&file_path) else { continue; };
-        let dest = temp_dir.join(file_path.as_ref());
-        write_asset_file(&dest, asset.data.as_ref())?;
-    }
-    Ok(temp_dir.join("playbooks/update-bonesremote.yml"))
+Data vars passed:
+```json
+{
+  "ssh_port": "22",
+  "bonesremote_install_root": "/usr/local",
+  "bonesremote_binary_path": "/opt/bonesdeploy/current/bonesremote",
+  "bonesremote_managed_projects_root": "/srv/deployments"
 }
 ```
 
-## Exit Codes
+The entire remote update is a single pyinfra deploy. No embedded playbooks or additional assets are shipped.
 
 - **0**: All updates successful
 - **1**: Update failed (network, verification, permission, etc.)
@@ -439,7 +322,7 @@ The old version directories are preserved until manually cleaned.
 
 2. **Remote**:
    - SSH access to deployment server
-   - `ansible-playbook` installed locally
+   - `pyinfra` installed locally (or auto-installed via pip)
    - `sudo` configured on remote for `bonesremote` commands
 
 ## Related Commands

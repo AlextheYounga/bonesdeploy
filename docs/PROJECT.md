@@ -49,26 +49,19 @@ We create a `bonesremote` executable that does not require a password and allows
 ├── deployment
 │   ├── 01_run_deployment_concerns.sh
 │   └── 02_permissions_lockup.sh (example)
-├── setup                            # machine bootstrap assets used by `bonesdeploy remote setup`
-│   ├── playbooks/
-│   ├── roles/
-│   │   ├── common/
-│   │   ├── firewall/
-│   │   ├── ssh/
-│   │   ├── ssl/
-│   │   └── users/
-│   └── vars/
-└── runtime                          # per-site runtime assets used by `bonesdeploy remote runtime`
-    ├── playbooks/
-    ├── roles/
-    │   ├── django_runtime/
-    │   ├── laravel_runtime/
-    │   ├── next_runtime/
-    │   ├── nuxt_runtime/
-    │   ├── rails_runtime/
-    │   ├── sveltekit_runtime/
-    │   └── vue_runtime/
-    └── vars/
+├── infra                             # pyinfra deploy scripts used by `bonesdeploy remote setup|runtime|ssl`
+│   ├── setup.py                      # machine bootstrap (users, git repo, firewall, bonesremote)
+│   ├── runtime.py                    # per-site runtime (AppArmor, nginx, systemd services)
+│   ├── ssl.py                        # TLS certificate provisioning via certbot
+│   └── assets/
+│       ├── apparmor/
+│       │   └── project-nginx-profile.j2
+│       └── nginx/
+│           ├── router.conf.j2
+│           ├── site-nginx.conf.j2
+│           └── site-nginx.service.j2
+└── runtime                           # template-specific operations used by `bonesdeploy remote runtime`
+    └── operations.py
 
 ### Bones YAML
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
@@ -169,7 +162,7 @@ All product-owned paths must live in `crates/shared/src/paths.rs`.
 
 Other modules may derive subpaths by joining values from `shared::paths`, but they must not introduce their own independent path roots, filenames, or install locations.
 
-This applies to Rust code, Ansible vars, Jinja templates, embedded playbooks, and docs examples that describe the system layout.
+This applies to Rust code, pyinfra deploy scripts, Jinja2 templates, and docs examples that describe the system layout.
 
 ```
 bonesdeploy/
@@ -182,23 +175,21 @@ bonesdeploy/
 │   │   ├── pre-push
 │   │   └── pre-receive
 │   ├── deployment/
-│   └── setup/                  # nginx + ansible roles for `bonesdeploy remote setup`
+│   └── setup/                  # nginx + pyinfra deploy scripts for shared server bootstrap
 │       ├── apparmor/
 │       ├── nginx/
-│       ├── playbooks/
-│       ├── roles/
-│       └── vars/
+│       ├── setup.py
+│       ├── runtime.py
+│       └── ssl.py
 ├── templates/                  # per-framework starter overlays (see below)
 │   ├── laravel/
 │   │   ├── bones.yaml
 │   │   ├── deployment/
-│   │   └── setup/
+│   │   └── runtime/
 │   └── ...
 ├── crates/
 │   ├── bonesdeploy/            # local CLI binary
 │   │   ├── Cargo.toml
-│   │   ├── scripts/
-│   │   │   └── bootstrap_python3.sh  # embedded one-off bootstrap for ansible prerequisites
 │   │   └── src/
 │   │       ├── main.rs         # clap setup, command dispatch
 │   │       ├── commands/
@@ -241,17 +232,17 @@ bonesdeploy/
 ```
 
 ### Per-Framework Templates
-The `templates/` directory ships starter overlays that `bonesdeploy init` can use as a base when scaffolding into a project of the matching kind. Each template follows the same convention as `kit/` — machine bootstrap assets live under `setup/`, framework runtime assets live under `runtime/`, and user-editable files (`bones.yaml`, `deployment/`) stay at the root:
+The `templates/` directory ships starter overlays that `bonesdeploy init` can use as a base when scaffolding into a project of the matching kind. Each template follows the same convention as `kit/` — framework runtime assets live under `runtime/operations.py`, and user-editable files (`bones.yaml`, `deployment/`) stay at the root:
 
-- `templates/django/`        → `django_runtime` role
-- `templates/laravel/`       → `laravel_runtime` role (PHP + PHP-FPM)
-- `templates/next/`          → `next_runtime` role
-- `templates/nuxt/`          → `nuxt_runtime` role
-- `templates/rails/`         → `rails_runtime` role
-- `templates/sveltekit/`     → `sveltekit_runtime` role
-- `templates/vue/`           → `vue_runtime` role
+- `templates/django/`        → Django (Python + Gunicorn)
+- `templates/laravel/`       → Laravel (PHP + PHP-FPM)
+- `templates/next/`          → Next.js (Node)
+- `templates/nuxt/`          → Nuxt (Node)
+- `templates/rails/`         → Rails (Ruby + Bundler)
+- `templates/sveltekit/`     → SvelteKit (Node)
+- `templates/vue/`           → Vue (Node)
 
-Templates inherit the same `bones.yaml` schema and only customize permissions paths, deployment scripts, and the runtime assets captured in `.bones/runtime/`.
+Templates inherit the same `bones.yaml` schema and only customize permissions paths, deployment scripts, and the runtime operations captured in `.bones/runtime/operations.py`.
 
 ### BonesDeploy CLI Commands
 - **init**:
@@ -289,21 +280,23 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Sets `BONES_FORCE_DEPLOY=1` so manual deploy runs even when `deploy_on_push = false`.
 
 - ****remote setup****
-  - Runs `.bones/setup/playbooks/setup.yml` locally using `ansible-playbook` against the configured host.
-  - Passes `bones.yaml` deployment values plus machine-bootstrap variables to the playbook.
+  - Runs `.bones/infra/setup.py` via `pyinfra` against the configured host as root (or `BONES_BOOTSTRAP_SSH_USER`).
+  - Passes `bones.yaml` deployment values plus computed paths and variables as pyinfra data.
   - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
-  - Provisions machine-level dependencies, users, and shared server bootstrap concerns.
+  - Installs `bonesremote` from source and runs `bonesremote init`.
+  - Provisions machine-level dependencies (users, groups, firewall, system packages).
 
 - **remote runtime**:
   - Prompts for a framework template, refreshes `.bones/runtime/`, and writes `.bones/runtime.yaml`.
   - Reapplies template-specific defaults into `.bones/bones.yaml` only when they still match generic or previous-template values.
-  - After a `y/N` confirmation, runs `.bones/runtime/playbooks/runtime.yml` using `ansible-playbook` against the configured host.
-  - Configures per-site runtime assets such as framework services, AppArmor, nginx, and runs `bonesremote doctor`.
+  - After a `y/N` confirmation, runs `.bones/infra/runtime.py` via `pyinfra` against the configured host as the deploy user.
+  - Loads the template's `operations.py` at runtime to install framework-specific packages and services.
+  - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
   - Does not handle SSL; use `remote ssl` for TLS configuration.
 
 - **remote ssl**
-  - Runs the SSL playbook (`.bones/runtime/playbooks/ssl.yml`) against the configured host.
+  - Runs `.bones/infra/ssl.py` via `pyinfra` against the configured host as root.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
   - Separate from `remote runtime` to keep certificate management decoupled from app runtime concerns.

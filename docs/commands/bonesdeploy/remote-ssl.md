@@ -2,7 +2,7 @@
 
 ## Overview
 
-Configures SSL/TLS certificates for the deployment using Let's Encrypt and certbot. This command runs the SSL playbook directly, separate from the runtime playbook, keeping certificate management decoupled from app runtime concerns.
+Configures SSL/TLS certificates for the deployment using Let's Encrypt and certbot. This command runs the SSL pyinfra deploy script (`.bones/infra/ssl.py`) as root, separate from the runtime deploy, keeping certificate management decoupled from app runtime concerns.
 
 ## Command Signature
 
@@ -20,15 +20,15 @@ Both flags are optional if values are already configured in `bones.yaml`.
 
 ## Architecture
 
-The SSL command is now fully separated from `remote runtime`:
+The SSL command is fully separated from `remote runtime`:
 
-- **`remote runtime`**: Configures framework services, AppArmor, nginx, and runs doctor - no SSL involvement
-- **`remote ssl`**: Runs only the SSL playbook - handles certbot, challenges, and TLS configuration
+- **`remote runtime`**: Configures framework services, AppArmor, nginx, and runs doctor — no SSL involvement
+- **`remote ssl`**: Runs only the SSL deploy — handles certbot, challenges, and TLS configuration
 
 This separation ensures:
 1. Runtime updates don't accidentally trigger certificate operations
 2. SSL can be run independently without full runtime reconfiguration
-3. Certificate renewal doesn't require runtime playbook changes
+3. Certificate renewal doesn't require runtime deploy changes
 
 ---
 
@@ -36,67 +36,51 @@ This separation ensures:
 
 ### 1. Load Configuration
 
-**Source:** `remote_ssl.rs`
-
 ```rust
 let bones_yaml = Path::new(config::Constants::BONES_YAML);
 let mut cfg = config::load(bones_yaml)?;
 ```
 
-Loads the existing configuration.
+Loads the existing configuration. Resolves `domain` and `email` from CLI args, existing config, or interactive prompts.
 
----
-
-### 2. Update SSL Configuration from Flags
-
-If `--domain` or `--email` flags are provided, updates the configuration with those values.
-
----
-
-### 3. Validate Required Fields
+### 2. Validate Required Fields
 
 Ensures both domain and email are set before proceeding. These are required for Let's Encrypt certificate issuance.
 
----
+### 3. Ensure Runtime Assets Exist
 
-### 4. Ensure Runtime Assets Exist
+Scaffolds `.bones/infra/` and `.bones/runtime/` base assets if missing, ensuring the SSL deploy script and the nginx router template exist.
 
-**Source:** `remote_ssl.rs`
+### 4. Run pyinfra SSL Deploy (as Root)
 
-```rust
-ensure_runtime_assets_exist()?;
+Connects as root (or `BONES_BOOTSTRAP_SSH_USER`) since certbot and nginx configuration require elevated privileges:
+
+```bash
+pyinfra <inventory_file> .bones/infra/ssl.py --data <data_file> -vv
 ```
 
-Scaffolds `.bones/runtime/` base assets if missing, ensuring the SSL playbook exists.
+**pyinfra Data Variables:**
+- `ssl_domain` — domain for the certificate
+- `ssl_email` — email for Let's Encrypt
+- `nginx_ssl_certificate_path` — path to fullchain.pem
+- `nginx_ssl_certificate_key_path` — path to privkey.pem
+- `project_name`, `service_user`, `group` — deployment metadata
+- `paths` — computed `DeploymentPaths` struct
 
----
+### 5. SSL Deploy Tasks
 
-### 5. Run SSL Playbook
+The SSL pyinfra deploy performs these operations in order:
 
-**Source:** `remote_ssl.rs`
+1. **Validate SSL inputs** — ensure domain and email are provided
+2. **Render nginx HTTP challenge config** — temporary HTTP-only router config for certbot challenge
+3. **Validate and reload nginx** — apply the HTTP challenge config
+4. **Obtain certificate** — `certbot certonly` via webroot challenge
+5. **Render nginx HTTPS config** — final router config with TLS enabled (port 443, HTTP→HTTPS redirect)
+6. **Validate and reload nginx** — apply the HTTPS config
 
-Runs `.bones/runtime/playbooks/ssl.yml` directly (not via tags on runtime playbook).
+### 6. Sync Configuration
 
-**Ansible Variables:**
-- `ssl_domain={domain}`: Domain for certificate
-- `ssl_email={email}`: Email for Let's Encrypt
-- `nginx_ssl_certificate_path`: Path to fullchain.pem
-- `nginx_ssl_certificate_key_path`: Path to privkey.pem
-
----
-
-### 6. SSL Playbook Tasks
-
-The SSL playbook performs:
-
-1. **Validate SSL inputs** - Ensure domain and email are provided
-2. **Render nginx HTTP challenge config** - Temporary HTTP-only config for certbot challenge
-3. **Validate nginx** - `nginx -t`
-4. **Reload nginx** - Apply HTTP challenge config
-5. **Obtain certificate** - certbot webroot challenge
-6. **Render nginx HTTPS config** - Final config with TLS enabled
-7. **Validate nginx** - `nginx -t`
-8. **Reload nginx** - Apply HTTPS config
+After SSL succeeds, saves the updated `bones.yaml` and syncs `.bones/` to the remote bare repo via `bonesdeploy push`.
 
 ---
 
@@ -133,7 +117,7 @@ ssl:
 
 ### Nginx Configuration
 ```
-/etc/nginx/sites-available/myapp
+/etc/nginx/sites-available/myapp.conf
   - HTTP redirect to HTTPS
   - SSL certificate configuration
   - Modern SSL settings (TLS 1.2/1.3)
