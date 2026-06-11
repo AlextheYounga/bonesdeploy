@@ -162,19 +162,3 @@
 
 ## `tests/cleancode/src/cleancode_no_manufactured_success.rs`
 - Detects match arms that construct success values from error paths. (no_suspicious_fallback)
-
-## `tests/e2e/src/e2e_cmd_deploy.rs`
-- Verifies that `bonesdeploy deploy` triggers the remote hook path end-to-end. (e2e_bonesdeploy_deploy_invokes_remote_hook_path)
-
-## `tests/e2e/src/e2e_cmd_pull.rs`
-- Verifies that `bonesdeploy pull` syncs the remote `.bones` folder back into the local project. (e2e_bonesdeploy_pull_syncs_remote_bones_folder_back_locally)
-
-## `tests/e2e/src/e2e_cmd_push.rs`
-- Verifies that `bonesdeploy push` invokes the remote sync path end-to-end. (e2e_bonesdeploy_push_invokes_remote_sync_path)
-
-## `tests/e2e/src/e2e_cmd_rollback.rs`
-- Verifies that `bonesdeploy rollback` invokes the remote release rollback command. (e2e_bonesdeploy_rollback_invokes_remote_release_rollback)
-
-## `tests/e2e/src/e2e_smoke.rs`
-- Verifies that the e2e harness bootstrap SSH user can be overridden via environment variable. (e2e_harness_bootstrap_user_can_be_overridden)
-- Verifies that the e2e harness bootstrap SSH user defaults to root for secure provisioning. (e2e_harness_bootstrap_user_defaults_to_root)

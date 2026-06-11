@@ -85,9 +85,9 @@ enum Command {
 
 #[derive(Subcommand)]
 enum RemoteCommand {
-    /// Run remote setup playbook against configured host
+    /// Run remote setup against configured host
     Setup,
-    /// Apply the configured runtime playbook against configured host
+    /// Apply the configured runtime against configured host
     Runtime,
     /// Obtain and configure SSL certificates with certbot
     Ssl {
