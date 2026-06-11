@@ -88,7 +88,7 @@ BonesDeploy assumes opinionated server defaults unless you change them in `.bone
 - `group = "www-data"`
 
 The `init` command creates the local `.bones/` scaffold and records project settings.
-If `pyinfra` is missing, BonesDeploy installs it automatically with `python3 -m pip install --user pyinfra`.
+If `pyinfra` is missing, BonesDeploy installs it automatically into an isolated managed environment under `XDG_STATE_HOME` (defaults to `~/.local/state/bonesdeploy/pyinfra/.venv`).
 Template-based projects then use `bonesdeploy remote runtime` to prompt for a framework and scaffold runtime assets (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install Node.js).
 `bonesdeploy remote setup` handles machine bootstrap as root, while `bonesdeploy remote runtime` applies per-site runtime assets such as AppArmor and nginx after a quick confirmation prompt.
 

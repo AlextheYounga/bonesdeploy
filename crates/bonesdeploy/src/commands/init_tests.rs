@@ -184,7 +184,7 @@ fn cli_existing_or_prompt_prefers_existing_value_before_prompt() -> Result<()> {
 /// Materializes the pyinfra deploy files and shared infra assets during init.
 #[test]
 fn init_materializes_base_infra_assets() -> Result<()> {
-    with_temp_repo(|repo_dir, home_dir| {
+    with_temp_repo(|repo_dir, _home_dir| {
         run(&init_args())?;
 
         let bones_dir = repo_dir.join(".bones");
@@ -193,7 +193,7 @@ fn init_materializes_base_infra_assets() -> Result<()> {
         assert!(bones_dir.join("infra/ssl.py").is_file());
         assert!(bones_dir.join("infra/assets/nginx/router.conf.j2").is_file());
 
-        let config_root = home_dir.join(".config/bonesdeploy/atlas.bones");
+        let config_root = paths::bones_config_root().join("atlas.bones");
         assert!(config_root.join("infra/setup.py").is_file());
 
         assert!(!bones_dir.join("infra/.venv").exists());

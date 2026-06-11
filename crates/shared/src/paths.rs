@@ -213,7 +213,61 @@ fn parent_or_default(path: &str, fallback: &str) -> String {
         .map_or_else(|| fallback.to_string(), |parent| parent.display().to_string())
 }
 
+fn home_dir() -> PathBuf {
+    env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/root"))
+}
+
 pub fn bones_config_root() -> PathBuf {
-    let home = env::var("HOME").unwrap_or_else(|_| "/root".into());
-    Path::new(&home).join(".config/bonesdeploy")
+    if let Some(dir) = env::var("XDG_CONFIG_HOME").ok().filter(|v| !v.is_empty()) {
+        Path::new(&dir).join("bonesdeploy")
+    } else {
+        home_dir().join(".config/bonesdeploy")
+    }
+}
+
+pub fn bones_state_root() -> PathBuf {
+    if let Some(dir) = env::var("XDG_STATE_HOME").ok().filter(|v| !v.is_empty()) {
+        Path::new(&dir).join("bonesdeploy")
+    } else {
+        home_dir().join(".local/state/bonesdeploy")
+    }
+}
+
+pub fn managed_pyinfra_venv_dir() -> PathBuf {
+    bones_state_root().join("pyinfra").join(".venv")
+}
+
+pub fn managed_pyinfra_binary() -> PathBuf {
+    managed_pyinfra_venv_dir().join("bin").join("pyinfra")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Resolves the managed pyinfra binary path under the state root.
+    #[test]
+    fn managed_pyinfra_binary_is_in_managed_venv() {
+        let path = managed_pyinfra_binary();
+        let parent = path.parent().unwrap();
+        assert_eq!(parent.file_name().unwrap(), "bin");
+        let grandparent = parent.parent().unwrap();
+        assert_eq!(grandparent.file_name().unwrap(), ".venv");
+    }
+
+    /// Falls back to XDG_CONFIG_HOME when available.
+    #[test]
+    fn bones_config_root_uses_xdg_config_home() {
+        let home = home_dir();
+        let expected = home.join(".config/bonesdeploy");
+        assert_eq!(bones_config_root(), expected);
+    }
+
+    /// Falls back to XDG_STATE_HOME when available.
+    #[test]
+    fn bones_state_root_uses_xdg_state_home() {
+        let home = home_dir();
+        let expected = home.join(".local/state/bonesdeploy");
+        assert_eq!(bones_state_root(), expected);
+    }
 }

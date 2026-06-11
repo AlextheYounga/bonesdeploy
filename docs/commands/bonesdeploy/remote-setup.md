@@ -70,16 +70,19 @@ ensure_pyinfra_installed()?;
 
 #### 4.1 Check for `pyinfra` Binary
 
-First checks system PATH for `pyinfra`, then `~/.local/bin/pyinfra`.
+First checks system PATH for `pyinfra`, then a bonesdeploy-managed environment at `~/.local/state/bonesdeploy/pyinfra/.venv/bin/pyinfra` (respecting `XDG_STATE_HOME` when set).
 
 #### 4.2 Auto-Install pyinfra
 
-If not found, automatically installs it:
+If not found, automatically installs it into an isolated managed virtualenv:
 
 1. Checks that `python3` is available
-2. Ensures `pip` is available via `python3 -m ensurepip --upgrade`
-3. Runs `python3 -m pip install --user pyinfra`
-4. Verifies `pyinfra` is now available
+2. Checks that `python3 -m venv` is available
+3. Creates a managed virtualenv under the bonesdeploy state root
+4. Installs `pyinfra` into the virtualenv with its own `pip`
+5. Verifies the managed `pyinfra` binary is now available
+
+If any step fails, BonesDeploy prints explicit instructions for manual installation (e.g. `uv tool install pyinfra` or `pipx install pyinfra`).
 
 Unlike the Ansible era, no remote Python bootstrap is needed — pyinfra installs are purely local.
 
@@ -210,8 +213,8 @@ git push production master
 ## Prerequisites
 
 ### Local Machine
-- Python 3
-- pip (or `python3-venv`)
+- Python 3 with venv support (e.g. `python3` + `python3-venv` on Debian/Ubuntu)
+  - Or `uv` / `pipx` for manual pyinfra installation
 - SSH client
 - SSH key configured for root access to the target host
 
@@ -238,11 +241,12 @@ Place a `pre_packages.py` file in `.bones/infra/` alongside `setup.py`. It will 
 
 ## Error Scenarios
 
-1. **pyinfra not installed**: Auto-installs via pip
-2. **Python 3 not available locally**: Install Python 3 first
-3. **SSH connection failed**: Check host, port, and root SSH access
-4. **pyinfra task failure**: pyinfra outputs detailed error message with target host
-5. **Permission denied on remote**: Ensure bootstrap user has sudo
+1. **pyinfra not installed**: Auto-installs into an isolated managed virtualenv
+2. **Python 3 not available locally**: Install Python 3 first (with venv support)
+3. **Python venv module missing**: Install `python3-venv` (Debian/Ubuntu) or equivalent, or install pyinfra manually via `uv`/`pipx`
+4. **SSH connection failed**: Check host, port, and root SSH access
+5. **pyinfra task failure**: pyinfra outputs detailed error message with target host
+6. **Permission denied on remote**: Ensure bootstrap user has sudo
 
 ---
 

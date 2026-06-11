@@ -9,7 +9,7 @@ use console::style;
 use serde_json::Value;
 
 use crate::config;
-use shared::paths::DeploymentPaths;
+use shared::paths::{self, DeploymentPaths};
 
 pub struct PyinfraDeploy<'a> {
     pub deploy_file: &'a Path,
@@ -163,27 +163,18 @@ pub(crate) fn resolve_pyinfra_binary() -> Result<PathBuf> {
         return Ok(PathBuf::from("pyinfra"));
     }
 
-    if let Some(local_pyinfra) = user_pyinfra_path()?
-        && pyinfra_available(&local_pyinfra)?
-    {
-        return Ok(local_pyinfra);
+    let managed = paths::managed_pyinfra_binary();
+    if pyinfra_available(&managed)? {
+        return Ok(managed);
     }
 
-    ensure_local_python3_available()?;
-    ensure_pip_available()?;
-    install_pyinfra_with_pip()?;
+    ensure_managed_pyinfra_installed()?;
 
-    if pyinfra_available(Path::new("pyinfra"))? {
-        return Ok(PathBuf::from("pyinfra"));
+    if pyinfra_available(&managed)? {
+        return Ok(managed);
     }
 
-    if let Some(local_pyinfra) = user_pyinfra_path()?
-        && pyinfra_available(&local_pyinfra)?
-    {
-        return Ok(local_pyinfra);
-    }
-
-    bail!("Installed pyinfra with pip, but pyinfra is still unavailable. Ensure ~/.local/bin is in PATH.")
+    bail!("Installed pyinfra into a managed environment but the binary is still unavailable at {}.", managed.display())
 }
 
 fn pyinfra_available(binary: &Path) -> Result<bool> {
@@ -196,46 +187,58 @@ fn pyinfra_available(binary: &Path) -> Result<bool> {
     Ok(status.success())
 }
 
-fn install_pyinfra_with_pip() -> Result<()> {
+fn ensure_managed_pyinfra_installed() -> Result<()> {
+    verify_python3_available()?;
+    verify_venv_module_available()?;
+
+    let venv_dir = paths::managed_pyinfra_venv_dir();
+    let venv_pip = venv_dir.join("bin").join("pip");
+    let venv_pyinfra = paths::managed_pyinfra_binary();
+
     println!(
         "{}",
-        style("pyinfra not found. Installing pyinfra with python3 -m pip install --user pyinfra...").yellow()
+        style(format!("pyinfra not found. Installing pyinfra into a managed environment at {}...", venv_dir.display()))
+            .yellow()
     );
 
+    if let Some(parent) = venv_dir.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
+    }
+
     let status = Command::new("python3")
-        .args(["-m", "pip", "install", "--user", "pyinfra"])
+        .args(["-m", "venv", "--clear"])
+        .arg(&venv_dir)
         .status()
-        .context("Failed to run python3 -m pip install --user pyinfra")?;
+        .with_context(|| format!("Failed to run python3 -m venv {}", venv_dir.display()))?;
 
     if !status.success() {
-        bail!("Automatic pyinfra installation failed. Run `python3 -m pip install --user pyinfra` and retry.");
+        bail!("Failed to create managed virtualenv at {}", venv_dir.display());
+    }
+
+    let status = Command::new(&venv_pip)
+        .args(["install", "pyinfra"])
+        .status()
+        .with_context(|| format!("Failed to run {} install pyinfra", venv_pip.display()))?;
+
+    if !status.success() {
+        bail!(
+            "Failed to install pyinfra into the managed environment.\n\
+             Install pyinfra manually with `uv tool install pyinfra` or `pipx install pyinfra` and retry."
+        );
+    }
+
+    if !pyinfra_available(&venv_pyinfra)? {
+        bail!(
+            "pyinfra was installed into the managed environment but is not usable at {}.\n\
+             Install pyinfra manually with `uv tool install pyinfra` or `pipx install pyinfra` and retry.",
+            venv_pyinfra.display()
+        );
     }
 
     Ok(())
 }
 
-fn user_pyinfra_path() -> Result<Option<PathBuf>> {
-    let output = Command::new("python3").args(["-c", "import site; print(site.USER_BASE)"]).output();
-
-    let output = match output {
-        Ok(output) if output.status.success() => output,
-        Ok(_) => return Ok(None),
-        Err(error) if error.kind() == ErrorKind::NotFound => {
-            let _ = error;
-            return Ok(None);
-        }
-        Err(error) => return Err(error).context("Failed to discover python3 user base"),
-    };
-
-    let user_base = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if user_base.is_empty() {
-        return Ok(None);
-    }
-
-    Ok(Some(Path::new(&user_base).join("bin").join("pyinfra")))
-}
-
-fn ensure_local_python3_available() -> Result<()> {
+fn verify_python3_available() -> Result<()> {
     match Command::new("python3").arg("--version").status() {
         Ok(status) if status.success() => Ok(()),
         Ok(_) => bail!("python3 is installed but failed to execute. Install a working Python 3 runtime and retry."),
@@ -246,34 +249,23 @@ fn ensure_local_python3_available() -> Result<()> {
     }
 }
 
-fn ensure_pip_available() -> Result<()> {
-    if python_module_available("pip")? {
-        return Ok(());
+fn verify_venv_module_available() -> Result<()> {
+    match Command::new("python3").args(["-m", "venv", "--help"]).stdout(Stdio::null()).stderr(Stdio::null()).status() {
+        Ok(status) if status.success() => Ok(()),
+        Ok(_) => bail!(
+            "python3 -m venv failed.\n\
+             Virtualenv support is missing from your Python installation.\n\
+             Install your system's venv package (e.g. `python3-venv` on Debian/Ubuntu) \
+             or install pyinfra manually with `uv tool install pyinfra` or `pipx install pyinfra`."
+        ),
+        Err(error) if error.kind() == ErrorKind::NotFound => {
+            bail!(
+                "python3 not found. Install Python 3 with venv support (e.g. `python3-venv` on Debian/Ubuntu) \
+             or install pyinfra manually with `uv tool install pyinfra` or `pipx install pyinfra`."
+            )
+        }
+        Err(error) => Err(error).context("Failed to run python3 -m venv --help"),
     }
-
-    let status = Command::new("python3")
-        .args(["-m", "ensurepip", "--upgrade"])
-        .status()
-        .context("Failed to run python3 -m ensurepip --upgrade")?;
-
-    if !status.success() {
-        bail!("pip is not available for python3. Install python3-pip and retry.");
-    }
-
-    if !python_module_available("pip")? {
-        bail!("pip is still unavailable after running ensurepip. Install python3-pip and retry.");
-    }
-
-    Ok(())
-}
-
-fn python_module_available(module_name: &str) -> Result<bool> {
-    let status = Command::new("python3")
-        .args(["-m", module_name, "--version"])
-        .status()
-        .with_context(|| format!("Failed to run python3 -m {module_name} --version"))?;
-
-    Ok(status.success())
 }
 
 #[cfg(test)]
