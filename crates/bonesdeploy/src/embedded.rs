@@ -10,6 +10,12 @@ use crate::config;
 
 #[derive(Embed)]
 #[folder = "../../kit/"]
+#[exclude = "infra/__pycache__/**"]
+#[exclude = "infra/.venv/**"]
+#[exclude = "infra/.gitignore"]
+#[exclude = "infra/.python-version"]
+#[exclude = "infra/pyproject.toml"]
+#[exclude = "infra/uv.lock"]
 struct Kit;
 
 #[derive(Embed)]

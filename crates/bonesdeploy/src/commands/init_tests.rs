@@ -196,6 +196,11 @@ fn init_materializes_base_infra_assets() -> Result<()> {
         let config_root = home_dir.join(".config/bonesdeploy/atlas.bones");
         assert!(config_root.join("infra/setup.py").is_file());
 
+        assert!(!bones_dir.join("infra/.venv").exists());
+        assert!(!bones_dir.join("infra/__pycache__").exists());
+        assert!(!bones_dir.join("infra/.python-version").exists());
+        assert!(!bones_dir.join("infra/pyproject.toml").exists());
+
         Ok(())
     })
 }
