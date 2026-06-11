@@ -174,7 +174,7 @@ let script = embedded::read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASS
 
 Loads an embedded shell script designed to install Python 3 if missing.
 
-**Asset:** `scripts/bootstrap_python3.sh`
+**Asset:** `crates/bonesdeploy/scripts/bootstrap_python3.sh`
 
 #### 5.2 Execute Bootstrap via SSH
 

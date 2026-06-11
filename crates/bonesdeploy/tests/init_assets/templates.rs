@@ -43,7 +43,7 @@ fn template_setup_vars_files_define_runtime_and_package_metadata() {
 /// Pins the Laravel PHP version in the template setup vars file so sites can override it per template.
 #[test]
 fn laravel_template_setup_vars_file_defines_php_version() {
-    let path = project_root().join("templates/laravel/.lib/remote/vars/setup.yml");
+    let path = project_root().join("templates/laravel/setup/vars/setup.yml");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -58,7 +58,7 @@ fn laravel_template_setup_vars_file_defines_php_version() {
 /// Templates PHP package names in Laravel setup apt packages so they match the configured PHP version.
 #[test]
 fn laravel_template_setup_apt_packages_use_versioned_php_packages() {
-    let path = project_root().join("templates/laravel/.lib/remote/vars/setup.yml");
+    let path = project_root().join("templates/laravel/setup/vars/setup.yml");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -76,7 +76,7 @@ fn laravel_template_setup_apt_packages_use_versioned_php_packages() {
 /// Keeps the Laravel runtime role defaults focused on runtime layout instead of PHP version selection.
 #[test]
 fn laravel_runtime_role_defaults_do_not_define_php_version() {
-    let path = project_root().join("templates/laravel/.lib/remote/roles/laravel_runtime/defaults/main.yml");
+    let path = project_root().join("templates/laravel/setup/roles/laravel_runtime/defaults/main.yml");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -91,7 +91,7 @@ fn laravel_runtime_role_defaults_do_not_define_php_version() {
 /// Defines the base apt packages in the shared scaffold vars file.
 #[test]
 fn shared_remote_scaffold_vars_file_defines_base_apt_packages() {
-    let vars_file = project_root().join("kit/.lib/remote/vars/setup.yml");
+    let vars_file = project_root().join("kit/setup/vars/setup.yml");
     let content = fs::read_to_string(&vars_file);
     assert!(content.is_ok(), "failed to read {}", vars_file.display());
     let content = content.unwrap_or_default();
@@ -109,11 +109,10 @@ fn shared_remote_scaffold_vars_file_defines_base_apt_packages() {
 fn spa_template_runtime_roles_do_not_install_global_npm_packages() {
     for template in ["next", "sveltekit", "vue"] {
         let defaults =
-            project_root().join(format!("templates/{template}/.lib/remote/roles/{template}_runtime/defaults/main.yml"));
+            project_root().join(format!("templates/{template}/setup/roles/{template}_runtime/defaults/main.yml"));
         assert!(!defaults.exists(), "{template} runtime role should not define setup-time global npm packages");
 
-        let tasks =
-            project_root().join(format!("templates/{template}/.lib/remote/roles/{template}_runtime/tasks/main.yml"));
+        let tasks = project_root().join(format!("templates/{template}/setup/roles/{template}_runtime/tasks/main.yml"));
         let content = fs::read_to_string(&tasks);
         assert!(content.is_ok(), "failed to read {}", tasks.display());
         let content = content.unwrap_or_default();

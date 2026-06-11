@@ -21,13 +21,13 @@ pub struct BonesConfig {
 pub struct Constants;
 
 impl Constants {
-    pub const BONES_DIR: &'static str = ".bones";
-    pub const BONES_YAML: &'static str = ".bones/bones.yaml";
-    pub const BONES_HOOKS_SCRIPT: &'static str = ".bones/.lib/hooks.sh";
-    pub const BONES_HOOKS_DIR: &'static str = ".bones/hooks";
-    pub const BONES_DEPLOYMENT_DIR: &'static str = ".bones/deployment";
-    pub const BONES_REMOTE_SETUP_PLAYBOOK: &'static str = ".bones/.lib/remote/playbooks/setup.yml";
-    pub const BONES_REMOTE_ROLES_DIR: &'static str = ".bones/.lib/remote/roles";
+    pub const BONES_DIR: &'static str = paths::LOCAL_BONES_DIR;
+    pub const BONES_YAML: &'static str = paths::LOCAL_BONES_YAML;
+    pub const BONES_HOOKS_SCRIPT: &'static str = paths::LOCAL_BONES_HOOKS_SCRIPT;
+    pub const BONES_HOOKS_DIR: &'static str = paths::LOCAL_BONES_HOOKS_DIR;
+    pub const BONES_DEPLOYMENT_DIR: &'static str = paths::LOCAL_BONES_DEPLOYMENT_DIR;
+    pub const BONES_REMOTE_SETUP_PLAYBOOK: &'static str = paths::LOCAL_BONES_SETUP_PLAYBOOK;
+    pub const BONES_REMOTE_ROLES_DIR: &'static str = paths::LOCAL_BONES_SETUP_ROLES_DIR;
 
     pub const GIT_HOOKS_DIR: &'static str = ".git/hooks";
     pub const GIT_PRE_PUSH_HOOK_PATH: &'static str = ".git/hooks/pre-push";
@@ -41,8 +41,7 @@ impl Constants {
 
     pub const ASSET_HOOKS_DIR: &'static str = "hooks/";
     pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
-    pub const ASSET_SCRIPTS_DIR: &'static str = ".lib/scripts/";
-    pub const PYTHON_BOOTSTRAP_SCRIPT_ASSET: &'static str = ".lib/scripts/bootstrap_python3.sh";
+    pub const PYTHON_BOOTSTRAP_SCRIPT_ASSET: &'static str = "bootstrap_python3.sh";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

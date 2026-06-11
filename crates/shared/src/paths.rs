@@ -24,6 +24,14 @@ pub const USR_LOCAL_BIN: &str = "/usr/local/bin";
 pub const OPT_BONESDEPLOY: &str = "/opt/bonesdeploy";
 pub const TMP_ROOT: &str = "/tmp";
 
+pub const LOCAL_BONES_DIR: &str = ".bones";
+pub const LOCAL_BONES_YAML: &str = ".bones/bones.yaml";
+pub const LOCAL_BONES_HOOKS_DIR: &str = ".bones/hooks";
+pub const LOCAL_BONES_HOOKS_SCRIPT: &str = ".bones/hooks/hooks.sh";
+pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
+pub const LOCAL_BONES_SETUP_PLAYBOOK: &str = ".bones/setup/playbooks/setup.yml";
+pub const LOCAL_BONES_SETUP_ROLES_DIR: &str = ".bones/setup/roles";
+
 pub const BONES_DIR: &str = "bones";
 pub const BONES_YAML: &str = "bones.yaml";
 pub const NGINX_CONF: &str = "nginx.conf";

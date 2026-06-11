@@ -64,7 +64,7 @@ check_bones_structure(&mut issues);
    ```rust
    let expected = [
        config::Constants::BONES_YAML,           // .bones/bones.yaml
-       config::Constants::BONES_HOOKS_SCRIPT,   // .bones/hooks.sh
+       config::Constants::BONES_HOOKS_SCRIPT,   // .bones/hooks/hooks.sh
        config::Constants::BONES_HOOKS_DIR,      // .bones/hooks/
        config::Constants::BONES_DEPLOYMENT_DIR, // .bones/deployment/
    ];
@@ -375,7 +375,7 @@ OK All checks passed.
 ```
 bonesdeploy doctor
 
-  ! .bones/hooks.sh is missing
+  ! .bones/hooks/hooks.sh is missing
   ! .git/hooks/pre-push is not symlinked
   ! bonesremote is not available on the remote
 Doctor found 3 issues

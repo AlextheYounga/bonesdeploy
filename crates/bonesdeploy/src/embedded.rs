@@ -16,6 +16,10 @@ struct Kit;
 #[folder = "../../templates/"]
 struct Templates;
 
+#[derive(Embed)]
+#[folder = "scripts/"]
+struct Scripts;
+
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
         let Some(asset) = Kit::get(&file_path) else {
@@ -67,11 +71,15 @@ pub fn available_templates() -> Vec<String> {
 }
 
 pub fn read_asset(path: &str) -> Result<String> {
-    let asset = Kit::get(path);
-    match asset {
-        Some(file) => Ok(String::from_utf8_lossy(file.data.as_ref()).to_string()),
-        None => bail!("Embedded asset not found: {path}"),
+    if let Some(file) = Kit::get(path) {
+        return Ok(String::from_utf8_lossy(file.data.as_ref()).to_string());
     }
+
+    if let Some(file) = Scripts::get(path) {
+        return Ok(String::from_utf8_lossy(file.data.as_ref()).to_string());
+    }
+
+    bail!("Embedded asset not found: {path}")
 }
 
 fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()> {
@@ -85,7 +93,6 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
     if relative_path.starts_with(config::Constants::ASSET_HOOKS_DIR)
         || relative_path.starts_with(config::Constants::ASSET_DEPLOYMENT_DIR)
-        || relative_path.starts_with(config::Constants::ASSET_SCRIPTS_DIR)
     {
         fs::set_permissions(&dest, fs::Permissions::from_mode(0o755))
             .with_context(|| format!("Failed to set permissions on {}", dest.display()))?;
@@ -96,15 +103,27 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
 #[cfg(test)]
 mod tests {
+    use crate::config;
+
     use super::read_asset;
 
     /// Does not pass a `--config` flag to the doctor command in the hooks script.
     #[test]
     fn hooks_script_does_not_pass_config_to_doctor() {
-        let hooks_script = read_asset(".lib/hooks.sh");
+        let hooks_script = read_asset("hooks/hooks.sh");
         assert!(hooks_script.is_ok(), "hooks.sh should be embedded");
 
         let hooks_script = hooks_script.unwrap_or_default();
         assert!(!hooks_script.contains("bonesremote doctor --config"));
+    }
+
+    /// Embeds the remote python bootstrap script from the crate-local scripts directory.
+    #[test]
+    fn python_bootstrap_script_is_embedded_from_crate_scripts_directory() {
+        let script = read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASSET);
+        assert!(script.is_ok(), "python bootstrap script should be embedded");
+
+        let script = script.unwrap_or_default();
+        assert!(script.contains("apt-get install -y python3 python3-apt"));
     }
 }

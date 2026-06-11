@@ -40,29 +40,26 @@ We create a `bonesremote` executable that does not require a password and allows
 ## Bones Scaffolding
 .bones
 ├── bones.yaml
-├── hooks.sh                          # sourced by hooks (symlinked from .lib/hooks.sh)
-├── deployment
-│   ├── 01_run_deployment_concerns.sh
-│   └── 02_permissions_lockup.sh (example)
 ├── hooks
+│   ├── hooks.sh                      # shared hook library, sourced by every hook
 │   ├── post-receive
 │   ├── pre-push
 │   └── pre-receive
-└── .lib/                             # CLI-owned library files (not user-editable)
-    ├── hooks.sh                      # shared hook library, sourced by every hook
-    ├── scripts
-    │   └── bootstrap_python3.sh      # ensures python3 is available before ansible runs
-    └── remote                        # nginx + ansible roles for `bonesdeploy remote setup`
-        ├── nginx/
-        ├── playbooks/
-        ├── roles/
-        │   ├── common/
-        │   ├── firewall/
-        │   ├── nginx/
-        │   ├── ssh/
-        │   ├── ssl/
-        │   └── users/
-        └── vars/
+├── deployment
+│   ├── 01_run_deployment_concerns.sh
+│   └── 02_permissions_lockup.sh (example)
+└── setup                            # ansible assets used by `bonesdeploy remote setup`
+    ├── apparmor/
+    ├── nginx/
+    ├── playbooks/
+    ├── roles/
+    │   ├── common/
+    │   ├── firewall/
+    │   ├── nginx/
+    │   ├── ssh/
+    │   ├── ssl/
+    │   └── users/
+    └── vars/
 
 ### Bones YAML
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
@@ -143,7 +140,7 @@ ssl:
 ```
 
 ### Hooks
-Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
+Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor --local` and we fail if the doctor command expresses any warning or errors.
 - `pre-receive` => Short-circuits when `deploy_on_push = false`. Otherwise it resolves the configured deployment branch from stdin's pushed refs (skipping deletes and pushes to other branches), then runs `bonesremote doctor` and `sudo bonesremote release stage --config ...` to prepare build and release directories and write staged release state.
@@ -170,16 +167,29 @@ bonesdeploy/
 ├── Cargo.toml                  # workspace root
 ├── kit/                        # embedded assets (scaffolding templates)
 │   ├── bones.yaml
-│   ├── .lib/                   # CLI library files (hooks, scripts, remote)
+│   ├── hooks/
 │   │   ├── hooks.sh
-│   │   ├── scripts/
-│   │   └── remote/             # nginx + ansible roles for `bonesdeploy remote setup`
+│   │   ├── post-receive
+│   │   ├── pre-push
+│   │   └── pre-receive
 │   ├── deployment/
-│   └── hooks/
+│   └── setup/                  # nginx + ansible roles for `bonesdeploy remote setup`
+│       ├── apparmor/
+│       ├── nginx/
+│       ├── playbooks/
+│       ├── roles/
+│       └── vars/
 ├── templates/                  # per-framework starter overlays (see below)
+│   ├── laravel/
+│   │   ├── bones.yaml
+│   │   ├── deployment/
+│   │   └── setup/
+│   └── ...
 ├── crates/
-│   ├── bonesdeploy/               # local CLI binary
+│   ├── bonesdeploy/            # local CLI binary
 │   │   ├── Cargo.toml
+│   │   ├── scripts/
+│   │   │   └── bootstrap_python3.sh  # embedded one-off bootstrap for ansible prerequisites
 │   │   └── src/
 │   │       ├── main.rs         # clap setup, command dispatch
 │   │       ├── commands/
@@ -197,7 +207,7 @@ bonesdeploy/
 │   │       ├── git.rs          # git CLI operations: remote validation, repo checks
 │   │       ├── prompts.rs      # interactive user input collection, returns config
 │   │       └── ssh.rs          # openssh session management + rsync
-│   └── bonesremote/        # server-side binary
+│   └── bonesremote/            # server-side binary
 │       ├── Cargo.toml
 │       └── src/
 │           ├── main.rs
@@ -222,7 +232,7 @@ bonesdeploy/
 ```
 
 ### Per-Framework Templates
-The `templates/` directory ships starter overlays that `bonesdeploy init` can use as a base when scaffolding into a project of the matching kind. Each template follows the same `.lib/` convention as `kit/` — framework-owned files (remote roles, site config, vars) live under `.lib/` while user-editable files (bones.yaml, deployment/) stay at the root:
+The `templates/` directory ships starter overlays that `bonesdeploy init` can use as a base when scaffolding into a project of the matching kind. Each template follows the same convention as `kit/` — framework-owned setup assets live under `setup/` while user-editable files (`bones.yaml`, `deployment/`) stay at the root:
 
 - `templates/django/`        → `django_runtime` role
 - `templates/laravel/`       → `laravel_runtime` role (PHP + PHP-FPM)

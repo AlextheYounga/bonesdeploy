@@ -13,23 +13,23 @@ const TEMPLATES: [&str; 7] = [
 ];
 
 const TEMPLATE_SETUP_VARS_FILES: [&str; 7] = [
-    "templates/django/.lib/remote/vars/setup.yml",
-    "templates/laravel/.lib/remote/vars/setup.yml",
-    "templates/next/.lib/remote/vars/setup.yml",
-    "templates/nuxt/.lib/remote/vars/setup.yml",
-    "templates/rails/.lib/remote/vars/setup.yml",
-    "templates/sveltekit/.lib/remote/vars/setup.yml",
-    "templates/vue/.lib/remote/vars/setup.yml",
+    "templates/django/setup/vars/setup.yml",
+    "templates/laravel/setup/vars/setup.yml",
+    "templates/next/setup/vars/setup.yml",
+    "templates/nuxt/setup/vars/setup.yml",
+    "templates/rails/setup/vars/setup.yml",
+    "templates/sveltekit/setup/vars/setup.yml",
+    "templates/vue/setup/vars/setup.yml",
 ];
 
 const TEMPLATE_SETUP_PLAYBOOKS: [&str; 7] = [
-    "templates/django/.lib/remote/playbooks/setup.yml",
-    "templates/laravel/.lib/remote/playbooks/setup.yml",
-    "templates/next/.lib/remote/playbooks/setup.yml",
-    "templates/nuxt/.lib/remote/playbooks/setup.yml",
-    "templates/rails/.lib/remote/playbooks/setup.yml",
-    "templates/sveltekit/.lib/remote/playbooks/setup.yml",
-    "templates/vue/.lib/remote/playbooks/setup.yml",
+    "templates/django/setup/playbooks/setup.yml",
+    "templates/laravel/setup/playbooks/setup.yml",
+    "templates/next/setup/playbooks/setup.yml",
+    "templates/nuxt/setup/playbooks/setup.yml",
+    "templates/rails/setup/playbooks/setup.yml",
+    "templates/sveltekit/setup/playbooks/setup.yml",
+    "templates/vue/setup/playbooks/setup.yml",
 ];
 
 #[path = "init_assets/apparmor.rs"]

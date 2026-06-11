@@ -90,7 +90,7 @@ embedded::scaffold(bones_dir)?;
 
 Extracts embedded assets to `.bones/`:
 - `.bones/bones.yaml` - Configuration file (empty/defaults)
-- `.bones/hooks.sh` - Helper functions for hooks
+- `.bones/hooks/hooks.sh` - Helper functions for hooks
 - `.bones/hooks/` - Directory for Git hooks
   - `hooks/pre-receive` - Server-side hook
   - `hooks/post-receive` - Server-side hook

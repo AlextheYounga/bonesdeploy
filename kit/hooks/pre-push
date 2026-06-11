@@ -13,7 +13,7 @@ set -euo pipefail
 REMOTE_NAME="$1"
 REPO_ROOT=$(git rev-parse --show-toplevel)
 cd "$REPO_ROOT"
-HOOKS_LIB="$REPO_ROOT/.bones/hooks.sh"
+HOOKS_LIB="$REPO_ROOT/.bones/hooks/hooks.sh"
 
 if [ ! -f "$HOOKS_LIB" ]; then
     echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"

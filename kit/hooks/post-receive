@@ -11,7 +11,7 @@ set -euo pipefail
 
 GIT_DIR="${GIT_DIR:-.}"
 GIT_DIR=$(cd "$GIT_DIR" && pwd)
-HOOKS_LIB="$GIT_DIR/bones/hooks.sh"
+HOOKS_LIB="$GIT_DIR/bones/hooks/hooks.sh"
 
 if [ ! -f "$HOOKS_LIB" ]; then
     echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"
