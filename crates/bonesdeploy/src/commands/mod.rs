@@ -7,7 +7,6 @@ mod pull;
 mod push;
 mod remote_runtime;
 mod remote_setup;
-mod remote_setup_output;
 mod remote_ssl;
 mod rollback;
 mod update;

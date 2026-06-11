@@ -3,8 +3,8 @@ use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use console::style;
-use serde_json::json;
-use shared::paths::{ssl_certificate_key_path, ssl_certificate_path};
+use serde_json::Value;
+use shared::paths::{DeploymentPaths, ssl_certificate_key_path, ssl_certificate_path};
 
 use crate::commands::push;
 use crate::commands::remote_setup;
@@ -40,7 +40,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
 
     ensure_runtime_assets_exist()?;
 
-    remote_setup::ensure_ansible_playbook_installed()?;
+    remote_setup::ensure_pyinfra_installed()?;
 
     println!(
         "Running {} against {} for {}...",
@@ -49,18 +49,15 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
         style(&cfg.ssl.domain).cyan(),
     );
 
-    let extra_vars = ssl_extra_vars(&cfg.ssl.domain, &cfg.ssl.email);
+    let data_vars = build_ssl_data_vars(&cfg, &cfg.ssl.domain, &cfg.ssl.email);
 
     let ssh_user = remote_setup::resolve_bootstrap_ssh_user();
-    remote_setup::run_ansible_playbook(
+    let deploy_file = Path::new(config::Constants::BONES_REMOTE_SSL_DEPLOY);
+    remote_setup::run_pyinfra_deploy(
         &cfg,
         &ssh_user,
-        extra_vars,
-        &remote_setup::AnsiblePlaybook {
-            extra_args: &[],
-            playbook: Path::new(config::Constants::BONES_REMOTE_SSL_PLAYBOOK),
-            roles_dirs: &[],
-        },
+        &data_vars,
+        &remote_setup::PyinfraDeploy { extra_args: &[], deploy_file },
     )?;
 
     config::save(&cfg, bones_yaml)?;
@@ -77,8 +74,8 @@ fn ensure_runtime_assets_exist() -> Result<()> {
         bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
     }
 
-    let runtime_playbook = bones_dir.join("runtime/playbooks/runtime.yml");
-    if !runtime_playbook.is_file() {
+    let runtime_deploy = bones_dir.join("runtime/deploy.py");
+    if !runtime_deploy.is_file() {
         embedded::scaffold_runtime_base(bones_dir)?;
     }
 
@@ -93,22 +90,61 @@ fn ensure_runtime_assets_exist() -> Result<()> {
     Ok(())
 }
 
-fn ssl_extra_vars(domain: &str, email: &str) -> serde_json::Value {
-    json!({
-        "ssl_domain": domain,
-        "ssl_email": email,
-        "nginx_ssl_certificate_path": ssl_certificate_path(domain),
-        "nginx_ssl_certificate_key_path": ssl_certificate_key_path(domain),
-    })
+fn build_ssl_data_vars(cfg: &config::BonesConfig, domain: &str, email: &str) -> Value {
+    let paths =
+        DeploymentPaths::new(&cfg.data.project_name, &cfg.data.repo_path, &cfg.data.project_root, &cfg.data.web_root);
+    let mut vars = serde_json::Map::new();
+
+    vars.insert(String::from("ssl_domain"), Value::String(domain.to_string()));
+    vars.insert(String::from("ssl_email"), Value::String(email.to_string()));
+    vars.insert(String::from("nginx_ssl_certificate_path"), Value::String(ssl_certificate_path(domain)));
+    vars.insert(String::from("nginx_ssl_certificate_key_path"), Value::String(ssl_certificate_key_path(domain)));
+    vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
+    vars.insert(String::from("service_user"), Value::String(cfg.permissions.defaults.service_user.clone()));
+    vars.insert(String::from("group"), Value::String(cfg.permissions.defaults.group.clone()));
+    vars.insert(String::from("paths"), serde_json::to_value(paths).unwrap_or_default());
+
+    Value::Object(vars)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ssl_extra_vars;
+    use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions};
+
+    use super::build_ssl_data_vars;
+
+    fn test_cfg() -> BonesConfig {
+        BonesConfig {
+            data: Data {
+                project_name: String::from("test"),
+                repo_path: String::from("/home/git/test.git"),
+                project_root: String::from("/srv/test"),
+                web_root: String::from("public"),
+                host: String::from("example.com"),
+                port: String::from("22"),
+                branch: String::from("master"),
+                remote_name: String::from("production"),
+                deploy_on_push: true,
+            },
+            permissions: Permissions {
+                defaults: PermissionDefaults {
+                    deploy_user: String::from("git"),
+                    service_user: String::from("test"),
+                    group: String::from("www-data"),
+                    dir_mode: String::from("750"),
+                    file_mode: String::from("640"),
+                },
+                paths: vec![],
+            },
+            releases: Default::default(),
+            ssl: Default::default(),
+        }
+    }
 
     #[test]
-    fn ssl_extra_vars_includes_domain_and_email() {
-        let vars = ssl_extra_vars("app.example.com", "ops@example.com");
+    fn ssl_data_vars_includes_domain_and_email() {
+        let cfg = test_cfg();
+        let vars = build_ssl_data_vars(&cfg, "app.example.com", "ops@example.com");
 
         assert_eq!(vars.get("ssl_domain"), Some(&serde_json::Value::String(String::from("app.example.com"))));
         assert_eq!(vars.get("ssl_email"), Some(&serde_json::Value::String(String::from("ops@example.com"))));

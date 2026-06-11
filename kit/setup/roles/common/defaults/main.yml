@@ -1,9 +1,0 @@
----
-bonesremote_repo_url: https://github.com/AlextheYounga/bonesdeploy.git
-bonesremote_install_root: /usr/local
-bonesremote_binary_path: "{{ bonesremote_install_root }}/bin/bonesremote"
-rustup_install_script_url: https://sh.rustup.rs
-rustup_install_prefix: /root/.cargo/bin
-cargo_binary_path: "{{ rustup_install_prefix }}/cargo"
-common_placeholder_release_name: "19700101_000000"
-common_placeholder_template_path: "{{ playbook_dir }}/../roles/nginx/defaults/index.html.j2"

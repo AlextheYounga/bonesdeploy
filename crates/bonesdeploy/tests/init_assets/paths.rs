@@ -2,39 +2,39 @@ use std::fs;
 
 use super::project_root;
 
-/// Uses resolved placeholder web root paths in the common role.
+/// Uses resolved placeholder web root paths in the setup deploy script.
 #[test]
-fn shared_setup_playbook_uses_placeholder_web_root_paths() {
-    let playbook = project_root().join("kit/setup/roles/common/tasks/main.yml");
-    let content = fs::read_to_string(&playbook);
-    assert!(content.is_ok(), "failed to read {}", playbook.display());
+fn setup_deploy_uses_placeholder_web_root_paths() {
+    let deploy = project_root().join("kit/setup/deploy.py");
+    let content = fs::read_to_string(&deploy);
+    assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("{{ paths.placeholder_web_root }}"),
-        "common role must seed placeholder release using the resolved placeholder web root\n{content}"
+        content.contains("placeholder_web_root"),
+        "setup deploy must seed placeholder release using the resolved placeholder web root\n{content}"
     );
     assert!(
-        content.contains("{{ paths.placeholder_index }}"),
-        "common role must write placeholder index through the resolved path manifest\n{content}"
+        content.contains("placeholder_index"),
+        "setup deploy must write placeholder index through the resolved path manifest\n{content}"
     );
 }
 
-/// Uses the resolved current web root for certbot validation in the SSL role.
+/// Uses the resolved current web root for certbot validation in the SSL deploy.
 #[test]
-fn ssl_role_uses_current_web_root_path_manifest() {
-    let role = project_root().join("kit/runtime/roles/ssl/tasks/main.yml");
-    let content = fs::read_to_string(&role);
-    assert!(content.is_ok(), "failed to read {}", role.display());
+fn ssl_deploy_uses_current_web_root_path_manifest() {
+    let deploy = project_root().join("kit/runtime/deploy_ssl.py");
+    let content = fs::read_to_string(&deploy);
+    assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("{{ paths.current_web_root }}"),
-        "ssl role must use the resolved current web root for certbot webroot validation\n{content}"
+        content.contains("current_web_root"),
+        "ssl deploy must use the resolved current web root for certbot webroot validation\n{content}"
     );
 }
 
-/// Uses resolved paths in both router nginx and `AppArmor` templates.
+/// Uses resolved paths in both router nginx and AppArmor templates.
 #[test]
 fn nginx_and_apparmor_templates_use_resolved_paths() {
     let nginx_site = project_root().join("kit/runtime/nginx/router.conf.j2");
@@ -70,24 +70,17 @@ fn nginx_and_apparmor_templates_use_resolved_paths() {
     );
 }
 
-/// Defines router template and service defaults to allow self-contained playbook execution.
+/// Defines router template and nginx_defaults in the SSL deploy as self-contained deployment.
 #[test]
-fn ssl_role_defines_nginx_defaults_for_playbook() {
-    let defaults = project_root().join("kit/runtime/roles/ssl/defaults/main.yml");
-    let content = fs::read_to_string(&defaults);
-    assert!(content.is_ok(), "failed to read {}", defaults.display());
+fn ssl_deploy_defines_nginx_defaults_inline() {
+    let deploy = project_root().join("kit/runtime/deploy_ssl.py");
+    let content = fs::read_to_string(&deploy);
+    assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("nginx_site_template_path:"),
-        "ssl role must define nginx_site_template_path for self-contained playbook execution\n{content}"
+        content.contains("nginx_server_name") && content.contains("router.conf.j2"),
+        "ssl deploy must reference the router nginx template for self-contained deployment\n{content}"
     );
-    assert!(
-        content.contains("role_path") && content.contains("router.conf.j2"),
-        "ssl role must default to the router nginx template through the shared nginx role assets\n{content}"
-    );
-    assert!(
-        content.contains("nginx_service_name:"),
-        "ssl role must define nginx_service_name for self-contained playbook execution\n{content}"
-    );
+    assert!(content.contains("nginx -t"), "ssl deploy must validate nginx configuration\n{content}");
 }

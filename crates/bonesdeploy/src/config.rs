@@ -27,11 +27,9 @@ impl Constants {
     pub const BONES_DEPLOYMENT_DIR: &'static str = paths::LOCAL_BONES_DEPLOYMENT_DIR;
     pub const BONES_RUNTIME_DIR: &'static str = paths::LOCAL_BONES_RUNTIME_DIR;
     pub const BONES_RUNTIME_YAML: &'static str = paths::LOCAL_BONES_RUNTIME_YAML;
-    pub const BONES_REMOTE_RUNTIME_PLAYBOOK: &'static str = paths::LOCAL_BONES_RUNTIME_PLAYBOOK;
-    pub const BONES_REMOTE_RUNTIME_ROLES_DIR: &'static str = paths::LOCAL_BONES_RUNTIME_ROLES_DIR;
-    pub const BONES_REMOTE_SSL_PLAYBOOK: &'static str = paths::LOCAL_BONES_SSL_PLAYBOOK;
-    pub const BONES_REMOTE_SETUP_PLAYBOOK: &'static str = paths::LOCAL_BONES_SETUP_PLAYBOOK;
-    pub const BONES_REMOTE_ROLES_DIR: &'static str = paths::LOCAL_BONES_SETUP_ROLES_DIR;
+    pub const BONES_REMOTE_RUNTIME_DEPLOY: &'static str = paths::LOCAL_BONES_RUNTIME_DEPLOY;
+    pub const BONES_REMOTE_SSL_DEPLOY: &'static str = paths::LOCAL_BONES_SSL_DEPLOY;
+    pub const BONES_REMOTE_SETUP_DEPLOY: &'static str = paths::LOCAL_BONES_SETUP_DEPLOY;
 
     pub const GIT_HOOKS_DIR: &'static str = ".git/hooks";
     pub const GIT_PRE_PUSH_HOOK_PATH: &'static str = ".git/hooks/pre-push";
@@ -45,7 +43,6 @@ impl Constants {
 
     pub const ASSET_HOOKS_DIR: &'static str = "hooks/";
     pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
-    pub const PYTHON_BOOTSTRAP_SCRIPT_ASSET: &'static str = "bootstrap_python3.sh";
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

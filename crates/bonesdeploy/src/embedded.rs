@@ -16,10 +16,6 @@ struct Kit;
 #[folder = "../../templates/"]
 struct Templates;
 
-#[derive(Embed)]
-#[folder = "scripts/"]
-struct Scripts;
-
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
         if file_path.starts_with("runtime/") {
@@ -123,10 +119,6 @@ pub fn read_asset(path: &str) -> Result<String> {
         return Ok(String::from_utf8_lossy(file.data.as_ref()).to_string());
     }
 
-    if let Some(file) = Scripts::get(path) {
-        return Ok(String::from_utf8_lossy(file.data.as_ref()).to_string());
-    }
-
     bail!("Embedded asset not found: {path}")
 }
 
@@ -151,8 +143,6 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use crate::config;
-
     use super::read_asset;
 
     /// Does not pass a `--config` flag to the doctor command in the hooks script.
@@ -163,15 +153,5 @@ mod tests {
 
         let hooks_script = hooks_script.unwrap_or_default();
         assert!(!hooks_script.contains("bonesremote doctor --config"));
-    }
-
-    /// Embeds the remote python bootstrap script from the crate-local scripts directory.
-    #[test]
-    fn python_bootstrap_script_is_embedded_from_crate_scripts_directory() {
-        let script = read_asset(config::Constants::PYTHON_BOOTSTRAP_SCRIPT_ASSET);
-        assert!(script.is_ok(), "python bootstrap script should be embedded");
-
-        let script = script.unwrap_or_default();
-        assert!(script.contains("apt-get install -y python3 python3-apt"));
     }
 }

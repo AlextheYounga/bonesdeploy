@@ -2,7 +2,7 @@ use std::fs;
 
 use super::project_root;
 
-/// Sets an `AppArmor` profile in the per-site nginx systemd service template.
+/// Sets an AppArmor profile in the per-site nginx systemd service template.
 #[test]
 fn nginx_service_template_sets_apparmor_profile() {
     let service_template = project_root().join("kit/runtime/nginx/site-nginx.service.j2");
@@ -13,7 +13,7 @@ fn nginx_service_template_sets_apparmor_profile() {
     assert!(content.contains("AppArmorProfile="), "per-site systemd service must pin an AppArmor profile\n{content}");
 }
 
-/// Requires the `AppArmor` service in the nginx systemd service template.
+/// Requires the AppArmor service in the nginx systemd service template.
 #[test]
 fn nginx_service_template_waits_for_apparmor_service() {
     let service_template = project_root().join("kit/runtime/nginx/site-nginx.service.j2");
@@ -31,14 +31,14 @@ fn nginx_service_template_waits_for_apparmor_service() {
     );
 }
 
-/// Ensures the `AppArmor` profile template file exists at the expected path.
+/// Ensures the AppArmor profile template file exists at the expected path.
 #[test]
 fn apparmor_profile_template_exists() {
     let profile_template = project_root().join("kit/runtime/apparmor/project-nginx-profile.j2");
     assert!(profile_template.exists(), "expected AppArmor profile template at {}", profile_template.display());
 }
 
-/// Allows reading the site nginx configuration in the `AppArmor` profile template.
+/// Allows reading the site nginx configuration in the AppArmor profile template.
 #[test]
 fn apparmor_profile_template_allows_site_nginx_conf() {
     let profile_template = project_root().join("kit/runtime/apparmor/project-nginx-profile.j2");
@@ -55,8 +55,7 @@ fn apparmor_profile_template_allows_site_nginx_conf() {
 /// Allows reading the per-site conf root in the Laravel PHP-FPM AppArmor profile.
 #[test]
 fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
-    let profile_template =
-        project_root().join("templates/laravel/runtime/roles/laravel_runtime/templates/site-php-fpm-profile.j2");
+    let profile_template = project_root().join("templates/laravel/runtime/templates/site-php-fpm-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -111,79 +110,44 @@ fn apparmor_profile_template_limits_network_to_unix_stream() {
     );
 }
 
-/// Ensures all expected `AppArmor` role asset files exist.
+/// Verifies apparmor profile enforcement is handled by the runtime deploy script.
 #[test]
-fn apparmor_role_assets_exist() {
-    let role_root = project_root().join("kit/runtime/roles/apparmor");
-
-    for file in ["tasks/main.yml", "defaults/main.yml", "handlers/main.yml"] {
-        assert!(role_root.join(file).is_file(), "missing apparmor role {file}");
-    }
-}
-
-/// Enforces the project `AppArmor` profile into enforce mode.
-#[test]
-fn apparmor_role_enforces_project_profile() {
-    let tasks_file = project_root().join("kit/runtime/roles/apparmor/tasks/main.yml");
-    let content = fs::read_to_string(&tasks_file);
-    assert!(content.is_ok(), "failed to read {}", tasks_file.display());
+fn runtime_deploy_enforces_apparmor_profile() {
+    let deploy = project_root().join("kit/runtime/deploy.py");
+    let content = fs::read_to_string(&deploy);
+    assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
 
     assert!(
         content.contains("aa-enforce"),
-        "apparmor role must explicitly set project profile to enforce mode\n{content}"
+        "runtime deploy must explicitly set project profile to enforce mode\n{content}"
     );
 }
 
-/// Verifies the `AppArmor` profile is loaded in the kernel.
+/// Verifies AppArmor profile loading is handled by the runtime deploy script.
 #[test]
-fn apparmor_role_verifies_profile_loaded() {
-    let tasks_file = project_root().join("kit/runtime/roles/apparmor/tasks/main.yml");
-    let content = fs::read_to_string(&tasks_file);
-    assert!(content.is_ok(), "failed to read {}", tasks_file.display());
+fn runtime_deploy_loads_apparmor_profile() {
+    let deploy = project_root().join("kit/runtime/deploy.py");
+    let content = fs::read_to_string(&deploy);
+    assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("{{ paths.apparmor_profiles }}"),
-        "apparmor role must check loaded profiles via kernel apparmor profile list\n{content}"
-    );
-    assert!(content.contains("apparmor_profile_name"), "apparmor role must verify expected profile name\n{content}");
-}
-
-/// Verifies the `AppArmor` profile is in enforce mode via kernel output.
-#[test]
-fn apparmor_role_verifies_profile_enforce_mode() {
-    let tasks_file = project_root().join("kit/runtime/roles/apparmor/tasks/main.yml");
-    let content = fs::read_to_string(&tasks_file);
-    assert!(content.is_ok(), "failed to read {}", tasks_file.display());
-    let content = content.unwrap_or_default();
-
-    assert!(
-        content.contains("{{ paths.apparmor_profiles }}")
-            && content.contains("\\(enforce\\)")
-            && content.contains("apparmor_profile_name | regex_escape"),
-        "apparmor role must verify enforce mode directly from kernel AppArmor profiles output\n{content}"
+        content.contains("apparmor_parser -r"),
+        "runtime deploy must load the per-project apparmor profile\n{content}"
     );
 }
 
-/// Verifies `AppArmor` is enabled in the kernel parameters.
+/// Verifies AppArmor kernel enabled check is in the runtime deploy script.
 #[test]
-fn apparmor_role_verifies_kernel_enabled() {
-    let tasks_file = project_root().join("kit/runtime/roles/apparmor/tasks/main.yml");
-    let content = fs::read_to_string(&tasks_file);
-    assert!(content.is_ok(), "failed to read {}", tasks_file.display());
+fn runtime_deploy_verifies_kernel_enabled() {
+    let deploy = project_root().join("kit/runtime/deploy.py");
+    let content = fs::read_to_string(&deploy);
+    assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("{{ paths.apparmor_enabled_param }}"),
-        "apparmor role must verify kernel apparmor enabled parameter\n{content}"
-    );
-    assert!(
-        content.contains("in ['y', 'yes', '1']"),
-        "apparmor role must assert enabled value is affirmative\n{content}"
-    );
-    assert!(
-        content.contains("| trim | lower"),
-        "apparmor role kernel-enabled assertion must trim aa parameter output before comparison\n{content}"
+        content.contains("apparmor_enabled_param"),
+        "runtime deploy must verify kernel apparmor enabled parameter\n{content}"
     );
 }

@@ -9,6 +9,7 @@ use crate::config;
 use crate::embedded;
 use crate::git;
 use crate::prompts;
+use shared::paths::DeploymentPaths;
 
 pub fn run() -> Result<()> {
     git::ensure_git_repository()?;
@@ -58,16 +59,44 @@ pub fn run() -> Result<()> {
     }
 
     let ssh_user = cfg.permissions.defaults.deploy_user.clone();
-    let playbook = PathBuf::from(config::Constants::BONES_REMOTE_RUNTIME_PLAYBOOK);
-    let roles_dirs = [PathBuf::from(config::Constants::BONES_REMOTE_RUNTIME_ROLES_DIR)];
+    let deploy_file = PathBuf::from(config::Constants::BONES_REMOTE_RUNTIME_DEPLOY);
 
-    remote_setup::ensure_ansible_playbook_installed()?;
-    remote_setup::run_ansible_playbook(
+    remote_setup::ensure_pyinfra_installed()?;
+    let data_vars = build_runtime_data_vars(&cfg, runtime_yaml)?;
+    remote_setup::run_pyinfra_deploy(
         &cfg,
         &ssh_user,
-        Value::Null,
-        &remote_setup::AnsiblePlaybook { extra_args: &[], playbook: &playbook, roles_dirs: &roles_dirs },
+        &data_vars,
+        &remote_setup::PyinfraDeploy { extra_args: &[], deploy_file: &deploy_file },
     )
+}
+
+fn build_runtime_data_vars(cfg: &config::BonesConfig, runtime_yaml: &Path) -> Result<Value> {
+    let paths = DeploymentPaths::new(
+        &cfg.data.project_name,
+        &cfg.data.repo_path,
+        &cfg.data.project_root,
+        &cfg.data.web_root,
+    );
+    let mut vars = serde_json::Map::new();
+
+    vars.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
+    vars.insert(String::from("deploy_user"), Value::String(cfg.permissions.defaults.deploy_user.clone()));
+    vars.insert(String::from("service_user"), Value::String(cfg.permissions.defaults.service_user.clone()));
+    vars.insert(String::from("group"), Value::String(cfg.permissions.defaults.group.clone()));
+    vars.insert(String::from("project_root_parent"), Value::String(paths.project_root_parent.clone()));
+    vars.insert(String::from("project_root"), Value::String(cfg.data.project_root.clone()));
+    vars.insert(String::from("web_root"), Value::String(cfg.data.web_root.clone()));
+    vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
+    vars.insert(String::from("repo_path"), Value::String(cfg.data.repo_path.clone()));
+    vars.insert(String::from("paths"), serde_json::to_value(paths)?);
+
+    let runtime_data = config::load_runtime(runtime_yaml)?;
+    for (key, value) in runtime_data {
+        vars.insert(key, value);
+    }
+
+    Ok(Value::Object(vars))
 }
 
 fn parse_runtime_defaults(template_name: &str) -> Result<Map<String, Value>> {

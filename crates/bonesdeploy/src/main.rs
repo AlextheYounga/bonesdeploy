@@ -4,7 +4,6 @@ mod embedded;
 mod git;
 mod prompts;
 mod ssh;
-mod update_assets;
 
 use anyhow::Result;
 use clap::Parser;

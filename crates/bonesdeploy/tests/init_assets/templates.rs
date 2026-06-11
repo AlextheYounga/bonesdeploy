@@ -81,7 +81,7 @@ fn laravel_template_setup_apt_packages_use_versioned_php_packages() {
 /// Runs the PHP-FPM master process without forcing the systemd service itself to the app user.
 #[test]
 fn laravel_php_fpm_service_template_leaves_privilege_dropping_to_the_pool() {
-    let path = project_root().join("templates/laravel/runtime/roles/laravel_runtime/templates/site-php-fpm.service.j2");
+    let path = project_root().join("templates/laravel/runtime/templates/site-php-fpm.service.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -118,18 +118,17 @@ fn laravel_nginx_template_uses_absolute_fastcgi_params_include() {
     );
 }
 
-/// Keeps the Laravel runtime role defaults focused on runtime layout instead of PHP version selection.
+/// Keeps the Laravel runtime operations using the PHP version from data vars instead of hardcoding.
 #[test]
-fn laravel_runtime_role_defaults_do_not_define_php_version() {
-    let path = project_root().join("templates/laravel/runtime/roles/laravel_runtime/defaults/main.yml");
+fn laravel_runtime_operations_do_not_hardcode_php_version() {
+    let path = project_root().join("templates/laravel/runtime/operations.py");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
 
     assert!(
-        !content.contains("laravel_php_version:"),
-        "laravel runtime role defaults should not hardcode PHP version selection
-{content}"
+        content.contains("data.get(\"laravel_php_version\"") || content.contains("data[\"laravel_php_version\"]"),
+        "laravel runtime operations should reference PHP version from data vars\n{content}"
     );
 }
 
@@ -149,23 +148,18 @@ fn shared_remote_scaffold_vars_file_defines_base_apt_packages() {
     assert!(content.contains("certbot"), "shared remote vars file must include certbot in apt packages\n{content}");
 }
 
-/// Does not install global npm packages in SPA template runtime roles.
+/// Does not install global npm packages in SPA template runtime operations.
 #[test]
-fn spa_template_runtime_roles_do_not_install_global_npm_packages() {
+fn spa_template_runtime_operations_do_not_install_global_npm_packages() {
     for template in ["next", "sveltekit", "vue"] {
-        let defaults =
-            project_root().join(format!("templates/{template}/runtime/roles/{template}_runtime/defaults/main.yml"));
-        assert!(!defaults.exists(), "{template} runtime role should not define setup-time global npm packages");
-
-        let tasks =
-            project_root().join(format!("templates/{template}/runtime/roles/{template}_runtime/tasks/main.yml"));
-        let content = fs::read_to_string(&tasks);
-        assert!(content.is_ok(), "failed to read {}", tasks.display());
+        let ops = project_root().join(format!("templates/{template}/runtime/operations.py"));
+        let content = fs::read_to_string(&ops);
+        assert!(content.is_ok(), "failed to read {}", ops.display());
         let content = content.unwrap_or_default();
 
         assert!(
             !content.contains("npm install -g"),
-            "{template} runtime role should not install globals during setup because the project Node version is resolved later\n{content}"
+            "{template} runtime operations should not install globals during setup because the project Node version is resolved later\n{content}"
         );
     }
 }
