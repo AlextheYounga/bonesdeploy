@@ -6,7 +6,7 @@ from utils import unflatten
 
 
 here = os.path.dirname(__file__)
-DEPLOY_DATA = _unflatten(host.data.dict())
+DEPLOY_DATA = unflatten(host.data.dict())
 PATHS = DEPLOY_DATA.get("paths", {})
 
 # Validate inputs

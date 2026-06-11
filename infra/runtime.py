@@ -6,7 +6,6 @@ from pyinfra.operations import apt, files, server, systemd
 from utils import unflatten
 
 
-
 DEPLOY_DATA = unflatten(host.data.dict())
 PATHS = DEPLOY_DATA.get("paths", {})
 
