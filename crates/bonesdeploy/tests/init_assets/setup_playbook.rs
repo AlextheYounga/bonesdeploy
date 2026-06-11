@@ -86,6 +86,27 @@ fn shared_setup_playbook_starts_setup_apt_packages_before_rustup_and_users() {
     assert!(rustup_idx < users_idx, "rustup bootstrap should run before users role\n{content}");
 }
 
+/// Runs template-specific pre-package setup before installing the shared apt package manifest.
+#[test]
+fn shared_setup_playbook_runs_pre_package_hook_before_setup_apt_packages() {
+    let playbook = project_root().join("kit/setup/playbooks/setup.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    let pre_packages_idx = content.find("Run template-specific pre-package setup");
+    let apt_idx = content.find("Install setup apt packages");
+
+    assert!(pre_packages_idx.is_some(), "shared setup playbook must include a pre-package hook\n{content}");
+    assert!(apt_idx.is_some(), "shared setup playbook must install setup apt packages\n{content}");
+    assert!(pre_packages_idx < apt_idx, "pre-package hook should run before setup apt packages\n{content}");
+    assert!(
+        content.contains("include_tasks: \"{{ playbook_dir }}/../tasks/pre_packages.yml\"")
+            && content.contains("setup_pre_packages_enabled | default(false)"),
+        "shared setup playbook must gate the pre-package hook behind template vars\n{content}"
+    );
+}
+
 /// Starts the slow toolchain installers with Ansible async/poll orchestration after package installation.
 #[test]
 fn common_role_runs_toolchain_installers_as_async_jobs() {

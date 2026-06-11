@@ -2,6 +2,15 @@
 runtime_role: laravel_runtime
 setup_label: Laravel
 laravel_php_version: "8.3"
+setup_pre_packages_enabled: true
+laravel_php_sury_prerequisite_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - lsb-release
+laravel_php_sury_keyring_package_url: https://packages.sury.org/debsuryorg-archive-keyring.deb
+laravel_php_sury_keyring_package_path: /tmp/debsuryorg-archive-keyring.deb
+laravel_php_sury_keyring_path: /usr/share/keyrings/deb.sury.org-php.gpg
 setup_apt_packages:
   - build-essential
   - ca-certificates

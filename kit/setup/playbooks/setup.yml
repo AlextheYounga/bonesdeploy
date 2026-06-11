@@ -7,6 +7,11 @@
     - "{{ playbook_dir }}/../vars/setup.yml"
 
   tasks:
+    - name: Run template-specific pre-package setup
+      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/pre_packages.yml"
+      when: setup_pre_packages_enabled | default(false)
+      tags: [setup, packages]
+
     - name: Install setup apt packages
       ansible.builtin.apt:
         name: "{{ setup_apt_packages }}"

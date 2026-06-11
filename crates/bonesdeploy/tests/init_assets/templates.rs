@@ -53,6 +53,11 @@ fn laravel_template_setup_vars_file_defines_php_version() {
         "laravel template setup vars must define the PHP version override
 {content}"
     );
+    assert!(
+        content.contains("setup_pre_packages_enabled: true"),
+        "laravel template setup vars must enable pre-package setup for PHP repository bootstrap
+{content}"
+    );
 }
 
 /// Templates PHP package names in Laravel setup apt packages so they match the configured PHP version.
