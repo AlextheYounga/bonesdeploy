@@ -13,13 +13,13 @@ const TEMPLATES: [&str; 7] = [
 ];
 
 const TEMPLATE_SETUP_VARS_FILES: [&str; 7] = [
-    "templates/django/setup/vars/setup.yml",
-    "templates/laravel/setup/vars/setup.yml",
-    "templates/next/setup/vars/setup.yml",
-    "templates/nuxt/setup/vars/setup.yml",
-    "templates/rails/setup/vars/setup.yml",
-    "templates/sveltekit/setup/vars/setup.yml",
-    "templates/vue/setup/vars/setup.yml",
+    "templates/django/runtime/vars/setup.yml",
+    "templates/laravel/runtime/vars/setup.yml",
+    "templates/next/runtime/vars/setup.yml",
+    "templates/nuxt/runtime/vars/setup.yml",
+    "templates/rails/runtime/vars/setup.yml",
+    "templates/sveltekit/runtime/vars/setup.yml",
+    "templates/vue/runtime/vars/setup.yml",
 ];
 
 #[path = "init_assets/apparmor.rs"]

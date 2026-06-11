@@ -7,11 +7,6 @@
     - "{{ playbook_dir }}/../../runtime.yaml"
 
   tasks:
-    - name: Run template-specific pre-package setup
-      ansible.builtin.include_tasks: "{{ playbook_dir }}/../tasks/pre_packages.yml"
-      when: runtime_pre_packages_enabled | default(false)
-      tags: [runtime, packages]
-
     - name: Install runtime apt packages
       ansible.builtin.apt:
         name: "{{ runtime_apt_packages | default([]) }}"
@@ -38,3 +33,15 @@
         name: nginx
         public: true
       tags: [nginx]
+
+  post_tasks:
+    - name: Run bonesremote doctor as deploy user
+      become_user: "{{ deploy_user }}"
+      ansible.builtin.command:
+        argv:
+          - bonesremote
+          - doctor
+      environment:
+        PATH: "{{ paths.usr_local_bin }}:{{ ansible_facts['env']['PATH'] }}"
+      changed_when: false
+      tags: [runtime, doctor]

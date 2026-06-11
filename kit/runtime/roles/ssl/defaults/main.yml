@@ -1,5 +1,4 @@
 ---
-ssl_enabled: false
 ssl_domain: ""
 ssl_email: ""
 ssl_cert_path: ""

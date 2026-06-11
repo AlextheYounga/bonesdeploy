@@ -94,13 +94,13 @@ Template-based projects then use `bonesdeploy remote runtime` to prompt for a fr
 
 To customize nginx behavior, edit `.bones/runtime/nginx/router.conf.j2` and re-run `bonesdeploy remote runtime`.
 
-When DNS is ready, enable SSL with certbot:
+When DNS is ready, enable SSL with certbot (separate from runtime):
 
 ```sh
 bonesdeploy remote ssl --domain app.example.com --email ops@example.com
 ```
 
-This obtains a Let's Encrypt certificate and updates the managed runtime nginx router config to listen on 443 and redirect HTTP to HTTPS.
+This runs the dedicated SSL playbook to obtain a Let's Encrypt certificate and configure the runtime nginx router for HTTPS. SSL is fully decoupled from runtime configuration.
 
 ### Syncing Configuration
 

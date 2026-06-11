@@ -41,20 +41,3 @@
         name: common
         public: true
       tags: [common]
-
-    - name: Run ssl role
-      ansible.builtin.include_role:
-        name: ssl
-      tags: [ssl]
-
-  post_tasks:
-    - name: Run bonesremote doctor as deploy user
-      become_user: "{{ deploy_user }}"
-      ansible.builtin.command:
-        argv:
-          - bonesremote
-          - doctor
-      environment:
-        PATH: "{{ paths.usr_local_bin }}:{{ ansible_facts['env']['PATH'] }}"
-      changed_when: false
-      tags: [common, bonesremote]

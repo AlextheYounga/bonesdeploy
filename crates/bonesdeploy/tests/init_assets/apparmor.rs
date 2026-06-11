@@ -5,7 +5,7 @@ use super::project_root;
 /// Sets an `AppArmor` profile in the per-site nginx systemd service template.
 #[test]
 fn nginx_service_template_sets_apparmor_profile() {
-    let service_template = project_root().join("kit/setup/nginx/site-nginx.service.j2");
+    let service_template = project_root().join("kit/runtime/nginx/site-nginx.service.j2");
     let content = fs::read_to_string(&service_template);
     assert!(content.is_ok(), "failed to read {}", service_template.display());
     let content = content.unwrap_or_default();
@@ -16,7 +16,7 @@ fn nginx_service_template_sets_apparmor_profile() {
 /// Requires the `AppArmor` service in the nginx systemd service template.
 #[test]
 fn nginx_service_template_waits_for_apparmor_service() {
-    let service_template = project_root().join("kit/setup/nginx/site-nginx.service.j2");
+    let service_template = project_root().join("kit/runtime/nginx/site-nginx.service.j2");
     let content = fs::read_to_string(&service_template);
     assert!(content.is_ok(), "failed to read {}", service_template.display());
     let content = content.unwrap_or_default();
@@ -34,14 +34,14 @@ fn nginx_service_template_waits_for_apparmor_service() {
 /// Ensures the `AppArmor` profile template file exists at the expected path.
 #[test]
 fn apparmor_profile_template_exists() {
-    let profile_template = project_root().join("kit/setup/apparmor/project-nginx-profile.j2");
+    let profile_template = project_root().join("kit/runtime/apparmor/project-nginx-profile.j2");
     assert!(profile_template.exists(), "expected AppArmor profile template at {}", profile_template.display());
 }
 
 /// Allows reading the site nginx configuration in the `AppArmor` profile template.
 #[test]
 fn apparmor_profile_template_allows_site_nginx_conf() {
-    let profile_template = project_root().join("kit/setup/apparmor/project-nginx-profile.j2");
+    let profile_template = project_root().join("kit/runtime/apparmor/project-nginx-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -56,7 +56,7 @@ fn apparmor_profile_template_allows_site_nginx_conf() {
 #[test]
 fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
     let profile_template =
-        project_root().join("templates/laravel/setup/roles/laravel_runtime/templates/site-php-fpm-profile.j2");
+        project_root().join("templates/laravel/runtime/roles/laravel_runtime/templates/site-php-fpm-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -74,7 +74,7 @@ fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
 /// Does not deny the parent home path when the repo path is derived from the shared helper.
 #[test]
 fn apparmor_profile_template_does_not_deny_repo_path_parent_home() {
-    let profile_template = project_root().join("kit/setup/apparmor/project-nginx-profile.j2");
+    let profile_template = project_root().join("kit/runtime/apparmor/project-nginx-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -92,7 +92,7 @@ fn apparmor_profile_template_does_not_deny_repo_path_parent_home() {
 /// Limits network access to unix stream sockets and denies inet sockets.
 #[test]
 fn apparmor_profile_template_limits_network_to_unix_stream() {
-    let profile_template = project_root().join("kit/setup/apparmor/project-nginx-profile.j2");
+    let profile_template = project_root().join("kit/runtime/apparmor/project-nginx-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -114,9 +114,9 @@ fn apparmor_profile_template_limits_network_to_unix_stream() {
 /// Ensures all expected `AppArmor` role asset files exist.
 #[test]
 fn apparmor_role_assets_exist() {
-    let role_root = project_root().join("kit/setup/roles/apparmor");
+    let role_root = project_root().join("kit/runtime/roles/apparmor");
 
-    for file in ["tasks/main.yml", "defaults/main.yml", "handlers/main.yml", "README.md"] {
+    for file in ["tasks/main.yml", "defaults/main.yml", "handlers/main.yml"] {
         assert!(role_root.join(file).is_file(), "missing apparmor role {file}");
     }
 }
@@ -124,7 +124,7 @@ fn apparmor_role_assets_exist() {
 /// Enforces the project `AppArmor` profile into enforce mode.
 #[test]
 fn apparmor_role_enforces_project_profile() {
-    let tasks_file = project_root().join("kit/setup/roles/apparmor/tasks/main.yml");
+    let tasks_file = project_root().join("kit/runtime/roles/apparmor/tasks/main.yml");
     let content = fs::read_to_string(&tasks_file);
     assert!(content.is_ok(), "failed to read {}", tasks_file.display());
     let content = content.unwrap_or_default();
@@ -138,7 +138,7 @@ fn apparmor_role_enforces_project_profile() {
 /// Verifies the `AppArmor` profile is loaded in the kernel.
 #[test]
 fn apparmor_role_verifies_profile_loaded() {
-    let tasks_file = project_root().join("kit/setup/roles/apparmor/tasks/main.yml");
+    let tasks_file = project_root().join("kit/runtime/roles/apparmor/tasks/main.yml");
     let content = fs::read_to_string(&tasks_file);
     assert!(content.is_ok(), "failed to read {}", tasks_file.display());
     let content = content.unwrap_or_default();
@@ -153,7 +153,7 @@ fn apparmor_role_verifies_profile_loaded() {
 /// Verifies the `AppArmor` profile is in enforce mode via kernel output.
 #[test]
 fn apparmor_role_verifies_profile_enforce_mode() {
-    let tasks_file = project_root().join("kit/setup/roles/apparmor/tasks/main.yml");
+    let tasks_file = project_root().join("kit/runtime/roles/apparmor/tasks/main.yml");
     let content = fs::read_to_string(&tasks_file);
     assert!(content.is_ok(), "failed to read {}", tasks_file.display());
     let content = content.unwrap_or_default();
@@ -169,7 +169,7 @@ fn apparmor_role_verifies_profile_enforce_mode() {
 /// Verifies `AppArmor` is enabled in the kernel parameters.
 #[test]
 fn apparmor_role_verifies_kernel_enabled() {
-    let tasks_file = project_root().join("kit/setup/roles/apparmor/tasks/main.yml");
+    let tasks_file = project_root().join("kit/runtime/roles/apparmor/tasks/main.yml");
     let content = fs::read_to_string(&tasks_file);
     assert!(content.is_ok(), "failed to read {}", tasks_file.display());
     let content = content.unwrap_or_default();

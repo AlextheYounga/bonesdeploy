@@ -59,16 +59,13 @@ pub fn run() -> Result<()> {
 
     let ssh_user = cfg.permissions.defaults.deploy_user.clone();
     let playbook = PathBuf::from(config::Constants::BONES_REMOTE_RUNTIME_PLAYBOOK);
-    let roles_dirs = [
-        PathBuf::from(config::Constants::BONES_REMOTE_RUNTIME_ROLES_DIR),
-        PathBuf::from(config::Constants::BONES_REMOTE_ROLES_DIR),
-    ];
+    let roles_dirs = [PathBuf::from(config::Constants::BONES_REMOTE_RUNTIME_ROLES_DIR)];
 
     remote_setup::ensure_ansible_playbook_installed()?;
     remote_setup::run_ansible_playbook(
         &cfg,
         &ssh_user,
-        serde_json::json!({}),
+        Value::Null,
         &remote_setup::AnsiblePlaybook { extra_args: &[], playbook: &playbook, roles_dirs: &roles_dirs },
     )
 }

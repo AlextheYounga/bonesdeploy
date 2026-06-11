@@ -1,0 +1,13 @@
+---
+- name: SSL setup for bonesdeploy
+  hosts: all
+  become: true
+
+  vars_files:
+    - "{{ playbook_dir }}/../../runtime.yaml"
+
+  tasks:
+    - name: Run ssl role
+      ansible.builtin.include_role:
+        name: ssl
+      tags: [ssl]

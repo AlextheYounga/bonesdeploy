@@ -40,7 +40,7 @@ fn update_bonesremote_playbook_installs_from_git_like_init() {
 #[test]
 fn apparmor_role_keeps_profile_path_derived_from_profile_name_override() {
     let defaults =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/setup/roles/apparmor/defaults/main.yml");
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/runtime/roles/apparmor/defaults/main.yml");
     let defaults_content = fs::read_to_string(&defaults);
     assert!(defaults_content.is_ok(), "failed to read {}", defaults.display());
     let defaults_content = defaults_content.unwrap_or_default();
@@ -50,7 +50,7 @@ fn apparmor_role_keeps_profile_path_derived_from_profile_name_override() {
         "apparmor defaults must keep destination path derived from apparmor_profile_name\n{defaults_content}"
     );
 
-    let tasks = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/setup/roles/apparmor/tasks/main.yml");
+    let tasks = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join("kit/runtime/roles/apparmor/tasks/main.yml");
     let tasks_content = fs::read_to_string(&tasks);
     assert!(tasks_content.is_ok(), "failed to read {}", tasks.display());
     let tasks_content = tasks_content.unwrap_or_default();

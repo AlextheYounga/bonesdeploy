@@ -51,7 +51,7 @@ pub fn scaffold_runtime_base(bones_dir: &Path) -> Result<()> {
 }
 
 pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Result<()> {
-    let prefix = format!("{template_name}/setup/");
+    let prefix = format!("{template_name}/runtime/");
     let mut found = false;
 
     for file_path in Templates::iter() {
@@ -63,13 +63,13 @@ pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Resul
             continue;
         };
 
+        found = true;
         let relative_path = file_path.trim_start_matches(&prefix);
         if relative_path == "vars/setup.yml" {
             continue;
         }
 
         write_asset(bones_dir, &format!("runtime/{relative_path}"), asset.data.as_ref())?;
-        found = true;
     }
 
     if !found {
@@ -83,7 +83,7 @@ pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Resul
 }
 
 pub fn read_template_runtime_vars(template_name: &str) -> Result<String> {
-    let path = format!("{template_name}/setup/vars/setup.yml");
+    let path = format!("{template_name}/runtime/vars/setup.yml");
     let Some(file) = Templates::get(&path) else {
         bail!(
             "Embedded runtime vars not found for template: {template_name}. Available templates: {}",

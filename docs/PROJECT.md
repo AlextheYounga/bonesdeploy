@@ -299,12 +299,14 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Prompts for a framework template, refreshes `.bones/runtime/`, and writes `.bones/runtime.yaml`.
   - Reapplies template-specific defaults into `.bones/bones.yaml` only when they still match generic or previous-template values.
   - After a `y/N` confirmation, runs `.bones/runtime/playbooks/runtime.yml` using `ansible-playbook` against the configured host.
-  - Configures per-site runtime assets such as framework services, AppArmor, and nginx.
+  - Configures per-site runtime assets such as framework services, AppArmor, nginx, and runs `bonesremote doctor`.
+  - Does not handle SSL; use `remote ssl` for TLS configuration.
 
 - **remote ssl**
-  - Runs the SSL Ansible role against the configured host.
+  - Runs the SSL playbook (`.bones/runtime/playbooks/ssl.yml`) against the configured host.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
+  - Separate from `remote runtime` to keep certificate management decoupled from app runtime concerns.
 
 - **rollback**
   - SSHes into the configured host and runs `bonesremote release rollback --config ...`, which repoints `current` to the previous release without rebuilding.

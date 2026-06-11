@@ -29,6 +29,7 @@ impl Constants {
     pub const BONES_RUNTIME_YAML: &'static str = paths::LOCAL_BONES_RUNTIME_YAML;
     pub const BONES_REMOTE_RUNTIME_PLAYBOOK: &'static str = paths::LOCAL_BONES_RUNTIME_PLAYBOOK;
     pub const BONES_REMOTE_RUNTIME_ROLES_DIR: &'static str = paths::LOCAL_BONES_RUNTIME_ROLES_DIR;
+    pub const BONES_REMOTE_SSL_PLAYBOOK: &'static str = paths::LOCAL_BONES_SSL_PLAYBOOK;
     pub const BONES_REMOTE_SETUP_PLAYBOOK: &'static str = paths::LOCAL_BONES_SETUP_PLAYBOOK;
     pub const BONES_REMOTE_ROLES_DIR: &'static str = paths::LOCAL_BONES_SETUP_ROLES_DIR;
 

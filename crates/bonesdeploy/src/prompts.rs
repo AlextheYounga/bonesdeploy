@@ -191,7 +191,7 @@ fn remote_runtime_prompt_lines() -> [&'static str; 7] {
         "It will:",
         "  - install template-specific runtime packages",
         "  - provision framework services like PHP-FPM",
-        "  - configure AppArmor and nginx for this site",
+        "  - configure AppArmor, nginx, and SSL for this site",
     ]
 }
 

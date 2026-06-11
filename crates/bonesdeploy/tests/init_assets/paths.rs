@@ -23,7 +23,7 @@ fn shared_setup_playbook_uses_placeholder_web_root_paths() {
 /// Uses the resolved current web root for certbot validation in the SSL role.
 #[test]
 fn ssl_role_uses_current_web_root_path_manifest() {
-    let role = project_root().join("kit/setup/roles/ssl/tasks/main.yml");
+    let role = project_root().join("kit/runtime/roles/ssl/tasks/main.yml");
     let content = fs::read_to_string(&role);
     assert!(content.is_ok(), "failed to read {}", role.display());
     let content = content.unwrap_or_default();
@@ -37,7 +37,7 @@ fn ssl_role_uses_current_web_root_path_manifest() {
 /// Uses resolved paths in both router nginx and `AppArmor` templates.
 #[test]
 fn nginx_and_apparmor_templates_use_resolved_paths() {
-    let nginx_site = project_root().join("kit/setup/nginx/router.conf.j2");
+    let nginx_site = project_root().join("kit/runtime/nginx/router.conf.j2");
     let nginx_conf = fs::read_to_string(&nginx_site);
     assert!(nginx_conf.is_ok(), "failed to read {}", nginx_site.display());
     let nginx_conf = nginx_conf.unwrap_or_default();
@@ -51,7 +51,7 @@ fn nginx_and_apparmor_templates_use_resolved_paths() {
         "nginx router template must not claim the default server on shared hosts\n{nginx_conf}"
     );
 
-    let apparmor = project_root().join("kit/setup/apparmor/project-nginx-profile.j2");
+    let apparmor = project_root().join("kit/runtime/apparmor/project-nginx-profile.j2");
     let apparmor_conf = fs::read_to_string(&apparmor);
     assert!(apparmor_conf.is_ok(), "failed to read {}", apparmor.display());
     let apparmor_conf = apparmor_conf.unwrap_or_default();
@@ -70,29 +70,17 @@ fn nginx_and_apparmor_templates_use_resolved_paths() {
     );
 }
 
-/// Treats SSL enabled as an explicit boolean rather than relying on string truthiness.
+/// Defines router template and service defaults to allow self-contained playbook execution.
 #[test]
-fn ssl_role_treats_ssl_enabled_as_explicit_boolean() {
-    let role = project_root().join("kit/setup/roles/ssl/tasks/main.yml");
-    let content = fs::read_to_string(&role);
-    assert!(content.is_ok(), "failed to read {}", role.display());
-    let content = content.unwrap_or_default();
-
-    assert!(!content.contains("when: ssl_enabled\n"), "ssl role must not rely on string truthiness\n{content}");
-    assert!(content.contains("when: ssl_enabled | bool"), "ssl role should cast CLI vars explicitly\n{content}");
-}
-
-/// Defines router template and service defaults to allow tag-based execution without the nginx role.
-#[test]
-fn ssl_role_defines_nginx_defaults_for_tag_based_execution() {
-    let defaults = project_root().join("kit/setup/roles/ssl/defaults/main.yml");
+fn ssl_role_defines_nginx_defaults_for_playbook() {
+    let defaults = project_root().join("kit/runtime/roles/ssl/defaults/main.yml");
     let content = fs::read_to_string(&defaults);
     assert!(content.is_ok(), "failed to read {}", defaults.display());
     let content = content.unwrap_or_default();
 
     assert!(
         content.contains("nginx_site_template_path:"),
-        "ssl role must define nginx_site_template_path for self-contained tag execution\n{content}"
+        "ssl role must define nginx_site_template_path for self-contained playbook execution\n{content}"
     );
     assert!(
         content.contains("role_path") && content.contains("router.conf.j2"),
@@ -100,6 +88,6 @@ fn ssl_role_defines_nginx_defaults_for_tag_based_execution() {
     );
     assert!(
         content.contains("nginx_service_name:"),
-        "ssl role must define nginx_service_name for self-contained tag execution\n{content}"
+        "ssl role must define nginx_service_name for self-contained playbook execution\n{content}"
     );
 }

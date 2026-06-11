@@ -18,6 +18,13 @@ bonesdeploy remote runtime
 - Reapplies template-specific defaults into `.bones/bones.yaml` when they still match generic or previous-template values
 - Passes `.bones/runtime.yaml` to the runtime playbook through `vars_files`
 - Prompts `y/N` before running the runtime playbook remotely
+- Runs `bonesremote doctor` after playbook completion
+
+## What It Does NOT Do
+
+- Does not handle SSL/TLS configuration (use `bonesdeploy remote ssl` for TLS)
+- Does not run certbot or certificate challenges
+- Does not pass any SSL-related variables to Ansible
 
 ## When to Run
 

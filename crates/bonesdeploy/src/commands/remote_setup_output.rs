@@ -13,7 +13,7 @@ use tempfile::NamedTempFile;
 
 use crate::commands::remote_setup;
 use crate::config;
-use shared::paths::{DeploymentPaths, ssl_certificate_key_path, ssl_certificate_path};
+use shared::paths::DeploymentPaths;
 
 const BRAND: &str = "☠ bonesdeploy";
 const CLEAR_LINE: &str = "\r\u{1b}[2K";
@@ -241,16 +241,6 @@ fn build_ansible_vars(cfg: &config::BonesConfig, extra_vars: Value) -> Result<Va
     vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
     vars.insert(String::from("repo_path"), Value::String(cfg.data.repo_path.clone()));
     vars.insert(String::from("paths"), serde_json::to_value(paths)?);
-
-    if cfg.ssl.enabled && !cfg.ssl.domain.is_empty() {
-        vars.insert(String::from("nginx_server_name"), Value::String(cfg.ssl.domain.clone()));
-        vars.insert(String::from("nginx_ssl_enabled"), Value::Bool(true));
-        vars.insert(String::from("nginx_ssl_certificate_path"), Value::String(ssl_certificate_path(&cfg.ssl.domain)));
-        vars.insert(
-            String::from("nginx_ssl_certificate_key_path"),
-            Value::String(ssl_certificate_key_path(&cfg.ssl.domain)),
-        );
-    }
 
     merge_extra_vars(&mut vars, extra_vars)?;
     Ok(Value::Object(vars))

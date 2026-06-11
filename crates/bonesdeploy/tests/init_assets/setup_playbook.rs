@@ -27,7 +27,7 @@ fn remote_setup_playbook_includes_firewall_role() {
     );
 }
 
-/// Loads shared setup variables and keeps the doctor validation task in the remote setup playbook.
+/// Loads shared setup variables and keeps runtime validation out of the remote setup playbook.
 #[test]
 fn remote_setup_playbook_loads_shared_setup_vars_and_doctor_task() {
     let playbook = project_root().join("kit/setup/playbooks/setup.yml");
@@ -41,8 +41,8 @@ fn remote_setup_playbook_loads_shared_setup_vars_and_doctor_task() {
         "remote setup playbook should load template override vars from a dedicated file\n{content}"
     );
     assert!(
-        content.contains("Run bonesremote doctor as deploy user"),
-        "remote setup playbook must keep the doctor validation in the shared playbook\n{content}"
+        !content.contains("bonesremote doctor"),
+        "remote setup playbook must not run runtime doctor checks\n{content}"
     );
 }
 
@@ -123,13 +123,13 @@ fn common_role_runs_toolchain_installers_as_async_jobs() {
 #[test]
 fn template_playbooks_include_apparmor_role() {
     for playbook in [
-        "templates/django/setup/playbooks/setup.yml",
-        "templates/laravel/setup/playbooks/setup.yml",
-        "templates/next/setup/playbooks/setup.yml",
-        "templates/nuxt/setup/playbooks/setup.yml",
-        "templates/rails/setup/playbooks/setup.yml",
-        "templates/sveltekit/setup/playbooks/setup.yml",
-        "templates/vue/setup/playbooks/setup.yml",
+        "templates/django/runtime/playbooks/setup.yml",
+        "templates/laravel/runtime/playbooks/setup.yml",
+        "templates/next/runtime/playbooks/setup.yml",
+        "templates/nuxt/runtime/playbooks/setup.yml",
+        "templates/rails/runtime/playbooks/setup.yml",
+        "templates/sveltekit/runtime/playbooks/setup.yml",
+        "templates/vue/runtime/playbooks/setup.yml",
     ] {
         let path = project_root().join(playbook);
         assert!(!path.exists(), "template playbook {playbook} should be removed in favor of shared kit setup logic");
@@ -184,4 +184,44 @@ fn remote_runtime_playbook_installs_runtime_packages_before_runtime_role() {
     assert!(packages_idx.is_some(), "runtime playbook must install runtime apt packages\n{content}");
     assert!(runtime_idx.is_some(), "runtime playbook must apply the runtime role\n{content}");
     assert!(packages_idx < runtime_idx, "runtime packages must install before runtime role execution\n{content}");
+}
+
+/// Leaves SSL role out of the runtime playbook since SSL has its own playbook.
+#[test]
+fn remote_runtime_playbook_excludes_ssl_role() {
+    let playbook = project_root().join("kit/runtime/playbooks/runtime.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        !content.contains("Run ssl role") && !content.contains("name: ssl"),
+        "runtime playbook must not include SSL role - SSL has its own playbook\n{content}"
+    );
+}
+
+/// Applies only the SSL role through the dedicated SSL playbook.
+#[test]
+fn remote_ssl_playbook_applies_ssl_role_only() {
+    let playbook = project_root().join("kit/runtime/playbooks/ssl.yml");
+    let content = fs::read_to_string(&playbook);
+    assert!(content.is_ok(), "failed to read {}", playbook.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("Run ssl role") && content.contains("name: ssl"),
+        "SSL playbook must apply the SSL role\n{content}"
+    );
+    assert!(
+        !content.contains("Run AppArmor role") && !content.contains("name: apparmor"),
+        "SSL playbook must not include AppArmor role\n{content}"
+    );
+    assert!(
+        !content.contains("Run nginx role") && !content.contains("name: nginx"),
+        "SSL playbook must not include general nginx role\n{content}"
+    );
+    assert!(
+        !content.contains("Run runtime role") && !content.contains("runtime_role"),
+        "SSL playbook must not include runtime role\n{content}"
+    );
 }

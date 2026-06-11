@@ -33,6 +33,7 @@ pub const LOCAL_BONES_RUNTIME_DIR: &str = ".bones/runtime";
 pub const LOCAL_BONES_RUNTIME_YAML: &str = ".bones/runtime.yaml";
 pub const LOCAL_BONES_RUNTIME_PLAYBOOK: &str = ".bones/runtime/playbooks/runtime.yml";
 pub const LOCAL_BONES_RUNTIME_ROLES_DIR: &str = ".bones/runtime/roles";
+pub const LOCAL_BONES_SSL_PLAYBOOK: &str = ".bones/runtime/playbooks/ssl.yml";
 pub const LOCAL_BONES_SETUP_PLAYBOOK: &str = ".bones/setup/playbooks/setup.yml";
 pub const LOCAL_BONES_SETUP_ROLES_DIR: &str = ".bones/setup/roles";
 
