@@ -12,6 +12,7 @@ const TEMPLATES: [&str; 7] = [
     "templates/vue/bones.yaml",
 ];
 
+// These probably aren't necessary anymore
 const TEMPLATE_SETUP_VARS_FILES: [&str; 7] = [
     "templates/django/runtime/vars/setup.yml",
     "templates/laravel/runtime/vars/setup.yml",

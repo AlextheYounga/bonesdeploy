@@ -46,6 +46,7 @@ pub fn scaffold_runtime_base(bones_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+// What does this do?
 pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Result<()> {
     let prefix = format!("{template_name}/runtime/");
     let mut found = false;
@@ -64,6 +65,7 @@ pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Resul
         if relative_path == "vars/setup.yml" {
             continue;
         }
+		// Specifically, why are we checking that this exists? Why do we still need this?
 
         write_asset(bones_dir, &format!("runtime/{relative_path}"), asset.data.as_ref())?;
     }
