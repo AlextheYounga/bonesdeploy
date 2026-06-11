@@ -1,11 +1,13 @@
 import io
 import os
-import importlib.util
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 from pyinfra import host
 from pyinfra.facts.server import LinuxDistribution
 from pyinfra.operations import apt, files, server
-from utils import unflatten
+from src.utils import unflatten, load_optional_module
 
 SETUP_APT_PACKAGES = [
     "build-essential",
@@ -25,17 +27,13 @@ DEPLOY_DATA = unflatten(host.data.dict())
 PATHS = DEPLOY_DATA.get("paths", {})
 
 
-def _load_optional_module(module_path, module_name):
-    if os.path.exists(module_path):
-        spec = importlib.util.spec_from_file_location(module_name, module_path)
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+
 
 
 # Template-specific pre-package setup
 pre_packages_path = os.path.join(os.path.dirname(__file__), "pre_packages.py")
 if os.path.exists(pre_packages_path):
-    _load_optional_module(pre_packages_path, "pre_packages")
+    load_optional_module(pre_packages_path, "pre_packages")
 
 # Install setup apt packages
 apt.packages(

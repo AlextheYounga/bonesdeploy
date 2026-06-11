@@ -1,9 +1,12 @@
 import os
 import importlib.util
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 from pyinfra import host
 from pyinfra.operations import apt, files, server, systemd
-from utils import unflatten
+from src.utils import unflatten
 
 
 DEPLOY_DATA = unflatten(host.data.dict())

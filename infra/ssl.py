@@ -1,8 +1,11 @@
 import os
+import sys
+
+sys.path.insert(0, os.path.dirname(__file__))
 
 from pyinfra import host
 from pyinfra.operations import files, server, systemd
-from utils import unflatten
+from src.utils import unflatten
 
 
 here = os.path.dirname(__file__)
