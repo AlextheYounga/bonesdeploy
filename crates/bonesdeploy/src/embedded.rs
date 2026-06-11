@@ -18,10 +18,6 @@ struct Templates;
 
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
-        if file_path.starts_with("infra/") {
-            continue;
-        }
-
         let Some(asset) = Kit::get(&file_path) else {
             continue;
         };

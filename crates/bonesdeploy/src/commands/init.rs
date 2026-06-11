@@ -46,7 +46,6 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
         config::save(&seed, Path::new(config::Constants::BONES_YAML))?;
 
         initial_project_name = Some(project_name);
-        println!("Using build-from-scratch scaffold.");
     }
 
     update_gitignore()?;
