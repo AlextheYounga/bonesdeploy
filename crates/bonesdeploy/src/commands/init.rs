@@ -22,12 +22,11 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
     git::ensure_git_repository()?;
 
     let bones_dir = Path::new(config::Constants::BONES_DIR);
+    let is_fresh = !bones_dir.exists();
 
     let mut initial_project_name: Option<String> = None;
 
-    if bones_dir.exists() {
-        println!(".bones/ already exists, skipping scaffold extraction.");
-    } else {
+    if is_fresh {
         let project_name = resolve_project_name(args)?;
         let config_dir = config::bones_config_dir(&project_name);
 
@@ -45,12 +44,9 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
         };
         config::save(&seed, Path::new(config::Constants::BONES_YAML))?;
 
-        let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
-        if !runtime_yaml.exists() {
-            seed_runtime_config(args, bones_dir, runtime_yaml)?;
-        }
-
         initial_project_name = Some(project_name);
+    } else {
+        println!(".bones/ already exists, skipping scaffold extraction.");
     }
 
     update_gitignore()?;
@@ -71,6 +67,13 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
 
     config::save(&cfg, bones_yaml)?;
     println!("Saved config to {}", config::Constants::BONES_YAML);
+
+    if is_fresh {
+        let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
+        if !runtime_yaml.exists() {
+            seed_runtime_config(args, bones_dir, runtime_yaml)?;
+        }
+    }
     ensure_local_remote(&cfg)?;
 
     symlink_pre_push()?;
