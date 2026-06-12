@@ -1,13 +1,13 @@
 worker_processes 1;
 pid {{ paths.runtime_nginx_pid }};
-error_log stderr notice;
+error_log {{ paths.runtime_socket_dir }}/error.log notice;
 
 events {
     worker_connections 1024;
 }
 
 http {
-    access_log stderr;
+    access_log {{ paths.runtime_socket_dir }}/access.log;
     client_body_temp_path {{ paths.runtime_socket_dir }}/client_body;
     proxy_temp_path {{ paths.runtime_socket_dir }}/proxy;
     fastcgi_temp_path {{ paths.runtime_socket_dir }}/fastcgi;

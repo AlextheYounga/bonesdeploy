@@ -84,3 +84,27 @@ fn ssl_deploy_defines_nginx_defaults_inline() {
     );
     assert!(content.contains("nginx -t"), "ssl deploy must validate nginx configuration\n{content}");
 }
+
+/// Base per-site nginx config writes error/access logs under the runtime socket directory
+/// so that the non-root service user can write them under the systemd sandbox and AppArmor profile.
+/// Relative "stderr" paths resolve to unwritable locations like /usr/share/nginx/stderr.
+#[test]
+fn base_site_nginx_config_writes_logs_under_runtime_socket_dir() {
+    let nginx_config = project_root().join("infra/assets/nginx/site-nginx.conf.j2");
+    let content = fs::read_to_string(&nginx_config);
+    assert!(content.is_ok(), "failed to read {}", nginx_config.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("error_log {{ paths.runtime_socket_dir }}/error.log"),
+        "base per-site nginx config must write error log under the runtime socket directory\n{content}"
+    );
+    assert!(
+        content.contains("access_log {{ paths.runtime_socket_dir }}/access.log"),
+        "base per-site nginx config must write access log under the runtime socket directory\n{content}"
+    );
+    assert!(
+        !content.contains("access_log stderr"),
+        "base per-site nginx config must not use relative stderr access log (non-root cannot write /usr/share/nginx)\n{content}"
+    );
+}

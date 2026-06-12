@@ -165,3 +165,26 @@ fn laravel_nginx_template_uses_resolved_path_manifest() {
         "laravel nginx config must not manually construct current web root\n{content}"
     );
 }
+
+/// Laravel nginx config writes error/access logs under the runtime socket directory
+/// so that the non-root service user can write them under the systemd sandbox and AppArmor profile.
+#[test]
+fn laravel_nginx_config_writes_logs_under_runtime_socket_dir() {
+    let path = templates_root().join("laravel/infra/assets/nginx/laravel-site-nginx.conf.j2");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("error_log {{ paths.runtime_socket_dir }}/error.log"),
+        "laravel nginx config must write error log under the runtime socket directory\n{content}"
+    );
+    assert!(
+        content.contains("access_log {{ paths.runtime_socket_dir }}/access.log"),
+        "laravel nginx config must write access log under the runtime socket directory\n{content}"
+    );
+    assert!(
+        !content.contains("access_log stderr"),
+        "laravel nginx config must not use relative stderr access log (non-root cannot write /usr/share/nginx)\n{content}"
+    );
+}
