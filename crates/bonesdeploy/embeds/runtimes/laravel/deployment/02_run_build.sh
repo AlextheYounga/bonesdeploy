@@ -2,14 +2,18 @@
 
 set -Eeuo pipefail
 
+trap 'status=$?; echo "[bonesdeploy] Failed at line $LINENO: $BASH_COMMAND (status $status)" >&2; exit "$status"' ERR
+
 [ -f artisan ] || { echo "artisan not found"; exit 1; }
 command -v php >/dev/null 2>&1 || { echo "php not found"; exit 1; }
 command -v composer >/dev/null 2>&1 || { echo "composer not found"; exit 1; }
 
 # Install PHP dependencies first — artisan requires vendor/autoload.php
+echo "[bonesdeploy] Installing Composer dependencies..."
 composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
 # Maintenance mode once the app can boot
+echo "[bonesdeploy] Entering Laravel maintenance mode..."
 php artisan down --render="errors::503"
 trap 'php artisan up || true' EXIT
 
@@ -31,7 +35,9 @@ command -v pnpm >/dev/null 2>&1 || {
   exit 1
 }
 
+echo "[bonesdeploy] Installing frontend dependencies..."
 pnpm install --frozen-lockfile
+echo "[bonesdeploy] Building frontend assets..."
 pnpm run build
 
 if php artisan list | grep -q 'wayfinder:generate'; then
@@ -42,9 +48,11 @@ if [ ! -f .env ] || ! grep -Eq '^APP_KEY=base64:' .env; then
   php artisan key:generate --force
 fi
 
+echo "[bonesdeploy] Running migrations..."
 php artisan migrate --force
 
 # Clear old caches and rebuild them back-to-back
+echo "[bonesdeploy] Rebuilding Laravel caches..."
 php artisan optimize:clear
 php artisan config:cache
 php artisan route:cache

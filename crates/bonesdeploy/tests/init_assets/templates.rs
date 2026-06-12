@@ -166,6 +166,45 @@ fn laravel_nginx_template_uses_resolved_path_manifest() {
     );
 }
 
+/// Laravel build script has an ERR trap that prints the failing command and line.
+#[test]
+fn laravel_build_script_has_err_trap_with_command_and_line() {
+    let path = templates_root().join("laravel/deployment/02_run_build.sh");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("trap '") && content.contains("ERR"),
+        "laravel build script must trap on ERR to report failing commands\n{content}"
+    );
+    assert!(
+        content.contains("$LINENO") && content.contains("$BASH_COMMAND"),
+        "laravel build script ERR trap must include the failing line number and command\n{content}"
+    );
+}
+
+/// Laravel build script prints step labels before Composer, artisan, pnpm, migrations, and cache rebuilds
+/// so that production failures are easy to localize in deploy output.
+#[test]
+fn laravel_build_script_prints_step_labels_for_phases() {
+    let path = templates_root().join("laravel/deployment/02_run_build.sh");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    for label in &[
+        "Installing Composer dependencies",
+        "Entering Laravel maintenance mode",
+        "Installing frontend dependencies",
+        "Building frontend assets",
+        "Running migrations",
+        "Rebuilding Laravel caches",
+    ] {
+        assert!(content.contains(label), "laravel build script must print a step label for: {label}\n{content}");
+    }
+}
+
 /// Laravel nginx config writes error/access logs under the runtime socket directory
 /// so that the non-root service user can write them under the systemd sandbox and AppArmor profile.
 #[test]

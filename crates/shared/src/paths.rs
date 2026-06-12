@@ -48,6 +48,7 @@ pub const RELEASES_DIR: &str = "releases";
 pub const SHARED_DIR: &str = "shared";
 pub const BUILD_DIR: &str = "build";
 pub const WORKSPACE_DIR: &str = "workspace";
+pub const LOGS_DIR: &str = "logs";
 pub const CURRENT_LINK: &str = "current";
 pub const INSTALL_VERSIONS_DIR: &str = "versions";
 pub const INSTALL_CURRENT_LINK: &str = "current";
@@ -125,6 +126,7 @@ pub struct DeploymentPaths {
     pub releases: String,
     pub shared: String,
     pub build_root: String,
+    pub build_logs: String,
     pub current: String,
     pub current_web_root: String,
     pub placeholder_release: String,
@@ -171,6 +173,7 @@ impl DeploymentPaths {
             releases: Path::new(&project_root).join(RELEASES_DIR).display().to_string(),
             shared: Path::new(&project_root).join(SHARED_DIR).display().to_string(),
             build_root: Path::new(&project_root).join(BUILD_DIR).join(WORKSPACE_DIR).display().to_string(),
+            build_logs: Path::new(&project_root).join(BUILD_DIR).join(LOGS_DIR).display().to_string(),
             current: current.display().to_string(),
             current_web_root: current.join(&web_root).display().to_string(),
             placeholder_release: placeholder_release.display().to_string(),

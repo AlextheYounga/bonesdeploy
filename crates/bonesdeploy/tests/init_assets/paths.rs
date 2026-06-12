@@ -85,6 +85,29 @@ fn ssl_deploy_defines_nginx_defaults_inline() {
     assert!(content.contains("nginx -t"), "ssl deploy must validate nginx configuration\n{content}");
 }
 
+/// Build logs directory is centralized under project_root/build/logs via the resolved path manifest
+/// so the deploy runner can persist per-script logs without re-deriving the location.
+#[test]
+fn build_logs_path_uses_centralized_manifest() {
+    let shared = project_root().join("crates/shared/src/paths.rs");
+    let content = fs::read_to_string(&shared);
+    assert!(content.is_ok(), "failed to read {}", shared.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("pub const LOGS_DIR: &str = \"logs\";"),
+        "paths.rs must declare LOGS_DIR as a centralized constant\n{content}"
+    );
+    assert!(
+        content.contains("pub build_logs: String,"),
+        "DeploymentPaths must expose build_logs for the centralized logs directory\n{content}"
+    );
+    assert!(
+        content.contains("build_logs: Path::new(&project_root).join(BUILD_DIR).join(LOGS_DIR).display().to_string()"),
+        "build_logs must be derived from project_root/build/logs through centralized constants\n{content}"
+    );
+}
+
 /// Base per-site nginx config writes error/access logs under the runtime socket directory
 /// so that the non-root service user can write them under the systemd sandbox and AppArmor profile.
 /// Relative "stderr" paths resolve to unwritable locations like /usr/share/nginx/stderr.
