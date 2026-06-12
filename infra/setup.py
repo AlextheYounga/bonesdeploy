@@ -1,4 +1,3 @@
-import io
 import os
 import sys
 
@@ -116,36 +115,15 @@ files.directory(
 )
 
 placeholder_index = PATHS["placeholder_index"]
-placeholder_html = f"""\
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{DEPLOY_DATA["project_name"]}</title>
-    <style>
-        body {{ font-family: system-ui, sans-serif; display: flex; justify-content: center;
-               align-items: center; min-height: 100vh; margin: 0; background: #f5f5f5; }}
-        main {{ text-align: center; padding: 2rem; }}
-        h1 {{ color: #333; }}
-        p {{ color: #666; }}
-    </style>
-</head>
-<body>
-    <main>
-        <h1>{DEPLOY_DATA["project_name"]}</h1>
-        <p>{DEPLOY_DATA.get('setup_label', 'bonesdeploy')} deployment coming soon.</p>
-    </main>
-</body>
-</html>"""
 
-files.put(
+files.template(
     name="Seed placeholder index page",
-    src=io.StringIO(placeholder_html),
+    src=os.path.join(os.path.dirname(__file__), "assets/nginx/index.html.j2"),
     dest=placeholder_index,
     user=DEPLOY_DATA["service_user"],
     group=DEPLOY_DATA["group"],
     mode="0640",
+    **DEPLOY_DATA,
     _sudo=True,
 )
 
