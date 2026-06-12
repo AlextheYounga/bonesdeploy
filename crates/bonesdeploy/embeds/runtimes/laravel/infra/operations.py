@@ -1,6 +1,7 @@
 import os
 
 from pyinfra import host
+from pyinfra.facts.server import LinuxDistribution
 from pyinfra.operations import apt, files, server, systemd
 from src.utils import unflatten
 
@@ -59,7 +60,7 @@ apt.deb(
     _sudo=True,
 )
 
-deb = host.get_fact(server.LinuxDistribution)
+deb = host.get_fact(LinuxDistribution)
 codename = deb.get("release_meta", {}).get("DISTRIB_CODENAME", "noble") if deb else "noble"
 
 apt.repo(
