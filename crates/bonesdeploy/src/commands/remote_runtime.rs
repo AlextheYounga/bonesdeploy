@@ -53,7 +53,7 @@ pub fn run() -> Result<()> {
         return Ok(());
     }
 
-    let ssh_user = String::from(paths::DEPLOY_USER);
+    let ssh_user = remote_setup::resolve_bootstrap_ssh_user();
     let deploy_file = PathBuf::from(config::Constants::BONES_REMOTE_RUNTIME_DEPLOY);
 
     remote_setup::ensure_pyinfra_installed()?;
