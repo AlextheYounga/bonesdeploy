@@ -56,13 +56,9 @@ pub async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result
     let session = ssh::connect_as("root", &cfg.data.host, port).await?;
 
     let install_root = paths::USR_LOCAL_BIN.trim_end_matches("/bin");
-    let binary_path = paths::bonesremote_global_link().display().to_string();
-
     println!("Building bonesremote from source on remote...");
     ssh::stream_cmd(&session, &format!("cargo install --git {repo_url} bonesremote --force --root {install_root}"))
         .await?;
-
-    ssh::stream_cmd(&session, &format!("ln -sf {binary_path} /usr/local/bin/bonesremote")).await?;
 
     ssh::stream_cmd(
         &session,
