@@ -1,12 +1,10 @@
-# Permissions for deployment
 permissions:
   defaults:
     dir_mode: '750'
     file_mode: '640'
 shared:
-  # Files persisted in shared/ and symlinked into each release.
-  shared_files:
-    - '.env'
-  # Directories persisted in shared/ and symlinked into each release.
-  shared_dirs:
-    - 'storage'
+  paths:
+    - path: '.env'
+      type: 'file'
+    - path: 'storage'
+      type: 'dir'

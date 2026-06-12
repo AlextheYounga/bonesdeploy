@@ -1,5 +1,6 @@
 template: laravel
 web_root: public
+php_version: '8.3'
 permissions:
   defaults:
     dir_mode: '750'
@@ -8,9 +9,11 @@ permissions:
     - path: 'storage'
       mode: '770'
       recursive: true
+      type: 'dir'
     - path: 'bootstrap/cache'
       mode: '770'
       recursive: true
+      type: 'dir'
     - path: 'database'
       mode: '770'
       recursive: false
@@ -20,7 +23,8 @@ permissions:
       recursive: false
       type: 'file'
 shared:
-  shared_files:
-  - '.env'
-  shared_dirs:
-  - storage
+  paths: 
+    - path: 'storage'
+      type: 'dir'
+    - path: '.env'
+      type: 'file'

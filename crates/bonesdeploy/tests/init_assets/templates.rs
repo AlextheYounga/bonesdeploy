@@ -39,6 +39,81 @@ fn laravel_php_fpm_service_template_leaves_privilege_dropping_to_the_pool() {
     );
 }
 
+/// Grants only the capabilities the PHP-FPM master needs to drop privileges and own the socket.
+#[test]
+fn laravel_php_fpm_service_grants_required_drop_capabilities() {
+    let path = templates_root().join("laravel/infra/assets/php/site-php-fpm.service.j2");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_CHOWN"),
+        "laravel PHP-FPM systemd service must allow setuid, setgid, and chown for master privilege drop\n{content}"
+    );
+    assert!(
+        content.contains("AmbientCapabilities="),
+        "laravel PHP-FPM systemd service must keep ambient capabilities empty despite bounding capabilities\n{content}"
+    );
+}
+
+/// PHP-FPM config must include a [global] section so it is a valid FPM config, not just a pool snippet.
+#[test]
+fn laravel_php_fpm_config_includes_global_section() {
+    let path = templates_root().join("laravel/infra/assets/php/php-fpm-pool.conf.j2");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(content.contains("[global]"), "laravel PHP-FPM config must include a [global] section\n{content}");
+    assert!(
+        content.contains("error_log = /proc/self/fd/2"),
+        "laravel PHP-FPM config must log errors to stderr for systemd capture\n{content}"
+    );
+    assert!(
+        content.contains("daemonize = no"),
+        "laravel PHP-FPM config must disable daemonizing for systemd\n{content}"
+    );
+}
+
+/// PHP-FPM pool config uses the resolved paths.current instead of raw path construction.
+#[test]
+fn laravel_php_fpm_config_uses_resolved_current_path() {
+    let path = templates_root().join("laravel/infra/assets/php/php-fpm-pool.conf.j2");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("chdir = {{ paths.current }}"),
+        "laravel PHP-FPM config must use the resolved current path instead of manual construction\n{content}"
+    );
+    assert!(
+        !content.contains("{{ project_root }}/current"),
+        "laravel PHP-FPM config must not hardcode project_root/current\n{content}"
+    );
+}
+
+/// Validates the rendered PHP-FPM configuration before starting the service.
+#[test]
+fn laravel_operations_validates_php_fpm_config_before_service_start() {
+    let path = templates_root().join("laravel/infra/operations.py");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("--test --fpm-config"),
+        "laravel operations must validate PHP-FPM config with --test before starting the service\n{content}"
+    );
+    let validate_idx = content.find("--test --fpm-config");
+    let start_idx = content.find("Enable and start per-project PHP-FPM service");
+    assert!(
+        validate_idx.is_some() && start_idx.is_some() && validate_idx < start_idx,
+        "laravel operations must validate PHP-FPM config before enabling and starting the service\n{content}"
+    );
+}
+
 /// Uses an absolute nginx fastcgi params include because per-site configs run outside /etc/nginx.
 #[test]
 fn laravel_nginx_template_uses_absolute_fastcgi_params_include() {

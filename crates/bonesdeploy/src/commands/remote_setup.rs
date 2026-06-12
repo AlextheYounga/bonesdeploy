@@ -234,7 +234,7 @@ fn ensure_managed_pyinfra_installed() -> Result<()> {
     }
 
     let status = Command::new(&venv_pip)
-        .args(["install", "pyinfra"])
+        .args(["install", "pyinfra", "PyYAML"])
         .status()
         .with_context(|| format!("Failed to run {} install pyinfra", venv_pip.display()))?;
 

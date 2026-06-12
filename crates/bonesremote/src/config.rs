@@ -11,8 +11,6 @@ pub struct BonesConfig {
     pub data: Data,
     #[serde(default)]
     pub releases: Releases,
-    #[serde(default)]
-    pub shared: Shared,
 }
 
 pub struct Constants;
@@ -64,13 +62,6 @@ impl Default for Releases {
     fn default() -> Self {
         Self { keep: 5 }
     }
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Shared {
-    pub shared_files: Vec<String>,
-    pub shared_dirs: Vec<String>,
 }
 
 pub fn load(path: &Path) -> Result<BonesConfig> {
@@ -166,7 +157,7 @@ data:
         Ok(())
     }
 
-    /// Applies default values for port, branch, releases, and shared when fields are missing.
+    /// Applies default values for port, branch, and releases when fields are missing.
     #[test]
     fn load_uses_defaults_for_missing_fields() -> Result<()> {
         let path = temp_file_path("bonesremote_config_missing_fields");
@@ -178,8 +169,6 @@ data:
         assert_eq!(cfg.data.port, "22");
         assert_eq!(cfg.data.branch, "master");
         assert_eq!(cfg.releases.keep, 5);
-        assert!(cfg.shared.shared_files.is_empty());
-        assert!(cfg.shared.shared_dirs.is_empty());
         Ok(())
     }
 

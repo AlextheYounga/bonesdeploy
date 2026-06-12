@@ -96,10 +96,6 @@ mod tests {
                 deploy_on_push: true,
             },
             releases: crate::config::Releases { keep: 5 },
-            shared: crate::config::Shared {
-                shared_files: vec![String::from(".env")],
-                shared_dirs: vec![String::from("storage")],
-            },
         };
         let yaml = serde_yml::to_string(&cfg)?;
         fs::write(path, yaml)?;

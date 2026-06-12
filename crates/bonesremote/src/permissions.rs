@@ -4,7 +4,7 @@ use std::process::Command;
 use std::{fs, io};
 
 use anyhow::{Context, Result, bail};
-use shared::config::PathOverride;
+use shared::config::{PathOverride, PathType};
 use shared::paths;
 use walkdir::WalkDir;
 
@@ -92,16 +92,15 @@ fn apply_path_overrides(
             let metadata = fs::metadata(&target)
                 .with_context(|| format!("Failed to read metadata for override target {}", target.display()))?;
 
-            match path_type.as_str() {
-                "dir" if metadata.is_dir() => apply_single_mode(&target, mode)?,
-                "file" if metadata.is_file() => apply_single_mode(&target, mode)?,
-                "dir" => {
+            match path_type {
+                PathType::Dir if metadata.is_dir() => apply_single_mode(&target, mode)?,
+                PathType::File if metadata.is_file() => apply_single_mode(&target, mode)?,
+                PathType::Dir => {
                     bail!("Override '{}' expected a directory, got {}", override_entry.path, target.display())
                 }
-                "file" => {
+                PathType::File => {
                     bail!("Override '{}' expected a file, got {}", override_entry.path, target.display())
                 }
-                other => bail!("Unknown path type: {other}"),
             }
         } else {
             apply_single_mode(&target, mode)?;

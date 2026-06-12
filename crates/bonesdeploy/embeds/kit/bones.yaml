@@ -1,26 +1,14 @@
-# User data goes here
 data:
   port: '22'
   branch: 'master'
   deploy_on_push: true
 
-  # Optional path overrides. Leave commented out to use the defaults.
-  # project_root defaults to /srv/deployments/<project_name>
-  #   Stores deployment state: build/, releases/, shared/, current.
-  # project_root: '/srv/deployments/<project_name>'
-  #
-  # repo_path defaults to /home/git/<project_name>.git
-  # repo_path: '/home/git/<project_name>.git'
-  #
-  # web_root defaults to public
-  # web_root: 'public'
 releases:
-  # Number of old releases to keep after each successful activation.
-  keep: 5
+  keep: 5 # Number of old releases to keep after each successful activation.
 
+# Optional TLS values used by `bonesdeploy remote ssl`.
+# You can leave these empty and pass --domain/--email on the command.
 ssl:
-  # Optional TLS values used by `bonesdeploy remote ssl`.
-  # You can leave these empty and pass --domain/--email on the command.
   enabled: false
   domain: ''
   email: ''

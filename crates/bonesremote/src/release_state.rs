@@ -146,7 +146,7 @@ mod tests {
     use anyhow::Result;
     use shared::paths;
 
-    use crate::config::{BonesConfig, Data, Releases, Shared};
+    use crate::config::{BonesConfig, Data, Releases};
 
     use super::{
         clear_staged_release, current_link, current_release_name, list_releases_sorted, point_symlink_atomically,
@@ -173,7 +173,6 @@ mod tests {
                 deploy_on_push: true,
             },
             releases: Releases { keep: 5 },
-            shared: Shared { shared_files: Vec::new(), shared_dirs: Vec::new() },
         }
     }
 

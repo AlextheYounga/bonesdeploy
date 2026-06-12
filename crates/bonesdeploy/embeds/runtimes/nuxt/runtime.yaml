@@ -12,7 +12,8 @@ permissions:
       mode: '770'
       recursive: true
 shared:
-  shared_files:
-  - '.env'
-  shared_dirs:
-  - storage
+  paths:
+    - path: '.env'
+      type: 'file'
+    - path: 'storage'
+      type: 'dir'

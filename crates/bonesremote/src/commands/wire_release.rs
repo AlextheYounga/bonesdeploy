@@ -9,10 +9,13 @@ use crate::permissions;
 use crate::privileges;
 use crate::release_state;
 
+use shared::config::{PathType, Shared, SharedPath};
+
 pub fn run(config_path: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release wire")?;
 
-    let cfg = config::load(Path::new(config_path))?;
+    let config_path = Path::new(config_path);
+    let cfg = config::load(config_path)?;
     let release_name = release_state::read_staged_release(&cfg)?;
     let build_root = release_state::build_root(&cfg);
     let shared_dir = release_state::shared_dir(&cfg);
@@ -22,15 +25,31 @@ pub fn run(config_path: &str) -> Result<()> {
     // build unless we re-open it here.
     permissions::chown_paths_to_deploy_user(&[shared_dir.as_path()], false)?;
 
-    for shared_file in &cfg.shared.shared_files {
-        wire_path(&cfg, (&build_root, &shared_dir), shared_file, true)?;
-    }
-    for shared_dir_path in &cfg.shared.shared_dirs {
-        wire_path(&cfg, (&build_root, &shared_dir), shared_dir_path, false)?;
+    let shared_paths = load_runtime_shared_paths(config_path)?;
+    for shared_path in &shared_paths {
+        let is_file = matches!(shared_path.path_type, PathType::File);
+        wire_path(&cfg, (&build_root, &shared_dir), &shared_path.path, is_file)?;
     }
 
     println!("Wired build workspace for staged release: {release_name}");
     Ok(())
+}
+
+fn load_runtime_shared_paths(config_path: &Path) -> Result<Vec<SharedPath>> {
+    #[derive(serde::Deserialize)]
+    struct RuntimeShared {
+        #[serde(default)]
+        shared: Shared,
+    }
+    let runtime_path = config_path.parent().unwrap_or(Path::new(".")).join("runtime.yaml");
+    if !runtime_path.exists() {
+        return Ok(Vec::new());
+    }
+    let content =
+        fs::read_to_string(&runtime_path).with_context(|| format!("Failed to read {}", runtime_path.display()))?;
+    let rt: RuntimeShared =
+        serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
+    Ok(rt.shared.paths)
 }
 
 fn wire_path(_cfg: &config::BonesConfig, roots: (&Path, &Path), relative_path: &str, create_file: bool) -> Result<()> {

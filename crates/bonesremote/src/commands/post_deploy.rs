@@ -160,10 +160,6 @@ mod tests {
                 deploy_on_push: true,
             },
             releases: config::Releases { keep },
-            shared: config::Shared {
-                shared_files: vec![String::from(".env")],
-                shared_dirs: vec![String::from("storage")],
-            },
         }
     }
 

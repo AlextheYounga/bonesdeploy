@@ -10,7 +10,7 @@ use anyhow::{Result, bail};
 use shared::paths;
 use tempfile::TempDir;
 
-use crate::config::{BonesConfig, Data, Releases, Shared, Ssl};
+use crate::config::{BonesConfig, Data, Releases, Ssl};
 
 fn test_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -109,7 +109,6 @@ fn incomplete_seed(project_name: &str) -> BonesConfig {
             deploy_on_push: true,
         },
         releases: Releases::default(),
-        shared: Shared::default(),
         ssl: Ssl::default(),
     }
 }

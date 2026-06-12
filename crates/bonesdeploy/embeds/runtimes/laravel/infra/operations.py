@@ -3,24 +3,30 @@ import os
 from pyinfra import host
 from pyinfra.facts.server import LinuxDistribution
 from pyinfra.operations import apt, files, server, systemd
-from src.utils import unflatten
+from src.utils import unflatten, load_runtime_config
 
 
 SETUP_LABEL = "Laravel"
-LARAVEL_PHP_VERSION = "8.3"
+
+
+here = os.path.dirname(__file__)
+data = unflatten(host.data.dict())
+runtime = load_runtime_config(__file__)
+php_version = runtime.get("php_version", "8.3")
+
 SETUP_APT_EXTRAS = [
-    f"php{LARAVEL_PHP_VERSION}",
-    f"php{LARAVEL_PHP_VERSION}-cli",
-    f"php{LARAVEL_PHP_VERSION}-fpm",
-    f"php{LARAVEL_PHP_VERSION}-bcmath",
-    f"php{LARAVEL_PHP_VERSION}-curl",
-    f"php{LARAVEL_PHP_VERSION}-gd",
-    f"php{LARAVEL_PHP_VERSION}-intl",
-    f"php{LARAVEL_PHP_VERSION}-mbstring",
-    f"php{LARAVEL_PHP_VERSION}-mysql",
-    f"php{LARAVEL_PHP_VERSION}-sqlite3",
-    f"php{LARAVEL_PHP_VERSION}-xml",
-    f"php{LARAVEL_PHP_VERSION}-zip",
+    f"php{php_version}",
+    f"php{php_version}-cli",
+    f"php{php_version}-fpm",
+    f"php{php_version}-bcmath",
+    f"php{php_version}-curl",
+    f"php{php_version}-gd",
+    f"php{php_version}-intl",
+    f"php{php_version}-mbstring",
+    f"php{php_version}-mysql",
+    f"php{php_version}-sqlite3",
+    f"php{php_version}-xml",
+    f"php{php_version}-zip",
     "composer",
 ]
 LARAVEL_PHP_SURY_PREREQUISITE_PACKAGES = [
@@ -157,7 +163,7 @@ files.template(
     group="root",
     mode="0644",
     laravel_php_fpm_pool_config_path=pool_config_path,
-    laravel_php_version_resolved=data.get("laravel_php_version", LARAVEL_PHP_VERSION),
+    laravel_php_version_resolved=php_version,
     apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm",
     **data,
     _sudo=True,
@@ -178,6 +184,12 @@ files.template(
 server.shell(
     name="Load PHP-FPM AppArmor profile",
     commands=[f"apparmor_parser -r -T -W /etc/apparmor.d/bonesdeploy-{data['project_name']}-php-fpm"],
+    _sudo=True,
+)
+
+server.shell(
+    name="Validate PHP-FPM configuration",
+    commands=[f"/usr/sbin/php-fpm{php_version} --test --fpm-config {pool_config_path}"],
     _sudo=True,
 )
 

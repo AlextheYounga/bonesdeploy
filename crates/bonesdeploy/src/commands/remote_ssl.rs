@@ -111,7 +111,7 @@ fn build_ssl_data_vars(cfg: &config::BonesConfig, domain: &str, email: &str) -> 
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{BonesConfig, Data, Shared};
+    use crate::config::{BonesConfig, Data};
 
     use super::build_ssl_data_vars;
 
@@ -129,7 +129,6 @@ mod tests {
                 deploy_on_push: true,
             },
             releases: Default::default(),
-            shared: Shared::default(),
             ssl: Default::default(),
         }
     }

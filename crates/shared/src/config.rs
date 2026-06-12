@@ -50,8 +50,21 @@ impl Default for Releases {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Shared {
-    pub shared_files: Vec<String>,
-    pub shared_dirs: Vec<String>,
+    pub paths: Vec<SharedPath>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SharedPath {
+    pub path: String,
+    #[serde(rename = "type")]
+    pub path_type: PathType,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PathType {
+    File,
+    Dir,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -81,7 +94,7 @@ pub struct PathOverride {
     #[serde(default)]
     pub recursive: bool,
     #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
-    pub path_type: Option<String>,
+    pub path_type: Option<PathType>,
 }
 
 pub fn default_repo_path_for(project_name: &str) -> String {

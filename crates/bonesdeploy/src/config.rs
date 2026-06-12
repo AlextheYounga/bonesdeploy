@@ -13,8 +13,6 @@ pub struct BonesConfig {
     #[serde(default)]
     pub releases: Releases,
     #[serde(default)]
-    pub shared: Shared,
-    #[serde(default)]
     pub ssl: Ssl,
 }
 
@@ -86,13 +84,6 @@ impl Default for Releases {
     fn default() -> Self {
         Self { keep: 5 }
     }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Shared {
-    pub shared_files: Vec<String>,
-    pub shared_dirs: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -208,8 +199,8 @@ mod tests {
     use shared::paths;
 
     use super::{
-        BonesConfig, Data, Releases, Shared, Ssl, default_project_root_for, default_repo_path_for, default_web_root,
-        load, save, service_user,
+        BonesConfig, Data, Releases, Ssl, default_project_root_for, default_repo_path_for, default_web_root, load,
+        save, service_user,
     };
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -238,7 +229,6 @@ mod tests {
                 deploy_on_push: true,
             },
             releases: Releases::default(),
-            shared: Shared::default(),
             ssl: Ssl::default(),
         }
     }
