@@ -1,4 +1,5 @@
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -7,6 +8,7 @@ use console::style;
 use tempfile::TempDir;
 
 use crate::commands::update_release;
+use crate::config;
 
 const SOURCE_REPO_URL: &str = "https://github.com/AlextheYounga/bonesdeploy.git";
 const SOURCE_BRANCH: &str = "master";
@@ -50,6 +52,8 @@ pub async fn run(options: UpdateOptions) -> Result<()> {
             update_release::update_local_from_source(SOURCE_REPO_URL)?;
             println!("{} Local update complete.", style("Done!").green());
         }
+
+        refresh_local_bones_from_source(&source_dir, Path::new(config::Constants::BONES_DIR))?;
     }
 
     if !options.skip_remote {
@@ -127,9 +131,133 @@ fn parse_version_line(line: &str) -> Option<String> {
     (!version.is_empty()).then(|| version.to_string())
 }
 
+fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Result<()> {
+    if !bones_dir.exists() {
+        return Ok(());
+    }
+
+    println!("{}", style("Refreshing local .bones scaffold...").cyan());
+
+    let kit_root = source_dir.join("crates/bonesdeploy/embeds/kit");
+    sync_tree(&kit_root.join("hooks"), &bones_dir.join("hooks"), true)?;
+    sync_tree(&kit_root.join("deployment"), &bones_dir.join("deployment"), true)?;
+
+    let infra_root = source_dir.join("infra");
+    sync_infra_tree(&infra_root, &bones_dir.join("infra"), Path::new(""))?;
+
+    if let Some(template_name) = current_runtime_template(bones_dir)? {
+        let runtime_root = source_dir.join(format!("crates/bonesdeploy/embeds/runtimes/{template_name}/infra"));
+        if runtime_root.is_dir() {
+            sync_tree(&runtime_root, &bones_dir.join("infra"), false)?;
+        }
+    }
+
+    println!("{} Local .bones scaffold refreshed.", style("Done!").green());
+    Ok(())
+}
+
+fn current_runtime_template(bones_dir: &Path) -> Result<Option<String>> {
+    let runtime_yaml = bones_dir.join("runtime.yaml");
+    if !runtime_yaml.is_file() {
+        return Ok(None);
+    }
+
+    let runtime = config::load_runtime(&runtime_yaml)?;
+    Ok(runtime.get("template").and_then(serde_json::Value::as_str).map(str::to_string))
+}
+
+fn sync_infra_tree(source_root: &Path, dest_root: &Path, relative: &Path) -> Result<()> {
+    for entry in fs::read_dir(source_root).with_context(|| format!("Failed to read {}", source_root.display()))? {
+        let entry = entry.with_context(|| format!("Failed to read entry in {}", source_root.display()))?;
+        let file_type =
+            entry.file_type().with_context(|| format!("Failed to read file type for {}", entry.path().display()))?;
+        let name = entry.file_name();
+        let next_relative = relative.join(&name);
+
+        if should_skip_infra_path(&next_relative, file_type.is_dir()) {
+            continue;
+        }
+
+        let source_path = entry.path();
+        let dest_path = dest_root.join(&next_relative);
+
+        if file_type.is_dir() {
+            fs::create_dir_all(&dest_path).with_context(|| format!("Failed to create {}", dest_path.display()))?;
+            sync_infra_tree(&source_path, dest_root, &next_relative)?;
+            continue;
+        }
+
+        copy_file(&source_path, &dest_path, false)?;
+    }
+
+    Ok(())
+}
+
+fn should_skip_infra_path(relative: &Path, is_dir: bool) -> bool {
+    let Some(first) = relative.components().next().map(std::path::Component::as_os_str) else {
+        return false;
+    };
+
+    if is_dir {
+        return first == "__pycache__" || first == ".venv";
+    }
+
+    first == ".gitignore"
+        || first == "README.md"
+        || first == ".python-version"
+        || first == "pyproject.toml"
+        || first == "uv.lock"
+}
+
+fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {
+    if !source_root.is_dir() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(source_root).with_context(|| format!("Failed to read {}", source_root.display()))? {
+        let entry = entry.with_context(|| format!("Failed to read entry in {}", source_root.display()))?;
+        let file_type =
+            entry.file_type().with_context(|| format!("Failed to read file type for {}", entry.path().display()))?;
+        let source_path = entry.path();
+        let dest_path = dest_root.join(entry.file_name());
+
+        if file_type.is_dir() {
+            fs::create_dir_all(&dest_path).with_context(|| format!("Failed to create {}", dest_path.display()))?;
+            sync_tree(&source_path, &dest_path, executable)?;
+            continue;
+        }
+
+        copy_file(&source_path, &dest_path, executable)?;
+    }
+
+    Ok(())
+}
+
+fn copy_file(source: &Path, dest: &Path, executable: bool) -> Result<()> {
+    if let Some(parent) = dest.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
+    }
+
+    fs::copy(source, dest).with_context(|| format!("Failed to copy {} to {}", source.display(), dest.display()))?;
+
+    if executable {
+        fs::set_permissions(dest, fs::Permissions::from_mode(0o755))
+            .with_context(|| format!("Failed to set permissions on {}", dest.display()))?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{SOURCE_BRANCH, SOURCE_REPO_URL, parse_package_version};
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::Path;
+
+    use anyhow::Result;
+    use tempfile::TempDir;
+
+    use super::{SOURCE_BRANCH, SOURCE_REPO_URL, parse_package_version, refresh_local_bones_from_source};
 
     /// Verifies the update source repository and branch constants are set to the canonical values.
     #[test]
@@ -160,5 +288,48 @@ version = "not-this"
     fn rejects_manifest_without_package_version() {
         let result = parse_package_version("[dependencies]\nversion = \"0.2.8\"\n");
         assert!(result.is_err());
+    }
+
+    /// Refreshes .bones scaffold assets from the cloned source tree without overwriting local config files.
+    #[test]
+    fn refresh_local_bones_updates_scaffold_without_touching_configs() -> Result<()> {
+        let temp = TempDir::new()?;
+        let source_dir = temp.path().join("source");
+        let bones_dir = temp.path().join(".bones");
+
+        write(&source_dir.join("crates/bonesdeploy/embeds/kit/hooks/pre-push"), "new hook")?;
+        write(&source_dir.join("crates/bonesdeploy/embeds/kit/deployment/01_build.sh"), "new deploy")?;
+        write(&source_dir.join("infra/runtime.py"), "new runtime")?;
+        write(&source_dir.join("infra/README.md"), "skip me")?;
+        write(&source_dir.join("crates/bonesdeploy/embeds/runtimes/laravel/infra/operations.py"), "laravel ops")?;
+
+        write(&bones_dir.join("bones.yaml"), "keep: config\n")?;
+        write(&bones_dir.join("runtime.yaml"), "template: laravel\n")?;
+        write(&bones_dir.join("infra/runtime.py"), "old runtime")?;
+
+        refresh_local_bones_from_source(&source_dir, &bones_dir)?;
+
+        assert_eq!(fs::read_to_string(bones_dir.join("bones.yaml"))?, "keep: config\n");
+        assert_eq!(fs::read_to_string(bones_dir.join("runtime.yaml"))?, "template: laravel\n");
+        assert_eq!(fs::read_to_string(bones_dir.join("hooks/pre-push"))?, "new hook");
+        assert_eq!(fs::read_to_string(bones_dir.join("deployment/01_build.sh"))?, "new deploy");
+        assert_eq!(fs::read_to_string(bones_dir.join("infra/runtime.py"))?, "new runtime");
+        assert_eq!(fs::read_to_string(bones_dir.join("infra/operations.py"))?, "laravel ops");
+        assert!(!bones_dir.join("infra/README.md").exists());
+
+        let hook_mode = fs::metadata(bones_dir.join("hooks/pre-push"))?.permissions().mode() & 0o777;
+        let deploy_mode = fs::metadata(bones_dir.join("deployment/01_build.sh"))?.permissions().mode() & 0o777;
+        assert_eq!(hook_mode, 0o755);
+        assert_eq!(deploy_mode, 0o755);
+
+        Ok(())
+    }
+
+    fn write(path: &Path, content: &str) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, content)?;
+        Ok(())
     }
 }
