@@ -2,6 +2,7 @@ import os
 
 from pyinfra import host
 from pyinfra.operations import apt, files, server, systemd
+from src.utils import unflatten
 
 
 SETUP_LABEL = "Laravel"
@@ -33,7 +34,7 @@ LARAVEL_PHP_SURY_KEYRING_PATH = "/usr/share/keyrings/deb.sury.org-php.gpg"
 
 
 here = os.path.dirname(__file__)
-data = host.data
+data = unflatten(host.data.dict())
 pool_config_path = f"/srv/conf/{data['project_name']}/php-fpm.conf"
 
 apt.packages(
@@ -122,7 +123,6 @@ files.template(
     mode="0644",
     laravel_php_fpm_pool_name=data["project_name"],
     laravel_php_fpm_socket_path=f"/run/{data['project_name']}/php-fpm.sock",
-    project_root=data["project_root"],
     **data,
     _sudo=True,
 )
