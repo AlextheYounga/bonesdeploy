@@ -19,7 +19,7 @@ assert DEPLOY_DATA.get("ssl_email"), "ssl_email is required"
 # Render nginx HTTP challenge config
 files.template(
     name="Render nginx HTTP challenge config",
-    src=os.path.join(here, "nginx/router.conf.j2"),
+    src=os.path.join(here, "assets/nginx/router.conf.j2"),
     dest=PATHS["nginx_site_available"],
     user="root",
     group="root",
@@ -59,7 +59,7 @@ server.shell(
 # Render nginx HTTPS config
 files.template(
     name="Render nginx HTTPS config",
-    src=os.path.join(here, "nginx/router.conf.j2"),
+    src=os.path.join(here, "assets/nginx/router.conf.j2"),
     dest=PATHS["nginx_site_available"],
     user="root",
     group="root",

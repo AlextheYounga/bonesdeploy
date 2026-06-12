@@ -70,6 +70,12 @@ codename = (
     or "noble"
 )
 
+server.shell(
+    name="Remove stale PHP apt source file",
+    commands=["rm -f /etc/apt/sources.list.d/php.list"],
+    _sudo=True,
+)
+
 apt.repo(
     name="Add Laravel PHP apt repository",
     src=f"deb [signed-by={LARAVEL_PHP_SURY_KEYRING_PATH}] https://packages.sury.org/php {codename} main",
