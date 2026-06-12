@@ -6,12 +6,12 @@ set -Eeuo pipefail
 command -v php >/dev/null 2>&1 || { echo "php not found"; exit 1; }
 command -v composer >/dev/null 2>&1 || { echo "composer not found"; exit 1; }
 
-# Maintenance mode first — before anything destructive
-php artisan down
-trap 'php artisan up || true' EXIT
-
-# Install PHP dependencies
+# Install PHP dependencies first — artisan requires vendor/autoload.php
 composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+
+# Maintenance mode once the app can boot
+php artisan down --render="errors::503"
+trap 'php artisan up || true' EXIT
 
 # Frontend build
 if [ -f "./.nvmrc" ]; then
