@@ -62,7 +62,13 @@ apt.deb(
 )
 
 deb = host.get_fact(LinuxDistribution)
-codename = deb.get("release_meta", {}).get("DISTRIB_CODENAME", "noble") if deb else "noble"
+release_meta = deb.get("release_meta", {}) if deb else {}
+codename = (
+    release_meta.get("VERSION_CODENAME")
+    or release_meta.get("CODENAME")
+    or release_meta.get("DISTRIB_CODENAME")
+    or "noble"
+)
 
 apt.repo(
     name="Add Laravel PHP apt repository",
