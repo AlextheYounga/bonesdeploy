@@ -184,7 +184,7 @@ files.template(
 
 server.shell(
     name="Validate nginx configuration with Laravel config",
-    commands=[f"nginx -t -c {data['paths']['site_nginx_config']}"],
+    commands=[f"nginx -t -c {data['paths']['site_nginx_config']} -g 'daemon off;'"],
     _sudo=True,
 )
 
