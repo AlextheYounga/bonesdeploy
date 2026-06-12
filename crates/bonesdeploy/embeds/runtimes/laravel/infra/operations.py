@@ -167,3 +167,27 @@ systemd.service(
     daemon_reload=True,
     _sudo=True,
 )
+
+files.template(
+    name="Deploy Laravel-specific per-site nginx config",
+    src=os.path.join(here, "assets/nginx/laravel-site-nginx.conf.j2"),
+    dest=data["paths"]["site_nginx_config"],
+    user="root",
+    group=data["group"],
+    mode="0640",
+    **data,
+    _sudo=True,
+)
+
+server.shell(
+    name="Validate nginx configuration with Laravel config",
+    commands=[f"nginx -t -c {data['paths']['site_nginx_config']}"],
+    _sudo=True,
+)
+
+systemd.service(
+    name="Restart per-site nginx with Laravel config",
+    service=f"{data['project_name']}-nginx",
+    restarted=True,
+    _sudo=True,
+)

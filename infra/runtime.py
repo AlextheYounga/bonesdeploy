@@ -24,15 +24,6 @@ if pkgs:
         _sudo=True,
     )
 
-# --- Template-specific runtime setup ---
-
-if DEPLOY_DATA.get("template"):
-    ops_path = os.path.join(os.path.dirname(__file__), "operations.py")
-    if os.path.exists(ops_path):
-        spec = importlib.util.spec_from_file_location("operations", ops_path)
-        ops = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(ops)
-
 # --- AppArmor ---
 systemd.service(
     name="Ensure apparmor service is enabled and started",
@@ -195,6 +186,16 @@ systemd.service(
     daemon_reload=True,
     _sudo=True,
 )
+
+# --- Template-specific runtime setup ---
+
+if DEPLOY_DATA.get("template"):
+    ops_path = os.path.join(os.path.dirname(__file__), "operations.py")
+    if os.path.exists(ops_path):
+        spec = importlib.util.spec_from_file_location("operations", ops_path)
+        ops = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ops)
+
 
 # --- Post-task: doctor ---
 

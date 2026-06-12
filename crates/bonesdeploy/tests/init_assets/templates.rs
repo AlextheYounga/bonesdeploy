@@ -42,7 +42,7 @@ fn laravel_php_fpm_service_template_leaves_privilege_dropping_to_the_pool() {
 /// Uses an absolute nginx fastcgi params include because per-site configs run outside /etc/nginx.
 #[test]
 fn laravel_nginx_template_uses_absolute_fastcgi_params_include() {
-    let path = templates_root().join("laravel/infra/assets/nginx/site-nginx.conf.j2");
+    let path = templates_root().join("laravel/infra/assets/nginx/laravel-site-nginx.conf.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
