@@ -131,3 +131,37 @@ fn laravel_nginx_template_uses_absolute_fastcgi_params_include() {
         "laravel nginx site config must not use a relative fastcgi_params include\n{content}"
     );
 }
+
+/// Laravel nginx template uses the resolved path manifest so it stays in sync with systemd/AppArmor.
+#[test]
+fn laravel_nginx_template_uses_resolved_path_manifest() {
+    let path = templates_root().join("laravel/infra/assets/nginx/laravel-site-nginx.conf.j2");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("pid {{ paths.runtime_nginx_pid }}"),
+        "laravel nginx config must use the resolved pid path\n{content}"
+    );
+    assert!(
+        content.contains("listen unix:{{ paths.runtime_nginx_socket }}"),
+        "laravel nginx config must use the resolved listen socket path\n{content}"
+    );
+    assert!(
+        content.contains("root {{ paths.current_web_root }}"),
+        "laravel nginx config must use the resolved web root path\n{content}"
+    );
+    assert!(
+        content.contains("{{ paths.runtime_socket_dir }}/"),
+        "laravel nginx config must use the resolved socket directory for temp paths\n{content}"
+    );
+    assert!(
+        !content.contains("/run/{{ project_name }}"),
+        "laravel nginx config must not hardcode /run path instead of using the manifest\n{content}"
+    );
+    assert!(
+        !content.contains("{{ project_root }}/current/{{ web_root }}"),
+        "laravel nginx config must not manually construct current web root\n{content}"
+    );
+}
