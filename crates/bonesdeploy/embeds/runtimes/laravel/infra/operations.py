@@ -37,6 +37,7 @@ LARAVEL_PHP_SURY_KEYRING_PATH = "/usr/share/keyrings/deb.sury.org-php.gpg"
 here = os.path.dirname(__file__)
 data = unflatten(host.data.dict())
 pool_config_path = f"/srv/conf/{data['project_name']}/php-fpm.conf"
+php_fpm_socket_path = data["paths"]["runtime_php_fpm_socket"]
 
 apt.packages(
     name="Install PHP repo prerequisites",
@@ -123,7 +124,7 @@ files.template(
     group="root",
     mode="0644",
     laravel_php_fpm_pool_name=data["project_name"],
-    laravel_php_fpm_socket_path=f"/run/{data['project_name']}/php-fpm.sock",
+    laravel_php_fpm_socket_path=php_fpm_socket_path,
     **data,
     _sudo=True,
 )
@@ -176,6 +177,7 @@ files.template(
     user="root",
     group=data["service_group"],
     mode="0640",
+    laravel_php_fpm_socket_path=php_fpm_socket_path,
     **data,
     _sudo=True,
 )
