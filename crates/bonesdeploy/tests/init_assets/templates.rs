@@ -67,12 +67,26 @@ fn laravel_php_fpm_config_includes_global_section() {
 
     assert!(content.contains("[global]"), "laravel PHP-FPM config must include a [global] section\n{content}");
     assert!(
-        content.contains("error_log = /proc/self/fd/2"),
-        "laravel PHP-FPM config must log errors to stderr for systemd capture\n{content}"
+        content.contains("error_log = {{ paths.runtime_socket_dir }}/php-fpm.log"),
+        "laravel PHP-FPM config must log errors under the writable runtime socket directory\n{content}"
     );
     assert!(
         content.contains("daemonize = no"),
         "laravel PHP-FPM config must disable daemonizing for systemd\n{content}"
+    );
+}
+
+/// Laravel nginx should prefer index.php but still fall back to index.html for placeholder releases.
+#[test]
+fn laravel_nginx_template_prefers_php_but_falls_back_to_html() {
+    let path = templates_root().join("laravel/infra/assets/nginx/laravel-site-nginx.conf.j2");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("index index.php index.html;"),
+        "laravel nginx config must prefer index.php but fall back to index.html\n{content}"
     );
 }
 

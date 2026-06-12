@@ -143,7 +143,8 @@ mod tests {
         let hooks_script = super::Kit::get("hooks/hooks.sh");
         assert!(hooks_script.is_some(), "hooks.sh should be embedded");
 
-        let hooks_script = String::from_utf8_lossy(hooks_script.unwrap().data.as_ref()).to_string();
+        let hooks_script =
+            hooks_script.map(|asset| String::from_utf8_lossy(asset.data.as_ref()).to_string()).unwrap_or_default();
         assert!(!hooks_script.contains("bonesremote doctor --config"));
     }
 }

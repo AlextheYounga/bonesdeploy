@@ -17,7 +17,7 @@ http {
     server {
         listen unix:{{ paths.runtime_nginx_socket }};
         root {{ paths.current_web_root }};
-        index index.php;
+        index index.php index.html;
 
         location / {
             try_files $uri $uri/ /index.php?$query_string;
