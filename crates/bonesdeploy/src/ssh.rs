@@ -10,15 +10,17 @@ pub async fn connect(config: &BonesConfig) -> Result<Session> {
     let port: u16 = config.data.port.parse().with_context(|| format!("Invalid port: {}", config.data.port))?;
     let user = paths::DEPLOY_USER;
 
-    let session = SessionBuilder::default()
+    connect_as(user, host, port).await
+}
+
+pub async fn connect_as(user: &str, host: &str, port: u16) -> Result<Session> {
+    SessionBuilder::default()
         .known_hosts_check(KnownHosts::Accept)
         .user(user.into())
         .port(port)
         .connect(host)
         .await
-        .with_context(|| format!("Failed to connect to {user}@{host}:{port}"))?;
-
-    Ok(session)
+        .with_context(|| format!("Failed to connect to {user}@{host}:{port}"))
 }
 
 pub async fn run_cmd(session: &Session, cmd: &str) -> Result<String> {

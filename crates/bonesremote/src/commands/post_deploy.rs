@@ -9,12 +9,65 @@ use crate::permissions;
 use crate::privileges;
 use crate::release_state;
 
+use shared::config::PathOverride;
+
+#[derive(serde::Deserialize)]
+struct RuntimeConfig {
+    #[serde(default)]
+    permissions: RuntimePermissions,
+}
+
+#[derive(serde::Deserialize, Default)]
+struct RuntimePermissions {
+    #[serde(default)]
+    defaults: RuntimePermissionDefaults,
+    #[serde(default)]
+    paths: Vec<PathOverride>,
+}
+
+#[derive(serde::Deserialize)]
+struct RuntimePermissionDefaults {
+    #[serde(default = "default_dir_mode")]
+    dir_mode: String,
+    #[serde(default = "default_file_mode")]
+    file_mode: String,
+}
+
+impl Default for RuntimePermissionDefaults {
+    fn default() -> Self {
+        Self { dir_mode: default_dir_mode(), file_mode: default_file_mode() }
+    }
+}
+
+fn default_dir_mode() -> String {
+    "750".into()
+}
+
+fn default_file_mode() -> String {
+    "640".into()
+}
+
+fn load_runtime_permissions(config_path: &Path) -> Result<(String, String, Vec<PathOverride>)> {
+    let runtime_path = config_path.parent().unwrap_or(Path::new(".")).join("runtime.yaml");
+    if !runtime_path.exists() {
+        return Ok((default_dir_mode(), default_file_mode(), Vec::new()));
+    }
+    let content =
+        fs::read_to_string(&runtime_path).with_context(|| format!("Failed to read {}", runtime_path.display()))?;
+    let rt: RuntimeConfig =
+        serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
+    Ok((rt.permissions.defaults.dir_mode, rt.permissions.defaults.file_mode, rt.permissions.paths))
+}
+
 pub fn run(config_path: &str) -> Result<()> {
     privileges::ensure_root("bonesremote hooks post-deploy")?;
 
-    let cfg = config::load(Path::new(config_path))?;
+    let config_path = Path::new(config_path);
+    let cfg = config::load(config_path)?;
     restart_site_nginx(&cfg)?;
-    permissions::harden_active_release(&cfg)?;
+
+    let (dir_mode, file_mode, path_overrides) = load_runtime_permissions(config_path)?;
+    permissions::harden_active_release(&cfg, &dir_mode, &file_mode, &path_overrides)?;
 
     let pruned = prune_old_releases(&cfg)?;
     if !pruned.is_empty() {
@@ -105,10 +158,6 @@ mod tests {
                 web_root: String::from("public"),
                 branch: String::from("main"),
                 deploy_on_push: true,
-            },
-            permissions: config::Permissions {
-                defaults: config::PermissionDefaults { dir_mode: String::from("750"), file_mode: String::from("640") },
-                paths: Vec::new(),
             },
             releases: config::Releases { keep },
             shared: config::Shared {

@@ -20,7 +20,7 @@ pub fn run(config_path: &str) -> Result<()> {
     // Grant deploy-user traversal access to shared/ before wiring individual paths.
     // post-deploy hardens shared/ to service_user:www-data, locking out the next deploy's
     // build unless we re-open it here.
-    permissions::chown_paths_to_deploy_user(&cfg, &[shared_dir.as_path()], false)?;
+    permissions::chown_paths_to_deploy_user(&[shared_dir.as_path()], false)?;
 
     for shared_file in &cfg.shared.shared_files {
         wire_path(&cfg, (&build_root, &shared_dir), shared_file, true)?;
@@ -33,7 +33,7 @@ pub fn run(config_path: &str) -> Result<()> {
     Ok(())
 }
 
-fn wire_path(cfg: &config::BonesConfig, roots: (&Path, &Path), relative_path: &str, create_file: bool) -> Result<()> {
+fn wire_path(_cfg: &config::BonesConfig, roots: (&Path, &Path), relative_path: &str, create_file: bool) -> Result<()> {
     let (release_dir, shared_dir) = roots;
     let release_path = release_dir.join(relative_path);
     let shared_path = shared_dir.join(relative_path);
@@ -53,7 +53,7 @@ fn wire_path(cfg: &config::BonesConfig, roots: (&Path, &Path), relative_path: &s
         create_default_shared_target(&shared_path, create_file)?;
     }
 
-    permissions::chown_paths_to_deploy_user(cfg, &[shared_path.as_path()], true)?;
+    permissions::chown_paths_to_deploy_user(&[shared_path.as_path()], true)?;
 
     ensure_parent_exists(&release_path)?;
     if path_exists(&release_path) {

@@ -10,8 +10,6 @@ pub struct BonesConfig {
     #[serde(default)]
     pub data: Data,
     #[serde(default)]
-    pub permissions: Permissions,
-    #[serde(default)]
     pub releases: Releases,
     #[serde(default)]
     pub shared: Shared,
@@ -73,36 +71,6 @@ impl Default for Releases {
 pub struct Shared {
     pub shared_files: Vec<String>,
     pub shared_dirs: Vec<String>,
-}
-
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Permissions {
-    pub defaults: PermissionDefaults,
-    pub paths: Vec<PathOverride>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct PermissionDefaults {
-    pub dir_mode: String,
-    pub file_mode: String,
-}
-
-impl Default for PermissionDefaults {
-    fn default() -> Self {
-        Self { dir_mode: "750".into(), file_mode: "640".into() }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct PathOverride {
-    pub path: String,
-    pub mode: String,
-    #[serde(default)]
-    pub recursive: bool,
-    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
-    pub path_type: Option<String>,
 }
 
 pub fn load(path: &Path) -> Result<BonesConfig> {

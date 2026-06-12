@@ -8,6 +8,7 @@ use crate::config;
 use crate::embedded;
 use crate::git;
 use crate::prompts;
+use shared::config::PathOverride;
 use shared::paths::{self, DeploymentPaths};
 
 pub fn run() -> Result<()> {
@@ -139,7 +140,7 @@ struct RuntimePermissions {
     #[serde(default)]
     defaults: Option<RuntimePermissionDefaults>,
     #[serde(default)]
-    paths: Vec<config::PathOverride>,
+    paths: Vec<PathOverride>,
 }
 
 #[derive(serde::Deserialize)]

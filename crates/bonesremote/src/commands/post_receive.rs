@@ -83,11 +83,25 @@ mod tests {
     }
 
     fn write_config(path: &Path, repo_path: &Path, project_root: &Path, branch: &str) -> Result<()> {
-        let yaml = format!(
-            "data:\n  remote_name: production\n  project_name: postreceive\n  host: localhost\n  port: \"22\"\n  repo_path: {}\n  project_root: {}\n  web_root: public\n  branch: {branch}\n  deploy_on_push: true\npermissions:\n  defaults:\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\nshared:\n  shared_files:\n    - .env\n  shared_dirs:\n    - storage\n",
-            repo_path.display(),
-            project_root.display()
-        );
+        let cfg = crate::config::BonesConfig {
+            data: crate::config::Data {
+                remote_name: String::from("production"),
+                project_name: String::from("postreceive"),
+                host: String::from("localhost"),
+                port: String::from("22"),
+                repo_path: repo_path.to_string_lossy().to_string(),
+                project_root: project_root.to_string_lossy().to_string(),
+                web_root: String::from("public"),
+                branch: branch.to_string(),
+                deploy_on_push: true,
+            },
+            releases: crate::config::Releases { keep: 5 },
+            shared: crate::config::Shared {
+                shared_files: vec![String::from(".env")],
+                shared_dirs: vec![String::from("storage")],
+            },
+        };
+        let yaml = serde_yml::to_string(&cfg)?;
         fs::write(path, yaml)?;
         Ok(())
     }

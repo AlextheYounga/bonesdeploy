@@ -146,7 +146,7 @@ mod tests {
     use anyhow::Result;
     use shared::paths;
 
-    use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Shared};
+    use crate::config::{BonesConfig, Data, Releases, Shared};
 
     use super::{
         clear_staged_release, current_link, current_release_name, list_releases_sorted, point_symlink_atomically,
@@ -171,10 +171,6 @@ mod tests {
                 web_root: String::from("public"),
                 branch: String::from("master"),
                 deploy_on_push: true,
-            },
-            permissions: Permissions {
-                defaults: PermissionDefaults { dir_mode: String::from("750"), file_mode: String::from("640") },
-                paths: Vec::new(),
             },
             releases: Releases { keep: 5 },
             shared: Shared { shared_files: Vec::new(), shared_dirs: Vec::new() },

@@ -11,8 +11,6 @@ pub struct BonesConfig {
     #[serde(default)]
     pub data: Data,
     #[serde(default)]
-    pub permissions: Permissions,
-    #[serde(default)]
     pub releases: Releases,
     #[serde(default)]
     pub shared: Shared,
@@ -106,36 +104,6 @@ pub struct Ssl {
     pub domain: String,
     #[serde(default)]
     pub email: String,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Permissions {
-    pub defaults: PermissionDefaults,
-    pub paths: Vec<PathOverride>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct PermissionDefaults {
-    pub dir_mode: String,
-    pub file_mode: String,
-}
-
-impl Default for PermissionDefaults {
-    fn default() -> Self {
-        Self { dir_mode: "750".into(), file_mode: "640".into() }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PathOverride {
-    pub path: String,
-    pub mode: String,
-    #[serde(default)]
-    pub recursive: bool,
-    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
-    pub path_type: Option<String>,
 }
 
 pub fn is_configured(config: &BonesConfig) -> bool {
@@ -240,8 +208,8 @@ mod tests {
     use shared::paths;
 
     use super::{
-        BonesConfig, Data, PermissionDefaults, Permissions, Releases, Shared, Ssl, default_project_root_for,
-        default_repo_path_for, default_web_root, load, save, service_user,
+        BonesConfig, Data, Releases, Shared, Ssl, default_project_root_for, default_repo_path_for, default_web_root,
+        load, save, service_user,
     };
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -268,10 +236,6 @@ mod tests {
                 web_root: default_web_root(),
                 branch: String::from("master"),
                 deploy_on_push: true,
-            },
-            permissions: Permissions {
-                defaults: PermissionDefaults { dir_mode: String::from("750"), file_mode: String::from("640") },
-                paths: Vec::new(),
             },
             releases: Releases::default(),
             shared: Shared::default(),
