@@ -97,7 +97,7 @@ pub fn read_template_runtime_config(template_name: &str) -> Result<String> {
 }
 
 pub fn read_kit_runtime_config() -> Result<String> {
-    let path = "kit/runtime.yaml";
+    let path = "runtime.yaml";
     let Some(file) = Kit::get(path) else {
         bail!("Embedded kit runtime config not found");
     };

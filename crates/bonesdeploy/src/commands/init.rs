@@ -70,9 +70,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
 
     if is_fresh {
         let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
-        if !runtime_yaml.exists() {
-            seed_runtime_config(args, bones_dir, runtime_yaml)?;
-        }
+        seed_runtime_config(args, bones_dir, runtime_yaml)?;
     }
     ensure_local_remote(&cfg)?;
 
