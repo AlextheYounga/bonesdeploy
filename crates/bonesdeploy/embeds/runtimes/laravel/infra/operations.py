@@ -71,6 +71,14 @@ apt.repo(
     _sudo=True,
 )
 
+apt.packages(
+    name="Install Laravel PHP packages",
+    packages=SETUP_APT_EXTRAS,
+    present=True,
+    update=True,
+    _sudo=True,
+)
+
 files.directory(
     name="Ensure conf directory exists",
     path=data["paths"]["conf_root"],
