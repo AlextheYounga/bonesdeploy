@@ -84,6 +84,9 @@ fn build_runtime_data_vars(cfg: &config::BonesConfig, runtime_yaml: &Path) -> Re
 
     let runtime_data = config::load_runtime(runtime_yaml)?;
     for (key, value) in runtime_data {
+        if key == "paths" {
+            continue;
+        }
         vars.insert(key, value);
     }
 
