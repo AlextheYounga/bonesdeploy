@@ -156,7 +156,7 @@ files.link(
     _sudo=True,
 )
 
-files.file(
+files.link(
     name="Disable default nginx site",
     path=PATHS["nginx_default_site_enabled"],
     present=False,
