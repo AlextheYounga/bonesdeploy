@@ -4,13 +4,14 @@ use std::process::Command;
 use std::{fs, io};
 
 use anyhow::{Context, Result, bail};
+use shared::config::PathOverride;
 use shared::paths;
 use walkdir::WalkDir;
 
 use crate::config::BonesConfig;
 use crate::release_state;
 
-pub fn chown_paths_to_deploy_user(_cfg: &BonesConfig, paths: &[&Path], recursive: bool) -> Result<()> {
+pub fn chown_paths_to_deploy_user(paths: &[&Path], recursive: bool) -> Result<()> {
     let ownership = format!("{}:{}", paths::DEPLOY_USER, paths::DEFAULT_GROUP);
 
     for path in paths {
@@ -26,11 +27,10 @@ pub fn chown_paths_to_deploy_user(_cfg: &BonesConfig, paths: &[&Path], recursive
     Ok(())
 }
 
-pub fn harden_paths(cfg: &BonesConfig, paths: &[&Path]) -> Result<()> {
-    let defaults = &cfg.permissions.defaults;
-    let ownership = format!("{}:{}", &cfg.data.project_name, paths::DEFAULT_GROUP);
-    let dir_mode = parse_mode(&defaults.dir_mode)?;
-    let file_mode = parse_mode(&defaults.file_mode)?;
+pub fn harden_paths(project_name: &str, dir_mode: &str, file_mode: &str, paths: &[&Path]) -> Result<()> {
+    let ownership = format!("{project_name}:{}", paths::DEFAULT_GROUP);
+    let dir_mode_parsed = parse_mode(dir_mode)?;
+    let file_mode_parsed = parse_mode(file_mode)?;
 
     for path in paths {
         if !path.exists() {
@@ -39,21 +39,23 @@ pub fn harden_paths(cfg: &BonesConfig, paths: &[&Path]) -> Result<()> {
 
         let path_str = path.to_string_lossy();
         run_chown(&ownership, &path_str, true)?;
-        apply_default_modes(path, dir_mode, file_mode)?;
+        apply_default_modes(path, dir_mode_parsed, file_mode_parsed)?;
         println!(
-            "Hardened {} (owner {}:{}, dirs {}, files {})",
+            "Hardened {} (owner {project_name}:{}, dirs {dir_mode}, files {file_mode})",
             path.display(),
-            cfg.data.project_name,
             paths::DEFAULT_GROUP,
-            defaults.dir_mode,
-            defaults.file_mode
         );
     }
 
     Ok(())
 }
 
-pub fn harden_active_release(cfg: &BonesConfig) -> Result<()> {
+pub fn harden_active_release(
+    cfg: &BonesConfig,
+    dir_mode: &str,
+    file_mode: &str,
+    path_overrides: &[PathOverride],
+) -> Result<()> {
     let current_link = release_state::current_link(cfg);
     let active_target =
         fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
@@ -65,12 +67,17 @@ pub fn harden_active_release(cfg: &BonesConfig) -> Result<()> {
     };
 
     let shared = release_state::shared_dir(cfg);
-    harden_paths(cfg, &[active_release.as_path(), shared.as_path()])?;
-    apply_path_overrides(cfg, &active_release, &shared)
+    harden_paths(&cfg.data.project_name, dir_mode, file_mode, &[active_release.as_path(), shared.as_path()])?;
+    apply_path_overrides(&cfg.data.project_name, &active_release, &shared, path_overrides)
 }
 
-fn apply_path_overrides(cfg: &BonesConfig, active_release: &Path, shared_root: &Path) -> Result<()> {
-    for override_entry in &cfg.permissions.paths {
+fn apply_path_overrides(
+    project_name: &str,
+    active_release: &Path,
+    shared_root: &Path,
+    path_overrides: &[PathOverride],
+) -> Result<()> {
+    for override_entry in path_overrides {
         let Some(target) = select_override_target(active_release, shared_root, &override_entry.path)? else {
             let logical_path = active_release.join(&override_entry.path);
             println!("Warning: override path '{}' does not exist, skipping", logical_path.display());
@@ -108,6 +115,9 @@ fn apply_path_overrides(cfg: &BonesConfig, active_release: &Path, shared_root: &
             if override_entry.recursive { " (recursive)" } else { "" }
         );
     }
+
+    let ownership = format!("{project_name}:{}", paths::DEFAULT_GROUP);
+    run_chown(&ownership, &shared_root.to_string_lossy(), true)?;
 
     Ok(())
 }
@@ -178,7 +188,6 @@ fn parse_mode(mode_str: &str) -> Result<u32> {
 fn apply_default_modes(root: &Path, dir_mode: u32, file_mode: u32) -> Result<()> {
     for entry in WalkDir::new(root) {
         let entry = entry.with_context(|| format!("Failed to walk {}", root.display()))?;
-        // Follow symlinks so a symlink to a directory gets dir_mode, not file_mode
         let metadata = fs::metadata(entry.path())
             .with_context(|| format!("Failed to read metadata for {}", entry.path().display()))?;
 

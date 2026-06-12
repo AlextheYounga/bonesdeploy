@@ -41,9 +41,9 @@ pub fn run(config_path: &str) -> Result<()> {
     fs::create_dir_all(&staged_release_dir)
         .with_context(|| format!("Failed to create release dir: {}", staged_release_dir.display()))?;
 
-    permissions::chown_paths_to_deploy_user(&cfg, &[project_root, releases_dir.as_path(), build_dir.as_path()], false)?;
-    permissions::chown_paths_to_deploy_user(&cfg, &[build_root.as_path()], true)?;
-    permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path()], true)?;
+    permissions::chown_paths_to_deploy_user(&[project_root, releases_dir.as_path(), build_dir.as_path()], false)?;
+    permissions::chown_paths_to_deploy_user(&[build_root.as_path()], true)?;
+    permissions::chown_paths_to_deploy_user(&[staged_release_dir.as_path()], true)?;
 
     ensure_deploy_user_can_traverse(project_root)
         .with_context(|| format!("Failed to set traverse permission on {}", project_root.display()))?;

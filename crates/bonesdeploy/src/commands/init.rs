@@ -40,7 +40,6 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
 
         let seed = config::BonesConfig {
             data: config::Data { project_name: project_name.clone(), ..Default::default() },
-            permissions: config::Permissions::default(),
             releases: config::Releases::default(),
             shared: config::Shared::default(),
             ssl: config::Ssl::default(),
@@ -125,8 +124,6 @@ fn collect_from_seed(
     let web_root =
         init_config::seed_string(existing_config, |cfg| &cfg.data.web_root, config::default_web_root().as_str());
     let deploy_on_push = existing_config.is_none_or(|cfg| cfg.data.deploy_on_push);
-    let dir_mode = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.dir_mode, "750");
-    let file_mode = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.file_mode, "640");
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases.keep.max(1));
     let shared_files = existing_config
         .map(|cfg| cfg.shared.shared_files.clone())
@@ -136,7 +133,6 @@ fn collect_from_seed(
         .map(|cfg| cfg.shared.shared_dirs.clone())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| vec![String::from("storage")]);
-    let path_overrides = existing_config.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
 
     Ok(config::BonesConfig {
         data: config::Data {
@@ -149,10 +145,6 @@ fn collect_from_seed(
             web_root,
             branch,
             deploy_on_push,
-        },
-        permissions: config::Permissions {
-            defaults: config::PermissionDefaults { dir_mode, file_mode },
-            paths: path_overrides,
         },
         releases: config::Releases { keep: releases_keep },
         shared: config::Shared { shared_files, shared_dirs },

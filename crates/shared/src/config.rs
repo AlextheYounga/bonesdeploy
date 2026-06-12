@@ -74,7 +74,7 @@ impl Default for PermissionDefaults {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PathOverride {
     pub path: String,
     pub mode: String,
