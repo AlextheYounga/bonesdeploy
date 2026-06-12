@@ -66,8 +66,6 @@ files.template(
     mode="0644",
     nginx_server_name=DEPLOY_DATA["ssl_domain"],
     nginx_ssl_enabled=True,
-    nginx_ssl_certificate_path=f"/etc/letsencrypt/live/{DEPLOY_DATA["ssl_domain"]}/fullchain.pem",
-    nginx_ssl_certificate_key_path=f"/etc/letsencrypt/live/{DEPLOY_DATA["ssl_domain"]}/privkey.pem",
     **DEPLOY_DATA,
     _sudo=True,
 )
