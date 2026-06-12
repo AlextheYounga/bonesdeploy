@@ -201,6 +201,10 @@ fn remote_runtime_prompt_lines() -> [&'static str; 9] {
     ]
 }
 
+pub fn confirm_remote_ssl() -> Result<bool> {
+    confirm_with_lines(remote_ssl_prompt_lines(), "Set up HTTPS now?")
+}
+
 fn remote_ssl_prompt_lines() -> [&'static str; 5] {
     [
         "Remote SSL setup",

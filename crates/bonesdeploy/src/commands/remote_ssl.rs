@@ -38,6 +38,11 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
 
     config::save(&cfg, bones_yaml)?;
 
+    if !prompts::confirm_remote_ssl()? {
+        println!("Skipped remote SSL setup.");
+        return Ok(());
+    }
+
     ensure_runtime_assets_exist()?;
 
     remote_setup::ensure_pyinfra_installed()?;
