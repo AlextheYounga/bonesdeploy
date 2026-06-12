@@ -121,7 +121,6 @@ files.template(
     src=os.path.join(os.path.dirname(__file__), "assets/nginx/index.html.j2"),
     dest=placeholder_index,
     user=DEPLOY_DATA["service_user"],
-    group=DEPLOY_DATA["group"],
     mode="0640",
     **DEPLOY_DATA,
     _sudo=True,
