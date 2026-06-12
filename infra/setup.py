@@ -137,7 +137,6 @@ files.directory(
 )
 
 
-
 files.template(
     name="Seed placeholder index page",
     src=os.path.join(os.path.dirname(__file__), "assets/nginx/index.html.j2"),
