@@ -6,7 +6,7 @@ Requires=apparmor.service
 [Service]
 Type=simple
 User={{ service_user }}
-Group={{ group }}
+Group={{ service_group }}
 WorkingDirectory={{ paths.current }}
 
 ExecStart=/usr/sbin/nginx -c {{ paths.site_nginx_config }} -g 'daemon off;'

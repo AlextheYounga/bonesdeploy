@@ -1,10 +1,10 @@
 [{{ laravel_php_fpm_pool_name }}]
 user = {{ service_user }}
-group = {{ group }}
+group = {{ service_group }}
 
 listen = {{ laravel_php_fpm_socket_path }}
 listen.owner = {{ service_user }}
-listen.group = {{ group }}
+listen.group = {{ service_group }}
 listen.mode = 0660
 
 pm = dynamic

@@ -79,14 +79,14 @@ server.user(
 
 server.group(
     name="Ensure service group exists",
-    group=DEPLOY_DATA["group"],
+    group=DEPLOY_DATA["service_group"],
     _sudo=True,
 )
 
 server.user(
     name="Ensure service user is in service group",
     user=DEPLOY_DATA["service_user"],
-    groups=[DEPLOY_DATA["group"]],
+    groups=[DEPLOY_DATA["service_group"]],
     append=True,
     _sudo=True,
 )
@@ -131,7 +131,7 @@ files.directory(
     name="Ensure placeholder release directory exists",
     path=PATHS["placeholder_web_root"],
     user=DEPLOY_DATA["service_user"],
-    group=DEPLOY_DATA["group"],
+    group=DEPLOY_DATA["service_group"],
     mode="0750",
     _sudo=True,
 )
@@ -160,7 +160,7 @@ files.directory(
     name="Ensure web root exists",
     path=DEPLOY_DATA.get("live_root_parent", "/var/www"),
     user="root",
-    group=DEPLOY_DATA["group"],
+    group=DEPLOY_DATA["service_group"],
     mode="2775",
     _sudo=True,
 )

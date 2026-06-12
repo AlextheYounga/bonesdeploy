@@ -36,14 +36,6 @@ here = os.path.dirname(__file__)
 data = host.data
 pool_config_path = f"/srv/conf/{data['project_name']}/php-fpm.conf"
 
-
-def template_data(*, exclude=(), **extra):
-    values = dict(data)
-    for key in exclude:
-        values.pop(key, None)
-    values.update(extra)
-    return values
-
 apt.packages(
     name="Install PHP repo prerequisites",
     packages=LARAVEL_PHP_SURY_PREREQUISITE_PACKAGES,
@@ -80,7 +72,7 @@ files.directory(
     name="Ensure conf directory exists",
     path=data["paths"]["conf_root"],
     user="root",
-    group=data["group"],
+    group=data["service_group"],
     mode="0750",
     _sudo=True,
 )
@@ -89,7 +81,7 @@ files.directory(
     name="Ensure storage directories exist",
     path=f"{data['paths']['current']}/storage/logs",
     user=data["service_user"],
-    group=data["group"],
+    group=data["service_group"],
     mode="0775",
     _sudo=True,
 )
@@ -98,7 +90,7 @@ files.directory(
     name="Ensure storage framework cache directory exists",
     path=f"{data['paths']['current']}/storage/framework/cache",
     user=data["service_user"],
-    group=data["group"],
+    group=data["service_group"],
     mode="0775",
     _sudo=True,
 )
@@ -107,7 +99,7 @@ files.directory(
     name="Ensure storage framework sessions directory exists",
     path=f"{data['paths']['current']}/storage/framework/sessions",
     user=data["service_user"],
-    group=data["group"],
+    group=data["service_group"],
     mode="0775",
     _sudo=True,
 )
@@ -116,7 +108,7 @@ files.directory(
     name="Ensure storage framework views directory exists",
     path=f"{data['paths']['current']}/storage/framework/views",
     user=data["service_user"],
-    group=data["group"],
+    group=data["service_group"],
     mode="0775",
     _sudo=True,
 )
@@ -128,12 +120,10 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    **template_data(
-        exclude=("group", "project_root"),
-        laravel_php_fpm_pool_name=data["project_name"],
-        laravel_php_fpm_socket_path=f"/run/{data['project_name']}/php-fpm.sock",
-        project_root=data["project_root"],
-    ),
+    laravel_php_fpm_pool_name=data["project_name"],
+    laravel_php_fpm_socket_path=f"/run/{data['project_name']}/php-fpm.sock",
+    project_root=data["project_root"],
+    **data,
     _sudo=True,
 )
 
@@ -144,12 +134,10 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    **template_data(
-        exclude=("group",),
-        laravel_php_fpm_pool_config_path=pool_config_path,
-        laravel_php_version_resolved=data.get("laravel_php_version", LARAVEL_PHP_VERSION),
-        apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm",
-    ),
+    laravel_php_fpm_pool_config_path=pool_config_path,
+    laravel_php_version_resolved=data.get("laravel_php_version", LARAVEL_PHP_VERSION),
+    apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm",
+    **data,
     _sudo=True,
 )
 
@@ -160,7 +148,8 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    **template_data(exclude=("group",), apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm"),
+    apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm",
+    **data,
     _sudo=True,
 )
 
@@ -184,9 +173,9 @@ files.template(
     src=os.path.join(here, "assets/nginx/laravel-site-nginx.conf.j2"),
     dest=data["paths"]["site_nginx_config"],
     user="root",
-    group=data["group"],
+    group=data["service_group"],
     mode="0640",
-    **template_data(exclude=("group",)),
+    **data,
     _sudo=True,
 )
 

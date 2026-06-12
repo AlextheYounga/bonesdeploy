@@ -101,7 +101,7 @@ fn build_ssl_data_vars(cfg: &config::BonesConfig, domain: &str, email: &str) -> 
     vars.insert(String::from("nginx_ssl_certificate_key_path"), Value::String(ssl_certificate_key_path(domain)));
     vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
     vars.insert(String::from("service_user"), Value::String(config::service_user(&cfg.data.project_name)));
-    vars.insert(String::from("group"), Value::String(String::from(paths::DEFAULT_GROUP)));
+    vars.insert(String::from("service_group"), Value::String(String::from(paths::DEFAULT_GROUP)));
     vars.insert(String::from("paths"), serde_json::to_value(paths).unwrap_or_default());
 
     Value::Object(vars)
