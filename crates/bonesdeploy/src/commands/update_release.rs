@@ -3,9 +3,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use shared::paths;
-use tokio::runtime::Handle;
 
-use crate::commands::remote_setup::resolve_bootstrap_ssh_user;
 use crate::config;
 use crate::ssh;
 
@@ -47,7 +45,7 @@ pub fn update_local_from_source(repo_url: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn update_remote_from_source(repo_url: &str, _version: &str) -> Result<()> {
+pub async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result<()> {
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
     if !bones_yaml.exists() {
         bail!("No .bones/bones.yaml found. Run from a bonesdeploy project directory.");
@@ -55,32 +53,27 @@ pub fn update_remote_from_source(repo_url: &str, _version: &str) -> Result<()> {
 
     let cfg = config::load(bones_yaml)?;
     let port: u16 = cfg.data.port.parse().with_context(|| format!("Invalid port: {}", cfg.data.port))?;
-    let ssh_user = resolve_bootstrap_ssh_user();
-
-    let handle = Handle::try_current().context("No tokio runtime available")?;
-
-    let session = handle.block_on(ssh::connect_as(&ssh_user, &cfg.data.host, port))?;
+    let session = ssh::connect_as("root", &cfg.data.host, port).await?;
 
     let install_root = paths::USR_LOCAL_BIN.trim_end_matches("/bin");
     let binary_path = paths::bonesremote_global_link().display().to_string();
 
     println!("Building bonesremote from source on remote...");
-    handle.block_on(ssh::stream_cmd(
-        &session,
-        &format!("cargo install --git {repo_url} bonesremote --force --root {install_root}"),
-    ))?;
+    ssh::stream_cmd(&session, &format!("cargo install --git {repo_url} bonesremote --force --root {install_root}"))
+        .await?;
 
-    handle.block_on(ssh::stream_cmd(&session, &format!("ln -sf {binary_path} /usr/local/bin/bonesremote")))?;
+    ssh::stream_cmd(&session, &format!("ln -sf {binary_path} /usr/local/bin/bonesremote")).await?;
 
-    handle.block_on(ssh::stream_cmd(
+    ssh::stream_cmd(
         &session,
         &format!(
             "mkdir -p {root} && chown root:root {root} && chmod 711 {root}",
             root = paths::DEFAULT_PROJECT_ROOT_PARENT
         ),
-    ))?;
+    )
+    .await?;
 
-    handle.block_on(async { session.close().await })?;
+    session.close().await?;
 
     Ok(())
 }

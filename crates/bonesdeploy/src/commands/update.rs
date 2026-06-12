@@ -17,7 +17,7 @@ pub struct UpdateOptions {
     pub skip_remote: bool,
 }
 
-pub fn run(options: UpdateOptions) -> Result<()> {
+pub async fn run(options: UpdateOptions) -> Result<()> {
     println!("{}", style("bonesdeploy update").bold());
 
     let current_local = update_release::current_local_version();
@@ -57,7 +57,7 @@ pub fn run(options: UpdateOptions) -> Result<()> {
             println!("{} Remote bonesremote is already current.", style("Done!").green());
         } else {
             println!("{}", style("Updating remote bonesremote...").cyan());
-            update_release::update_remote_from_source(SOURCE_REPO_URL, &master_versions.bonesremote)?;
+            update_release::update_remote_from_source(SOURCE_REPO_URL, &master_versions.bonesremote).await?;
             println!("{} Remote update complete.", style("Done!").green());
         }
     }

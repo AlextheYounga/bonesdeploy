@@ -25,6 +25,11 @@ SETUP_APT_PACKAGES = [
 DEPLOY_DATA = unflatten(host.data.dict())
 PATHS = DEPLOY_DATA.get("paths", {})
 
+rustup_bin = os.path.join("/root/.cargo/bin/rustup")
+cargo_bin = os.path.join("/root/.cargo/bin/cargo")
+br_bin = "/usr/local/bin/bonesremote"
+placeholder_index = PATHS["placeholder_index"]
+
 # Install setup apt packages
 apt.packages(
     name="Install setup apt packages",
@@ -32,6 +37,23 @@ apt.packages(
     present=True,
     update=True,
     cache_time=3600,
+    _sudo=True,
+)
+
+if deb_fact := host.get_fact(LinuxDistribution):
+    if deb_fact.get("name") == "Ubuntu":
+        apt.packages(
+            name="Install build-essential for bonesremote compilation",
+            packages=["build-essential"],
+            present=True,
+            _sudo=True,
+        )
+
+server.shell(
+    name="Install rustup and cargo",
+    commands=[
+        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal"
+    ],
     _sudo=True,
 )
 
@@ -114,7 +136,7 @@ files.directory(
     _sudo=True,
 )
 
-placeholder_index = PATHS["placeholder_index"]
+
 
 files.template(
     name="Seed placeholder index page",
@@ -131,43 +153,6 @@ files.link(
     path=PATHS["current"],
     target=PATHS["placeholder_release"],
     force=True,
-    _sudo=True,
-)
-
-# --- Common: rustup and bonesremote ---
-
-rustup_bin = os.path.join("/root/.cargo/bin/rustup")
-cargo_bin = os.path.join("/root/.cargo/bin/cargo")
-br_bin = "/usr/local/bin/bonesremote"
-
-deb_fact = host.get_fact(LinuxDistribution)
-if deb_fact and deb_fact.get("name") == "Ubuntu":
-    apt.packages(
-        name="Install build-essential for bonesremote compilation",
-        packages=["build-essential"],
-        present=True,
-        _sudo=True,
-    )
-
-server.shell(
-    name="Install rustup and cargo",
-    commands=[
-        "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal"
-    ],
-    _sudo=True,
-)
-
-server.shell(
-    name="Install bonesremote binary",
-    commands=[
-        f"{cargo_bin} install --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote"
-    ],
-    _sudo=True,
-)
-
-server.shell(
-    name="Run bonesremote init",
-    commands=["/usr/local/bin/bonesremote init"],
     _sudo=True,
 )
 
@@ -230,3 +215,17 @@ if DEPLOY_DATA.get("firewall_show_status", True):
         commands=["ufw status verbose"],
         _sudo=True,
     )
+
+server.shell(
+    name="Install bonesremote binary",
+    commands=[
+        f"{cargo_bin} install --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote"
+    ],
+    _sudo=True,
+)
+
+server.shell(
+    name="Run bonesremote init",
+    commands=["/usr/local/bin/bonesremote init"],
+    _sudo=True,
+)

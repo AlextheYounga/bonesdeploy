@@ -58,7 +58,7 @@ fn shared_setup_deploy_uses_single_setup_apt_packages_manifest() {
     );
 }
 
-/// Starts setup apt installation before user creation and rustup bootstrap.
+/// Starts setup apt installation before rustup bootstrap and user creation.
 #[test]
 fn shared_setup_deploy_starts_packages_before_users_and_rustup() {
     let deploy = project_root().join("infra/setup.py");
@@ -73,8 +73,8 @@ fn shared_setup_deploy_starts_packages_before_users_and_rustup() {
     assert!(apt_idx.is_some(), "shared setup deploy must install setup apt packages\n{content}");
     assert!(users_idx.is_some(), "shared setup deploy must include user setup\n{content}");
     assert!(rustup_idx.is_some(), "shared setup deploy must start rustup bootstrap\n{content}");
-    assert!(apt_idx < users_idx, "setup apt packages should run before user setup\n{content}");
-    assert!(users_idx < rustup_idx, "user setup should run before rustup bootstrap\n{content}");
+    assert!(apt_idx < rustup_idx, "setup apt packages should run before rustup bootstrap\n{content}");
+    assert!(rustup_idx < users_idx, "rustup bootstrap should run before user setup\n{content}");
 }
 
 /// Leaves per-site runtime roles out of the shared setup deploy.
