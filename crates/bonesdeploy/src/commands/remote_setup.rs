@@ -160,7 +160,7 @@ pub fn run_pyinfra_deploy(
         command.arg("--data").arg(data_arg);
     }
 
-    command.arg("-vv");
+    // command.arg("-vv");
 
     let status = command.status().context("Failed to run pyinfra")?;
 

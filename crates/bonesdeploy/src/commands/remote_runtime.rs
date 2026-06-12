@@ -1,12 +1,10 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, bail};
 use serde_json::Value;
 
 use crate::commands::remote_setup;
 use crate::config;
-use crate::embedded;
 use crate::git;
 use crate::prompts;
 use shared::paths::{self, DeploymentPaths};
@@ -22,18 +20,10 @@ pub fn run() -> Result<()> {
     let bones_yaml = Path::new(config::Constants::BONES_YAML);
     let cfg = config::load(bones_yaml)?;
 
-    let available_templates = embedded::available_templates();
-    let template_name =
-        prompts::choose_template(&available_templates)?.ok_or_else(|| anyhow!("A runtime template is required."))?;
-
-    embedded::scaffold_runtime_base(bones_dir)?;
-    embedded::scaffold_runtime_template(&template_name, bones_dir)?;
-
     let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
-    let template_config = embedded::read_template_runtime_config(&template_name)?;
-    fs::write(runtime_yaml, template_config)?;
-    println!("Saved runtime config to {}", config::Constants::BONES_RUNTIME_YAML);
-    println!("Applied runtime template: {template_name}");
+    if !runtime_yaml.exists() {
+        bail!("{} does not exist. Run `bonesdeploy init` first.", config::Constants::BONES_RUNTIME_YAML);
+    }
 
     if !prompts::confirm_remote_runtime()? {
         println!("Skipped remote runtime apply.");

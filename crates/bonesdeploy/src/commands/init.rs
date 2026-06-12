@@ -47,9 +47,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
 
         let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
         if !runtime_yaml.exists() {
-            let kit_runtime = embedded::read_kit_runtime_config()?;
-            fs::write(runtime_yaml, kit_runtime)?;
-            println!("Seeded {} from kit defaults", config::Constants::BONES_RUNTIME_YAML);
+            seed_runtime_config(args, bones_dir, runtime_yaml)?;
         }
 
         initial_project_name = Some(project_name);
@@ -91,6 +89,25 @@ fn print_follow_up_hint() {
     println!();
     println!("{}", style("Next:").cyan().bold());
     println!("Run {} to sync {} to the remote.", style("bonesdeploy push").cyan(), style(".bones/").cyan());
+}
+
+fn seed_runtime_config(args: &InitArgs, bones_dir: &Path, runtime_yaml: &Path) -> Result<()> {
+    let available = embedded::available_templates();
+    let template = if args.non_interactive { None } else { prompts::choose_template(&available)? };
+
+    if let Some(ref template_name) = template {
+        embedded::scaffold_runtime_template(template_name, bones_dir)?;
+        let template_config = embedded::read_template_runtime_config(template_name)?;
+        fs::write(runtime_yaml, template_config)?;
+        println!("Applied runtime template: {template_name}");
+        println!("Saved runtime config to {}", config::Constants::BONES_RUNTIME_YAML);
+    } else {
+        let kit_runtime = embedded::read_kit_runtime_config()?;
+        fs::write(runtime_yaml, kit_runtime)?;
+        println!("Seeded {} from kit defaults", config::Constants::BONES_RUNTIME_YAML);
+    }
+
+    Ok(())
 }
 
 fn collect(project_name_hint: &str, args: &InitArgs) -> Result<config::BonesConfig> {
