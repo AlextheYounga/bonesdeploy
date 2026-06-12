@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use openssh::{KnownHosts, Session, SessionBuilder, Stdio};
+use shared::paths;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::config::BonesConfig;
@@ -7,11 +8,11 @@ use crate::config::BonesConfig;
 pub async fn connect(config: &BonesConfig) -> Result<Session> {
     let host = &config.data.host;
     let port: u16 = config.data.port.parse().with_context(|| format!("Invalid port: {}", config.data.port))?;
-    let user = &config.permissions.defaults.deploy_user;
+    let user = paths::DEPLOY_USER;
 
     let session = SessionBuilder::default()
         .known_hosts_check(KnownHosts::Accept)
-        .user(user.clone())
+        .user(user.into())
         .port(port)
         .connect(host)
         .await

@@ -13,6 +13,8 @@ pub struct BonesConfig {
     pub permissions: Permissions,
     #[serde(default)]
     pub releases: Releases,
+    #[serde(default)]
+    pub shared: Shared,
 }
 
 pub struct Constants;
@@ -58,14 +60,19 @@ impl Default for Data {
 #[serde(default)]
 pub struct Releases {
     pub keep: usize,
-    pub shared_files: Vec<String>,
-    pub shared_dirs: Vec<String>,
 }
 
 impl Default for Releases {
     fn default() -> Self {
-        Self { keep: 5, shared_files: Vec::new(), shared_dirs: Vec::new() }
+        Self { keep: 5 }
     }
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Shared {
+    pub shared_files: Vec<String>,
+    pub shared_dirs: Vec<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -78,22 +85,13 @@ pub struct Permissions {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PermissionDefaults {
-    pub deploy_user: String,
-    pub service_user: String,
-    pub group: String,
     pub dir_mode: String,
     pub file_mode: String,
 }
 
 impl Default for PermissionDefaults {
     fn default() -> Self {
-        Self {
-            deploy_user: "git".into(),
-            service_user: String::new(),
-            group: "www-data".into(),
-            dir_mode: "750".into(),
-            file_mode: "640".into(),
-        }
+        Self { dir_mode: "750".into(), file_mode: "640".into() }
     }
 }
 
@@ -115,14 +113,9 @@ pub fn load(path: &Path) -> Result<BonesConfig> {
     Ok(config)
 }
 
-// Fill in fields intentionally absent from bones.yaml so the rest of the app
-// can read them as plain strings.
 fn apply_derived_defaults(config: &mut BonesConfig) {
     let project_name = &config.data.project_name;
 
-    if config.permissions.defaults.service_user.is_empty() {
-        config.permissions.defaults.service_user = project_name.clone();
-    }
     if config.data.repo_path.is_empty() {
         config.data.repo_path = default_repo_path_for(project_name);
     }
@@ -163,9 +156,9 @@ mod tests {
         env::temp_dir().join(format!("{prefix}_{}_{}.yaml", process::id(), nanos))
     }
 
-    /// Derives service user, project root, repo path, and web root from the project name.
+    /// Derives repo path, project root, and web root from the project name.
     #[test]
-    fn load_derives_service_user_project_root_repo_path_and_web_root() -> Result<()> {
+    fn load_derives_project_root_repo_path_and_web_root_from_project_name() -> Result<()> {
         let path = temp_file_path("bonesremote_config_derived_defaults");
         let yaml = r"
 data:
@@ -177,16 +170,15 @@ data:
         let cfg = load(&path)?;
         fs::remove_file(&path).ok();
 
-        assert_eq!(cfg.permissions.defaults.service_user, "acme");
         assert_eq!(cfg.data.repo_path, default_repo_path_for("acme"));
         assert_eq!(cfg.data.project_root, default_project_root_for("acme"));
         assert_eq!(cfg.data.web_root, default_web_root());
         Ok(())
     }
 
-    /// Preserves explicitly configured service user and path overrides.
+    /// Preserves explicitly configured repo path, project root, and web root.
     #[test]
-    fn load_preserves_explicit_service_user_and_paths() -> Result<()> {
+    fn load_preserves_explicit_repo_project_and_web_root() -> Result<()> {
         let path = temp_file_path("bonesremote_config_explicit_values");
         let yaml = r"
 data:
@@ -194,23 +186,19 @@ data:
   repo_path: /custom/repo.git
   project_root: /custom/deploy
   web_root: dist
-permissions:
-  defaults:
-    service_user: web
 ";
 
         fs::write(&path, yaml)?;
         let cfg = load(&path)?;
         fs::remove_file(&path).ok();
 
-        assert_eq!(cfg.permissions.defaults.service_user, "web");
         assert_eq!(cfg.data.repo_path, "/custom/repo.git");
         assert_eq!(cfg.data.project_root, "/custom/deploy");
         assert_eq!(cfg.data.web_root, "dist");
         Ok(())
     }
 
-    /// Applies default values for port, branch, deploy user, and releases when fields are missing.
+    /// Applies default values for port, branch, releases, and shared when fields are missing.
     #[test]
     fn load_uses_defaults_for_missing_fields() -> Result<()> {
         let path = temp_file_path("bonesremote_config_missing_fields");
@@ -221,10 +209,9 @@ permissions:
 
         assert_eq!(cfg.data.port, "22");
         assert_eq!(cfg.data.branch, "master");
-        assert_eq!(cfg.permissions.defaults.deploy_user, "git");
         assert_eq!(cfg.releases.keep, 5);
-        assert!(cfg.releases.shared_files.is_empty());
-        assert!(cfg.releases.shared_dirs.is_empty());
+        assert!(cfg.shared.shared_files.is_empty());
+        assert!(cfg.shared.shared_dirs.is_empty());
         Ok(())
     }
 
@@ -247,22 +234,5 @@ permissions:
         let path = temp_file_path("bonesremote_config_missing_file");
         let result = load(&path);
         assert!(result.is_err());
-    }
-
-    /// Keeps the default service user as an empty string when project name is empty.
-    #[test]
-    fn load_keeps_default_service_user_when_project_name_is_empty() -> Result<()> {
-        let path = temp_file_path("bonesremote_config_empty_project");
-        let yaml = r"
-data:
-  project_name: ''
-";
-
-        fs::write(&path, yaml)?;
-        let cfg = load(&path)?;
-        fs::remove_file(&path).ok();
-
-        assert_eq!(cfg.permissions.defaults.service_user, "");
-        Ok(())
     }
 }

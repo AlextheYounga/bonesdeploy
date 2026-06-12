@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use console::style;
 use serde_json::Value;
-use shared::paths::{DeploymentPaths, ssl_certificate_key_path, ssl_certificate_path};
+use shared::paths::{self, DeploymentPaths, ssl_certificate_key_path, ssl_certificate_path};
 
 use crate::commands::push;
 use crate::commands::remote_setup;
@@ -100,8 +100,8 @@ fn build_ssl_data_vars(cfg: &config::BonesConfig, domain: &str, email: &str) -> 
     vars.insert(String::from("nginx_ssl_certificate_path"), Value::String(ssl_certificate_path(domain)));
     vars.insert(String::from("nginx_ssl_certificate_key_path"), Value::String(ssl_certificate_key_path(domain)));
     vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
-    vars.insert(String::from("service_user"), Value::String(cfg.permissions.defaults.service_user.clone()));
-    vars.insert(String::from("group"), Value::String(cfg.permissions.defaults.group.clone()));
+    vars.insert(String::from("service_user"), Value::String(config::service_user(&cfg.data.project_name)));
+    vars.insert(String::from("group"), Value::String(String::from(paths::DEFAULT_GROUP)));
     vars.insert(String::from("paths"), serde_json::to_value(paths).unwrap_or_default());
 
     Value::Object(vars)
@@ -109,7 +109,7 @@ fn build_ssl_data_vars(cfg: &config::BonesConfig, domain: &str, email: &str) -> 
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions};
+    use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Shared};
 
     use super::build_ssl_data_vars;
 
@@ -127,16 +127,11 @@ mod tests {
                 deploy_on_push: true,
             },
             permissions: Permissions {
-                defaults: PermissionDefaults {
-                    deploy_user: String::from("git"),
-                    service_user: String::from("test"),
-                    group: String::from("www-data"),
-                    dir_mode: String::from("750"),
-                    file_mode: String::from("640"),
-                },
+                defaults: PermissionDefaults { dir_mode: String::from("750"), file_mode: String::from("640") },
                 paths: vec![],
             },
             releases: Default::default(),
+            shared: Shared::default(),
             ssl: Default::default(),
         }
     }

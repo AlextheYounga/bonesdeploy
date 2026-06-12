@@ -8,6 +8,9 @@ pub const DEFAULT_PROJECT_ROOT_PARENT: &str = "/srv/deployments";
 pub const DEFAULT_CONF_ROOT_PARENT: &str = "/srv/conf";
 pub const DEFAULT_WEB_ROOT: &str = "public";
 
+pub const DEPLOY_USER: &str = "git";
+pub const DEFAULT_GROUP: &str = "www-data";
+
 pub const ETC_NGINX: &str = "/etc/nginx";
 pub const ETC_NGINX_SITES_AVAILABLE: &str = "/etc/nginx/sites-available";
 pub const ETC_NGINX_SITES_ENABLED: &str = "/etc/nginx/sites-enabled";

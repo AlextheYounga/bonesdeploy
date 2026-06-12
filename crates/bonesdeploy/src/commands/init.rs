@@ -12,6 +12,7 @@ use crate::config;
 use crate::embedded;
 use crate::git;
 use crate::prompts;
+use shared::paths;
 
 pub struct InitOutcome {
     pub remote_setup_ran: bool,
@@ -41,9 +42,17 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
             data: config::Data { project_name: project_name.clone(), ..Default::default() },
             permissions: config::Permissions::default(),
             releases: config::Releases::default(),
+            shared: config::Shared::default(),
             ssl: config::Ssl::default(),
         };
         config::save(&seed, Path::new(config::Constants::BONES_YAML))?;
+
+        let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
+        if !runtime_yaml.exists() {
+            let kit_runtime = embedded::read_kit_runtime_config()?;
+            fs::write(runtime_yaml, kit_runtime)?;
+            println!("Seeded {} from kit defaults", config::Constants::BONES_RUNTIME_YAML);
+        }
 
         initial_project_name = Some(project_name);
     }
@@ -116,19 +125,15 @@ fn collect_from_seed(
     let web_root =
         init_config::seed_string(existing_config, |cfg| &cfg.data.web_root, config::default_web_root().as_str());
     let deploy_on_push = existing_config.is_none_or(|cfg| cfg.data.deploy_on_push);
-    let deploy_user = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.deploy_user, "git");
-    let service_user =
-        init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.service_user, &project_name);
-    let group = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.group, "www-data");
     let dir_mode = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.dir_mode, "750");
     let file_mode = init_config::seed_string(existing_config, |cfg| &cfg.permissions.defaults.file_mode, "640");
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases.keep.max(1));
     let shared_files = existing_config
-        .map(|cfg| cfg.releases.shared_files.clone())
+        .map(|cfg| cfg.shared.shared_files.clone())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| vec![String::from(".env")]);
     let shared_dirs = existing_config
-        .map(|cfg| cfg.releases.shared_dirs.clone())
+        .map(|cfg| cfg.shared.shared_dirs.clone())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| vec![String::from("storage")]);
     let path_overrides = existing_config.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
@@ -146,10 +151,11 @@ fn collect_from_seed(
             deploy_on_push,
         },
         permissions: config::Permissions {
-            defaults: config::PermissionDefaults { deploy_user, service_user, group, dir_mode, file_mode },
+            defaults: config::PermissionDefaults { dir_mode, file_mode },
             paths: path_overrides,
         },
-        releases: config::Releases { keep: releases_keep, shared_files, shared_dirs },
+        releases: config::Releases { keep: releases_keep },
+        shared: config::Shared { shared_files, shared_dirs },
         ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
     })
 }
@@ -258,7 +264,7 @@ fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
         return Ok(());
     }
 
-    let remote_url = format!("{}@{}:{}", cfg.permissions.defaults.deploy_user, cfg.data.host, cfg.data.repo_path);
+    let remote_url = format!("{}@{}:{}", paths::DEPLOY_USER, cfg.data.host, cfg.data.repo_path);
     git::add_remote(&cfg.data.remote_name, &remote_url)?;
     println!("Configured local git remote {} -> {}", cfg.data.remote_name, remote_url);
     Ok(())

@@ -1,2 +1,0 @@
-SETUP_LABEL = "Nuxt"
-SETUP_APT_EXTRAS = []

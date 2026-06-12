@@ -8,6 +8,7 @@ use console::style;
 
 use crate::config;
 use crate::git;
+use shared::paths;
 
 use super::init;
 
@@ -47,7 +48,7 @@ fn resolve_pull_target() -> Result<PullTarget> {
     if bones_yaml.exists() {
         let cfg = config::load(bones_yaml)?;
         return Ok(PullTarget {
-            user: cfg.permissions.defaults.deploy_user,
+            user: String::from(paths::DEPLOY_USER),
             host: cfg.data.host,
             port: cfg.data.port,
             repo_path: cfg.data.repo_path,

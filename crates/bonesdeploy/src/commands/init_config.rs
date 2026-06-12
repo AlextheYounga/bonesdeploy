@@ -128,18 +128,15 @@ fn build_config(
     );
     let web_root = seed_string(existing_config, |cfg| &cfg.data.web_root, config::default_web_root().as_str());
     let deploy_on_push = existing_config.is_none_or(|cfg| cfg.data.deploy_on_push);
-    let deploy_user = seed_string(existing_config, |cfg| &cfg.permissions.defaults.deploy_user, "git");
-    let service_user = seed_string(existing_config, |cfg| &cfg.permissions.defaults.service_user, &project_name);
-    let group = seed_string(existing_config, |cfg| &cfg.permissions.defaults.group, "www-data");
     let dir_mode = seed_string(existing_config, |cfg| &cfg.permissions.defaults.dir_mode, "750");
     let file_mode = seed_string(existing_config, |cfg| &cfg.permissions.defaults.file_mode, "640");
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases.keep.max(1));
     let shared_files = existing_config
-        .map(|cfg| cfg.releases.shared_files.clone())
+        .map(|cfg| cfg.shared.shared_files.clone())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| vec![String::from(".env")]);
     let shared_dirs = existing_config
-        .map(|cfg| cfg.releases.shared_dirs.clone())
+        .map(|cfg| cfg.shared.shared_dirs.clone())
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| vec![String::from("storage")]);
     let path_overrides = existing_config.map_or_else(Vec::new, |cfg| cfg.permissions.paths.clone());
@@ -157,10 +154,11 @@ fn build_config(
             deploy_on_push,
         },
         permissions: config::Permissions {
-            defaults: config::PermissionDefaults { deploy_user, service_user, group, dir_mode, file_mode },
+            defaults: config::PermissionDefaults { dir_mode, file_mode },
             paths: path_overrides,
         },
-        releases: config::Releases { keep: releases_keep, shared_files, shared_dirs },
+        releases: config::Releases { keep: releases_keep },
+        shared: config::Shared { shared_files, shared_dirs },
         ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
     }
 }

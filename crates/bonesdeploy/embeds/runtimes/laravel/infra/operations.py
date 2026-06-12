@@ -68,8 +68,6 @@ apt.repo(
     _sudo=True,
 )
 
-
-
 files.directory(
     name="Ensure conf directory exists",
     path=data["paths"]["conf_root"],
@@ -117,7 +115,7 @@ files.directory(
 
 files.template(
     name="Deploy PHP-FPM pool config",
-    src=os.path.join(here, "templates/php-fpm-pool.conf.j2"),
+    src=os.path.join(here, "assets/php/php-fpm-pool.conf.j2"),
     dest=pool_config_path,
     user="root",
     group="root",
@@ -131,7 +129,7 @@ files.template(
 
 files.template(
     name="Deploy PHP-FPM systemd service",
-    src=os.path.join(here, "templates/site-php-fpm.service.j2"),
+    src=os.path.join(here, "assets/php/site-php-fpm.service.j2"),
     dest=f"/etc/systemd/system/{data['project_name']}-php-fpm.service",
     user="root",
     group="root",
@@ -145,7 +143,7 @@ files.template(
 
 files.template(
     name="Deploy PHP-FPM AppArmor profile",
-    src=os.path.join(here, "templates/site-php-fpm-profile.j2"),
+    src=os.path.join(here, "assets/php/site-php-fpm-profile.j2"),
     dest=f"/etc/apparmor.d/bonesdeploy-{data['project_name']}-php-fpm",
     user="root",
     group="root",

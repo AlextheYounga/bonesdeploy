@@ -1,2 +1,0 @@
-SETUP_LABEL = "SvelteKit"
-SETUP_APT_EXTRAS = []

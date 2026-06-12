@@ -39,14 +39,19 @@ impl Default for Data {
 #[serde(default)]
 pub struct Releases {
     pub keep: usize,
-    pub shared_files: Vec<String>,
-    pub shared_dirs: Vec<String>,
 }
 
 impl Default for Releases {
     fn default() -> Self {
-        Self { keep: 5, shared_files: Vec::new(), shared_dirs: Vec::new() }
+        Self { keep: 5 }
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Shared {
+    pub shared_files: Vec<String>,
+    pub shared_dirs: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -59,22 +64,13 @@ pub struct Permissions {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PermissionDefaults {
-    pub deploy_user: String,
-    pub service_user: String,
-    pub group: String,
     pub dir_mode: String,
     pub file_mode: String,
 }
 
 impl Default for PermissionDefaults {
     fn default() -> Self {
-        Self {
-            deploy_user: "git".into(),
-            service_user: String::new(),
-            group: "www-data".into(),
-            dir_mode: "750".into(),
-            file_mode: "640".into(),
-        }
+        Self { dir_mode: "750".into(), file_mode: "640".into() }
     }
 }
 
@@ -100,12 +96,9 @@ pub fn default_web_root() -> String {
     paths::default_web_root()
 }
 
-pub fn apply_derived_defaults(data: &mut Data, permissions: &mut Permissions) {
+pub fn apply_derived_defaults(data: &mut Data) {
     let project_name = &data.project_name;
 
-    if permissions.defaults.service_user.is_empty() {
-        permissions.defaults.service_user = project_name.clone();
-    }
     if data.repo_path.is_empty() {
         data.repo_path = default_repo_path_for(project_name);
     }

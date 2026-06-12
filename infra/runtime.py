@@ -24,7 +24,8 @@ if pkgs:
         _sudo=True,
     )
 
-# Template-specific runtime setup
+# --- Template-specific runtime setup ---
+
 if DEPLOY_DATA.get("template"):
     ops_path = os.path.join(os.path.dirname(__file__), "operations.py")
     if os.path.exists(ops_path):

@@ -23,11 +23,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// Install sudoers drop-in for passwordless bonesremote
-    Init {
-        /// Deploy user allowed to run privileged bonesremote commands
-        #[arg(long, default_value = "git")]
-        deploy_user: String,
-    },
+    Init,
     /// Check server environment health
     Doctor,
     /// Release lifecycle operations
@@ -105,7 +101,7 @@ enum HookCommand {
 
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init { deploy_user } => init::run(deploy_user),
+        Command::Init => init::run(),
         Command::Doctor => doctor::run(),
         Command::Release { command } => match command {
             ReleaseCommand::Stage { config } => stage_release::run(config),

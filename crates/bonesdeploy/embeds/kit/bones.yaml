@@ -14,27 +14,9 @@ data:
   #
   # web_root defaults to public
   # web_root: 'public'
-
-# Permissions for deployment
-permissions:
-  defaults:
-    deploy_user: 'git'
-    service_user: '<project_name>'
-    group: 'www-data'
-    dir_mode: '750'
-    file_mode: '640'
-
 releases:
   # Number of old releases to keep after each successful activation.
   keep: 5
-
-  # Files persisted in shared/ and symlinked into each release.
-  shared_files:
-    - '.env'
-
-  # Directories persisted in shared/ and symlinked into each release.
-  shared_dirs:
-    - 'storage'
 
 ssl:
   # Optional TLS values used by `bonesdeploy remote ssl`.

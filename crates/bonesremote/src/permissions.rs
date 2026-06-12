@@ -4,15 +4,14 @@ use std::process::Command;
 use std::{fs, io};
 
 use anyhow::{Context, Result, bail};
+use shared::paths;
 use walkdir::WalkDir;
 
 use crate::config::BonesConfig;
 use crate::release_state;
 
-pub fn chown_paths_to_deploy_user(cfg: &BonesConfig, paths: &[&Path], recursive: bool) -> Result<()> {
-    let deploy_user = &cfg.permissions.defaults.deploy_user;
-    let group = &cfg.permissions.defaults.group;
-    let ownership = format!("{deploy_user}:{group}");
+pub fn chown_paths_to_deploy_user(_cfg: &BonesConfig, paths: &[&Path], recursive: bool) -> Result<()> {
+    let ownership = format!("{}:{}", paths::DEPLOY_USER, paths::DEFAULT_GROUP);
 
     for path in paths {
         if !path.exists() {
@@ -29,7 +28,7 @@ pub fn chown_paths_to_deploy_user(cfg: &BonesConfig, paths: &[&Path], recursive:
 
 pub fn harden_paths(cfg: &BonesConfig, paths: &[&Path]) -> Result<()> {
     let defaults = &cfg.permissions.defaults;
-    let ownership = format!("{}:{}", defaults.service_user, defaults.group);
+    let ownership = format!("{}:{}", &cfg.data.project_name, paths::DEFAULT_GROUP);
     let dir_mode = parse_mode(&defaults.dir_mode)?;
     let file_mode = parse_mode(&defaults.file_mode)?;
 
@@ -44,8 +43,8 @@ pub fn harden_paths(cfg: &BonesConfig, paths: &[&Path]) -> Result<()> {
         println!(
             "Hardened {} (owner {}:{}, dirs {}, files {})",
             path.display(),
-            defaults.service_user,
-            defaults.group,
+            cfg.data.project_name,
+            paths::DEFAULT_GROUP,
             defaults.dir_mode,
             defaults.file_mode
         );

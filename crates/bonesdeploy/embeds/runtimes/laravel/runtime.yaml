@@ -1,18 +1,7 @@
-data:
-  remote_name: 'production'
-  project_name: ''
-  host: ''
-  port: '22'
-  repo_path: '/home/git/<project_name>.git'
-  project_root: '/srv/deployments/<project_name>'
-  web_root: 'public'
-  branch: 'master'
-
+template: laravel
+web_root: public
 permissions:
   defaults:
-    deploy_user: 'git'
-    service_user: ''
-    group: 'www-data'
     dir_mode: '750'
     file_mode: '640'
   paths:
@@ -30,3 +19,8 @@ permissions:
       mode: '660'
       recursive: false
       type: 'file'
+shared:
+  shared_files:
+  - '.env'
+  shared_dirs:
+  - storage

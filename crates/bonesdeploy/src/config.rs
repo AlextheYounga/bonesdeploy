@@ -15,6 +15,8 @@ pub struct BonesConfig {
     #[serde(default)]
     pub releases: Releases,
     #[serde(default)]
+    pub shared: Shared,
+    #[serde(default)]
     pub ssl: Ssl,
 }
 
@@ -25,7 +27,6 @@ impl Constants {
     pub const BONES_HOOKS_SCRIPT: &'static str = paths::LOCAL_BONES_HOOKS_SCRIPT;
     pub const BONES_HOOKS_DIR: &'static str = paths::LOCAL_BONES_HOOKS_DIR;
     pub const BONES_DEPLOYMENT_DIR: &'static str = paths::LOCAL_BONES_DEPLOYMENT_DIR;
-    pub const BONES_RUNTIME_DIR: &'static str = paths::LOCAL_BONES_RUNTIME_DIR;
     pub const BONES_RUNTIME_YAML: &'static str = paths::LOCAL_BONES_RUNTIME_YAML;
     pub const BONES_REMOTE_RUNTIME_DEPLOY: &'static str = paths::LOCAL_BONES_RUNTIME_DEPLOY;
     pub const BONES_REMOTE_SSL_DEPLOY: &'static str = paths::LOCAL_BONES_SSL_DEPLOY;
@@ -81,14 +82,19 @@ impl Default for Data {
 #[serde(default)]
 pub struct Releases {
     pub keep: usize,
-    pub shared_files: Vec<String>,
-    pub shared_dirs: Vec<String>,
 }
 
 impl Default for Releases {
     fn default() -> Self {
-        Self { keep: 5, shared_files: Vec::new(), shared_dirs: Vec::new() }
+        Self { keep: 5 }
     }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Shared {
+    pub shared_files: Vec<String>,
+    pub shared_dirs: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -112,22 +118,13 @@ pub struct Permissions {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PermissionDefaults {
-    pub deploy_user: String,
-    pub service_user: String,
-    pub group: String,
     pub dir_mode: String,
     pub file_mode: String,
 }
 
 impl Default for PermissionDefaults {
     fn default() -> Self {
-        Self {
-            deploy_user: "git".into(),
-            service_user: String::new(),
-            group: "www-data".into(),
-            dir_mode: "750".into(),
-            file_mode: "640".into(),
-        }
+        Self { dir_mode: "750".into(), file_mode: "640".into() }
     }
 }
 
@@ -199,12 +196,13 @@ pub fn save_runtime(runtime: &Map<String, Value>, path: &Path) -> Result<()> {
     Ok(())
 }
 
+pub fn service_user(project_name: &str) -> String {
+    project_name.to_string()
+}
+
 fn apply_derived_defaults(config: &mut BonesConfig) {
     let project_name = &config.data.project_name;
 
-    if config.permissions.defaults.service_user.is_empty() {
-        config.permissions.defaults.service_user = project_name.clone();
-    }
     if config.data.repo_path.is_empty() {
         config.data.repo_path = default_repo_path_for(project_name);
     }
@@ -242,8 +240,8 @@ mod tests {
     use shared::paths;
 
     use super::{
-        BonesConfig, Data, PermissionDefaults, Permissions, Releases, Ssl, default_project_root_for,
-        default_repo_path_for, default_web_root, load, save,
+        BonesConfig, Data, PermissionDefaults, Permissions, Releases, Shared, Ssl, default_project_root_for,
+        default_repo_path_for, default_web_root, load, save, service_user,
     };
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -272,31 +270,20 @@ mod tests {
                 deploy_on_push: true,
             },
             permissions: Permissions {
-                defaults: PermissionDefaults {
-                    deploy_user: String::from("git"),
-                    service_user: String::from(project_name),
-                    group: String::from("www-data"),
-                    dir_mode: String::from("750"),
-                    file_mode: String::from("640"),
-                },
+                defaults: PermissionDefaults { dir_mode: String::from("750"), file_mode: String::from("640") },
                 paths: Vec::new(),
             },
-            releases: Releases { keep: 5, shared_files: Vec::new(), shared_dirs: Vec::new() },
+            releases: Releases::default(),
+            shared: Shared::default(),
             ssl: Ssl::default(),
         }
     }
 
-    /// Applies the project name as the default service user.
+    /// Derives service user from the project name.
     #[test]
-    fn load_applies_default_service_user_from_project_name() -> Result<()> {
-        let path = temp_path("service_user.yaml");
-        fs::write(&path, minimal_yaml("lawsnipe"))?;
-
-        let cfg = load(&path)?;
-        assert_eq!(cfg.permissions.defaults.service_user, "lawsnipe");
-
-        fs::remove_file(path)?;
-        Ok(())
+    fn service_user_is_derived_from_project_name() {
+        assert_eq!(service_user("lawsnipe"), "lawsnipe");
+        assert_eq!(service_user("atlas"), "atlas");
     }
 
     /// Derives the default repo path from the project name.

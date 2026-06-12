@@ -6,8 +6,9 @@ use console::style;
 
 use crate::config;
 use crate::privileges;
+use shared::paths;
 
-pub fn run(deploy_user: &str) -> Result<()> {
+pub fn run() -> Result<()> {
     privileges::ensure_root("bonesremote init")?;
 
     println!("{}", style(format!("{} init", config::Constants::BINARY_NAME)).bold());
@@ -18,7 +19,8 @@ pub fn run(deploy_user: &str) -> Result<()> {
     // Only the commands that need ownership or live-state changes run via sudo.
     let sudoers_content = format!(
         "# Installed by bonesremote init\n\
-         {deploy_user} ALL=(root) NOPASSWD: {bonesdeploy_path} release stage --config *, {bonesdeploy_path} release wire --config *, {bonesdeploy_path} hooks post-deploy --config *\n"
+         {} ALL=(root) NOPASSWD: {bonesdeploy_path} release stage --config *, {bonesdeploy_path} release wire --config *, {bonesdeploy_path} hooks post-deploy --config *\n",
+        paths::DEPLOY_USER
     );
 
     fs::write(sudoers_path, &sudoers_content).with_context(|| format!("Failed to write {sudoers_path}"))?;

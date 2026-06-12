@@ -107,17 +107,11 @@ mod tests {
                 deploy_on_push: true,
             },
             permissions: config::Permissions {
-                defaults: config::PermissionDefaults {
-                    deploy_user: String::from("git"),
-                    service_user: String::from("svc-acme"),
-                    group: String::from("www-data"),
-                    dir_mode: String::from("750"),
-                    file_mode: String::from("640"),
-                },
+                defaults: config::PermissionDefaults { dir_mode: String::from("750"), file_mode: String::from("640") },
                 paths: Vec::new(),
             },
-            releases: config::Releases {
-                keep,
+            releases: config::Releases { keep },
+            shared: config::Shared {
                 shared_files: vec![String::from(".env")],
                 shared_dirs: vec![String::from("storage")],
             },

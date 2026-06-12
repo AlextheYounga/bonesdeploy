@@ -24,8 +24,8 @@ struct Kit;
 struct Infra;
 
 #[derive(Embed)]
-#[folder = "./embeds/templates/"]
-struct Templates;
+#[folder = "./embeds/runtimes/"]
+struct Runtimes;
 
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
@@ -56,22 +56,22 @@ pub fn scaffold_runtime_base(bones_dir: &Path) -> Result<()> {
     Ok(())
 }
 pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Result<()> {
-    let prefix = format!("{template_name}/runtime/");
+    let prefix = format!("{template_name}/infra/");
     let mut found = false;
 
-    for file_path in Templates::iter() {
+    for file_path in Runtimes::iter() {
         if !file_path.starts_with(&prefix) {
             continue;
         }
 
-        let Some(asset) = Templates::get(&file_path) else {
+        let Some(asset) = Runtimes::get(&file_path) else {
             continue;
         };
 
         found = true;
         let relative_path = file_path.trim_start_matches(&prefix);
 
-        write_asset(bones_dir, &format!("runtime/{relative_path}"), asset.data.as_ref())?;
+        write_asset(bones_dir, &format!("infra/{relative_path}"), asset.data.as_ref())?;
     }
 
     if !found {
@@ -84,11 +84,11 @@ pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Resul
     Ok(())
 }
 
-pub fn read_template_bones_config(template_name: &str) -> Result<String> {
-    let path = format!("{template_name}/bones.yaml");
-    let Some(file) = Templates::get(&path) else {
+pub fn read_template_runtime_config(template_name: &str) -> Result<String> {
+    let path = format!("{template_name}/runtime.yaml");
+    let Some(file) = Runtimes::get(&path) else {
         bail!(
-            "Embedded bones config not found for template: {template_name}. Available templates: {}",
+            "Embedded runtime config not found for template: {template_name}. Available templates: {}",
             available_templates().join(", ")
         );
     };
@@ -96,10 +96,18 @@ pub fn read_template_bones_config(template_name: &str) -> Result<String> {
     Ok(String::from_utf8_lossy(file.data.as_ref()).to_string())
 }
 
+pub fn read_kit_runtime_config() -> Result<String> {
+    let path = "kit/runtime.yaml";
+    let Some(file) = Kit::get(path) else {
+        bail!("Embedded kit runtime config not found");
+    };
+    Ok(String::from_utf8_lossy(file.data.as_ref()).to_string())
+}
+
 pub fn available_templates() -> Vec<String> {
     let mut templates = BTreeSet::new();
 
-    for file_path in Templates::iter() {
+    for file_path in Runtimes::iter() {
         if let Some((name, _)) = file_path.split_once('/') {
             templates.insert(name.to_string());
         }

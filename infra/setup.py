@@ -167,7 +167,7 @@ server.shell(
 
 server.shell(
     name="Run bonesremote init",
-    commands=[f"/usr/local/bin/bonesremote init --deploy-user {DEPLOY_DATA["deploy_user"]}"],
+    commands=["/usr/local/bin/bonesremote init"],
     _sudo=True,
 )
 

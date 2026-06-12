@@ -22,10 +22,10 @@ pub fn run(config_path: &str) -> Result<()> {
     // build unless we re-open it here.
     permissions::chown_paths_to_deploy_user(&cfg, &[shared_dir.as_path()], false)?;
 
-    for shared_file in &cfg.releases.shared_files {
+    for shared_file in &cfg.shared.shared_files {
         wire_path(&cfg, (&build_root, &shared_dir), shared_file, true)?;
     }
-    for shared_dir_path in &cfg.releases.shared_dirs {
+    for shared_dir_path in &cfg.shared.shared_dirs {
         wire_path(&cfg, (&build_root, &shared_dir), shared_dir_path, false)?;
     }
 

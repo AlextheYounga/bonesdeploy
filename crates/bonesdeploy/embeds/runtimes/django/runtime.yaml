@@ -1,0 +1,18 @@
+template: django
+web_root: public
+permissions:
+  defaults:
+    dir_mode: '750'
+    file_mode: '640'
+  paths:
+    - path: 'static'
+      mode: '750'
+      recursive: true
+    - path: 'media'
+      mode: '770'
+      recursive: true
+shared:
+  shared_files:
+  - '.env'
+  shared_dirs:
+  - storage

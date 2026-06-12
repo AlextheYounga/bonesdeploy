@@ -72,9 +72,9 @@ fn build_setup_data_vars(cfg: &config::BonesConfig, deploy_authorized_key: &str)
     let mut vars = serde_json::Map::new();
 
     vars.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
-    vars.insert(String::from("deploy_user"), Value::String(cfg.permissions.defaults.deploy_user.clone()));
-    vars.insert(String::from("service_user"), Value::String(cfg.permissions.defaults.service_user.clone()));
-    vars.insert(String::from("group"), Value::String(cfg.permissions.defaults.group.clone()));
+    vars.insert(String::from("deploy_user"), Value::String(String::from(paths::DEPLOY_USER)));
+    vars.insert(String::from("service_user"), Value::String(config::service_user(&cfg.data.project_name)));
+    vars.insert(String::from("group"), Value::String(String::from(paths::DEFAULT_GROUP)));
     vars.insert(String::from("project_root_parent"), Value::String(paths.project_root_parent.clone()));
     vars.insert(String::from("project_root"), Value::String(cfg.data.project_root.clone()));
     vars.insert(String::from("web_root"), Value::String(cfg.data.web_root.clone()));

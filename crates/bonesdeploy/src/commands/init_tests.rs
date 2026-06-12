@@ -10,7 +10,7 @@ use anyhow::{Result, bail};
 use shared::paths;
 use tempfile::TempDir;
 
-use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Ssl};
+use crate::config::{BonesConfig, Data, PermissionDefaults, Permissions, Releases, Shared, Ssl};
 
 fn test_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -109,16 +109,11 @@ fn incomplete_seed(project_name: &str) -> BonesConfig {
             deploy_on_push: true,
         },
         permissions: Permissions {
-            defaults: PermissionDefaults {
-                deploy_user: String::from("git"),
-                service_user: String::from(project_name),
-                group: String::from("www-data"),
-                dir_mode: String::from("750"),
-                file_mode: String::from("640"),
-            },
+            defaults: PermissionDefaults { dir_mode: String::from("750"), file_mode: String::from("640") },
             paths: Vec::new(),
         },
-        releases: Releases { keep: 5, shared_files: Vec::new(), shared_dirs: Vec::new() },
+        releases: Releases::default(),
+        shared: Shared::default(),
         ssl: Ssl::default(),
     }
 }

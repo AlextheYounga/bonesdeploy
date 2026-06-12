@@ -84,7 +84,7 @@ mod tests {
 
     fn write_config(path: &Path, repo_path: &Path, project_root: &Path, branch: &str) -> Result<()> {
         let yaml = format!(
-            "data:\n  remote_name: production\n  project_name: postreceive\n  host: localhost\n  port: \"22\"\n  repo_path: {}\n  project_root: {}\n  web_root: public\n  branch: {branch}\n  deploy_on_push: true\npermissions:\n  defaults:\n    deploy_user: git\n    service_user: postreceive\n    group: www-data\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\n  shared_files:\n    - .env\n  shared_dirs:\n    - storage\n",
+            "data:\n  remote_name: production\n  project_name: postreceive\n  host: localhost\n  port: \"22\"\n  repo_path: {}\n  project_root: {}\n  web_root: public\n  branch: {branch}\n  deploy_on_push: true\npermissions:\n  defaults:\n    dir_mode: \"750\"\n    file_mode: \"640\"\nreleases:\n  keep: 5\nshared:\n  shared_files:\n    - .env\n  shared_dirs:\n    - storage\n",
             repo_path.display(),
             project_root.display()
         );
