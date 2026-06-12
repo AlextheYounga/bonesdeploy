@@ -175,27 +175,39 @@ fn remote_setup_prompt_lines() -> [&'static str; 12] {
         "Remote setup",
         "This is intended for a fresh VPS, but is idempotent (can be run multiple times).",
         "You can use this to set up as many sites on your VPS as you would like. Run this once per site.",
-		"",
-        "This step will:",
-		"  - Ensure necessary prerequisite packages are installed the server.",
-		"  - Ensure correct user groups, roles, and firewalls are configured the server.",
-		"  - Set up a git bare repo for this project on the server.",
-		"  - Create the appropriate deployment and release directories for your project.",
-		"  - Install the bonesremote binary on the server, used to facilitate deployments.",
         "",
-		"For more information, you can check the setup.py file under .bones/infra/setup.py."
+        "This step will:",
+        "  - Ensure necessary prerequisite packages are installed the server.",
+        "  - Ensure correct user groups, roles, and firewalls are configured the server.",
+        "  - Set up a git bare repo for this project on the server.",
+        "  - Create the appropriate deployment and release directories for your project.",
+        "  - Install the bonesremote binary on the server, used to facilitate deployments.",
+        "",
+        "For more information, you can check the setup.py file under .bones/infra/setup.py.",
     ]
 }
 
-fn remote_runtime_prompt_lines() -> [&'static str; 7] {
+fn remote_runtime_prompt_lines() -> [&'static str; 9] {
     [
         "Remote runtime",
         "This applies per-site runtime configurations to the server.",
-		"",
+        "",
         "It will:",
         "  - Ensure runtime-specific packages are installed.",
         "  - Provision runtime-specific services, like PHP-FPM, Python, or Ruby, depending on your runtime template.",
         "  - Configure AppArmor, nginx, and systemd services are configured for this site.",
+        "",
+        "For more information, you can check the runtime.py file under .bones/infra/setup.py.",
+    ]
+}
+
+fn remote_ssl_prompt_lines() -> [&'static str; 5] {
+    [
+        "Remote SSL setup",
+        "This applies per-site SSL configurations to allow HTTPS traffic to your site.",
+        "Before beginning this step, please ensure you have set up the appropriate A or CNAME DNS record on your DNS provider which points to this server.",
+        "Common DNS providers are Namecheap, GoDaddy, Cloudflare, etc.",
+        "If you have not completed this step, certificate creation will fail on this step.",
     ]
 }
 
