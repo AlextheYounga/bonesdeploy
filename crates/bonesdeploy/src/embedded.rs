@@ -56,7 +56,7 @@ pub fn scaffold_runtime_base(bones_dir: &Path) -> Result<()> {
     Ok(())
 }
 pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Result<()> {
-    let prefix = format!("{template_name}/infra/");
+    let prefix = format!("{template_name}/");
     let mut found = false;
 
     for file_path in Runtimes::iter() {
@@ -71,7 +71,7 @@ pub fn scaffold_runtime_template(template_name: &str, bones_dir: &Path) -> Resul
         found = true;
         let relative_path = file_path.trim_start_matches(&prefix);
 
-        write_asset(bones_dir, &format!("infra/{relative_path}"), asset.data.as_ref())?;
+        write_asset(bones_dir, relative_path, asset.data.as_ref())?;
     }
 
     if !found {
