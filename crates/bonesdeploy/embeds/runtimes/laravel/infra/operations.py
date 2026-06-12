@@ -36,6 +36,14 @@ here = os.path.dirname(__file__)
 data = host.data
 pool_config_path = f"/srv/conf/{data['project_name']}/php-fpm.conf"
 
+
+def template_data(*, exclude=(), **extra):
+    values = dict(data)
+    for key in exclude:
+        values.pop(key, None)
+    values.update(extra)
+    return values
+
 apt.packages(
     name="Install PHP repo prerequisites",
     packages=LARAVEL_PHP_SURY_PREREQUISITE_PACKAGES,
@@ -120,10 +128,12 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    laravel_php_fpm_pool_name=data["project_name"],
-    laravel_php_fpm_socket_path=f"/run/{data['project_name']}/php-fpm.sock",
-    project_root=data["project_root"],
-    **data,
+    **template_data(
+        exclude=("group", "project_root"),
+        laravel_php_fpm_pool_name=data["project_name"],
+        laravel_php_fpm_socket_path=f"/run/{data['project_name']}/php-fpm.sock",
+        project_root=data["project_root"],
+    ),
     _sudo=True,
 )
 
@@ -134,10 +144,12 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    laravel_php_fpm_pool_config_path=pool_config_path,
-    laravel_php_version_resolved=data.get("laravel_php_version", LARAVEL_PHP_VERSION),
-    apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm",
-    **data,
+    **template_data(
+        exclude=("group",),
+        laravel_php_fpm_pool_config_path=pool_config_path,
+        laravel_php_version_resolved=data.get("laravel_php_version", LARAVEL_PHP_VERSION),
+        apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm",
+    ),
     _sudo=True,
 )
 
@@ -148,8 +160,7 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm",
-    **data,
+    **template_data(exclude=("group",), apparmor_profile_name=f"bonesdeploy-{data['project_name']}-php-fpm"),
     _sudo=True,
 )
 
@@ -175,7 +186,7 @@ files.template(
     user="root",
     group=data["group"],
     mode="0640",
-    **data,
+    **template_data(exclude=("group",)),
     _sudo=True,
 )
 

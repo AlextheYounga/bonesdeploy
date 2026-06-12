@@ -12,6 +12,14 @@ here = os.path.dirname(__file__)
 DEPLOY_DATA = unflatten(host.data.dict())
 PATHS = DEPLOY_DATA.get("paths", {})
 
+
+def template_data(*, exclude=(), **extra):
+    values = dict(DEPLOY_DATA)
+    for key in exclude:
+        values.pop(key, None)
+    values.update(extra)
+    return values
+
 # Validate inputs
 assert DEPLOY_DATA.get("ssl_domain"), "ssl_domain is required"
 assert DEPLOY_DATA.get("ssl_email"), "ssl_email is required"
@@ -24,9 +32,7 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    nginx_server_name=DEPLOY_DATA["ssl_domain"],
-    nginx_ssl_enabled=False,
-    **DEPLOY_DATA,
+    **template_data(exclude=("group",), nginx_server_name=DEPLOY_DATA["ssl_domain"], nginx_ssl_enabled=False),
     _sudo=True,
 )
 
@@ -64,11 +70,13 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    nginx_server_name=DEPLOY_DATA["ssl_domain"],
-    nginx_ssl_enabled=True,
-    nginx_ssl_certificate_path=f"/etc/letsencrypt/live/{DEPLOY_DATA["ssl_domain"]}/fullchain.pem",
-    nginx_ssl_certificate_key_path=f"/etc/letsencrypt/live/{DEPLOY_DATA["ssl_domain"]}/privkey.pem",
-    **DEPLOY_DATA,
+    **template_data(
+        exclude=("group",),
+        nginx_server_name=DEPLOY_DATA["ssl_domain"],
+        nginx_ssl_enabled=True,
+        nginx_ssl_certificate_path=f"/etc/letsencrypt/live/{DEPLOY_DATA["ssl_domain"]}/fullchain.pem",
+        nginx_ssl_certificate_key_path=f"/etc/letsencrypt/live/{DEPLOY_DATA["ssl_domain"]}/privkey.pem",
+    ),
     _sudo=True,
 )
 

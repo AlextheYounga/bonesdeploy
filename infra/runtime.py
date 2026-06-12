@@ -12,6 +12,14 @@ from src.utils import unflatten
 DEPLOY_DATA = unflatten(host.data.dict())
 PATHS = DEPLOY_DATA.get("paths", {})
 
+
+def template_data(*, exclude=(), **extra):
+    values = dict(DEPLOY_DATA)
+    for key in exclude:
+        values.pop(key, None)
+    values.update(extra)
+    return values
+
 # Install runtime apt packages
 pkgs = DEPLOY_DATA.get("runtime_apt_packages", [])
 if pkgs:
@@ -49,8 +57,7 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    apparmor_profile_name=apparmor_profile_name,
-    **DEPLOY_DATA,
+    **template_data(exclude=("group",), apparmor_profile_name=apparmor_profile_name),
     _sudo=True,
 )
 
@@ -110,7 +117,7 @@ files.template(
     user="root",
     group=DEPLOY_DATA["group"],
     mode="0640",
-    **DEPLOY_DATA,
+    **template_data(exclude=("group",)),
     _sudo=True,
 )
 
@@ -121,7 +128,7 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    **DEPLOY_DATA,
+    **template_data(exclude=("group",)),
     _sudo=True,
 )
 
@@ -140,11 +147,13 @@ files.template(
     user="root",
     group="root",
     mode="0644",
-    nginx_server_name=nginx_server_name,
-    nginx_ssl_enabled=nginx_ssl_enabled,
-    nginx_ssl_certificate_path=DEPLOY_DATA.get("ssl_cert_path", ""),
-    nginx_ssl_certificate_key_path=DEPLOY_DATA.get("ssl_key_path", ""),
-    **DEPLOY_DATA,
+    **template_data(
+        exclude=("group",),
+        nginx_server_name=nginx_server_name,
+        nginx_ssl_enabled=nginx_ssl_enabled,
+        nginx_ssl_certificate_path=DEPLOY_DATA.get("ssl_cert_path", ""),
+        nginx_ssl_certificate_key_path=DEPLOY_DATA.get("ssl_key_path", ""),
+    ),
     _sudo=True,
 )
 
