@@ -1,8 +1,11 @@
+mod bootstrap_ssh;
 mod commands;
 mod config;
 mod embedded;
 mod git;
 mod prompts;
+mod pyinfra;
+mod remote_data;
 mod ssh;
 
 use anyhow::Result;

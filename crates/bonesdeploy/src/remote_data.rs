@@ -1,0 +1,89 @@
+use std::path::Path;
+
+use anyhow::Result;
+use serde_json::{Map, Value};
+
+use crate::config;
+use shared::paths::{self, ssl_certificate_key_path, ssl_certificate_path};
+
+fn base(cfg: &config::BonesConfig) -> Result<Map<String, Value>> {
+    let paths = cfg.data.deployment_paths();
+    let mut vars = Map::new();
+
+    vars.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
+    vars.insert(String::from("deploy_user"), Value::String(String::from(paths::DEPLOY_USER)));
+    vars.insert(String::from("service_user"), Value::String(config::service_user(&cfg.data.project_name)));
+    vars.insert(String::from("service_group"), Value::String(String::from(paths::DEFAULT_GROUP)));
+    vars.insert(String::from("project_root_parent"), Value::String(paths.project_root_parent.clone()));
+    vars.insert(String::from("project_root"), Value::String(cfg.data.project_root.clone()));
+    vars.insert(String::from("web_root"), Value::String(cfg.data.web_root.clone()));
+    vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
+    vars.insert(String::from("repo_path"), Value::String(cfg.data.repo_path.clone()));
+    vars.insert(String::from("paths"), serde_json::to_value(paths)?);
+
+    Ok(vars)
+}
+
+pub fn setup(cfg: &config::BonesConfig, deploy_authorized_key: &str) -> Result<Value> {
+    let mut vars = base(cfg)?;
+    vars.insert(String::from("deploy_authorized_key"), Value::String(deploy_authorized_key.to_string()));
+    vars.insert(String::from("setup_label"), Value::String(String::from("bonesdeploy")));
+    Ok(Value::Object(vars))
+}
+
+pub fn runtime(cfg: &config::BonesConfig, runtime_yaml: &Path) -> Result<Value> {
+    let mut vars = base(cfg)?;
+    let runtime_data = config::load_runtime(runtime_yaml)?;
+    for (key, value) in runtime_data {
+        if key == "paths" {
+            continue;
+        }
+        vars.insert(key, value);
+    }
+    Ok(Value::Object(vars))
+}
+
+pub fn ssl(cfg: &config::BonesConfig, domain: &str, email: &str) -> Result<Value> {
+    let mut vars = base(cfg)?;
+    vars.insert(String::from("ssl_domain"), Value::String(domain.to_string()));
+    vars.insert(String::from("ssl_email"), Value::String(email.to_string()));
+    vars.insert(String::from("nginx_ssl_certificate_path"), Value::String(ssl_certificate_path(domain)));
+    vars.insert(String::from("nginx_ssl_certificate_key_path"), Value::String(ssl_certificate_key_path(domain)));
+    Ok(Value::Object(vars))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::{BonesConfig, Data, Releases, Ssl};
+
+    use super::ssl;
+
+    fn test_cfg() -> BonesConfig {
+        BonesConfig {
+            data: Data {
+                project_name: String::from("test"),
+                repo_path: String::from("/home/git/test.git"),
+                project_root: String::from("/srv/test"),
+                web_root: String::from("public"),
+                host: String::from("example.com"),
+                port: String::from("22"),
+                branch: String::from("master"),
+                remote_name: String::from("production"),
+                deploy_on_push: true,
+            },
+            releases: Releases::default(),
+            ssl: Ssl::default(),
+        }
+    }
+
+    /// Passes the SSL domain and email into the data sent to the pyinfra SSL deploy.
+    #[test]
+    fn ssl_data_includes_domain_and_email() -> anyhow::Result<()> {
+        let cfg = test_cfg();
+        let vars = ssl(&cfg, "app.example.com", "ops@example.com")?;
+
+        assert_eq!(vars.get("ssl_domain"), Some(&serde_json::Value::String(String::from("app.example.com"))));
+        assert_eq!(vars.get("ssl_email"), Some(&serde_json::Value::String(String::from("ops@example.com"))));
+        Ok(())
+    }
+}
