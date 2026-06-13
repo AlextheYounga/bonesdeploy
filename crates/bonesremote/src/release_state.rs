@@ -10,7 +10,7 @@ use crate::config::{BonesConfig, Constants};
 use shared::paths::DeploymentPaths;
 
 fn deployment_paths(cfg: &BonesConfig) -> DeploymentPaths {
-    DeploymentPaths::new(&cfg.data.project_name, &cfg.data.repo_path, &cfg.data.project_root, &cfg.data.web_root)
+    cfg.data.deployment_paths()
 }
 
 pub fn staged_release_path(cfg: &BonesConfig) -> PathBuf {

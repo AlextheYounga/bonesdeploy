@@ -137,14 +137,14 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
 #[cfg(test)]
 mod tests {
+    use anyhow::{Result, anyhow};
+
     /// Does not pass a `--config` flag to the doctor command in the hooks script.
     #[test]
-    fn hooks_script_does_not_pass_config_to_doctor() {
-        let hooks_script = super::Kit::get("hooks/hooks.sh");
-        assert!(hooks_script.is_some(), "hooks.sh should be embedded");
-
-        let hooks_script =
-            hooks_script.map(|asset| String::from_utf8_lossy(asset.data.as_ref()).to_string()).unwrap_or_default();
+    fn hooks_script_does_not_pass_config_to_doctor() -> Result<()> {
+        let hooks_script = super::Kit::get("hooks/hooks.sh").ok_or_else(|| anyhow!("hooks.sh should be embedded"))?;
+        let hooks_script = String::from_utf8_lossy(hooks_script.data.as_ref()).to_string();
         assert!(!hooks_script.contains("bonesremote doctor --config"));
+        Ok(())
     }
 }

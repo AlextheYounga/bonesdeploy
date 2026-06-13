@@ -136,3 +136,9 @@ pub fn hide_derived_defaults(data: &mut Data) {
         data.web_root.clear();
     }
 }
+
+impl Data {
+    pub fn deployment_paths(&self) -> crate::paths::DeploymentPaths {
+        crate::paths::DeploymentPaths::new(&self.project_name, &self.repo_path, &self.project_root, &self.web_root)
+    }
+}

@@ -3,7 +3,11 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use shared::config as shared_config;
 use shared::paths;
+
+pub use shared::config::Data;
+pub use shared::config::Releases;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BonesConfig {
@@ -22,80 +26,12 @@ impl Constants {
     pub const BUILD_DIR: &str = paths::BUILD_DIR;
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Data {
-    pub remote_name: String,
-    pub project_name: String,
-    pub host: String,
-    pub port: String,
-    pub repo_path: String,
-    pub project_root: String,
-    pub web_root: String,
-    pub branch: String,
-    pub deploy_on_push: bool,
-}
-
-impl Default for Data {
-    fn default() -> Self {
-        Self {
-            remote_name: String::new(),
-            project_name: String::new(),
-            host: String::new(),
-            port: "22".into(),
-            repo_path: String::new(),
-            project_root: String::new(),
-            web_root: String::new(),
-            branch: "master".into(),
-            deploy_on_push: true,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Releases {
-    pub keep: usize,
-}
-
-impl Default for Releases {
-    fn default() -> Self {
-        Self { keep: 5 }
-    }
-}
-
 pub fn load(path: &Path) -> Result<BonesConfig> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let mut config: BonesConfig =
         serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    apply_derived_defaults(&mut config);
+    shared_config::apply_derived_defaults(&mut config.data);
     Ok(config)
-}
-
-fn apply_derived_defaults(config: &mut BonesConfig) {
-    let project_name = &config.data.project_name;
-
-    if config.data.repo_path.is_empty() {
-        config.data.repo_path = default_repo_path_for(project_name);
-    }
-    if config.data.project_root.is_empty() {
-        config.data.project_root = default_project_root_for(project_name);
-    }
-    if config.data.web_root.is_empty() {
-        config.data.web_root = default_web_root();
-    }
-}
-
-pub fn default_repo_path_for(project_name: &str) -> String {
-    paths::default_repo_path_for(project_name)
-}
-
-pub fn default_project_root_for(project_name: &str) -> String {
-    paths::default_project_root_for(project_name)
-}
-
-pub fn default_web_root() -> String {
-    paths::default_web_root()
 }
 
 #[cfg(test)]
@@ -107,8 +43,9 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
+    use shared::paths;
 
-    use super::{default_project_root_for, default_repo_path_for, default_web_root, load};
+    use super::load;
 
     fn temp_file_path(prefix: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
@@ -129,9 +66,9 @@ data:
         let cfg = load(&path)?;
         fs::remove_file(&path).ok();
 
-        assert_eq!(cfg.data.repo_path, default_repo_path_for("acme"));
-        assert_eq!(cfg.data.project_root, default_project_root_for("acme"));
-        assert_eq!(cfg.data.web_root, default_web_root());
+        assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("acme"));
+        assert_eq!(cfg.data.project_root, paths::default_project_root_for("acme"));
+        assert_eq!(cfg.data.web_root, paths::default_web_root());
         Ok(())
     }
 

@@ -5,7 +5,12 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use shared::config as shared_config;
 use shared::paths;
+
+pub use shared::config::Data;
+pub use shared::config::Releases;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BonesConfig {
     #[serde(default)]
@@ -42,50 +47,6 @@ impl Constants {
     pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Data {
-    pub remote_name: String,
-    pub project_name: String,
-    pub host: String,
-    pub port: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub repo_path: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub project_root: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub web_root: String,
-    pub branch: String,
-    pub deploy_on_push: bool,
-}
-impl Default for Data {
-    fn default() -> Self {
-        Self {
-            remote_name: String::new(),
-            project_name: String::new(),
-            host: String::new(),
-            port: "22".into(),
-            repo_path: String::new(),
-            project_root: String::new(),
-            web_root: String::new(),
-            branch: "master".into(),
-            deploy_on_push: true,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Releases {
-    pub keep: usize,
-}
-
-impl Default for Releases {
-    fn default() -> Self {
-        Self { keep: 5 }
-    }
-}
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ssl {
@@ -100,10 +61,6 @@ pub struct Ssl {
 pub fn is_configured(config: &BonesConfig) -> bool {
     let d = &config.data;
     !d.remote_name.is_empty() && !d.project_name.is_empty() && !d.host.is_empty() && !d.repo_path.is_empty()
-}
-
-pub fn default_repo_path_for(project_name: &str) -> String {
-    paths::default_repo_path_for(project_name)
 }
 
 pub fn default_project_root_for(project_name: &str) -> String {
@@ -127,13 +84,13 @@ pub fn load(path: &Path) -> Result<BonesConfig> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let mut config: BonesConfig =
         serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    apply_derived_defaults(&mut config);
+    shared_config::apply_derived_defaults(&mut config.data);
     Ok(config)
 }
 
 pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
-    hide_derived_defaults(&mut to_serialize);
+    shared_config::hide_derived_defaults(&mut to_serialize.data);
 
     let yaml = serde_yml::to_string(&to_serialize).context("Failed to serialize bones config")?;
     fs::write(path, yaml).with_context(|| format!("Failed to write {}", path.display()))?;
@@ -159,34 +116,6 @@ pub fn service_user(project_name: &str) -> String {
     project_name.to_string()
 }
 
-fn apply_derived_defaults(config: &mut BonesConfig) {
-    let project_name = &config.data.project_name;
-
-    if config.data.repo_path.is_empty() {
-        config.data.repo_path = default_repo_path_for(project_name);
-    }
-    if config.data.project_root.is_empty() {
-        config.data.project_root = default_project_root_for(project_name);
-    }
-    if config.data.web_root.is_empty() {
-        config.data.web_root = default_web_root();
-    }
-}
-
-fn hide_derived_defaults(config: &mut BonesConfig) {
-    let project_name = &config.data.project_name;
-
-    if config.data.repo_path == default_repo_path_for(project_name) {
-        config.data.repo_path.clear();
-    }
-    if config.data.project_root == default_project_root_for(project_name) {
-        config.data.project_root.clear();
-    }
-    if config.data.web_root == default_web_root() {
-        config.data.web_root.clear();
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::env::temp_dir;
@@ -199,8 +128,7 @@ mod tests {
     use shared::paths;
 
     use super::{
-        BonesConfig, Data, Releases, Ssl, default_project_root_for, default_repo_path_for, default_web_root, load,
-        save, service_user,
+        BonesConfig, Data, Releases, Ssl, default_project_root_for, default_web_root, load, save, service_user,
     };
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -222,7 +150,7 @@ mod tests {
                 project_name: String::from(project_name),
                 host: String::from("deploy.example.com"),
                 port: String::from("22"),
-                repo_path: default_repo_path_for(project_name),
+                repo_path: paths::default_repo_path_for(project_name),
                 project_root: default_project_root_for(project_name),
                 web_root: default_web_root(),
                 branch: String::from("master"),
