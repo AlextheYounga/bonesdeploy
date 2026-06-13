@@ -93,7 +93,7 @@ fn shared_setup_deploy_keeps_runtime_roles_out() {
     assert!(!content.contains("per-site nginx"), "shared setup deploy must not apply per-site nginx\n{content}");
 }
 
-/// Applies runtime, AppArmor, and nginx through the dedicated runtime deploy script.
+/// Applies runtime, `AppArmor`, and nginx through the dedicated runtime deploy script.
 #[test]
 fn remote_runtime_deploy_applies_runtime_apparmor_and_nginx() {
     let deploy = project_root().join("infra/runtime.py");
@@ -108,6 +108,48 @@ fn remote_runtime_deploy_applies_runtime_apparmor_and_nginx() {
     assert!(
         content.contains("apparmor_parser") && content.contains("per-site nginx"),
         "runtime deploy must apply shared per-site AppArmor and nginx\n{content}"
+    );
+}
+
+/// Uses a root-owned runtime socket directory so the PHP-FPM master can write without ACLs.
+#[test]
+fn remote_runtime_deploy_uses_root_owned_runtime_socket_dir() {
+    let deploy = project_root().join("infra/runtime.py");
+    let content = fs::read_to_string(&deploy);
+    assert!(content.is_ok(), "failed to read {}", deploy.display());
+    let content = content.unwrap_or_default();
+
+    let socket_dir_start = content.find("name=\"Ensure socket directory exists\"").unwrap_or_else(|| {
+        assert!(
+            content.contains("name=\"Ensure socket directory exists\""),
+            "runtime deploy must create the runtime socket directory"
+        );
+        0
+    });
+    let conf_dir_start = content.find("name=\"Ensure conf directory exists\"").unwrap_or_else(|| {
+        assert!(
+            content.contains("name=\"Ensure conf directory exists\""),
+            "runtime deploy must configure the conf directory after the socket directory"
+        );
+        0
+    });
+    let socket_dir_block = &content[socket_dir_start..conf_dir_start];
+
+    assert!(
+        socket_dir_block.contains("path=PATHS[\"runtime_socket_dir\"]"),
+        "runtime deploy must target the resolved runtime socket directory\n{socket_dir_block}"
+    );
+    assert!(
+        socket_dir_block.contains("user=\"root\""),
+        "runtime deploy must make the runtime socket directory root-owned\n{socket_dir_block}"
+    );
+    assert!(
+        socket_dir_block.contains("group=DEPLOY_DATA[\"service_group\"]"),
+        "runtime deploy must keep the runtime socket directory in the service group\n{socket_dir_block}"
+    );
+    assert!(
+        socket_dir_block.contains("mode=\"0770\""),
+        "runtime deploy must make the runtime socket directory group-writable without ACLs\n{socket_dir_block}"
     );
 }
 
