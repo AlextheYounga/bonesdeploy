@@ -54,10 +54,12 @@
 
 ## `crates/bonesdeploy/tests/init_assets/apparmor.rs`
 - Allows reading the site nginx configuration in the AppArmor profile template. (apparmor_profile_template_allows_site_nginx_conf)
+- Allows the resolved release web root in the AppArmor profile template. (apparmor_profile_template_allows_resolved_release_web_root)
 - Does not deny the parent home path when the repo path is derived from the shared helper. (apparmor_profile_template_does_not_deny_repo_path_parent_home)
 - Ensures the AppArmor profile template file exists at the expected path. (apparmor_profile_template_exists)
 - Limits network access to unix stream sockets and denies inet sockets. (apparmor_profile_template_limits_network_to_unix_stream)
 - Allows reading the per-site conf root in the Laravel PHP-FPM AppArmor profile. (laravel_php_fpm_apparmor_profile_allows_site_conf_root)
+- Grants only the minimal capabilities needed by the Laravel PHP-FPM master. (laravel_php_fpm_apparmor_profile_grants_minimal_capabilities)
 - Sets an AppArmor profile in the per-site nginx systemd service template. (nginx_service_template_sets_apparmor_profile)
 - Requires the AppArmor service in the nginx systemd service template. (nginx_service_template_waits_for_apparmor_service)
 - Verifies apparmor profile enforcement is handled by the runtime deploy script. (runtime_deploy_enforces_apparmor_profile)
@@ -81,6 +83,7 @@
 
 ## `crates/bonesdeploy/tests/init_assets/setup_playbook.rs`
 - Applies runtime, AppArmor, and nginx through the dedicated runtime deploy script. (remote_runtime_deploy_applies_runtime_apparmor_and_nginx)
+- Uses a root-owned runtime socket directory so the PHP-FPM master can write without ACLs. (remote_runtime_deploy_uses_root_owned_runtime_socket_dir)
 - Leaves SSL role out of the runtime deploy since SSL has its own deploy script. (remote_runtime_deploy_excludes_ssl_logic)
 - Installs runtime apt packages before applying runtime roles. (remote_runtime_deploy_installs_packages_before_operations)
 - Leaves per-site AppArmor out of the shared remote setup deploy script. (remote_setup_deploy_excludes_apparmor_logic)

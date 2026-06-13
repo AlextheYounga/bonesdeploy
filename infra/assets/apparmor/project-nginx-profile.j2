@@ -27,6 +27,8 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-ngi
   /sys/devices/system/cpu/online r,
 
   {{ paths.current_web_root }}/** r,
+  # current is a symlink, so allow the resolved release path too.
+  {{ paths.releases }}/*/{{ web_root }}/** r,
   {{ paths.repo_bones_yaml }} r,
   {{ paths.site_nginx_config }} r,
 

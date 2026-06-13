@@ -86,9 +86,10 @@ server.user(
 files.directory(
     name="Ensure socket directory exists",
     path=PATHS["runtime_socket_dir"],
-    user=DEPLOY_DATA["service_user"],
+    # Root owns the runtime dir so privileged masters can create sockets and logs without ACLs.
+    user="root",
     group=DEPLOY_DATA["service_group"],
-    mode="0750",
+    mode="0770",
     _sudo=True,
 )
 

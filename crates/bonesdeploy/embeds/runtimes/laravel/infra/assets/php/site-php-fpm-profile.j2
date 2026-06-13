@@ -6,6 +6,11 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-php
 
   network unix stream,
 
+  # Allow the FPM master to drop privileges and chown the socket.
+  capability chown,
+  capability setgid,
+  capability setuid,
+
   /usr/sbin/php-fpm* mrix,
 
   /usr/** r,

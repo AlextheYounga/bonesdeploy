@@ -54,6 +54,24 @@ fn apparmor_profile_template_allows_site_nginx_conf() {
     );
 }
 
+/// Allows the resolved release web root in the `AppArmor` profile template.
+#[test]
+fn apparmor_profile_template_allows_resolved_release_web_root() {
+    let profile_template = project_root().join("infra/assets/apparmor/project-nginx-profile.j2");
+    let content = fs::read_to_string(&profile_template);
+    assert!(content.is_ok(), "failed to read {}", profile_template.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("{{ paths.current_web_root }}/** r,"),
+        "AppArmor template must still allow the resolved current web root\n{content}"
+    );
+    assert!(
+        content.contains("{{ paths.releases }}/*/{{ web_root }}/** r,"),
+        "AppArmor template must allow the resolved release web root because current is a symlink\n{content}"
+    );
+}
+
 /// Allows reading the per-site conf root in the Laravel PHP-FPM AppArmor profile.
 #[test]
 fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
@@ -70,6 +88,36 @@ fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
     assert!(
         content.contains("{{ paths.conf_root }}/** r,"),
         "Laravel PHP-FPM AppArmor profile must allow reading files beneath the site config directory\n{content}"
+    );
+}
+
+/// Grants only the minimal capabilities needed by the Laravel PHP-FPM `AppArmor` profile.
+#[test]
+fn laravel_php_fpm_apparmor_profile_grants_minimal_capabilities() {
+    let profile_template =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("embeds/runtimes/laravel/infra/assets/php/site-php-fpm-profile.j2");
+    let content = fs::read_to_string(&profile_template);
+    assert!(content.is_ok(), "failed to read {}", profile_template.display());
+    let content = content.unwrap_or_default();
+
+    assert!(content.contains("capability chown,"), "Laravel PHP-FPM AppArmor profile must allow chown\n{content}");
+    assert!(content.contains("capability setgid,"), "Laravel PHP-FPM AppArmor profile must allow setgid\n{content}");
+    assert!(content.contains("capability setuid,"), "Laravel PHP-FPM AppArmor profile must allow setuid\n{content}");
+    assert!(
+        !content.contains("capability dac_override,"),
+        "Laravel PHP-FPM AppArmor profile must not allow DAC override\n{content}"
+    );
+    assert!(
+        !content.contains("capability dac_read_search,"),
+        "Laravel PHP-FPM AppArmor profile must not allow DAC read search\n{content}"
+    );
+    assert!(
+        !content.contains("capability fsetid,"),
+        "Laravel PHP-FPM AppArmor profile must not allow fsetid\n{content}"
+    );
+    assert!(
+        !content.lines().any(|line| line.trim() == "/ rw,"),
+        "Laravel PHP-FPM AppArmor profile must not allow root filesystem read-write\n{content}"
     );
 }
 
