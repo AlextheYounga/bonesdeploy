@@ -1,5 +1,7 @@
 Here is the simpler, opinionated plan I would hand to the code agent. This chooses one model and avoids branching.
 
+> **Status: Implemented.** The ownership model below has been fully implemented. The README, PROJECT.md, and command docs have been updated. See the permission contract at `docs/PROJECT.md` and the current code in `crates/bonesremote/src/commands/`. This document is kept for historical reference.
+
 # BonesDeploy Rehaul Plan: Simple Stable Ownership Model
 
 ## Goal

@@ -11,6 +11,8 @@ SupplementaryGroups={{ release_group }}
 WorkingDirectory={{ paths.current }}
 RuntimeDirectory={{ project_name }}
 RuntimeDirectoryMode=0750
+StandardOutput=journal
+StandardError=journal
 
 ExecStart=/usr/sbin/nginx -c {{ paths.site_nginx_config }} -g 'daemon off;'
 

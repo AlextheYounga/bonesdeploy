@@ -2,39 +2,22 @@
 
 ## Overview
 
-Creates symlinks from the build workspace to the shared directory for all configured shared paths. This ensures that files and directories that should persist across releases (like `.env`, `storage/`, logs) are available in the build workspace. The command runs with root privileges to manage symlinks and ownership.
+Creates symlinks from the build workspace to the shared directory for all configured shared paths. This ensures that files and directories that should persist across releases (like `.env`, `storage/`) are available in the build workspace. Command runs as the deploy user — no elevated privileges required.
 
 ## Command Signature
 
 ```bash
-sudo bonesremote release wire --config <path>
+bonesremote release wire --config <path>
 ```
 
 **Flags:**
 - `--config <path>`: Path to `bones.yaml` configuration file (required)
 
-**Note:** Must be run as root (via sudo).
-
 ---
 
 ## Detailed Execution Steps
 
-### 1. Verify Root Privileges
-
-**Source:** `wire_release.rs:13`
-
-```rust
-privileges::ensure_root("bonesremote release wire")?;
-```
-
-Ensures the command is running as root. Required for:
-- Managing symlinks
-- Changing file ownership
-- Moving files between directories
-
----
-
-### 2. Load Configuration
+### 1. Load Configuration
 
 **Source:** `wire_release.rs:15`
 
@@ -68,7 +51,7 @@ Reads the release name from `<repo_path>/bones/.staged_release`.
 
 ---
 
-### 4. Define Build and Shared Paths
+### 2. Define Build and Shared Paths
 
 **Source:** `wire_release.rs:17-18`
 
@@ -78,35 +61,32 @@ let shared_dir = release_state::shared_dir(&cfg);
 ```
 
 **Paths:**
-- `build_root`: `/srv/deployments/myapp/build/workspace`
-- `shared_dir`: `/srv/deployments/myapp/shared`
+- `build_root`: `/srv/sites/myapp/build/workspace`
+- `shared_dir`: `/srv/sites/myapp/shared`
 
 ---
 
-### 5. Wire Shared Files and Directories
+### 3. Load and Wire Shared Paths
 
-**Source:** `wire_release.rs:20-23`
+**Source:** `wire_release.rs:19-23`
 
 ```rust
-for shared_file in &cfg.releases.shared_files {
-    wire_path(&cfg, &build_root, &shared_dir, shared_file)?;
-}
-
-for shared_dir_path in &cfg.releases.shared_dirs {
-    wire_path(&cfg, &build_root, &shared_dir, shared_dir_path)?;
+let shared_paths = load_runtime_shared_paths(config_path)?;
+for shared_path in &shared_paths {
+    validate_shared_path(&shared_path.path)?;
+    wire_path(&build_root, &shared_dir, &shared_path.path)?;
 }
 ```
 
-Iterates through `releases.shared_files` and `releases.shared_dirs` and wires each entry.
+Shared paths are loaded from `runtime.yaml` (sibling of `bones.yaml` in the bare repo's `bones/` dir):
 
-**Example shared files and directories:**
 ```yaml
-releases:
-  shared_files:
-    - .env
-  shared_dirs:
-    - storage
-    - logs
+shared:
+  paths:
+    - path: .env
+      type: file
+    - path: storage
+      type: dir
 ```
 
 ---
@@ -117,146 +97,55 @@ releases:
 
 For each shared path, performs the following steps:
 
-#### 6.1 Define Paths
+#### 3.1 Validate Path
 
 ```rust
-let release_path = release_dir.join(relative_path);
-let shared_path = shared_dir.join(relative_path);
-```
-
-**Example for `.env`:**
-- `release_path`: `/srv/deployments/myapp/build/workspace/.env`
-- `shared_path`: `/srv/deployments/myapp/shared/.env`
-
-#### 6.2 Move Existing File to Shared (if needed)
-
-**Source:** `wire_release.rs:32-41`
-
-```rust
-if path_exists(&release_path) && !path_exists(&shared_path) {
-    ensure_parent_exists(&shared_path)?;
-    fs::rename(&release_path, &shared_path).with_context(|| {
-        format!(
-            "Failed to move release path into shared path: {} -> {}",
-            release_path.display(),
-            shared_path.display()
-        )
-    })?;
-}
-```
-
-**Scenario:** First deployment, file exists in release but not in shared.
-
-**Action:**
-- Move file from release to shared
-- Prevents losing the file on subsequent deployments
-
-**Example:**
-- `.env` exists in `build/workspace/.env`
-- Doesn't exist in `shared/.env`
-- Move: `build/workspace/.env` → `shared/.env`
-
-#### 6.3 Create Default Shared Target (if needed)
-
-**Source:** `wire_release.rs:43-45`, `wire_release.rs:63-75`
-
-```rust
-if !path_exists(&shared_path) {
-    create_default_shared_target(&shared_path, relative_path)?;
-}
-```
-
-**Implementation:**
-```rust
-fn create_default_shared_target(shared_path: &Path, relative_path: &str) -> Result<()> {
-    ensure_parent_exists(shared_path)?;
-
-    if looks_like_file(relative_path) {
-        fs::File::create(shared_path)
-            .with_context(|| format!("Failed to create shared file: {}", shared_path.display()))?;
-    } else {
-        fs::create_dir_all(shared_path)
-            .with_context(|| format!("Failed to create shared directory: {}", shared_path.display()))?;
-    }
-
+fn validate_shared_path(relative_path: &str) -> Result<()> {
+    if relative_path.is_empty() { bail!("shared path must not be empty"); }
+    if relative_path.starts_with('/') { bail!("shared path must be relative, got: {relative_path}"); }
+    if relative_path.contains("..") { bail!("shared path must not contain .., got: {relative_path}"); }
     Ok(())
 }
 ```
 
-**Creates the shared file/directory if it doesn't exist:**
-- File: Creates empty file
-- Directory: Creates directory (and parents)
+Rejects absolute paths, empty paths, and parent-directory traversal — shared paths must live under the project tree.
 
-**File vs Directory Heuristic:** `wire_release.rs:77-82`
+#### 3.2 Wire Symlink
+
 ```rust
-fn looks_like_file(relative_path: &str) -> bool {
-    PathBuf::from(relative_path).file_name().is_some_and(|name| {
-        let name = name.to_string_lossy();
-        name.starts_with('.') || name.contains('.')
-    })
+let release_path = build_root.join(relative_path);
+let shared_path = shared_dir.join(relative_path);
+
+if !shared_path_exists(&shared_path) {
+    bail!("shared path does not exist: {}", shared_path.display());
 }
-```
 
-**Rules:**
-- Starts with `.` → File (e.g., `.env`, `.htaccess`)
-- Contains `.` → File (e.g., `config.json`, `app.db`)
-- Otherwise → Directory (e.g., `storage`, `logs`)
-
-**Examples:**
-- `.env` → File (starts with `.`)
-- `config.json` → File (contains `.`)
-- `storage` → Directory (no `.`)
-
-#### 6.4 Set Ownership
-
-**Source:** `wire_release.rs:47`
-
-```rust
-permissions::chown_paths_to_deploy_user(cfg, &[shared_path.as_path()], true)?;
-```
-
-Changes ownership of shared path to `deploy_user:group`.
-
-**Why?** Deploy user needs to read/write the shared files.
-
-#### 6.5 Remove Existing Release Path
-
-**Source:** `wire_release.rs:49-52`
-
-```rust
 ensure_parent_exists(&release_path)?;
-if path_exists(&release_path) {
-    remove_path(&release_path)?;
+if release_path_is_resolved(&release_path) {
+    replace_workspace_path_with_shared_symlink(&release_path)?;
 }
+
+symlink(&shared_path, &release_path)?;
 ```
 
-**Removes** the file/directory/symlink from the release path to make room for the symlink.
+**Example for `.env`:**
+- `release_path`: `/srv/sites/myapp/build/workspace/.env`
+- `shared_path`: `/srv/sites/myapp/shared/.env`
 
-**Why remove?**
-- Path might be a file from the repository
-- Path might be an old symlink
-- Need clean location for new symlink
+**Flow:**
+1. Verify the shared target already exists (provisioned by `setup.py` or previous deploy)
+2. Ensure parent directories exist in the build workspace
+3. If a file, dir, or old symlink exists at the target path in the workspace, replace it with `replace_workspace_path_with_shared_symlink` (safe because this is a disposable workspace — never `current`, `releases/`, or `shared/`)
+4. Create a symlink from the workspace path to the shared path
 
-#### 6.6 Create Symlink
+**Result:**
 
-**Source:** `wire_release.rs:54-58`
-
-```rust
-symlink(&shared_path, &release_path).with_context(|| {
-    format!("Failed to create shared symlink {} -> {}", release_path.display(), shared_path.display())
-})?;
-```
-
-**Creates symlink:** `release_path` → `shared_path`
-
-**Example:**
 ```
 build/workspace/.env -> ../../shared/.env
 build/workspace/storage -> ../../shared/storage
-build/workspace/logs -> ../../shared/logs
 ```
 
-**Result:** The build workspace now has symlinks to the shared files/directories. When code is checked out or deployment scripts run, they'll interact with the actual shared files.
+**Why no chown?** The shared directory is already owned by the runtime user (provisioned during `bonesdeploy remote setup`). The workspace is owned by the deploy user. Symlinks carry their own permissions (always `0777`), and reads go through the target's ownership — no permission change needed.
 
 #### 6.7 Print Progress
 
@@ -278,8 +167,8 @@ println!("Wired build workspace for staged release: {release_name}");
 
 **Example Output:**
 ```
-Linked shared path: /srv/deployments/myapp/build/workspace/.env -> /srv/deployments/myapp/shared/.env
-Linked shared path: /srv/deployments/myapp/build/workspace/storage -> /srv/deployments/myapp/shared/storage
+Linked shared path: /srv/sites/myapp/build/workspace/.env -> /srv/sites/myapp/shared/.env
+Linked shared path: /srv/sites/myapp/build/workspace/storage -> /srv/sites/myapp/shared/storage
 Wired build workspace for staged release: 20260507_150432
 ```
 
@@ -288,19 +177,17 @@ Wired build workspace for staged release: 20260507_150432
 ## Directory Structure After Wiring
 
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── build/
 │   └── workspace/
 │       ├── .env -> ../../shared/.env           # Symlink
 │       ├── storage -> ../../shared/storage     # Symlink
-│       ├── logs -> ../../shared/logs           # Symlink
 │       └── (other files from git checkout)
 ├── releases/
 │   └── 20260507_150432/    # (empty, waiting for build)
 ├── shared/
-│   ├── .env                # Actual file
-│   ├── storage/            # Actual directory
-│   └── logs/               # Actual directory
+│   ├── .env                # Actual file, runtime-user-owned
+│   └── storage/            # Actual directory, runtime-user-owned
 └── current -> releases/20260507_140000/
 ```
 
@@ -346,15 +233,15 @@ When a new release is activated:
 
 ```bash
 # 1. Stage release
-sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
 
-# 2. Check out code
-git --work-tree=/srv/deployments/myapp/build/workspace \
+# 2. Check out code (done by post-receive hook)
+git --work-tree=/srv/sites/myapp/build/workspace \
     --git-dir=/home/git/myapp.git \
     checkout -f master
 
 # 3. Wire shared paths
-sudo bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
 
 # 4. Build and deploy
 # (deployment scripts run in build/workspace with symlinks active)

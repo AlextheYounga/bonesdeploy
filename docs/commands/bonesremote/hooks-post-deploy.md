@@ -2,41 +2,24 @@
 
 ## Overview
 
-Post-deployment hook that runs after a release is activated. It restarts the per-site nginx service to pick up the new release, hardens file permissions to restrict access, and prunes old releases to save disk space. This command must be run as root to manage systemd services and change file ownership.
+Post-deployment hook that runs after a release is activated. It prunes old releases to save disk space, keeping only the configured number of recent releases. This command does not restart services, change ownership, or harden permissions — service restart is handled by the calling hook script (`sudo bonesremote service restart`), and ownership is a provisioning-time contract established once by `bonesdeploy remote setup`.
 
 ## Command Signature
 
 ```bash
-sudo bonesremote hooks post-deploy --config <path>
+bonesremote hooks post-deploy --config <path>
 ```
 
 **Flags:**
 - `--config <path>`: Path to `bones.yaml` configuration file (required)
 
-**Note:** Must be run as root (via sudo).
-
 ---
 
 ## Detailed Execution Steps
 
-### 1. Verify Root Privileges
+### 1. Load Configuration
 
-**Source:** `post_deploy.rs:13`
-
-```rust
-privileges::ensure_root("bonesremote hooks post-deploy")?;
-```
-
-Ensures the command is running as root. Required for:
-- Managing systemd services
-- Changing file ownership
-- Hardening permissions
-
----
-
-### 2. Load Configuration
-
-**Source:** `post_deploy.rs:15`
+**Source:** `post_deploy.rs:14`
 
 ```rust
 let cfg = config::load(Path::new(config_path))?;
@@ -46,90 +29,7 @@ Loads deployment configuration.
 
 ---
 
-### 3. Restart Per-Site Nginx
-
-**Source:** `post_deploy.rs:16`
-
-```rust
-restart_site_nginx(&cfg)?;
-```
-
-Restarts the per-site nginx service if it's running, so it picks up the new release.
-
-**Source:** `post_deploy.rs:27-47`
-
-#### 3.1 Check Service Status
-
-```rust
-let service_name = format!("{}-nginx", cfg.data.project_name);
-let status = Command::new("systemctl")
-    .args(["is-active", "--quiet", &service_name])
-    .status()
-    .context("Failed to check nginx service status")?;
-```
-
-Checks if the per-site nginx service is currently active.
-
-**Service name:** `{project_name}-nginx` (e.g., `myapp-nginx`)
-
-#### 3.2 Restart if Active
-
-```rust
-if status.success() {
-    let restart_status = Command::new("systemctl")
-        .args(["restart", &service_name])
-        .status()
-        .context("Failed to restart nginx service")?;
-
-    if !restart_status.success() {
-        bail!("Failed to restart {service_name} service");
-    }
-    println!("Restarted {service_name} service");
-}
-```
-
-If the service is active, restarts it. This causes nginx to:
-1. Stop serving the old release
-2. Re-read the `current` symlink (now pointing to the new release)
-3. Start serving the new release
-
-**Why restart instead of reload?**
-- Ensures nginx picks up the new release via `current`
-- Cleaner than trying to reload with changed paths
-- Minimal downtime (typically < 1 second)
-
-#### 3.3 Skip if Not Active
-
-If the service isn't running yet (e.g., first deployment), the restart is skipped. The service will be started during the initial `remote setup`.
-
----
-
-### 4. Harden Active Release Permissions
-
-**Source:** `post_deploy.rs:17`
-
-```rust
-permissions::harden_active_release(&cfg)?;
-```
-
-Restricts permissions on the active release to the service user.
-
-**Typical actions:**
-1. Change ownership to `service_user:group`
-2. Set directory permissions to `dir_mode` (default: `750`)
-3. Set file permissions to `file_mode` (default: `640`)
-4. Apply any path-specific overrides from `permissions.paths`
-
-**Why harden?**
-- Deploy user (`git`) has write access during deployment
-- Service user (`myapp`) should own the release files
-- Restricts access to application code and data
-- Security best practice
-
-**After hardening:**
-- Service user can read/write files
-- Group can read files (e.g., web server for static files)
-- Others have no access
+### 2. Prune Old Releases
 
 ---
 
@@ -231,84 +131,6 @@ Ok(())
 
 ---
 
-## systemd Service Management
-
-### Service Lifecycle
-
-1. **First deployment**
-   - Service file created
-   - Service enabled (auto-start on boot)
-   - Service started immediately
-
-2. **Subsequent deployments**
-   - Service file updated (if needed)
-   - Service restarted (via `Restart=always` on crash)
-   - Service continues running
-
-3. **Service monitoring**
-   ```bash
-   sudo systemctl status myapp
-   sudo journalctl -u myapp -f
-   ```
-
-### Service Configuration
-
-**From `bones.yaml`:**
-```yaml
-runtime:
-  command:
-    - /usr/bin/node
-    - dist/server.js
-  working_dir: .
-  writable_paths: []
-
-permissions:
-  defaults:
-    service_user: myapp
-    group: www-data
-
-data:
-  project_name: myapp
-  web_root: public
-  repo_path: /home/git/myapp.git
-```
-
-**Generated service:**
-- User: `myapp`
-- WorkingDirectory: `/srv/deployments/myapp/current/public`
-- ExecStart: `/usr/sbin/nginx -c /srv/conf/myapp/nginx.conf -g 'daemon off;'`
-
----
-
-## Permission Hardening
-
-### Ownership Changes
-
-**Before hardening** (post-deploy):
-- Owner: `git:git` (deploy user created files)
-- Permissions: Default umask
-
-**After hardening:**
-- Owner: `myapp:www-data` (service user owns files)
-- Directories: `750` (rwxr-x---)
-- Files: `640` (rw-r-----)
-
-### Path-Specific Overrides
-
-**Configuration:**
-```yaml
-permissions:
-  paths:
-    - path: storage/logs
-      mode: "770"
-      recursive: true
-    - path: bootstrap/cache
-      mode: "775"
-      recursive: true
-```
-
-Allows custom permissions for specific paths.
-
 ---
 
 ## Release Pruning Strategy
@@ -359,20 +181,23 @@ Result: [A, B, C]
 ## Typical Workflow
 
 ```bash
-# 1. Deployment triggered
-git push production master
+# 1. Stage release
+bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
 
-# 2. Staging
-sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+# 2. Checkout into build workspace (done by post-receive hook)
+bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.yaml --revision <sha>
 
-# 3. Checkout
-bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.yaml
+# 3. Wire shared paths
+bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
 
-# 4. Deploy
+# 4. Deploy scripts + activate
 bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
 
-# 5. Post-deploy ← YOU ARE HERE
-sudo bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.yaml
+# 5. Post-deploy (prune old releases)
+bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.yaml
+
+# 6. Restart nginx (requires elevated privileges)
+sudo bonesremote service restart --config /home/git/myapp.git/bones/bones.yaml
 ```
 
 ---
@@ -391,21 +216,10 @@ systemctl command failed with status 1
 - Binary path incorrect
 - Permission denied
 
-### Permission Hardening Failed
-
-```
-Failed to chown path: /srv/deployments/myapp/releases/20260507_150000
-```
-
-**Possible causes:**
-- User or group doesn't exist
-- Not running as root
-- Path doesn't exist
-
 ### Pruning Failed
 
 ```
-Failed to prune old release /srv/deployments/myapp/releases/20260507_120000
+Failed to prune old release /srv/sites/myapp/releases/20260507_120000
 ```
 
 **Possible causes:**

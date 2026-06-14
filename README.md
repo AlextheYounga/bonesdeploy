@@ -6,7 +6,7 @@
 
 > WARNING: BonesDeploy is still under active development. There may be some cool bugs!
 
-A drop-in Rust deployment system for git-based deployments over SSH. BonesDeploy scaffolds hook scripts and deployment configs into your repo, syncs them to a remote bare repository, and manages file ownership and permissions across deploys without forcing containers, a control plane, or a platform layer.
+A drop-in Rust deployment system for git-based deployments over SSH. BonesDeploy scaffolds hook scripts and deployment configs into your repo, syncs them to a remote bare repository, and manages permissions through provisioning-time contracts (setgid directories + systemd sandboxing) without forcing containers, a control plane, or a platform layer.
 
 It produces two binaries:
 - **`bonesdeploy`** — local CLI for setup and management
@@ -26,18 +26,25 @@ If you want a Heroku-style abstraction layer, use a platform. If you want a disc
 
 ## How It Works
 
-BonesDeploy uses a two-user deployment model:
+BonesDeploy uses a two-user permission contract:
 
-1. A **deploy user** (default: `git`) handles SSH access and runs deployment scripts. This user has restricted sudo ability but no password login.
-2. A **service user** (defaults to the project name) owns the deployed files. This user has no home folder, no login, and no sudo ability — limiting attack scope.
+1. A **deploy user** (default: `git`) handles SSH access, owns the bare repo, and creates release artifacts. This user has restricted sudo ability (service restart only) but no password login.
+2. A **runtime user** (defaults to the project name) owns runtime state — shared files, sockets, and writable directories. This user has no home folder, no login, and no sudo ability — limiting attack scope.
 
-During deployment, `bonesremote` temporarily changes file ownership to the deploy user so scripts can write, then hardens permissions back to the service user afterward. The sudoers configuration is strictly limited to `bonesremote release stage`, `bonesremote release wire`, and `bonesremote hooks post-deploy`.
+Permissions are a **provisioning-time contract**, not a deployment-time repair:
+
+- The deploy user owns immutable release archives (`releases/`) with setgid so the runtime group can read them.
+- The runtime user owns mutable shared state (`shared/`).
+- Root creates users, directories, systemd units, and sockets during provisioning.
+- No deploy step changes ownership or applies recursive chown.
+
+The sudoers configuration is strictly limited to `bonesremote service restart`, the only command that needs elevated privileges during normal operation.
 
 This gives you a clean privilege boundary:
 
-- the **deploy user** can connect and deploy
-- the **service user** ends up owning the app
-- `bonesremote` is the only privileged bridge between those two phases
+- the **deploy user** can connect, stage, and activate
+- the **runtime user** runs the app
+- `root` provisions the machine and restarts services
 
 ## Installation
 
@@ -81,11 +88,12 @@ This will:
 BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.yaml`:
 
 - `port = "22"`
-- `web_root = "/var/www/<project_name>"`
-- `project_root = "/srv/deployments/<project_name>"`
+- `web_root = "public"`
+- `project_root = "/srv/sites/<project_name>"`
 - `deploy_user = "git"`
-- `service_user = "<project_name>"`
-- `group = "www-data"`
+- `runtime_user = "<project_name>"`
+- `runtime_group = "<project_name>"`
+- `release_group = "<project_name>-release"`
 
 The `init` command creates the local `.bones/` scaffold and records project settings.
 If `pyinfra` is missing, BonesDeploy installs it automatically into an isolated managed environment under `XDG_STATE_HOME` (defaults to `~/.local/state/bonesdeploy/pyinfra/.venv`).
@@ -122,12 +130,13 @@ git push production master
 
 The hook chain handles the rest:
 1. **pre-push** (local) — runs `bonesdeploy doctor --local`
-2. **pre-receive** (remote) — resolves the configured deployment ref from the pushed refs; if it matches, runs `bonesremote doctor`, then `sudo bonesremote release stage --config ...`. Pushes to other branches or branch deletions are skipped without staging.
+2. **pre-receive** (remote) — resolves the configured deployment ref from the pushed refs; if it matches, runs `bonesremote doctor` and `bonesremote release stage --config ...`. Pushes to other branches or branch deletions are skipped without staging.
 3. **post-receive** (remote) — runs the deployment pipeline:
     - `bonesremote hooks post-receive --config ... --revision <newrev>` (checkout into `build/workspace`)
-    - `sudo bonesremote release wire --config ...` (just-in-time wire shared paths)
-    - `bonesremote hooks deploy --config ...` (run deployment scripts + activate/drop-failed)
-    - `sudo bonesremote hooks post-deploy --config ...` (permission hardening + pruning)
+    - `bonesremote release wire --config ...` (just-in-time wire shared paths into the build workspace)
+    - `bonesremote hooks deploy --config ...` (run deployment scripts, copy workspace to release, activate)
+    - `bonesremote hooks post-deploy --config ...` (prune old releases)
+    - `sudo bonesremote service restart --config ...` (restart the per-site nginx service)
 
 `pre-push -> pre-receive -> post-receive`
 
@@ -169,30 +178,19 @@ data:
   remote_name: "production"
   project_name: "myproject"
   repo_path: "/home/git/myproject.git"
-  web_root: "/var/www/myproject"
-  project_root: "/srv/deployments/myproject"
+  web_root: "public"
+  project_root: "/srv/sites/myproject"
   branch: "master"
   deploy_on_push: true
-
-permissions:
-  defaults:
-    deploy_user: "git"
-    service_user: "myproject"
-    group: "www-data"
-    dir_mode: "750"
-    file_mode: "640"
-  paths:
-    - path: "storage"
-      mode: "770"
-      recursive: true
-    - path: "database/database.sqlite"
-      mode: "660"
-      type: "file"
+  deploy_user: "git"
+  runtime_user: "myproject"
+  runtime_group: "myproject"
+  release_group: "myproject-release"
 
 releases:
   keep: 5
-  shared_paths: [".env", "storage"]
 
+# Optional TLS values used by `bonesdeploy remote ssl`.
 ssl:
   enabled: false
   domain: ""
@@ -231,7 +229,7 @@ BonesDeploy is a strong fit when you want:
 
 - direct Linux deploys over SSH
 - simple app hosting on one machine at a time
-- explicit file ownership and permission hardening
+- explicit provisioning-time permission contracts with setgid group inheritance
 - a lightweight alternative to container-first deployment stacks
 - something you can run comfortably on low-cost hosts and Raspberry Pis
 

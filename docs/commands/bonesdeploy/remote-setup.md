@@ -17,7 +17,7 @@ let cfg = config::load(bones_yaml)?;
 
 Loads deployment configuration from `.bones/bones.yaml` to determine:
 - Remote server connection details (`host`, `port`)
-- User accounts and permissions (`deploy_user`, `service_user`, `group`)
+- User accounts and permissions (`deploy_user`, `runtime_user`, `runtime_group`, `release_group`)
 - Directory paths (`repo_path`, `project_root`, `web_root`)
 
 ---
@@ -114,7 +114,7 @@ The pyinfra deploy script performs these operations in order:
 2. **Git bare repository** — creates the parent directory, `git init --bare`, creates `bones/` subdirectory
 3. **Placeholder release** — creates `project_root` structure, seeds a placeholder `index.html`, symlinks `current` → placeholder
 4. **Rust toolchain & bonesremote** — installs `rustup`/`cargo`, builds and installs `bonesremote` from source, runs `bonesremote init --deploy-user <user>` to set up sudoers
-5. **Users & groups** — creates `deploy_user` (shell access, home dir), `service_user` (system user, no login), and `group`, adds service user to group, creates web root parent with mode `2775`
+5. **Users & groups** — creates `deploy_user` (shell access, home dir), `runtime_user` (system user, no login, dedicated per project), `runtime_group`, and `release_group`, adds runtime user to both groups, creates project root parent with mode `0711`
 6. **SSH key** — installs the deploy user's public key (if one was resolved)
 7. **Firewall (UFW)** — enables UFW, allows SSH on the configured port, default-deny, rate-limited SSH
 

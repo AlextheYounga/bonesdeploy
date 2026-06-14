@@ -2,39 +2,22 @@
 
 ## Overview
 
-Creates the directory structure and staging state for a new deployment release. This command runs with root privileges to create directories and set ownership to the deploy user. It prepares the build workspace where code will be checked out and a release directory where the final runtime will be placed.
+Creates the directory structure and staging state for a new deployment release. Prepares the build workspace where code will be checked out, the release directory tree, and the shared directory for persistent data. Command runs as the deploy user — no elevated privileges required, provisioning-time permissions handle the layout.
 
 ## Command Signature
 
 ```bash
-sudo bonesremote release stage --config <path>
+bonesremote release stage --config <path>
 ```
 
 **Flags:**
 - `--config <path>`: Path to `bones.yaml` configuration file (required)
 
-**Note:** Must be run as root (via sudo).
-
 ---
 
 ## Detailed Execution Steps
 
-### 1. Verify Root Privileges
-
-**Source:** `stage_release.rs:15`
-
-```rust
-privileges::ensure_root("bonesremote release stage")?;
-```
-
-Ensures the command is running as root. Required for:
-- Creating directories
-- Changing ownership
-- Setting permissions
-
----
-
-### 2. Load Configuration
+### 1. Load Configuration
 
 **Source:** `stage_release.rs:17`
 
@@ -46,7 +29,7 @@ Loads deployment configuration from `bones.yaml`.
 
 ---
 
-### 3. Define Directory Paths
+### 2. Define Directory Paths
 
 **Source:** `stage_release.rs:19-22`
 
@@ -61,10 +44,10 @@ let shared_dir = release_state::shared_dir(&cfg);
 
 | Variable | Path | Purpose |
 |----------|------|---------|
-| `project_root` | `/srv/deployments/myapp` | Root for all deployment data |
-| `build_root` | `/srv/deployments/myapp/build/workspace` | Where code is checked out |
-| `releases_dir` | `/srv/deployments/myapp/runtime` | Contains all releases |
-| `shared_dir` | `/srv/deployments/myapp/shared` | Shared files across releases |
+| `project_root` | `/srv/sites/myapp` | Root for all site data |
+| `build_root` | `/srv/sites/myapp/build/workspace` | Where code is checked out |
+| `releases_dir` | `/srv/sites/myapp/releases` | Contains all releases |
+| `shared_dir` | `/srv/sites/myapp/shared` | Shared files across releases |
 
 ---
 
@@ -85,7 +68,7 @@ fs::create_dir_all(&shared_dir)
 
 **Creates:**
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── build/
 │   └── workspace/
 ├── releases/
@@ -136,48 +119,11 @@ fs::create_dir_all(&staged_release_dir)
     .with_context(|| format!("Failed to create release dir: {}", staged_release_dir.display()))?;
 ```
 
-**Creates:** `/srv/deployments/myapp/releases/20260507_150432/`
+**Creates:** `/srv/sites/myapp/releases/20260507_150432/`
 
 This directory will hold the final runtime after the build is complete.
 
----
-
-### 7. Set Ownership to Deploy User
-
-**Source:** `stage_release.rs:38-40`
-
-```rust
-permissions::chown_paths_to_deploy_user(&cfg, &[project_root, releases_dir.as_path()], false)?;
-permissions::chown_paths_to_deploy_user(&cfg, &[build_root.as_path()], true)?;
-permissions::chown_paths_to_deploy_user(&cfg, &[staged_release_dir.as_path()], true)?;
-```
-
-#### 7.1 Chown Logic
-
-Changes ownership to `deploy_user:group` (e.g., `git:www-data`).
-
-**First call:** `chown_paths_to_deploy_user(..., false)`
-- Changes owner of directories themselves
-- Does NOT change contents recursively
-- For: `project_root`, `releases_dir`
-
-**Second call:** `chown_paths_to_deploy_user(..., true)`
-- Changes owner recursively
-- For: `build_root`, `staged_release_dir`
-
-**Why different?**
-- `project_root` and `releases_dir` may contain existing releases owned by other users
-- Don't want to change ownership of those
-- `build_root` and `staged_release_dir` are new/empty, safe to chown recursively
-
-#### 7.2 Why Deploy User?
-
-The deploy user (`git`) will:
-- Check out code into `build_root`
-- Run deployment scripts
-- Copy files to `staged_release_dir`
-
-All these operations require write access.
+Ownership is inherited from `releases/` (`git:foo-release`) via the setgid bit — no chown needed.
 
 ---
 
@@ -237,7 +183,7 @@ Staged release: 20260507_150432
 ## Directory Structure After Staging
 
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── build/
 │   └── workspace/          # (empty, ready for checkout)
 ├── releases/
@@ -270,47 +216,28 @@ Staged release: 20260507_150432
 
 ---
 
-## Why Root Privileges?
+## Why No Root?
 
-### What requires root?
+The deploy user (`git`) owns `releases/`, `build/`, and `shared/` (or the runtime user owns shared). The setgid bit on `releases/` means new release dirs inherit the `foo-release` group automatically — no root ownership change needed.
 
-1. **Create directories in `/srv/`** - Typically owned by root
-2. **Change ownership** - Only root can change file owner
-3. **Set permissions** - May need to set special permissions
-
-### Why not run as deploy user?
-
-- Deploy user may not have permission to create `/srv/deployments/`
-- Deploy user cannot change ownership to itself
-- Some operations require elevated privileges
-
-### Security Model
-
-1. **Root creates** directories and sets ownership
-2. **Deploy user** performs all actual work (checkout, build, copy)
-3. **Root** activates release and hardens permissions (post-deploy)
-
-This minimizes the time running as root.
+The only command that requires root is `bonesremote service restart`, which is restricted via a narrow sudoers drop-in.
 
 ---
 
 ## Typical Workflow
 
 ```bash
-# 1. Stage release (as root via sudo)
-sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+# 1. Stage release
+bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
 
-# 2. Check out code (as deploy user)
-#    (done by post-receive hook)
+# 2. Check out code (done by post-receive hook)
+bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.yaml --revision <sha>
 
-# 3. Wire shared paths (as root via sudo)
-sudo bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
+# 3. Wire shared paths
+bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
 
-# 4. Run deployment scripts (as deploy user)
-#    (done by hooks deploy)
-
-# 5. Activate release (as deploy user)
-bonesremote release activate --config /home/git/myapp.git/bones/bones.yaml
+# 4. Run deployment scripts and activate (done by hooks deploy)
+bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
 ```
 
 ---
@@ -328,15 +255,16 @@ Failed to create project_root: /srv/deployments/myapp
 - Disk space issues
 - Path component is a file, not directory
 
-### Ownership Change Failed
+### Release Directory Creation Failed
 
 ```
-Failed to chown path: /srv/deployments/myapp/build/workspace
+Failed to create release dir: /srv/sites/myapp/releases/20260507_150432
 ```
 
 **Possible causes:**
-- User or group doesn't exist
-- Not running as root
+- Permission denied (deploy user doesn't own parent)
+- Disk space issues
+- Path component is a file, not directory
 
 ---
 
