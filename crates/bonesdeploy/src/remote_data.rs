@@ -4,16 +4,17 @@ use anyhow::Result;
 use serde_json::{Map, Value};
 
 use crate::config;
-use shared::paths::{self, ssl_certificate_key_path, ssl_certificate_path};
+use shared::paths::{ssl_certificate_key_path, ssl_certificate_path};
 
 fn base(cfg: &config::BonesConfig) -> Result<Map<String, Value>> {
     let paths = cfg.data.deployment_paths();
     let mut vars = Map::new();
 
     vars.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
-    vars.insert(String::from("deploy_user"), Value::String(String::from(paths::DEPLOY_USER)));
-    vars.insert(String::from("service_user"), Value::String(config::service_user(&cfg.data.project_name)));
-    vars.insert(String::from("service_group"), Value::String(String::from(paths::DEFAULT_GROUP)));
+    vars.insert(String::from("deploy_user"), Value::String(cfg.data.deploy_user.clone()));
+    vars.insert(String::from("runtime_user"), Value::String(cfg.data.runtime_user.clone()));
+    vars.insert(String::from("runtime_group"), Value::String(cfg.data.runtime_group.clone()));
+    vars.insert(String::from("release_group"), Value::String(cfg.data.release_group.clone()));
     vars.insert(String::from("project_root_parent"), Value::String(paths.project_root_parent.clone()));
     vars.insert(String::from("project_root"), Value::String(cfg.data.project_root.clone()));
     vars.insert(String::from("web_root"), Value::String(cfg.data.web_root.clone()));
@@ -70,6 +71,7 @@ mod tests {
                 branch: String::from("master"),
                 remote_name: String::from("production"),
                 deploy_on_push: true,
+                ..Default::default()
             },
             releases: Releases::default(),
             ssl: Ssl::default(),

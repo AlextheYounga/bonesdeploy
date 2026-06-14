@@ -94,6 +94,7 @@ mod tests {
                 web_root: String::from("public"),
                 branch: branch.to_string(),
                 deploy_on_push: true,
+                ..Default::default()
             },
             releases: crate::config::Releases { keep: 5 },
         };

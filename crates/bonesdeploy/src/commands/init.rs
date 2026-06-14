@@ -12,7 +12,6 @@ use crate::config;
 use crate::embedded;
 use crate::git;
 use crate::prompts;
-use shared::paths;
 
 pub struct InitOutcome {
     pub remote_setup_ran: bool,
@@ -154,6 +153,7 @@ fn collect_from_seed(
             web_root,
             branch,
             deploy_on_push,
+            ..Default::default()
         },
         releases: config::Releases { keep: releases_keep },
         ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
@@ -264,7 +264,7 @@ fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
         return Ok(());
     }
 
-    let remote_url = format!("{}@{}:{}", paths::DEPLOY_USER, cfg.data.host, cfg.data.repo_path);
+    let remote_url = format!("{}@{}:{}", cfg.data.deploy_user, cfg.data.host, cfg.data.repo_path);
     git::add_remote(&cfg.data.remote_name, &remote_url)?;
     println!("Configured local git remote {} -> {}", cfg.data.remote_name, remote_url);
     Ok(())

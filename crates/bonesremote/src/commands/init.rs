@@ -18,9 +18,9 @@ pub fn run() -> Result<()> {
 
     // Only the commands that need ownership or live-state changes run via sudo.
     let sudoers_content = format!(
-        "# Installed by bonesremote init\n\
-         {} ALL=(root) NOPASSWD: {bonesdeploy_path} release stage --config *, {bonesdeploy_path} release wire --config *, {bonesdeploy_path} hooks post-deploy --config *\n",
-        paths::DEPLOY_USER
+            "# Installed by bonesremote init\n\
+             {} ALL=(root) NOPASSWD: {bonesdeploy_path} service restart --config *\n",
+            paths::DEPLOY_USER
     );
 
     fs::write(sudoers_path, &sudoers_content).with_context(|| format!("Failed to write {sudoers_path}"))?;

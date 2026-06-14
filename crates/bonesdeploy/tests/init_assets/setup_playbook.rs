@@ -144,8 +144,8 @@ fn remote_runtime_deploy_uses_root_owned_runtime_socket_dir() {
         "runtime deploy must make the runtime socket directory root-owned\n{socket_dir_block}"
     );
     assert!(
-        socket_dir_block.contains("group=DEPLOY_DATA[\"service_group\"]"),
-        "runtime deploy must keep the runtime socket directory in the service group\n{socket_dir_block}"
+        socket_dir_block.contains("group=DEPLOY_DATA[\"runtime_group\"]"),
+        "runtime deploy must keep the runtime socket directory in the runtime group\n{socket_dir_block}"
     );
     assert!(
         socket_dir_block.contains("mode=\"0770\""),

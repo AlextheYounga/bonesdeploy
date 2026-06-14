@@ -87,7 +87,7 @@ bones_resolve_deploy_push_target() {
 }
 
 bones_stage_release() {
-	if ! sudo bonesremote release stage --config "$BONES_YAML"; then
+	if ! bonesremote release stage --config "$BONES_YAML"; then
 		echo "[bonesdeploy] release stage failed. Push rejected."
 		exit 1
 	fi
@@ -109,7 +109,7 @@ bones_wire_release() {
 	fi
 
 	echo "[bonesdeploy] Wiring shared paths just-in-time..."
-	if ! sudo bonesremote release wire --config "$BONES_YAML"; then
+	if ! bonesremote release wire --config "$BONES_YAML"; then
 		echo "[bonesdeploy] release wire failed."
 		exit 1
 	fi
@@ -129,10 +129,15 @@ bones_wire_release() {
 }
 
 bones_post_deploy() {
-	echo "[bonesdeploy] Running post-deploy (hardening permissions)..."
-
-	if ! sudo bonesremote hooks post-deploy --config "$BONES_YAML"; then
+	echo "[bonesdeploy] Running post-deploy (pruning old releases)..."
+	if ! bonesremote hooks post-deploy --config "$BONES_YAML"; then
 		echo "[bonesdeploy] post-deploy failed."
+		exit 1
+	fi
+
+	echo "[bonesdeploy] Restarting site nginx..."
+	if ! sudo bonesremote service restart --config "$BONES_YAML"; then
+		echo "[bonesdeploy] service restart failed."
 		exit 1
 	fi
 

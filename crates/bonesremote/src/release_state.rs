@@ -171,6 +171,7 @@ mod tests {
                 web_root: String::from("public"),
                 branch: String::from("master"),
                 deploy_on_push: true,
+                ..Default::default()
             },
             releases: Releases { keep: 5 },
         }

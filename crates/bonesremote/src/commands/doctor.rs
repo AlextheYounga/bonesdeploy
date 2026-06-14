@@ -56,11 +56,7 @@ fn check_globally_available(issues: &mut Vec<String>) {
 }
 
 fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let privileged_commands = [
-        [config::Constants::BINARY_NAME, "release", "stage", "--config", "/nonexistent"],
-        [config::Constants::BINARY_NAME, "release", "wire", "--config", "/nonexistent"],
-        [config::Constants::BINARY_NAME, "hooks", "post-deploy", "--config", "/nonexistent"],
-    ];
+    let privileged_commands = [[config::Constants::BINARY_NAME, "service", "restart", "--config", "/nonexistent"]];
 
     for command in privileged_commands {
         let result = Command::new("sudo").arg("-n").arg("-l").args(command).output();

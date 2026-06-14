@@ -6,6 +6,7 @@ mod init;
 mod post_deploy;
 mod post_receive;
 mod rollback;
+mod service;
 mod stage_release;
 mod version;
 mod wire_release;
@@ -36,6 +37,11 @@ enum Command {
         #[command(subcommand)]
         command: HookCommand,
     },
+    /// Narrow privileged service operations (requires root)
+    Service {
+        #[command(subcommand)]
+        command: ServiceCommand,
+    },
     /// Print the version
     Version,
 }
@@ -48,13 +54,13 @@ enum ReleaseCommand {
         #[arg(long)]
         config: String,
     },
-    /// Wire shared paths into the staged release
+    /// Wire shared paths into the build workspace
     Wire {
         /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
     },
-    /// Atomically activate staged release and prune old releases
+    /// Atomically activate staged release
     Activate {
         /// Path to bones.yaml config file
         #[arg(long)]
@@ -82,7 +88,7 @@ enum HookCommand {
         #[arg(long)]
         config: String,
     },
-    /// Run the post-receive checkout and release wiring sequence
+    /// Run the post-receive checkout sequence
     PostReceive {
         /// Path to bones.yaml config file
         #[arg(long)]
@@ -91,8 +97,18 @@ enum HookCommand {
         #[arg(long)]
         revision: Option<String>,
     },
-    /// Harden permissions back to service user after deployment
+    /// Prune old releases after deployment
     PostDeploy {
+        /// Path to bones.yaml config file
+        #[arg(long)]
+        config: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum ServiceCommand {
+    /// Restart the per-site nginx service
+    Restart {
         /// Path to bones.yaml config file
         #[arg(long)]
         config: String,
@@ -114,6 +130,9 @@ pub fn run(cli: &Cli) -> Result<()> {
             HookCommand::Deploy { config } => deploy::run(config),
             HookCommand::PostReceive { config, revision } => post_receive::run(config, revision.as_deref()),
             HookCommand::PostDeploy { config } => post_deploy::run(config),
+        },
+        Command::Service { command } => match command {
+            ServiceCommand::Restart { config } => service::run(config),
         },
         Command::Version => {
             version::run();

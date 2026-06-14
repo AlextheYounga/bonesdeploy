@@ -17,6 +17,14 @@ pub struct Data {
     pub web_root: String,
     pub branch: String,
     pub deploy_on_push: bool,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub deploy_user: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub runtime_user: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub runtime_group: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub release_group: String,
 }
 
 impl Default for Data {
@@ -31,8 +39,28 @@ impl Default for Data {
             web_root: String::new(),
             branch: "master".into(),
             deploy_on_push: true,
+            deploy_user: String::new(),
+            runtime_user: String::new(),
+            runtime_group: String::new(),
+            release_group: String::new(),
         }
     }
+}
+
+pub fn default_deploy_user() -> String {
+    paths::DEPLOY_USER.to_string()
+}
+
+pub fn runtime_user_for(project_name: &str) -> String {
+    project_name.to_string()
+}
+
+pub fn runtime_group_for(project_name: &str) -> String {
+    project_name.to_string()
+}
+
+pub fn release_group_for(project_name: &str) -> String {
+    format!("{project_name}-release")
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -121,6 +149,18 @@ pub fn apply_derived_defaults(data: &mut Data) {
     if data.web_root.is_empty() {
         data.web_root = default_web_root();
     }
+    if data.deploy_user.is_empty() {
+        data.deploy_user = default_deploy_user();
+    }
+    if data.runtime_user.is_empty() {
+        data.runtime_user = runtime_user_for(project_name);
+    }
+    if data.runtime_group.is_empty() {
+        data.runtime_group = runtime_group_for(project_name);
+    }
+    if data.release_group.is_empty() {
+        data.release_group = release_group_for(project_name);
+    }
 }
 
 pub fn hide_derived_defaults(data: &mut Data) {
@@ -134,6 +174,18 @@ pub fn hide_derived_defaults(data: &mut Data) {
     }
     if data.web_root == default_web_root() {
         data.web_root.clear();
+    }
+    if data.deploy_user == default_deploy_user() {
+        data.deploy_user.clear();
+    }
+    if data.runtime_user == runtime_user_for(project_name) {
+        data.runtime_user.clear();
+    }
+    if data.runtime_group == runtime_group_for(project_name) {
+        data.runtime_group.clear();
+    }
+    if data.release_group == release_group_for(project_name) {
+        data.release_group.clear();
     }
 }
 

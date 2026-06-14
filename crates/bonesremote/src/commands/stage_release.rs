@@ -8,13 +8,9 @@ use time::format_description::FormatItem;
 use time::macros::format_description;
 
 use crate::config;
-use crate::permissions;
-use crate::privileges;
 use crate::release_state;
 
 pub fn run(config_path: &str) -> Result<()> {
-    privileges::ensure_root("bonesremote release stage")?;
-
     let cfg = config::load(Path::new(config_path))?;
 
     let project_root = Path::new(&cfg.data.project_root);
@@ -41,35 +37,9 @@ pub fn run(config_path: &str) -> Result<()> {
     fs::create_dir_all(&staged_release_dir)
         .with_context(|| format!("Failed to create release dir: {}", staged_release_dir.display()))?;
 
-    permissions::chown_paths_to_deploy_user(&[project_root, releases_dir.as_path(), build_dir.as_path()], false)?;
-    permissions::chown_paths_to_deploy_user(&[build_root.as_path()], true)?;
-    permissions::chown_paths_to_deploy_user(&[staged_release_dir.as_path()], true)?;
-
-    ensure_deploy_user_can_traverse(project_root)
-        .with_context(|| format!("Failed to set traverse permission on {}", project_root.display()))?;
-    ensure_deploy_user_can_traverse(&build_dir)
-        .with_context(|| format!("Failed to set traverse permission on {}", build_dir.display()))?;
-    ensure_deploy_user_can_traverse(&build_root)
-        .with_context(|| format!("Failed to set traverse permission on {}", build_root.display()))?;
-
     release_state::write_staged_release(&cfg, &release_name)?;
 
     println!("Staged release: {release_name}");
-    Ok(())
-}
-
-fn ensure_deploy_user_can_traverse(path: &Path) -> Result<()> {
-    let metadata = fs::metadata(path).with_context(|| format!("Failed to read metadata for {}", path.display()))?;
-    let mut permissions = metadata.permissions();
-    let mode = permissions.mode();
-    let next_mode = mode | 0o750;
-
-    if next_mode != mode {
-        permissions.set_mode(next_mode);
-        fs::set_permissions(path, permissions)
-            .with_context(|| format!("Failed to set mode {:o} on {}", next_mode, path.display()))?;
-    }
-
     Ok(())
 }
 
@@ -105,35 +75,11 @@ mod tests {
 
     use anyhow::Result;
 
-    use shared::paths;
-
-    use super::{ensure_deploy_user_can_traverse, ensure_non_owner_can_traverse};
+    use super::ensure_non_owner_can_traverse;
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
         env::temp_dir().join(format!("bonesremote_stage_release_test_{}_{}_{}", process::id(), nanos, test_name))
-    }
-
-    /// Adds owner and group execute bits so the deploy user can traverse the build workspace.
-    #[test]
-    fn ensure_deploy_user_can_traverse_adds_required_owner_group_bits() -> Result<()> {
-        let root = temp_dir_path("traverse_bits");
-        fs::create_dir_all(&root)?;
-
-        let path = root.join(paths::WORKSPACE_DIR);
-        fs::create_dir_all(&path)?;
-
-        let mut permissions = fs::metadata(&path)?.permissions();
-        permissions.set_mode(0o700);
-        fs::set_permissions(&path, permissions)?;
-
-        ensure_deploy_user_can_traverse(&path)?;
-
-        let mode = fs::metadata(&path)?.permissions().mode() & 0o777;
-        assert_eq!(mode, 0o750);
-
-        fs::remove_dir_all(root)?;
-        Ok(())
     }
 
     /// Adds the other execute bit so non-owner processes can traverse project root parents.
@@ -142,7 +88,7 @@ mod tests {
         let root = temp_dir_path("other_traverse_bit");
         fs::create_dir_all(&root)?;
 
-        let path = root.join("deployments");
+        let path = root.join("sites");
         fs::create_dir_all(&path)?;
 
         let mut permissions = fs::metadata(&path)?.permissions();
