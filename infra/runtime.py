@@ -94,7 +94,7 @@ files.template(
     src=os.path.join(here, "assets/nginx/site-nginx.conf.j2"),
     dest=PATHS["site_nginx_config"],
     user="root",
-    group=DEPLOY_DATA["service_group"],
+    group=DEPLOY_DATA["runtime_group"],
     mode="0640",
     **DEPLOY_DATA,
     _sudo=True,
