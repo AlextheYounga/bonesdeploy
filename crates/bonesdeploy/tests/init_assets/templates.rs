@@ -41,6 +41,22 @@ fn laravel_php_fpm_service_template_sets_runtime_user_in_systemd_service() {
         content.contains("ExecStart=/usr/sbin/php-fpm{{ laravel_php_version_resolved }} --nodaemonize --fpm-config {{ laravel_php_fpm_pool_config_path }}"),
         "laravel PHP-FPM systemd service must still start the versioned FPM binary with the pool config\n{content}"
     );
+    assert!(
+        content.contains("RuntimeDirectory={{ project_name }}"),
+        "laravel PHP-FPM systemd service must use RuntimeDirectory so systemd manages /run/<site> ownership\n{content}"
+    );
+    assert!(
+        content.contains("RuntimeDirectoryMode=0750"),
+        "laravel PHP-FPM systemd service must set RuntimeDirectoryMode so the runtime dir is group-readable\n{content}"
+    );
+    assert!(
+        content.contains("StandardOutput=journal"),
+        "laravel PHP-FPM systemd service must set StandardOutput=journal so logs go to journald\n{content}"
+    );
+    assert!(
+        content.contains("StandardError=journal"),
+        "laravel PHP-FPM systemd service must set StandardError=journal so stderr goes to journald\n{content}"
+    );
 }
 
 /// Grants only the capabilities the PHP-FPM master needs to drop privileges and own the socket.
@@ -71,8 +87,8 @@ fn laravel_php_fpm_config_includes_global_section() {
 
     assert!(content.contains("[global]"), "laravel PHP-FPM config must include a [global] section\n{content}");
     assert!(
-        content.contains("error_log = {{ paths.runtime_socket_dir }}/php-fpm.log"),
-        "laravel PHP-FPM config must log errors under the writable runtime socket directory\n{content}"
+        content.contains("error_log = /proc/self/fd/2"),
+        "laravel PHP-FPM config must send errors to stderr for systemd journald\n{content}"
     );
     assert!(
         content.contains("daemonize = no"),

@@ -71,10 +71,10 @@ server.shell(
 files.directory(
     name="Ensure socket directory exists",
     path=PATHS["runtime_socket_dir"],
-    # Root owns the runtime dir so privileged masters can create sockets and logs without ACLs.
-    user="root",
+    # Runtime user owns the dir so PHP-FPM and nginx can create sockets and pid files.
+    user=DEPLOY_DATA["runtime_user"],
     group=DEPLOY_DATA["runtime_group"],
-    mode="0770",
+    mode="0750",
     _sudo=True,
 )
 

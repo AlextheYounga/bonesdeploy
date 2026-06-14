@@ -1,5 +1,5 @@
 [global]
-error_log = {{ paths.runtime_socket_dir }}/php-fpm.log
+error_log = /proc/self/fd/2
 daemonize = no
 
 [{{ laravel_php_fpm_pool_name }}]

@@ -9,6 +9,8 @@ User={{ runtime_user }}
 Group={{ runtime_group }}
 SupplementaryGroups={{ release_group }}
 WorkingDirectory={{ paths.current }}
+RuntimeDirectory={{ project_name }}
+RuntimeDirectoryMode=0750
 
 ExecStart=/usr/sbin/nginx -c {{ paths.site_nginx_config }} -g 'daemon off;'
 

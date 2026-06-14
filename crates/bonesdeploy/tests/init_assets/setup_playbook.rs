@@ -111,9 +111,9 @@ fn remote_runtime_deploy_applies_runtime_apparmor_and_nginx() {
     );
 }
 
-/// Uses a root-owned runtime socket directory so the PHP-FPM master can write without ACLs.
+/// Uses a runtime-user-owned runtime socket directory so PHP-FPM and nginx can create sockets and pid files.
 #[test]
-fn remote_runtime_deploy_uses_root_owned_runtime_socket_dir() {
+fn remote_runtime_deploy_uses_runtime_user_owned_runtime_socket_dir() {
     let deploy = project_root().join("infra/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
@@ -140,16 +140,16 @@ fn remote_runtime_deploy_uses_root_owned_runtime_socket_dir() {
         "runtime deploy must target the resolved runtime socket directory\n{socket_dir_block}"
     );
     assert!(
-        socket_dir_block.contains("user=\"root\""),
-        "runtime deploy must make the runtime socket directory root-owned\n{socket_dir_block}"
+        socket_dir_block.contains("user=DEPLOY_DATA[\"runtime_user\"]"),
+        "runtime deploy must make the runtime socket directory runtime-user-owned\n{socket_dir_block}"
     );
     assert!(
         socket_dir_block.contains("group=DEPLOY_DATA[\"runtime_group\"]"),
         "runtime deploy must keep the runtime socket directory in the runtime group\n{socket_dir_block}"
     );
     assert!(
-        socket_dir_block.contains("mode=\"0770\""),
-        "runtime deploy must make the runtime socket directory group-writable without ACLs\n{socket_dir_block}"
+        socket_dir_block.contains("mode=\"0750\""),
+        "runtime deploy must make the runtime socket directory group-readable without ACLs\n{socket_dir_block}"
     );
 }
 
