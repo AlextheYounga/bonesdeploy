@@ -109,9 +109,9 @@ enum HookCommand {
 enum ServiceCommand {
     /// Restart the per-site nginx service
     Restart {
-        /// Path to bones.yaml config file
+        /// Site (project) name
         #[arg(long)]
-        config: String,
+        site: String,
     },
 }
 
@@ -132,7 +132,7 @@ pub fn run(cli: &Cli) -> Result<()> {
             HookCommand::PostDeploy { config } => post_deploy::run(config),
         },
         Command::Service { command } => match command {
-            ServiceCommand::Restart { config } => service::run(config),
+            ServiceCommand::Restart { site } => service::run(site),
         },
         Command::Version => {
             version::run();

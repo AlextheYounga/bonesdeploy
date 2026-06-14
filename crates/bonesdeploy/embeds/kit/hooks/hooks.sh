@@ -136,7 +136,12 @@ bones_post_deploy() {
 	fi
 
 	echo "[bonesdeploy] Restarting site nginx..."
-	if ! sudo bonesremote service restart --config "$BONES_YAML"; then
+	SITE_NAME=$(grep -E '^[[:space:]]*project_name:[[:space:]]*' "$BONES_YAML" | head -1 | sed 's/^[^:]*:[[:space:]]*//' | tr -d '[:space:]')
+	if [ -z "$SITE_NAME" ]; then
+		echo "[bonesdeploy] Could not read project_name from $BONES_YAML"
+		exit 1
+	fi
+	if ! sudo bonesremote service restart --site "$SITE_NAME"; then
 		echo "[bonesdeploy] service restart failed."
 		exit 1
 	fi
