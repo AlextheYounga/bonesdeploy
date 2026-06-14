@@ -1,99 +1,18 @@
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 
 use crate::config;
-use crate::permissions;
-use crate::privileges;
 use crate::release_state;
 
-use shared::config::PathOverride;
-
-#[derive(serde::Deserialize)]
-struct RuntimeConfig {
-    #[serde(default)]
-    permissions: RuntimePermissions,
-}
-
-#[derive(serde::Deserialize, Default)]
-struct RuntimePermissions {
-    #[serde(default)]
-    defaults: RuntimePermissionDefaults,
-    #[serde(default)]
-    paths: Vec<PathOverride>,
-}
-
-#[derive(serde::Deserialize)]
-struct RuntimePermissionDefaults {
-    #[serde(default = "default_dir_mode")]
-    dir_mode: String,
-    #[serde(default = "default_file_mode")]
-    file_mode: String,
-}
-
-impl Default for RuntimePermissionDefaults {
-    fn default() -> Self {
-        Self { dir_mode: default_dir_mode(), file_mode: default_file_mode() }
-    }
-}
-
-fn default_dir_mode() -> String {
-    "750".into()
-}
-
-fn default_file_mode() -> String {
-    "640".into()
-}
-
-fn load_runtime_permissions(config_path: &Path) -> Result<(String, String, Vec<PathOverride>)> {
-    let runtime_path = config_path.parent().unwrap_or(Path::new(".")).join("runtime.yaml");
-    if !runtime_path.exists() {
-        return Ok((default_dir_mode(), default_file_mode(), Vec::new()));
-    }
-    let content =
-        fs::read_to_string(&runtime_path).with_context(|| format!("Failed to read {}", runtime_path.display()))?;
-    let rt: RuntimeConfig =
-        serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
-    Ok((rt.permissions.defaults.dir_mode, rt.permissions.defaults.file_mode, rt.permissions.paths))
-}
-
 pub fn run(config_path: &str) -> Result<()> {
-    privileges::ensure_root("bonesremote hooks post-deploy")?;
-
     let config_path = Path::new(config_path);
     let cfg = config::load(config_path)?;
-    restart_site_nginx(&cfg)?;
-
-    let (dir_mode, file_mode, path_overrides) = load_runtime_permissions(config_path)?;
-    permissions::harden_active_release(&cfg, &dir_mode, &file_mode, &path_overrides)?;
 
     let pruned = prune_old_releases(&cfg)?;
     if !pruned.is_empty() {
         println!("Pruned releases: {}", pruned.join(", "));
-    }
-
-    Ok(())
-}
-
-fn restart_site_nginx(cfg: &config::BonesConfig) -> Result<()> {
-    let service_name = format!("{}-nginx", cfg.data.project_name);
-    let status = Command::new("systemctl")
-        .args(["is-active", "--quiet", &service_name])
-        .status()
-        .context("Failed to check nginx service status")?;
-
-    if status.success() {
-        let restart_status = Command::new("systemctl")
-            .args(["restart", &service_name])
-            .status()
-            .context("Failed to restart nginx service")?;
-
-        if !restart_status.success() {
-            bail!("Failed to restart {service_name} service");
-        }
-        println!("Restarted {service_name} service");
     }
 
     Ok(())
@@ -158,6 +77,7 @@ mod tests {
                 web_root: String::from("public"),
                 branch: String::from("main"),
                 deploy_on_push: true,
+                ..Default::default()
             },
             releases: config::Releases { keep },
         }

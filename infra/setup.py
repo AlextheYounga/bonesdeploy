@@ -68,8 +68,8 @@ server.user(
 )
 
 server.user(
-    name="Ensure service user exists",
-    user=DEPLOY_DATA["service_user"],
+    name="Ensure runtime user exists",
+    user=DEPLOY_DATA["runtime_user"],
     system=True,
     home="/nonexistent",
     shell="/usr/sbin/nologin",
@@ -78,20 +78,34 @@ server.user(
 )
 
 server.group(
-    name="Ensure service group exists",
-    group=DEPLOY_DATA["service_group"],
+    name="Ensure runtime group exists",
+    group=DEPLOY_DATA["runtime_group"],
     _sudo=True,
 )
 
 server.user(
-    name="Ensure service user is in service group",
-    user=DEPLOY_DATA["service_user"],
-    groups=[DEPLOY_DATA["service_group"]],
+    name="Ensure runtime user is in runtime group",
+    user=DEPLOY_DATA["runtime_user"],
+    groups=[DEPLOY_DATA["runtime_group"]],
     append=True,
     _sudo=True,
 )
 
-# --- Common: bare repo and placeholder ---
+server.group(
+    name="Ensure release-read group exists",
+    group=DEPLOY_DATA["release_group"],
+    _sudo=True,
+)
+
+server.user(
+    name="Ensure runtime user is in release-read group",
+    user=DEPLOY_DATA["runtime_user"],
+    groups=[DEPLOY_DATA["release_group"]],
+    append=True,
+    _sudo=True,
+)
+
+# --- Common: bare repo and project root ---
 
 files.directory(
     name="Ensure bare repo parent directory exists",
@@ -128,10 +142,46 @@ files.directory(
 )
 
 files.directory(
+    name="Ensure project root with setgid for release group",
+    path=DEPLOY_DATA["project_root"],
+    user=DEPLOY_DATA["deploy_user"],
+    group=DEPLOY_DATA["release_group"],
+    mode="2751",
+    _sudo=True,
+)
+
+files.directory(
+    name="Ensure releases directory with setgid",
+    path=PATHS["releases"],
+    user=DEPLOY_DATA["deploy_user"],
+    group=DEPLOY_DATA["release_group"],
+    mode="2750",
+    _sudo=True,
+)
+
+files.directory(
+    name="Ensure build directory (private to deploy user)",
+    path=PATHS["project_root"] + "/build",
+    user=DEPLOY_DATA["deploy_user"],
+    group=DEPLOY_DATA["deploy_user"],
+    mode="0700",
+    _sudo=True,
+)
+
+files.directory(
+    name="Ensure shared directory (owned by runtime user)",
+    path=PATHS["shared"],
+    user=DEPLOY_DATA["runtime_user"],
+    group=DEPLOY_DATA["runtime_group"],
+    mode="0711",
+    _sudo=True,
+)
+
+files.directory(
     name="Ensure placeholder release directory exists",
     path=PATHS["placeholder_web_root"],
-    user=DEPLOY_DATA["service_user"],
-    group=DEPLOY_DATA["service_group"],
+    user=DEPLOY_DATA["deploy_user"],
+    group=DEPLOY_DATA["release_group"],
     mode="0750",
     _sudo=True,
 )
@@ -141,7 +191,8 @@ files.template(
     name="Seed placeholder index page",
     src=os.path.join(os.path.dirname(__file__), "assets/nginx/index.html.j2"),
     dest=placeholder_index,
-    user=DEPLOY_DATA["service_user"],
+    user=DEPLOY_DATA["deploy_user"],
+    group=DEPLOY_DATA["release_group"],
     mode="0640",
     **DEPLOY_DATA,
     _sudo=True,
@@ -152,15 +203,6 @@ files.link(
     path=PATHS["current"],
     target=PATHS["placeholder_release"],
     force=True,
-    _sudo=True,
-)
-
-files.directory(
-    name="Ensure web root exists",
-    path=DEPLOY_DATA.get("live_root_parent", "/var/www"),
-    user="root",
-    group=DEPLOY_DATA["service_group"],
-    mode="2775",
     _sudo=True,
 )
 

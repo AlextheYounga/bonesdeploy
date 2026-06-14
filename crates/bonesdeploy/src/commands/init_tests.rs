@@ -107,6 +107,7 @@ fn incomplete_seed(project_name: &str) -> BonesConfig {
             web_root: String::new(),
             branch: String::from("main"),
             deploy_on_push: true,
+            ..Default::default()
         },
         releases: Releases::default(),
         ssl: Ssl::default(),

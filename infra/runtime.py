@@ -68,27 +68,12 @@ server.shell(
 
 # --- Nginx ---
 
-server.group(
-    name="Create per-project runtime group",
-    group=DEPLOY_DATA["project_name"],
-    system=True,
-    _sudo=True,
-)
-
-server.user(
-    name="Add service user to project group",
-    user=DEPLOY_DATA["service_user"],
-    groups=[DEPLOY_DATA["project_name"]],
-    append=True,
-    _sudo=True,
-)
-
 files.directory(
     name="Ensure socket directory exists",
     path=PATHS["runtime_socket_dir"],
     # Root owns the runtime dir so privileged masters can create sockets and logs without ACLs.
     user="root",
-    group=DEPLOY_DATA["service_group"],
+    group=DEPLOY_DATA["runtime_group"],
     mode="0770",
     _sudo=True,
 )
@@ -97,7 +82,7 @@ files.directory(
     name="Ensure conf directory exists",
     path=PATHS["conf_root"],
     user="root",
-    group=DEPLOY_DATA["service_group"],
+    group=DEPLOY_DATA["runtime_group"],
     mode="0750",
     _sudo=True,
 )

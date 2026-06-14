@@ -101,7 +101,7 @@ files.directory(
     name="Ensure conf directory exists",
     path=data["paths"]["conf_root"],
     user="root",
-    group=data["service_group"],
+    group=data["runtime_group"],
     mode="0750",
     _sudo=True,
 )
@@ -109,8 +109,8 @@ files.directory(
 files.directory(
     name="Ensure storage directories exist",
     path=f"{data['paths']['current']}/storage/logs",
-    user=data["service_user"],
-    group=data["service_group"],
+    user=data["runtime_user"],
+    group=data["runtime_group"],
     mode="0775",
     _sudo=True,
 )
@@ -118,8 +118,8 @@ files.directory(
 files.directory(
     name="Ensure storage framework cache directory exists",
     path=f"{data['paths']['current']}/storage/framework/cache",
-    user=data["service_user"],
-    group=data["service_group"],
+    user=data["runtime_user"],
+    group=data["runtime_group"],
     mode="0775",
     _sudo=True,
 )
@@ -127,8 +127,8 @@ files.directory(
 files.directory(
     name="Ensure storage framework sessions directory exists",
     path=f"{data['paths']['current']}/storage/framework/sessions",
-    user=data["service_user"],
-    group=data["service_group"],
+    user=data["runtime_user"],
+    group=data["runtime_group"],
     mode="0775",
     _sudo=True,
 )
@@ -136,8 +136,8 @@ files.directory(
 files.directory(
     name="Ensure storage framework views directory exists",
     path=f"{data['paths']['current']}/storage/framework/views",
-    user=data["service_user"],
-    group=data["service_group"],
+    user=data["runtime_user"],
+    group=data["runtime_group"],
     mode="0775",
     _sudo=True,
 )
@@ -207,7 +207,7 @@ files.template(
     src=os.path.join(here, "assets/nginx/laravel-site-nginx.conf.j2"),
     dest=data["paths"]["site_nginx_config"],
     user="root",
-    group=data["service_group"],
+    group=data["runtime_group"],
     mode="0640",
     laravel_php_fpm_socket_path=php_fpm_socket_path,
     **data,

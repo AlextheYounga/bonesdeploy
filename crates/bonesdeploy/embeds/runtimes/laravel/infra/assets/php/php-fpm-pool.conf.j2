@@ -3,12 +3,12 @@ error_log = {{ paths.runtime_socket_dir }}/php-fpm.log
 daemonize = no
 
 [{{ laravel_php_fpm_pool_name }}]
-user = {{ service_user }}
-group = {{ service_group }}
+user = {{ runtime_user }}
+group = {{ runtime_group }}
 
 listen = {{ laravel_php_fpm_socket_path }}
-listen.owner = {{ service_user }}
-listen.group = {{ service_group }}
+listen.owner = {{ runtime_user }}
+listen.group = {{ runtime_group }}
 listen.mode = 0660
 
 pm = dynamic

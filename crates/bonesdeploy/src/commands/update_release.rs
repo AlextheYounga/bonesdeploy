@@ -21,7 +21,7 @@ pub fn current_remote_version() -> String {
         return String::from("unknown");
     };
 
-    let host = format!("{}@{}", paths::DEPLOY_USER, cfg.data.host);
+    let host = format!("{}@{}", cfg.data.deploy_user, cfg.data.host);
     let output = Command::new("ssh").args(["-p", &cfg.data.port]).args([&host, "bonesremote", "version"]).output();
 
     match output {

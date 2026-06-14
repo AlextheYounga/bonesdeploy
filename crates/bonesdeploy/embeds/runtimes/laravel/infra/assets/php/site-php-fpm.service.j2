@@ -5,6 +5,9 @@ Requires=apparmor.service
 
 [Service]
 Type=simple
+User={{ runtime_user }}
+Group={{ runtime_group }}
+SupplementaryGroups={{ release_group }}
 WorkingDirectory={{ paths.current }}
 
 ExecStart=/usr/sbin/php-fpm{{ laravel_php_version_resolved }} --nodaemonize --fpm-config {{ laravel_php_fpm_pool_config_path }}

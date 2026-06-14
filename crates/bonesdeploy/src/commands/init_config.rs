@@ -141,6 +141,7 @@ fn build_config(
             web_root,
             branch,
             deploy_on_push,
+            ..Default::default()
         },
         releases: config::Releases { keep: releases_keep },
         ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),

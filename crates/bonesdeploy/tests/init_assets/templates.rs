@@ -17,21 +17,25 @@ fn laravel_runtime_operations_uses_host_data() {
     assert!(content.contains("host.data"), "laravel runtime operations should use host.data\n{content}");
 }
 
-/// Runs the PHP-FPM master process without forcing the systemd service itself to the app user.
+/// Runs the PHP-FPM master as the runtime user through systemd directives.
 #[test]
-fn laravel_php_fpm_service_template_leaves_privilege_dropping_to_the_pool() {
+fn laravel_php_fpm_service_template_sets_runtime_user_in_systemd_service() {
     let path = templates_root().join("laravel/infra/assets/php/site-php-fpm.service.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
 
     assert!(
-        !content.contains("User={{ service_user }}"),
-        "laravel PHP-FPM systemd service should not force the master process to the app user\n{content}"
+        content.contains("User={{ runtime_user }}"),
+        "laravel PHP-FPM systemd service should run as the runtime user\n{content}"
     );
     assert!(
-        !content.contains("Group={{ group }}"),
-        "laravel PHP-FPM systemd service should not force the master process to the app group\n{content}"
+        content.contains("Group={{ runtime_group }}"),
+        "laravel PHP-FPM systemd service should run with the runtime group\n{content}"
+    );
+    assert!(
+        content.contains("SupplementaryGroups={{ release_group }}"),
+        "laravel PHP-FPM systemd service should have the release group for code access\n{content}"
     );
     assert!(
         content.contains("ExecStart=/usr/sbin/php-fpm{{ laravel_php_version_resolved }} --nodaemonize --fpm-config {{ laravel_php_fpm_pool_config_path }}"),

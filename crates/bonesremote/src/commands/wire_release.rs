@@ -2,33 +2,24 @@ use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::config;
-use crate::permissions;
-use crate::privileges;
 use crate::release_state;
 
-use shared::config::{PathType, Shared, SharedPath};
+use shared::config::{Shared, SharedPath};
 
 pub fn run(config_path: &str) -> Result<()> {
-    privileges::ensure_root("bonesremote release wire")?;
-
     let config_path = Path::new(config_path);
     let cfg = config::load(config_path)?;
     let release_name = release_state::read_staged_release(&cfg)?;
     let build_root = release_state::build_root(&cfg);
     let shared_dir = release_state::shared_dir(&cfg);
 
-    // Grant deploy-user traversal access to shared/ before wiring individual paths.
-    // post-deploy hardens shared/ to service_user:www-data, locking out the next deploy's
-    // build unless we re-open it here.
-    permissions::chown_paths_to_deploy_user(&[shared_dir.as_path()], false)?;
-
     let shared_paths = load_runtime_shared_paths(config_path)?;
     for shared_path in &shared_paths {
-        let is_file = matches!(shared_path.path_type, PathType::File);
-        wire_path(&cfg, (&build_root, &shared_dir), &shared_path.path, is_file)?;
+        validate_shared_path(&shared_path.path)?;
+        wire_path(&build_root, &shared_dir, &shared_path.path)?;
     }
 
     println!("Wired build workspace for staged release: {release_name}");
@@ -52,30 +43,29 @@ fn load_runtime_shared_paths(config_path: &Path) -> Result<Vec<SharedPath>> {
     Ok(rt.shared.paths)
 }
 
-fn wire_path(_cfg: &config::BonesConfig, roots: (&Path, &Path), relative_path: &str, create_file: bool) -> Result<()> {
-    let (release_dir, shared_dir) = roots;
-    let release_path = release_dir.join(relative_path);
+fn validate_shared_path(relative_path: &str) -> Result<()> {
+    if relative_path.is_empty() {
+        bail!("shared path must not be empty");
+    }
+    if relative_path.starts_with('/') {
+        bail!("shared path must be relative, got: {relative_path}");
+    }
+    if relative_path.contains("..") {
+        bail!("shared path must not contain .., got: {relative_path}");
+    }
+    Ok(())
+}
+
+fn wire_path(build_root: &Path, shared_dir: &Path, relative_path: &str) -> Result<()> {
+    let release_path = build_root.join(relative_path);
     let shared_path = shared_dir.join(relative_path);
 
-    if path_exists(&release_path) && !path_exists(&shared_path) {
-        ensure_parent_exists(&shared_path)?;
-        fs::rename(&release_path, &shared_path).with_context(|| {
-            format!(
-                "Failed to move release path into shared path: {} -> {}",
-                release_path.display(),
-                shared_path.display()
-            )
-        })?;
+    if !shared_path_exists(&shared_path) {
+        bail!("shared path does not exist: {}", shared_path.display());
     }
-
-    if !path_exists(&shared_path) {
-        create_default_shared_target(&shared_path, create_file)?;
-    }
-
-    permissions::chown_paths_to_deploy_user(&[shared_path.as_path()], true)?;
 
     ensure_parent_exists(&release_path)?;
-    if path_exists(&release_path) {
+    if release_path_is_resolved(&release_path) {
         remove_path(&release_path)?;
     }
 
@@ -88,26 +78,20 @@ fn wire_path(_cfg: &config::BonesConfig, roots: (&Path, &Path), relative_path: &
     Ok(())
 }
 
-fn create_default_shared_target(shared_path: &Path, create_file: bool) -> Result<()> {
-    ensure_parent_exists(shared_path)?;
-
-    if create_file {
-        fs::File::create(shared_path)
-            .with_context(|| format!("Failed to create shared file: {}", shared_path.display()))?;
-    } else {
-        fs::create_dir_all(shared_path)
-            .with_context(|| format!("Failed to create shared directory: {}", shared_path.display()))?;
-    }
-
-    Ok(())
-}
-
 fn ensure_parent_exists(path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("Failed to create parent directory: {}", parent.display()))?;
     }
     Ok(())
+}
+
+fn shared_path_exists(path: &Path) -> bool {
+    fs::symlink_metadata(path).is_ok()
+}
+
+fn release_path_is_resolved(path: &Path) -> bool {
+    fs::symlink_metadata(path).is_ok()
 }
 
 fn remove_path(path: &Path) -> Result<()> {
@@ -123,10 +107,6 @@ fn remove_path(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn path_exists(path: &Path) -> bool {
-    fs::symlink_metadata(path).is_ok()
-}
-
 #[cfg(test)]
 mod tests {
     use std::env;
@@ -136,43 +116,12 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::paths;
 
-    use super::{create_default_shared_target, remove_path};
+    use super::{remove_path, validate_shared_path};
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
         env::temp_dir().join(format!("bonesremote_wire_release_test_{}_{}_{}", process::id(), nanos, test_name))
-    }
-
-    /// Creates a default file when the shared target path is declared as a file.
-    #[test]
-    fn create_default_shared_target_creates_file_for_explicit_file_paths() -> Result<()> {
-        let root = temp_dir_path("default_file");
-        let shared_file = root.join(paths::SHARED_DIR).join(".env");
-
-        create_default_shared_target(&shared_file, true)?;
-
-        assert!(shared_file.exists());
-        assert!(shared_file.is_file());
-
-        fs::remove_dir_all(root)?;
-        Ok(())
-    }
-
-    /// Creates a default directory when the shared target path is declared as a directory.
-    #[test]
-    fn create_default_shared_target_creates_directory_for_explicit_directory_paths() -> Result<()> {
-        let root = temp_dir_path("default_directory");
-        let shared_dir = root.join(paths::SHARED_DIR).join("storage");
-
-        create_default_shared_target(&shared_dir, false)?;
-
-        assert!(shared_dir.exists());
-        assert!(shared_dir.is_dir());
-
-        fs::remove_dir_all(root)?;
-        Ok(())
     }
 
     /// Removes both files and directories, including nested contents.
@@ -194,5 +143,15 @@ mod tests {
 
         fs::remove_dir_all(root)?;
         Ok(())
+    }
+
+    /// Rejects empty, absolute, and parent-directory paths.
+    #[test]
+    fn validate_shared_path_rejects_unsafe_paths() {
+        assert!(validate_shared_path("").is_err());
+        assert!(validate_shared_path("/etc").is_err());
+        assert!(validate_shared_path("../.env").is_err());
+        assert!(validate_shared_path("storage").is_ok());
+        assert!(validate_shared_path("storage/logs").is_ok());
     }
 }

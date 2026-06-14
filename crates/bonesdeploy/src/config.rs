@@ -112,10 +112,6 @@ pub fn save_runtime(runtime: &Map<String, Value>, path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn service_user(project_name: &str) -> String {
-    project_name.to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use std::env::temp_dir;
@@ -128,7 +124,7 @@ mod tests {
     use shared::paths;
 
     use super::{
-        BonesConfig, Data, Releases, Ssl, default_project_root_for, default_web_root, load, save, service_user,
+        BonesConfig, Data, Releases, Ssl, default_project_root_for, default_web_root, load, save,
     };
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -155,17 +151,11 @@ mod tests {
                 web_root: default_web_root(),
                 branch: String::from("master"),
                 deploy_on_push: true,
+                ..Default::default()
             },
             releases: Releases::default(),
             ssl: Ssl::default(),
         }
-    }
-
-    /// Derives service user from the project name.
-    #[test]
-    fn service_user_is_derived_from_project_name() {
-        assert_eq!(service_user("lawsnipe"), "lawsnipe");
-        assert_eq!(service_user("atlas"), "atlas");
     }
 
     /// Derives the default repo path from the project name.
