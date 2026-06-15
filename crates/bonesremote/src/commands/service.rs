@@ -1,15 +1,20 @@
+use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
+use crate::config;
 use crate::privileges;
 
-pub fn run(site_name: &str) -> Result<()> {
+pub fn run(config_path: &str) -> Result<()> {
     privileges::ensure_root("bonesremote service restart")?;
+
+    let cfg = config::load(Path::new(config_path))?;
+    let site_name = &cfg.data.project_name;
 
     if !is_valid_site_name(site_name) {
         bail!(
-            "invalid site name: {site_name}. Must be 1-32 chars, lowercase letters, digits, hyphens, underscores, starting with a letter or underscore."
+            "invalid site name in config: {site_name}. Must be 1-32 chars, lowercase letters, digits, hyphens, underscores, starting with a letter or underscore."
         );
     }
 

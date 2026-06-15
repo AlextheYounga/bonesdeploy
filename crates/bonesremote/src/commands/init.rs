@@ -19,7 +19,7 @@ pub fn run() -> Result<()> {
     // Only the commands that need ownership or live-state changes run via sudo.
     let sudoers_content = format!(
             "# Installed by bonesremote init\n\
-             {} ALL=(root) NOPASSWD: {bonesdeploy_path} service restart --site *\n",
+             {} ALL=(root) NOPASSWD: {bonesdeploy_path} service restart --config *\n",
             paths::DEPLOY_USER
     );
 
