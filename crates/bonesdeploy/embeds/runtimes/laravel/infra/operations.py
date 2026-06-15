@@ -214,6 +214,15 @@ files.template(
     _sudo=True,
 )
 
+files.directory(
+    name="Ensure runtime socket directory exists before nginx validation",
+    path=data["paths"]["runtime_socket_dir"],
+    user=data["runtime_user"],
+    group=data["runtime_group"],
+    mode="0750",
+    _sudo=True,
+)
+
 server.shell(
     name="Validate nginx configuration with Laravel config",
     commands=[f"nginx -t -c {data['paths']['site_nginx_config']} -g 'daemon off;'"],

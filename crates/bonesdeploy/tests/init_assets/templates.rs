@@ -148,6 +148,40 @@ fn laravel_operations_validates_php_fpm_config_before_service_start() {
     );
 }
 
+/// Ensures the runtime socket dir is created before nginx config validation,
+/// because nginx -t needs to open pid/temp paths under /run/<site>.
+#[test]
+fn laravel_nginx_validation_creates_runtime_socket_dir_first() {
+    let path = templates_root().join("laravel/infra/operations.py");
+    let content = fs::read_to_string(&path);
+    assert!(content.is_ok(), "failed to read {}", path.display());
+    let content = content.unwrap_or_default();
+
+    assert!(
+        content.contains("path=data[\"paths\"][\"runtime_socket_dir\"]"),
+        "laravel operations must ensure runtime socket dir exists before nginx validation\n{content}"
+    );
+    assert!(
+        content.contains("user=data[\"runtime_user\"]"),
+        "laravel operations must set runtime_user on the runtime socket dir\n{content}"
+    );
+    assert!(
+        content.contains("group=data[\"runtime_group\"]"),
+        "laravel operations must set runtime_group on the runtime socket dir\n{content}"
+    );
+    assert!(
+        content.contains("mode=\"0750\""),
+        "laravel operations must set mode 0750 on the runtime socket dir\n{content}"
+    );
+
+    let dir_idx = content.find("Ensure runtime socket directory exists before nginx validation");
+    let nginx_idx = content.find("nginx -t");
+    assert!(
+        dir_idx.is_some() && nginx_idx.is_some() && dir_idx < nginx_idx,
+        "laravel operations must create the runtime socket directory before validating nginx config\n{content}"
+    );
+}
+
 /// Uses an absolute nginx fastcgi params include because per-site configs run outside /etc/nginx.
 #[test]
 fn laravel_nginx_template_uses_absolute_fastcgi_params_include() {
