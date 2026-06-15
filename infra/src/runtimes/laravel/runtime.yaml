@@ -1,6 +1,6 @@
 template: laravel
 web_root: public
-php_version: '8.3'
+php_version: '8.5'
 permissions:
   defaults:
     dir_mode: '750'
