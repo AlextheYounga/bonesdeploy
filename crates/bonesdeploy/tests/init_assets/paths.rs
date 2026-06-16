@@ -37,7 +37,7 @@ fn ssl_deploy_uses_current_web_root_path_manifest() {
 /// Uses resolved paths in both router nginx and AppArmor templates.
 #[test]
 fn nginx_and_apparmor_templates_use_resolved_paths() {
-    let nginx_site = project_root().join("infra/assets/nginx/router.conf.j2");
+    let nginx_site = project_root().join("infra/src/assets/nginx/router.conf.j2");
     let nginx_conf = fs::read_to_string(&nginx_site);
     assert!(nginx_conf.is_ok(), "failed to read {}", nginx_site.display());
     let nginx_conf = nginx_conf.unwrap_or_default();
@@ -51,7 +51,7 @@ fn nginx_and_apparmor_templates_use_resolved_paths() {
         "nginx router template must not claim the default server on shared hosts\n{nginx_conf}"
     );
 
-    let apparmor = project_root().join("infra/assets/apparmor/project-nginx-profile.j2");
+    let apparmor = project_root().join("infra/src/assets/apparmor/project-nginx-profile.j2");
     let apparmor_conf = fs::read_to_string(&apparmor);
     assert!(apparmor_conf.is_ok(), "failed to read {}", apparmor.display());
     let apparmor_conf = apparmor_conf.unwrap_or_default();
@@ -113,7 +113,7 @@ fn build_logs_path_uses_centralized_manifest() {
 /// Relative "stderr" paths resolve to unwritable locations like /usr/share/nginx/stderr.
 #[test]
 fn base_site_nginx_config_writes_logs_under_runtime_socket_dir() {
-    let nginx_config = project_root().join("infra/assets/nginx/site-nginx.conf.j2");
+    let nginx_config = project_root().join("infra/src/assets/nginx/site-nginx.conf.j2");
     let content = fs::read_to_string(&nginx_config);
     assert!(content.is_ok(), "failed to read {}", nginx_config.display());
     let content = content.unwrap_or_default();

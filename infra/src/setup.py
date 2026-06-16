@@ -174,7 +174,7 @@ def setup_repo_and_project_dirs(data, paths):
 def setup_placeholder_release(data, paths, here):
     files.template(
         name="Seed placeholder index page",
-        src=os.path.join(here, "src/assets/nginx/index.html.j2"),
+        src=os.path.join(here, "assets/nginx/index.html.j2"),
         dest=paths["placeholder_index"],
         user=data["deploy_user"],
         group=data["release_group"],

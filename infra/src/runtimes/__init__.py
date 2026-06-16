@@ -1,11 +1,4 @@
 import importlib
-import src.runtimes.laravel.laravel
-import src.runtimes.laravel.laravel
-import src.runtimes.django.django
-import src.runtimes.next.next
-import src.runtimes.rails.rails
-import src.runtimes.sveltekit.svelte
-import src.runtimes.vue.vue
 
 
 _REGISTRY = {}

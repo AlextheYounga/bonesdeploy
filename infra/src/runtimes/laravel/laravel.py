@@ -1,8 +1,6 @@
 import os
-from pyinfra import host
-from pyinfra.facts.server import LinuxDistribution
-from pyinfra.operations import apt, files, server, systemd
-from src.utils import load_runtime_config, unflatten
+
+from src.utils import load_runtime_config
 
 
 PHP_SURY_KEYRING_URL = "https://packages.sury.org/debsuryorg-archive-keyring.deb"
@@ -34,27 +32,11 @@ def questions():
     ]
 
 
-def defaults():
-    return {
-        "php_version": "8.3",
-        "install_queue_worker": False,
-        "shared_paths": [
-            {"path": ".env", "type": "file", "required": True},
-            {"path": "storage", "type": "dir", "required": True},
-        ],
-    }
-
-
-def shared_paths(ctx):
-    return defaults()["shared_paths"]
-
-
-def apply(ctx):
-    raise NotImplementedError("laravel apply is not migrated yet")
-
-
 def deploy():
-
+    from pyinfra import host
+    from pyinfra.facts.server import LinuxDistribution
+    from pyinfra.operations import apt, files, server, systemd
+    from src.utils import unflatten
 
     here = os.path.dirname(__file__)
     data = unflatten(host.data.dict())
@@ -78,6 +60,9 @@ def deploy():
 
 
 def _resolve_codename():
+    from pyinfra import host
+    from pyinfra.facts.server import LinuxDistribution
+
     deb = host.get_fact(LinuxDistribution)
     release_meta = deb.get("release_meta", {}) if deb else {}
     return (
@@ -89,6 +74,8 @@ def _resolve_codename():
 
 
 def _add_php_apt_source(php_version):
+    from pyinfra.operations import apt, server
+
     apt.packages(
         name="Install PHP repo prerequisites",
         packages=PHP_SURY_PREREQUISITES,
@@ -129,6 +116,8 @@ def setup_php_repository(php_version):
 
 
 def install_php_packages(php_version):
+    from pyinfra.operations import apt
+
     packages = [
         f"php{php_version}",
         f"php{php_version}-cli",
@@ -155,6 +144,8 @@ def install_php_packages(php_version):
 
 
 def setup_storage_directories(paths, runtime_user, runtime_group):
+    from pyinfra.operations import files
+
     subdirs = ["logs", "framework/cache", "framework/sessions", "framework/views"]
     for subdir in subdirs:
         files.directory(
@@ -168,6 +159,8 @@ def setup_storage_directories(paths, runtime_user, runtime_group):
 
 
 def setup_php_fpm(here, data, paths, project, php_version, pool_config_path, php_fpm_socket_path, runtime_user, runtime_group):
+    from pyinfra.operations import files, server, systemd
+
     files.directory(
         name="Ensure conf directory exists",
         path=paths["conf_root"],
@@ -179,7 +172,7 @@ def setup_php_fpm(here, data, paths, project, php_version, pool_config_path, php
 
     files.template(
         name="Deploy PHP-FPM pool config",
-        src=os.path.join(here, "src/assets/php/php-fpm-pool.conf.j2"),
+        src=os.path.join(here, "assets/php/php-fpm-pool.conf.j2"),
         dest=pool_config_path,
         user="root",
         group="root",
@@ -192,7 +185,7 @@ def setup_php_fpm(here, data, paths, project, php_version, pool_config_path, php
 
     files.template(
         name="Deploy PHP-FPM systemd service",
-        src=os.path.join(here, "src/assets/php/site-php-fpm.service.j2"),
+        src=os.path.join(here, "assets/php/site-php-fpm.service.j2"),
         dest=f"/etc/systemd/system/{project}-php-fpm.service",
         user="root",
         group="root",
@@ -221,12 +214,14 @@ def setup_php_fpm(here, data, paths, project, php_version, pool_config_path, php
 
 
 def setup_php_fpm_apparmor(project, here, data):
+    from pyinfra.operations import files, server
+
     profile_name = f"bonesdeploy-{project}-php-fpm"
     profile_path = f"/etc/apparmor.d/{profile_name}"
 
     files.template(
         name="Deploy PHP-FPM AppArmor profile",
-        src=os.path.join(here, "src/assets/php/site-php-fpm-profile.j2"),
+        src=os.path.join(here, "assets/php/site-php-fpm-profile.j2"),
         dest=profile_path,
         user="root",
         group="root",
@@ -242,10 +237,13 @@ def setup_php_fpm_apparmor(project, here, data):
         _sudo=True,
     )
 
+
 def setup_laravel_nginx(here, data, paths, project, php_fpm_socket_path, runtime_user, runtime_group):
+    from pyinfra.operations import files, server, systemd
+
     files.template(
         name="Deploy Laravel-specific per-site nginx config",
-        src=os.path.join(here, "src/assets/nginx/laravel-site-nginx.conf.j2"),
+        src=os.path.join(here, "assets/nginx/laravel-site-nginx.conf.j2"),
         dest=paths["site_nginx_config"],
         user="root",
         group=runtime_group,

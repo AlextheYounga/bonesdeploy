@@ -26,22 +26,6 @@ def questions():
     ]
 
 
-def defaults():
-    return {
-        "python_version": "3.12",
-        "install_postgres": False,
-        "shared_paths": [],
-    }
-
-
-def shared_paths(ctx):
-    return defaults()["shared_paths"]
-
-
-def apply(ctx):
-    raise NotImplementedError("django apply is not migrated yet")
-
-
 def deploy():
     from pyinfra.operations import apt
 

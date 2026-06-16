@@ -33,23 +33,6 @@ def questions():
     ]
 
 
-def defaults():
-    return {
-        "ruby_version": "3.3",
-        "install_postgres": False,
-        "install_redis": False,
-        "shared_paths": [],
-    }
-
-
-def shared_paths(ctx):
-    return defaults()["shared_paths"]
-
-
-def apply(ctx):
-    raise NotImplementedError("rails apply is not migrated yet")
-
-
 def deploy():
     from pyinfra.operations import apt
 
