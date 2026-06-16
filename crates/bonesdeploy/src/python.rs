@@ -55,7 +55,6 @@ pub fn list_runtimes() -> Result<Vec<String>> {
 }
 
 /// Returns the questions for a given runtime from Python.
-#[allow(dead_code)]
 pub fn runtime_questions(runtime: &str) -> Result<Value> {
     run_python_json(&["runtime", "questions", runtime])
 }

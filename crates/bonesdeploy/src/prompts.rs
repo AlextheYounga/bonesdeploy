@@ -7,6 +7,63 @@ use inquire::{Confirm, Select, Text};
 use crate::config::BonesConfig;
 use crate::git;
 
+pub fn prompt_runtime_questions(questions: &serde_json::Value, defaults: &serde_json::Value) -> Result<serde_json::Value> {
+    let mut answers = defaults.clone();
+    let questions = questions.as_array().cloned().unwrap_or_default();
+
+    for question in questions {
+        let key = question["key"].as_str().unwrap_or("");
+        if key.is_empty() {
+            continue;
+        }
+        let label = question["label"].as_str().unwrap_or(key);
+        let question_type = question["type"].as_str().unwrap_or("text");
+        let default = answers.get(key).or(question.get("default")).cloned();
+
+        let answer: serde_json::Value = match question_type {
+            "bool" => {
+                let default_bool = default.as_ref().and_then(|v| v.as_bool()).unwrap_or(false);
+                let choice = Confirm::new(label)
+                    .with_default(default_bool)
+                    .prompt()
+                    .map_err(|err| anyhow!(err))?;
+                serde_json::Value::Bool(choice)
+            }
+            "choice" => {
+                let choices: Vec<String> = question["choices"]
+                    .as_array()
+                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+                    .unwrap_or_default();
+                if choices.is_empty() {
+                    default.unwrap_or(serde_json::Value::Null)
+                } else {
+                    let default_idx = default
+                        .as_ref()
+                        .and_then(|v| v.as_str())
+                        .and_then(|d| choices.iter().position(|c| c == d))
+                        .unwrap_or(0);
+                    let choice = Select::new(label, choices.clone())
+                        .with_starting_cursor(default_idx)
+                        .prompt()
+                        .map_err(|err| anyhow!(err))?;
+                    serde_json::Value::String(choice)
+                }
+            }
+            _ => {
+                let default_str = default.as_ref().and_then(|v| v.as_str()).unwrap_or("");
+                let input = Text::new(label)
+                    .with_default(default_str)
+                    .prompt()
+                    .map_err(|err| anyhow!(err))?;
+                serde_json::Value::String(input)
+            }
+        };
+        answers[key] = answer;
+    }
+
+    Ok(answers)
+}
+
 pub fn choose_template(available_templates: &[String]) -> Result<Option<String>> {
     if available_templates.is_empty() {
         return Ok(None);

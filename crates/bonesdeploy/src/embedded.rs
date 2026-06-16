@@ -13,7 +13,7 @@ struct Kit;
 
 #[derive(Embed)]
 #[folder = "../../infra"]
-#[exclude = "tests"]
+#[exclude = "tests/**"]
 #[exclude = "__pycache__/**"]
 #[exclude = ".venv/**"]
 #[exclude = ".gitignore"]
@@ -37,6 +37,20 @@ pub fn scaffold(bones_dir: &Path) -> Result<()> {
         };
         write_asset(bones_dir, &format!("infra/{file_path}"), asset.data.as_ref())?;
     }
+    Ok(())
+}
+
+pub fn ensure_infra_assets_exist(bones_dir: &Path) -> Result<()> {
+    scaffold_runtime_base(bones_dir)?;
+
+    let runtime_toml = bones_dir.join(config::Constants::BONES_RUNTIME_TOML);
+    if !runtime_toml.is_file() {
+        if let Some(parent) = runtime_toml.parent() {
+            fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
+        }
+        crate::config::save_runtime(&serde_json::Map::new(), &runtime_toml)?;
+    }
+
     Ok(())
 }
 

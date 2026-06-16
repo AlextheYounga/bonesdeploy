@@ -1,7 +1,6 @@
-use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use console::style;
 
 use crate::bootstrap_ssh;
@@ -44,7 +43,11 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    ensure_runtime_assets_exist()?;
+    let bones_dir = Path::new(config::Constants::BONES_DIR);
+    if !bones_dir.exists() {
+        bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
+    }
+    embedded::ensure_infra_assets_exist(bones_dir)?;
 
     pyinfra::ensure_pyinfra_installed()?;
 
@@ -65,25 +68,6 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     push::sync_bones_directory(&cfg)?;
 
     println!("\n{} SSL setup complete.", style("Done!").green().bold());
-
-    Ok(())
-}
-
-fn ensure_runtime_assets_exist() -> Result<()> {
-    let bones_dir = Path::new(config::Constants::BONES_DIR);
-    if !bones_dir.exists() {
-        bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
-    }
-
-    embedded::scaffold_runtime_base(bones_dir)?;
-
-    let runtime_toml = Path::new(config::Constants::BONES_RUNTIME_TOML);
-    if !runtime_toml.is_file() {
-        if let Some(parent) = runtime_toml.parent() {
-            fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
-        }
-        config::save_runtime(&serde_json::Map::new(), runtime_toml)?;
-    }
 
     Ok(())
 }

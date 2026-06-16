@@ -7,6 +7,7 @@ use console::style;
 
 use crate::bootstrap_ssh;
 use crate::config;
+use crate::embedded;
 use crate::pyinfra;
 use crate::pyinfra::PyinfraDeploy;
 use crate::remote_data;
@@ -14,6 +15,12 @@ use crate::remote_data;
 pub fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
+
+    let bones_dir = Path::new(config::Constants::BONES_DIR);
+    if !bones_dir.exists() {
+        bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
+    }
+    embedded::ensure_infra_assets_exist(bones_dir)?;
 
     let deploy_file = Path::new(config::Constants::BONES_REMOTE_SETUP_DEPLOY);
     if !deploy_file.is_file() {

@@ -46,7 +46,8 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
 
         initial_project_name = Some(project_name);
     } else {
-        println!(".bones/ already exists, skipping scaffold extraction.");
+        println!(".bones/ already exists, refreshing infra files...");
+        embedded::scaffold_runtime_base(bones_dir)?;
     }
 
     update_gitignore()?;
@@ -98,8 +99,14 @@ fn seed_runtime_config(args: &InitArgs, _bones_dir: &Path, runtime_toml: &Path) 
 
     if let Some(ref template_name) = template {
         let defaults = python::runtime_defaults(template_name)?;
-        let toml = toml::to_string(&defaults).context("Failed to serialize runtime defaults")?;
-        fs::write(runtime_toml, toml)?;
+        let answers = if args.non_interactive {
+            defaults
+        } else {
+            let questions = python::runtime_questions(template_name)?;
+            prompts::prompt_runtime_questions(&questions, &defaults)?
+        };
+        let toml_str = toml::to_string(&answers).context("Failed to serialize runtime config")?;
+        fs::write(runtime_toml, toml_str)?;
         println!("Applied runtime template: {template_name}");
         println!("Saved runtime config to {}", config::Constants::BONES_RUNTIME_TOML);
     } else {
