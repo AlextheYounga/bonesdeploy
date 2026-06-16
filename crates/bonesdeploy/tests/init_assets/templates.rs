@@ -156,15 +156,15 @@ fn laravel_nginx_validation_creates_runtime_socket_dir_first() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("path=data[\"paths\"][\"runtime_socket_dir\"]"),
+        content.contains("paths[\"runtime_socket_dir\"]"),
         "laravel operations must ensure runtime socket dir exists before nginx validation\n{content}"
     );
     assert!(
-        content.contains("user=data[\"runtime_user\"]"),
+        content.contains("user=runtime_user"),
         "laravel operations must set runtime_user on the runtime socket dir\n{content}"
     );
     assert!(
-        content.contains("group=data[\"runtime_group\"]"),
+        content.contains("group=runtime_group"),
         "laravel operations must set runtime_group on the runtime socket dir\n{content}"
     );
     assert!(

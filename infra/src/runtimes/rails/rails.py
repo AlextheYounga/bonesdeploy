@@ -1,4 +1,12 @@
-SETUP_LABEL = "Rails"
+RUBY_PACKAGES = [
+    "ruby-full",
+    "ruby-bundler",
+    "libffi-dev",
+    "libpq-dev",
+    "libyaml-dev",
+    "shared-mime-info",
+    "zlib1g-dev",
+]
 
 
 def questions():
@@ -43,22 +51,11 @@ def apply(ctx):
 
 
 def deploy():
-    from pyinfra import host
-    from pyinfra.operations import apt, files, server, systemd
-
-    RUBY_PREREQUISITE_PACKAGES = [
-        "ruby-full",
-        "ruby-bundler",
-        "libffi-dev",
-        "libpq-dev",
-        "libyaml-dev",
-        "shared-mime-info",
-        "zlib1g-dev",
-    ]
+    from pyinfra.operations import apt
 
     apt.packages(
         name="Install Rails repo prerequisites",
-        packages=RUBY_PREREQUISITE_PACKAGES,
+        packages=RUBY_PACKAGES,
         present=True,
         update=True,
         _sudo=True,
