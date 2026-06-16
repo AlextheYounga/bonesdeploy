@@ -13,6 +13,7 @@ struct Kit;
 
 #[derive(Embed)]
 #[folder = "../../infra"]
+#[exclude = "tests"]
 #[exclude = "__pycache__/**"]
 #[exclude = ".venv/**"]
 #[exclude = ".gitignore"]

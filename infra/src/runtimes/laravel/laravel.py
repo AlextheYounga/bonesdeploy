@@ -50,7 +50,7 @@ def deploy():
     pool_config_path = f"/srv/conf/{project}/php-fpm.conf"
     php_fpm_socket_path = paths["runtime_php_fpm_socket"]
 
-    setup_php_repository(php_version)
+    add_php_apt_source(php_version)
     install_php_packages(php_version)
 
     setup_storage_directories(paths, runtime_user, runtime_group)
@@ -73,7 +73,7 @@ def _resolve_codename():
     )
 
 
-def _add_php_apt_source(php_version):
+def add_php_apt_source():
     from pyinfra.operations import apt, server
 
     apt.packages(
@@ -109,10 +109,6 @@ def _add_php_apt_source(php_version):
         filename="php",
         _sudo=True,
     )
-
-
-def setup_php_repository(php_version):
-    _add_php_apt_source(php_version)
 
 
 def install_php_packages(php_version):
@@ -264,7 +260,7 @@ def setup_laravel_nginx(here, data, paths, project, php_fpm_socket_path, runtime
 
     server.shell(
         name="Validate nginx configuration with Laravel config",
-        commands=[f"nginx -t -c {paths['site_nginx_config']} -g 'daemon off;'"],
+        commands=[f"nginx -t -c {paths['site_nginx_config']}"],
         _sudo=True,
     )
 
