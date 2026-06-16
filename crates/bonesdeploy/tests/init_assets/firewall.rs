@@ -5,7 +5,7 @@ use super::project_root;
 /// Applies all UFW rules through a shell commands list instead of individual module operations.
 #[test]
 fn setup_deploy_applies_all_firewall_rules_via_shell_commands() {
-    let deploy = project_root().join("infra/setup.py");
+    let deploy = project_root().join("infra/src/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -16,7 +16,7 @@ fn setup_deploy_applies_all_firewall_rules_via_shell_commands() {
 /// Handles SSH allowance with and without CIDR restrictions.
 #[test]
 fn setup_deploy_handles_manage_ssh_with_and_without_cidrs() {
-    let deploy = project_root().join("infra/setup.py");
+    let deploy = project_root().join("infra/src/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -27,7 +27,7 @@ fn setup_deploy_handles_manage_ssh_with_and_without_cidrs() {
 /// Filters 'ssh' from allowed ports list to avoid double-allowing.
 #[test]
 fn setup_deploy_filters_ssh_from_allowed_ports() {
-    let deploy = project_root().join("infra/setup.py");
+    let deploy = project_root().join("infra/src/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -41,7 +41,7 @@ fn setup_deploy_filters_ssh_from_allowed_ports() {
 /// Resolves port aliases like 'http' to numeric ports.
 #[test]
 fn setup_deploy_resolves_port_aliases() {
-    let deploy = project_root().join("infra/setup.py");
+    let deploy = project_root().join("infra/src/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -55,7 +55,7 @@ fn setup_deploy_resolves_port_aliases() {
 /// Sets default policies and enables UFW.
 #[test]
 fn setup_deploy_sets_default_policies_and_enables_ufw() {
-    let deploy = project_root().join("infra/setup.py");
+    let deploy = project_root().join("infra/src/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -71,7 +71,7 @@ fn setup_deploy_sets_default_policies_and_enables_ufw() {
 /// Only runs when `firewall_enabled` is true.
 #[test]
 fn setup_deploy_runs_firewall_only_when_enabled() {
-    let deploy = project_root().join("infra/setup.py");
+    let deploy = project_root().join("infra/src/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -85,7 +85,7 @@ fn setup_deploy_runs_firewall_only_when_enabled() {
 /// Keeps status check behind `firewall_show_status` flag.
 #[test]
 fn setup_deploy_keeps_status_check_gated_by_show_status() {
-    let deploy = project_root().join("infra/setup.py");
+    let deploy = project_root().join("infra/src/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();

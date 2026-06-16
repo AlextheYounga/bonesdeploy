@@ -29,7 +29,7 @@ impl Constants {
     pub const BONES_HOOKS_DIR: &'static str = paths::LOCAL_BONES_HOOKS_DIR;
     pub const BONES_DEPLOYMENT_DIR: &'static str = paths::LOCAL_BONES_DEPLOYMENT_DIR;
     pub const BONES_RUNTIME_YAML: &'static str = paths::LOCAL_BONES_RUNTIME_YAML;
-    pub const BONES_REMOTE_RUNTIME_DEPLOY: &'static str = paths::LOCAL_BONES_RUNTIME_DEPLOY;
+    pub const BONES_INFRA_MAIN: &'static str = paths::LOCAL_BONES_INFRA_MAIN;
     pub const BONES_REMOTE_SSL_DEPLOY: &'static str = paths::LOCAL_BONES_SSL_DEPLOY;
     pub const BONES_REMOTE_SETUP_DEPLOY: &'static str = paths::LOCAL_BONES_SETUP_DEPLOY;
 

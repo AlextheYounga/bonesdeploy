@@ -1,7 +1,5 @@
 use std::fs;
 
-use std::path::Path;
-
 use super::project_root;
 
 /// Sets an AppArmor profile in the per-site nginx systemd service template.
@@ -76,7 +74,7 @@ fn apparmor_profile_template_allows_resolved_release_web_root() {
 #[test]
 fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
     let profile_template =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("embeds/runtimes/laravel/infra/assets/php/site-php-fpm-profile.j2");
+        project_root().join("infra/src/runtimes/laravel/assets/php/site-php-fpm-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -95,7 +93,7 @@ fn laravel_php_fpm_apparmor_profile_allows_site_conf_root() {
 #[test]
 fn laravel_php_fpm_apparmor_profile_grants_minimal_capabilities() {
     let profile_template =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("embeds/runtimes/laravel/infra/assets/php/site-php-fpm-profile.j2");
+        project_root().join("infra/src/runtimes/laravel/assets/php/site-php-fpm-profile.j2");
     let content = fs::read_to_string(&profile_template);
     assert!(content.is_ok(), "failed to read {}", profile_template.display());
     let content = content.unwrap_or_default();
@@ -164,7 +162,7 @@ fn apparmor_profile_template_limits_network_to_unix_stream() {
 /// Verifies apparmor profile enforcement is handled by the runtime deploy script.
 #[test]
 fn runtime_deploy_enforces_apparmor_profile() {
-    let deploy = project_root().join("infra/runtime.py");
+    let deploy = project_root().join("infra/src/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -178,7 +176,7 @@ fn runtime_deploy_enforces_apparmor_profile() {
 /// Verifies AppArmor profile loading is handled by the runtime deploy script.
 #[test]
 fn runtime_deploy_loads_apparmor_profile() {
-    let deploy = project_root().join("infra/runtime.py");
+    let deploy = project_root().join("infra/src/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -192,7 +190,7 @@ fn runtime_deploy_loads_apparmor_profile() {
 /// Verifies AppArmor kernel enabled check is in the runtime deploy script.
 #[test]
 fn runtime_deploy_verifies_kernel_enabled() {
-    let deploy = project_root().join("infra/runtime.py");
+    let deploy = project_root().join("infra/src/runtime.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();

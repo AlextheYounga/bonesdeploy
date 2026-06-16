@@ -6,6 +6,8 @@ use std::path::Path;
 mod apparmor;
 #[path = "init_assets/firewall.rs"]
 mod firewall;
+#[path = "init_assets/removed_modules_tripwires.rs"]
+mod removed_modules_tripwires;
 #[path = "init_assets/paths.rs"]
 mod paths;
 #[path = "init_assets/setup_playbook.rs"]

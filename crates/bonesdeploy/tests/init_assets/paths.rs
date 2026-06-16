@@ -5,7 +5,7 @@ use super::project_root;
 /// Uses resolved placeholder web root paths in the setup deploy script.
 #[test]
 fn setup_deploy_uses_placeholder_web_root_paths() {
-    let deploy = project_root().join("infra/setup.py");
+    let deploy = project_root().join("infra/src/setup.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -23,7 +23,7 @@ fn setup_deploy_uses_placeholder_web_root_paths() {
 /// Uses the resolved current web root for certbot validation in the SSL deploy.
 #[test]
 fn ssl_deploy_uses_current_web_root_path_manifest() {
-    let deploy = project_root().join("infra/ssl.py");
+    let deploy = project_root().join("infra/src/ssl.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();
@@ -73,7 +73,7 @@ fn nginx_and_apparmor_templates_use_resolved_paths() {
 /// Defines router template and nginx_defaults in the SSL deploy as self-contained deployment.
 #[test]
 fn ssl_deploy_defines_nginx_defaults_inline() {
-    let deploy = project_root().join("infra/ssl.py");
+    let deploy = project_root().join("infra/src/ssl.py");
     let content = fs::read_to_string(&deploy);
     assert!(content.is_ok(), "failed to read {}", deploy.display());
     let content = content.unwrap_or_default();

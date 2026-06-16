@@ -175,12 +175,15 @@ systemd.service(
 
 # --- Template-specific runtime setup ---
 
-if DEPLOY_DATA.get("template"):
-    ops_path = os.path.join(os.path.dirname(__file__), "operations.py")
-    if os.path.exists(ops_path):
-        spec = importlib.util.spec_from_file_location("operations", ops_path)
-        ops = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(ops)
+template = DEPLOY_DATA.get("template")
+if template:
+    try:
+        from src.runtimes import get_runtime
+        mod = get_runtime(template)
+        if hasattr(mod, "deploy"):
+            mod.deploy()
+    except (ImportError, KeyError):
+        pass
 
 
 # --- Post-task: doctor ---

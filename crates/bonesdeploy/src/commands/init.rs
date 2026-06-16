@@ -12,6 +12,7 @@ use crate::config;
 use crate::embedded;
 use crate::git;
 use crate::prompts;
+use crate::python;
 
 pub struct InitOutcome {
     pub remote_setup_ran: bool,
@@ -91,19 +92,19 @@ fn print_follow_up_hint() {
     println!("Run {} to sync {} to the remote.", style("bonesdeploy push").cyan(), style(".bones/").cyan());
 }
 
-fn seed_runtime_config(args: &InitArgs, bones_dir: &Path, runtime_yaml: &Path) -> Result<()> {
-    let available = embedded::available_templates();
+fn seed_runtime_config(args: &InitArgs, _bones_dir: &Path, runtime_yaml: &Path) -> Result<()> {
+    let available = python::list_runtimes()?;
     let template = if args.non_interactive { None } else { prompts::choose_template(&available)? };
 
     if let Some(ref template_name) = template {
-        embedded::scaffold_runtime_template(template_name, bones_dir)?;
-        let template_config = embedded::read_template_runtime_config(template_name)?;
-        fs::write(runtime_yaml, template_config)?;
+        let defaults = python::runtime_defaults(template_name)?;
+        let yaml = serde_yml::to_string(&defaults).context("Failed to serialize runtime defaults")?;
+        fs::write(runtime_yaml, yaml)?;
         println!("Applied runtime template: {template_name}");
         println!("Saved runtime config to {}", config::Constants::BONES_RUNTIME_YAML);
     } else {
-        let kit_runtime = embedded::read_kit_runtime_config()?;
-        fs::write(runtime_yaml, kit_runtime)?;
+        let empty = serde_json::Map::new();
+        config::save_runtime(&empty, runtime_yaml)?;
         println!("Seeded {} from kit defaults", config::Constants::BONES_RUNTIME_YAML);
     }
 

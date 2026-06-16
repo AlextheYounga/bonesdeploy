@@ -5,6 +5,7 @@ mod embedded;
 mod git;
 mod prompts;
 mod pyinfra;
+mod python;
 mod remote_data;
 mod ssh;
 

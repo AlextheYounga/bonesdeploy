@@ -1,15 +1,13 @@
 use std::fs;
 
-use std::path::Path;
-
 fn templates_root() -> std::path::PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("embeds/runtimes")
+    super::project_root().join("infra/src/runtimes")
 }
 
 /// Keeps the Laravel runtime operations using host.data instead of a bare data global.
 #[test]
 fn laravel_runtime_operations_uses_host_data() {
-    let path = templates_root().join("laravel/infra/operations.py");
+    let path = templates_root().join("laravel/laravel.py");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -20,7 +18,7 @@ fn laravel_runtime_operations_uses_host_data() {
 /// Runs the PHP-FPM master as the runtime user through systemd directives.
 #[test]
 fn laravel_php_fpm_service_template_sets_runtime_user_in_systemd_service() {
-    let path = templates_root().join("laravel/infra/assets/php/site-php-fpm.service.j2");
+    let path = templates_root().join("laravel/assets/php/site-php-fpm.service.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -62,7 +60,7 @@ fn laravel_php_fpm_service_template_sets_runtime_user_in_systemd_service() {
 /// Grants only the capabilities the PHP-FPM master needs to drop privileges and own the socket.
 #[test]
 fn laravel_php_fpm_service_grants_required_drop_capabilities() {
-    let path = templates_root().join("laravel/infra/assets/php/site-php-fpm.service.j2");
+    let path = templates_root().join("laravel/assets/php/site-php-fpm.service.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -80,7 +78,7 @@ fn laravel_php_fpm_service_grants_required_drop_capabilities() {
 /// PHP-FPM config must include a [global] section so it is a valid FPM config, not just a pool snippet.
 #[test]
 fn laravel_php_fpm_config_includes_global_section() {
-    let path = templates_root().join("laravel/infra/assets/php/php-fpm-pool.conf.j2");
+    let path = templates_root().join("laravel/assets/php/php-fpm-pool.conf.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -99,7 +97,7 @@ fn laravel_php_fpm_config_includes_global_section() {
 /// Laravel nginx should prefer index.php but still fall back to index.html for placeholder releases.
 #[test]
 fn laravel_nginx_template_prefers_php_but_falls_back_to_html() {
-    let path = templates_root().join("laravel/infra/assets/nginx/laravel-site-nginx.conf.j2");
+    let path = templates_root().join("laravel/assets/nginx/laravel-site-nginx.conf.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -113,7 +111,7 @@ fn laravel_nginx_template_prefers_php_but_falls_back_to_html() {
 /// PHP-FPM pool config uses the resolved paths.current instead of raw path construction.
 #[test]
 fn laravel_php_fpm_config_uses_resolved_current_path() {
-    let path = templates_root().join("laravel/infra/assets/php/php-fpm-pool.conf.j2");
+    let path = templates_root().join("laravel/assets/php/php-fpm-pool.conf.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -131,7 +129,7 @@ fn laravel_php_fpm_config_uses_resolved_current_path() {
 /// Validates the rendered PHP-FPM configuration before starting the service.
 #[test]
 fn laravel_operations_validates_php_fpm_config_before_service_start() {
-    let path = templates_root().join("laravel/infra/operations.py");
+    let path = templates_root().join("laravel/laravel.py");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -152,7 +150,7 @@ fn laravel_operations_validates_php_fpm_config_before_service_start() {
 /// because nginx -t needs to open pid/temp paths under /run/<site>.
 #[test]
 fn laravel_nginx_validation_creates_runtime_socket_dir_first() {
-    let path = templates_root().join("laravel/infra/operations.py");
+    let path = templates_root().join("laravel/laravel.py");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -185,7 +183,7 @@ fn laravel_nginx_validation_creates_runtime_socket_dir_first() {
 /// Uses an absolute nginx fastcgi params include because per-site configs run outside /etc/nginx.
 #[test]
 fn laravel_nginx_template_uses_absolute_fastcgi_params_include() {
-    let path = templates_root().join("laravel/infra/assets/nginx/laravel-site-nginx.conf.j2");
+    let path = templates_root().join("laravel/assets/nginx/laravel-site-nginx.conf.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -203,7 +201,7 @@ fn laravel_nginx_template_uses_absolute_fastcgi_params_include() {
 /// Laravel nginx template uses the resolved path manifest so it stays in sync with systemd/AppArmor.
 #[test]
 fn laravel_nginx_template_uses_resolved_path_manifest() {
-    let path = templates_root().join("laravel/infra/assets/nginx/laravel-site-nginx.conf.j2");
+    let path = templates_root().join("laravel/assets/nginx/laravel-site-nginx.conf.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
@@ -277,7 +275,7 @@ fn laravel_build_script_prints_step_labels_for_phases() {
 /// so that the non-root service user can write them under the systemd sandbox and AppArmor profile.
 #[test]
 fn laravel_nginx_config_writes_logs_under_runtime_socket_dir() {
-    let path = templates_root().join("laravel/infra/assets/nginx/laravel-site-nginx.conf.j2");
+    let path = templates_root().join("laravel/assets/nginx/laravel-site-nginx.conf.j2");
     let content = fs::read_to_string(&path);
     assert!(content.is_ok(), "failed to read {}", path.display());
     let content = content.unwrap_or_default();
