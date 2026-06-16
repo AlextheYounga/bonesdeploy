@@ -1,32 +1,16 @@
 import os
 
 from pyinfra import host
-from pyinfra.facts.server import LinuxDistribution
 from pyinfra.operations import apt, files, server
 from src.utils import unflatten
-
-
-BASE_SYSTEM_PACKAGES = [
-    "build-essential",
-    "ca-certificates",
-    "curl",
-    "git",
-    "rsync",
-    "sudo",
-    "nginx",
-    "apparmor",
-    "apparmor-utils",
-    "certbot",
-    "ufw",
-]
-
+from packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
 
 def deploy():
     data = unflatten(host.data.dict())
     paths = data.get("paths", {})
     here = os.path.dirname(__file__)
+    packages = BASE_SYSTEM_PACKAGES + SUPPLEMENTARY_PACKAGES
 
-    packages = data.get("setup_apt_packages", BASE_SYSTEM_PACKAGES)
     install_system_packages(packages)
     install_rust()
     ensure_users_and_groups(data, paths)
@@ -49,7 +33,6 @@ def install_system_packages(packages):
 
 
 def install_rust():
-    cargo_bin = "/root/.cargo/bin/cargo"
     server.shell(
         name="Install rustup and cargo",
         commands=[
@@ -59,7 +42,7 @@ def install_rust():
     )
 
 
-def ensure_users_and_groups(data, paths):
+def ensure_users_and_groups(data):
     server.user(
         name="Ensure deploy user exists",
         user=data["deploy_user"],
@@ -191,7 +174,7 @@ def setup_repo_and_project_dirs(data, paths):
 def setup_placeholder_release(data, paths, here):
     files.template(
         name="Seed placeholder index page",
-        src=os.path.join(here, "assets/nginx/index.html.j2"),
+        src=os.path.join(here, "src/assets/nginx/index.html.j2"),
         dest=paths["placeholder_index"],
         user=data["deploy_user"],
         group=data["release_group"],

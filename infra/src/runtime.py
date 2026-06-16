@@ -1,7 +1,7 @@
 import os
 
 from pyinfra import host
-from pyinfra.operations import apt, files, server, systemd
+from pyinfra.operations import files, server, systemd
 from src.utils import unflatten
 
 
@@ -10,25 +10,10 @@ def deploy():
     paths = data.get("paths", {})
     here = os.path.dirname(__file__)
 
-    install_runtime_apt_packages(data)
     setup_apparmor(data, paths, here)
     setup_nginx(data, paths, here)
     setup_template_runtime(data)
     run_doctor(data)
-
-
-def install_runtime_apt_packages(data):
-    pkgs = data.get("runtime_apt_packages", [])
-    if not pkgs:
-        return
-    apt.packages(
-        name="Install runtime apt packages",
-        packages=pkgs,
-        present=True,
-        update=True,
-        cache_time=3600,
-        _sudo=True,
-    )
 
 
 def setup_apparmor(data, paths, here):
@@ -51,7 +36,7 @@ def setup_apparmor(data, paths, here):
 
     files.template(
         name="Deploy per-project apparmor profile",
-        src=os.path.join(here, "assets/apparmor/project-nginx-profile.j2"),
+        src=os.path.join(here, "src/assets/apparmor/project-nginx-profile.j2"),
         dest=apparmor_profile_path,
         user="root",
         group="root",
@@ -95,7 +80,7 @@ def setup_nginx(data, paths, here):
 
     files.template(
         name="Deploy per-site nginx config",
-        src=os.path.join(here, "assets/nginx/site-nginx.conf.j2"),
+        src=os.path.join(here, "src/assets/nginx/site-nginx.conf.j2"),
         dest=paths["site_nginx_config"],
         user="root",
         group=data["runtime_group"],
@@ -106,7 +91,7 @@ def setup_nginx(data, paths, here):
 
     files.template(
         name="Deploy per-site nginx systemd service",
-        src=os.path.join(here, "assets/nginx/site-nginx.service.j2"),
+        src=os.path.join(here, "src/assets/nginx/site-nginx.service.j2"),
         dest=paths["systemd_site_nginx_service"],
         user="root",
         group="root",
@@ -125,7 +110,7 @@ def setup_nginx(data, paths, here):
 
     files.template(
         name="Deploy router nginx config",
-        src=os.path.join(here, "assets/nginx/router.conf.j2"),
+        src=os.path.join(here, "src/assets/nginx/router.conf.j2"),
         dest=paths["nginx_site_available"],
         user="root",
         group="root",

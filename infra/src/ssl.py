@@ -21,7 +21,7 @@ def deploy():
 def render_http_challenge_config(data, paths, here):
     files.template(
         name="Render nginx HTTP challenge config",
-        src=os.path.join(here, "assets/nginx/router.conf.j2"),
+        src=os.path.join(here, "src/assets/nginx/router.conf.j2"),
         dest=paths["nginx_site_available"],
         user="root",
         group="root",
@@ -64,7 +64,7 @@ def obtain_certificate(data, paths):
 def render_https_config(data, paths, here):
     files.template(
         name="Render nginx HTTPS config",
-        src=os.path.join(here, "assets/nginx/router.conf.j2"),
+        src=os.path.join(here, "src/assets/nginx/router.conf.j2"),
         dest=paths["nginx_site_available"],
         user="root",
         group="root",
