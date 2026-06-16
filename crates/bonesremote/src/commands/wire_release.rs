@@ -32,14 +32,14 @@ fn load_runtime_shared_paths(config_path: &Path) -> Result<Vec<SharedPath>> {
         #[serde(default)]
         shared: Shared,
     }
-    let runtime_path = config_path.parent().unwrap_or(Path::new(".")).join("runtime.yaml");
+    let runtime_path = config_path.parent().unwrap_or(Path::new(".")).join("runtime.toml");
     if !runtime_path.exists() {
         return Ok(Vec::new());
     }
     let content =
         fs::read_to_string(&runtime_path).with_context(|| format!("Failed to read {}", runtime_path.display()))?;
     let rt: RuntimeShared =
-        serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
     Ok(rt.shared.paths)
 }
 

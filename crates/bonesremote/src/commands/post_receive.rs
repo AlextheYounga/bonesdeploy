@@ -98,8 +98,8 @@ mod tests {
             },
             releases: crate::config::Releases { keep: 5 },
         };
-        let yaml = serde_yml::to_string(&cfg)?;
-        fs::write(path, yaml)?;
+        let toml = toml::to_string(&cfg)?;
+        fs::write(path, toml)?;
         Ok(())
     }
 
@@ -157,7 +157,7 @@ mod tests {
 
         let bare = create_remote_with_master_commit(&root)?;
         let project_root = root.join("deploy");
-        let config_path = root.join("bones.yaml");
+        let config_path = root.join("bones.toml");
         write_config(&config_path, &bare, &project_root, "master")?;
 
         let result = run(config_path.to_string_lossy().as_ref(), None);
@@ -178,11 +178,11 @@ mod tests {
         let build_root = project_root.join(Constants::BUILD_DIR).join(paths::WORKSPACE_DIR);
         fs::create_dir_all(&build_root)?;
 
-        let config_path = root.join("bones.yaml");
+        let config_path = root.join("bones.toml");
         write_config(&config_path, &bare, &project_root, "master")?;
 
-        let config_yaml_path = config_path.to_string_lossy().to_string();
-        let result = run(&config_yaml_path, Some("master"));
+        let config_path_str = config_path.to_string_lossy().to_string();
+        let result = run(&config_path_str, Some("master"));
 
         // Post-receive is responsible for checkout; shared-path wiring happens in a separate command.
         assert!(result.is_ok());
@@ -204,7 +204,7 @@ mod tests {
         let build_root = build_dir.join(paths::WORKSPACE_DIR);
         fs::create_dir_all(&build_root)?;
 
-        let config_path = root.join("bones.yaml");
+        let config_path = root.join("bones.toml");
         write_config(&config_path, &bare, &project_root, "master")?;
 
         let mut perms = fs::metadata(&build_dir)?.permissions();

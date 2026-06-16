@@ -50,31 +50,31 @@ enum Command {
 enum ReleaseCommand {
     /// Stage a new release before checkout
     Stage {
-        /// Path to bones.yaml config file
+        /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
     /// Wire shared paths into the build workspace
     Wire {
-        /// Path to bones.yaml config file
+        /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
     /// Atomically activate staged release
     Activate {
-        /// Path to bones.yaml config file
+        /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
     /// Drop a failed staged release and clear state
     DropFailed {
-        /// Path to bones.yaml config file
+        /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
     /// Repoint current to the previous release
     Rollback {
-        /// Path to bones.yaml config file
+        /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
@@ -84,13 +84,13 @@ enum ReleaseCommand {
 enum HookCommand {
     /// Run deployment scripts and release activation sequence
     Deploy {
-        /// Path to bones.yaml config file
+        /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
     /// Run the post-receive checkout sequence
     PostReceive {
-        /// Path to bones.yaml config file
+        /// Path to bones.toml config file
         #[arg(long)]
         config: String,
         /// Exact revision to check out into the build workspace
@@ -99,7 +99,7 @@ enum HookCommand {
     },
     /// Prune old releases after deployment
     PostDeploy {
-        /// Path to bones.yaml config file
+        /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },
@@ -109,7 +109,7 @@ enum HookCommand {
 enum ServiceCommand {
     /// Restart the per-site nginx service
     Restart {
-        /// Path to bones.yaml config file
+        /// Path to bones.toml config file
         #[arg(long)]
         config: String,
     },

@@ -43,9 +43,9 @@ pub fn run() -> Result<()> {
 }
 
 fn resolve_pull_target() -> Result<PullTarget> {
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    if bones_yaml.exists() {
-        let cfg = config::load(bones_yaml)?;
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    if bones_toml.exists() {
+        let cfg = config::load(bones_toml)?;
         return Ok(PullTarget {
             user: cfg.data.deploy_user.clone(),
             host: cfg.data.host,
@@ -71,7 +71,7 @@ fn resolve_remote_name() -> Result<String> {
         [] => bail!("No git remotes configured. Add a deployment remote before running bonesdeploy pull."),
         [remote] => Ok(remote.clone()),
         _ => {
-            bail!("Multiple git remotes configured. Keep .bones/bones.yaml or name the deployment remote 'production'.")
+            bail!("Multiple git remotes configured. Keep .bones/bones.toml or name the deployment remote 'production'.")
         }
     }
 }

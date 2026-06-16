@@ -157,12 +157,12 @@ fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Resul
 }
 
 fn current_runtime_template(bones_dir: &Path) -> Result<Option<String>> {
-    let runtime_yaml = bones_dir.join("runtime.yaml");
-    if !runtime_yaml.is_file() {
+    let runtime_toml = bones_dir.join("runtime.toml");
+    if !runtime_toml.is_file() {
         return Ok(None);
     }
 
-    let runtime = config::load_runtime(&runtime_yaml)?;
+    let runtime = config::load_runtime(&runtime_toml)?;
     Ok(runtime.get("template").and_then(serde_json::Value::as_str).map(str::to_string))
 }
 
@@ -303,14 +303,14 @@ version = "not-this"
         write(&source_dir.join("infra/README.md"), "skip me")?;
         write(&source_dir.join("crates/bonesdeploy/embeds/runtimes/laravel/infra/operations.py"), "laravel ops")?;
 
-        write(&bones_dir.join("bones.yaml"), "keep: config\n")?;
-        write(&bones_dir.join("runtime.yaml"), "template: laravel\n")?;
+        write(&bones_dir.join("bones.toml"), "keep = 'config'\n")?;
+        write(&bones_dir.join("runtime.toml"), "template = 'laravel'\n")?;
         write(&bones_dir.join("infra/runtime.py"), "old runtime")?;
 
         refresh_local_bones_from_source(&source_dir, &bones_dir)?;
 
-        assert_eq!(fs::read_to_string(bones_dir.join("bones.yaml"))?, "keep: config\n");
-        assert_eq!(fs::read_to_string(bones_dir.join("runtime.yaml"))?, "template: laravel\n");
+        assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "keep = 'config'\n");
+        assert_eq!(fs::read_to_string(bones_dir.join("runtime.toml"))?, "template = 'laravel'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("hooks/pre-push"))?, "new hook");
         assert_eq!(fs::read_to_string(bones_dir.join("deployment/01_build.sh"))?, "new deploy");
         assert_eq!(fs::read_to_string(bones_dir.join("infra/runtime.py"))?, "new runtime");

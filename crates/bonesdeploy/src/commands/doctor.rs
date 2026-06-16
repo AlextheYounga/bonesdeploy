@@ -18,8 +18,8 @@ pub async fn run(local_only: bool) -> Result<()> {
     check_pre_push_symlink(&mut issues);
 
     if !local_only {
-        let bones_yaml = Path::new(config::Constants::BONES_YAML);
-        match config::load(bones_yaml) {
+        let bones_toml = Path::new(config::Constants::BONES_TOML);
+        match config::load(bones_toml) {
             Ok(cfg) => check_remote(&cfg, &mut issues).await,
             Err(e) => issues.push(format!("Cannot load config: {e}")),
         }
@@ -54,7 +54,7 @@ fn check_bones_structure(issues: &mut Vec<String>) {
     }
 
     let expected = [
-        config::Constants::BONES_YAML,
+        config::Constants::BONES_TOML,
         config::Constants::BONES_HOOKS_SCRIPT,
         config::Constants::BONES_HOOKS_DIR,
         config::Constants::BONES_DEPLOYMENT_DIR,

@@ -98,21 +98,7 @@ pub enum PathType {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Permissions {
-    pub defaults: PermissionDefaults,
     pub paths: Vec<PathOverride>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct PermissionDefaults {
-    pub dir_mode: String,
-    pub file_mode: String,
-}
-
-impl Default for PermissionDefaults {
-    fn default() -> Self {
-        Self { dir_mode: "750".into(), file_mode: "640".into() }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -14,8 +14,8 @@ use crate::pyinfra::PyinfraDeploy;
 use crate::remote_data;
 
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    let mut cfg = config::load(bones_yaml)?;
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let mut cfg = config::load(bones_toml)?;
 
     if let Some(value) = domain {
         cfg.ssl.domain = value.trim().to_string();
@@ -30,14 +30,14 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     }
 
     if cfg.ssl.domain.is_empty() {
-        bail!("SSL domain is missing. Pass --domain or set ssl.domain in .bones/bones.yaml");
+        bail!("SSL domain is missing. Pass --domain or set ssl.domain in .bones/bones.toml");
     }
 
     if cfg.ssl.email.is_empty() {
-        bail!("SSL email is missing. Pass --email or set ssl.email in .bones/bones.yaml");
+        bail!("SSL email is missing. Pass --email or set ssl.email in .bones/bones.toml");
     }
 
-    config::save(&cfg, bones_yaml)?;
+    config::save(&cfg, bones_toml)?;
 
     if !prompts::confirm_remote_ssl()? {
         println!("Skipped remote SSL setup.");
@@ -61,7 +61,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let deploy_file = Path::new(config::Constants::BONES_REMOTE_SSL_DEPLOY);
     pyinfra::run_pyinfra_deploy(&cfg, &ssh_user, &deploy_data, &PyinfraDeploy { extra_args: &[], deploy_file })?;
 
-    config::save(&cfg, bones_yaml)?;
+    config::save(&cfg, bones_toml)?;
     push::sync_bones_directory(&cfg)?;
 
     println!("\n{} SSL setup complete.", style("Done!").green().bold());
@@ -77,12 +77,12 @@ fn ensure_runtime_assets_exist() -> Result<()> {
 
     embedded::scaffold_runtime_base(bones_dir)?;
 
-    let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
-    if !runtime_yaml.is_file() {
-        if let Some(parent) = runtime_yaml.parent() {
+    let runtime_toml = Path::new(config::Constants::BONES_RUNTIME_TOML);
+    if !runtime_toml.is_file() {
+        if let Some(parent) = runtime_toml.parent() {
             fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
         }
-        config::save_runtime(&serde_json::Map::new(), runtime_yaml)?;
+        config::save_runtime(&serde_json::Map::new(), runtime_toml)?;
     }
 
     Ok(())

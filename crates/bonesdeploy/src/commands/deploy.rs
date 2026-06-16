@@ -6,8 +6,8 @@ use crate::config;
 use crate::ssh;
 
 pub async fn run() -> Result<()> {
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    let cfg = config::load(bones_yaml)?;
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let cfg = config::load(bones_toml)?;
 
     let repo_path = &cfg.data.repo_path;
 

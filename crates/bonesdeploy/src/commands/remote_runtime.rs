@@ -1,14 +1,11 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Result, bail};
 
-use crate::bootstrap_ssh;
 use crate::config;
 use crate::git;
 use crate::prompts;
-use crate::pyinfra;
-use crate::pyinfra::PyinfraDeploy;
-use crate::remote_data;
+use crate::python;
 
 pub fn run() -> Result<()> {
     git::ensure_git_repository()?;
@@ -18,12 +15,9 @@ pub fn run() -> Result<()> {
         bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
     }
 
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    let cfg = config::load(bones_yaml)?;
-
-    let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
-    if !runtime_yaml.exists() {
-        bail!("{} does not exist. Run `bonesdeploy init` first.", config::Constants::BONES_RUNTIME_YAML);
+    let runtime_toml = Path::new(config::Constants::BONES_RUNTIME_TOML);
+    if !runtime_toml.exists() {
+        bail!("{} does not exist. Run `bonesdeploy init` first.", config::Constants::BONES_RUNTIME_TOML);
     }
 
     if !prompts::confirm_remote_runtime()? {
@@ -31,15 +25,18 @@ pub fn run() -> Result<()> {
         return Ok(());
     }
 
-    let ssh_user = bootstrap_ssh::resolve();
-    let deploy_file = PathBuf::from(config::Constants::BONES_REMOTE_RUNTIME_DEPLOY);
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    println!(
+        "Applying runtime using {} ...",
+        config::Constants::BONES_INFRA_MAIN
+    );
 
-    pyinfra::ensure_pyinfra_installed()?;
-    let deploy_data = remote_data::runtime(&cfg, runtime_yaml)?;
-    pyinfra::run_pyinfra_deploy(
-        &cfg,
-        &ssh_user,
-        &deploy_data,
-        &PyinfraDeploy { extra_args: &[], deploy_file: &deploy_file },
-    )
+    python::run_python(&[
+        "runtime-apply", "apply",
+        "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml"),
+        "--runtime-config", runtime_toml.to_str().unwrap_or(".bones/runtime.toml"),
+    ])?;
+
+    println!("Runtime apply completed.");
+    Ok(())
 }

@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use anyhow::Result;
 use serde_json::{Map, Value};
 
@@ -29,18 +27,6 @@ pub fn setup(cfg: &config::BonesConfig, deploy_authorized_key: &str) -> Result<V
     let mut vars = base(cfg)?;
     vars.insert(String::from("deploy_authorized_key"), Value::String(deploy_authorized_key.to_string()));
     vars.insert(String::from("setup_label"), Value::String(String::from("bonesdeploy")));
-    Ok(Value::Object(vars))
-}
-
-pub fn runtime(cfg: &config::BonesConfig, runtime_yaml: &Path) -> Result<Value> {
-    let mut vars = base(cfg)?;
-    let runtime_data = config::load_runtime(runtime_yaml)?;
-    for (key, value) in runtime_data {
-        if key == "paths" {
-            continue;
-        }
-        vars.insert(key, value);
-    }
     Ok(Value::Object(vars))
 }
 
