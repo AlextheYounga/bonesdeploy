@@ -15,9 +15,9 @@ pub fn run() -> Result<()> {
         bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
     }
 
-    let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
-    if !runtime_yaml.exists() {
-        bail!("{} does not exist. Run `bonesdeploy init` first.", config::Constants::BONES_RUNTIME_YAML);
+    let runtime_toml = Path::new(config::Constants::BONES_RUNTIME_TOML);
+    if !runtime_toml.exists() {
+        bail!("{} does not exist. Run `bonesdeploy init` first.", config::Constants::BONES_RUNTIME_TOML);
     }
 
     if !prompts::confirm_remote_runtime()? {
@@ -25,7 +25,7 @@ pub fn run() -> Result<()> {
         return Ok(());
     }
 
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
     println!(
         "Applying runtime using {} ...",
         config::Constants::BONES_INFRA_MAIN
@@ -33,8 +33,8 @@ pub fn run() -> Result<()> {
 
     python::run_python(&[
         "runtime-apply", "apply",
-        "--config", bones_yaml.to_str().unwrap_or(".bones/bones.yaml"),
-        "--runtime-config", runtime_yaml.to_str().unwrap_or(".bones/runtime.yaml"),
+        "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml"),
+        "--runtime-config", runtime_toml.to_str().unwrap_or(".bones/runtime.toml"),
     ])?;
 
     println!("Runtime apply completed.");

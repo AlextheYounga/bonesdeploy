@@ -12,8 +12,8 @@ use crate::pyinfra::PyinfraDeploy;
 use crate::remote_data;
 
 pub fn run() -> Result<()> {
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    let cfg = config::load(bones_yaml)?;
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let cfg = config::load(bones_toml)?;
 
     let deploy_file = Path::new(config::Constants::BONES_REMOTE_SETUP_DEPLOY);
     if !deploy_file.is_file() {

@@ -24,11 +24,11 @@ pub struct BonesConfig {
 pub struct Constants;
 impl Constants {
     pub const BONES_DIR: &'static str = paths::LOCAL_BONES_DIR;
-    pub const BONES_YAML: &'static str = paths::LOCAL_BONES_YAML;
+    pub const BONES_TOML: &'static str = paths::LOCAL_BONES_TOML;
     pub const BONES_HOOKS_SCRIPT: &'static str = paths::LOCAL_BONES_HOOKS_SCRIPT;
     pub const BONES_HOOKS_DIR: &'static str = paths::LOCAL_BONES_HOOKS_DIR;
     pub const BONES_DEPLOYMENT_DIR: &'static str = paths::LOCAL_BONES_DEPLOYMENT_DIR;
-    pub const BONES_RUNTIME_YAML: &'static str = paths::LOCAL_BONES_RUNTIME_YAML;
+    pub const BONES_RUNTIME_TOML: &'static str = paths::LOCAL_BONES_RUNTIME_TOML;
     pub const BONES_INFRA_MAIN: &'static str = paths::LOCAL_BONES_INFRA_MAIN;
     pub const BONES_REMOTE_SSL_DEPLOY: &'static str = paths::LOCAL_BONES_SSL_DEPLOY;
     pub const BONES_REMOTE_SETUP_DEPLOY: &'static str = paths::LOCAL_BONES_SETUP_DEPLOY;
@@ -83,7 +83,7 @@ pub fn repo_directory_name() -> Result<String> {
 pub fn load(path: &Path) -> Result<BonesConfig> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let mut config: BonesConfig =
-        serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     shared_config::apply_derived_defaults(&mut config.data);
     Ok(config)
 }
@@ -92,23 +92,23 @@ pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
     shared_config::hide_derived_defaults(&mut to_serialize.data);
 
-    let yaml = serde_yml::to_string(&to_serialize).context("Failed to serialize bones config")?;
-    fs::write(path, yaml).with_context(|| format!("Failed to write {}", path.display()))?;
+    let toml_str = toml::to_string(&to_serialize).context("Failed to serialize bones config")?;
+    fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
 
 pub fn load_runtime(path: &Path) -> Result<Map<String, Value>> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let value: Value = serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    let value: Value = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     match value {
         Value::Object(map) => Ok(map),
-        _ => anyhow::bail!("{} must contain a YAML object", path.display()),
+        _ => anyhow::bail!("{} must contain a TOML table", path.display()),
     }
 }
 
 pub fn save_runtime(runtime: &Map<String, Value>, path: &Path) -> Result<()> {
-    let yaml = serde_yml::to_string(runtime).context("Failed to serialize runtime config")?;
-    fs::write(path, yaml).with_context(|| format!("Failed to write {}", path.display()))?;
+    let toml_str = toml::to_string(runtime).context("Failed to serialize runtime config")?;
+    fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
 
@@ -132,9 +132,9 @@ mod tests {
         temp_dir().join(format!("bonesdeploy_config_test_{}_{}_{}", process::id(), nanos, file_name))
     }
 
-    fn minimal_yaml(project_name: &str) -> String {
+    fn minimal_toml(project_name: &str) -> String {
         format!(
-            "data:\n  remote_name: production\n  project_name: {project_name}\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: {}\n  branch: master\n  deploy_on_push: true\n",
+            "[data]\nremote_name = \"production\"\nproject_name = \"{project_name}\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nbranch = \"master\"\ndeploy_on_push = true\n",
             paths::default_repo_path_for(project_name)
         )
     }
@@ -161,8 +161,8 @@ mod tests {
     /// Derives the default repo path from the project name.
     #[test]
     fn load_applies_default_repo_path_from_project_name() -> Result<()> {
-        let path = temp_path("repo_path.yaml");
-        fs::write(&path, minimal_yaml("atlas"))?;
+        let path = temp_path("repo_path.toml");
+        fs::write(&path, minimal_toml("atlas"))?;
 
         let cfg = load(&path)?;
         assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("atlas"));
@@ -174,8 +174,8 @@ mod tests {
     /// Derives the default project root from the project name.
     #[test]
     fn load_applies_default_project_root_from_project_name() -> Result<()> {
-        let path = temp_path("project_root.yaml");
-        fs::write(&path, minimal_yaml("atlas"))?;
+        let path = temp_path("project_root.toml");
+        fs::write(&path, minimal_toml("atlas"))?;
 
         let cfg = load(&path)?;
         assert_eq!(cfg.data.project_root, paths::default_project_root_for("atlas"));
@@ -187,8 +187,8 @@ mod tests {
     /// Applies the default web root when not explicitly configured.
     #[test]
     fn load_applies_default_web_root() -> Result<()> {
-        let path = temp_path("web_root.yaml");
-        fs::write(&path, minimal_yaml("atlas"))?;
+        let path = temp_path("web_root.toml");
+        fs::write(&path, minimal_toml("atlas"))?;
 
         let cfg = load(&path)?;
         assert_eq!(cfg.data.web_root, "public");
@@ -201,7 +201,7 @@ mod tests {
     #[test]
     fn save_omits_derived_repo_project_and_web_roots() -> Result<()> {
         let config = sample_config("phoenix");
-        let path = temp_path("save_derived_defaults.yaml");
+        let path = temp_path("save_derived_defaults.toml");
 
         save(&config, &path)?;
         let content = fs::read_to_string(&path)?;
@@ -221,14 +221,14 @@ mod tests {
         config.ssl =
             Ssl { enabled: true, domain: String::from("app.example.com"), email: String::from("ops@example.com") };
 
-        let path = temp_path("save_ssl_settings.yaml");
+        let path = temp_path("save_ssl_settings.toml");
         save(&config, &path)?;
         let content = fs::read_to_string(&path)?;
 
-        assert!(content.contains("ssl:"));
-        assert!(content.contains("enabled: true"));
-        assert!(content.contains("domain: app.example.com"));
-        assert!(content.contains("email: ops@example.com"));
+        assert!(content.contains("[ssl]"));
+        assert!(content.contains("enabled = true"));
+        assert!(content.contains("domain = \"app.example.com\""));
+        assert!(content.contains("email = \"ops@example.com\""));
 
         fs::remove_file(path)?;
         Ok(())
@@ -237,13 +237,13 @@ mod tests {
     /// Preserves explicitly configured repo, project root, and web root overrides.
     #[test]
     fn load_preserves_explicit_repo_project_and_web_root_overrides() -> Result<()> {
-        let path = temp_path("overrides.yaml");
-        let yaml = format!(
-            "data:\n  remote_name: production\n  project_name: app\n  host: deploy.example.com\n  port: \"22\"\n  repo_path: {}\n  project_root: /custom/deploy\n  web_root: dist\n  branch: master\n  deploy_on_push: true\n",
+        let path = temp_path("overrides.toml");
+        let toml = format!(
+            "[data]\nremote_name = \"production\"\nproject_name = \"app\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\nweb_root = \"dist\"\nbranch = \"master\"\ndeploy_on_push = true\n",
             paths::default_repo_path_for("app")
         );
 
-        fs::write(&path, yaml)?;
+        fs::write(&path, toml)?;
         let cfg = load(Path::new(&path))?;
 
         assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("app"));

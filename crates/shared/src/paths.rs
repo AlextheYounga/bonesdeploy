@@ -28,19 +28,19 @@ pub const OPT_BONESDEPLOY: &str = "/opt/bonesdeploy";
 pub const TMP_ROOT: &str = "/tmp";
 
 pub const LOCAL_BONES_DIR: &str = ".bones";
-pub const LOCAL_BONES_YAML: &str = ".bones/bones.yaml";
+pub const LOCAL_BONES_TOML: &str = ".bones/bones.toml";
 pub const LOCAL_BONES_HOOKS_DIR: &str = ".bones/hooks";
 pub const LOCAL_BONES_HOOKS_SCRIPT: &str = ".bones/hooks/hooks.sh";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
 pub const LOCAL_BONES_RUNTIME_DIR: &str = ".bones/runtime";
-pub const LOCAL_BONES_RUNTIME_YAML: &str = ".bones/runtime.yaml";
+pub const LOCAL_BONES_RUNTIME_TOML: &str = ".bones/runtime.toml";
 pub const LOCAL_BONES_INFRA_MAIN: &str = ".bones/infra/main.py";
 pub const LOCAL_BONES_RUNTIME_DEPLOY: &str = ".bones/infra/runtime.py";
 pub const LOCAL_BONES_SSL_DEPLOY: &str = ".bones/infra/ssl.py";
 pub const LOCAL_BONES_SETUP_DEPLOY: &str = ".bones/infra/setup.py";
 
 pub const BONES_DIR: &str = "bones";
-pub const BONES_YAML: &str = "bones.yaml";
+pub const BONES_TOML: &str = "bones.toml";
 pub const NGINX_CONF: &str = "nginx.conf";
 pub const INDEX_HTML: &str = "index.html";
 pub const GIT_HEAD: &str = "HEAD";
@@ -118,7 +118,7 @@ pub struct DeploymentPaths {
     pub repo_parent: String,
     pub repo_head: String,
     pub repo_bones: String,
-    pub repo_bones_yaml: String,
+    pub repo_bones_toml: String,
     pub repo_deployment: String,
     pub site_nginx_config: String,
     pub conf_root: String,
@@ -165,7 +165,7 @@ impl DeploymentPaths {
             repo_parent: parent_or_default(&repo, DEFAULT_REPO_PARENT),
             repo_head: Path::new(&repo).join(GIT_HEAD).display().to_string(),
             repo_bones: repo_bones.display().to_string(),
-            repo_bones_yaml: repo_bones.join(BONES_YAML).display().to_string(),
+            repo_bones_toml: repo_bones.join(BONES_TOML).display().to_string(),
             site_nginx_config: conf_root.join(NGINX_CONF).display().to_string(),
             repo_deployment: repo_bones.join(DEPLOYMENT_DIR).display().to_string(),
             conf_root: conf_root.display().to_string(),

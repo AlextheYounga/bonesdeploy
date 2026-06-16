@@ -1,12 +1,10 @@
 import os
-import importlib.util
-
-import yaml
+import tomllib
 
 
-def load_yaml(path):
-    with open(path, "r", encoding="utf-8") as file:
-        return yaml.safe_load(file) or {}
+def load_toml(path):
+    with open(path, "rb") as file:
+        return tomllib.load(file)
 
 
 def bones_dir(deploy_file):
@@ -14,11 +12,11 @@ def bones_dir(deploy_file):
 
 
 def load_bones_config(deploy_file):
-    return load_yaml(os.path.join(bones_dir(deploy_file), "bones.yaml"))
+    return load_toml(os.path.join(bones_dir(deploy_file), "bones.toml"))
 
 
 def load_runtime_config(deploy_file):
-    return load_yaml(os.path.join(bones_dir(deploy_file), "runtime.yaml"))
+    return load_toml(os.path.join(bones_dir(deploy_file), "runtime.toml"))
 
 
 def unflatten(data_dict):

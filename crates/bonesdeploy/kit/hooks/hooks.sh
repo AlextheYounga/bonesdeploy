@@ -1,7 +1,7 @@
 	bones_init_remote_context() {
 	local git_dir_input="${1:-${GIT_DIR:-.}}"
 	GIT_DIR=$(cd "$git_dir_input" && pwd)
-	BONES_YAML="$GIT_DIR/bones/bones.yaml"
+	BONES_TOML="$GIT_DIR/bones/bones.toml"
 }
 
 bones_should_deploy_on_push() {
@@ -10,7 +10,7 @@ bones_should_deploy_on_push() {
 	fi
 
 	local deploy_on_push
-	deploy_on_push=$(grep -E '^[[:space:]]*deploy_on_push:[[:space:]]*' "$BONES_YAML" | head -1 | sed 's/#.*$//' | sed 's/^[^:]*:[[:space:]]*//' | tr -d '[:space:]')
+	deploy_on_push=$(grep -E '^[[:space:]]*deploy_on_push[[:space:]]*=' "$BONES_TOML" | head -1 | sed 's/#.*$//' | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]' | tr -d '"'"'"')
 
 	if [ -z "$deploy_on_push" ]; then
 		return 0
@@ -24,7 +24,7 @@ bones_should_deploy_on_push() {
 }
 
 bones_read_config_branch() {
-	grep -E '^[[:space:]]*branch:[[:space:]]*' "$BONES_YAML" | head -1 | sed 's/#.*$//' | sed 's/^[^:]*:[[:space:]]*//' | sed "s/^'//" | sed "s/'$//" | sed 's/^"//' | sed 's/"$//'
+	grep -E '^[[:space:]]*branch[[:space:]]*=' "$BONES_TOML" | head -1 | sed 's/#.*$//' | sed 's/^[^=]*=[[:space:]]*//' | sed 's/^["'\'']//' | sed 's/["'\'']$//'
 }
 
 bones_is_zero_oid() {
@@ -36,7 +36,7 @@ bones_resolve_deploy_push_target() {
 	local branch
 	branch=$(bones_read_config_branch)
 	if [ -z "$branch" ]; then
-		echo "[bonesdeploy] Could not read branch from $BONES_YAML"
+		echo "[bonesdeploy] Could not read branch from $BONES_TOML"
 		return 1
 	fi
 
@@ -87,7 +87,7 @@ bones_resolve_deploy_push_target() {
 }
 
 bones_stage_release() {
-	if ! bonesremote release stage --config "$BONES_YAML"; then
+	if ! bonesremote release stage --config "$BONES_TOML"; then
 		echo "[bonesdeploy] release stage failed. Push rejected."
 		exit 1
 	fi
@@ -98,7 +98,7 @@ bones_stage_release() {
 bones_wire_release() {
 	local revision="${1:-}"
 	echo "[bonesdeploy] Running post-receive checkout..."
-	local cmd=(bonesremote hooks post-receive --config "$BONES_YAML")
+	local cmd=(bonesremote hooks post-receive --config "$BONES_TOML")
 	if [ -n "$revision" ]; then
 		cmd+=(--revision "$revision")
 	fi
@@ -109,7 +109,7 @@ bones_wire_release() {
 	fi
 
 	echo "[bonesdeploy] Wiring shared paths just-in-time..."
-	if ! bonesremote release wire --config "$BONES_YAML"; then
+	if ! bonesremote release wire --config "$BONES_TOML"; then
 		echo "[bonesdeploy] release wire failed."
 		exit 1
 	fi
@@ -120,7 +120,7 @@ bones_wire_release() {
 	bones_run_deployment() {
 		echo "[bonesdeploy] Running deploy hook command..."
 
-		if ! bonesremote hooks deploy --config "$BONES_YAML"; then
+		if ! bonesremote hooks deploy --config "$BONES_TOML"; then
 			echo "[bonesdeploy] deploy hook command failed."
 			exit 1
 		fi
@@ -130,13 +130,13 @@ bones_wire_release() {
 
 bones_post_deploy() {
 	echo "[bonesdeploy] Running post-deploy (pruning old releases)..."
-	if ! bonesremote hooks post-deploy --config "$BONES_YAML"; then
+	if ! bonesremote hooks post-deploy --config "$BONES_TOML"; then
 		echo "[bonesdeploy] post-deploy failed."
 		exit 1
 	fi
 
 	echo "[bonesdeploy] Restarting site nginx..."
-	if ! sudo bonesremote service restart --config "$BONES_YAML"; then
+	if ! sudo bonesremote service restart --config "$BONES_TOML"; then
 		echo "[bonesdeploy] service restart failed."
 		exit 1
 	fi
@@ -145,7 +145,7 @@ bones_post_deploy() {
 }
 
 bones_read_local_remote_name() {
-	grep -E '^[[:space:]]*remote_name:[[:space:]]*' .bones/bones.yaml | head -1 | sed 's/#.*$//' | sed 's/^[^:]*:[[:space:]]*//' | sed "s/^'//" | sed "s/'$//" | sed 's/^"//' | sed 's/"$//'
+	grep -E '^[[:space:]]*remote_name[[:space:]]*=' .bones/bones.toml | head -1 | sed 's/#.*$//' | sed 's/^[^=]*=[[:space:]]*//' | sed 's/^["'\'']//' | sed 's/["'\'']$//'
 }
 
 bones_should_run_for_remote() {
@@ -153,7 +153,7 @@ bones_should_run_for_remote() {
 	BONES_REMOTE=$(bones_read_local_remote_name)
 
 	if [ -z "$BONES_REMOTE" ]; then
-		echo "[bonesdeploy] Warning: Could not read remote_name from .bones/bones.yaml"
+		echo "[bonesdeploy] Warning: Could not read remote_name from .bones/bones.toml"
 		return 1
 	fi
 

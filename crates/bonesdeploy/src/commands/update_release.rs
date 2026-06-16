@@ -12,12 +12,12 @@ pub fn current_local_version() -> String {
 }
 
 pub fn current_remote_version() -> String {
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    if !bones_yaml.exists() {
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    if !bones_toml.exists() {
         return String::from("unknown");
     }
 
-    let Ok(cfg) = config::load(bones_yaml) else {
+    let Ok(cfg) = config::load(bones_toml) else {
         return String::from("unknown");
     };
 
@@ -46,12 +46,12 @@ pub fn update_local_from_source(repo_url: &str) -> Result<()> {
 }
 
 pub async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result<()> {
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    if !bones_yaml.exists() {
-        bail!("No .bones/bones.yaml found. Run from a bonesdeploy project directory.");
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    if !bones_toml.exists() {
+        bail!("No .bones/bones.toml found. Run from a bonesdeploy project directory.");
     }
 
-    let cfg = config::load(bones_yaml)?;
+    let cfg = config::load(bones_toml)?;
     let port: u16 = cfg.data.port.parse().with_context(|| format!("Invalid port: {}", cfg.data.port))?;
     let session = ssh::connect_as("root", &cfg.data.host, port).await?;
 

@@ -61,8 +61,8 @@ fn nginx_and_apparmor_templates_use_resolved_paths() {
         "AppArmor profile must read the resolved current web root path\n{apparmor_conf}"
     );
     assert!(
-        apparmor_conf.contains("{{ paths.repo_bones_yaml }} r,"),
-        "AppArmor profile must read the resolved repo bones yaml path\n{apparmor_conf}"
+        apparmor_conf.contains("{{ paths.repo_bones_toml }} r,"),
+        "AppArmor profile must read the resolved repo bones toml path\n{apparmor_conf}"
     );
     assert!(
         apparmor_conf.contains("{{ paths.site_nginx_config }} r,"),

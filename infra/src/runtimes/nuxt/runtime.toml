@@ -1,0 +1,16 @@
+template = "nuxt"
+web_root = ".output/public"
+
+[permissions]
+paths = [
+    { path = "*", type = "dir", mode = "750" },
+    { path = "*", type = "file", mode = "640" },
+    { path = ".output", type = "dir", mode = "770", recursive = true },
+    { path = ".nuxt", type = "dir", mode = "770", recursive = true },
+]
+
+[shared]
+paths = [
+    { path = ".env", type = "file" },
+    { path = "storage", type = "dir" },
+]

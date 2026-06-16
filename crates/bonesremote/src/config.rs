@@ -29,7 +29,7 @@ impl Constants {
 pub fn load(path: &Path) -> Result<BonesConfig> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let mut config: BonesConfig =
-        serde_yml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     shared_config::apply_derived_defaults(&mut config.data);
     Ok(config)
 }
@@ -49,20 +49,20 @@ mod tests {
 
     fn temp_file_path(prefix: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
-        env::temp_dir().join(format!("{prefix}_{}_{}.yaml", process::id(), nanos))
+        env::temp_dir().join(format!("{prefix}_{}_{}.toml", process::id(), nanos))
     }
 
     /// Derives repo path, project root, and web root from the project name.
     #[test]
     fn load_derives_project_root_repo_path_and_web_root_from_project_name() -> Result<()> {
         let path = temp_file_path("bonesremote_config_derived_defaults");
-        let yaml = r"
-data:
-  project_name: acme
-  host: example.com
-";
+        let toml = r#"
+[data]
+project_name = "acme"
+host = "example.com"
+"#;
 
-        fs::write(&path, yaml)?;
+        fs::write(&path, toml)?;
         let cfg = load(&path)?;
         fs::remove_file(&path).ok();
 
@@ -76,15 +76,15 @@ data:
     #[test]
     fn load_preserves_explicit_repo_project_and_web_root() -> Result<()> {
         let path = temp_file_path("bonesremote_config_explicit_values");
-        let yaml = r"
-data:
-  project_name: acme
-  repo_path: /custom/repo.git
-  project_root: /custom/deploy
-  web_root: dist
-";
+        let toml = r#"
+[data]
+project_name = "acme"
+repo_path = "/custom/repo.git"
+project_root = "/custom/deploy"
+web_root = "dist"
+"#;
 
-        fs::write(&path, yaml)?;
+        fs::write(&path, toml)?;
         let cfg = load(&path)?;
         fs::remove_file(&path).ok();
 
@@ -98,7 +98,7 @@ data:
     #[test]
     fn load_uses_defaults_for_missing_fields() -> Result<()> {
         let path = temp_file_path("bonesremote_config_missing_fields");
-        fs::write(&path, "{}\n")?;
+        fs::write(&path, "")?;
 
         let cfg = load(&path)?;
         fs::remove_file(&path).ok();
@@ -109,11 +109,11 @@ data:
         Ok(())
     }
 
-    /// Returns an error when the config file contains invalid YAML.
+    /// Returns an error when the config file contains invalid TOML.
     #[test]
-    fn load_fails_for_invalid_yaml() -> Result<()> {
-        let path = temp_file_path("bonesremote_config_invalid_yaml");
-        fs::write(&path, "data: [\n")?;
+    fn load_fails_for_invalid_toml() -> Result<()> {
+        let path = temp_file_path("bonesremote_config_invalid_toml");
+        fs::write(&path, "[data\n")?;
 
         let result = load(&path);
         fs::remove_file(&path).ok();

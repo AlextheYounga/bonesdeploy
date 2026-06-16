@@ -42,7 +42,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
             releases: config::Releases::default(),
             ssl: config::Ssl::default(),
         };
-        config::save(&seed, Path::new(config::Constants::BONES_YAML))?;
+        config::save(&seed, Path::new(config::Constants::BONES_TOML))?;
 
         initial_project_name = Some(project_name);
     } else {
@@ -51,8 +51,8 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
 
     update_gitignore()?;
 
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    let cfg = load_or_collect_config(bones_yaml, args)?;
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let cfg = load_or_collect_config(bones_toml, args)?;
 
     if let Some(ref initial) = initial_project_name
         && cfg.data.project_name != *initial
@@ -65,12 +65,12 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
         println!("Renamed centralized folder to {}.bones", cfg.data.project_name);
     }
 
-    config::save(&cfg, bones_yaml)?;
-    println!("Saved config to {}", config::Constants::BONES_YAML);
+    config::save(&cfg, bones_toml)?;
+    println!("Saved config to {}", config::Constants::BONES_TOML);
 
     if is_fresh {
-        let runtime_yaml = Path::new(config::Constants::BONES_RUNTIME_YAML);
-        seed_runtime_config(args, bones_dir, runtime_yaml)?;
+        let runtime_toml = Path::new(config::Constants::BONES_RUNTIME_TOML);
+        seed_runtime_config(args, bones_dir, runtime_toml)?;
     }
     ensure_local_remote(&cfg)?;
 
@@ -92,20 +92,20 @@ fn print_follow_up_hint() {
     println!("Run {} to sync {} to the remote.", style("bonesdeploy push").cyan(), style(".bones/").cyan());
 }
 
-fn seed_runtime_config(args: &InitArgs, _bones_dir: &Path, runtime_yaml: &Path) -> Result<()> {
+fn seed_runtime_config(args: &InitArgs, _bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
     let available = python::list_runtimes()?;
     let template = if args.non_interactive { None } else { prompts::choose_template(&available)? };
 
     if let Some(ref template_name) = template {
         let defaults = python::runtime_defaults(template_name)?;
-        let yaml = serde_yml::to_string(&defaults).context("Failed to serialize runtime defaults")?;
-        fs::write(runtime_yaml, yaml)?;
+        let toml = toml::to_string(&defaults).context("Failed to serialize runtime defaults")?;
+        fs::write(runtime_toml, toml)?;
         println!("Applied runtime template: {template_name}");
-        println!("Saved runtime config to {}", config::Constants::BONES_RUNTIME_YAML);
+        println!("Saved runtime config to {}", config::Constants::BONES_RUNTIME_TOML);
     } else {
         let empty = serde_json::Map::new();
-        config::save_runtime(&empty, runtime_yaml)?;
-        println!("Seeded {} from kit defaults", config::Constants::BONES_RUNTIME_YAML);
+        config::save_runtime(&empty, runtime_toml)?;
+        println!("Seeded {} from kit defaults", config::Constants::BONES_RUNTIME_TOML);
     }
 
     Ok(())
@@ -201,11 +201,11 @@ fn cli_existing_or_prompt(
     }
 }
 
-fn load_or_collect_config(bones_yaml: &Path, args: &InitArgs) -> Result<config::BonesConfig> {
-    if bones_yaml.exists() {
-        let existing = config::load(bones_yaml)?;
+fn load_or_collect_config(bones_toml: &Path, args: &InitArgs) -> Result<config::BonesConfig> {
+    if bones_toml.exists() {
+        let existing = config::load(bones_toml)?;
         if config::is_configured(&existing) {
-            println!("Loading existing config from {}...", config::Constants::BONES_YAML);
+            println!("Loading existing config from {}...", config::Constants::BONES_TOML);
             return Ok(existing);
         }
         let project_name = config::repo_directory_name()?;

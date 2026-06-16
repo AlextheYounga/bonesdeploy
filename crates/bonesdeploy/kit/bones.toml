@@ -1,7 +1,7 @@
 [data]
-port ='22'
+port = '22'
 branch = 'master'
-deploy_on_push = false
+deploy_on_push = true
 
 [releases]
 keep = 5
