@@ -53,7 +53,7 @@ fn shared_setup_deploy_uses_single_setup_apt_packages_manifest() {
     let content = content.unwrap_or_default();
 
     assert!(
-        content.contains("SETUP_APT_PACKAGES"),
+        content.contains("BASE_SYSTEM_PACKAGES"),
         "shared setup deploy must drive package installation from a single manifest\n{content}"
     );
 }
@@ -136,15 +136,15 @@ fn remote_runtime_deploy_uses_runtime_user_owned_runtime_socket_dir() {
     let socket_dir_block = &content[socket_dir_start..conf_dir_start];
 
     assert!(
-        socket_dir_block.contains("path=PATHS[\"runtime_socket_dir\"]"),
+        socket_dir_block.contains("path=paths[\"runtime_socket_dir\"]"),
         "runtime deploy must target the resolved runtime socket directory\n{socket_dir_block}"
     );
     assert!(
-        socket_dir_block.contains("user=DEPLOY_DATA[\"runtime_user\"]"),
+        socket_dir_block.contains("user=data[\"runtime_user\"]"),
         "runtime deploy must make the runtime socket directory runtime-user-owned\n{socket_dir_block}"
     );
     assert!(
-        socket_dir_block.contains("group=DEPLOY_DATA[\"runtime_group\"]"),
+        socket_dir_block.contains("group=data[\"runtime_group\"]"),
         "runtime deploy must keep the runtime socket directory in the runtime group\n{socket_dir_block}"
     );
     assert!(
