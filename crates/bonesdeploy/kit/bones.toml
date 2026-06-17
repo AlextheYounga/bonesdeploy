@@ -1,0 +1,12 @@
+[data]
+port = '22'
+branch = 'master'
+deploy_on_push = true
+
+[releases]
+keep = 5
+
+[ssl]
+enabled = false
+domain = ''
+email = ''
