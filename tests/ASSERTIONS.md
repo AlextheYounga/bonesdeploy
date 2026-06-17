@@ -34,10 +34,10 @@
 - Omits derived repo, project root, and web root fields when saving. (save_omits_derived_repo_project_and_web_roots)
 - Persists SSL settings (enabled, domain, email) when saving. (save_persists_ssl_settings)
 
-## `crates/bonesdeploy/src/embedded.rs`
+## `crates/bonesdeploy/src/infra/embedded.rs`
 - Does not pass a `--config` flag to the doctor command in the hooks script. (hooks_script_does_not_pass_config_to_doctor)
 
-## `crates/bonesdeploy/src/git.rs`
+## `crates/bonesdeploy/src/infra/git.rs`
 - Rejects repo paths that do not end with `.git`. (parse_remote_url_rejects_non_git_paths)
 - Rejects non-SSH URLs that cannot be used with SSH deployment connections. (parse_remote_url_rejects_non_ssh_urls)
 - Rejects relative SCP paths that can resolve differently across hosts. (parse_remote_url_rejects_relative_scp_paths)
@@ -46,7 +46,7 @@
 - Defaults the SSH port to 22 when not explicitly provided in the URL. (parse_ssh_style_url_defaults_port_to_22)
 - Parses the host, port, and repository path from a full SSH-style URL. (parse_ssh_style_url_parses_host_port_and_repo_path)
 
-## `crates/bonesdeploy/src/prompts.rs`
+## `crates/bonesdeploy/src/ui/prompts.rs`
 - Accepts common yes values like y, yes, and YES. (confirmation_parser_accepts_common_yes_values)
 - Rejects non-affirmative values like empty string, n, and no. (confirmation_parser_rejects_non_affirmative_values)
 - Describes AppArmor and nginx in the remote runtime prompt. (remote_runtime_prompt_lines_include_site_runtime_concerns)

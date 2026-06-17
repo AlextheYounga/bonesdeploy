@@ -1,139 +1,18 @@
-mod deploy;
-mod doctor;
-mod init;
-mod init_config;
-mod manage;
-mod pull;
-mod push;
-mod remote_runtime;
-mod remote_setup;
-mod remote_ssl;
-mod rollback;
-mod update;
-mod update_release;
-mod version;
+pub(crate) mod deploy;
+pub(crate) mod doctor;
+pub(crate) mod init;
+pub(crate) mod init_config;
+pub(crate) mod manage;
+pub(crate) mod pull;
+pub(crate) mod push;
+pub(crate) mod remote_runtime;
+pub(crate) mod remote_setup;
+pub(crate) mod remote_ssl;
+pub(crate) mod rollback;
+pub(crate) mod update;
+pub(crate) mod update_release;
+pub(crate) mod version;
 
-use anyhow::Result;
-use clap::{Parser, Subcommand};
-
-#[derive(Parser)]
-#[command(name = "bonesdeploy", about = "Git deployment scaffolding tool")]
-pub struct Cli {
-    #[command(subcommand)]
-    command: Command,
-}
-
-#[derive(Subcommand)]
-enum Command {
-    /// Set up bonesdeploy in the current repository. Run this once per project.
-    Init {
-        /// Skip all interactive prompts; required fields must be provided via flags
-        #[arg(long)]
-        non_interactive: bool,
-        /// Run remote setup after init (instead of prompting)
-        #[arg(long)]
-        setup_remote: bool,
-        /// Project name (default: current directory name)
-        #[arg(long)]
-        project_name: Option<String>,
-        /// Git branch to deploy
-        #[arg(long)]
-        branch: Option<String>,
-        /// Deployment remote name (default: production)
-        #[arg(short = 'r', long)]
-        remote: Option<String>,
-        /// Server hostname or IP
-        #[arg(short = 'H', long)]
-        host: Option<String>,
-        /// SSH port (default: 22)
-        #[arg(long)]
-        port: Option<String>,
-    },
-    /// Check local and remote environment health
-    Doctor {
-        /// Skip remote checks
-        #[arg(long)]
-        local: bool,
-    },
-    /// Sync .bones/ folder to the remote bare repo
-    Push,
-    /// Sync .bones/ folder back from the remote bare repo
-    Pull,
-    /// Run deployment hooks manually without pushing commits
-    Deploy,
-    /// Update bonesdeploy and bonesremote to the latest version
-    Update {
-        /// Skip local update
-        #[arg(long)]
-        skip_local: bool,
-        /// Skip remote update
-        #[arg(long)]
-        skip_remote: bool,
-    },
-    /// Remote operations
-    Remote {
-        #[command(subcommand)]
-        command: RemoteCommand,
-    },
-    /// Open remote server management TUI
-    Manage,
-    /// Roll back current release to the previous one
-    Rollback,
-    /// Print the version
-    Version,
-}
-
-#[derive(Subcommand)]
-enum RemoteCommand {
-    /// Run remote setup against configured host
-    Setup,
-    /// Apply the configured runtime against configured host
-    Runtime,
-    /// Obtain and configure SSL certificates with certbot
-    Ssl {
-        /// Domain name for the certificate (e.g. app.example.com)
-        #[arg(long)]
-        domain: Option<String>,
-        /// Email used for Let's Encrypt registration and notices
-        #[arg(long)]
-        email: Option<String>,
-    },
-}
-
-pub async fn run(cli: &Cli) -> Result<()> {
-    match &cli.command {
-        Command::Init { non_interactive, setup_remote, project_name, branch, remote, host, port } => {
-            let outcome = init::run(&init::InitArgs {
-                non_interactive: *non_interactive,
-                setup_remote: *setup_remote,
-                project_name: project_name.clone(),
-                branch: branch.clone(),
-                remote: remote.clone(),
-                host: host.clone(),
-                port: port.clone(),
-            })?;
-            if outcome.remote_setup_ran {
-                push::run().await?;
-            }
-            Ok(())
-        }
-        Command::Doctor { local } => doctor::run(*local).await,
-        Command::Push => push::run().await,
-        Command::Pull => pull::run(),
-        Command::Deploy => deploy::run().await,
-        Command::Update { skip_local, skip_remote } => {
-            update::run(update::UpdateOptions { skip_local: *skip_local, skip_remote: *skip_remote }).await
-        }
-        Command::Manage => manage::run(),
-        Command::Remote { command } => match command {
-            RemoteCommand::Setup => remote_setup::run(),
-            RemoteCommand::Runtime => remote_runtime::run(),
-            RemoteCommand::Ssl { domain, email } => remote_ssl::run(domain.clone(), email.clone()),
-        },
-        Command::Rollback => rollback::run().await,
-        Command::Version => {
-            version::run();
-            Ok(())
-        }
-    }
-}
+// Compatibility re-exports — CLI types now live in crate::cli
+pub use crate::cli::args::Cli;
+pub use crate::cli::dispatch::run;

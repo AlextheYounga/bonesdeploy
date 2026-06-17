@@ -1,13 +1,14 @@
-mod bonesinfra;
-mod bootstrap_ssh;
+mod app;
+mod cli;
 mod commands;
 mod config;
-mod embedded;
-mod git;
-mod prompts;
-mod python;
 mod remote_data;
-mod ssh;
+
+mod infra;
+pub(crate) use infra::{bootstrap_ssh, embedded, git, python, ssh};
+
+mod ui;
+pub(crate) use ui::prompts;
 
 use anyhow::Result;
 use clap::Parser;

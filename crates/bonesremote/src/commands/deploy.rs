@@ -7,7 +7,7 @@ use anyhow::{Context, Result, bail};
 use crate::config;
 use crate::release_state;
 
-#[path = "deploy_output.rs"]
+#[path = "../release/scripts.rs"]
 mod deploy_output;
 
 use super::activate_release;

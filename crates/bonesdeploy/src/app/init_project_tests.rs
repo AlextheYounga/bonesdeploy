@@ -4,7 +4,8 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use super::{InitArgs, cli_existing_or_prompt, collect_non_interactive, run};
+use super::{cli_existing_or_prompt, collect_non_interactive, run};
+use crate::commands::init_config::InitArgs;
 
 use anyhow::{Result, bail};
 use shared::paths;
