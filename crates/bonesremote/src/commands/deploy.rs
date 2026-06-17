@@ -11,7 +11,36 @@ use crate::release_state;
 mod deploy_output;
 
 use super::activate_release;
+use super::doctor;
 use super::drop_failed_release;
+use super::post_deploy;
+use super::post_receive;
+use super::stage_release;
+use super::wire_release;
+
+pub fn run_full(config_path: &str, revision: Option<&str>) -> Result<()> {
+    doctor::run()?;
+    stage_release::run(config_path)?;
+
+    let deploy_result = (|| {
+        post_receive::run(config_path, revision)?;
+        wire_release::run(config_path)?;
+        run(config_path)?;
+        restart_services(config_path)?;
+        post_deploy::run(config_path)
+    })();
+
+    if let Err(error) = deploy_result {
+        if let Err(cleanup_error) = drop_failed_release::run(config_path) {
+            return Err(
+                error.context(format!("Failed to clean up staged release after deployment failure: {cleanup_error}"))
+            );
+        }
+        return Err(error);
+    }
+
+    Ok(())
+}
 
 pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
@@ -67,6 +96,20 @@ pub fn run(config_path: &str) -> Result<()> {
     publish_release_tree(&build_root, &release_path)?;
 
     activate_release::run(config_path)
+}
+
+fn restart_services(config_path: &str) -> Result<()> {
+    let status = Command::new("sudo")
+        .arg(config::Constants::BINARY_NAME)
+        .args(["service", "restart", "--config", config_path])
+        .status()
+        .context("Failed to restart site services")?;
+
+    if !status.success() {
+        bail!("Failed to restart site services: status {status}");
+    }
+
+    Ok(())
 }
 
 fn publish_release_tree(build_root: &Path, release_path: &Path) -> Result<()> {

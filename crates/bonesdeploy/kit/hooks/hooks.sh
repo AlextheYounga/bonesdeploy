@@ -75,73 +75,20 @@ bones_resolve_deploy_push_target() {
 	return 0
 }
 
-	bones_run_doctor_remote() {
-		echo "[bonesdeploy] Running remote doctor..."
-
-		if ! bonesremote doctor; then
-			echo "[bonesdeploy] Remote doctor reported issues. Push rejected."
-			exit 1
-		fi
-
-	echo "[bonesdeploy] Doctor passed. Staging release..."
-}
-
-bones_stage_release() {
-	if ! bonesremote release stage --config "$BONES_TOML"; then
-		echo "[bonesdeploy] release stage failed. Push rejected."
-		exit 1
-	fi
-
-	echo "[bonesdeploy] Release staged."
-}
-
-bones_wire_release() {
+bones_run_remote_deploy() {
 	local revision="${1:-}"
-	echo "[bonesdeploy] Running post-receive checkout..."
-	local cmd=(bonesremote hooks post-receive --config "$BONES_TOML")
+	echo "[bonesdeploy] Starting remote deploy..."
+	local cmd=(bonesremote deploy --config "$BONES_TOML")
 	if [ -n "$revision" ]; then
 		cmd+=(--revision "$revision")
 	fi
 
 	if ! "${cmd[@]}"; then
-		echo "[bonesdeploy] post-receive hook command failed."
+		echo "[bonesdeploy] remote deploy failed."
 		exit 1
 	fi
 
-	echo "[bonesdeploy] Wiring shared paths just-in-time..."
-	if ! bonesremote release wire --config "$BONES_TOML"; then
-		echo "[bonesdeploy] release wire failed."
-		exit 1
-	fi
-
-	echo "[bonesdeploy] Release wired."
-}
-
-	bones_run_deployment() {
-		echo "[bonesdeploy] Running deploy hook command..."
-
-		if ! bonesremote hooks deploy --config "$BONES_TOML"; then
-			echo "[bonesdeploy] deploy hook command failed."
-			exit 1
-		fi
-
-	echo "[bonesdeploy] Deploy hook command complete. Running post-deploy..."
-}
-
-bones_post_deploy() {
-	echo "[bonesdeploy] Running post-deploy (pruning old releases)..."
-	if ! bonesremote hooks post-deploy --config "$BONES_TOML"; then
-		echo "[bonesdeploy] post-deploy failed."
-		exit 1
-	fi
-
-	echo "[bonesdeploy] Restarting site nginx..."
-	if ! sudo bonesremote service restart --config "$BONES_TOML"; then
-		echo "[bonesdeploy] service restart failed."
-		exit 1
-	fi
-
-	echo "[bonesdeploy] post-deploy complete. Deployment finished."
+	echo "[bonesdeploy] Deployment finished."
 }
 
 bones_read_local_remote_name() {

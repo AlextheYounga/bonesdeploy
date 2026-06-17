@@ -117,7 +117,6 @@ fn replace_workspace_path_with_shared_symlink(path: &Path) -> Result<()> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use std::env;

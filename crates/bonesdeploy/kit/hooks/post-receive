@@ -2,10 +2,8 @@
 #
 # post-receive — Remote hook, runs after refs are updated.
 #
-# Delegates checkout + release wiring to bonesremote, then
-# calls deploy scripts.
-#
-# GIT_DIR is set by git to the bare repo path.
+# Resolves the pushed deployment ref and delegates the full remote
+# deployment lifecycle to bonesremote.
 
 set -euo pipefail
 
@@ -32,9 +30,7 @@ main() {
 		exit 0
 	fi
 
-	bones_wire_release "$BONES_DEPLOY_NEWREV"
-	bones_run_deployment
-	bones_post_deploy
+	bones_run_remote_deploy "$BONES_DEPLOY_NEWREV"
 }
 
 main

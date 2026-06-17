@@ -38,8 +38,6 @@ impl Constants {
 
     pub const REMOTE_BONES_DIR: &'static str = "bones";
     pub const REMOTE_HOOKS_DIR: &'static str = "hooks";
-    pub const PRE_RECEIVE_HOOK: &'static str = "pre-receive";
-    pub const POST_RECEIVE_HOOK: &'static str = "post-receive";
 
     pub const ASSET_HOOKS_DIR: &'static str = "hooks/";
     pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
@@ -121,9 +119,7 @@ mod tests {
     use anyhow::Result;
     use shared::paths;
 
-    use super::{
-        BonesConfig, Data, Releases, Ssl, default_project_root_for, default_web_root, load, save,
-    };
+    use super::{BonesConfig, Data, Releases, Ssl, default_project_root_for, default_web_root, load, save};
 
     fn temp_path(file_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());

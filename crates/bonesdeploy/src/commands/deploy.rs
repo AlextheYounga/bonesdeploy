@@ -9,33 +9,14 @@ pub async fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
-    let repo_path = &cfg.data.repo_path;
+    let remote_bones_toml = cfg.data.deployment_paths().repo_bones_toml;
 
     println!("Deploying {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
 
     let session = ssh::connect(&cfg).await?;
 
-    println!("Running pre-receive...");
-    ssh::stream_cmd(
-        &session,
-        &format!(
-            "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
-            config::Constants::REMOTE_HOOKS_DIR,
-            config::Constants::PRE_RECEIVE_HOOK
-        ),
-    )
-    .await?;
-
-    println!("Running post-receive...");
-    ssh::stream_cmd(
-        &session,
-        &format!(
-            "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
-            config::Constants::REMOTE_HOOKS_DIR,
-            config::Constants::POST_RECEIVE_HOOK
-        ),
-    )
-    .await?;
+    println!("Running remote deploy...");
+    ssh::stream_cmd(&session, &format!("bonesremote deploy --config '{remote_bones_toml}'")).await?;
 
     session.close().await?;
 

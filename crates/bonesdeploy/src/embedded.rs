@@ -97,4 +97,14 @@ mod tests {
         assert!(!hooks_script.contains("bonesremote doctor --config"));
         Ok(())
     }
+
+    /// Routes hook deployments through the single top-level remote deploy command.
+    #[test]
+    fn hooks_script_uses_top_level_remote_deploy_command() -> Result<()> {
+        let hooks_script = super::Kit::get("hooks/hooks.sh").ok_or_else(|| anyhow!("hooks.sh should be embedded"))?;
+        let hooks_script = String::from_utf8_lossy(hooks_script.data.as_ref()).to_string();
+        assert!(hooks_script.contains("bonesremote deploy --config \"$BONES_TOML\""));
+        assert!(!hooks_script.contains("bonesremote hooks deploy --config"));
+        Ok(())
+    }
 }

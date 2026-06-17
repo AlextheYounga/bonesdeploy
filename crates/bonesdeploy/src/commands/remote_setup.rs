@@ -32,7 +32,10 @@ pub fn run() -> Result<()> {
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    python::run_python_with_stdin(&["setup", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")], &json)?;
+    python::run_python_with_stdin(
+        &["setup", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")],
+        &json,
+    )?;
 
     println!("{} Remote setup complete.", style("Done!").green().bold());
 

@@ -2,38 +2,9 @@
 #
 # pre-receive — Remote hook, runs before refs are updated.
 #
-# Runs bonesremote doctor to validate the server environment,
-# then stages a release directly.
-#
-# GIT_DIR is set by git to the bare repo path.
+# Deployment lifecycle now runs from post-receive through a single
+# bonesremote deploy command. pre-receive intentionally stays inert.
 
 set -euo pipefail
 
-GIT_DIR="${GIT_DIR:-.}"
-GIT_DIR=$(cd "$GIT_DIR" && pwd)
-HOOKS_LIB="$GIT_DIR/bones/hooks/hooks.sh"
-
-if [ ! -f "$HOOKS_LIB" ]; then
-    echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"
-    exit 1
-fi
-
-# shellcheck source=/dev/null
-. "$HOOKS_LIB"
-bones_init_remote_context "$GIT_DIR"
-
-main() {
-	if ! bones_should_deploy_on_push; then
-		echo "[bonesdeploy] deploy_on_push=false, skipping deployment on push."
-		exit 0
-	fi
-
-	if ! bones_resolve_deploy_push_target; then
-		exit 0
-	fi
-
-	bones_run_doctor_remote
-	bones_stage_release
-}
-
-main
+exit 0

@@ -7,7 +7,10 @@ use inquire::{Confirm, Select, Text};
 use crate::config::BonesConfig;
 use crate::git;
 
-pub fn prompt_runtime_questions(questions: &serde_json::Value, defaults: &serde_json::Value) -> Result<serde_json::Value> {
+pub fn prompt_runtime_questions(
+    questions: &serde_json::Value,
+    defaults: &serde_json::Value,
+) -> Result<serde_json::Value> {
     let mut answers = defaults.clone();
     let questions = questions.as_array().cloned().unwrap_or_default();
 
@@ -23,10 +26,7 @@ pub fn prompt_runtime_questions(questions: &serde_json::Value, defaults: &serde_
         let answer: serde_json::Value = match question_type {
             "bool" => {
                 let default_bool = default.as_ref().and_then(|v| v.as_bool()).unwrap_or(false);
-                let choice = Confirm::new(label)
-                    .with_default(default_bool)
-                    .prompt()
-                    .map_err(|err| anyhow!(err))?;
+                let choice = Confirm::new(label).with_default(default_bool).prompt().map_err(|err| anyhow!(err))?;
                 serde_json::Value::Bool(choice)
             }
             "choice" => {
@@ -51,10 +51,7 @@ pub fn prompt_runtime_questions(questions: &serde_json::Value, defaults: &serde_
             }
             _ => {
                 let default_str = default.as_ref().and_then(|v| v.as_str()).unwrap_or("");
-                let input = Text::new(label)
-                    .with_default(default_str)
-                    .prompt()
-                    .map_err(|err| anyhow!(err))?;
+                let input = Text::new(label).with_default(default_str).prompt().map_err(|err| anyhow!(err))?;
                 serde_json::Value::String(input)
             }
         };

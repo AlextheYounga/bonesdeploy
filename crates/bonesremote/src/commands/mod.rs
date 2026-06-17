@@ -27,6 +27,15 @@ enum Command {
     Init,
     /// Check server environment health
     Doctor,
+    /// Run the full remote deployment lifecycle
+    Deploy {
+        /// Path to bones.toml config file
+        #[arg(long)]
+        config: String,
+        /// Exact revision to check out into the build workspace
+        #[arg(long)]
+        revision: Option<String>,
+    },
     /// Release lifecycle operations
     Release {
         #[command(subcommand)]
@@ -119,6 +128,7 @@ pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init => init::run(),
         Command::Doctor => doctor::run(),
+        Command::Deploy { config, revision } => deploy::run_full(config, revision.as_deref()),
         Command::Release { command } => match command {
             ReleaseCommand::Stage { config } => stage_release::run(config),
             ReleaseCommand::Wire { config } => wire_release::run(config),
