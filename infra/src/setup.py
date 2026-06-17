@@ -264,5 +264,3 @@ def install_bonesremote(data):
         _sudo=True,
     )
 
-
-deploy()

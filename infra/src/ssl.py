@@ -88,5 +88,3 @@ def render_https_config(data, paths, here):
         _sudo=True,
     )
 
-
-deploy()

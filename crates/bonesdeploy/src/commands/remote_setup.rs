@@ -4,12 +4,12 @@ use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use console::style;
+use serde_json::Value;
 
 use crate::bootstrap_ssh;
 use crate::config;
 use crate::embedded;
-use crate::pyinfra;
-use crate::pyinfra::PyinfraDeploy;
+use crate::python;
 use crate::remote_data;
 
 pub fn run() -> Result<()> {
@@ -22,18 +22,17 @@ pub fn run() -> Result<()> {
     }
     embedded::ensure_infra_assets_exist(bones_dir)?;
 
-    let deploy_file = Path::new(config::Constants::BONES_REMOTE_SETUP_DEPLOY);
-    if !deploy_file.is_file() {
-        bail!("Missing remote setup deploy file: {}", deploy_file.display());
-    }
-
-    pyinfra::ensure_pyinfra_installed()?;
-
     let ssh_user = bootstrap_ssh::resolve();
     let deploy_authorized_key = resolve_deploy_authorized_key()?;
 
-    let deploy_data = remote_data::setup(&cfg, &deploy_authorized_key)?;
-    pyinfra::run_pyinfra_deploy(&cfg, &ssh_user, &deploy_data, &PyinfraDeploy { extra_args: &[], deploy_file })?;
+    let mut deploy_data = remote_data::setup(&cfg, &deploy_authorized_key)?;
+    if let Value::Object(ref mut map) = deploy_data {
+        map.insert(String::from("ssh_user"), Value::String(ssh_user.clone()));
+        map.insert(String::from("host"), Value::String(cfg.data.host.clone()));
+    }
+
+    let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
+    python::run_python_with_stdin(&["setup", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")], &json)?;
 
     println!("{} Remote setup complete.", style("Done!").green().bold());
 

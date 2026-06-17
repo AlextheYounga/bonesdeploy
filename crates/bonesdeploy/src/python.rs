@@ -1,5 +1,6 @@
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
@@ -28,7 +29,41 @@ pub fn run_python(args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-/// Runs a Python infra command that returns JSON, parses and returns it.
+/// Runs `python3 .bones/infra/main.py <args>` with JSON piped to stdin.
+pub fn run_python_with_stdin(args: &[&str], stdin_json: &str) -> Result<String> {
+    let main_py = Path::new(super::config::Constants::BONES_INFRA_MAIN);
+    if !main_py.exists() {
+        bail!(
+            "{} not found. Run `bonesdeploy init` first to scaffold the infra entrypoint.",
+            main_py.display()
+        );
+    }
+
+    let mut child = Command::new("python3")
+        .arg(main_py)
+        .args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("Failed to run python3 {} {}", main_py.display(), args.join(" ")))?;
+
+    child
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(stdin_json.as_bytes())
+        .context("Failed to write JSON data to python3 stdin")?;
+
+    let output = child.wait_with_output().with_context(|| format!("Failed to wait on python3 {} {}", main_py.display(), args.join(" ")))?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("python3 {} failed:\n{}", main_py.display(), stderr.trim());
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
 pub fn run_python_json(args: &[&str]) -> Result<Value> {
     let mut json_args = args.to_vec();
     json_args.push("--json");

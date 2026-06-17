@@ -1,15 +1,15 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use console::style;
+use serde_json::Value;
 
 use crate::bootstrap_ssh;
 use crate::commands::push;
 use crate::config;
 use crate::embedded;
 use crate::prompts;
-use crate::pyinfra;
-use crate::pyinfra::PyinfraDeploy;
+use crate::python;
 use crate::remote_data;
 
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
@@ -49,8 +49,6 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     }
     embedded::ensure_infra_assets_exist(bones_dir)?;
 
-    pyinfra::ensure_pyinfra_installed()?;
-
     println!(
         "Running {} against {} for {}...",
         style("remote ssl").cyan().bold(),
@@ -58,11 +56,16 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
         style(&cfg.ssl.domain).cyan(),
     );
 
-    let deploy_data = remote_data::ssl(&cfg, &cfg.ssl.domain, &cfg.ssl.email)?;
-
     let ssh_user = bootstrap_ssh::resolve();
-    let deploy_file = Path::new(config::Constants::BONES_REMOTE_SSL_DEPLOY);
-    pyinfra::run_pyinfra_deploy(&cfg, &ssh_user, &deploy_data, &PyinfraDeploy { extra_args: &[], deploy_file })?;
+    let mut deploy_data = remote_data::ssl(&cfg, &cfg.ssl.domain, &cfg.ssl.email)?;
+    if let Value::Object(ref mut map) = deploy_data {
+        map.insert(String::from("ssh_user"), Value::String(ssh_user.clone()));
+        map.insert(String::from("host"), Value::String(cfg.data.host.clone()));
+        map.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
+    }
+
+    let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
+    python::run_python_with_stdin(&["ssl", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")], &json)?;
 
     config::save(&cfg, bones_toml)?;
     push::sync_bones_directory(&cfg)?;

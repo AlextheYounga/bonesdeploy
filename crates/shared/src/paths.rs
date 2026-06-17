@@ -240,27 +240,9 @@ pub fn bones_state_root() -> PathBuf {
     }
 }
 
-pub fn managed_pyinfra_venv_dir() -> PathBuf {
-    bones_state_root().join("pyinfra").join(".venv")
-}
-
-pub fn managed_pyinfra_binary() -> PathBuf {
-    managed_pyinfra_venv_dir().join("bin").join("pyinfra")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Resolves the managed pyinfra binary path under the state root.
-    #[test]
-    fn managed_pyinfra_binary_is_in_managed_venv() {
-        let path = managed_pyinfra_binary();
-        let parent = path.parent().unwrap();
-        assert_eq!(parent.file_name().unwrap(), "bin");
-        let grandparent = parent.parent().unwrap();
-        assert_eq!(grandparent.file_name().unwrap(), ".venv");
-    }
 
     /// Falls back to XDG_CONFIG_HOME when available.
     #[test]

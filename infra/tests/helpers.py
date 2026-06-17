@@ -7,6 +7,9 @@ SRC_DIR = INFRA_DIR / "src"
 REPO_ROOT = INFRA_DIR.parent
 sys.path.insert(0, str(INFRA_DIR))
 
+PYTHON_BIN = sys.executable
+PYTHON_ENV = {**os.environ, "PYTHONPATH": str(INFRA_DIR)}
+
 
 def read(path):
     return Path(path).read_text()
@@ -55,7 +58,7 @@ def run(*args):
         capture_output=True,
         text=True,
         timeout=10,
-        env={**os.environ, "PYTHONPATH": str(INFRA_DIR)},
+        env=PYTHON_ENV,
     )
     assert result.returncode == 0, f"Failed: {' '.join(args)}\n{result.stderr}"
     return result.stdout

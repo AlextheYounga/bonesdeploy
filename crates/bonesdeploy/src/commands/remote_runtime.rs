@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
+use crate::bootstrap_ssh;
 use crate::config;
 use crate::embedded;
 use crate::git;
@@ -29,15 +30,17 @@ pub fn run() -> Result<()> {
     }
 
     let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let ssh_user = bootstrap_ssh::resolve();
     println!(
         "Applying runtime using {} ...",
         config::Constants::BONES_INFRA_MAIN
     );
 
     python::run_python(&[
-        "runtime-apply", "apply",
+        "runtime", "apply",
         "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml"),
         "--runtime-config", runtime_toml.to_str().unwrap_or(".bones/runtime.toml"),
+        "--ssh-user", &ssh_user,
     ])?;
 
     println!("Runtime apply completed.");

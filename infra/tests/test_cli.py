@@ -1,9 +1,33 @@
 """CLI commands must run without crashing."""
 
+import json
+import subprocess
+
 from . import helpers
 
-
 MAIN = helpers.INFRA_DIR / "main.py"
+PYTHON = helpers.PYTHON_BIN
+
+
+def _run_no_input(*args):
+    return subprocess.run(
+        [PYTHON, str(MAIN), *args],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env=helpers.PYTHON_ENV,
+    )
+
+
+def _run_with_stdin(stdin_data, *args):
+    return subprocess.run(
+        [PYTHON, str(MAIN), *args],
+        input=json.dumps(stdin_data) if isinstance(stdin_data, dict) else stdin_data,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        env=helpers.PYTHON_ENV,
+    )
 
 
 def test_runtime_list():
@@ -20,19 +44,18 @@ def test_runtime_defaults():
         helpers.run(MAIN, "runtime", "defaults", name, "--json")
 
 
-def test_unimplemented_commands_fail_gracefully():
-    import subprocess
+def test_setup_apply_rejects_missing_host():
+    result = _run_with_stdin({"ssh_user": "root"}, "setup", "apply", "--config", "/dev/null")
+    assert result.returncode == 3, f"Expected exit 3 for missing host, got {result.returncode}"
+    assert "missing host" in result.stderr.lower()
 
-    for args in (
-        ["setup", "apply", "--config", "/dev/null"],
-        ["runtime-apply", "apply", "--config", "/dev/null", "--runtime-config", "/dev/null"],
-        ["ssl", "apply", "--config", "/dev/null"],
-    ):
-        result = subprocess.run(
-            ["python3", str(MAIN), *args],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        assert result.returncode == 2, f"Expected exit 2 for unimplemented: {' '.join(args)}"
-        assert "Error" in result.stderr, f"Expected error message: {' '.join(args)}"
+
+def test_runtime_apply_requires_ssh_user():
+    result = _run_no_input("runtime", "apply", "--config", "/dev/null", "--runtime-config", "/dev/null")
+    assert result.returncode != 0, f"Expected non-zero exit for missing --ssh-user"
+
+
+def test_ssl_apply_rejects_missing_host():
+    result = _run_with_stdin({"ssh_user": "root"}, "ssl", "apply", "--config", "/dev/null")
+    assert result.returncode == 3, f"Expected exit 3 for missing host, got {result.returncode}"
+    assert "missing host" in result.stderr.lower()

@@ -199,5 +199,3 @@ def run_doctor(data):
         _sudo_user=data["deploy_user"],
     )
 
-
-deploy()

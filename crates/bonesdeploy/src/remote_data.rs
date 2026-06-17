@@ -64,7 +64,7 @@ mod tests {
         }
     }
 
-    /// Passes the SSL domain and email into the data sent to the pyinfra SSL deploy.
+    /// Passes the SSL domain and email into the deploy data sent to the infra CLI.
     #[test]
     fn ssl_data_includes_domain_and_email() -> anyhow::Result<()> {
         let cfg = test_cfg();
