@@ -138,7 +138,7 @@ fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Resul
 
     println!("{}", style("Refreshing local .bones scaffold...").cyan());
 
-    let kit_root = source_dir.join("crates/bonesdeploy/embeds/kit");
+    let kit_root = source_dir.join("crates/bonesdeploy/kit");
     sync_tree(&kit_root.join("hooks"), &bones_dir.join("hooks"), true)?;
     sync_tree(&kit_root.join("deployment"), &bones_dir.join("deployment"), true)?;
 
@@ -234,8 +234,8 @@ version = "not-this"
         let source_dir = temp.path().join("source");
         let bones_dir = temp.path().join(".bones");
 
-        write(&source_dir.join("crates/bonesdeploy/embeds/kit/hooks/pre-push"), "new hook")?;
-        write(&source_dir.join("crates/bonesdeploy/embeds/kit/deployment/01_build.sh"), "new deploy")?;
+        write(&source_dir.join("crates/bonesdeploy/kit/hooks/pre-push"), "new hook")?;
+        write(&source_dir.join("crates/bonesdeploy/kit/deployment/01_build.sh"), "new deploy")?;
 
         write(&bones_dir.join("bones.toml"), "keep = 'config'\n")?;
         write(&bones_dir.join("runtime.toml"), "template = 'laravel'\n")?;

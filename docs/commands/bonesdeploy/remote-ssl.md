@@ -2,7 +2,7 @@
 
 ## Overview
 
-Configures SSL/TLS certificates for the deployment using Let's Encrypt and certbot. This command runs the SSL pyinfra deploy script (`.bones/infra/ssl.py`) as root, separate from the runtime deploy, keeping certificate management decoupled from app runtime concerns.
+Configures SSL/TLS certificates for the deployment using Let's Encrypt and certbot. This command runs the SSL configuration from the hidden `bonesinfra` checkout managed by `bonesdeploy` as root, separate from the runtime deploy, keeping certificate management decoupled from app runtime concerns.
 
 ## Command Signature
 
@@ -49,14 +49,14 @@ Ensures both domain and email are set before proceeding. These are required for 
 
 ### 3. Ensure Runtime Assets Exist
 
-Scaffolds `.bones/infra/` and `.bones/runtime/` base assets if missing, ensuring the SSL deploy script and the nginx router template exist.
+Uses the hidden `bonesinfra` checkout managed by `bonesdeploy`, ensuring the SSL deploy script and the nginx router template exist.
 
 ### 4. Run pyinfra SSL Deploy (as Root)
 
 Connects as root (or `BONES_BOOTSTRAP_SSH_USER`) since certbot and nginx configuration require elevated privileges:
 
 ```bash
-pyinfra <host> .bones/infra/ssl.py --ssh-user root --ssh-port 22 --data ssl_domain=app.example.com --data ssl_email=ops@example.com --data paths.repo=/home/git/myapp.git ... -vv
+bonesdeploy remote ssl --host <host> --ssh-user root --ssh-port 22 --domain app.example.com --email ops@example.com --repo-path /home/git/myapp.git
 ```
 
 **pyinfra Data Variables:**

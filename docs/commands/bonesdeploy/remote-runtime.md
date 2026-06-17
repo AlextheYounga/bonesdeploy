@@ -2,7 +2,7 @@
 
 ## Overview
 
-Prompts for a framework template, refreshes the local `.bones/runtime/` scaffold (with template-specific `operations.py`), writes `.bones/runtime.yaml`, then asks whether to apply the runtime pyinfra deploy script (`.bones/infra/runtime.py`) on the server as the deploy user.
+Prompts for a framework template, then applies the runtime configuration from the hidden `bonesinfra` checkout managed by `bonesdeploy` on the server as the deploy user.
 
 ## Command Signature
 
@@ -20,7 +20,7 @@ Loads `.bones/bones.yaml` and `.bones/runtime.yaml`. Prompts the user to select 
 
 Deletes the existing `.bones/runtime/` directory (if any) and writes fresh scaffold:
 
-- Writes `kit/infra/` assets to `.bones/infra/` (shared runtime deploy script + Jinja2 templates)
+- Writes runtime assets from the hidden `bonesinfra` checkout managed by `bonesdeploy` (shared runtime deploy script + Jinja2 templates)
 - Writes `templates/<name>/runtime/` files to `.bones/runtime/` (template-specific `operations.py`)
 - Saves the selected template name to `.bones/runtime.yaml`
 
@@ -37,7 +37,7 @@ Prompts `y/N` before running the remote deploy. On confirmation:
 Connects as the deploy user (from `bones.yaml`) — root is not needed since service management and nginx config are handled via `sudo` inside the pyinfra operations.
 
 ```bash
-pyinfra <host> .bones/infra/runtime.py --ssh-user git --ssh-port 22 --data deploy_user=git --data project_name=myapp --data paths.repo=/home/git/myapp.git ... -vv
+bonesdeploy remote runtime --host <host> --ssh-user git --ssh-port 22 --deploy-user git --project-name myapp --repo-path /home/git/myapp.git
 ```
 
 The runtime pyinfra deploy performs these operations in order:
@@ -62,7 +62,7 @@ The runtime pyinfra deploy performs these operations in order:
 1. After `bonesdeploy init` to choose a framework
 2. When switching framework templates
 3. After updating framework runtime assets in the repo
-4. After editing `.bones/infra/assets/` Jinja2 templates
+4. After editing the Jinja2 templates in the `src/assets/` directory of the `bonesinfra` repo
 
 ---
 

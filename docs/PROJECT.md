@@ -66,19 +66,9 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 ├── deployment
 │   ├── 01_run_deployment_concerns.sh
 │   └── 02_permissions_lockup.sh (example)
-├── infra                             # pyinfra deploy scripts used by `bonesdeploy remote setup|runtime|ssl`
-│   ├── setup.py                      # machine bootstrap (users, git repo, firewall, bonesremote)
-│   ├── runtime.py                    # per-site runtime (AppArmor, nginx, systemd services)
-│   ├── ssl.py                        # TLS certificate provisioning via certbot
-│   └── assets/
-│       ├── apparmor/
-│       │   └── project-nginx-profile.j2
-│       └── nginx/
-│           ├── router.conf.j2
-│           ├── site-nginx.conf.j2
-│           └── site-nginx.service.j2
-└── runtime                           # template-specific operations used by `bonesdeploy remote runtime`
-    └── operations.py
+```
+
+Python infra deploy scripts are managed separately by the hidden `bonesinfra` checkout; see `crates/bonesdeploy/src/bonesinfra.rs`.
 
 ### Bones YAML
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
@@ -155,25 +145,14 @@ This applies to Rust code, pyinfra deploy scripts, Jinja2 templates, and docs ex
 bonesdeploy/
 ├── Cargo.toml                  # workspace root
 ├── kit/                        # embedded assets (scaffolding templates)
-│   ├── bones.yaml
+│   ├── bones.toml
+│   ├── runtime.toml
 │   ├── hooks/
 │   │   ├── hooks.sh
 │   │   ├── post-receive
 │   │   ├── pre-push
 │   │   └── pre-receive
-│   ├── deployment/
-│   └── setup/                  # nginx + pyinfra deploy scripts for shared server bootstrap
-│       ├── apparmor/
-│       ├── nginx/
-│       ├── setup.py
-│       ├── runtime.py
-│       └── ssl.py
-├── templates/                  # per-framework starter overlays (see below)
-│   ├── laravel/
-│   │   ├── bones.yaml
-│   │   ├── deployment/
-│   │   └── runtime/
-│   └── ...
+│   └── deployment/
 ├── crates/
 │   ├── bonesdeploy/            # local CLI binary
 │   │   ├── Cargo.toml
@@ -219,11 +198,11 @@ bonesdeploy/
 ```
 
 ### Per-Framework Templates
-Runtime templates ship starter overlays that `bonesdeploy remote runtime` uses when scaffolding infrastructure for a matching framework. Each template lives under `crates/bonesdeploy/embeds/runtimes/` — framework runtime assets (`operations.py`, Jinja2 templates) stay together:
+Runtime templates ship starter overlays that `bonesdeploy remote runtime` uses when scaffolding infrastructure for a matching framework. Each template lives in the `bonesinfra` repo (`https://github.com/AlextheYounga/bonesinfra.git`) — framework runtime assets (`operations.py`, Jinja2 templates) stay together:
 
 - `runtimes/laravel/`        → Laravel (PHP + PHP-FPM)
 
-Templates inherit the same `bones.yaml` schema and only customize permissions paths, deployment scripts, and the runtime operations captured in `.bones/runtime/operations.py`.
+Templates inherit the same `bones.yaml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the `bonesinfra` repo.
 
 ### BonesDeploy CLI Commands
 - **init**:
@@ -261,7 +240,7 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
   - Sets `BONES_FORCE_DEPLOY=1` so manual deploy runs even when `deploy_on_push = false`.
 
 - ****remote setup****
-  - Runs `.bones/infra/setup.py` via `pyinfra` against the configured host as root (or `BONES_BOOTSTRAP_SSH_USER`).
+  - runs the setup script from the hidden `bonesinfra` checkout via `pyinfra` against the configured host as root (or `BONES_BOOTSTRAP_SSH_USER`).
   - Passes `bones.yaml` deployment values plus computed paths and variables as pyinfra data.
   - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
@@ -271,13 +250,13 @@ Templates inherit the same `bones.yaml` schema and only customize permissions pa
 - **remote runtime**:
   - Prompts for a framework template, refreshes `.bones/runtime/`, and writes `.bones/runtime.yaml`.
   - Reapplies template-specific defaults into `.bones/bones.yaml` only when they still match generic or previous-template values.
-  - After a `y/N` confirmation, runs `.bones/infra/runtime.py` via `pyinfra` against the configured host as the deploy user.
+  - After a `y/N` confirmation, runs the runtime script from the hidden `bonesinfra` checkout via `pyinfra` against the configured host as the deploy user.
   - Loads the template's `operations.py` at runtime to install framework-specific packages and services.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
   - Does not handle SSL; use `remote ssl` for TLS configuration.
 
 - **remote ssl**
-  - Runs `.bones/infra/ssl.py` via `pyinfra` against the configured host as root.
+  - Runs the SSL script from the hidden `bonesinfra` checkout via `pyinfra` against the configured host as root.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
   - Separate from `remote runtime` to keep certificate management decoupled from app runtime concerns.

@@ -100,7 +100,7 @@ If `pyinfra` is missing, BonesDeploy installs it automatically into an isolated 
 Template-based projects then use `bonesdeploy remote runtime` to prompt for a framework and scaffold runtime assets (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install Node.js).
 `bonesdeploy remote setup` handles machine bootstrap as root, while `bonesdeploy remote runtime` applies per-site runtime assets such as AppArmor and nginx after a quick confirmation prompt.
 
-To customize nginx behavior, edit `.bones/infra/assets/nginx/router.conf.j2` and re-run `bonesdeploy remote runtime`.
+To customize nginx behavior, edit the Jinja2 templates in the `src/assets/` directory of the `bonesinfra` repo and re-run `bonesdeploy remote runtime`.
 
 When DNS is ready, enable SSL with certbot (separate from runtime):
 
@@ -208,13 +208,6 @@ ssl:
 ├── hooks.sh             # shared hook functions imported by hook entrypoints
 ├── deployment/
 │   └── 01_*.sh          # deployment scripts (run sequentially)
-├── infra/
-│   ├── setup.py         # machine bootstrap pyinfra deploy
-│   ├── runtime.py       # per-site runtime pyinfra deploy
-│   ├── ssl.py           # TLS certificate pyinfra deploy
-│   └── assets/          # Jinja2 templates for nginx + AppArmor
-├── runtime/
-│   └── operations.py    # template-specific operations (framework packages/services)
 └── hooks/
     ├── pre-push         # symlinked to .git/hooks/pre-push
     ├── pre-receive

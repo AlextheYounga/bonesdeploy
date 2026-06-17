@@ -2,7 +2,7 @@
 
 ## Overview
 
-Provisions the remote server for deployment by running a pyinfra deploy script (`.bones/infra/setup.py`) that sets up the required infrastructure: user accounts, Git bare repository, directory structure, firewall (UFW), and machine-level dependencies. Runs as `root` (or `BONES_BOOTSTRAP_SSH_USER` if set) since it needs to create system users and install packages. This command is typically run once per project during initial setup.
+Provisions the remote server for deployment by running the setup script from the hidden `bonesinfra` checkout managed by `bonesdeploy`. This script sets up the required infrastructure: user accounts, Git bare repository, directory structure, firewall (UFW), and machine-level dependencies. Runs as `root` (or `BONES_BOOTSTRAP_SSH_USER` if set) since it needs to create system users and install packages. This command is typically run once per project during initial setup.
 
 ## Detailed Execution Steps
 
@@ -33,7 +33,7 @@ if !deploy_path.is_file() {
 }
 ```
 
-Checks for the existence of `.bones/infra/setup.py`. This pyinfra deploy script is responsible for:
+Checks for the existence of the hidden `bonesinfra` checkout managed by `bonesdeploy`. This pyinfra deploy script is responsible for:
 - Installing system packages
 - Creating the bare Git repository
 - Creating deploy and service users
@@ -105,7 +105,7 @@ The deploy user's public SSH key is resolved from `BONES_DEPLOY_PUBLIC_KEY_PATH`
 Invokes pyinfra with the host directly (no temporary inventory file) and data passed as CLI flags:
 
 ```bash
-pyinfra <host> .bones/infra/setup.py --ssh-user root --ssh-port 22 --data ssh_port=22 --data deploy_user=git --data paths.repo=/home/git/myapp.git --data paths.project_root=/srv/deployments/myapp ... -vv
+bonesdeploy remote setup --host <host> --ssh-user root --ssh-port 22 --deploy-user git --repo-path /home/git/myapp.git --project-root /srv/deployments/myapp
 ```
 
 The pyinfra deploy script performs these operations in order:
@@ -199,11 +199,11 @@ git push production master
 
 ## Customization
 
-The setup process can be customized by editing `.bones/infra/setup.py`. The deploy script is written to `.bones/infra/` during `bonesdeploy init` and belongs to the user — edit freely.
+The setup process can be customized by editing the `setup.py` file in the `bonesinfra` repo (`https://github.com/AlextheYounga/bonesinfra.git`). The deploy script is part of the hidden `bonesinfra` checkout managed by `bonesdeploy` and belongs to the user — edit freely.
 
 ### Adding System Packages
 
-Edit the `SETUP_APT_PACKAGES` list in `.bones/infra/setup.py` or override via `setup_apt_packages` in your pyinfra data vars.
+Edit the `SETUP_APT_PACKAGES` list in the `bonesinfra` repo's `setup.py` or override via `setup_apt_packages` in your pyinfra data vars.
 
 ---
 
