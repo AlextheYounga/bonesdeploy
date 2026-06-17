@@ -1,3 +1,4 @@
+mod bonesinfra;
 mod bootstrap_ssh;
 mod commands;
 mod config;

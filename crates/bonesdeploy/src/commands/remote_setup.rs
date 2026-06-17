@@ -8,7 +8,6 @@ use serde_json::Value;
 
 use crate::bootstrap_ssh;
 use crate::config;
-use crate::embedded;
 use crate::python;
 use crate::remote_data;
 
@@ -16,19 +15,14 @@ pub fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
-    let bones_dir = Path::new(config::Constants::BONES_DIR);
-    if !bones_dir.exists() {
-        bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
-    }
-    embedded::ensure_infra_assets_exist(bones_dir)?;
-
     let ssh_user = bootstrap_ssh::resolve();
     let deploy_authorized_key = resolve_deploy_authorized_key()?;
 
     let mut deploy_data = remote_data::setup(&cfg, &deploy_authorized_key)?;
+    let host = cfg.data.host;
     if let Value::Object(ref mut map) = deploy_data {
-        map.insert(String::from("ssh_user"), Value::String(ssh_user.clone()));
-        map.insert(String::from("host"), Value::String(cfg.data.host.clone()));
+        map.insert(String::from("ssh_user"), Value::String(ssh_user));
+        map.insert(String::from("host"), Value::String(host));
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;

@@ -7,7 +7,6 @@ use serde_json::Value;
 use crate::bootstrap_ssh;
 use crate::commands::push;
 use crate::config;
-use crate::embedded;
 use crate::prompts;
 use crate::python;
 use crate::remote_data;
@@ -43,12 +42,6 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    let bones_dir = Path::new(config::Constants::BONES_DIR);
-    if !bones_dir.exists() {
-        bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
-    }
-    embedded::ensure_infra_assets_exist(bones_dir)?;
-
     println!(
         "Running {} against {} for {}...",
         style("remote ssl").cyan().bold(),
@@ -59,7 +52,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let ssh_user = bootstrap_ssh::resolve();
     let mut deploy_data = remote_data::ssl(&cfg, &cfg.ssl.domain, &cfg.ssl.email)?;
     if let Value::Object(ref mut map) = deploy_data {
-        map.insert(String::from("ssh_user"), Value::String(ssh_user.clone()));
+        map.insert(String::from("ssh_user"), Value::String(ssh_user));
         map.insert(String::from("host"), Value::String(cfg.data.host.clone()));
         map.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
     }

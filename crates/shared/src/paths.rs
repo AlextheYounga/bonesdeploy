@@ -34,10 +34,6 @@ pub const LOCAL_BONES_HOOKS_SCRIPT: &str = ".bones/hooks/hooks.sh";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
 pub const LOCAL_BONES_RUNTIME_DIR: &str = ".bones/runtime";
 pub const LOCAL_BONES_RUNTIME_TOML: &str = ".bones/runtime.toml";
-pub const LOCAL_BONES_INFRA_MAIN: &str = ".bones/infra/main.py";
-pub const LOCAL_BONES_RUNTIME_DEPLOY: &str = ".bones/infra/runtime.py";
-pub const LOCAL_BONES_SSL_DEPLOY: &str = ".bones/infra/ssl.py";
-pub const LOCAL_BONES_SETUP_DEPLOY: &str = ".bones/infra/setup.py";
 
 pub const BONES_DIR: &str = "bones";
 pub const BONES_TOML: &str = "bones.toml";

@@ -25,7 +25,7 @@ pub fn prompt_runtime_questions(
 
         let answer: serde_json::Value = match question_type {
             "bool" => {
-                let default_bool = default.as_ref().and_then(|v| v.as_bool()).unwrap_or(false);
+                let default_bool = default.as_ref().and_then(serde_json::Value::as_bool).unwrap_or(false);
                 let choice = Confirm::new(label).with_default(default_bool).prompt().map_err(|err| anyhow!(err))?;
                 serde_json::Value::Bool(choice)
             }
@@ -237,7 +237,7 @@ fn remote_setup_prompt_lines() -> [&'static str; 12] {
         "  - Create the appropriate deployment and release directories for your project.",
         "  - Install the bonesremote binary on the server, used to facilitate deployments.",
         "",
-        "For more information, you can check the setup.py file under .bones/infra/setup.py.",
+        "For more information, check the hidden bonesinfra checkout managed by bonesdeploy.",
     ]
 }
 
@@ -251,7 +251,7 @@ fn remote_runtime_prompt_lines() -> [&'static str; 9] {
         "  - Provision runtime-specific services, like PHP-FPM, Python, or Ruby, depending on your runtime template.",
         "  - Configure AppArmor, nginx, and systemd services are configured for this site.",
         "",
-        "For more information, you can check the runtime.py file under .bones/infra/setup.py.",
+        "For more information, check the hidden bonesinfra checkout managed by bonesdeploy.",
     ]
 }
 
@@ -353,7 +353,7 @@ mod tests {
         assert!(joined.contains("firewalls"), "remote setup prompt should describe firewall configuration\n{joined}");
     }
 
-    /// Describes AppArmor and nginx in the remote runtime prompt.
+    /// Describes `AppArmor` and nginx in the remote runtime prompt.
     #[test]
     fn remote_runtime_prompt_lines_include_site_runtime_concerns() {
         let joined = remote_runtime_prompt_lines().join("\n");

@@ -46,8 +46,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
 
         initial_project_name = Some(project_name);
     } else {
-        println!(".bones/ already exists, refreshing infra files...");
-        embedded::scaffold_runtime_base(bones_dir)?;
+        println!(".bones/ already exists, keeping existing local bones state.");
     }
 
     update_gitignore()?;
@@ -94,8 +93,12 @@ fn print_follow_up_hint() {
 }
 
 fn seed_runtime_config(args: &InitArgs, _bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
-    let available = python::list_runtimes()?;
-    let template = if args.non_interactive { None } else { prompts::choose_template(&available)? };
+    let template = if args.non_interactive {
+        None
+    } else {
+        let available = python::list_runtimes()?;
+        prompts::choose_template(&available)?
+    };
 
     if let Some(ref template_name) = template {
         let defaults = python::runtime_defaults(template_name)?;

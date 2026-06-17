@@ -4,20 +4,12 @@ use anyhow::{Result, bail};
 
 use crate::bootstrap_ssh;
 use crate::config;
-use crate::embedded;
 use crate::git;
 use crate::prompts;
 use crate::python;
 
 pub fn run() -> Result<()> {
     git::ensure_git_repository()?;
-
-    let bones_dir = Path::new(config::Constants::BONES_DIR);
-    if !bones_dir.exists() {
-        bail!(".bones/ does not exist. Run `bonesdeploy init` first.");
-    }
-
-    embedded::ensure_infra_assets_exist(bones_dir)?;
 
     let runtime_toml = Path::new(config::Constants::BONES_RUNTIME_TOML);
     if !runtime_toml.exists() {
@@ -31,7 +23,7 @@ pub fn run() -> Result<()> {
 
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let ssh_user = bootstrap_ssh::resolve();
-    println!("Applying runtime using {} ...", config::Constants::BONES_INFRA_MAIN);
+    println!("Applying runtime using hidden bonesinfra ...");
 
     python::run_python(&[
         "runtime",

@@ -69,7 +69,7 @@ mod tests {
     use shared::paths;
 
     use super::run;
-    use crate::config::Constants;
+    use crate::config::{BonesConfig, Constants, Data, Releases};
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -83,8 +83,8 @@ mod tests {
     }
 
     fn write_config(path: &Path, repo_path: &Path, project_root: &Path, branch: &str) -> Result<()> {
-        let cfg = crate::config::BonesConfig {
-            data: crate::config::Data {
+        let cfg = BonesConfig {
+            data: Data {
                 remote_name: String::from("production"),
                 project_name: String::from("postreceive"),
                 host: String::from("localhost"),
@@ -96,7 +96,7 @@ mod tests {
                 deploy_on_push: true,
                 ..Default::default()
             },
-            releases: crate::config::Releases { keep: 5 },
+            releases: Releases { keep: 5 },
         };
         let toml = toml::to_string(&cfg)?;
         fs::write(path, toml)?;

@@ -2,7 +2,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use super::{InitArgs, cli_existing_or_prompt, collect_non_interactive, run};
 
@@ -18,7 +18,7 @@ fn test_lock() -> &'static Mutex<()> {
 }
 
 struct TestEnvironment {
-    _lock: std::sync::MutexGuard<'static, ()>,
+    _lock: MutexGuard<'static, ()>,
     original_dir: PathBuf,
     original_home: Option<String>,
 }
@@ -172,37 +172,33 @@ fn cli_existing_or_prompt_prefers_existing_value_before_prompt() -> Result<()> {
     Ok(())
 }
 
-/// Materializes the pyinfra deploy files and shared infra assets during init.
+/// Materializes the base bonesdeploy kit and runtime config during init.
 #[test]
-fn init_materializes_base_infra_assets() -> Result<()> {
+fn init_materializes_base_bones_assets() -> Result<()> {
     with_temp_repo(|repo_dir, _home_dir| {
         run(&init_args())?;
 
         let bones_dir = repo_dir.join(".bones");
-        assert!(bones_dir.join("infra/setup.py").is_file());
-        assert!(bones_dir.join("infra/runtime.py").is_file());
-        assert!(bones_dir.join("infra/ssl.py").is_file());
-        assert!(bones_dir.join("infra/assets/nginx/router.conf.j2").is_file());
+        assert!(bones_dir.join("bones.toml").is_file());
+        assert!(bones_dir.join("runtime.toml").is_file());
+        assert!(bones_dir.join("hooks/hooks.sh").is_file());
+        assert!(bones_dir.join("deployment/01_install_build_deps.sh").is_file());
+        assert!(bones_dir.join("deployment/02_run_build.sh").is_file());
 
         let config_root = paths::bones_config_root().join("atlas.bones");
-        assert!(config_root.join("infra/setup.py").is_file());
-
-        assert!(!bones_dir.join("infra/.venv").exists());
-        assert!(!bones_dir.join("infra/__pycache__").exists());
-        assert!(!bones_dir.join("infra/.python-version").exists());
-        assert!(!bones_dir.join("infra/pyproject.toml").exists());
+        assert!(config_root.join("hooks/hooks.sh").is_file());
 
         Ok(())
     })
 }
 
-/// Keeps an already materialized infra scaffold intact when init is run again.
+/// Keeps an already materialized local bones scaffold intact when init is run again.
 #[test]
-fn init_rerun_preserves_existing_infra_assets() -> Result<()> {
+fn init_rerun_preserves_existing_bones_assets() -> Result<()> {
     with_temp_repo(|repo_dir, _home_dir| {
         run(&init_args())?;
 
-        let sentinel = repo_dir.join(".bones/infra/setup.py");
+        let sentinel = repo_dir.join(".bones/hooks/hooks.sh");
         let original = fs::read_to_string(&sentinel)?;
 
         run(&init_args())?;

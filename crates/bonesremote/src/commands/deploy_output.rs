@@ -217,6 +217,9 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
+    use std::os::unix::prelude::PermissionsExt;
+
+    use shared::paths::DeploymentPaths;
 
     use super::{
         ConsoleTargets, DeploymentRun, ScriptEnv, TeeWriter, deployment_log_path, run_deployment_script_with_consoles,
@@ -264,7 +267,7 @@ mod tests {
 
         let script = root.join("00_hello.sh");
         write_file(&script, "#!/usr/bin/env bash\necho 'hello-stdout'\necho 'hello-stderr' >&2\n")?;
-        fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755))?;
+        fs::set_permissions(&script, PermissionsExt::from_mode(0o755))?;
 
         let log_path = logs.join("20260612_211412-00_hello.sh.log");
         let consoles = ConsoleTargets::new(Cursor::new(Vec::new()), Cursor::new(Vec::new()));
@@ -310,7 +313,7 @@ mod tests {
 
         let script = root.join("01_install.sh");
         write_file(&script, "#!/usr/bin/env bash\necho 'about to fail' >&2\nexit 7\n")?;
-        fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755))?;
+        fs::set_permissions(&script, PermissionsExt::from_mode(0o755))?;
 
         let log_path = logs.join("20260612_211412-01_install.sh.log");
         let consoles = ConsoleTargets::new(Cursor::new(Vec::new()), Cursor::new(Vec::new()));
@@ -345,7 +348,7 @@ mod tests {
 
         let script = root.join("00_pass.sh");
         write_file(&script, "#!/usr/bin/env bash\necho ok\n")?;
-        fs::set_permissions(&script, std::os::unix::fs::PermissionsExt::from_mode(0o755))?;
+        fs::set_permissions(&script, PermissionsExt::from_mode(0o755))?;
 
         let log_path = root.join("build/logs/20260612_211412-00_pass.sh.log");
         let consoles = ConsoleTargets::new(Cursor::new(Vec::new()), Cursor::new(Vec::new()));
@@ -369,11 +372,10 @@ mod tests {
         Ok(())
     }
 
-    /// Builds the log path under the centralized project_root/build/logs directory.
+    /// Builds the log path under the centralized `project_root/build/logs` directory.
     #[test]
     fn deployment_log_path_lives_under_build_logs() {
-        let paths =
-            shared::paths::DeploymentPaths::new("demo", "/home/git/demo.git", "/srv/deployments/demo", "public");
+        let paths = DeploymentPaths::new("demo", "/home/git/demo.git", "/srv/deployments/demo", "public");
         let log = deployment_log_path(&paths, "20260612_211412", "02_run_build.sh");
 
         assert_eq!(

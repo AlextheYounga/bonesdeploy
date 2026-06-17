@@ -1,19 +1,15 @@
 use std::io::Write;
-use std::path::Path;
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
 
-/// Runs `python3 .bones/infra/main.py <args>` and returns stdout as a String.
+/// Runs the hidden bonesinfra entrypoint with the provided args.
 pub fn run_python(args: &[&str]) -> Result<String> {
-    let main_py = Path::new(super::config::Constants::BONES_INFRA_MAIN);
-    if !main_py.exists() {
-        bail!("{} not found. Run `bonesdeploy init` first to scaffold the infra entrypoint.", main_py.display());
-    }
+    let main_py = super::bonesinfra::main_py_path()?;
 
     let output = Command::new("python3")
-        .arg(main_py)
+        .arg(&main_py)
         .args(args)
         .output()
         .with_context(|| format!("Failed to run python3 {} {}", main_py.display(), args.join(" ")))?;
@@ -26,15 +22,12 @@ pub fn run_python(args: &[&str]) -> Result<String> {
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
-/// Runs `python3 .bones/infra/main.py <args>` with JSON piped to stdin.
+/// Runs the hidden bonesinfra entrypoint with JSON piped to stdin.
 pub fn run_python_with_stdin(args: &[&str], stdin_json: &str) -> Result<String> {
-    let main_py = Path::new(super::config::Constants::BONES_INFRA_MAIN);
-    if !main_py.exists() {
-        bail!("{} not found. Run `bonesdeploy init` first to scaffold the infra entrypoint.", main_py.display());
-    }
+    let main_py = super::bonesinfra::main_py_path()?;
 
     let mut child = Command::new("python3")
-        .arg(main_py)
+        .arg(&main_py)
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -42,12 +35,8 @@ pub fn run_python_with_stdin(args: &[&str], stdin_json: &str) -> Result<String> 
         .spawn()
         .with_context(|| format!("Failed to run python3 {} {}", main_py.display(), args.join(" ")))?;
 
-    child
-        .stdin
-        .take()
-        .unwrap()
-        .write_all(stdin_json.as_bytes())
-        .context("Failed to write JSON data to python3 stdin")?;
+    let mut stdin = child.stdin.take().context("Failed to capture python3 stdin")?;
+    stdin.write_all(stdin_json.as_bytes()).context("Failed to write JSON data to python3 stdin")?;
 
     let output = child
         .wait_with_output()

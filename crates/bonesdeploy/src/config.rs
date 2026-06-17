@@ -29,7 +29,6 @@ impl Constants {
     pub const BONES_HOOKS_DIR: &'static str = paths::LOCAL_BONES_HOOKS_DIR;
     pub const BONES_DEPLOYMENT_DIR: &'static str = paths::LOCAL_BONES_DEPLOYMENT_DIR;
     pub const BONES_RUNTIME_TOML: &'static str = paths::LOCAL_BONES_RUNTIME_TOML;
-    pub const BONES_INFRA_MAIN: &'static str = paths::LOCAL_BONES_INFRA_MAIN;
 
     pub const GIT_HOOKS_DIR: &'static str = ".git/hooks";
     pub const GIT_PRE_PUSH_HOOK_PATH: &'static str = ".git/hooks/pre-push";
