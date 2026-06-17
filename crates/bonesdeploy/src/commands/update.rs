@@ -142,71 +142,8 @@ fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Resul
     sync_tree(&kit_root.join("hooks"), &bones_dir.join("hooks"), true)?;
     sync_tree(&kit_root.join("deployment"), &bones_dir.join("deployment"), true)?;
 
-    let infra_root = source_dir.join("infra");
-    sync_infra_tree(&infra_root, &bones_dir.join("infra"), Path::new(""))?;
-
-    if let Some(template_name) = current_runtime_template(bones_dir)? {
-        let runtime_root = source_dir.join(format!("crates/bonesdeploy/embeds/runtimes/{template_name}/infra"));
-        if runtime_root.is_dir() {
-            sync_tree(&runtime_root, &bones_dir.join("infra"), false)?;
-        }
-    }
-
     println!("{} Local .bones scaffold refreshed.", style("Done!").green());
     Ok(())
-}
-
-fn current_runtime_template(bones_dir: &Path) -> Result<Option<String>> {
-    let runtime_toml = bones_dir.join("runtime.toml");
-    if !runtime_toml.is_file() {
-        return Ok(None);
-    }
-
-    let runtime = config::load_runtime(&runtime_toml)?;
-    Ok(runtime.get("template").and_then(serde_json::Value::as_str).map(str::to_string))
-}
-
-fn sync_infra_tree(source_root: &Path, dest_root: &Path, relative: &Path) -> Result<()> {
-    for entry in fs::read_dir(source_root).with_context(|| format!("Failed to read {}", source_root.display()))? {
-        let entry = entry.with_context(|| format!("Failed to read entry in {}", source_root.display()))?;
-        let file_type =
-            entry.file_type().with_context(|| format!("Failed to read file type for {}", entry.path().display()))?;
-        let name = entry.file_name();
-        let next_relative = relative.join(&name);
-
-        if should_skip_infra_path(&next_relative, file_type.is_dir()) {
-            continue;
-        }
-
-        let source_path = entry.path();
-        let dest_path = dest_root.join(&next_relative);
-
-        if file_type.is_dir() {
-            fs::create_dir_all(&dest_path).with_context(|| format!("Failed to create {}", dest_path.display()))?;
-            sync_infra_tree(&source_path, dest_root, &next_relative)?;
-            continue;
-        }
-
-        copy_file(&source_path, &dest_path, false)?;
-    }
-
-    Ok(())
-}
-
-fn should_skip_infra_path(relative: &Path, is_dir: bool) -> bool {
-    let Some(first) = relative.components().next().map(std::path::Component::as_os_str) else {
-        return false;
-    };
-
-    if is_dir {
-        return first == "__pycache__" || first == ".venv";
-    }
-
-    first == ".gitignore"
-        || first == "README.md"
-        || first == ".python-version"
-        || first == "pyproject.toml"
-        || first == "uv.lock"
 }
 
 fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {
@@ -299,13 +236,9 @@ version = "not-this"
 
         write(&source_dir.join("crates/bonesdeploy/embeds/kit/hooks/pre-push"), "new hook")?;
         write(&source_dir.join("crates/bonesdeploy/embeds/kit/deployment/01_build.sh"), "new deploy")?;
-        write(&source_dir.join("infra/runtime.py"), "new runtime")?;
-        write(&source_dir.join("infra/README.md"), "skip me")?;
-        write(&source_dir.join("crates/bonesdeploy/embeds/runtimes/laravel/infra/operations.py"), "laravel ops")?;
 
         write(&bones_dir.join("bones.toml"), "keep = 'config'\n")?;
         write(&bones_dir.join("runtime.toml"), "template = 'laravel'\n")?;
-        write(&bones_dir.join("infra/runtime.py"), "old runtime")?;
 
         refresh_local_bones_from_source(&source_dir, &bones_dir)?;
 
@@ -313,9 +246,6 @@ version = "not-this"
         assert_eq!(fs::read_to_string(bones_dir.join("runtime.toml"))?, "template = 'laravel'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("hooks/pre-push"))?, "new hook");
         assert_eq!(fs::read_to_string(bones_dir.join("deployment/01_build.sh"))?, "new deploy");
-        assert_eq!(fs::read_to_string(bones_dir.join("infra/runtime.py"))?, "new runtime");
-        assert_eq!(fs::read_to_string(bones_dir.join("infra/operations.py"))?, "laravel ops");
-        assert!(!bones_dir.join("infra/README.md").exists());
 
         let hook_mode = fs::metadata(bones_dir.join("hooks/pre-push"))?.permissions().mode() & 0o777;
         let deploy_mode = fs::metadata(bones_dir.join("deployment/01_build.sh"))?.permissions().mode() & 0o777;

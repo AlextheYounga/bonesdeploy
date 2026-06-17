@@ -92,15 +92,6 @@ pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
     Ok(())
 }
 
-pub fn load_runtime(path: &Path) -> Result<Map<String, Value>> {
-    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let value: Value = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    match value {
-        Value::Object(map) => Ok(map),
-        _ => anyhow::bail!("{} must contain a TOML table", path.display()),
-    }
-}
-
 pub fn save_runtime(runtime: &Map<String, Value>, path: &Path) -> Result<()> {
     let toml_str = toml::to_string(runtime).context("Failed to serialize runtime config")?;
     fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
