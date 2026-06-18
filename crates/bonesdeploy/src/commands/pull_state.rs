@@ -32,6 +32,10 @@ pub fn run() -> Result<()> {
     if !bones_dir.exists() {
         let project_name = config::repo_directory_name()?;
         let config_dir = config::bones_config_dir(&project_name);
+        if config_dir.exists() && !config_dir.is_dir() {
+            fs::remove_file(&config_dir)
+                .with_context(|| format!("Stale file at {}, cannot create directory", config_dir.display()))?;
+        }
         fs::create_dir_all(&config_dir)?;
         unix_fs::symlink(&config_dir, bones_dir)?;
     }

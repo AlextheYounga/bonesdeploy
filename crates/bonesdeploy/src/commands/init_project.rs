@@ -32,6 +32,10 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
         let config_dir = config::bones_config_dir(&project_name);
 
         println!("Creating {}...", config_dir.display());
+        if config_dir.exists() && !config_dir.is_dir() {
+            fs::remove_file(&config_dir)
+                .with_context(|| format!("Stale file at {}, cannot create directory", config_dir.display()))?;
+        }
         fs::create_dir_all(&config_dir)?;
         embedded::scaffold(&config_dir)?;
 
