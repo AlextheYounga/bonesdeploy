@@ -91,7 +91,6 @@ mod tests {
                 port: String::from("22"),
                 repo_path: repo_path.to_string_lossy().to_string(),
                 project_root: project_root.to_string_lossy().to_string(),
-                web_root: String::from("public"),
                 branch: branch.to_string(),
                 deploy_on_push: true,
                 ..Default::default()

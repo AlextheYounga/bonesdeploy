@@ -105,7 +105,6 @@ fn incomplete_seed(project_name: &str) -> BonesConfig {
             port: String::from("22"),
             repo_path: String::new(),
             project_root: String::new(),
-            web_root: String::new(),
             branch: String::from("main"),
             deploy_on_push: true,
             ..Default::default()

@@ -1,3 +1,7 @@
+use std::fs;
+use std::path::Path;
+
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::paths;
@@ -14,17 +18,8 @@ pub struct Data {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub project_root: String,
     #[serde(skip_serializing_if = "String::is_empty")]
-    pub web_root: String,
     pub branch: String,
     pub deploy_on_push: bool,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub deploy_user: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub runtime_user: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub runtime_group: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub release_group: String,
 }
 
 impl Default for Data {
@@ -36,13 +31,8 @@ impl Default for Data {
             port: "22".into(),
             repo_path: String::new(),
             project_root: String::new(),
-            web_root: String::new(),
             branch: "master".into(),
             deploy_on_push: true,
-            deploy_user: String::new(),
-            runtime_user: String::new(),
-            runtime_group: String::new(),
-            release_group: String::new(),
         }
     }
 }
@@ -119,8 +109,24 @@ pub fn default_project_root_for(project_name: &str) -> String {
     paths::default_project_root_for(project_name)
 }
 
-pub fn default_web_root() -> String {
-    paths::default_web_root()
+const RUNTIME_TOML: &str = "runtime.toml";
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct RuntimeConfig {
+    #[serde(default = "paths::default_web_root")]
+    pub web_root: String,
+}
+
+pub fn load_runtime_config(config_dir: &Path) -> Result<RuntimeConfig> {
+    let path = config_dir.join(RUNTIME_TOML);
+    if path.exists() {
+        let content = fs::read_to_string(&path)
+            .with_context(|| format!("Failed to read {}", path.display()))?;
+        Ok(toml::from_str(&content)
+            .with_context(|| format!("Failed to parse {}", path.display()))?)
+    } else {
+        Ok(RuntimeConfig { web_root: paths::default_web_root() })
+    }
 }
 
 pub fn apply_derived_defaults(data: &mut Data) {
@@ -131,21 +137,6 @@ pub fn apply_derived_defaults(data: &mut Data) {
     }
     if data.project_root.is_empty() {
         data.project_root = default_project_root_for(project_name);
-    }
-    if data.web_root.is_empty() {
-        data.web_root = default_web_root();
-    }
-    if data.deploy_user.is_empty() {
-        data.deploy_user = default_deploy_user();
-    }
-    if data.runtime_user.is_empty() {
-        data.runtime_user = runtime_user_for(project_name);
-    }
-    if data.runtime_group.is_empty() {
-        data.runtime_group = runtime_group_for(project_name);
-    }
-    if data.release_group.is_empty() {
-        data.release_group = release_group_for(project_name);
     }
 }
 
@@ -158,25 +149,10 @@ pub fn hide_derived_defaults(data: &mut Data) {
     if data.project_root == default_project_root_for(project_name) {
         data.project_root.clear();
     }
-    if data.web_root == default_web_root() {
-        data.web_root.clear();
-    }
-    if data.deploy_user == default_deploy_user() {
-        data.deploy_user.clear();
-    }
-    if data.runtime_user == runtime_user_for(project_name) {
-        data.runtime_user.clear();
-    }
-    if data.runtime_group == runtime_group_for(project_name) {
-        data.runtime_group.clear();
-    }
-    if data.release_group == release_group_for(project_name) {
-        data.release_group.clear();
-    }
 }
 
 impl Data {
-    pub fn deployment_paths(&self) -> crate::paths::DeploymentPaths {
-        crate::paths::DeploymentPaths::new(&self.project_name, &self.repo_path, &self.project_root, &self.web_root)
+    pub fn deployment_paths(&self, web_root: &str) -> crate::paths::DeploymentPaths {
+        crate::paths::DeploymentPaths::new(&self.project_name, &self.repo_path, &self.project_root, web_root)
     }
 }

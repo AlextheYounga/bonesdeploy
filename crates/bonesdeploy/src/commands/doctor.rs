@@ -178,7 +178,7 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
 }
 
 fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
-    let user = &cfg.data.deploy_user;
+    let user = shared::config::default_deploy_user();
     let host = &cfg.data.host;
     let port = &cfg.data.port;
     let repo_path = &cfg.data.repo_path;

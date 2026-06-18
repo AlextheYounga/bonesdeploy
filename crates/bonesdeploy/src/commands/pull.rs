@@ -47,7 +47,7 @@ fn resolve_pull_target() -> Result<PullTarget> {
     if bones_toml.exists() {
         let cfg = config::load(bones_toml)?;
         return Ok(PullTarget {
-            user: cfg.data.deploy_user.clone(),
+            user: shared::config::default_deploy_user(),
             host: cfg.data.host,
             port: cfg.data.port,
             repo_path: cfg.data.repo_path,

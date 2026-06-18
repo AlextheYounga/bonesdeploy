@@ -4,6 +4,8 @@ use anyhow::{Context, Result, bail};
 use console::style;
 use serde_json::Value;
 
+use shared::config as shared_config;
+
 use crate::bootstrap_ssh;
 use crate::commands::push;
 use crate::config;
@@ -14,6 +16,7 @@ use crate::remote_data;
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let mut cfg = config::load(bones_toml)?;
+    let runtime = shared_config::load_runtime_config(Path::new(config::Constants::BONES_DIR))?;
 
     if let Some(value) = domain {
         cfg.ssl.domain = value.trim().to_string();
@@ -50,7 +53,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     );
 
     let ssh_user = bootstrap_ssh::resolve();
-    let mut deploy_data = remote_data::ssl(&cfg, &cfg.ssl.domain, &cfg.ssl.email)?;
+    let mut deploy_data = remote_data::ssl(&cfg, &runtime.web_root, &cfg.ssl.domain, &cfg.ssl.email)?;
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from("ssh_user"), Value::String(ssh_user));
         map.insert(String::from("host"), Value::String(cfg.data.host.clone()));

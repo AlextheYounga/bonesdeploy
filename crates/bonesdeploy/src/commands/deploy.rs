@@ -1,5 +1,6 @@
 use anyhow::Result;
 use console::style;
+use shared::paths;
 use std::path::Path;
 
 use crate::config;
@@ -9,7 +10,7 @@ pub async fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
-    let remote_bones_toml = cfg.data.deployment_paths().repo_bones_toml;
+    let remote_bones_toml = cfg.data.deployment_paths(paths::DEFAULT_WEB_ROOT).repo_bones_toml;
 
     println!("Deploying {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
 

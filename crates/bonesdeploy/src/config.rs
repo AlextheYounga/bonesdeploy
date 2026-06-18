@@ -62,10 +62,6 @@ pub fn default_project_root_for(project_name: &str) -> String {
     paths::default_project_root_for(project_name)
 }
 
-pub fn default_web_root() -> String {
-    paths::default_web_root()
-}
-
 pub fn bones_config_dir(project_name: &str) -> PathBuf {
     paths::bones_config_root().join(format!("{project_name}.bones"))
 }
@@ -109,7 +105,7 @@ mod tests {
     use anyhow::Result;
     use shared::paths;
 
-    use super::{BonesConfig, Data, Releases, Ssl, default_project_root_for, default_web_root, load, save};
+    use super::{BonesConfig, Data, Releases, Ssl, default_project_root_for, load, save};
 
     fn temp_path(file_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -132,7 +128,6 @@ mod tests {
                 port: String::from("22"),
                 repo_path: paths::default_repo_path_for(project_name),
                 project_root: default_project_root_for(project_name),
-                web_root: default_web_root(),
                 branch: String::from("master"),
                 deploy_on_push: true,
                 ..Default::default()
@@ -168,22 +163,9 @@ mod tests {
         Ok(())
     }
 
-    /// Applies the default web root when not explicitly configured.
+    /// Omits derived repo and project root fields when saving.
     #[test]
-    fn load_applies_default_web_root() -> Result<()> {
-        let path = temp_path("web_root.toml");
-        fs::write(&path, minimal_toml("atlas"))?;
-
-        let cfg = load(&path)?;
-        assert_eq!(cfg.data.web_root, "public");
-
-        fs::remove_file(path)?;
-        Ok(())
-    }
-
-    /// Omits derived repo, project root, and web root fields when saving.
-    #[test]
-    fn save_omits_derived_repo_project_and_web_roots() -> Result<()> {
+    fn save_omits_derived_repo_and_project_root() -> Result<()> {
         let config = sample_config("phoenix");
         let path = temp_path("save_derived_defaults.toml");
 
@@ -192,7 +174,6 @@ mod tests {
 
         assert!(!content.contains("repo_path:"));
         assert!(!content.contains("project_root:"));
-        assert!(!content.contains("web_root:"));
 
         fs::remove_file(path)?;
         Ok(())
@@ -218,12 +199,12 @@ mod tests {
         Ok(())
     }
 
-    /// Preserves explicitly configured repo, project root, and web root overrides.
+    /// Preserves explicitly configured repo and project root overrides.
     #[test]
-    fn load_preserves_explicit_repo_project_and_web_root_overrides() -> Result<()> {
+    fn load_preserves_explicit_repo_and_project_root_overrides() -> Result<()> {
         let path = temp_path("overrides.toml");
         let toml = format!(
-            "[data]\nremote_name = \"production\"\nproject_name = \"app\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\nweb_root = \"dist\"\nbranch = \"master\"\ndeploy_on_push = true\n",
+            "[data]\nremote_name = \"production\"\nproject_name = \"app\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\nbranch = \"master\"\ndeploy_on_push = true\n",
             paths::default_repo_path_for("app")
         );
 
@@ -232,7 +213,6 @@ mod tests {
 
         assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("app"));
         assert_eq!(cfg.data.project_root, "/custom/deploy");
-        assert_eq!(cfg.data.web_root, "dist");
 
         fs::remove_file(path)?;
         Ok(())

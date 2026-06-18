@@ -6,6 +6,8 @@ use anyhow::{Context, Result, bail};
 use console::style;
 use serde_json::Value;
 
+use shared::config as shared_config;
+
 use crate::bootstrap_ssh;
 use crate::config;
 use crate::python;
@@ -14,11 +16,12 @@ use crate::remote_data;
 pub fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
+    let runtime = shared_config::load_runtime_config(Path::new(config::Constants::BONES_DIR))?;
 
     let ssh_user = bootstrap_ssh::resolve();
     let deploy_authorized_key = resolve_deploy_authorized_key()?;
 
-    let mut deploy_data = remote_data::setup(&cfg, &deploy_authorized_key)?;
+    let mut deploy_data = remote_data::setup(&cfg, &runtime.web_root, &deploy_authorized_key)?;
     let host = cfg.data.host;
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from("ssh_user"), Value::String(ssh_user));

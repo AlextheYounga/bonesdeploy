@@ -101,13 +101,9 @@ host = "deploy.example.com"
 port = "22"
 repo_path = "/home/git/lawsnipe.git"
 project_root = "/srv/sites/lawsnipe"
-web_root = "public"
 branch = "master"
 deploy_on_push = true
 deploy_user = "git"
-runtime_user = "lawsnipe"
-runtime_group = "lawsnipe"
-release_group = "lawsnipe-release"
 
 [releases]
 keep = 5

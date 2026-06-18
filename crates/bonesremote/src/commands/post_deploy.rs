@@ -74,7 +74,6 @@ mod tests {
                 port: String::from("22"),
                 repo_path: temp_root.join("repo.git").to_string_lossy().to_string(),
                 project_root: temp_root.join("project_root").to_string_lossy().to_string(),
-                web_root: String::from("public"),
                 branch: String::from("main"),
                 deploy_on_push: true,
                 ..Default::default()

@@ -148,8 +148,6 @@ fn collect_from_seed(
         &project_name,
         config::default_project_root_for,
     );
-    let web_root =
-        init_config::seed_string(existing_config, |cfg| &cfg.data.web_root, config::default_web_root().as_str());
     let deploy_on_push = existing_config.is_none_or(|cfg| cfg.data.deploy_on_push);
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases.keep.max(1));
 
@@ -161,7 +159,6 @@ fn collect_from_seed(
             port,
             repo_path,
             project_root,
-            web_root,
             branch,
             deploy_on_push,
             ..Default::default()
@@ -275,7 +272,7 @@ fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
         return Ok(());
     }
 
-    let remote_url = format!("{}@{}:{}", cfg.data.deploy_user, cfg.data.host, cfg.data.repo_path);
+    let remote_url = format!("{}@{}:{}", shared::config::default_deploy_user(), cfg.data.host, cfg.data.repo_path);
     git::add_remote(&cfg.data.remote_name, &remote_url)?;
     println!("Configured local git remote {} -> {}", cfg.data.remote_name, remote_url);
     Ok(())

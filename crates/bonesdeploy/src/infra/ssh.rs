@@ -7,9 +7,9 @@ use crate::config::BonesConfig;
 pub async fn connect(config: &BonesConfig) -> Result<Session> {
     let host = &config.data.host;
     let port: u16 = config.data.port.parse().with_context(|| format!("Invalid port: {}", config.data.port))?;
-    let user = &config.data.deploy_user;
+    let user = shared::config::default_deploy_user();
 
-    connect_as(user, host, port).await
+    connect_as(&user, host, port).await
 }
 
 pub async fn connect_as(user: &str, host: &str, port: u16) -> Result<Session> {

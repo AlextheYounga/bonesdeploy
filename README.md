@@ -85,7 +85,7 @@ This will:
 4. Symlink the `pre-push` hook into `.git/hooks/`
 5. Create a local deployment git remote if needed
 
-BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.yaml`:
+BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.toml`:
 
 - `port = "22"`
 - `web_root = "public"`
@@ -130,13 +130,9 @@ git push production master
 
 The hook chain handles the rest:
 1. **pre-push** (local) — runs `bonesdeploy doctor --local`
-2. **pre-receive** (remote) — resolves the configured deployment ref from the pushed refs; if it matches, runs `bonesremote doctor` and `bonesremote release stage --config ...`. Pushes to other branches or branch deletions are skipped without staging.
-3. **post-receive** (remote) — runs the deployment pipeline:
-    - `bonesremote hooks post-receive --config ... --revision <newrev>` (checkout into `build/workspace`)
-    - `bonesremote release wire --config ...` (just-in-time wire shared paths into the build workspace)
-    - `bonesremote hooks deploy --config ...` (run deployment scripts, copy workspace to release, activate)
-    - `bonesremote hooks post-deploy --config ...` (prune old releases)
-    - `sudo bonesremote service restart --config ...` (restart the per-site nginx service)
+2. **pre-receive** (remote) — inert (`exit 0`); all deployment logic runs in post-receive
+3. **post-receive** (remote) — resolves the configured deployment ref, then runs a single `bonesremote deploy --config <bones_toml> --revision <newrev>` command that orchestrates the full pipeline:
+    - Doctor check → stage release → git checkout into `build/workspace` → wire shared paths → run deployment scripts → activate release (atomic symlink) → restart nginx → prune old releases
 
 `pre-push -> pre-receive -> post-receive`
 
@@ -171,30 +167,29 @@ This atomically updates both local (`bonesdeploy`) and remote (`bonesremote`) us
 
 ## Configuration
 
-`bonesdeploy init` generates `.bones/bones.yaml`:
+`bonesdeploy init` generates `.bones/bones.toml`:
 
-```yaml
-data:
-  remote_name: "production"
-  project_name: "myproject"
-  repo_path: "/home/git/myproject.git"
-  web_root: "public"
-  project_root: "/srv/sites/myproject"
-  branch: "master"
-  deploy_on_push: true
-  deploy_user: "git"
-  runtime_user: "myproject"
-  runtime_group: "myproject"
-  release_group: "myproject-release"
+```toml
+[data]
+remote_name = "production"
+project_name = "myproject"
+repo_path = "/home/git/myproject.git"
+web_root = "public"
+project_root = "/srv/sites/myproject"
+branch = "master"
+deploy_on_push = true
+deploy_user = "git"
+runtime_user = "myproject"
+runtime_group = "myproject"
+release_group = "myproject-release"
 
-releases:
-  keep: 5
+[releases]
+keep = 5
 
-# Optional TLS values used by `bonesdeploy remote ssl`.
-ssl:
-  enabled: false
-  domain: ""
-  email: ""
+[ssl]
+enabled = false
+domain = ""
+email = ""
 ```
 
 `host` and `repo_path` are inferred from the deployment remote URL when possible; if parsing fails, init asks only for those missing values.
@@ -203,8 +198,8 @@ ssl:
 
 ```
 .bones/
-├── bones.yaml           # project configuration
-├── runtime.yaml         # framework runtime configuration
+├── bones.toml           # project configuration
+├── runtime.toml         # framework runtime configuration
 ├── hooks.sh             # shared hook functions imported by hook entrypoints
 ├── deployment/
 │   └── 01_*.sh          # deployment scripts (run sequentially)

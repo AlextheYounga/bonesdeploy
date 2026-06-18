@@ -32,7 +32,6 @@ pub const LOCAL_BONES_TOML: &str = ".bones/bones.toml";
 pub const LOCAL_BONES_HOOKS_DIR: &str = ".bones/hooks";
 pub const LOCAL_BONES_HOOKS_SCRIPT: &str = ".bones/hooks/hooks.sh";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
-pub const LOCAL_BONES_RUNTIME_DIR: &str = ".bones/runtime";
 pub const LOCAL_BONES_RUNTIME_TOML: &str = ".bones/runtime.toml";
 
 pub const BONES_DIR: &str = "bones";
@@ -149,7 +148,6 @@ impl DeploymentPaths {
     pub fn new(project_name: &str, repo_path: &str, project_root: &str, web_root: &str) -> Self {
         let repo = repo_path.to_string();
         let project_root = project_root.to_string();
-        let web_root = web_root.to_string();
         let placeholder_release = Path::new(&project_root).join(RELEASES_DIR).join(PLACEHOLDER_RELEASE_NAME);
         let current = Path::new(&project_root).join(CURRENT_LINK);
         let runtime_socket_dir = Path::new(RUNTIME_SOCKET_PARENT).join(project_name);
@@ -172,7 +170,7 @@ impl DeploymentPaths {
             build_root: Path::new(&project_root).join(BUILD_DIR).join(WORKSPACE_DIR).display().to_string(),
             build_logs: Path::new(&project_root).join(BUILD_DIR).join(LOGS_DIR).display().to_string(),
             current: current.display().to_string(),
-            current_web_root: current.join(&web_root).display().to_string(),
+            current_web_root: current.join(web_root).display().to_string(),
             placeholder_release: placeholder_release.display().to_string(),
             placeholder_web_root: placeholder_release.join(&web_root).display().to_string(),
             placeholder_index: placeholder_release.join(&web_root).join(INDEX_HTML).display().to_string(),

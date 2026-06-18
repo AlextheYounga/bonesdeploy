@@ -1,21 +1,31 @@
 use anyhow::Result;
 use serde_json::{Map, Value};
-
-use crate::config;
+use shared::config as shared_config;
 use shared::paths::{ssl_certificate_key_path, ssl_certificate_path};
 
-fn base(cfg: &config::BonesConfig) -> Result<Map<String, Value>> {
-    let paths = cfg.data.deployment_paths();
+use crate::config;
+
+fn base(cfg: &config::BonesConfig, web_root: &str) -> Result<Map<String, Value>> {
+    let paths = cfg.data.deployment_paths(web_root);
     let mut vars = Map::new();
 
     vars.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
-    vars.insert(String::from("deploy_user"), Value::String(cfg.data.deploy_user.clone()));
-    vars.insert(String::from("runtime_user"), Value::String(cfg.data.runtime_user.clone()));
-    vars.insert(String::from("runtime_group"), Value::String(cfg.data.runtime_group.clone()));
-    vars.insert(String::from("release_group"), Value::String(cfg.data.release_group.clone()));
+    vars.insert(String::from("deploy_user"), Value::String(shared_config::default_deploy_user()));
+    vars.insert(
+        String::from("runtime_user"),
+        Value::String(shared_config::runtime_user_for(&cfg.data.project_name)),
+    );
+    vars.insert(
+        String::from("runtime_group"),
+        Value::String(shared_config::runtime_group_for(&cfg.data.project_name)),
+    );
+    vars.insert(
+        String::from("release_group"),
+        Value::String(shared_config::release_group_for(&cfg.data.project_name)),
+    );
     vars.insert(String::from("project_root_parent"), Value::String(paths.project_root_parent.clone()));
     vars.insert(String::from("project_root"), Value::String(cfg.data.project_root.clone()));
-    vars.insert(String::from("web_root"), Value::String(cfg.data.web_root.clone()));
+    vars.insert(String::from("web_root"), Value::String(web_root.to_string()));
     vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
     vars.insert(String::from("repo_path"), Value::String(cfg.data.repo_path.clone()));
     vars.insert(String::from("paths"), serde_json::to_value(paths)?);
@@ -23,15 +33,15 @@ fn base(cfg: &config::BonesConfig) -> Result<Map<String, Value>> {
     Ok(vars)
 }
 
-pub fn setup(cfg: &config::BonesConfig, deploy_authorized_key: &str) -> Result<Value> {
-    let mut vars = base(cfg)?;
+pub fn setup(cfg: &config::BonesConfig, web_root: &str, deploy_authorized_key: &str) -> Result<Value> {
+    let mut vars = base(cfg, web_root)?;
     vars.insert(String::from("deploy_authorized_key"), Value::String(deploy_authorized_key.to_string()));
     vars.insert(String::from("setup_label"), Value::String(String::from("bonesdeploy")));
     Ok(Value::Object(vars))
 }
 
-pub fn ssl(cfg: &config::BonesConfig, domain: &str, email: &str) -> Result<Value> {
-    let mut vars = base(cfg)?;
+pub fn ssl(cfg: &config::BonesConfig, web_root: &str, domain: &str, email: &str) -> Result<Value> {
+    let mut vars = base(cfg, web_root)?;
     vars.insert(String::from("ssl_domain"), Value::String(domain.to_string()));
     vars.insert(String::from("ssl_email"), Value::String(email.to_string()));
     vars.insert(String::from("nginx_ssl_certificate_path"), Value::String(ssl_certificate_path(domain)));
@@ -51,7 +61,6 @@ mod tests {
                 project_name: String::from("test"),
                 repo_path: String::from("/home/git/test.git"),
                 project_root: String::from("/srv/test"),
-                web_root: String::from("public"),
                 host: String::from("example.com"),
                 port: String::from("22"),
                 branch: String::from("master"),
@@ -68,7 +77,7 @@ mod tests {
     #[test]
     fn ssl_data_includes_domain_and_email() -> anyhow::Result<()> {
         let cfg = test_cfg();
-        let vars = ssl(&cfg, "app.example.com", "ops@example.com")?;
+        let vars = ssl(&cfg, "public", "app.example.com", "ops@example.com")?;
 
         assert_eq!(vars.get("ssl_domain"), Some(&serde_json::Value::String(String::from("app.example.com"))));
         assert_eq!(vars.get("ssl_email"), Some(&serde_json::Value::String(String::from("ops@example.com"))));

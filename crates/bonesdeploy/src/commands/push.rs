@@ -51,7 +51,7 @@ pub async fn run() -> Result<()> {
 }
 
 pub(crate) fn sync_bones_directory(cfg: &config::BonesConfig) -> Result<()> {
-    let user = &cfg.data.deploy_user;
+    let user = shared::config::default_deploy_user();
     let host = &cfg.data.host;
     let port = &cfg.data.port;
     let repo_path = &cfg.data.repo_path;

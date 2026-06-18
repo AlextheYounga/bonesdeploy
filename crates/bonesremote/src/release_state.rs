@@ -7,10 +7,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 
 use crate::config::{BonesConfig, Constants};
-use shared::paths::DeploymentPaths;
+use shared::paths::{self as shared_paths, DeploymentPaths};
 
 fn deployment_paths(cfg: &BonesConfig) -> DeploymentPaths {
-    cfg.data.deployment_paths()
+    cfg.data.deployment_paths(shared_paths::DEFAULT_WEB_ROOT)
 }
 
 pub fn staged_release_path(cfg: &BonesConfig) -> PathBuf {
@@ -168,7 +168,6 @@ mod tests {
                 port: String::from("22"),
                 repo_path: root.join("repo.git").to_string_lossy().to_string(),
                 project_root: root.join("deploy").to_string_lossy().to_string(),
-                web_root: String::from("public"),
                 branch: String::from("master"),
                 deploy_on_push: true,
                 ..Default::default()

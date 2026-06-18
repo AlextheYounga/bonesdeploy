@@ -6,7 +6,6 @@ use anyhow::{Context, Result, bail};
 use shared::paths;
 
 const REPOSITORY_URL: &str = "https://github.com/AlextheYounga/bonesinfra.git";
-const REPOSITORY_BRANCH: &str = "master";
 const CHECKOUT_DIR: &str = "bonesinfra";
 const ENTRYPOINT: &str = "main.py";
 
@@ -29,7 +28,24 @@ fn ensure_available() -> Result<PathBuf> {
     install_checkout(&checkout)?;
 
     if !main_py.is_file() {
-        bail!("Installed hidden bonesinfra checkout at {}, but {} is missing.", checkout.display(), main_py.display());
+        let contents: Vec<_> = fs::read_dir(&checkout)
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.ok())
+            .map(|e| e.path().display().to_string())
+            .collect();
+        if contents.is_empty() {
+            bail!(
+                "Git clone succeeded but checkout is empty at {}. The repository may have no default branch.",
+                checkout.display()
+            );
+        }
+        bail!(
+            "Installed bonesinfra checkout at {}, but {} is missing.\nContents of checkout:\n  {}",
+            checkout.display(),
+            main_py.display(),
+            contents.join("\n  ")
+        );
     }
 
     Ok(checkout)
@@ -41,7 +57,7 @@ fn install_checkout(checkout: &Path) -> Result<()> {
     }
 
     let status = Command::new("git")
-        .args(["clone", "--depth", "1", "--branch", REPOSITORY_BRANCH, REPOSITORY_URL, &checkout.to_string_lossy()])
+        .args(["clone", "--depth", "1", REPOSITORY_URL, &checkout.to_string_lossy()])
         .status()
         .context("Failed to run git clone for hidden bonesinfra checkout")?;
 

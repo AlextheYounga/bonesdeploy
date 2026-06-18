@@ -52,9 +52,9 @@ mod tests {
         env::temp_dir().join(format!("{prefix}_{}_{}.toml", process::id(), nanos))
     }
 
-    /// Derives repo path, project root, and web root from the project name.
+    /// Derives repo path and project root from the project name.
     #[test]
-    fn load_derives_project_root_repo_path_and_web_root_from_project_name() -> Result<()> {
+    fn load_derives_project_root_and_repo_path_from_project_name() -> Result<()> {
         let path = temp_file_path("bonesremote_config_derived_defaults");
         let toml = r#"
 [data]
@@ -68,20 +68,18 @@ host = "example.com"
 
         assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("acme"));
         assert_eq!(cfg.data.project_root, paths::default_project_root_for("acme"));
-        assert_eq!(cfg.data.web_root, paths::default_web_root());
         Ok(())
     }
 
-    /// Preserves explicitly configured repo path, project root, and web root.
+    /// Preserves explicitly configured repo path and project root.
     #[test]
-    fn load_preserves_explicit_repo_project_and_web_root() -> Result<()> {
+    fn load_preserves_explicit_repo_and_project_root() -> Result<()> {
         let path = temp_file_path("bonesremote_config_explicit_values");
         let toml = r#"
 [data]
 project_name = "acme"
 repo_path = "/custom/repo.git"
 project_root = "/custom/deploy"
-web_root = "dist"
 "#;
 
         fs::write(&path, toml)?;
@@ -90,7 +88,6 @@ web_root = "dist"
 
         assert_eq!(cfg.data.repo_path, "/custom/repo.git");
         assert_eq!(cfg.data.project_root, "/custom/deploy");
-        assert_eq!(cfg.data.web_root, "dist");
         Ok(())
     }
 

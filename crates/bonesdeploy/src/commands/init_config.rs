@@ -126,7 +126,6 @@ fn build_config(
         &project_name,
         config::default_project_root_for,
     );
-    let web_root = seed_string(existing_config, |cfg| &cfg.data.web_root, config::default_web_root().as_str());
     let deploy_on_push = existing_config.is_none_or(|cfg| cfg.data.deploy_on_push);
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases.keep.max(1));
 
@@ -138,7 +137,6 @@ fn build_config(
             port,
             repo_path,
             project_root,
-            web_root,
             branch,
             deploy_on_push,
             ..Default::default()
@@ -151,17 +149,6 @@ fn build_config(
 pub fn non_empty(value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| value.to_string())
-}
-
-pub fn seed_string(
-    existing_config: Option<&config::BonesConfig>,
-    field: impl Fn(&config::BonesConfig) -> &String,
-    fallback: &str,
-) -> String {
-    existing_config
-        .map(field)
-        .filter(|field_value| !field_value.is_empty())
-        .map_or_else(|| fallback.to_string(), Clone::clone)
 }
 
 pub fn resolve_repo_path(
