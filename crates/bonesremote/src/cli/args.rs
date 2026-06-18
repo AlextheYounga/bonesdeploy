@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "bonesremote", about = "Server-side git deployment tool")]
+#[command(name = "bonesremote", about = "Remote release deployment tool")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -26,11 +26,6 @@ pub enum Command {
     Release {
         #[command(subcommand)]
         command: ReleaseCommand,
-    },
-    /// Hook-oriented helper commands
-    Hooks {
-        #[command(subcommand)]
-        command: HookCommand,
     },
     /// Narrow privileged service operations (requires root)
     Service {
@@ -65,28 +60,6 @@ pub enum ReleaseCommand {
     },
     /// Repoint current to the previous release
     Rollback {
-        #[arg(long)]
-        config: String,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum HookCommand {
-    /// Run deployment scripts and release activation sequence
-    Deploy {
-        #[arg(long)]
-        config: String,
-    },
-    /// Run the post-receive checkout sequence
-    PostReceive {
-        #[arg(long)]
-        config: String,
-        /// Exact revision to check out into the build workspace
-        #[arg(long)]
-        revision: Option<String>,
-    },
-    /// Prune old releases after deployment
-    PostDeploy {
         #[arg(long)]
         config: String,
     },

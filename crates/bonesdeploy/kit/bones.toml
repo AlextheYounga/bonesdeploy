@@ -4,7 +4,7 @@
 port = '22'
 branch = 'master'
 domain = ''
-# preview_domain = ""
+preview_domain = ""
 email = ''
 deploy_on_push = false
 ssl_enabled = false

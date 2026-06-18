@@ -1,9 +1,9 @@
 use anyhow::Result;
 
-use crate::cli::args::{Cli, Command, HookCommand, ReleaseCommand, ServiceCommand};
+use crate::cli::args::{Cli, Command, ReleaseCommand, ServiceCommand};
 use crate::commands::{
-    activate_release, deploy, doctor, drop_failed_release, init, post_deploy, post_receive,
-    rollback, service, stage_release, version, wire_release,
+    activate_release, deploy, doctor, drop_failed_release, init, rollback, service, stage_release,
+    version, wire_release,
 };
 
 pub fn run(cli: &Cli) -> Result<()> {
@@ -17,11 +17,6 @@ pub fn run(cli: &Cli) -> Result<()> {
             ReleaseCommand::Activate { config } => activate_release::run(config),
             ReleaseCommand::DropFailed { config } => drop_failed_release::run(config),
             ReleaseCommand::Rollback { config } => rollback::run(config),
-        },
-        Command::Hooks { command } => match command {
-            HookCommand::Deploy { config } => deploy::run(config),
-            HookCommand::PostReceive { config, revision } => post_receive::run(config, revision.as_deref()),
-            HookCommand::PostDeploy { config } => post_deploy::run(config),
         },
         Command::Service { command } => match command {
             ServiceCommand::Restart { config } => service::run(config),

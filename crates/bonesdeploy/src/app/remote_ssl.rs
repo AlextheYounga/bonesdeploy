@@ -31,11 +31,11 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     }
 
     if cfg.ssl.domain.is_empty() {
-        bail!("SSL domain is missing. Pass --domain or set ssl.domain in .bones/bones.toml");
+        bail!("SSL domain is missing. Pass --domain or set domain in .bones/bones.toml");
     }
 
     if cfg.ssl.email.is_empty() {
-        bail!("SSL email is missing. Pass --email or set ssl.email in .bones/bones.toml");
+        bail!("SSL email is missing. Pass --email or set email in .bones/bones.toml");
     }
 
     config::save(&cfg, bones_toml)?;

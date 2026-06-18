@@ -27,6 +27,7 @@ fn base(cfg: &config::BonesConfig, web_root: &str) -> Result<Map<String, Value>>
     vars.insert(String::from("project_root"), Value::String(cfg.data.project_root.clone()));
     vars.insert(String::from("web_root"), Value::String(web_root.to_string()));
     vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
+    vars.insert(String::from("preview_domain"), Value::String(cfg.data.preview_domain.clone()));
     vars.insert(String::from("repo_path"), Value::String(cfg.data.repo_path.clone()));
     vars.insert(String::from("paths"), serde_json::to_value(paths)?);
 
@@ -53,7 +54,7 @@ pub fn ssl(cfg: &config::BonesConfig, web_root: &str, domain: &str, email: &str)
 mod tests {
     use crate::config::{BonesConfig, Data, Releases, Ssl};
 
-    use super::ssl;
+    use super::{base, ssl};
 
     fn test_cfg() -> BonesConfig {
         BonesConfig {
@@ -81,6 +82,20 @@ mod tests {
 
         assert_eq!(vars.get("ssl_domain"), Some(&serde_json::Value::String(String::from("app.example.com"))));
         assert_eq!(vars.get("ssl_email"), Some(&serde_json::Value::String(String::from("ops@example.com"))));
+        Ok(())
+    }
+
+    #[test]
+    fn base_data_includes_preview_domain() -> anyhow::Result<()> {
+        let mut cfg = test_cfg();
+        cfg.data.preview_domain = String::from("test-example-com.nip.io");
+
+        let vars = base(&cfg, "public")?;
+
+        assert_eq!(
+            vars.get("preview_domain"),
+            Some(&serde_json::Value::String(String::from("test-example-com.nip.io")))
+        );
         Ok(())
     }
 }
