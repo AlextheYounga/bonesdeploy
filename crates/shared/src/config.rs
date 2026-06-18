@@ -140,17 +140,6 @@ pub fn apply_derived_defaults(data: &mut Data) {
     }
 }
 
-pub fn hide_derived_defaults(data: &mut Data) {
-    let project_name = &data.project_name;
-
-    if data.repo_path == default_repo_path_for(project_name) {
-        data.repo_path.clear();
-    }
-    if data.project_root == default_project_root_for(project_name) {
-        data.project_root.clear();
-    }
-}
-
 impl Data {
     pub fn deployment_paths(&self, web_root: &str) -> crate::paths::DeploymentPaths {
         crate::paths::DeploymentPaths::new(&self.project_name, &self.repo_path, &self.project_root, web_root)

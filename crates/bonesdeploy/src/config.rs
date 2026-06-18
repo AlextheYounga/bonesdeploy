@@ -81,7 +81,7 @@ pub fn load(path: &Path) -> Result<BonesConfig> {
 
 pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
-    shared_config::hide_derived_defaults(&mut to_serialize.data);
+    shared_config::apply_derived_defaults(&mut to_serialize.data);
 
     let toml_str = toml::to_string(&to_serialize).context("Failed to serialize bones config")?;
     fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
@@ -163,17 +163,17 @@ mod tests {
         Ok(())
     }
 
-    /// Omits derived repo and project root fields when saving.
+    /// Includes derived repo and project root fields when saving.
     #[test]
-    fn save_omits_derived_repo_and_project_root() -> Result<()> {
+    fn save_includes_derived_repo_and_project_root() -> Result<()> {
         let config = sample_config("phoenix");
         let path = temp_path("save_derived_defaults.toml");
 
         save(&config, &path)?;
         let content = fs::read_to_string(&path)?;
 
-        assert!(!content.contains("repo_path:"));
-        assert!(!content.contains("project_root:"));
+        assert!(content.contains("repo_path ="), "save should include repo_path");
+        assert!(content.contains("project_root ="), "save should include project_root");
 
         fs::remove_file(path)?;
         Ok(())
