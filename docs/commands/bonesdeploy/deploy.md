@@ -2,23 +2,21 @@
 
 ## Overview
 
-Manually triggers the deployment sequence on the remote server by running the `pre-receive` and `post-receive` hooks directly, without requiring a `git push`. This is useful for testing deployment scripts, re-running failed deployments, or deploying when you don't have new commits to push.
+Manually triggers the full deployment sequence on the remote server by running `bonesremote deploy --config <remote_bones_toml>` over SSH. This is useful for testing deployment scripts, re-running failed deployments, or deploying when you don't have new commits to push.
 
 ## Detailed Execution Steps
 
 ### 1. Load Configuration
 
-**Source:** `deploy.rs:9-10`
+**Source:** `deploy.rs:9-12`
 
 ```rust
-let bones_yaml = Path::new(config::Constants::BONES_YAML);
-let cfg = config::load(bones_yaml)?;
+let bones_toml = Path::new(config::Constants::BONES_TOML);
+let cfg = config::load(bones_toml)?;
+let remote_bones_toml = cfg.data.deployment_paths().repo_bones_toml;
 ```
 
-Loads deployment configuration to determine:
-- Remote server connection details
-- Git directory path
-- Project name
+Loads local `.bones/bones.toml` and computes the remote config path (e.g., `/home/git/myapp.git/bones/bones.toml`).
 
 ---
 
@@ -27,10 +25,10 @@ Loads deployment configuration to determine:
 **Source:** `deploy.rs:14`
 
 ```rust
-println!("Deploying {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
+println!("Deploying {} on {}...",
+    style(&cfg.data.project_name).cyan().bold(),
+    style(&cfg.data.host).cyan());
 ```
-
-Displays the project name and target host.
 
 ---
 
@@ -42,96 +40,55 @@ Displays the project name and target host.
 let session = ssh::connect(&cfg).await?;
 ```
 
-Connects to the remote server via SSH.
+Connects to the remote server as the configured `deploy_user` (default: `git`) using the `openssh` crate.
 
 ---
 
-### 4. Run Pre-Receive Hook
+### 4. Run Remote Deploy
 
-**Source:** `deploy.rs:18-27`
+**Source:** `deploy.rs:18-19`
 
 ```rust
-println!("Running pre-receive...");
-ssh::stream_cmd(
-    &session,
-    &format!(
-        "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
-        config::Constants::REMOTE_HOOKS_DIR,
-        config::Constants::PRE_RECEIVE_HOOK
-    ),
-)
-.await?;
+println!("Running remote deploy...");
+ssh::stream_cmd(&session,
+    &format!("bonesremote deploy --config '{remote_bones_toml}'")).await?;
 ```
 
-#### 4.1 Environment Setup
-
-**Environment Variables:**
-- `BONES_FORCE_DEPLOY=1`: Signals to hooks that this is a forced/manual deployment (bypasses normal checks)
-- `GIT_DIR='{repo_path}'`: Sets the Git directory for the bare repository
-
-#### 4.2 Hook Execution
+Runs `bonesremote deploy` on the remote host, streaming stdout/stderr to the local terminal. This is the main deployment command — it orchestrates the full server-side pipeline:
 
 **Command Executed:**
 ```bash
-BONES_FORCE_DEPLOY=1 GIT_DIR='/home/git/myapp.git' '/home/git/myapp.git/bones/hooks/pre-receive' </dev/null
+bonesremote deploy --config '/home/git/myapp.git/bones/bones.toml'
 ```
 
-**What `pre-receive` does:**
-1. Validates the incoming push
-2. Checks for deployment prerequisites
-3. Stages a new release
-4. Sets up the build workspace
+#### 4.1 What `bonesremote deploy` Does (Server-Side Pipeline)
 
-**Note:** Input is redirected from `/dev/null` because manual deployment doesn't have actual Git refs being pushed.
+`bonesremote deploy` implements `run_full()` in `crates/bonesremote/src/commands/deploy.rs:21-43`:
 
-#### 4.3 Output Streaming
+1. **doctor** — Checks the server environment (binary availability, AppArmor, sudoers)
+2. **stage_release** — Creates a timestamped release directory (e.g., `releases/20260507_150000/`), ensures `build/workspace` and `shared/` exist, writes staged release state
+3. **post_receive** — Checks out the configured branch into `build/workspace` via:
+   ```bash
+   git --work-tree <project_root>/build/workspace --git-dir <repo_path> checkout -f <branch>
+   ```
+4. **wire_release** — Reads `runtime.toml` for shared path definitions, creates symlinks from `shared/` into `build/workspace` (e.g., `.env` → `shared/.env`)
+5. **deploy** (inner `run` function) — See section 4.2
+6. **restart_services** — Runs `sudo bonesremote service restart --config <config>` to restart the per-site nginx
+7. **post_deploy** — Prunes old releases beyond the configured `releases.keep` count
 
-**Source:** Uses `ssh::stream_cmd` instead of `ssh::run_cmd`:
-- Streams stdout/stderr in real-time to local terminal
-- Allows user to see deployment progress
-- Fails if hook exits with non-zero status
+On failure at any step from 3-7, **drop_failed_release** cleans up the staged release directory and state.
 
----
+#### 4.2 Inner Deploy Step (`run()`)
 
-### 5. Run Post-Receive Hook
+**Source:** `crates/bonesremote/src/commands/deploy.rs:45-99`
 
-**Source:** `deploy.rs:29-38`
-
-```rust
-println!("Running post-receive...");
-ssh::stream_cmd(
-    &session,
-    &format!(
-        "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
-        config::Constants::REMOTE_HOOKS_DIR,
-        config::Constants::POST_RECEIVE_HOOK
-    ),
-)
-.await?;
-```
-
-#### 5.1 Hook Execution
-
-**Command Executed:**
-```bash
-BONES_FORCE_DEPLOY=1 GIT_DIR='/home/git/myapp.git' '/home/git/myapp.git/bones/hooks/post-receive' </dev/null
-```
-
-**What `post-receive` does:**
-1. Checks out the latest code to build workspace
-2. Wires shared paths (symlinks for `.env`, `storage/`, etc.)
-3. Runs deployment scripts
-4. Activates the release (atomically switches symlink)
-5. Restarts the service (if configured)
-6. Prunes old releases
-
-#### 5.2 Deployment Script Execution
-
-The `post-receive` hook typically calls `bonesremote hooks deploy`, which:
-1. Lists all scripts in `bones/deployment/`
-2. Sorts them by filename (hence numeric prefixes)
-3. Executes each script in order
-4. Fails fast if any script exits non-zero
+1. Lists deployment scripts from `bones/deployment/` (sorted numerically)
+2. For each script:
+   - Runs it in `build/workspace` with environment variables (`PROJECT_NAME`, `PROJECT_ROOT`, `REPO_PATH`, `WEB_ROOT`)
+   - Captures output to a log file in the release directory
+   - Fails fast if any script exits non-zero
+3. After all scripts succeed, copies `build/workspace` to the staged release directory via `cp -a`
+4. Calls `activate_release::run()` to atomically switch the `current` symlink to the new release
 
 **Example Deployment Scripts:**
 ```bash
@@ -143,21 +100,19 @@ The `post-receive` hook typically calls `bonesremote hooks deploy`, which:
 
 ---
 
-### 6. Close SSH Session
+### 5. Close SSH Session
 
-**Source:** `deploy.rs:40`
+**Source:** `deploy.rs:21`
 
 ```rust
 session.close().await?;
 ```
 
-Cleanly closes the SSH connection.
-
 ---
 
-### 7. Print Success Message
+### 6. Print Success Message
 
-**Source:** `deploy.rs:42`
+**Source:** `deploy.rs:23`
 
 ```rust
 println!("\n{} Deployment complete.", style("Done!").green().bold());
@@ -165,34 +120,25 @@ println!("\n{} Deployment complete.", style("Done!").green().bold());
 
 ---
 
-## Difference from `git push`
+## How `git push` Differs from `bonesdeploy deploy`
 
 | Aspect | `git push` | `bonesdeploy deploy` |
 |--------|-----------|---------------------|
 | **Trigger** | Push commits to remote | Manual command |
-| **Pre-receive input** | Git refs (old/new SHA) | Empty (force mode) |
-| **Commit requirement** | Must have new commits | Works with existing commits |
-| **Use case** | Normal deployment workflow | Testing, re-deployment, recovery |
+| **Deploy mechanism** | `post-receive` hook calls `bonesremote deploy --revision <sha>` | Directly calls `bonesremote deploy --config <path>` (uses configured branch) |
+| **Commit requirement** | Must have new commits | Works with existing commits (re-deployment) |
+| **Pre-push doctor** | Runs locally via `pre-push` hook | Not run (user invokes deliberately) |
+| **Use case** | Normal CI/CD workflow | Testing, re-deployment after failure, recovery |
 
 ---
 
 ## When to Use
 
-1. **Testing deployment scripts**: Validate changes to deployment scripts without pushing new commits
+1. **Testing deployment scripts**: Validate changes to `bones/deployment/` scripts without pushing new commits
 2. **Re-running failed deployments**: After fixing deployment script issues
-3. **Manual deployments**: When you want to control deployment timing separately from commits
+3. **Manual deployments**: When `deploy_on_push = false` or you want to control deployment timing separately from commits
 4. **Recovery**: Re-deploy the current commit after a failed deployment
 5. **Initial setup**: Deploy after `bonesdeploy push` before the first `git push`
-
----
-
-## How `BONES_FORCE_DEPLOY=1` Affects Hooks
-
-The `BONES_FORCE_DEPLOY` environment variable signals to the hooks that this is a manual deployment. This typically:
-
-1. **Skips push validation**: Normally `pre-receive` validates incoming refs, but with force deploy, it skips these checks
-2. **Uses current branch**: Instead of using pushed refs, uses the configured branch from `bones.yaml`
-3. **Allows re-deployment**: Can deploy the same commit multiple times
 
 ---
 
@@ -200,16 +146,14 @@ The `BONES_FORCE_DEPLOY` environment variable signals to the hooks that this is 
 
 ### Normal Deployment (via Git Push)
 ```bash
-# Make changes
 git add .
 git commit -m "Add feature"
-git push production master  # Triggers deployment automatically
+git push production master  # post-receive hook triggers bonesremote deploy
 ```
 
 ### Manual Deployment
 ```bash
-# No new commits needed
-bonesdeploy deploy  # Deploys current state of configured branch
+bonesdeploy deploy  # SSH -> bonesremote deploy --config <path>
 ```
 
 ### Combined Workflow
@@ -227,13 +171,13 @@ bonesdeploy deploy
 
 ### Directory State Before Deploy
 ```
-/srv/deployments/myapp/
-├── build/workspace/     # Previous build workspace
+/srv/sites/myapp/
+├── build/workspace/       # Previous build (git checkout)
 ├── releases/
-│   ├── 20260507_120000/ # Old release
-│   ├── 20260507_130000/ # Old release
-│   └── 20260507_140000/ # Current release
-├── shared/
+│   ├── 20260507_120000/   # Old release
+│   ├── 20260507_130000/   # Old release
+│   └── 20260507_140000/   # Current (active) release
+├── shared/                # Runtime-persistent files
 │   ├── .env
 │   └── storage/
 └── current -> releases/20260507_140000/
@@ -241,43 +185,42 @@ bonesdeploy deploy
 
 ### Directory State After Deploy
 ```
-/srv/deployments/myapp/
-├── build/workspace/     # New build (overwritten)
+/srv/sites/myapp/
+├── build/workspace/       # Overwritten with new checkout
 ├── releases/
-│   ├── 20260507_130000/ # Old release
-│   ├── 20260507_140000/ # Previous current
-│   └── 20260507_150000/ # New release
+│   ├── 20260507_130000/   # Old release
+│   ├── 20260507_140000/   # Previous current
+│   └── 20260507_150000/   # New release (timestamped)
 ├── shared/
 │   ├── .env
 │   └── storage/
-└── current -> releases/20260507_150000/  # Switched
+└── current -> releases/20260507_150000/  # Atomically switched
 ```
 
 ---
 
 ## Error Handling
 
-If deployment fails:
+If the remote deploy fails:
 
-1. **Pre-receive failure**: Build workspace not created, no release staged
-2. **Post-receive failure**: 
-   - Build workspace may be in partial state
-   - Failed release is dropped
-   - Current symlink remains pointing to previous release
-   - Service continues running on old release
+1. **Pre-stage failure** (doctor/stage): No release state created, nothing to clean up
+2. **Mid-deploy failure** (checkout/wire/scripts/activate):
+   - `drop_failed_release` removes the staged release dir and clears state
+   - `current` symlink remains pointing to the previous release
+   - Service continues running on the old release
 
 **Recovery:**
 ```bash
 # Fix the issue (e.g., deployment script error)
-bonesdeploy push  # Sync updated scripts
-bonesdeploy deploy  # Retry deployment
+bonesdeploy push     # Sync updated scripts to remote
+bonesdeploy deploy   # Retry deployment
 ```
 
 ---
 
 ## Related Commands
 
-- `bonesdeploy push` - Syncs `.bones/` to remote
-- `bonesdeploy rollback` - Reverts to previous release
-- `bonesdeploy doctor` - Validates environment
-- `bonesremote hooks deploy` - Server-side deployment command
+- `bonesdeploy push` — Syncs `.bones/` to the remote bare repo
+- `bonesdeploy rollback` — Reverts `current` symlink to the previous release
+- `bonesdeploy doctor` — Validates local and remote environment
+- `bonesremote deploy` — Server-side binary (runs remotely via SSH)

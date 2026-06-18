@@ -2,7 +2,9 @@
 
 ## Overview
 
-Orchestrates the deployment sequence by running all deployment scripts in the `bones/deployment/` directory, publishing the build workspace to the release directory, and activating the release. This command is the main deployment driver that transforms a staged release into a running application.
+Runs deployment scripts, publishes the build workspace to the staged release directory, and activates the release (atomic symlink switch). This is called internally by `bonesremote deploy --config <path>` (the recommended unified command) as one step in the full pipeline.
+
+Use this subcommand directly only when composing a custom pipeline from individual building blocks.
 
 ## Command Signature
 
@@ -11,7 +13,7 @@ bonesremote hooks deploy --config <path>
 ```
 
 **Flags:**
-- `--config <path>`: Path to `bones.yaml` configuration file (required)
+- `--config <path>`: Path to `bones.toml` configuration file (required)
 
 **Note:** Must NOT be run as root (runs as deploy user).
 
@@ -469,27 +471,25 @@ Deployment script 03_run_migrations.sh failed with status 1
 
 ## Typical Workflow
 
+**Recommended approach** — use the unified `bonesremote deploy` command:
+
 ```bash
-# 1. Post-receive hook runs
-bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.yaml
+# All steps in one call:
+bonesremote deploy --config /home/git/myapp.git/bones/bones.toml
+# orchestrates: doctor → stage → checkout → wire → scripts → activate → restart → prune
+```
 
-# 2. Post-receive calls deploy
-bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
+**Individual building blocks** (for custom pipelines):
 
-# 3. Deploy runs scripts
-# - 01_install_dependencies.sh
-# - 02_build_assets.sh
-# - 03_run_migrations.sh
-# - 04_clear_cache.sh
+```bash
+# 1. Post-receive (checkout)
+bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.toml
 
-# 4. Deploy publishes to release directory
-# cp -a build/workspace/. releases/20260507_150432/
+# 2. Deploy scripts + activate
+bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.toml
 
-# 5. Deploy activates release
-# current -> releases/20260507_150432
-
-# 6. Post-deploy runs (separate command)
-sudo bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.yaml
+# 3. Post-deploy (prune)
+sudo bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.toml
 ```
 
 ---

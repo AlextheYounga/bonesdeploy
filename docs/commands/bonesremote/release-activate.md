@@ -2,7 +2,7 @@
 
 ## Overview
 
-Atomically activates the staged release by switching the `current` symlink to point to the new release directory. This makes the new release live through `current`. The command also clears the staged release state, marking the deployment as complete.
+Atomically switches the `current` symlink to point to the staged release, making it the active deployment. Called internally by `bonesremote deploy --config <path>` (the recommended unified command) and by `bonesremote hooks deploy`. Use directly when composing a custom pipeline from individual building blocks.
 
 ## Command Signature
 
@@ -11,7 +11,7 @@ bonesremote release activate --config <path>
 ```
 
 **Flags:**
-- `--config <path>`: Path to `bones.yaml` configuration file (required)
+- `--config <path>`: Path to `bones.toml` configuration file (required)
 
 **Note:** Must NOT be run as root (runs as deploy user).
 
@@ -239,7 +239,7 @@ Activated release: 20260507_150432
 /var/www/myapp -> /srv/deployments/myapp/current  # Updated!
 
 /home/git/myapp.git/bones/
-├── bones.yaml
+├── bones.toml
 └── (no .staged_release file)  # Cleared
 ```
 
@@ -316,7 +316,7 @@ current exists and is not a symlink: /srv/deployments/myapp/current
 
 ```bash
 # 1. Stage release
-sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.toml
 
 # 2. Check out code
 git --work-tree=/srv/deployments/myapp/build/workspace \
@@ -324,16 +324,16 @@ git --work-tree=/srv/deployments/myapp/build/workspace \
     checkout -f master
 
 # 3. Wire shared paths
-sudo bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
+sudo bonesremote release wire --config /home/git/myapp.git/bones/bones.toml
 
 # 4. Run deployment scripts
 # (scripts populate build/workspace and releases/<release-id>/)
 
 # 5. Activate release
-bonesremote release activate --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release activate --config /home/git/myapp.git/bones/bones.toml
 
 # 6. Post-deploy (restart service, harden permissions)
-sudo bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.yaml
+sudo bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.toml
 ```
 
 ---

@@ -8,7 +8,7 @@ Synchronizes the remote bare repository's `bones/` directory back into the local
 
 ### 1. Determine Sync Target
 
-The command uses the local `.bones/bones.yaml` when it exists. Otherwise it falls back to the configured Git remote URL, preferring a remote named `production` when multiple remotes are present.
+The command uses the local `.bones/bones.toml` when it exists. Otherwise it falls back to the configured Git remote URL, preferring a remote named `production` when multiple remotes are present.
 
 ### 2. Create Local Scaffold Directory
 

@@ -255,7 +255,7 @@ if local_needs_update {
 
 ```rust
 pub fn update_remote_from_source(repo_url: &str, version: &str) -> Result<()> {
-    let cfg = config::load(bones_yaml)?;
+    let cfg = config::load(bones_toml)?;
     // ...
     run_pyinfra_deploy(&cfg, &ssh_user, &data_vars, &deploy)?;
 }
@@ -263,7 +263,7 @@ pub fn update_remote_from_source(repo_url: &str, version: &str) -> Result<()> {
 
 **Remote Update Process:**
 
-1. **Load Configuration** — requires `.bones/bones.yaml` to exist.
+1. **Load Configuration** — requires `.bones/bones.toml` to exist.
 
 2. **Generate pyinfra Deploy Script** — dynamically writes a temporary `update_bonesremote.py` containing pyinfra operations:
    - `cargo install --git <repo_url> bonesremote --force --root <install_root>` (with sudo)

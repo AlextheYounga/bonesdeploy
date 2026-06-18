@@ -11,7 +11,7 @@ bonesremote release rollback --config <path>
 ```
 
 **Flags:**
-- `--config <path>`: Path to `bones.yaml` configuration file (required)
+- `--config <path>`: Path to `bones.toml` configuration file (required)
 
 **Note:** Must NOT be run as root (runs as deploy user).
 
@@ -366,7 +366,7 @@ sudo systemctl restart myapp
 ```bash
 # 1. Issue discovered in production
 # 2. Immediate rollback
-bonesremote release rollback --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release rollback --config /home/git/myapp.git/bones/bones.toml
 
 # 3. Verify service restored
 curl https://app.example.com/health
@@ -384,7 +384,7 @@ curl https://app.example.com/health
 # 2. Decide to rollback
 # 3. Announce to team
 # 4. Execute rollback
-bonesremote release rollback --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release rollback --config /home/git/myapp.git/bones/bones.toml
 
 # 5. Verify application
 # 6. Monitor for issues

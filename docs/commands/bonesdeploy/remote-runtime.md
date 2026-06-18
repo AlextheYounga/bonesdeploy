@@ -14,7 +14,7 @@ bonesdeploy remote runtime
 
 ### 1. Load Configuration and Choose Template
 
-Loads `.bones/bones.yaml` and `.bones/runtime.yaml`. Prompts the user to select a framework from the available templates (`django`, `laravel`, `next`, `nuxt`, `rails`, `sveltekit`, `vue`).
+Loads `.bones/bones.toml` and `.bones/runtime.toml`. Prompts the user to select a framework from the available templates (`django`, `laravel`, `next`, `nuxt`, `rails`, `sveltekit`, `vue`).
 
 ### 2. Scaffold Runtime Assets
 
@@ -22,11 +22,11 @@ Deletes the existing `.bones/runtime/` directory (if any) and writes fresh scaff
 
 - Writes runtime assets from the hidden `bonesinfra` checkout managed by `bonesdeploy` (shared runtime deploy script + Jinja2 templates)
 - Writes `templates/<name>/runtime/` files to `.bones/runtime/` (template-specific `operations.py`)
-- Saves the selected template name to `.bones/runtime.yaml`
+- Saves the selected template name to `.bones/runtime.toml`
 
 ### 3. Apply Template Defaults
 
-Parses the template's `bones.yaml` to extract `web_root` and `permissions.paths` defaults. Updates the main `.bones/bones.yaml` with these values only when the existing values still match the generic defaults — preserving any user overrides.
+Parses the template's `bones.toml` to extract `web_root` and `permissions.paths` defaults. Updates the main `.bones/bones.toml` with these values only when the existing values still match the generic defaults — preserving any user overrides.
 
 ### 4. Confirm Remote Apply
 
@@ -34,7 +34,7 @@ Prompts `y/N` before running the remote deploy. On confirmation:
 
 ### 5. Run pyinfra Deploy (as Deploy User)
 
-Connects as the deploy user (from `bones.yaml`) — root is not needed since service management and nginx config are handled via `sudo` inside the pyinfra operations.
+Connects as the deploy user (from `bones.toml`) — root is not needed since service management and nginx config are handled via `sudo` inside the pyinfra operations.
 
 ```bash
 bonesdeploy remote runtime --host <host> --ssh-user git --ssh-port 22 --deploy-user git --project-name myapp --repo-path /home/git/myapp.git

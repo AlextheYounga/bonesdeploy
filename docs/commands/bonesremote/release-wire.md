@@ -2,7 +2,9 @@
 
 ## Overview
 
-Creates symlinks from the build workspace to the shared directory for all configured shared paths. This ensures that files and directories that should persist across releases (like `.env`, `storage/`) are available in the build workspace. Command runs as the deploy user — no elevated privileges required.
+Creates symlinks from the build workspace to the shared directory for all configured shared paths (defined in `runtime.toml`). Called internally by `bonesremote deploy --config <path>` (the recommended unified command) after git checkout.
+
+Use this subcommand directly when composing a custom pipeline from individual building blocks.
 
 ## Command Signature
 
@@ -11,7 +13,7 @@ bonesremote release wire --config <path>
 ```
 
 **Flags:**
-- `--config <path>`: Path to `bones.yaml` configuration file (required)
+- `--config <path>`: Path to `bones.toml` configuration file (required)
 
 ---
 
@@ -78,15 +80,14 @@ for shared_path in &shared_paths {
 }
 ```
 
-Shared paths are loaded from `runtime.yaml` (sibling of `bones.yaml` in the bare repo's `bones/` dir):
+Shared paths are loaded from `runtime.toml` (sibling of `bones.toml` in the bare repo's `bones/` dir):
 
-```yaml
-shared:
-  paths:
-    - path: .env
-      type: file
-    - path: storage
-      type: dir
+```toml
+[shared]
+paths = [
+    { path = ".env", type = "file" },
+    { path = "storage", type = "dir" },
+]
 ```
 
 ---
@@ -233,7 +234,7 @@ When a new release is activated:
 
 ```bash
 # 1. Stage release
-bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release stage --config /home/git/myapp.git/bones/bones.toml
 
 # 2. Check out code (done by post-receive hook)
 git --work-tree=/srv/sites/myapp/build/workspace \
@@ -241,13 +242,13 @@ git --work-tree=/srv/sites/myapp/build/workspace \
     checkout -f master
 
 # 3. Wire shared paths
-bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release wire --config /home/git/myapp.git/bones/bones.toml
 
 # 4. Build and deploy
 # (deployment scripts run in build/workspace with symlinks active)
 
 # 5. Activate release
-bonesremote release activate --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release activate --config /home/git/myapp.git/bones/bones.toml
 ```
 
 ---

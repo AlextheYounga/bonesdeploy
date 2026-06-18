@@ -14,7 +14,7 @@ bonesdeploy remote ssl [--domain <domain>] [--email <email>]
 - `--domain <domain>`: Domain name for the certificate (e.g., `app.example.com`)
 - `--email <email>`: Email for Let's Encrypt registration and notices
 
-Both flags are optional if values are already configured in `bones.yaml`.
+Both flags are optional if values are already configured in `bones.toml`.
 
 ---
 
@@ -37,8 +37,8 @@ This separation ensures:
 ### 1. Load Configuration
 
 ```rust
-let bones_yaml = Path::new(config::Constants::BONES_YAML);
-let mut cfg = config::load(bones_yaml)?;
+let bones_toml = Path::new(config::Constants::BONES_TOML);
+let mut cfg = config::load(bones_toml)?;
 ```
 
 Loads the existing configuration. Resolves `domain` and `email` from CLI args, existing config, or interactive prompts.
@@ -80,26 +80,26 @@ The SSL pyinfra deploy performs these operations in order:
 
 ### 6. Sync Configuration
 
-After SSL succeeds, saves the updated `bones.yaml` and syncs `.bones/` to the remote bare repo via `bonesdeploy push`.
+After SSL succeeds, saves the updated `bones.toml` and syncs `.bones/` to the remote bare repo via `bonesdeploy push`.
 
 ---
 
-## SSL Configuration in bones.yaml
+## SSL Configuration in bones.toml
 
 **Before `remote ssl`:**
-```yaml
-ssl:
-  enabled: false
-  domain: ""
-  email: ""
+```toml
+[ssl]
+enabled = false
+domain = ""
+email = ""
 ```
 
 **After `remote ssl --domain app.example.com --email admin@example.com`:**
-```yaml
-ssl:
-  enabled: true
-  domain: app.example.com
-  email: admin@example.com
+```toml
+[ssl]
+enabled = true
+domain = "app.example.com"
+email = "admin@example.com"
 ```
 
 ---

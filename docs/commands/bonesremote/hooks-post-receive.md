@@ -2,7 +2,9 @@
 
 ## Overview
 
-Git hook that runs after a push is received by the bare repository. It checks out the pushed code to the build workspace and wires shared paths. This is the first step in the deployment pipeline, triggered automatically by `git push` or manually via `bonesdeploy deploy`.
+Checks out the configured branch or revision into the deployment build workspace. This is one of the building blocks of the deployment pipeline — typically you would run `bonesremote deploy --config <path>` instead, which orchestrates the full lifecycle (doctor, stage, checkout, wire, scripts, activate, restart, prune) in a single call.
+
+This subcommand is useful when you need only the checkout step, or when composing a custom pipeline from individual building blocks.
 
 ## Command Signature
 
@@ -11,7 +13,7 @@ bonesremote hooks post-receive --config <path> [--revision <ref>]
 ```
 
 **Flags:**
-- `--config <path>`: Path to `bones.yaml` configuration file (required)
+- `--config <path>`: Path to `bones.toml` configuration file (required)
 - `--revision <ref>`: Optional Git revision to checkout (default: configured branch)
 
 **Note:** Must NOT be run as root (runs as deploy user).
@@ -87,7 +89,7 @@ println!("Checking out {checkout_target} to {}...", build_root.display());
 
 **Priority:**
 1. `--revision` flag if provided
-2. Configured branch from `bones.yaml` (default: `master`)
+2. Configured branch from `bones.toml` (default: `master`)
 
 **Example:**
 - Flag provided: `--revision feature/new-api` → checks out `feature/new-api`
@@ -157,30 +159,9 @@ git \
 
 ---
 
-### 7. Wire Shared Paths
+### 7. Wire Shared Paths (Separate Step)
 
-**Source:** `post_receive.rs:42`
-
-```rust
-wire_release::run(config_path)?;
-```
-
-Calls `bonesremote release wire` to:
-1. Move existing files to shared (first deployment)
-2. Create shared files/directories if needed
-3. Create symlinks from build workspace to shared paths
-
-**After wiring, the build workspace has:**
-```
-build/workspace/
-├── .env -> ../../shared/.env
-├── storage -> ../../shared/storage
-├── logs -> ../../shared/logs
-├── src/                    # From git checkout
-├── public/                 # From git checkout
-├── package.json            # From git checkout
-└── ...                     # Other project files
-```
+**Note:** `post_receive.rs` only handles git checkout. Shared path wiring is a separate step — `wire_release::run(config_path)` — called by `bonesremote deploy` (the unified command) after checkout. In the old hook pipeline, wiring happened as a distinct subcommand after post-receive.
 
 ---
 
@@ -196,55 +177,42 @@ The command succeeds silently unless an error occurs. The `wire_release` command
 
 #### Automatic (via Git Hook)
 
-The `post-receive` hook in the bare repository is triggered by `git push`:
+The `post-receive` hook in the bare repository calls the unified `bonesremote deploy --config <path> --revision <rev>` command. Internally, that calls `hooks post-receive` (checkout) as one step in its pipeline:
 
 ```
+git push production master
+  ↓
 /home/git/myapp.git/hooks/post-receive
   ↓
-bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.yaml
+bonesremote deploy --config <path> --revision <newrev>
+  ├─ doctor
+  ├─ stage_release
+  ├─ hooks post-receive (checkout)  ← you are here
+  ├─ release wire
+  ├─ hooks deploy (scripts + activate)
+  ├─ service restart (sudo)
+  └─ hooks post-deploy (prune)
 ```
 
-**Flow:**
-1. Developer runs `git push production master`
-2. Git receives the push
-3. `post-receive` hook executes
-4. Code checked out to `build/workspace`
-5. Shared paths wired
-6. Deployment continues
+#### Manual (via bonesdeploy deploy)
 
-#### Manual (via bonesdeploy)
+`bonesdeploy deploy` runs `bonesremote deploy --config <remote_bones_toml>` directly over SSH — without git hooks. That in turn calls all the same building blocks internally.
 
-The `bonesdeploy deploy` command runs this hook manually:
+#### Standalone
+
+You can also run this subcommand directly if you only need the checkout step:
 
 ```bash
-bonesdeploy deploy
-  ↓ (SSH to server)
-bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.yaml
+bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.toml --revision main
 ```
 
-**Use case:** Re-deploy without pushing new commits.
+**Use case:** Custom pipelines, debugging, manual checkout without running deploy scripts.
 
 ---
 
 ## Environment Variables
 
-When run as a Git hook, the following environment variables are available:
-
-- `GIT_DIR`: Path to the bare repository
-- `BONES_FORCE_DEPLOY`: Set to `1` when run manually (bypasses validation)
-
-**From `bonesdeploy deploy`:**
-```rust
-ssh::stream_cmd(
-    &session,
-    &format!(
-        "BONES_FORCE_DEPLOY=1 GIT_DIR='{repo_path}' '{repo_path}/{}/{}' </dev/null",
-        config::Constants::REMOTE_HOOKS_DIR,
-        config::Constants::POST_RECEIVE_HOOK
-    ),
-)
-.await?;
-```
+This subcommand does not use any specific environment variables. Git hook environment variables (`GIT_DIR`, etc.) are handled by the `post-receive` shell script that calls `bonesremote deploy --config <path>` — they are not passed through to this subcommand.
 
 ---
 
@@ -254,10 +222,9 @@ ssh::stream_cmd(
 
 **Default behavior:** Checkout configured branch
 
-```yaml
-# bones.yaml
-data:
-  branch: master
+```toml
+[data]
+branch = "master"
 ```
 
 **Command:** `git checkout -f master`
@@ -332,7 +299,7 @@ Build workspace does not exist: /srv/deployments/myapp/build/workspace
 
 **Solution:** Run staging first:
 ```bash
-sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.toml
 ```
 
 ### Git Checkout Failed
@@ -362,38 +329,45 @@ Failed to create shared symlink ...
 
 ## Integration with Deployment Pipeline
 
-### Full Pipeline
+### Full Pipeline (Recommended)
 
 ```
 git push production master
   ↓
-pre-receive hook (validation)
+pre-push (local doctor) → pre-receive (inert) → post-receive
   ↓
-release stage (create directories)
-  ↓
-post-receive hook ← YOU ARE HERE
-  ├─ git checkout
-  └─ wire shared paths
-  ↓
-hooks deploy (run scripts, activate)
-  ↓
-hooks post-deploy (harden permissions, restart)
+bonesremote deploy --config <path> --revision <rev>
+  ├─ doctor
+  ├─ stage_release
+  ├─ hooks post-receive (checkout)  ← you are here
+  ├─ release wire
+  ├─ hooks deploy (scripts + activate)
+  ├─ service restart (sudo)
+  └─ hooks post-deploy (prune)
 ```
 
-### Manual Deployment Pipeline
+### Manual Deployment (Recommended)
 
 ```bash
-# 1. Stage
-sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+bonesdeploy deploy
+  ↓ (SSH → bonesremote deploy --config <path>)
+```
 
-# 2. Post-receive (checkout + wire)
-bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.yaml
+### Standalone Usage (Building Blocks)
 
-# 3. Deploy
-bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
+These subcommands are available for custom pipelines:
 
-# 4. Post-deploy
-sudo bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.yaml
+```bash
+# All in one (recommended)
+bonesremote deploy --config /home/git/myapp.git/bones/bones.toml
+
+# Or individual building blocks:
+bonesremote release stage --config /path/to/bones.toml
+bonesremote hooks post-receive --config /path/to/bones.toml
+bonesremote release wire --config /path/to/bones.toml
+bonesremote hooks deploy --config /path/to/bones.toml
+sudo bonesremote service restart --config /path/to/bones.toml
+bonesremote hooks post-deploy --config /path/to/bones.toml
 ```
 
 ---

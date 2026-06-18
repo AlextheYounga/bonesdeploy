@@ -78,7 +78,7 @@ embedded::scaffold(bones_dir)?;
 ```
 
 Extracts embedded assets to `.bones/`:
-- `.bones/bones.yaml` - Configuration file (empty/defaults)
+- `.bones/bones.toml` - Configuration file (empty/defaults)
 - `.bones/hooks/hooks.sh` - Helper functions for hooks
 - `.bones/hooks/` - Directory for Git hooks
   - `hooks/pre-receive` - Server-side hook
@@ -112,13 +112,13 @@ Ensures `.bones/` is added to `.gitignore` to prevent committing deployment conf
 **Source:** `init.rs:54-55`
 
 ```rust
-let bones_yaml = Path::new(config::Constants::BONES_YAML);
-let cfg = load_or_collect_config(bones_yaml)?;
+let bones_toml = Path::new(config::Constants::BONES_TOML);
+let cfg = load_or_collect_config(bones_toml)?;
 ```
 
 #### 4.1 Load or Prompt Logic
 
-If `.bones/bones.yaml` exists and is complete (has required fields), loads it directly. Otherwise, prompts the user for missing configuration values.
+If `.bones/bones.toml` exists and is complete (has required fields), loads it directly. Otherwise, prompts the user for missing configuration values.
 
 **Required fields for "complete":**
 - `remote_name` (e.g., "production")
@@ -189,7 +189,7 @@ If configuration is incomplete, prompts for:
 
 #### 4.3 Re-initialization Behavior
 
-If `bones.yaml` already exists and is incomplete, the command:
+If `bones.toml` already exists and is incomplete, the command:
 - Loads the existing configuration
 - Uses existing values as defaults for prompts
 - Preserves any custom settings (path overrides, writable paths, etc.)
@@ -202,11 +202,11 @@ If `bones.yaml` already exists and is incomplete, the command:
 **Source:** `init.rs:57-59`
 
 ```rust
-config::save(&cfg, bones_yaml)?;
-println!("Saved config to {}", config::Constants::BONES_YAML);
+config::save(&cfg, bones_toml)?;
+println!("Saved config to {}", config::Constants::BONES_TOML);
 ```
 
-Writes the configuration to `.bones/bones.yaml` in YAML format.
+Writes the configuration to `.bones/bones.toml` in YAML format.
 
 **Special handling:**
 - Omits `web_root` and `project_root` if they match project-derived defaults (keeps config clean)
@@ -283,7 +283,7 @@ Prints user guidance:
 
 After successful execution:
 - `.bones/` directory structure created
-- `.bones/bones.yaml` configured with deployment settings
+- `.bones/bones.toml` configured with deployment settings
 - `.gitignore` updated to exclude `.bones/`
 - Git remote added (if it didn't exist)
 - Pre-push hook symlinked

@@ -11,11 +11,11 @@ Synchronizes the local `.bones/` directory to the remote bare Git repository usi
 **Source:** `push.rs:11-12`
 
 ```rust
-let bones_yaml = Path::new(config::Constants::BONES_YAML);
-let cfg = config::load(bones_yaml)?;
+let bones_toml = Path::new(config::Constants::BONES_TOML);
+let cfg = config::load(bones_toml)?;
 ```
 
-Loads the deployment configuration from `.bones/bones.yaml`. Required for:
+Loads the deployment configuration from `.bones/bones.toml`. Required for:
 - Remote server connection details (`host`, `port`)
 - Git directory path (`repo_path`)
 - Deploy user (`deploy_user`)
@@ -228,7 +228,7 @@ println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
 
 ```
 .bones/
-├── bones.yaml              # Configuration
+├── bones.toml              # Configuration
 ├── hooks.sh                # Helper functions
 ├── hooks/                  # Server-side Git hooks
 │   ├── pre-receive         # Validates push
@@ -261,7 +261,7 @@ println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
 1. **After `bonesdeploy init`**: Initial sync to remote
 2. **After modifying hooks**: When you've changed `bones/hooks/*`
 3. **After modifying deployment scripts**: When you've changed `bones/deployment/*`
-4. **After configuration changes**: When `bones.yaml` has been updated
+4. **After configuration changes**: When `bones.toml` has been updated
 5. **Before first deployment**: Ensure remote has latest configuration
 6. **When `doctor` reports sync issues**: If local/remote are out of sync
 

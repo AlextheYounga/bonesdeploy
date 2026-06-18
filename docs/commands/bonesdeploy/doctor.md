@@ -63,7 +63,7 @@ check_bones_structure(&mut issues);
 2. **Verify required files and directories exist**
    ```rust
    let expected = [
-       config::Constants::BONES_YAML,           // .bones/bones.yaml
+       config::Constants::BONES_TOML,           // .bones/bones.toml
        config::Constants::BONES_HOOKS_SCRIPT,   // .bones/hooks/hooks.sh
        config::Constants::BONES_HOOKS_DIR,      // .bones/hooks/
        config::Constants::BONES_DEPLOYMENT_DIR, // .bones/deployment/
@@ -77,7 +77,7 @@ check_bones_structure(&mut issues);
 **Expected Structure:**
 ```
 .bones/
-├── bones.yaml
+├── bones.toml
 ├── hooks.sh
 ├── hooks/
 │   ├── pre-push
@@ -168,15 +168,15 @@ Verifies that the pre-push hook is properly symlinked from `.git/hooks/pre-push`
 
 ```rust
 if !local_only {
-    let bones_yaml = Path::new(config::Constants::BONES_YAML);
-    match config::load(bones_yaml) {
+    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    match config::load(bones_toml) {
         Ok(cfg) => check_remote(&cfg, &mut issues).await,
         Err(e) => issues.push(format!("Cannot load config: {e}")),
     }
 }
 ```
 
-If `--local` flag is not set, performs remote validation. Requires `bones.yaml` to exist and be loadable.
+If `--local` flag is not set, performs remote validation. Requires `bones.toml` to exist and be loadable.
 
 #### 4.1 Establish SSH Connection
 
@@ -192,7 +192,7 @@ let session = match ssh::connect(cfg).await {
 };
 ```
 
-Connects to the remote server using configuration from `bones.yaml`:
+Connects to the remote server using configuration from `bones.toml`:
 - Host: `cfg.data.host`
 - Port: `cfg.data.port`
 - User: `cfg.permissions.defaults.deploy_user`
@@ -238,7 +238,7 @@ Verifies that the `.bones/` directory exists in the bare Git repository on the r
 **Why this matters:** The remote `bones/` directory contains:
 - Server-side hooks (`hooks/pre-receive`, `hooks/post-receive`)
 - Deployment scripts
-- `bones.yaml` configuration
+- `bones.toml` configuration
 
 If missing, `bonesdeploy push` needs to be run to sync local `.bones/` to remote.
 

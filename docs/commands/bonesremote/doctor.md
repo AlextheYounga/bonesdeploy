@@ -124,21 +124,19 @@ sudo chmod +x /usr/local/bin/bonesremote
 
 ### 5. Check Passwordless Sudo
 
-**Source:** `doctor.rs:18`, `doctor.rs:61-81`
+**Source:** `doctor.rs:19`, `doctor.rs:58-74`
 
 ```rust
 check_passwordless_sudo(&mut issues);
 ```
 
-Verifies the deploy user can run privileged commands without a password.
+Verifies the deploy user can run `bonesremote service restart` without a password prompt.
 
 **Implementation:**
 ```rust
 fn check_passwordless_sudo(issues: &mut Vec<String>) {
     let privileged_commands = [
-        [config::Constants::BINARY_NAME, "release", "stage", "--config", "/nonexistent"],
-        [config::Constants::BINARY_NAME, "release", "wire", "--config", "/nonexistent"],
-        [config::Constants::BINARY_NAME, "hooks", "post-deploy", "--config", "/nonexistent"],
+        [config::Constants::BINARY_NAME, "service", "restart", "--config", "/nonexistent"],
     ];
 
     for command in privileged_commands {
@@ -158,9 +156,8 @@ fn check_passwordless_sudo(issues: &mut Vec<String>) {
 ```
 
 **Checks:**
-1. For each privileged command:
-   - Runs `sudo -n -l <command>` (no password, list allowed commands)
-   - If fails, user can't run that command passwordless
+- Runs `sudo -n -l bonesremote service restart --config /nonexistent`
+- If it fails, the deploy user can't run the service restart command without a password prompt
 
 **sudo Flags:**
 - `-n`: Non-interactive mode (fail if password needed)
@@ -168,13 +165,15 @@ fn check_passwordless_sudo(issues: &mut Vec<String>) {
 
 **Example Issue:**
 ```
-bonesremote is not allowed via passwordless sudo: bonesremote release stage --config /nonexistent (run 'sudo bonesremote init')
+bonesremote is not allowed via passwordless sudo: bonesremote service restart --config /nonexistent (run 'sudo bonesremote init')
 ```
 
 **Solution:** Run initialization:
 ```bash
-sudo bonesremote init --deploy-user git
+sudo bonesremote init
 ```
+
+**Note:** Only `bonesremote service restart --config *` requires sudo. All other deployment steps (stage, checkout, wire, scripts, activate, prune) run as the deploy user directly.
 
 ---
 
@@ -228,7 +227,7 @@ OK All checks passed.
 bonesremote doctor
 
   ! bonesremote is not globally available (not in PATH)
-  ! bonesremote is not allowed via passwordless sudo: bonesremote release stage --config /nonexistent (run 'sudo bonesremote init')
+  ! bonesremote is not allowed via passwordless sudo: bonesremote service restart --config /nonexistent (run 'sudo bonesremote init')
 Doctor found 2 issues
 ```
 
@@ -240,7 +239,7 @@ Doctor found 2 issues
 |-------|-------------------|-----|
 | **Supported distribution** | Debian/Ubuntu OS | Use supported OS |
 | **Global availability** | `bonesremote` in PATH | Install globally |
-| **Passwordless sudo** | Sudoers configured | Run `sudo bonesremote init` |
+| **Passwordless sudo** | `bonesremote service restart` allowed via sudoers | Run `sudo bonesremote init` |
 | **AppArmor support** | Kernel + service + enforcing profiles | Enable and enforce AppArmor |
 
 ---

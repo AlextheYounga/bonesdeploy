@@ -2,7 +2,9 @@
 
 ## Overview
 
-Post-deployment hook that runs after a release is activated. It prunes old releases to save disk space, keeping only the configured number of recent releases. This command does not restart services, change ownership, or harden permissions — service restart is handled by the calling hook script (`sudo bonesremote service restart`), and ownership is a provisioning-time contract established once by `bonesdeploy remote setup`.
+Prunes old releases beyond the configured `releases.keep` count, saving disk space. Called internally by `bonesremote deploy --config <path>` (the recommended unified command) after activation.
+
+Does not restart services — that's handled by the unified `bonesremote deploy` command via `sudo bonesremote service restart --config <path>`. Ownership and permissions are a provisioning-time contract established once by `bonesdeploy remote setup`, not mutated here.
 
 ## Command Signature
 
@@ -11,7 +13,7 @@ bonesremote hooks post-deploy --config <path>
 ```
 
 **Flags:**
-- `--config <path>`: Path to `bones.yaml` configuration file (required)
+- `--config <path>`: Path to `bones.toml` configuration file (required)
 
 ---
 
@@ -138,9 +140,9 @@ Ok(())
 ### Default Behavior
 
 **Keep last 5 releases** (configurable):
-```yaml
-releases:
-  keep: 5
+```toml
+[releases]
+keep = 5
 ```
 
 ### Pruning Logic
@@ -180,24 +182,34 @@ Result: [A, B, C]
 
 ## Typical Workflow
 
+**Recommended approach** — use the unified `bonesremote deploy` command:
+
+```bash
+# All steps in one call:
+bonesremote deploy --config /path/to/bones.toml
+# orchestrates: doctor → stage → checkout → wire → scripts → activate → restart → prune
+```
+
+**Individual building blocks** (for custom pipelines):
+
 ```bash
 # 1. Stage release
-bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release stage --config /path/to/bones.toml
 
-# 2. Checkout into build workspace (done by post-receive hook)
-bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.yaml --revision <sha>
+# 2. Checkout into build workspace
+bonesremote hooks post-receive --config /path/to/bones.toml
 
 # 3. Wire shared paths
-bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release wire --config /path/to/bones.toml
 
 # 4. Deploy scripts + activate
-bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
+bonesremote hooks deploy --config /path/to/bones.toml
 
 # 5. Post-deploy (prune old releases)
-bonesremote hooks post-deploy --config /home/git/myapp.git/bones/bones.yaml
+bonesremote hooks post-deploy --config /path/to/bones.toml
 
 # 6. Restart nginx (requires elevated privileges)
-sudo bonesremote service restart --config /home/git/myapp.git/bones/bones.yaml
+sudo bonesremote service restart --config /path/to/bones.toml
 ```
 
 ---

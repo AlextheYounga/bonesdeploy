@@ -2,7 +2,7 @@
 
 ## Overview
 
-Cleans up a failed deployment by removing the staged release directory and clearing the staged release state. This command is called automatically when deployment scripts fail, or can be run manually to clean up after a failed deployment attempt.
+Removes a failed staged release and clears the staged release state. Called automatically by `bonesremote deploy --config <path>` (the recommended unified command) when any step in the pipeline fails. Can also be run manually to clean up after an aborted deployment.
 
 ## Command Signature
 
@@ -11,7 +11,7 @@ bonesremote release drop-failed --config <path>
 ```
 
 **Flags:**
-- `--config <path>`: Path to `bones.yaml` configuration file (required)
+- `--config <path>`: Path to `bones.toml` configuration file (required)
 
 ---
 
@@ -190,7 +190,7 @@ Can be run manually to clean up after:
 └── current -> releases/20260507_140000/
 
 /home/git/myapp.git/bones/
-├── bones.yaml
+├── bones.toml
 └── .staged_release         # Contains: 20260507_150432
 ```
 
@@ -203,7 +203,7 @@ Can be run manually to clean up after:
 └── current -> releases/20260507_140000/
 
 /home/git/myapp.git/bones/
-├── bones.yaml
+├── bones.toml
 └── (no .staged_release)    # Cleared
 ```
 
@@ -237,14 +237,14 @@ Can be run manually to clean up after:
 
 ```bash
 # 1. Deployment starts
-sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.toml
 # Created: /srv/deployments/myapp/releases/20260507_150432/
 
 # 2. Checkout and wire
 # ...
 
 # 3. Deployment script fails
-bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
+bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.toml
 # Script: 03_migrate.sh fails
 
 # 4. Automatic cleanup
@@ -261,7 +261,7 @@ bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
 # Deployment failed or was aborted
 # Manual cleanup needed
 
-bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.toml
 # Output:
 # Removed failed release: 20260507_150432
 # Cleared staged release state.
@@ -277,12 +277,12 @@ bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.yaml
 
 ```bash
 # First call
-bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.toml
 # Output: Removed failed release: 20260507_150432
 #         Cleared staged release state.
 
 # Second call (nothing to clean)
-bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.toml
 # Output: No staged release state found. Nothing to clean.
 ```
 

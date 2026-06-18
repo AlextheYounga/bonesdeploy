@@ -2,7 +2,9 @@
 
 ## Overview
 
-Creates the directory structure and staging state for a new deployment release. Prepares the build workspace where code will be checked out, the release directory tree, and the shared directory for persistent data. Command runs as the deploy user — no elevated privileges required, provisioning-time permissions handle the layout.
+Creates the directory structure and staging state for a new deployment release. Prepares the build workspace, release directory tree, and writes staged release state. Called internally by `bonesremote deploy --config <path>` (the recommended unified command) as part of the full pipeline.
+
+Use this subcommand directly when composing a custom pipeline from individual building blocks.
 
 ## Command Signature
 
@@ -11,7 +13,7 @@ bonesremote release stage --config <path>
 ```
 
 **Flags:**
-- `--config <path>`: Path to `bones.yaml` configuration file (required)
+- `--config <path>`: Path to `bones.toml` configuration file (required)
 
 ---
 
@@ -25,7 +27,7 @@ bonesremote release stage --config <path>
 let cfg = config::load(Path::new(config_path))?;
 ```
 
-Loads deployment configuration from `bones.yaml`.
+Loads deployment configuration from `bones.toml`.
 
 ---
 
@@ -196,7 +198,7 @@ Staged release: 20260507_150432
 └── current -> releases/20260507_140000/
 
 /home/git/myapp.git/bones/
-├── bones.yaml
+├── bones.toml
 └── .staged_release         # Contains: 20260507_150432
 ```
 
@@ -228,16 +230,16 @@ The only command that requires root is `bonesremote service restart`, which is r
 
 ```bash
 # 1. Stage release
-bonesremote release stage --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release stage --config /home/git/myapp.git/bones/bones.toml
 
 # 2. Check out code (done by post-receive hook)
-bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.yaml --revision <sha>
+bonesremote hooks post-receive --config /home/git/myapp.git/bones/bones.toml --revision <sha>
 
 # 3. Wire shared paths
-bonesremote release wire --config /home/git/myapp.git/bones/bones.yaml
+bonesremote release wire --config /home/git/myapp.git/bones/bones.toml
 
 # 4. Run deployment scripts and activate (done by hooks deploy)
-bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.yaml
+bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.toml
 ```
 
 ---

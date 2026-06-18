@@ -11,8 +11,8 @@ Opens an interactive remote management terminal (TUI) on the server by establish
 **Source:** `manage.rs:9-10`
 
 ```rust
-let bones_yaml = Path::new(config::Constants::BONES_YAML);
-let cfg = config::load(bones_yaml)?;
+let bones_toml = Path::new(config::Constants::BONES_TOML);
+let cfg = config::load(bones_toml)?;
 ```
 
 Loads deployment configuration to determine:
@@ -28,24 +28,24 @@ Loads deployment configuration to determine:
 **Source:** `manage.rs:12-13`
 
 ```rust
-let remote_bones_yaml = format!("{}/{}/bones.yaml", cfg.data.repo_path, config::Constants::REMOTE_BONES_DIR);
-let remote_command = format!("bonesremote manage --config {}", shell_quote_single(&remote_bones_yaml));
+let remote_bones_toml = format!("{}/{}/bones.toml", cfg.data.repo_path, config::Constants::REMOTE_BONES_DIR);
+let remote_command = format!("bonesremote manage --config {}", shell_quote_single(&remote_bones_toml));
 ```
 
 #### 2.1 Remote Configuration Path
 
-The `bones.yaml` on the server is located at:
+The `bones.toml` on the server is located at:
 ```
-<repo_path>/bones/bones.yaml
+<repo_path>/bones/bones.toml
 ```
 
-**Example:** `/home/git/myapp.git/bones/bones.yaml`
+**Example:** `/home/git/myapp.git/bones/bones.toml`
 
 #### 2.2 Command Construction
 
 **Example Remote Command:**
 ```bash
-bonesremote manage --config '/home/git/myapp.git/bones/bones.yaml'
+bonesremote manage --config '/home/git/myapp.git/bones/bones.toml'
 ```
 
 **Why quote the path?** The `shell_quote_single` function ensures the path is properly escaped if it contains special characters or spaces.
@@ -58,8 +58,8 @@ fn shell_quote_single(value: &str) -> String {
 ```
 
 This handles paths containing single quotes by escaping them properly:
-- Input: `/path/with'quote/bones.yaml`
-- Output: `'/path/with'"'"'quote/bones.yaml'`
+- Input: `/path/with'quote/bones.toml`
+- Output: `'/path/with'"'"'quote/bones.toml'`
 
 ---
 
@@ -98,13 +98,13 @@ let status = Command::new("ssh")
 - Without this, the TUI would not function properly
 
 **`-p {port}` flag:** Specify SSH port
-- Uses the port from `bones.yaml` (default: 22)
+- Uses the port from `bones.toml` (default: 22)
 
 #### 4.2 Full SSH Command
 
 **Example:**
 ```bash
-ssh -t -p 22 git@deploy.example.com "bonesremote manage --config '/home/git/myapp.git/bones/bones.yaml'"
+ssh -t -p 22 git@deploy.example.com "bonesremote manage --config '/home/git/myapp.git/bones/bones.toml'"
 ```
 
 #### 4.3 Execution Mode
@@ -211,7 +211,7 @@ While the implementation of `bonesremote manage` is not shown in the provided co
 1. **SSH Access Required**: User must have SSH access to the server as the deploy user
 2. **No Password Prompt**: Assumes SSH key authentication is configured
 3. **Deploy User Permissions**: Commands run as deploy user, not root
-4. **Configuration Access**: Can view and modify `bones.yaml` on server
+4. **Configuration Access**: Can view and modify `bones.toml` on server
 
 ---
 

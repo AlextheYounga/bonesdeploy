@@ -11,8 +11,8 @@ Reverts the currently active release to the previous release by repointing the `
 **Source:** `rollback.rs:10-11`
 
 ```rust
-let bones_yaml = Path::new(config::Constants::BONES_YAML);
-let cfg = config::load(bones_yaml)?;
+let bones_toml = Path::new(config::Constants::BONES_TOML);
+let cfg = config::load(bones_toml)?;
 ```
 
 Loads deployment configuration to determine:
@@ -27,15 +27,15 @@ Loads deployment configuration to determine:
 **Source:** `rollback.rs:13`
 
 ```rust
-let remote_bones_yaml = format!("{}/{}/bones.yaml", cfg.data.repo_path, config::Constants::REMOTE_BONES_DIR);
+let remote_bones_toml = format!("{}/{}/bones.toml", cfg.data.repo_path, config::Constants::REMOTE_BONES_DIR);
 ```
 
-Builds the path to `bones.yaml` on the remote server:
+Builds the path to `bones.toml` on the remote server:
 ```
-<repo_path>/bones/bones.yaml
+<repo_path>/bones/bones.toml
 ```
 
-**Example:** `/home/git/myapp.git/bones/bones.yaml`
+**Example:** `/home/git/myapp.git/bones/bones.toml`
 
 ---
 
@@ -68,7 +68,7 @@ Opens an SSH session to the remote server.
 **Source:** `rollback.rs:18-19`
 
 ```rust
-let command = format!("bonesremote release rollback --config '{remote_bones_yaml}'");
+let command = format!("bonesremote release rollback --config '{remote_bones_toml}'");
 ssh::stream_cmd(&session, &command).await?;
 ```
 
@@ -76,7 +76,7 @@ Executes `bonesremote release rollback` on the remote server and streams the out
 
 **Command Executed:**
 ```bash
-bonesremote release rollback --config '/home/git/myapp.git/bones/bones.yaml'
+bonesremote release rollback --config '/home/git/myapp.git/bones/bones.toml'
 ```
 
 ---
@@ -127,7 +127,7 @@ Ensures the command is not being run as root (security best practice).
 let cfg = config::load(Path::new(config_path))?;
 ```
 
-Loads `bones.yaml` from the bare repository.
+Loads `bones.toml` from the bare repository.
 
 ---
 

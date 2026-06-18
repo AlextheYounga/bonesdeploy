@@ -11,11 +11,11 @@ Provisions the remote server for deployment by running the setup script from the
 **Source:** `remote_setup.rs`
 
 ```rust
-let bones_yaml = Path::new(config::Constants::BONES_YAML);
-let cfg = config::load(bones_yaml)?;
+let bones_toml = Path::new(config::Constants::BONES_TOML);
+let cfg = config::load(bones_toml)?;
 ```
 
-Loads deployment configuration from `.bones/bones.yaml` to determine:
+Loads deployment configuration from `.bones/bones.toml` to determine:
 - Remote server connection details (`host`, `port`)
 - User accounts and permissions (`deploy_user`, `runtime_user`, `runtime_group`, `release_group`)
 - Directory paths (`repo_path`, `project_root`, `web_root`)
