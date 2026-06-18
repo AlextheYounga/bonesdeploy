@@ -7,7 +7,7 @@ use anyhow::{Context, Result, bail};
 use console::style;
 use tempfile::TempDir;
 
-use crate::commands::update_release;
+use super::update_release;
 use crate::config;
 
 const SOURCE_REPO_URL: &str = "https://github.com/AlextheYounga/bonesdeploy.git";

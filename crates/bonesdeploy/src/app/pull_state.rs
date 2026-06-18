@@ -9,7 +9,7 @@ use console::style;
 use crate::config;
 use crate::git;
 
-use super::init;
+use crate::app::init_project;
 
 struct PullTarget {
     user: String,
@@ -36,7 +36,7 @@ pub fn run() -> Result<()> {
     }
 
     rsync_bones(&target)?;
-    init::symlink_pre_push()?;
+    init_project::symlink_pre_push()?;
 
     println!("\n{} .bones/ pulled from remote.", style("Done!").green().bold());
     Ok(())

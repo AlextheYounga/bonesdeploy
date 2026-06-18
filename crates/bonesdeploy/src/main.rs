@@ -2,7 +2,6 @@ mod app;
 mod cli;
 mod commands;
 mod config;
-mod remote_data;
 
 mod infra;
 pub(crate) use infra::{bootstrap_ssh, embedded, git, python, ssh};

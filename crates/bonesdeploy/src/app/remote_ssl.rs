@@ -7,11 +7,11 @@ use serde_json::Value;
 use shared::config as shared_config;
 
 use crate::bootstrap_ssh;
-use crate::commands::push;
+use super::push_state;
 use crate::config;
 use crate::prompts;
 use crate::python;
-use crate::remote_data;
+use super::remote_data;
 
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
@@ -67,7 +67,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     )?;
 
     config::save(&cfg, bones_toml)?;
-    push::sync_bones_directory(&cfg)?;
+    push_state::sync_bones_directory(&cfg)?;
 
     println!("\n{} SSL setup complete.", style("Done!").green().bold());
 

@@ -11,7 +11,7 @@ use shared::config as shared_config;
 use crate::bootstrap_ssh;
 use crate::config;
 use crate::python;
-use crate::remote_data;
+use super::remote_data;
 
 pub fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);

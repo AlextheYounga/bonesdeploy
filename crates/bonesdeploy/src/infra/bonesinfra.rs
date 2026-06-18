@@ -21,8 +21,8 @@ fn ensure_available() -> Result<PathBuf> {
         return Ok(checkout);
     }
 
-    if checkout.exists() {
-        bail!("Hidden bonesinfra checkout is incomplete at {}. Remove it and retry.", checkout.display());
+    if fs::symlink_metadata(&checkout).is_ok() {
+        reset_checkout(&checkout)?;
     }
 
     install_checkout(&checkout)?;
@@ -51,6 +51,21 @@ fn ensure_available() -> Result<PathBuf> {
     Ok(checkout)
 }
 
+fn reset_checkout(checkout: &Path) -> Result<()> {
+    let metadata = fs::symlink_metadata(checkout)
+        .with_context(|| format!("Failed to inspect stale bonesinfra checkout at {}", checkout.display()))?;
+
+    if metadata.file_type().is_dir() {
+        fs::remove_dir_all(checkout)
+            .with_context(|| format!("Failed to remove stale bonesinfra checkout at {}", checkout.display()))?;
+        return Ok(());
+    }
+
+    fs::remove_file(checkout)
+        .with_context(|| format!("Failed to remove stale bonesinfra checkout at {}", checkout.display()))?;
+    Ok(())
+}
+
 fn install_checkout(checkout: &Path) -> Result<()> {
     if let Some(parent) = checkout.parent() {
         fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
@@ -74,12 +89,37 @@ fn checkout_dir() -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use shared::paths;
+    use std::fs;
 
-    use super::checkout_dir;
+    use shared::paths;
+    use tempfile::TempDir;
+
+    use super::{checkout_dir, reset_checkout};
 
     #[test]
     fn checkout_dir_lives_under_bones_state_root() {
         assert_eq!(checkout_dir(), paths::bones_state_root().join("bonesinfra"));
+    }
+
+    #[test]
+    fn reset_checkout_removes_stale_directory() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let checkout = temp_dir.path().join("bonesinfra");
+        fs::create_dir_all(checkout.join("nested")).expect("create stale checkout");
+
+        reset_checkout(&checkout).expect("reset stale checkout");
+
+        assert!(!checkout.exists());
+    }
+
+    #[test]
+    fn reset_checkout_removes_stale_file() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let checkout = temp_dir.path().join("bonesinfra");
+        fs::write(&checkout, "stale").expect("create stale file");
+
+        reset_checkout(&checkout).expect("reset stale file");
+
+        assert!(!checkout.exists());
     }
 }
