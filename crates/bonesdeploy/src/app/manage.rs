@@ -4,6 +4,7 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 
 use crate::config;
+use shared::config::default_deploy_user;
 
 pub fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
@@ -12,7 +13,7 @@ pub fn run() -> Result<()> {
     let remote_bones_toml = format!("{}/{}/bones.toml", cfg.repo_path, config::Constants::REMOTE_BONES_DIR);
     let remote_command = format!("bonesremote manage --config {}", shell_quote_single(&remote_bones_toml));
 
-    let target = format!("{}@{}", shared::config::default_deploy_user(), cfg.host);
+    let target = format!("{}@{}", default_deploy_user(), cfg.host);
 
     let status = Command::new("ssh")
         .arg("-t")

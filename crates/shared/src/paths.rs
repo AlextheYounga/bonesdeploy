@@ -172,8 +172,8 @@ impl DeploymentPaths {
             current: current.display().to_string(),
             current_web_root: current.join(web_root).display().to_string(),
             placeholder_release: placeholder_release.display().to_string(),
-            placeholder_web_root: placeholder_release.join(&web_root).display().to_string(),
-            placeholder_index: placeholder_release.join(&web_root).join(INDEX_HTML).display().to_string(),
+            placeholder_web_root: placeholder_release.join(web_root).display().to_string(),
+            placeholder_index: placeholder_release.join(web_root).join(INDEX_HTML).display().to_string(),
             nginx_site_available: Path::new(ETC_NGINX_SITES_AVAILABLE)
                 .join(format!("{project_name}.conf"))
                 .display()

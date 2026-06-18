@@ -129,7 +129,7 @@ fn build_config(
     let deploy_on_push = existing_config.is_none_or(|cfg| cfg.deploy_on_push);
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
 
-    let ssl_enabled = existing_config.map_or(false, |cfg| cfg.ssl_enabled);
+    let ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
     let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
     let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 

@@ -1,12 +1,13 @@
 use std::fs;
 use std::io::Write;
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
 
 /// Runs the hidden bonesinfra entrypoint with the provided args.
-pub fn run_python(args: &[&str]) -> Result<String> {
+pub fn run(args: &[&str]) -> Result<String> {
     let checkout = super::bonesinfra::checkout_path()?;
 
     let output = base_command(&checkout)
@@ -51,7 +52,7 @@ pub fn run_python_with_stdin(args: &[&str], stdin_json: &str) -> Result<String> 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 pub fn run_python_json(args: &[&str]) -> Result<Value> {
-    let stdout = run_python(args)?;
+    let stdout = run(args)?;
     parse_json_output(&stdout)
 }
 
@@ -59,7 +60,7 @@ fn parse_json_output(stdout: &str) -> Result<Value> {
     serde_json::from_str(stdout).context("Failed to parse JSON output from Python infra CLI")
 }
 
-fn base_command(checkout: &std::path::Path) -> Command {
+fn base_command(checkout: &Path) -> Command {
     let mut command = Command::new("uv");
     command.args(["run", "--project"]);
     command.arg(checkout);

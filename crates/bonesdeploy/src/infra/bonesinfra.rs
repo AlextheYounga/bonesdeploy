@@ -29,7 +29,7 @@ fn ensure_available() -> Result<PathBuf> {
         let contents: Vec<_> = fs::read_dir(&checkout)
             .into_iter()
             .flatten()
-            .filter_map(|e| e.ok())
+            .filter_map(Result::ok)
             .map(|e| e.path().display().to_string())
             .collect();
         if contents.is_empty() {

@@ -26,7 +26,7 @@ pub fn run() -> Result<()> {
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     println!("Applying runtime using hidden bonesinfra ...");
 
-    python::run_python(&[
+    python::run(&[
         "runtime",
         "apply",
         "--config",

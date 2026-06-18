@@ -6,6 +6,7 @@ use shared::paths;
 
 use crate::config;
 use crate::ssh;
+use shared::config::default_deploy_user;
 
 pub fn current_local_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
@@ -21,7 +22,7 @@ pub fn current_remote_version() -> String {
         return String::from("unknown");
     };
 
-    let host = format!("{}@{}", shared::config::default_deploy_user(), cfg.host);
+    let host = format!("{}@{}", default_deploy_user(), cfg.host);
     let output = Command::new("ssh").args(["-p", &cfg.port]).args([&host, "bonesremote", "version"]).output();
 
     match output {

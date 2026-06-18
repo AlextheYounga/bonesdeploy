@@ -7,6 +7,7 @@ use console::style;
 
 use crate::config;
 use crate::ssh;
+use shared::config::default_deploy_user;
 
 pub async fn run(local_only: bool) -> Result<()> {
     println!("{}", style("bonesdeploy doctor").bold());
@@ -178,7 +179,7 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
 }
 
 fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
-    let user = shared::config::default_deploy_user();
+    let user = default_deploy_user();
     let host = &cfg.host;
     let port = &cfg.port;
     let repo_path = &cfg.repo_path;

@@ -14,12 +14,12 @@ const SOURCE_REPO_URL: &str = "https://github.com/AlextheYounga/bonesdeploy.git"
 const SOURCE_BRANCH: &str = "master";
 
 #[derive(Clone, Copy)]
-pub struct UpdateOptions {
+pub struct Options {
     pub skip_local: bool,
     pub skip_remote: bool,
 }
 
-pub async fn run(options: UpdateOptions) -> Result<()> {
+pub async fn run(options: Options) -> Result<()> {
     println!("{}", style("bonesdeploy update").bold());
 
     let current_local = update_release::current_local_version();

@@ -13,7 +13,7 @@ use crate::embedded;
 use crate::git;
 use crate::prompts;
 use crate::python;
-use shared::config::{runtime_group_for, runtime_user_for, release_group_for};
+use shared::config::{default_deploy_user, runtime_group_for, runtime_user_for, release_group_for};
 
 pub struct InitOutcome {
     pub remote_setup_ran: bool,
@@ -166,7 +166,7 @@ fn collect_from_seed(
     let deploy_on_push = existing_config.is_none_or(|cfg| cfg.deploy_on_push);
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
 
-    let ssl_enabled = existing_config.map_or(false, |cfg| cfg.ssl_enabled);
+    let ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
     let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
     let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 
@@ -291,7 +291,7 @@ fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
         return Ok(());
     }
 
-    let remote_url = format!("{}@{}:{}", shared::config::default_deploy_user(), cfg.host, cfg.repo_path);
+    let remote_url = format!("{}@{}:{}", default_deploy_user(), cfg.host, cfg.repo_path);
     git::add_remote(&cfg.remote_name, &remote_url)?;
     println!("Configured local git remote {} -> {}", cfg.remote_name, remote_url);
     Ok(())

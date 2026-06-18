@@ -6,6 +6,7 @@ use console::style;
 
 use crate::config;
 use crate::ssh;
+use shared::config::default_deploy_user;
 
 pub async fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
@@ -51,7 +52,7 @@ pub async fn run() -> Result<()> {
 }
 
 pub(crate) fn sync_bones_directory(cfg: &config::BonesConfig) -> Result<()> {
-    let user = shared::config::default_deploy_user();
+    let user = default_deploy_user();
     let host = &cfg.host;
     let port = &cfg.port;
     let repo_path = &cfg.repo_path;

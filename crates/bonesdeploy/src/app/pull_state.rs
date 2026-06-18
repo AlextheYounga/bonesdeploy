@@ -8,6 +8,7 @@ use console::style;
 
 use crate::config;
 use crate::git;
+use shared::config::default_deploy_user;
 
 use crate::app::init_project;
 
@@ -47,7 +48,7 @@ fn resolve_pull_target() -> Result<PullTarget> {
     if bones_toml.exists() {
         let cfg = config::load(bones_toml)?;
         return Ok(PullTarget {
-            user: shared::config::default_deploy_user(),
+            user: default_deploy_user(),
             host: cfg.host,
             port: cfg.port,
             repo_path: cfg.repo_path,
