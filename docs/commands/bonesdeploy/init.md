@@ -81,7 +81,6 @@ Extracts embedded assets to `.bones/`:
 - `.bones/bones.toml` - Configuration file (empty/defaults)
 - `.bones/hooks/hooks.sh` - Helper functions for hooks
 - `.bones/hooks/` - Directory for Git hooks
-  - `hooks/pre-receive` - Server-side hook
   - `hooks/post-receive` - Server-side hook
   - `hooks/pre-push` - Client-side hook
 - `.bones/deployment/` - Directory for deployment scripts

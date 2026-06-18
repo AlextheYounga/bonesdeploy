@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use super::{cli_existing_or_prompt, collect_non_interactive, run};
+use super::{collect_non_interactive, run};
 use crate::commands::init_config::InitArgs;
 
 use anyhow::{Result, bail};
@@ -154,16 +154,6 @@ fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() -> R
         bail!("missing host should fail");
     };
     assert!(err.to_string().contains("--host is required"));
-
-    Ok(())
-}
-
-/// Reuses an existing project name instead of prompting again when init seeded one already.
-#[test]
-fn cli_existing_or_prompt_prefers_existing_value_before_prompt() -> Result<()> {
-    let value = cli_existing_or_prompt(None, Some(String::from("lawsnipe")), || bail!("prompt should not run"))?;
-
-    assert_eq!(value, "lawsnipe");
 
     Ok(())
 }

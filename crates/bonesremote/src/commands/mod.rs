@@ -1,4 +1,5 @@
 pub(crate) mod activate_release;
+pub(crate) mod config;
 pub(crate) mod deploy;
 pub(crate) mod doctor;
 pub(crate) mod drop_failed_release;

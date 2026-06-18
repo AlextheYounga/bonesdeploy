@@ -81,7 +81,6 @@ check_bones_structure(&mut issues);
 ├── hooks.sh
 ├── hooks/
 │   ├── pre-push
-│   ├── pre-receive
 │   └── post-receive
 └── deployment/
     └── (deployment scripts)
@@ -236,7 +235,7 @@ Verifies that the `.bones/` directory exists in the bare Git repository on the r
 **Location:** `<repo_path>/bones/` (e.g., `/home/git/myapp.git/bones/`)
 
 **Why this matters:** The remote `bones/` directory contains:
-- Server-side hooks (`hooks/pre-receive`, `hooks/post-receive`)
+- Server-side hook (`hooks/post-receive`)
 - Deployment scripts
 - `bones.toml` configuration
 
@@ -287,7 +286,7 @@ Compares local `.bones/` with remote `<repo_path>/bones/` to detect drift.
 3. If changes detected, adds issue with file list:
    ```
    Local .bones/ is out of sync with remote (run 'bonesdeploy push'). Changed files:
-      hooks/pre-receive
+      hooks/post-receive
       deployment/02_build.sh
    ```
 
@@ -318,19 +317,17 @@ Verifies that Git hooks in the bare repository are properly symlinked to the `bo
 
 2. For each hook that's not properly symlinked, adds an issue:
    ```
-   <repo_path>/hooks/pre-receive is not properly symlinked to bones/hooks/pre-receive
+   <repo_path>/hooks/post-receive is not properly symlinked to bones/hooks/post-receive
    ```
 
 **Expected State:**
 ```
 <repo_path>/
 ├── hooks/
-│   ├── pre-receive -> ../bones/hooks/pre-receive
-│   └── post-receive -> ../bones/hooks/post-receive
+│   ├── post-receive -> ../bones/hooks/post-receive
 └── bones/
     └── hooks/
-        ├── pre-receive
-        └── post-receive
+        ├── post-receive
 ```
 
 ---

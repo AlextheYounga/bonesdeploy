@@ -1,4 +1,4 @@
-	bones_init_remote_context() {
+bones_init_remote_context() {
 	local git_dir_input="${1:-${GIT_DIR:-.}}"
 	GIT_DIR=$(cd "$git_dir_input" && pwd)
 	BONES_TOML="$GIT_DIR/bones/bones.toml"
@@ -10,7 +10,7 @@ bones_should_deploy_on_push() {
 	fi
 
 	local deploy_on_push
-	deploy_on_push=$(grep -E '^[[:space:]]*deploy_on_push[[:space:]]*=' "$BONES_TOML" | head -1 | sed 's/#.*$//' | sed 's/^[^=]*=[[:space:]]*//' | tr -d '[:space:]' | tr -d '"'"'"')
+	deploy_on_push=$(bonesremote config --file "$BONES_TOML" deploy_on_push 2>/dev/null || true)
 
 	if [ -z "$deploy_on_push" ]; then
 		return 0
@@ -24,7 +24,7 @@ bones_should_deploy_on_push() {
 }
 
 bones_read_config_branch() {
-	grep -E '^[[:space:]]*branch[[:space:]]*=' "$BONES_TOML" | head -1 | sed 's/#.*$//' | sed 's/^[^=]*=[[:space:]]*//' | sed 's/^["'\'']//' | sed 's/["'\'']$//'
+	bonesremote config --file "$BONES_TOML" branch 2>/dev/null || true
 }
 
 bones_is_zero_oid() {
@@ -92,7 +92,7 @@ bones_run_remote_deploy() {
 }
 
 bones_read_local_remote_name() {
-	grep -E '^[[:space:]]*remote_name[[:space:]]*=' .bones/bones.toml | head -1 | sed 's/#.*$//' | sed 's/^[^=]*=[[:space:]]*//' | sed 's/^["'\'']//' | sed 's/["'\'']$//'
+	bonesdeploy config --file .bones/bones.toml remote_name 2>/dev/null || true
 }
 
 bones_should_run_for_remote() {

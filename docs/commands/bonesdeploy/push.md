@@ -128,7 +128,6 @@ ssh::run_cmd(&session, &cmd).await?;
 Removes Git's default sample hook files from `<repo_path>/hooks/`:
 - `pre-commit.sample`
 - `post-update.sample`
-- `pre-receive.sample`
 - etc.
 
 **Why?** Git creates these sample files when initializing a bare repository. They can interfere with hook symlinking and create confusion.
@@ -173,7 +172,7 @@ done
 ```
 
 **For each hook in `bones/hooks/`:**
-1. Extracts the hook name (e.g., `pre-receive`)
+1. Extracts the hook name (e.g., `post-receive`)
 2. Creates symlink: `<repo_path>/hooks/<name>` -> `<repo_path>/bones/hooks/<name>`
 
 **`ln -sf` Flags:**
@@ -184,12 +183,10 @@ done
 ```
 /home/git/myapp.git/
 ├── hooks/
-│   ├── pre-receive -> ../bones/hooks/pre-receive
-│   └── post-receive -> ../bones/hooks/post-receive
+│   ├── post-receive -> ../bones/hooks/post-receive
 └── bones/
     └── hooks/
-        ├── pre-receive
-        └── post-receive
+    ├── post-receive
 ```
 
 **Why Symlinks?**
@@ -231,7 +228,6 @@ println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
 ├── bones.toml              # Configuration
 ├── hooks.sh                # Helper functions
 ├── hooks/                  # Server-side Git hooks
-│   ├── pre-receive         # Validates push
 │   ├── post-receive        # Triggers deployment
 │   └── pre-push            # (Not used on remote, but synced anyway)
 ├── deployment/             # Deployment scripts
@@ -250,7 +246,6 @@ println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
 - `<repo_path>/bones/**` - All files from local `.bones/`
 
 **Symlinked:**
-- `<repo_path>/hooks/pre-receive` -> `../bones/hooks/pre-receive`
 - `<repo_path>/hooks/post-receive` -> `../bones/hooks/post-receive`
 - (Any other hooks in `bones/hooks/`)
 

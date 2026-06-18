@@ -32,6 +32,14 @@ pub enum Command {
         #[command(subcommand)]
         command: ServiceCommand,
     },
+    /// Get a config value from a TOML file
+    Config {
+        /// Path to TOML config file
+        #[arg(long)]
+        file: String,
+        /// Key to read
+        key: String,
+    },
     /// Print the version
     Version,
 }

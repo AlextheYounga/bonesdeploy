@@ -1,6 +1,6 @@
 # BonesDeploy v3
 
-A Rust CLI that compiles into a single binary, containing embeds of boilerplate scripts along with other git remote helpers. It produces two executables: `bonesdeploy` (local CLI for setup and management) and `bonesremote` (server-side tool for remote operations, installed on the deployment host). This is designed to run on a fresh server or VPS similar to Coolify. **We only handle Debian/Ubuntu machines.**
+A remote release deployment tool for simple Linux servers. It produces two executables: `bonesdeploy` (local CLI for setup, provisioning, deployment, and management) and `bonesremote` (server-side release lifecycle executor, installed on the deployment host). Git remains supported as an optional trigger, but it does not own the deployment model. **We only handle Debian/Ubuntu machines.**
 
 We keep detailed documentation of each command at: `docs/commands/*.md:`
 
@@ -55,20 +55,20 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 - No deploy step calls `chown`, `chmod -R`, or otherwise mutates ownership after provisioning.
 
 ## Bones Scaffolding
+```
 .bones
 ├── bones.toml
 ├── runtime.toml
 ├── hooks
 │   ├── hooks.sh                      # shared hook library, sourced by every hook
 │   ├── post-receive
-│   ├── pre-push
-│   └── pre-receive
+│   └── pre-push
 ├── deployment
-│   ├── 01_run_deployment_concerns.sh
-│   └── 02_permissions_lockup.sh (example)
+│   ├── 01_install_build_deps.sh
+│   └── 02_run_build.sh
 ```
 
-Python infra deploy scripts are managed separately by the hidden `bonesinfra` checkout; see `crates/bonesdeploy/src/bonesinfra.rs`.
+Python infra scripts and templates are managed separately by the hidden `bonesinfra` checkout; see `crates/bonesdeploy/src/infra/bonesinfra.rs`.
 
 ### Bones TOML
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
@@ -80,49 +80,42 @@ Collects the following project information from the user:
 - `port`: defaults to `22`, prompt shown when remote inference is unavailable
 - `repo_path`: inferred from selected remote URL when possible, else defaults to `/home/git/{project_name}.git`
 
-Everything else is defaulted for Debian/Ubuntu-first usability:
+Everything else is defaulted or derived for Debian/Ubuntu-first usability:
 - `project_root`: defaults to `/srv/sites/{project_name}`
-- `web_root`: defaults to `public`
-- `deploy_on_push`: defaults to `true`
-- `deploy_user`: defaults to `git`
-- `runtime_user`: defaults to `{project_name}`
-- `runtime_group`: defaults to `{project_name}`
-- `release_group`: defaults to `{project_name}-release` and gets setgid on `releases/` for inherited group access
+- `ssh_user`: defaults to `root`
+- `deploy_on_push`: defaults to `false`
 - `releases.keep`: defaults to `5`
+
+`web_root`, `runtime_user`, `runtime_group`, and `release_group` live in `.bones/runtime.toml`. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively.
 
 Users can override any default by editing `.bones/bones.toml` after init.
 
 Example `bones.toml`:
 ```toml
-[data]
 remote_name = "production"
 project_name = "lawsnipe"
+ssh_user = "root"
 host = "deploy.example.com"
 port = "22"
 repo_path = "/home/git/lawsnipe.git"
 project_root = "/srv/sites/lawsnipe"
 branch = "master"
-deploy_on_push = true
-deploy_user = "git"
-
-[releases]
-keep = 5
-
-[ssl]
-enabled = true
+preview_domain = "lawsnipe-deploy-example-com.nip.io"
 domain = "app.example.com"
 email = "ops@example.com"
+deploy_on_push = false
+ssl_enabled = true
+releases = 5
 ```
 
 ### Hooks
 Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor --local` and we fail if the doctor command expresses any warning or errors.
-- `pre-receive` => **Inert** (`exit 0`). Previously contained staging logic; now the full deployment lifecycle runs through post-receive via a single `bonesremote deploy` call.
 - `post-receive` => Resolves the configured deployment ref from stdin, then runs a single `bonesremote deploy --config "$BONES_TOML" --revision <newrev>` command. This unified command orchestrates the full pipeline: doctor → stage_release → post_receive (git checkout) → wire_release → deploy (scripts + activate) → service restart → post_deploy (prune). If the push didn't touch the configured branch, or the branch was deleted, post-receive exits without deploying.
 
 ### Deployment Folder
-This folder stores deployment scripts that are run by `bonesremote hooks deploy`. Files in this folder must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`. They are named in numerical order and all of these scripts are always run.
+This folder stores deployment scripts that are run by `bonesremote deploy`. Files in this folder must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`. They are named in numerical order and all of these scripts are always run.
 
 ## Crate Structure
 This Cargo workspace has three crates under `crates/`:
@@ -140,56 +133,27 @@ This applies to Rust code, pyinfra deploy scripts, Jinja2 templates, and docs ex
 ```
 bonesdeploy/
 ├── Cargo.toml                  # workspace root
-├── kit/                        # embedded assets (scaffolding templates)
-│   ├── bones.toml
-│   ├── runtime.toml
-│   ├── hooks/
-│   │   ├── hooks.sh
-│   │   ├── post-receive
-│   │   ├── pre-push
-│   │   └── pre-receive
-│   └── deployment/
 ├── crates/
-│   ├── bonesdeploy/            # local CLI binary
-│   │   ├── Cargo.toml
+│   ├── bonesdeploy/
+│   │   ├── kit/                # embedded scaffolding templates and hooks
 │   │   └── src/
-│   │       ├── main.rs         # clap setup, command dispatch
-│   │       ├── commands/
-│   │       │   ├── mod.rs
-│   │       │   ├── init.rs
-│   │       │   ├── doctor.rs
-│   │       │   ├── push.rs
-│   │       │   ├── deploy.rs
-│   │       │   ├── rollback.rs
-│   │       │   ├── remote_setup.rs
-│   │       │   ├── remote_ssl.rs
-│   │       │   └── version.rs
-│   │       ├── config.rs       # bones.toml structs + load/save + local file discovery
-│   │       ├── embedded.rs     # rust-embed from kit/, scaffold writing
-│   │       ├── git.rs          # git CLI operations: remote validation, repo checks
-│   │       ├── prompts.rs      # interactive user input collection, returns config
-│   │       └── ssh.rs          # openssh session management + rsync
-│   └── bonesremote/            # server-side binary
-│       ├── Cargo.toml
-│       └── src/
-│           ├── main.rs
-│           ├── commands/
-│           │   ├── mod.rs
-│           │   ├── init.rs
-│           │   ├── doctor.rs
-│           │   ├── stage_release.rs
-│           │   ├── wire_release.rs
-│           │   ├── activate_release.rs
-│           │   ├── drop_failed_release.rs
-│           │   ├── rollback.rs
-│           │   ├── post_receive.rs
-│           │   ├── deploy.rs
-│           │   ├── post_deploy.rs
-│           │   └── version.rs
-│           ├── config.rs       # bones.toml structs + remote file discovery
-│           ├── privileges.rs   # sudoers drop-in install + privilege checks
-│           ├── privileges.rs   # sudoers drop-in install + privilege checks
-│           └── release_state.rs # staged-release state file read/write
+│   │       ├── app/            # local command implementations
+│   │       ├── cli/            # clap args + dispatch
+│   │       ├── commands/       # command-specific helpers
+│   │       ├── infra/          # ssh, git, embedded assets, bonesinfra wrapper
+│   │       ├── ui/             # prompt helpers
+│   │       ├── config.rs
+│   │       └── main.rs
+│   ├── bonesremote/
+│   │   └── src/
+│   │       ├── cli/            # clap args + dispatch
+│   │       ├── commands/       # remote release lifecycle steps
+│   │       ├── config.rs
+│   │       ├── privileges.rs   # sudoers drop-in install + privilege checks
+│   │       ├── release/
+│   │       ├── release_state.rs
+│   │       └── main.rs
+│   └── shared/                 # config schema + central paths
 └── docs/
 ```
 
@@ -214,12 +178,12 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Loads config from `.bones/bones.toml`
   - Runs local checks:
     - `.bones` folder is set up correctly. Deployment scripts are named appropriately.
-    - Local `pre-push` hook is symlinked properly.
+    - Local `pre-push` hook is symlinked properly when `deploy_on_push = true`.
   - Runs remote checks (skipped with `--local`):
     - `bonesremote` executable exists on remote and can be run globally.
     - `{project_name}.git/bones` folder exists on remote (needs `bonesdeploy push` warning)
-    - `{project_name}.git/bones/hooks` matches with `{project_name}.git/hooks` inside the remote bare repo.
-  - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag since the remote is independently validated by `bonesremote doctor` in the `pre-receive` hook.
+    - `{project_name}.git/bones/hooks` matches with `{project_name}.git/hooks` inside the remote bare repo when `deploy_on_push = true`.
+  - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys.
 
 - **push**
   - Uses an `rsync -av --delete` command to push up our local `.bones` folder to the bare repo.
@@ -261,11 +225,10 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - SSHes into the configured host and runs `bonesremote release rollback --config ...`, which repoints `current` to the previous release without rebuilding.
 
 - **version**:
-  - Echoes "bonesdeploy 0.1.0".
+  - Echoes the installed `bonesdeploy` version.
 
-### BonesDeployRemote CLI Commands
+### BonesRemote CLI Commands
 - **Release commands** live under `bonesremote release ...`
-- **Hook commands** live under `bonesremote hooks ...`
 - **Service commands** live under `bonesremote service ...`
 - **deploy**:
   - Runs the full deployment lifecycle as a single command (the primary entrypoint used by both `post-receive` hook and `bonesdeploy deploy`).
@@ -291,16 +254,10 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 	- Deletes a failed staged release and clears staged release state.
 - **release rollback**
 	- Repoints `current` to the previous release.
-- **hooks post-receive**
-	- Checks out the resolved revision (or the configured branch if `--revision` is omitted) into `build/workspace`.
-- **hooks deploy**
-	- Runs deployment scripts in `build/workspace` (with shared paths already wired), copies release-ready output into staged `releases/<timestamp>`, drops failed staged releases on error, and activates release on success.
-- **hooks post-deploy**
-	- Prunes old releases beyond the configured `releases.keep` count. Does not mutate ownership or permissions — those are established at provisioning time.
 - **service restart**
 	- Restarts the per-site nginx systemd service. This is the only `bonesremote` command that requires root privileges.
 - **version**:
-  - Echoes "bonesdeploy 0.1.0".
+  - Echoes the installed `bonesremote` version.
 
 ## Security Notes
 - Sudo access for the deployment user is strictly limited to passwordless execution of `bonesremote service restart --config *` via the `/etc/sudoers.d/bonesdeploy` drop-in installed by `bonesremote init`.
@@ -314,17 +271,29 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - User runs `bonesdeploy init`, and the procedures outlined above are executed.
 - User can make any changes to their deployment scripts or hooks in `.bones/` (e.g., customizing `deployment/` files or adding project-specific logic).
 - User runs `bonesdeploy push` to sync the `.bones/` folder to the remote bare repo.
-- User runs `git push production master` or some similar command where the remote name aligns with our bones.toml configuration.
-- The `pre-push` hook checks to see if we are pushing to our bones remote (in this example, `production`). If so, it runs `bonesdeploy doctor` and fails on warnings/errors.
+- User runs `bonesdeploy deploy` to perform the actual remote release deployment.
+
+### Primary Deploy Flow
+
+1. `bonesdeploy deploy` SSHes into the configured host.
+2. It runs `bonesremote deploy --config <remote_bones_toml>`.
+3. `bonesremote deploy` orchestrates the full pipeline:
+   - **doctor** — Check server environment
+   - **stage_release** — Create timestamped release dir, ensure build workspace
+   - **post_receive** — `git checkout -f <branch>` into `build/workspace`
+   - **wire_release** — Symlink shared paths from `runtime.toml` into workspace
+   - **deploy** (inner) — Run deployment scripts, copy to release, activate symlink
+   - **restart_services** — `sudo bonesremote service restart --config ...`
+   - **post_deploy** — Prune old releases beyond `releases.keep`
+   - On failure: **drop_failed_release** — Clean up staged release
 
 ### Hook Event Order on `git push`
 
-`pre-push -> pre-receive -> post-receive`
+`pre-push -> post-receive`
 
-1. **pre-push** (local): Runs `bonesdeploy doctor --local` if pushing to the configured bones remote. Aborts on warnings or errors.
-2. **pre-receive** (remote): **Inert** (`exit 0`). Git refs are accepted without validation.
-3. Git updates refs in the bare repository.
-4. **post-receive** (remote): Resolves the configured deployment ref from stdin:
+1. **pre-push** (local): Runs `bonesdeploy doctor --local` if pushing to the configured bones remote and `deploy_on_push = true`. Aborts on warnings or errors.
+2. Git updates refs in the bare repository.
+3. **post-receive** (remote): Resolves the configured deployment ref from stdin:
    - If `deploy_on_push = false`, exits early without deploying.
    - If the configured branch wasn't pushed, or the push deleted it, exits without deploying.
    - Otherwise runs a single unified command:
@@ -341,4 +310,4 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
      - **post_deploy** — Prune old releases beyond `releases.keep`
      - On failure: **drop_failed_release** — Clean up staged release
 
-`bonesdeploy deploy` performs the same remote pipeline by SSHing into the host and running `bonesremote deploy --config <remote_bones_toml>` directly (without `--revision`, so it uses the configured branch).
+`bonesdeploy deploy` performs the same remote pipeline by SSHing into the host and running `bonesremote deploy --config <remote_bones_toml>` directly (without `--revision`, so it uses the configured branch). Git-triggered deploy is optional plumbing, not the primary model.

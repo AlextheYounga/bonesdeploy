@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, ReleaseCommand, ServiceCommand};
 use crate::commands::{
-    activate_release, deploy, doctor, drop_failed_release, init, rollback, service, stage_release,
+    activate_release, config, deploy, doctor, drop_failed_release, init, rollback, service, stage_release,
     version, wire_release,
 };
 
@@ -21,6 +21,7 @@ pub fn run(cli: &Cli) -> Result<()> {
         Command::Service { command } => match command {
             ServiceCommand::Restart { config } => service::run(config),
         },
+        Command::Config { file, key } => config::run(file, key),
         Command::Version => {
             version::run();
             Ok(())

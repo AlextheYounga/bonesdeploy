@@ -5,7 +5,7 @@ use crate::app::{
     deploy_project, doctor, init_project, manage, pull_state, push_state, remote_runtime, remote_setup, remote_ssl,
     rollback, update, version,
 };
-use crate::commands::init_config;
+use crate::commands::{config, init_config};
 
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
@@ -38,6 +38,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             RemoteCommand::Ssl { domain, email } => remote_ssl::run(domain.clone(), email.clone()),
         },
         Command::Rollback => rollback::run().await,
+        Command::Config { file, key } => config::run(file, key),
         Command::Version => {
             version::run();
             Ok(())

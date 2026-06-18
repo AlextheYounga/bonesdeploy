@@ -200,13 +200,12 @@ releases = 5
 │   └── 01_*.sh          # deployment scripts (run sequentially)
 └── hooks/
     ├── pre-push         # symlinked to .git/hooks/pre-push
-    ├── pre-receive      # inert hook (intentionally no-op)
     └── post-receive     # thin adapter → calls bonesremote deploy
 ```
 
 Hooks are written to `.bones/hooks/` once during init and import shared functions from `.bones/hooks.sh`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
 
-Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote deploy`; `pre-receive` is intentionally inert.
+Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote deploy`.
 
 ## Good Fit
 

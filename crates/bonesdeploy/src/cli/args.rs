@@ -63,6 +63,14 @@ pub enum Command {
     Manage,
     /// Roll back current release to the previous one
     Rollback,
+    /// Get a config value from a TOML file
+    Config {
+        /// Path to TOML config file
+        #[arg(long)]
+        file: String,
+        /// Key to read
+        key: String,
+    },
     /// Print the version
     Version,
 }
