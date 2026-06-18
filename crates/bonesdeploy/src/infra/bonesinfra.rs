@@ -7,17 +7,15 @@ use shared::paths;
 
 const REPOSITORY_URL: &str = "https://github.com/AlextheYounga/bonesinfra.git";
 const CHECKOUT_DIR: &str = "bonesinfra";
-const ENTRYPOINT: &str = "main.py";
 
-pub fn main_py_path() -> Result<PathBuf> {
-    let checkout = ensure_available()?;
-    Ok(checkout.join(ENTRYPOINT))
+pub fn checkout_path() -> Result<PathBuf> {
+    ensure_available()
 }
 
 fn ensure_available() -> Result<PathBuf> {
     let checkout = checkout_dir();
-    let main_py = checkout.join(ENTRYPOINT);
-    if main_py.is_file() {
+    let pyproject = checkout.join("pyproject.toml");
+    if pyproject.is_file() {
         return Ok(checkout);
     }
 
@@ -27,7 +25,7 @@ fn ensure_available() -> Result<PathBuf> {
 
     install_checkout(&checkout)?;
 
-    if !main_py.is_file() {
+    if !pyproject.is_file() {
         let contents: Vec<_> = fs::read_dir(&checkout)
             .into_iter()
             .flatten()
@@ -43,7 +41,7 @@ fn ensure_available() -> Result<PathBuf> {
         bail!(
             "Installed bonesinfra checkout at {}, but {} is missing.\nContents of checkout:\n  {}",
             checkout.display(),
-            main_py.display(),
+            pyproject.display(),
             contents.join("\n  ")
         );
     }

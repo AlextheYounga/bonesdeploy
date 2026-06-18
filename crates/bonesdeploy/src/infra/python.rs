@@ -6,17 +6,17 @@ use serde_json::Value;
 
 /// Runs the hidden bonesinfra entrypoint with the provided args.
 pub fn run_python(args: &[&str]) -> Result<String> {
-    let main_py = super::bonesinfra::main_py_path()?;
+    let checkout = super::bonesinfra::checkout_path()?;
 
-    let output = Command::new("python3")
-        .arg(&main_py)
+    let output = base_command(&checkout)
+        .current_dir(&checkout)
         .args(args)
         .output()
-        .with_context(|| format!("Failed to run python3 {} {}", main_py.display(), args.join(" ")))?;
+        .with_context(|| format!("Failed to run bonesinfra {} from {}", args.join(" "), checkout.display()))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("python3 {} failed:\n{}", main_py.display(), stderr.trim());
+        bail!("bonesinfra failed:\n{}", stderr.trim());
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -24,27 +24,27 @@ pub fn run_python(args: &[&str]) -> Result<String> {
 
 /// Runs the hidden bonesinfra entrypoint with JSON piped to stdin.
 pub fn run_python_with_stdin(args: &[&str], stdin_json: &str) -> Result<String> {
-    let main_py = super::bonesinfra::main_py_path()?;
+    let checkout = super::bonesinfra::checkout_path()?;
 
-    let mut child = Command::new("python3")
-        .arg(&main_py)
+    let mut child = base_command(&checkout)
+        .current_dir(&checkout)
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .with_context(|| format!("Failed to run python3 {} {}", main_py.display(), args.join(" ")))?;
+        .with_context(|| format!("Failed to run bonesinfra {} from {}", args.join(" "), checkout.display()))?;
 
     let mut stdin = child.stdin.take().context("Failed to capture python3 stdin")?;
     stdin.write_all(stdin_json.as_bytes()).context("Failed to write JSON data to python3 stdin")?;
 
     let output = child
         .wait_with_output()
-        .with_context(|| format!("Failed to wait on python3 {} {}", main_py.display(), args.join(" ")))?;
+        .with_context(|| format!("Failed to wait on bonesinfra {} from {}", args.join(" "), checkout.display()))?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("python3 {} failed:\n{}", main_py.display(), stderr.trim());
+        bail!("bonesinfra failed:\n{}", stderr.trim());
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -54,6 +54,14 @@ pub fn run_python_json(args: &[&str]) -> Result<Value> {
     json_args.push("--json");
     let stdout = run_python(&json_args)?;
     serde_json::from_str(&stdout).context("Failed to parse JSON output from Python infra CLI")
+}
+
+fn base_command(checkout: &std::path::Path) -> Command {
+    let mut command = Command::new("uv");
+    command.args(["run", "--project"]);
+    command.arg(checkout);
+    command.arg("bonesinfra");
+    command
 }
 
 /// Returns the list of available runtime names from Python.
