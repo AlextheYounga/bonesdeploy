@@ -137,9 +137,8 @@ bonesdeploy/
 │   ├── bonesdeploy/
 │   │   ├── kit/                # embedded scaffolding templates and hooks
 │   │   └── src/
-│   │       ├── app/            # local command implementations
 │   │       ├── cli/            # clap args + dispatch
-│   │       ├── commands/       # command-specific helpers
+│   │       ├── commands/       # CLI command implementations
 │   │       ├── infra/          # ssh, git, embedded assets, bonesinfra wrapper
 │   │       ├── ui/             # prompt helpers
 │   │       ├── config.rs

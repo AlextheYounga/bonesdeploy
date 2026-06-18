@@ -7,7 +7,7 @@ use console::style;
 
 use crate::commands::init_config;
 pub use crate::commands::init_config::InitArgs;
-use crate::app::remote_setup;
+use crate::commands::remote_setup;
 use crate::config;
 use crate::embedded;
 use crate::git;
@@ -298,5 +298,7 @@ fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
 }
 
 #[cfg(test)]
-#[path = "init_project_tests.rs"]
-mod tests;
+#[path = "tests/test_init_project.rs"]
+mod test_init_project;
+
+

@@ -1,11 +1,10 @@
 use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, RemoteCommand};
-use crate::app::{
-    deploy_project, doctor, init_project, manage, pull_state, push_state, remote_runtime, remote_setup, remote_ssl,
-    rollback, update, version,
+use crate::commands::{
+    config, deploy_project, doctor, init_config, init_project, manage, pull_state, push_state, remote_runtime,
+    remote_setup, remote_ssl, rollback, update, version,
 };
-use crate::commands::{config, init_config};
 
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {

@@ -260,5 +260,5 @@ fn apparmor_unit_wiring_status(contents: &str, installed_profiles: &HashSet<&str
 }
 
 #[cfg(test)]
-#[path = "doctor_tests.rs"]
-mod tests;
+#[path = "tests/test_doctor.rs"]
+mod test_doctor;

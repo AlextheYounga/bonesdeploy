@@ -10,7 +10,7 @@ use crate::config;
 use crate::git;
 use shared::config::default_deploy_user;
 
-use crate::app::init_project;
+use crate::commands::init_project;
 
 struct PullTarget {
     user: String,
