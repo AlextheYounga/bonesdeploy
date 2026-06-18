@@ -145,3 +145,28 @@ impl Data {
         crate::paths::DeploymentPaths::new(&self.project_name, &self.repo_path, &self.project_root, web_root)
     }
 }
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct BonesConfig {
+    #[serde(default)]
+    pub data: Data,
+    #[serde(default)]
+    pub releases: Releases,
+    #[serde(default)]
+    pub ssl: Ssl,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Ssl {
+    pub enabled: bool,
+    pub domain: String,
+    pub email: String,
+}
+
+pub fn load(path: &Path) -> Result<BonesConfig> {
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let mut config: BonesConfig = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    apply_derived_defaults(&mut config.data);
+    Ok(config)
+}

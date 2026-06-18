@@ -1,21 +1,6 @@
-use std::fs;
-use std::path::Path;
-
-use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
-use shared::config as shared_config;
 use shared::paths;
 
-pub use shared::config::Data;
-pub use shared::config::Releases;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct BonesConfig {
-    #[serde(default)]
-    pub data: Data,
-    #[serde(default)]
-    pub releases: Releases,
-}
+pub use shared::config::{BonesConfig, load};
 
 pub struct Constants;
 
@@ -24,14 +9,6 @@ impl Constants {
     pub const SUDOERS_PATH: &str = paths::SUDOERS_PATH;
     pub const STAGED_RELEASE_FILE: &str = paths::STAGED_RELEASE_FILE;
     pub const BUILD_DIR: &str = paths::BUILD_DIR;
-}
-
-pub fn load(path: &Path) -> Result<BonesConfig> {
-    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let mut config: BonesConfig =
-        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    shared_config::apply_derived_defaults(&mut config.data);
-    Ok(config)
 }
 
 #[cfg(test)]

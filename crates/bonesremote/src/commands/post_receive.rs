@@ -66,10 +66,11 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
+    use shared::config::{BonesConfig, Data, Releases};
     use shared::paths;
 
     use super::run;
-    use crate::config::{BonesConfig, Constants, Data, Releases};
+    use crate::config::Constants;
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -96,6 +97,7 @@ mod tests {
                 ..Default::default()
             },
             releases: Releases { keep: 5 },
+            ssl: Default::default(),
         };
         let toml = toml::to_string(&cfg)?;
         fs::write(path, toml)?;

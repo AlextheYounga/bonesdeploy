@@ -177,10 +177,10 @@ pub fn seed_path_override(
     if value.is_empty() {
         return String::new();
     }
-
-    let resolved_value = value.replace("<project_name>", current_project_name);
-    if resolved_value == default_for(&cfg.data.project_name) || resolved_value == default_for(current_project_name) {
-        return String::new();
+    let resolved = value.replace("<project_name>", current_project_name);
+    if resolved == default_for(current_project_name) {
+        String::new()
+    } else {
+        resolved
     }
-    resolved_value
 }

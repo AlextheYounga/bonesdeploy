@@ -144,9 +144,8 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
+    use shared::config::{BonesConfig, Data, Releases};
     use shared::paths;
-
-    use crate::config::{BonesConfig, Data, Releases};
 
     use super::{
         clear_staged_release, current_link, current_release_name, list_releases_sorted, point_symlink_atomically,
@@ -173,6 +172,7 @@ mod tests {
                 ..Default::default()
             },
             releases: Releases { keep: 5 },
+            ssl: Default::default(),
         }
     }
 

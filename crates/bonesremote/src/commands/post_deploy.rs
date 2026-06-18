@@ -52,11 +52,10 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-
+    use shared::config::{BonesConfig, Data, Releases};
     use shared::paths;
 
     use super::prune_old_releases;
-    use crate::config;
 
     fn temp_dir(prefix: &str) -> Result<PathBuf> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
@@ -65,9 +64,9 @@ mod tests {
         Ok(path)
     }
 
-    fn config_for(temp_root: &Path, keep: usize) -> config::BonesConfig {
-        config::BonesConfig {
-            data: config::Data {
+    fn config_for(temp_root: &Path, keep: usize) -> BonesConfig {
+        BonesConfig {
+            data: Data {
                 remote_name: String::from("production"),
                 project_name: String::from("acme"),
                 host: String::from("example.com"),
@@ -78,7 +77,8 @@ mod tests {
                 deploy_on_push: true,
                 ..Default::default()
             },
-            releases: config::Releases { keep },
+            releases: Releases { keep },
+            ssl: Default::default(),
         }
     }
 

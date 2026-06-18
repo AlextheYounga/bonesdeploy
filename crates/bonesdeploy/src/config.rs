@@ -3,23 +3,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use shared::config as shared_config;
 use shared::paths;
 
-pub use shared::config::Data;
-pub use shared::config::Releases;
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct BonesConfig {
-    #[serde(default)]
-    pub data: Data,
-    #[serde(default)]
-    pub releases: Releases,
-    #[serde(default)]
-    pub ssl: Ssl,
-}
+pub use shared::config::{BonesConfig, Data, Releases, Ssl, load};
 
 pub struct Constants;
 impl Constants {
@@ -42,17 +30,6 @@ impl Constants {
     pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Ssl {
-    #[serde(default)]
-    pub enabled: bool,
-    #[serde(default)]
-    pub domain: String,
-    #[serde(default)]
-    pub email: String,
-}
-
 pub fn is_configured(config: &BonesConfig) -> bool {
     let d = &config.data;
     !d.remote_name.is_empty() && !d.project_name.is_empty() && !d.host.is_empty() && !d.repo_path.is_empty()
@@ -69,14 +46,6 @@ pub fn bones_config_dir(project_name: &str) -> PathBuf {
 pub fn repo_directory_name() -> Result<String> {
     let cwd = env::current_dir()?;
     Ok(cwd.file_name().map_or_else(|| String::from("project"), |n| n.to_string_lossy().to_string()))
-}
-
-pub fn load(path: &Path) -> Result<BonesConfig> {
-    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let mut config: BonesConfig =
-        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    shared_config::apply_derived_defaults(&mut config.data);
-    Ok(config)
 }
 
 pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
@@ -105,7 +74,8 @@ mod tests {
     use anyhow::Result;
     use shared::paths;
 
-    use super::{BonesConfig, Data, Releases, Ssl, default_project_root_for, load, save};
+    use super::{BonesConfig, Data, Releases, Ssl, default_project_root_for, save};
+    use shared::config::load;
 
     fn temp_path(file_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());

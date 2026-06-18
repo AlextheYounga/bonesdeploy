@@ -7,7 +7,7 @@ use console::style;
 
 use crate::commands::init_config;
 pub use crate::commands::init_config::InitArgs;
-use crate::commands::remote_setup;
+use crate::app::remote_setup;
 use crate::config;
 use crate::embedded;
 use crate::git;
@@ -257,7 +257,7 @@ pub(crate) fn symlink_pre_push() -> Result<()> {
     let link = hooks_dir.join(config::Constants::PRE_PUSH_HOOK);
     let target = Path::new(config::Constants::PRE_PUSH_HOOK_TARGET);
 
-    if link.exists() || link.symlink_metadata().is_ok() {
+    if fs::symlink_metadata(&link).is_ok() {
         fs::remove_file(&link).with_context(|| format!("Failed to remove existing {}", link.display()))?;
     }
 
