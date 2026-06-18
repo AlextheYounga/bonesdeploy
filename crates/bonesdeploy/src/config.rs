@@ -84,7 +84,7 @@ mod tests {
 
     fn minimal_toml(project_name: &str) -> String {
         format!(
-            "[data]\nremote_name = \"production\"\nproject_name = \"{project_name}\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nbranch = \"master\"\ndeploy_on_push = true\n",
+            "remote_name = \"production\"\nproject_name = \"{project_name}\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nbranch = \"master\"\ndeploy_on_push = true\n",
             paths::default_repo_path_for(project_name)
         )
     }
@@ -160,8 +160,7 @@ mod tests {
         save(&config, &path)?;
         let content = fs::read_to_string(&path)?;
 
-        assert!(content.contains("[ssl]"));
-        assert!(content.contains("enabled = true"));
+        assert!(content.contains("ssl_enabled = true"));
         assert!(content.contains("domain = \"app.example.com\""));
         assert!(content.contains("email = \"ops@example.com\""));
 
@@ -174,7 +173,7 @@ mod tests {
     fn load_preserves_explicit_repo_and_project_root_overrides() -> Result<()> {
         let path = temp_path("overrides.toml");
         let toml = format!(
-            "[data]\nremote_name = \"production\"\nproject_name = \"app\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\nbranch = \"master\"\ndeploy_on_push = true\n",
+            "remote_name = \"production\"\nproject_name = \"app\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\nbranch = \"master\"\ndeploy_on_push = true\n",
             paths::default_repo_path_for("app")
         );
 

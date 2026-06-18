@@ -34,7 +34,6 @@ mod tests {
     fn load_derives_project_root_and_repo_path_from_project_name() -> Result<()> {
         let path = temp_file_path("bonesremote_config_derived_defaults");
         let toml = r#"
-[data]
 project_name = "acme"
 host = "example.com"
 "#;
@@ -53,7 +52,6 @@ host = "example.com"
     fn load_preserves_explicit_repo_and_project_root() -> Result<()> {
         let path = temp_file_path("bonesremote_config_explicit_values");
         let toml = r#"
-[data]
 project_name = "acme"
 repo_path = "/custom/repo.git"
 project_root = "/custom/deploy"

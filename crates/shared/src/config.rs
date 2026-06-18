@@ -19,6 +19,8 @@ pub struct Data {
     pub project_root: String,
     #[serde(skip_serializing_if = "String::is_empty")]
     pub branch: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    pub preview_domain: String,
     pub deploy_on_push: bool,
 }
 
@@ -32,6 +34,7 @@ impl Default for Data {
             repo_path: String::new(),
             project_root: String::new(),
             branch: "master".into(),
+            preview_domain: String::new(),
             deploy_on_push: true,
         }
     }
@@ -56,6 +59,7 @@ pub fn release_group_for(project_name: &str) -> String {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Releases {
+    #[serde(rename = "releases")]
     pub keep: usize,
 }
 
@@ -109,6 +113,27 @@ pub fn default_project_root_for(project_name: &str) -> String {
     paths::default_project_root_for(project_name)
 }
 
+pub fn default_preview_domain_for(project_name: &str, host: &str) -> String {
+    let project = sanitize_domain_label(project_name);
+    let host = sanitize_domain_label(host);
+
+    if project.is_empty() || host.is_empty() {
+        return String::new();
+    }
+
+    format!("{project}-{host}.nip.io")
+}
+
+fn sanitize_domain_label(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch.to_ascii_lowercase() } else { '-' })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string()
+}
+
 const RUNTIME_TOML: &str = "runtime.toml";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -138,6 +163,9 @@ pub fn apply_derived_defaults(data: &mut Data) {
     if data.project_root.is_empty() {
         data.project_root = default_project_root_for(project_name);
     }
+    if data.preview_domain.is_empty() {
+        data.preview_domain = default_preview_domain_for(project_name, &data.host);
+    }
 }
 
 impl Data {
@@ -146,19 +174,21 @@ impl Data {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct BonesConfig {
-    #[serde(default)]
+    #[serde(flatten)]
     pub data: Data,
-    #[serde(default)]
+    #[serde(flatten)]
     pub releases: Releases,
-    #[serde(default)]
+    #[serde(flatten)]
     pub ssl: Ssl,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Ssl {
+    #[serde(rename = "ssl_enabled")]
     pub enabled: bool,
     pub domain: String,
     pub email: String,

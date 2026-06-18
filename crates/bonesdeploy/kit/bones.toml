@@ -1,12 +1,11 @@
-[data]
+# project_name = "mysite"
+# remote_name = "production"
+# host = ''
 port = '22'
 branch = 'master'
-deploy_on_push = true
-
-[releases]
-keep = 5
-
-[ssl]
-enabled = false
 domain = ''
+# preview_domain = ""
 email = ''
+deploy_on_push = false
+ssl_enabled = false
+releases = 5
