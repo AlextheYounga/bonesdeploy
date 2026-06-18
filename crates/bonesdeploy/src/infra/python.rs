@@ -1,3 +1,4 @@
+use std::fs;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -50,10 +51,12 @@ pub fn run_python_with_stdin(args: &[&str], stdin_json: &str) -> Result<String> 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 pub fn run_python_json(args: &[&str]) -> Result<Value> {
-    let mut json_args = args.to_vec();
-    json_args.push("--json");
-    let stdout = run_python(&json_args)?;
-    serde_json::from_str(&stdout).context("Failed to parse JSON output from Python infra CLI")
+    let stdout = run_python(args)?;
+    parse_json_output(&stdout)
+}
+
+fn parse_json_output(stdout: &str) -> Result<Value> {
+    serde_json::from_str(stdout).context("Failed to parse JSON output from Python infra CLI")
 }
 
 fn base_command(checkout: &std::path::Path) -> Command {
@@ -62,6 +65,31 @@ fn base_command(checkout: &std::path::Path) -> Command {
     command.arg(checkout);
     command.arg("bonesinfra");
     command
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use anyhow::Result;
+
+    use super::{base_command, parse_json_output};
+
+    #[test]
+    fn base_command_launches_bonesinfra_via_uv() {
+        let command = base_command(Path::new("/tmp/bonesinfra"));
+
+        assert_eq!(command.get_program().to_string_lossy(), "uv");
+        let args: Vec<String> = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        assert_eq!(args, ["run", "--project", "/tmp/bonesinfra", "bonesinfra"]);
+    }
+
+    #[test]
+    fn parse_json_output_reads_cli_stdout() -> Result<()> {
+        let parsed = parse_json_output("[\"django\",\"rails\"]")?;
+        assert_eq!(parsed, serde_json::json!(["django", "rails"]));
+        Ok(())
+    }
 }
 
 /// Returns the list of available runtime names from Python.
@@ -80,7 +108,12 @@ pub fn runtime_questions(runtime: &str) -> Result<Value> {
     run_python_json(&["runtime", "questions", runtime])
 }
 
-/// Returns the defaults for a given runtime from Python.
 pub fn runtime_defaults(runtime: &str) -> Result<Value> {
-    run_python_json(&["runtime", "defaults", runtime])
+    let checkout = super::bonesinfra::checkout_path()?;
+    let toml_path = checkout.join("src").join("bonesinfra").join("runtimes").join(runtime).join("runtime.toml");
+    let content = fs::read_to_string(&toml_path)
+        .with_context(|| format!("Failed to read runtime defaults from {}", toml_path.display()))?;
+    let toml_value: toml::Value = toml::from_str(&content)
+        .with_context(|| format!("Failed to parse runtime.toml at {}", toml_path.display()))?;
+    serde_json::to_value(toml_value).context("Failed to convert runtime.toml to JSON")
 }
