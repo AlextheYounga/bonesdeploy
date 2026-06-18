@@ -170,26 +170,18 @@ This atomically updates both local (`bonesdeploy`) and remote (`bonesremote`) us
 `bonesdeploy init` generates `.bones/bones.toml`:
 
 ```toml
-[data]
 remote_name = "production"
 project_name = "myproject"
 repo_path = "/home/git/myproject.git"
-web_root = "public"
 project_root = "/srv/sites/myproject"
-branch = "master"
-deploy_on_push = true
-deploy_user = "git"
-runtime_user = "myproject"
-runtime_group = "myproject"
-release_group = "myproject-release"
-
-[releases]
-keep = 5
-
-[ssl]
-enabled = false
-domain = ""
-email = ""
+port = '22'
+branch = 'master'
+domain = ''
+preview_domain = ""
+email = ''
+deploy_on_push = false
+ssl_enabled = false
+releases = 5
 ```
 
 `host` and `repo_path` are inferred from the deployment remote URL when possible; if parsing fails, init asks only for those missing values.
