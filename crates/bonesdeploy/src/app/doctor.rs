@@ -14,15 +14,20 @@ pub async fn run(local_only: bool) -> Result<()> {
 
     let mut issues: Vec<String> = Vec::new();
 
+    let cfg = config::load(Path::new(config::Constants::BONES_TOML)).ok();
+    let deploy_on_push = cfg.as_ref().is_some_and(|c| c.deploy_on_push);
+
     check_bones_structure(&mut issues);
     check_deployment_naming(&mut issues);
-    check_pre_push_symlink(&mut issues);
+
+    if deploy_on_push {
+        check_pre_push_symlink(&mut issues);
+    }
 
     if !local_only {
-        let bones_toml = Path::new(config::Constants::BONES_TOML);
-        match config::load(bones_toml) {
-            Ok(cfg) => check_remote(&cfg, &mut issues).await,
-            Err(e) => issues.push(format!("Cannot load config: {e}")),
+        match &cfg {
+            Some(cfg) => check_remote(cfg, deploy_on_push, &mut issues).await,
+            None => issues.push("Cannot load .bones/bones.toml; skipping remote checks".into()),
         }
     }
 
@@ -116,7 +121,7 @@ fn check_pre_push_symlink(issues: &mut Vec<String>) {
     }
 }
 
-async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
+async fn check_remote(cfg: &config::BonesConfig, deploy_on_push: bool, issues: &mut Vec<String>) {
     let session = match ssh::connect(cfg).await {
         Ok(s) => s,
         Err(e) => {
@@ -144,8 +149,9 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
     // Check local .bones/ is in sync with remote
     check_rsync_sync(cfg, issues);
 
-    // Check hooks are symlinked properly
-    let check_hooks = format!(
+    // Check hooks are symlinked properly (only when git-triggered deploy is enabled)
+    if deploy_on_push {
+        let check_hooks = format!(
         "for hook in {repo_path}/{}/{}/{}; do \
             name=$(basename \"$hook\"); \
             link=\"{repo_path}/{}/$name\"; \
@@ -173,6 +179,7 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
             }
         }
         Err(e) => issues.push(format!("Failed to check remote hook symlinks: {e}")),
+    }
     }
 
     let _ = session.close().await;

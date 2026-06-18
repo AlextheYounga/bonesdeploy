@@ -1,28 +1,29 @@
-# BonesDeploy ☠️
+# BonesDeploy
 
-## Git Deployments with a Spine in a Barebones Framework 🏴‍☠️
+## Remote release deployment tool for simple Linux servers
 
 <div style="margin:0 auto; display: block;"><img width=600 height=600 src="docs/images/bonesdeploy.png" alt="BonesDeploy" /></div>
 
 > WARNING: BonesDeploy is still under active development. There may be some cool bugs!
 
-A drop-in Rust deployment system for git-based deployments over SSH. BonesDeploy scaffolds hook scripts and deployment configs into your repo, syncs them to a remote bare repository, and manages permissions through provisioning-time contracts (setgid directories + systemd sandboxing) without forcing containers, a control plane, or a platform layer.
+BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, syncs them to the remote, and manages permissions through provisioning-time contracts (setgid directories + systemd sandboxing) without forcing containers, a control plane, or a platform layer.
 
 It produces two binaries:
-- **`bonesdeploy`** — local CLI for setup and management
-- **`bonesremote`** — server-side tool for remote operations, installed on the deployment host
+- **`bonesdeploy`** — local CLI for init, config, deployment, and management
+- **`bonesremote`** — server-side release lifecycle executor, installed on the deployment host
 
 ## Why BonesDeploy
 
-BonesDeploy is built for developers who want `git push` deployments without handing deployment over to a PaaS or rebuilding everything around Docker.
+BonesDeploy is built for developers who want direct server deploys without handing deployment over to a PaaS or rebuilding everything around Docker.
 
-- **Drop-in** — add it to an existing repo, scaffold `.bones/`, and deploy over your existing SSH + bare repo workflow
-- **Git-native** — hooks, remotes, and bare repos stay the source of truth instead of hiding deployment behind a daemon
+- **Drop-in** — add it to an existing repo, scaffold `.bones/`, and deploy over your existing SSH workflow
+- **Simple lifecycle** — `bonesdeploy deploy` runs the full deployment pipeline on the remote server; `bonesremote deploy` owns the lifecycle
 - **Permission-aware** — BonesDeploy treats deploy-user to service-user handoff as a first-class concern instead of leaving shared groups or ACL sprawl behind
 - **Self-hosted and lightweight** — ideal for VPSes, old servers, and Raspberry Pis where simplicity matters more than orchestration
 - **Editable by design** — the generated hooks and deployment scripts are yours; BonesDeploy gives you structure, not lock-in
+- **Git optional** — git push can trigger deploys through a thin post-receive adapter, but `bonesdeploy deploy` is the primary deployment command
 
-If you want a Heroku-style abstraction layer, use a platform. If you want a disciplined, transparent deployment skeleton that drops into a normal Linux box, use BonesDeploy.
+If you want a Heroku-style abstraction layer, use a platform. If you want a disciplined, transparent deployment tool that drops into a normal Linux box, use BonesDeploy.
 
 ## How It Works
 
@@ -79,7 +80,7 @@ bonesdeploy init
 ```
 
 This will:
-1. Create a `.bones/` folder with hooks and deployment script templates
+1. Create a `.bones/` folder with deployment scripts and hooks
 2. Prompt for project name, branch, remote name, host, and port
 3. Add `.bones` to `.gitignore`
 4. Symlink the `pre-push` hook into `.git/hooks/`
@@ -122,31 +123,33 @@ This rsyncs `.bones/` to the remote bare repo and symlinks the hooks.
 
 ### Deploying
 
-Just push to your deployment remote:
-
-```sh
-git push production master
-```
-
-The hook chain handles the rest:
-1. **pre-push** (local) — runs `bonesdeploy doctor --local`
-2. **pre-receive** (remote) — inert (`exit 0`); all deployment logic runs in post-receive
-3. **post-receive** (remote) — resolves the configured deployment ref, then runs a single `bonesremote deploy --config <bones_toml> --revision <newrev>` command that orchestrates the full pipeline:
-    - Doctor check → stage release → git checkout into `build/workspace` → wire shared paths → run deployment scripts → activate release (atomic symlink) → restart nginx → prune old releases
-
-`pre-push -> pre-receive -> post-receive`
-
-If you set `deploy_on_push = false`, pushes only update refs. Run manual deploy when ready:
+Deploy the configured project release:
 
 ```sh
 bonesdeploy deploy
 ```
+
+This SSHs into the host and runs `bonesremote deploy --config <remote bones.toml>`, which orchestrates the full server-side pipeline: doctor check → stage release → checkout → wire shared paths → run deployment scripts → activate → restart services → prune old releases.
 
 To roll back to the previous release without rebuilding:
 
 ```sh
 bonesdeploy rollback
 ```
+
+### Git-triggered deploy (optional)
+
+If `deploy_on_push = true`:
+
+```sh
+git push production master
+# post-receive resolves the pushed revision
+# post-receive calls bonesremote deploy --config <path> --revision <sha>
+```
+
+Git post-receive is a thin adapter — it does not orchestrate the deployment lifecycle. `bonesremote deploy` owns the lifecycle regardless of the trigger.
+
+If `deploy_on_push = false` (the default), pushes only update refs. Run `bonesdeploy deploy` when ready.
 
 ### Health Checks
 
@@ -197,11 +200,13 @@ releases = 5
 │   └── 01_*.sh          # deployment scripts (run sequentially)
 └── hooks/
     ├── pre-push         # symlinked to .git/hooks/pre-push
-    ├── pre-receive
-    └── post-receive
+    ├── pre-receive      # inert hook (intentionally no-op)
+    └── post-receive     # thin adapter → calls bonesremote deploy
 ```
 
 Hooks are written to `.bones/hooks/` once during init and import shared functions from `.bones/hooks.sh`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
+
+Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote deploy`; `pre-receive` is intentionally inert.
 
 ## Good Fit
 

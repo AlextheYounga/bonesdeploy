@@ -88,8 +88,6 @@ pub fn run(config_path: &str) -> Result<()> {
             if !status.success() {
                 println!("Deployment script {script_name} failed.");
                 println!("Log: {}", log_path.display());
-                drop_failed_release::run(config_path)
-                    .with_context(|| "Failed to drop staged release after deployment script failure")?;
                 bail!("Deployment script {script_name} failed with status {status}");
             }
         }

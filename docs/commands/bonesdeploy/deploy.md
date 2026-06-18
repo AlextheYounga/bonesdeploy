@@ -2,7 +2,7 @@
 
 ## Overview
 
-Manually triggers the full deployment sequence on the remote server by running `bonesremote deploy --config <remote_bones_toml>` over SSH. This is useful for testing deployment scripts, re-running failed deployments, or deploying when you don't have new commits to push.
+Deploys the configured project release to the remote server by running `bonesremote deploy --config <remote_bones_toml>` over SSH. This is the primary deployment command — it triggers the full server-side deployment pipeline regardless of whether you're using git as a source transport.
 
 ## Detailed Execution Steps
 
@@ -122,47 +122,39 @@ println!("\n{} Deployment complete.", style("Done!").green().bold());
 
 ## How `git push` Differs from `bonesdeploy deploy`
 
-| Aspect | `git push` | `bonesdeploy deploy` |
-|--------|-----------|---------------------|
-| **Trigger** | Push commits to remote | Manual command |
-| **Deploy mechanism** | `post-receive` hook calls `bonesremote deploy --revision <sha>` | Directly calls `bonesremote deploy --config <path>` (uses configured branch) |
-| **Commit requirement** | Must have new commits | Works with existing commits (re-deployment) |
-| **Pre-push doctor** | Runs locally via `pre-push` hook | Not run (user invokes deliberately) |
-| **Use case** | Normal CI/CD workflow | Testing, re-deployment after failure, recovery |
+| Aspect | `bonesdeploy deploy` | `git push` |
+|--------|---------------------|-----------|
+| **Trigger** | Direct CLI command | Push commits to remote |
+| **Deploy mechanism** | SSH → `bonesremote deploy --config <path>` (uses configured branch) | `post-receive` hook (thin adapter) calls `bonesremote deploy --config <path> --revision <sha>` |
+| **Commit requirement** | Works with existing commits (re-deployment) | Must have new commits |
+| **Pre-deploy doctor** | Not run (user invokes deliberately) | Runs locally via `pre-push` hook |
+| **Use case** | Primary deployment workflow | Optional git-triggered deployment |
 
 ---
 
 ## When to Use
 
-1. **Testing deployment scripts**: Validate changes to `bones/deployment/` scripts without pushing new commits
-2. **Re-running failed deployments**: After fixing deployment script issues
-3. **Manual deployments**: When `deploy_on_push = false` or you want to control deployment timing separately from commits
-4. **Recovery**: Re-deploy the current commit after a failed deployment
-5. **Initial setup**: Deploy after `bonesdeploy push` before the first `git push`
+`bonesdeploy deploy` is the primary deployment command:
+
+1. **Normal deployments**: Deploy after syncing config with `bonesdeploy push`
+2. **Testing deployment scripts**: Validate changes to `bones/deployment/` scripts without pushing new commits
+3. **Re-running failed deployments**: After fixing deployment script issues
+4. **Controlled deployments**: When `deploy_on_push = false` (the default) or you want to control deployment timing separately from commits
+5. **Recovery**: Re-deploy the current commit after a failed deployment
 
 ---
 
 ## Typical Workflow
 
-### Normal Deployment (via Git Push)
+### Primary Deployment
 ```bash
-git add .
-git commit -m "Add feature"
-git push production master  # post-receive hook triggers bonesremote deploy
+bonesdeploy push         # sync .bones/ config to remote
+bonesdeploy deploy       # SSH → bonesremote deploy --config <path>
 ```
 
-### Manual Deployment
+### Git-Triggered Deployment (optional)
 ```bash
-bonesdeploy deploy  # SSH -> bonesremote deploy --config <path>
-```
-
-### Combined Workflow
-```bash
-# Push without triggering deployment
-git push production master --no-verify
-
-# Deploy manually later
-bonesdeploy deploy
+git push production master  # post-receive calls bonesremote deploy --revision <sha>
 ```
 
 ---

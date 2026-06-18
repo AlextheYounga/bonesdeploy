@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "bonesdeploy", about = "Git deployment scaffolding tool")]
+#[command(name = "bonesdeploy", about = "Remote release deployment tool")]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -43,7 +43,7 @@ pub enum Command {
     Push,
     /// Sync .bones/ folder back from the remote bare repo
     Pull,
-    /// Run deployment hooks manually without pushing commits
+    /// Deploy the configured project release to the remote server
     Deploy,
     /// Update bonesdeploy and bonesremote to the latest version
     Update {

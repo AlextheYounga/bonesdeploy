@@ -63,4 +63,42 @@ mod tests {
         assert!(!hooks_script.contains("bonesremote hooks deploy --config"));
         Ok(())
     }
+
+    /// pre-receive hook is inert and must not contain any lifecycle commands.
+    #[test]
+    fn pre_receive_is_inert() -> Result<()> {
+        let hook = super::Kit::get("hooks/pre-receive").ok_or_else(|| anyhow!("pre-receive should be embedded"))?;
+        let hook = String::from_utf8_lossy(hook.data.as_ref()).to_string();
+        assert!(!hook.contains("bonesremote deploy --config"));
+        assert!(!hook.contains("bonesremote release"));
+        assert!(!hook.contains("bonesremote hooks"));
+        assert!(!hook.contains("bonesremote doctor"));
+        assert!(!hook.contains("bonesremote post-deploy"));
+        Ok(())
+    }
+
+    /// post-receive is a thin adapter that only calls bonesremote deploy.
+    #[test]
+    fn post_receive_is_thin_adapter() -> Result<()> {
+        let hook = super::Kit::get("hooks/post-receive").ok_or_else(|| anyhow!("post-receive should be embedded"))?;
+        let hook = String::from_utf8_lossy(hook.data.as_ref()).to_string();
+        assert!(!hook.contains("bonesremote release stage"));
+        assert!(!hook.contains("bonesremote release wire"));
+        assert!(!hook.contains("bonesremote release activate"));
+        assert!(!hook.contains("bonesremote hooks deploy"));
+        assert!(!hook.contains("bonesremote post-deploy"));
+        Ok(())
+    }
+
+    /// Hook library must not orchestrate lower-level release lifecycle commands.
+    #[test]
+    fn hooks_sh_does_not_call_lower_level_lifecycle_commands() -> Result<()> {
+        let hooks_sh = super::Kit::get("hooks/hooks.sh").ok_or_else(|| anyhow!("hooks.sh should be embedded"))?;
+        let hooks_sh = String::from_utf8_lossy(hooks_sh.data.as_ref()).to_string();
+        assert!(!hooks_sh.contains("bonesremote release stage"));
+        assert!(!hooks_sh.contains("bonesremote release wire"));
+        assert!(!hooks_sh.contains("bonesremote release activate"));
+        assert!(!hooks_sh.contains("bonesremote post-deploy"));
+        Ok(())
+    }
 }
