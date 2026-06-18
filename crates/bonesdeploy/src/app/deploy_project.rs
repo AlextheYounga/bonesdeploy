@@ -10,9 +10,9 @@ pub async fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
-    let remote_bones_toml = cfg.data.deployment_paths(paths::DEFAULT_WEB_ROOT).repo_bones_toml;
+    let remote_bones_toml = cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).repo_bones_toml;
 
-    println!("Deploying {} on {}...", style(&cfg.data.project_name).cyan().bold(), style(&cfg.data.host).cyan());
+    println!("Deploying {} on {}...", style(&cfg.project_name).cyan().bold(), style(&cfg.host).cyan());
 
     let session = ssh::connect(&cfg).await?;
 

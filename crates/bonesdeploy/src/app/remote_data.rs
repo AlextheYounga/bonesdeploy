@@ -6,29 +6,29 @@ use shared::paths::{ssl_certificate_key_path, ssl_certificate_path};
 use crate::config;
 
 fn base(cfg: &config::BonesConfig, web_root: &str) -> Result<Map<String, Value>> {
-    let paths = cfg.data.deployment_paths(web_root);
+    let paths = cfg.deployment_paths(web_root);
     let mut vars = Map::new();
 
-    vars.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
+    vars.insert(String::from("ssh_port"), Value::String(cfg.port.clone()));
     vars.insert(String::from("deploy_user"), Value::String(shared_config::default_deploy_user()));
     vars.insert(
         String::from("runtime_user"),
-        Value::String(shared_config::runtime_user_for(&cfg.data.project_name)),
+        Value::String(shared_config::runtime_user_for(&cfg.project_name)),
     );
     vars.insert(
         String::from("runtime_group"),
-        Value::String(shared_config::runtime_group_for(&cfg.data.project_name)),
+        Value::String(shared_config::runtime_group_for(&cfg.project_name)),
     );
     vars.insert(
         String::from("release_group"),
-        Value::String(shared_config::release_group_for(&cfg.data.project_name)),
+        Value::String(shared_config::release_group_for(&cfg.project_name)),
     );
     vars.insert(String::from("project_root_parent"), Value::String(paths.project_root_parent.clone()));
-    vars.insert(String::from("project_root"), Value::String(cfg.data.project_root.clone()));
+    vars.insert(String::from("project_root"), Value::String(cfg.project_root.clone()));
     vars.insert(String::from("web_root"), Value::String(web_root.to_string()));
-    vars.insert(String::from("project_name"), Value::String(cfg.data.project_name.clone()));
-    vars.insert(String::from("preview_domain"), Value::String(cfg.data.preview_domain.clone()));
-    vars.insert(String::from("repo_path"), Value::String(cfg.data.repo_path.clone()));
+    vars.insert(String::from("project_name"), Value::String(cfg.project_name.clone()));
+    vars.insert(String::from("preview_domain"), Value::String(cfg.preview_domain.clone()));
+    vars.insert(String::from("repo_path"), Value::String(cfg.repo_path.clone()));
     vars.insert(String::from("paths"), serde_json::to_value(paths)?);
 
     Ok(vars)
@@ -52,25 +52,21 @@ pub fn ssl(cfg: &config::BonesConfig, web_root: &str, domain: &str, email: &str)
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{BonesConfig, Data, Releases, Ssl};
+    use crate::config::BonesConfig;
 
     use super::{base, ssl};
 
     fn test_cfg() -> BonesConfig {
         BonesConfig {
-            data: Data {
-                project_name: String::from("test"),
-                repo_path: String::from("/home/git/test.git"),
-                project_root: String::from("/srv/test"),
-                host: String::from("example.com"),
-                port: String::from("22"),
-                branch: String::from("master"),
-                remote_name: String::from("production"),
-                deploy_on_push: true,
-                ..Default::default()
-            },
-            releases: Releases::default(),
-            ssl: Ssl::default(),
+            project_name: String::from("test"),
+            repo_path: String::from("/home/git/test.git"),
+            project_root: String::from("/srv/test"),
+            host: String::from("example.com"),
+            port: String::from("22"),
+            branch: String::from("master"),
+            remote_name: String::from("production"),
+            deploy_on_push: true,
+            ..Default::default()
         }
     }
 
@@ -88,7 +84,7 @@ mod tests {
     #[test]
     fn base_data_includes_preview_domain() -> anyhow::Result<()> {
         let mut cfg = test_cfg();
-        cfg.data.preview_domain = String::from("test-example-com.nip.io");
+        cfg.preview_domain = String::from("test-example-com.nip.io");
 
         let vars = base(&cfg, "public")?;
 

@@ -11,7 +11,7 @@ pub async fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
-    let repo_path = &cfg.data.repo_path;
+    let repo_path = &cfg.repo_path;
     let remote_bones = format!("{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);
 
     // rsync .bones/ to remote
@@ -52,9 +52,9 @@ pub async fn run() -> Result<()> {
 
 pub(crate) fn sync_bones_directory(cfg: &config::BonesConfig) -> Result<()> {
     let user = shared::config::default_deploy_user();
-    let host = &cfg.data.host;
-    let port = &cfg.data.port;
-    let repo_path = &cfg.data.repo_path;
+    let host = &cfg.host;
+    let port = &cfg.port;
+    let repo_path = &cfg.repo_path;
     let dest = format!("{user}@{host}:{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);
 
     let status = Command::new("rsync")

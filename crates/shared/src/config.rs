@@ -8,7 +8,7 @@ use crate::paths;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Data {
+pub struct BonesConfig {
     pub remote_name: String,
     pub project_name: String,
     pub host: String,
@@ -22,9 +22,14 @@ pub struct Data {
     #[serde(skip_serializing_if = "String::is_empty")]
     pub preview_domain: String,
     pub deploy_on_push: bool,
+    #[serde(rename = "releases")]
+    pub releases_keep: usize,
+    pub ssl_enabled: bool,
+    pub domain: String,
+    pub email: String,
 }
 
-impl Default for Data {
+impl Default for BonesConfig {
     fn default() -> Self {
         Self {
             remote_name: String::new(),
@@ -36,7 +41,17 @@ impl Default for Data {
             branch: "master".into(),
             preview_domain: String::new(),
             deploy_on_push: true,
+            releases_keep: 5,
+            ssl_enabled: false,
+            domain: String::new(),
+            email: String::new(),
         }
+    }
+}
+
+impl BonesConfig {
+    pub fn deployment_paths(&self, web_root: &str) -> crate::paths::DeploymentPaths {
+        crate::paths::DeploymentPaths::new(&self.project_name, &self.repo_path, &self.project_root, web_root)
     }
 }
 
@@ -54,19 +69,6 @@ pub fn runtime_group_for(project_name: &str) -> String {
 
 pub fn release_group_for(project_name: &str) -> String {
     format!("{project_name}-release")
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Releases {
-    #[serde(rename = "releases")]
-    pub keep: usize,
-}
-
-impl Default for Releases {
-    fn default() -> Self {
-        Self { keep: 5 }
-    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -154,49 +156,23 @@ pub fn load_runtime_config(config_dir: &Path) -> Result<RuntimeConfig> {
     }
 }
 
-pub fn apply_derived_defaults(data: &mut Data) {
-    let project_name = &data.project_name;
+pub fn apply_derived_defaults(config: &mut BonesConfig) {
+    let project_name = &config.project_name;
 
-    if data.repo_path.is_empty() {
-        data.repo_path = default_repo_path_for(project_name);
+    if config.repo_path.is_empty() {
+        config.repo_path = default_repo_path_for(project_name);
     }
-    if data.project_root.is_empty() {
-        data.project_root = default_project_root_for(project_name);
+    if config.project_root.is_empty() {
+        config.project_root = default_project_root_for(project_name);
     }
-    if data.preview_domain.is_empty() {
-        data.preview_domain = default_preview_domain_for(project_name, &data.host);
+    if config.preview_domain.is_empty() {
+        config.preview_domain = default_preview_domain_for(project_name, &config.host);
     }
-}
-
-impl Data {
-    pub fn deployment_paths(&self, web_root: &str) -> crate::paths::DeploymentPaths {
-        crate::paths::DeploymentPaths::new(&self.project_name, &self.repo_path, &self.project_root, web_root)
-    }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct BonesConfig {
-    #[serde(flatten)]
-    pub data: Data,
-    #[serde(flatten)]
-    pub releases: Releases,
-    #[serde(flatten)]
-    pub ssl: Ssl,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Ssl {
-    #[serde(rename = "ssl_enabled")]
-    pub enabled: bool,
-    pub domain: String,
-    pub email: String,
 }
 
 pub fn load(path: &Path) -> Result<BonesConfig> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let mut config: BonesConfig = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    apply_derived_defaults(&mut config.data);
+    apply_derived_defaults(&mut config);
     Ok(config)
 }

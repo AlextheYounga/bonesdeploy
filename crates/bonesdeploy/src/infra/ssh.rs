@@ -5,8 +5,8 @@ use tokio::io::{AsyncBufReadExt, BufReader};
 use crate::config::BonesConfig;
 
 pub async fn connect(config: &BonesConfig) -> Result<Session> {
-    let host = &config.data.host;
-    let port: u16 = config.data.port.parse().with_context(|| format!("Invalid port: {}", config.data.port))?;
+    let host = &config.host;
+    let port: u16 = config.port.parse().with_context(|| format!("Invalid port: {}", config.port))?;
     let user = shared::config::default_deploy_user();
 
     connect_as(&user, host, port).await

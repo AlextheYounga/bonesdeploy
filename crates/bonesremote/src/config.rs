@@ -42,8 +42,8 @@ host = "example.com"
         let cfg = load(&path)?;
         fs::remove_file(&path).ok();
 
-        assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("acme"));
-        assert_eq!(cfg.data.project_root, paths::default_project_root_for("acme"));
+        assert_eq!(cfg.repo_path, paths::default_repo_path_for("acme"));
+        assert_eq!(cfg.project_root, paths::default_project_root_for("acme"));
         Ok(())
     }
 
@@ -61,8 +61,8 @@ project_root = "/custom/deploy"
         let cfg = load(&path)?;
         fs::remove_file(&path).ok();
 
-        assert_eq!(cfg.data.repo_path, "/custom/repo.git");
-        assert_eq!(cfg.data.project_root, "/custom/deploy");
+        assert_eq!(cfg.repo_path, "/custom/repo.git");
+        assert_eq!(cfg.project_root, "/custom/deploy");
         Ok(())
     }
 
@@ -75,9 +75,9 @@ project_root = "/custom/deploy"
         let cfg = load(&path)?;
         fs::remove_file(&path).ok();
 
-        assert_eq!(cfg.data.port, "22");
-        assert_eq!(cfg.data.branch, "master");
-        assert_eq!(cfg.releases.keep, 5);
+        assert_eq!(cfg.port, "22");
+        assert_eq!(cfg.branch, "master");
+        assert_eq!(cfg.releases_keep, 5);
         Ok(())
     }
 

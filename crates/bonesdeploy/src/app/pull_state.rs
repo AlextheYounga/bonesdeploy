@@ -48,9 +48,9 @@ fn resolve_pull_target() -> Result<PullTarget> {
         let cfg = config::load(bones_toml)?;
         return Ok(PullTarget {
             user: shared::config::default_deploy_user(),
-            host: cfg.data.host,
-            port: cfg.data.port,
-            repo_path: cfg.data.repo_path,
+            host: cfg.host,
+            port: cfg.port,
+            repo_path: cfg.repo_path,
         });
     }
 

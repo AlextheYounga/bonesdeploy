@@ -37,11 +37,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
         unix_fs::symlink(&config_dir, bones_dir)?;
         println!("Symlinked .bones -> {}", config_dir.display());
 
-        let seed = config::BonesConfig {
-            data: config::Data { project_name: project_name.clone(), ..Default::default() },
-            releases: config::Releases::default(),
-            ssl: config::Ssl::default(),
-        };
+        let seed = config::BonesConfig { project_name: project_name.clone(), ..Default::default() };
         config::save(&seed, Path::new(config::Constants::BONES_TOML))?;
 
         initial_project_name = Some(project_name);
@@ -55,14 +51,14 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
     let cfg = load_or_collect_config(bones_toml, args)?;
 
     if let Some(ref initial) = initial_project_name
-        && cfg.data.project_name != *initial
+        && cfg.project_name != *initial
     {
         let old_dir = config::bones_config_dir(initial);
-        let new_dir = config::bones_config_dir(&cfg.data.project_name);
+        let new_dir = config::bones_config_dir(&cfg.project_name);
         fs::rename(&old_dir, &new_dir)?;
         fs::remove_file(bones_dir)?;
         unix_fs::symlink(&new_dir, bones_dir)?;
-        println!("Renamed centralized folder to {}.bones", cfg.data.project_name);
+        println!("Renamed centralized folder to {}.bones", cfg.project_name);
     }
 
     config::save(&cfg, bones_toml)?;
@@ -132,7 +128,7 @@ fn collect_from_seed(
 ) -> Result<config::BonesConfig> {
     let project_name = cli_existing_or_prompt(
         args.project_name.as_ref(),
-        existing_config.and_then(|cfg| init_config::non_empty(&cfg.data.project_name)),
+        existing_config.and_then(|cfg| init_config::non_empty(&cfg.project_name)),
         || prompts::prompt_project_name(project_name_hint, existing_config),
     )?;
     let branch = cli_or_prompt(args.branch.as_ref(), || prompts::prompt_branch(existing_config))?;
@@ -144,27 +140,31 @@ fn collect_from_seed(
     let repo_path = init_config::resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
     let project_root = init_config::seed_path_override(
         existing_config,
-        |cfg| &cfg.data.project_root,
+        |cfg| &cfg.project_root,
         &project_name,
         config::default_project_root_for,
     );
-    let deploy_on_push = existing_config.is_none_or(|cfg| cfg.data.deploy_on_push);
-    let releases_keep = existing_config.map_or(5, |cfg| cfg.releases.keep.max(1));
+    let deploy_on_push = existing_config.is_none_or(|cfg| cfg.deploy_on_push);
+    let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
+
+    let ssl_enabled = existing_config.map_or(false, |cfg| cfg.ssl_enabled);
+    let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
+    let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 
     Ok(config::BonesConfig {
-        data: config::Data {
-            remote_name,
-            project_name,
-            host,
-            port,
-            repo_path,
-            project_root,
-            branch,
-            deploy_on_push,
-            ..Default::default()
-        },
-        releases: config::Releases { keep: releases_keep },
-        ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
+        remote_name,
+        project_name,
+        host,
+        port,
+        repo_path,
+        project_root,
+        branch,
+        deploy_on_push,
+        releases_keep,
+        ssl_enabled,
+        domain,
+        email,
+        ..Default::default()
     })
 }
 
@@ -268,13 +268,13 @@ pub(crate) fn symlink_pre_push() -> Result<()> {
 }
 
 fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
-    if git::remote_exists(&cfg.data.remote_name)? {
+    if git::remote_exists(&cfg.remote_name)? {
         return Ok(());
     }
 
-    let remote_url = format!("{}@{}:{}", shared::config::default_deploy_user(), cfg.data.host, cfg.data.repo_path);
-    git::add_remote(&cfg.data.remote_name, &remote_url)?;
-    println!("Configured local git remote {} -> {}", cfg.data.remote_name, remote_url);
+    let remote_url = format!("{}@{}:{}", shared::config::default_deploy_user(), cfg.host, cfg.repo_path);
+    git::add_remote(&cfg.remote_name, &remote_url)?;
+    println!("Configured local git remote {} -> {}", cfg.remote_name, remote_url);
     Ok(())
 }
 

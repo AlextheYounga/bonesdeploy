@@ -22,7 +22,7 @@ pub fn run() -> Result<()> {
     let deploy_authorized_key = resolve_deploy_authorized_key()?;
 
     let mut deploy_data = remote_data::setup(&cfg, &runtime.web_root, &deploy_authorized_key)?;
-    let host = cfg.data.host;
+    let host = cfg.host;
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from("ssh_user"), Value::String(ssh_user));
         map.insert(String::from("host"), Value::String(host));

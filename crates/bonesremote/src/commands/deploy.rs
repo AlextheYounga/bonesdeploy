@@ -51,7 +51,7 @@ pub fn run(config_path: &str) -> Result<()> {
     let runtime = shared_config::load_runtime_config(
         Path::new(config_path).parent().unwrap_or_else(|| Path::new(".")),
     )?;
-    let paths = cfg.data.deployment_paths(&runtime.web_root);
+    let paths = cfg.deployment_paths(&runtime.web_root);
     let deployment_dir = PathBuf::from(&paths.repo_deployment);
 
     if !release_path.exists() {
@@ -77,9 +77,9 @@ pub fn run(config_path: &str) -> Result<()> {
                 &build_root,
                 &log_path,
                 &deploy_output::ScriptEnv {
-                    project_name: &cfg.data.project_name,
-                    project_root: &cfg.data.project_root,
-                    repo_path: &cfg.data.repo_path,
+                    project_name: &cfg.project_name,
+                    project_root: &cfg.project_root,
+                    repo_path: &cfg.repo_path,
                     web_root: &runtime.web_root,
                 },
             )

@@ -38,7 +38,7 @@ fn resolve_project_name(
     args.project_name
         .clone()
         .filter(|v| !v.is_empty())
-        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.data.project_name)))
+        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.project_name)))
         .or_else(|| {
             let name = project_name_hint.to_string();
             (!name.is_empty()).then_some(name)
@@ -56,7 +56,7 @@ fn resolve_remote_name(args: &InitArgs, existing_config: Option<&config::BonesCo
     args.remote
         .clone()
         .filter(|v| !v.is_empty())
-        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.data.remote_name)))
+        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.remote_name)))
         .unwrap_or_else(|| String::from("production"))
 }
 
@@ -72,7 +72,7 @@ fn resolve_host(
     args.host
         .clone()
         .filter(|v| !v.is_empty())
-        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.data.host)))
+        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.host)))
         .or_else(|| inferred_remote.map(|details| details.host.clone()))
         .ok_or_else(|| {
             anyhow!(
@@ -87,7 +87,7 @@ fn resolve_branch(args: &InitArgs, existing_config: Option<&config::BonesConfig>
     args.branch
         .clone()
         .filter(|v| !v.is_empty())
-        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.data.branch)))
+        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.branch)))
         .unwrap_or_else(|| String::from("main"))
 }
 
@@ -99,7 +99,7 @@ fn resolve_port(
     args.port
         .clone()
         .filter(|v| !v.is_empty())
-        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.data.port)))
+        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.port)))
         .or_else(|| inferred_remote.map(|details| details.port.clone()))
         .unwrap_or_else(|| String::from("22"))
 }
@@ -122,27 +122,31 @@ fn build_config(
     let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote);
     let project_root = seed_path_override(
         existing_config,
-        |cfg| &cfg.data.project_root,
+        |cfg| &cfg.project_root,
         &project_name,
         config::default_project_root_for,
     );
-    let deploy_on_push = existing_config.is_none_or(|cfg| cfg.data.deploy_on_push);
-    let releases_keep = existing_config.map_or(5, |cfg| cfg.releases.keep.max(1));
+    let deploy_on_push = existing_config.is_none_or(|cfg| cfg.deploy_on_push);
+    let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
+
+    let ssl_enabled = existing_config.map_or(false, |cfg| cfg.ssl_enabled);
+    let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
+    let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 
     config::BonesConfig {
-        data: config::Data {
-            remote_name,
-            project_name,
-            host,
-            port,
-            repo_path,
-            project_root,
-            branch,
-            deploy_on_push,
-            ..Default::default()
-        },
-        releases: config::Releases { keep: releases_keep },
-        ssl: existing_config.map_or_else(config::Ssl::default, |cfg| cfg.ssl.clone()),
+        remote_name,
+        project_name,
+        host,
+        port,
+        repo_path,
+        project_root,
+        branch,
+        deploy_on_push,
+        releases_keep,
+        ssl_enabled,
+        domain,
+        email,
+        ..Default::default()
     }
 }
 
@@ -160,7 +164,7 @@ pub fn resolve_repo_path(
         return details.repo_path.clone();
     }
 
-    existing_config.map(|cfg| cfg.data.repo_path.as_str()).filter(|value| !value.is_empty()).map_or_else(
+    existing_config.map(|cfg| cfg.repo_path.as_str()).filter(|value| !value.is_empty()).map_or_else(
         || paths::default_repo_path_for(project_name),
         |value| value.replace("<project_name>", project_name),
     )

@@ -86,7 +86,7 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
 
 pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&BonesConfig>) -> Result<String> {
     let default_project_name = existing_config
-        .map(|cfg| cfg.data.project_name.as_str())
+        .map(|cfg| cfg.project_name.as_str())
         .filter(|value| !value.is_empty())
         .unwrap_or(project_name_hint);
     Text::new("Project name:")
@@ -98,7 +98,7 @@ pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bon
 
 pub fn prompt_branch(existing_config: Option<&BonesConfig>) -> Result<String> {
     let default_branch =
-        existing_config.map(|cfg| cfg.data.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("main");
+        existing_config.map(|cfg| cfg.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("main");
     Text::new("Branch:")
         .with_default(default_branch)
         .prompt()
@@ -114,7 +114,7 @@ pub fn prompt_remote_name(existing_config: Option<&BonesConfig>) -> Result<Strin
         return prompt_remote_name_text(existing_config);
     }
 
-    let default_remote = existing_config.map(|cfg| cfg.data.remote_name.clone()).filter(|value| !value.is_empty());
+    let default_remote = existing_config.map(|cfg| cfg.remote_name.clone()).filter(|value| !value.is_empty());
 
     let preferred = default_remote.or_else(|| {
         let has_production = remotes.iter().any(|r| r.name == "production");
@@ -186,7 +186,7 @@ pub fn prompt_host(
     }
 
     let default_host =
-        existing_config.map(|cfg| cfg.data.host.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
+        existing_config.map(|cfg| cfg.host.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
     Text::new("Server host or IP:")
         .with_default(default_host)
         .with_help_message("e.g. deploy.example.com or 203.0.113.10")
@@ -204,7 +204,7 @@ pub fn prompt_port(
     }
 
     let default_port =
-        existing_config.map(|cfg| cfg.data.port.as_str()).filter(|value| !value.is_empty()).unwrap_or("22");
+        existing_config.map(|cfg| cfg.port.as_str()).filter(|value| !value.is_empty()).unwrap_or("22");
     Text::new("SSH port:")
         .with_default(default_port)
         .prompt()
@@ -292,7 +292,7 @@ fn confirm_with_lines<const N: usize>(lines: [&'static str; N], prompt: &str) ->
 
 fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<String> {
     let default_remote = existing_config
-        .map(|cfg| cfg.data.remote_name.as_str())
+        .map(|cfg| cfg.remote_name.as_str())
         .filter(|value| !value.is_empty())
         .unwrap_or("production");
     Text::new("Deployment remote name:")
@@ -305,7 +305,7 @@ fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<Stri
 
 pub fn prompt_ssl_domain(existing_config: Option<&BonesConfig>) -> Result<String> {
     let default_domain =
-        existing_config.map(|cfg| cfg.ssl.domain.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
+        existing_config.map(|cfg| cfg.domain.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
     Text::new("SSL domain:")
         .with_default(default_domain)
         .with_help_message("e.g. app.example.com")
@@ -316,7 +316,7 @@ pub fn prompt_ssl_domain(existing_config: Option<&BonesConfig>) -> Result<String
 
 pub fn prompt_ssl_email(existing_config: Option<&BonesConfig>) -> Result<String> {
     let default_email =
-        existing_config.map(|cfg| cfg.ssl.email.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
+        existing_config.map(|cfg| cfg.email.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
     Text::new("SSL email:")
         .with_default(default_email)
         .with_help_message("e.g. ops@example.com")

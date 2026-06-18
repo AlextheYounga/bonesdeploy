@@ -124,7 +124,7 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
         }
     };
 
-    let repo_path = &cfg.data.repo_path;
+    let repo_path = &cfg.repo_path;
 
     // Check bonesremote is globally available
     if ssh::run_cmd(&session, "command -v bonesremote").await.is_err() {
@@ -179,9 +179,9 @@ async fn check_remote(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
 
 fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
     let user = shared::config::default_deploy_user();
-    let host = &cfg.data.host;
-    let port = &cfg.data.port;
-    let repo_path = &cfg.data.repo_path;
+    let host = &cfg.host;
+    let port = &cfg.port;
+    let repo_path = &cfg.repo_path;
     let dest = format!("{user}@{host}:{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);
 
     let output = Command::new("rsync")

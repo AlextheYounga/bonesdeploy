@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 use shared::config as shared_config;
 use shared::paths;
 
-pub use shared::config::{BonesConfig, Data, Releases, Ssl, load};
+pub use shared::config::{BonesConfig, load};
 
 pub struct Constants;
 impl Constants {
@@ -31,8 +31,7 @@ impl Constants {
 }
 
 pub fn is_configured(config: &BonesConfig) -> bool {
-    let d = &config.data;
-    !d.remote_name.is_empty() && !d.project_name.is_empty() && !d.host.is_empty() && !d.repo_path.is_empty()
+    !config.remote_name.is_empty() && !config.project_name.is_empty() && !config.host.is_empty() && !config.repo_path.is_empty()
 }
 
 pub fn default_project_root_for(project_name: &str) -> String {
@@ -50,7 +49,7 @@ pub fn repo_directory_name() -> Result<String> {
 
 pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
-    shared_config::apply_derived_defaults(&mut to_serialize.data);
+    shared_config::apply_derived_defaults(&mut to_serialize);
 
     let toml_str = toml::to_string(&to_serialize).context("Failed to serialize bones config")?;
     fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
@@ -74,7 +73,7 @@ mod tests {
     use anyhow::Result;
     use shared::paths;
 
-    use super::{BonesConfig, Data, Releases, Ssl, default_project_root_for, save};
+    use super::{BonesConfig, default_project_root_for, save};
     use shared::config::load;
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -91,19 +90,15 @@ mod tests {
 
     fn sample_config(project_name: &str) -> BonesConfig {
         BonesConfig {
-            data: Data {
-                remote_name: String::from("production"),
-                project_name: String::from(project_name),
-                host: String::from("deploy.example.com"),
-                port: String::from("22"),
-                repo_path: paths::default_repo_path_for(project_name),
-                project_root: default_project_root_for(project_name),
-                branch: String::from("master"),
-                deploy_on_push: true,
-                ..Default::default()
-            },
-            releases: Releases::default(),
-            ssl: Ssl::default(),
+            remote_name: String::from("production"),
+            project_name: String::from(project_name),
+            host: String::from("deploy.example.com"),
+            port: String::from("22"),
+            repo_path: paths::default_repo_path_for(project_name),
+            project_root: default_project_root_for(project_name),
+            branch: String::from("master"),
+            deploy_on_push: true,
+            ..Default::default()
         }
     }
 
@@ -114,7 +109,7 @@ mod tests {
         fs::write(&path, minimal_toml("atlas"))?;
 
         let cfg = load(&path)?;
-        assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("atlas"));
+        assert_eq!(cfg.repo_path, paths::default_repo_path_for("atlas"));
 
         fs::remove_file(path)?;
         Ok(())
@@ -127,7 +122,7 @@ mod tests {
         fs::write(&path, minimal_toml("atlas"))?;
 
         let cfg = load(&path)?;
-        assert_eq!(cfg.data.project_root, paths::default_project_root_for("atlas"));
+        assert_eq!(cfg.project_root, paths::default_project_root_for("atlas"));
 
         fs::remove_file(path)?;
         Ok(())
@@ -153,8 +148,9 @@ mod tests {
     #[test]
     fn save_persists_ssl_settings() -> Result<()> {
         let mut config = sample_config("phoenix");
-        config.ssl =
-            Ssl { enabled: true, domain: String::from("app.example.com"), email: String::from("ops@example.com") };
+        config.ssl_enabled = true;
+        config.domain = String::from("app.example.com");
+        config.email = String::from("ops@example.com");
 
         let path = temp_path("save_ssl_settings.toml");
         save(&config, &path)?;
@@ -180,8 +176,8 @@ mod tests {
         fs::write(&path, toml)?;
         let cfg = load(Path::new(&path))?;
 
-        assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("app"));
-        assert_eq!(cfg.data.project_root, "/custom/deploy");
+        assert_eq!(cfg.repo_path, paths::default_repo_path_for("app"));
+        assert_eq!(cfg.project_root, "/custom/deploy");
 
         fs::remove_file(path)?;
         Ok(())

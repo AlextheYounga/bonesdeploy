@@ -12,7 +12,7 @@ use crate::release_state;
 pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
 
-    let project_root = Path::new(&cfg.data.project_root);
+    let project_root = Path::new(&cfg.project_root);
     let build_dir = project_root.join(config::Constants::BUILD_DIR);
     let build_root = release_state::build_root(&cfg);
     let releases_dir = release_state::releases_dir(&cfg);

@@ -10,7 +10,7 @@ pub fn run(config_path: &str) -> Result<()> {
     privileges::ensure_root("bonesremote service restart")?;
 
     let cfg = config::load(Path::new(config_path))?;
-    let site_name = &cfg.data.project_name;
+    let site_name = &cfg.project_name;
 
     if !is_valid_site_name(site_name) {
         bail!(

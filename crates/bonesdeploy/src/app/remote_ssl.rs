@@ -19,22 +19,22 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let runtime = shared_config::load_runtime_config(Path::new(config::Constants::BONES_DIR))?;
 
     if let Some(value) = domain {
-        cfg.ssl.domain = value.trim().to_string();
-    } else if cfg.ssl.domain.is_empty() {
-        cfg.ssl.domain = prompts::prompt_ssl_domain(Some(&cfg))?;
+        cfg.domain = value.trim().to_string();
+    } else if cfg.domain.is_empty() {
+        cfg.domain = prompts::prompt_ssl_domain(Some(&cfg))?;
     }
 
     if let Some(value) = email {
-        cfg.ssl.email = value.trim().to_string();
-    } else if cfg.ssl.email.is_empty() {
-        cfg.ssl.email = prompts::prompt_ssl_email(Some(&cfg))?;
+        cfg.email = value.trim().to_string();
+    } else if cfg.email.is_empty() {
+        cfg.email = prompts::prompt_ssl_email(Some(&cfg))?;
     }
 
-    if cfg.ssl.domain.is_empty() {
+    if cfg.domain.is_empty() {
         bail!("SSL domain is missing. Pass --domain or set domain in .bones/bones.toml");
     }
 
-    if cfg.ssl.email.is_empty() {
+    if cfg.email.is_empty() {
         bail!("SSL email is missing. Pass --email or set email in .bones/bones.toml");
     }
 
@@ -48,16 +48,16 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     println!(
         "Running {} against {} for {}...",
         style("remote ssl").cyan().bold(),
-        style(&cfg.data.host).cyan(),
-        style(&cfg.ssl.domain).cyan(),
+        style(&cfg.host).cyan(),
+        style(&cfg.domain).cyan(),
     );
 
     let ssh_user = bootstrap_ssh::resolve();
-    let mut deploy_data = remote_data::ssl(&cfg, &runtime.web_root, &cfg.ssl.domain, &cfg.ssl.email)?;
+    let mut deploy_data = remote_data::ssl(&cfg, &runtime.web_root, &cfg.domain, &cfg.email)?;
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from("ssh_user"), Value::String(ssh_user));
-        map.insert(String::from("host"), Value::String(cfg.data.host.clone()));
-        map.insert(String::from("ssh_port"), Value::String(cfg.data.port.clone()));
+        map.insert(String::from("host"), Value::String(cfg.host.clone()));
+        map.insert(String::from("ssh_port"), Value::String(cfg.port.clone()));
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;

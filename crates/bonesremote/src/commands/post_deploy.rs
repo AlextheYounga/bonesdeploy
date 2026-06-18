@@ -21,7 +21,7 @@ pub fn run(config_path: &str) -> Result<()> {
 fn prune_old_releases(cfg: &config::BonesConfig) -> Result<Vec<String>> {
     let active_release = release_state::current_release_name(cfg)?;
     let mut releases = release_state::list_releases_sorted(cfg)?;
-    let keep = cfg.releases.keep.max(1);
+    let keep = cfg.releases_keep.max(1);
 
     let mut pruned = Vec::new();
     while releases.len() > keep {
@@ -52,7 +52,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::config::{BonesConfig, Data, Releases};
+    use shared::config::BonesConfig;
     use shared::paths;
 
     use super::prune_old_releases;
@@ -66,19 +66,16 @@ mod tests {
 
     fn config_for(temp_root: &Path, keep: usize) -> BonesConfig {
         BonesConfig {
-            data: Data {
-                remote_name: String::from("production"),
-                project_name: String::from("acme"),
-                host: String::from("example.com"),
-                port: String::from("22"),
-                repo_path: temp_root.join("repo.git").to_string_lossy().to_string(),
-                project_root: temp_root.join("project_root").to_string_lossy().to_string(),
-                branch: String::from("main"),
-                deploy_on_push: true,
-                ..Default::default()
-            },
-            releases: Releases { keep },
-            ssl: Default::default(),
+            remote_name: String::from("production"),
+            project_name: String::from("acme"),
+            host: String::from("example.com"),
+            port: String::from("22"),
+            repo_path: temp_root.join("repo.git").to_string_lossy().to_string(),
+            project_root: temp_root.join("project_root").to_string_lossy().to_string(),
+            branch: String::from("main"),
+            deploy_on_push: true,
+            releases_keep: keep,
+            ..Default::default()
         }
     }
 

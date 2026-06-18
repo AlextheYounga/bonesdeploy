@@ -11,7 +11,7 @@ use anyhow::{Result, bail};
 use shared::paths;
 use tempfile::TempDir;
 
-use crate::config::{BonesConfig, Data, Releases, Ssl};
+use crate::config::BonesConfig;
 
 fn test_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -98,19 +98,15 @@ fn with_temp_repo(test: impl FnOnce(&Path, &Path) -> Result<()>) -> Result<()> {
 
 fn incomplete_seed(project_name: &str) -> BonesConfig {
     BonesConfig {
-        data: Data {
-            remote_name: String::from("production"),
-            project_name: String::from(project_name),
-            host: String::new(),
-            port: String::from("22"),
-            repo_path: String::new(),
-            project_root: String::new(),
-            branch: String::from("main"),
-            deploy_on_push: true,
-            ..Default::default()
-        },
-        releases: Releases::default(),
-        ssl: Ssl::default(),
+        remote_name: String::from("production"),
+        project_name: String::from(project_name),
+        host: String::new(),
+        port: String::from("22"),
+        repo_path: String::new(),
+        project_root: String::new(),
+        branch: String::from("main"),
+        deploy_on_push: true,
+        ..Default::default()
     }
 }
 
@@ -130,11 +126,11 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
 
     let cfg = collect_non_interactive("workspace", Some(&seed), &args)?;
 
-    assert_eq!(cfg.data.project_name, "atlas");
-    assert_eq!(cfg.data.host, "deploy.example.com");
-    assert_eq!(cfg.data.branch, "main");
-    assert_eq!(cfg.data.remote_name, "production");
-    assert_eq!(cfg.data.repo_path, paths::default_repo_path_for("atlas"));
+    assert_eq!(cfg.project_name, "atlas");
+    assert_eq!(cfg.host, "deploy.example.com");
+    assert_eq!(cfg.branch, "main");
+    assert_eq!(cfg.remote_name, "production");
+    assert_eq!(cfg.repo_path, paths::default_repo_path_for("atlas"));
 
     Ok(())
 }

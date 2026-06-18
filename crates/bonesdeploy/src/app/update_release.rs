@@ -21,8 +21,8 @@ pub fn current_remote_version() -> String {
         return String::from("unknown");
     };
 
-    let host = format!("{}@{}", shared::config::default_deploy_user(), cfg.data.host);
-    let output = Command::new("ssh").args(["-p", &cfg.data.port]).args([&host, "bonesremote", "version"]).output();
+    let host = format!("{}@{}", shared::config::default_deploy_user(), cfg.host);
+    let output = Command::new("ssh").args(["-p", &cfg.port]).args([&host, "bonesremote", "version"]).output();
 
     match output {
         Ok(output) if output.status.success() => {
@@ -52,8 +52,8 @@ pub async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result
     }
 
     let cfg = config::load(bones_toml)?;
-    let port: u16 = cfg.data.port.parse().with_context(|| format!("Invalid port: {}", cfg.data.port))?;
-    let session = ssh::connect_as("root", &cfg.data.host, port).await?;
+    let port: u16 = cfg.port.parse().with_context(|| format!("Invalid port: {}", cfg.port))?;
+    let session = ssh::connect_as("root", &cfg.host, port).await?;
 
     let install_root = paths::USR_LOCAL_BIN.trim_end_matches("/bin");
     println!("Building bonesremote from source on remote...");

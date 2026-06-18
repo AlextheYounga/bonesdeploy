@@ -9,15 +9,15 @@ pub fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
-    let remote_bones_toml = format!("{}/{}/bones.toml", cfg.data.repo_path, config::Constants::REMOTE_BONES_DIR);
+    let remote_bones_toml = format!("{}/{}/bones.toml", cfg.repo_path, config::Constants::REMOTE_BONES_DIR);
     let remote_command = format!("bonesremote manage --config {}", shell_quote_single(&remote_bones_toml));
 
-    let target = format!("{}@{}", shared::config::default_deploy_user(), cfg.data.host);
+    let target = format!("{}@{}", shared::config::default_deploy_user(), cfg.host);
 
     let status = Command::new("ssh")
         .arg("-t")
         .arg("-p")
-        .arg(&cfg.data.port)
+        .arg(&cfg.port)
         .arg(&target)
         .arg(&remote_command)
         .status()

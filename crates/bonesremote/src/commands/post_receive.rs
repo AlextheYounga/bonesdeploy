@@ -13,14 +13,14 @@ pub fn run(config_path: &str, revision: Option<&str>) -> Result<()> {
     let build_root = release_state::build_root(&cfg);
     ensure_build_workspace_accessible(&build_root)?;
 
-    let checkout_target = revision.unwrap_or(cfg.data.branch.as_str());
+    let checkout_target = revision.unwrap_or(cfg.branch.as_str());
     println!("Checking out {checkout_target} to {}...", build_root.display());
 
     let status = Command::new("git")
         .arg("--work-tree")
         .arg(&build_root)
         .arg("--git-dir")
-        .arg(&cfg.data.repo_path)
+        .arg(&cfg.repo_path)
         .arg("checkout")
         .arg("-f")
         .arg(checkout_target)
@@ -66,7 +66,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::config::{BonesConfig, Data, Releases};
+    use shared::config::BonesConfig;
     use shared::paths;
 
     use super::run;
@@ -85,19 +85,15 @@ mod tests {
 
     fn write_config(path: &Path, repo_path: &Path, project_root: &Path, branch: &str) -> Result<()> {
         let cfg = BonesConfig {
-            data: Data {
-                remote_name: String::from("production"),
-                project_name: String::from("postreceive"),
-                host: String::from("localhost"),
-                port: String::from("22"),
-                repo_path: repo_path.to_string_lossy().to_string(),
-                project_root: project_root.to_string_lossy().to_string(),
-                branch: branch.to_string(),
-                deploy_on_push: true,
-                ..Default::default()
-            },
-            releases: Releases { keep: 5 },
-            ssl: Default::default(),
+            remote_name: String::from("production"),
+            project_name: String::from("postreceive"),
+            host: String::from("localhost"),
+            port: String::from("22"),
+            repo_path: repo_path.to_string_lossy().to_string(),
+            project_root: project_root.to_string_lossy().to_string(),
+            branch: branch.to_string(),
+            deploy_on_push: true,
+            ..Default::default()
         };
         let toml = toml::to_string(&cfg)?;
         fs::write(path, toml)?;

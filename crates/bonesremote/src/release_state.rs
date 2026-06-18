@@ -10,7 +10,7 @@ use crate::config::{BonesConfig, Constants};
 use shared::paths::{self as shared_paths, DeploymentPaths};
 
 fn deployment_paths(cfg: &BonesConfig) -> DeploymentPaths {
-    cfg.data.deployment_paths(shared_paths::DEFAULT_WEB_ROOT)
+    cfg.deployment_paths(shared_paths::DEFAULT_WEB_ROOT)
 }
 
 pub fn staged_release_path(cfg: &BonesConfig) -> PathBuf {
@@ -144,7 +144,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::config::{BonesConfig, Data, Releases};
+    use shared::config::BonesConfig;
     use shared::paths;
 
     use super::{
@@ -160,19 +160,15 @@ mod tests {
     fn sample_config(root: &Path) -> BonesConfig {
         let project = "unitapp";
         BonesConfig {
-            data: Data {
-                remote_name: String::from("production"),
-                project_name: String::from(project),
-                host: String::from("deploy.example.com"),
-                port: String::from("22"),
-                repo_path: root.join("repo.git").to_string_lossy().to_string(),
-                project_root: root.join("deploy").to_string_lossy().to_string(),
-                branch: String::from("master"),
-                deploy_on_push: true,
-                ..Default::default()
-            },
-            releases: Releases { keep: 5 },
-            ssl: Default::default(),
+            remote_name: String::from("production"),
+            project_name: String::from(project),
+            host: String::from("deploy.example.com"),
+            port: String::from("22"),
+            repo_path: root.join("repo.git").to_string_lossy().to_string(),
+            project_root: root.join("deploy").to_string_lossy().to_string(),
+            branch: String::from("master"),
+            deploy_on_push: true,
+            ..Default::default()
         }
     }
 
