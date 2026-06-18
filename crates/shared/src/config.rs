@@ -11,6 +11,7 @@ use crate::paths;
 pub struct BonesConfig {
     pub remote_name: String,
     pub project_name: String,
+	pub ssh_user: String,
     pub host: String,
     pub port: String,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -34,13 +35,14 @@ impl Default for BonesConfig {
         Self {
             remote_name: String::new(),
             project_name: String::new(),
+			ssh_user: String::from("root"),
             host: String::new(),
             port: "22".into(),
             repo_path: String::new(),
             project_root: String::new(),
             branch: "master".into(),
             preview_domain: String::new(),
-            deploy_on_push: true,
+            deploy_on_push: false,
             releases_keep: 5,
             ssl_enabled: false,
             domain: String::new(),
@@ -142,6 +144,12 @@ const RUNTIME_TOML: &str = "runtime.toml";
 pub struct RuntimeConfig {
     #[serde(default = "paths::default_web_root")]
     pub web_root: String,
+    #[serde(default)]
+    pub runtime_user: String,
+    #[serde(default)]
+    pub runtime_group: String,
+    #[serde(default)]
+    pub release_group: String,
 }
 
 pub fn load_runtime_config(config_dir: &Path) -> Result<RuntimeConfig> {
@@ -152,13 +160,16 @@ pub fn load_runtime_config(config_dir: &Path) -> Result<RuntimeConfig> {
         Ok(toml::from_str(&content)
             .with_context(|| format!("Failed to parse {}", path.display()))?)
     } else {
-        Ok(RuntimeConfig { web_root: paths::default_web_root() })
+        Ok(RuntimeConfig { web_root: paths::default_web_root(), runtime_user: String::new(), runtime_group: String::new(), release_group: String::new() })
     }
 }
 
 pub fn apply_derived_defaults(config: &mut BonesConfig) {
     let project_name = &config.project_name;
 
+    if config.ssh_user.is_empty() {
+        config.ssh_user = String::from("root");
+    }
     if config.repo_path.is_empty() {
         config.repo_path = default_repo_path_for(project_name);
     }

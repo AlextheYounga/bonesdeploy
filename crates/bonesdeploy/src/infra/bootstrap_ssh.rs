@@ -1,38 +1,48 @@
 use std::env;
 
-pub(crate) fn resolve() -> String {
-    resolve_from(env::var("BONES_BOOTSTRAP_SSH_USER").ok())
+pub(crate) fn resolve(config_ssh_user: Option<&str>) -> String {
+    // env override takes highest precedence
+    if let Ok(env_user) = env::var("BONES_BOOTSTRAP_SSH_USER") {
+        let trimmed = env_user.trim().to_string();
+        if !trimmed.is_empty() {
+            return trimmed;
+        }
+    }
+    resolve_from(config_ssh_user)
 }
 
-fn resolve_from(value: Option<String>) -> String {
-    value.map(|raw| raw.trim().to_string()).filter(|raw| !raw.is_empty()).unwrap_or_else(|| String::from("root"))
+fn resolve_from(value: Option<&str>) -> String {
+    value.and_then(|raw| {
+        let trimmed = raw.trim().to_string();
+        if trimmed.is_empty() { None } else { Some(trimmed) }
+    }).unwrap_or_else(|| String::from("root"))
 }
 
 #[cfg(test)]
 mod tests {
     use super::resolve_from;
 
-    /// Defaults the bootstrap SSH user to root when no override is provided.
+    /// Defaults the bootstrap SSH user to root when no config or env value is provided.
     #[test]
     fn defaults_to_root() {
         let user = resolve_from(None);
         assert_eq!(user, "root");
     }
 
-    /// Uses the environment override when provided for the bootstrap SSH user.
+    /// Uses the config value when provided.
     #[test]
-    fn uses_env_override() {
-        let user = resolve_from(Some(String::from("ubuntu")));
+    fn uses_config_value() {
+        let user = resolve_from(Some("ubuntu"));
         assert_eq!(user, "ubuntu");
     }
 
-    /// Trims whitespace and falls back to root when the bootstrap SSH user is blank.
+    /// Trims whitespace and falls back to root when the value is blank.
     #[test]
     fn trims_and_rejects_blank_values() {
-        let user = resolve_from(Some(String::from("   ")));
+        let user = resolve_from(Some("   "));
         assert_eq!(user, "root");
 
-        let user = resolve_from(Some(String::from("  ubuntu  ")));
+        let user = resolve_from(Some("  ubuntu  "));
         assert_eq!(user, "ubuntu");
     }
 }

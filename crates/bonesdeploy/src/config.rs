@@ -169,7 +169,7 @@ mod tests {
     fn load_preserves_explicit_repo_and_project_root_overrides() -> Result<()> {
         let path = temp_path("overrides.toml");
         let toml = format!(
-            "remote_name = \"production\"\nproject_name = \"app\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\nbranch = \"master\"\ndeploy_on_push = true\n",
+            "remote_name = \"production\"\nproject_name = \"app\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\nbranch = \"master\"\ndeploy_on_push = false\n",
             paths::default_repo_path_for("app")
         );
 

@@ -52,7 +52,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
         style(&cfg.domain).cyan(),
     );
 
-    let ssh_user = bootstrap_ssh::resolve();
+    let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     let mut deploy_data = remote_data::ssl(&cfg, &runtime.web_root, &cfg.domain, &cfg.email)?;
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from("ssh_user"), Value::String(ssh_user));

@@ -22,7 +22,8 @@ pub fn run() -> Result<()> {
     }
 
     let bones_toml = Path::new(config::Constants::BONES_TOML);
-    let ssh_user = bootstrap_ssh::resolve();
+    let cfg = config::load(bones_toml)?;
+    let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     println!("Applying runtime using hidden bonesinfra ...");
 
     python::run_python(&[

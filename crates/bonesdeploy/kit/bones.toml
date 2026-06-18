@@ -1,6 +1,7 @@
 # project_name = "mysite"
 # remote_name = "production"
 # host = ''
+ssh_user = "root"
 port = '22'
 branch = 'master'
 domain = ''

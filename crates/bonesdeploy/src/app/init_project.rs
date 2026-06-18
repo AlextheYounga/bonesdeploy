@@ -13,6 +13,7 @@ use crate::embedded;
 use crate::git;
 use crate::prompts;
 use crate::python;
+use shared::config::{runtime_group_for, runtime_user_for, release_group_for};
 
 pub struct InitOutcome {
     pub remote_setup_ran: bool,
@@ -66,7 +67,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
 
     if is_fresh {
         let runtime_toml = Path::new(config::Constants::BONES_RUNTIME_TOML);
-        seed_runtime_config(args, bones_dir, runtime_toml)?;
+        seed_runtime_config(args, &cfg.project_name, bones_dir, runtime_toml)?;
     }
     ensure_local_remote(&cfg)?;
 
@@ -88,7 +89,7 @@ fn print_follow_up_hint() {
     println!("Run {} to sync {} to the remote.", style("bonesdeploy push").cyan(), style(".bones/").cyan());
 }
 
-fn seed_runtime_config(args: &InitArgs, _bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
+fn seed_runtime_config(args: &InitArgs, project_name: &str, _bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
     let template = if args.non_interactive {
         None
     } else {
@@ -104,17 +105,35 @@ fn seed_runtime_config(args: &InitArgs, _bones_dir: &Path, runtime_toml: &Path) 
             let questions = python::runtime_questions(template_name)?;
             prompts::prompt_runtime_questions(&questions, &defaults)?
         };
-        let toml_str = toml::to_string(&answers).context("Failed to serialize runtime config")?;
+        let mut map = answers.as_object().cloned().unwrap_or_default();
+        inject_runtime_identity(&mut map, project_name);
+        let toml_str = toml::to_string(&map).context("Failed to serialize runtime config")?;
         fs::write(runtime_toml, toml_str)?;
         println!("Applied runtime template: {template_name}");
         println!("Saved runtime config to {}", config::Constants::BONES_RUNTIME_TOML);
     } else {
-        let empty = serde_json::Map::new();
-        config::save_runtime(&empty, runtime_toml)?;
+        let mut vars = serde_json::Map::new();
+        inject_runtime_identity(&mut vars, project_name);
+        config::save_runtime(&vars, runtime_toml)?;
         println!("Seeded {} from kit defaults", config::Constants::BONES_RUNTIME_TOML);
     }
 
     Ok(())
+}
+
+fn inject_runtime_identity(vars: &mut serde_json::Map<String, serde_json::Value>, project_name: &str) {
+    vars.insert(
+        "runtime_user".into(),
+        serde_json::Value::String(runtime_user_for(project_name)),
+    );
+    vars.insert(
+        "runtime_group".into(),
+        serde_json::Value::String(runtime_group_for(project_name)),
+    );
+    vars.insert(
+        "release_group".into(),
+        serde_json::Value::String(release_group_for(project_name)),
+    );
 }
 
 fn collect(project_name_hint: &str, args: &InitArgs) -> Result<config::BonesConfig> {
