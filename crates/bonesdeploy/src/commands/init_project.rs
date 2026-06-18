@@ -38,7 +38,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
         unix_fs::symlink(&config_dir, bones_dir)?;
         println!("Symlinked .bones -> {}", config_dir.display());
 
-        let seed = config::BonesConfig { project_name: project_name.clone(), ..Default::default() };
+        let seed = config::Bones { project_name: project_name.clone(), ..Default::default() };
         config::save(&seed, Path::new(config::Constants::BONES_TOML))?;
 
         initial_project_name = Some(project_name);
@@ -136,15 +136,15 @@ fn inject_runtime_identity(vars: &mut serde_json::Map<String, serde_json::Value>
     );
 }
 
-fn collect(project_name_hint: &str, args: &InitArgs) -> Result<config::BonesConfig> {
+fn collect(project_name_hint: &str, args: &InitArgs) -> Result<config::Bones> {
     collect_from_seed(project_name_hint, None, args)
 }
 
 fn collect_from_seed(
     project_name_hint: &str,
-    existing_config: Option<&config::BonesConfig>,
+    existing_config: Option<&config::Bones>,
     args: &InitArgs,
-) -> Result<config::BonesConfig> {
+) -> Result<config::Bones> {
     let project_name = cli_existing_or_prompt(
         args.project_name.as_ref(),
         existing_config.and_then(|cfg| init_config::non_empty(&cfg.project_name)),
@@ -170,7 +170,7 @@ fn collect_from_seed(
     let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
     let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 
-    Ok(config::BonesConfig {
+    Ok(config::Bones {
         remote_name,
         project_name,
         host,
@@ -190,9 +190,9 @@ fn collect_from_seed(
 #[cfg(test)]
 fn collect_non_interactive(
     project_name_hint: &str,
-    existing_config: Option<&config::BonesConfig>,
+    existing_config: Option<&config::Bones>,
     args: &InitArgs,
-) -> Result<config::BonesConfig> {
+) -> Result<config::Bones> {
     init_config::collect_non_interactive(project_name_hint, existing_config, args)
 }
 
@@ -227,7 +227,7 @@ fn cli_existing_or_prompt(
     }
 }
 
-fn load_or_collect_config(bones_toml: &Path, args: &InitArgs) -> Result<config::BonesConfig> {
+fn load_or_collect_config(bones_toml: &Path, args: &InitArgs) -> Result<config::Bones> {
     if bones_toml.exists() {
         let existing = config::load(bones_toml)?;
         if config::is_configured(&existing) {
@@ -286,7 +286,7 @@ pub(crate) fn symlink_pre_push() -> Result<()> {
     Ok(())
 }
 
-fn ensure_local_remote(cfg: &config::BonesConfig) -> Result<()> {
+fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
     if git::remote_exists(&cfg.remote_name)? {
         return Ok(());
     }

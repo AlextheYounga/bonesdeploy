@@ -92,7 +92,7 @@ Unlike the Ansible era, no remote Python bootstrap is needed — pyinfra install
 
 **Source:** `remote_setup.rs`
 
-Constructs data variables passed to pyinfra via repeated `--data key=value` CLI flags. Nested objects (like `DeploymentPaths`) are flattened into dotted keys (e.g. `--data paths.repo=/home/git/myapp.git`). The deploy scripts unflatten these back to nested dicts before use.
+Constructs data variables passed to pyinfra via repeated `--data key=value` CLI flags. Nested objects (like `Deployment`) are flattened into dotted keys (e.g. `--data paths.repo=/home/git/myapp.git`). The deploy scripts unflatten these back to nested dicts before use.
 
 The deploy user's public SSH key is resolved from `BONES_DEPLOY_PUBLIC_KEY_PATH` (falls back to `~/.ssh/id_ed25519.pub` → `id_ecdsa.pub` → `id_rsa.pub`). This key is installed as an authorized key for the deploy user so future connections (runtime, push, deploy) can connect without root.
 

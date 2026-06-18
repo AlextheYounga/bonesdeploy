@@ -6,9 +6,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use shared::paths::{self, DeploymentPaths};
+use shared::paths::{self, Deployment};
 
-pub(super) fn deployment_log_path(paths: &DeploymentPaths, release_name: &str, script_name: &str) -> PathBuf {
+pub(super) fn deployment_log_path(paths: &Deployment, release_name: &str, script_name: &str) -> PathBuf {
     Path::new(&paths.build_logs).join(format!("{release_name}-{script_name}.log"))
 }
 
@@ -219,7 +219,7 @@ mod tests {
     use anyhow::Result;
     use std::os::unix::prelude::PermissionsExt;
 
-    use shared::paths::DeploymentPaths;
+    use shared::paths::Deployment;
 
     use super::{
         ConsoleTargets, DeploymentRun, ScriptEnv, TeeWriter, deployment_log_path, run_deployment_script_with_consoles,
@@ -375,7 +375,7 @@ mod tests {
     /// Builds the log path under the centralized `project_root/build/logs` directory.
     #[test]
     fn deployment_log_path_lives_under_build_logs() {
-        let paths = DeploymentPaths::new("demo", "/home/git/demo.git", "/srv/deployments/demo", "public");
+        let paths = Deployment::new("demo", "/home/git/demo.git", "/srv/deployments/demo", "public");
         let log = deployment_log_path(&paths, "20260612_211412", "02_run_build.sh");
 
         assert_eq!(

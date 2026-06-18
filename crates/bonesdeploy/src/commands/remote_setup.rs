@@ -16,7 +16,7 @@ use super::remote_data;
 pub fn run() -> Result<()> {
     let bones_toml = Path::new(config::Constants::BONES_TOML);
     let cfg = config::load(bones_toml)?;
-    let runtime = shared_config::load_runtime_config(Path::new(config::Constants::BONES_DIR))?;
+    let runtime = shared_config::load_runtime(Path::new(config::Constants::BONES_DIR))?;
 
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     let deploy_authorized_key = resolve_deploy_authorized_key()?;

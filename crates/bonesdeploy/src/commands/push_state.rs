@@ -51,7 +51,7 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn sync_bones_directory(cfg: &config::BonesConfig) -> Result<()> {
+pub(crate) fn sync_bones_directory(cfg: &config::Bones) -> Result<()> {
     let user = default_deploy_user();
     let host = &cfg.host;
     let port = &cfg.port;

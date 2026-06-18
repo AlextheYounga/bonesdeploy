@@ -7,7 +7,7 @@ use serde_json::{Map, Value};
 use shared::config as shared_config;
 use shared::paths;
 
-pub use shared::config::{BonesConfig, load};
+pub use shared::config::{Bones, load};
 
 pub struct Constants;
 impl Constants {
@@ -30,7 +30,7 @@ impl Constants {
     pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
 }
 
-pub fn is_configured(config: &BonesConfig) -> bool {
+pub fn is_configured(config: &Bones) -> bool {
     !config.remote_name.is_empty() && !config.project_name.is_empty() && !config.host.is_empty() && !config.repo_path.is_empty()
 }
 
@@ -47,7 +47,7 @@ pub fn repo_directory_name() -> Result<String> {
     Ok(cwd.file_name().map_or_else(|| String::from("project"), |n| n.to_string_lossy().to_string()))
 }
 
-pub fn save(config: &BonesConfig, path: &Path) -> Result<()> {
+pub fn save(config: &Bones, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
     shared_config::apply_derived_defaults(&mut to_serialize);
 
@@ -73,7 +73,7 @@ mod tests {
     use anyhow::Result;
     use shared::paths;
 
-    use super::{BonesConfig, default_project_root_for, save};
+    use super::{Bones, default_project_root_for, save};
     use shared::config::load;
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -88,8 +88,8 @@ mod tests {
         )
     }
 
-    fn sample_config(project_name: &str) -> BonesConfig {
-        BonesConfig {
+    fn sample_config(project_name: &str) -> Bones {
+        Bones {
             remote_name: String::from("production"),
             project_name: String::from(project_name),
             host: String::from("deploy.example.com"),

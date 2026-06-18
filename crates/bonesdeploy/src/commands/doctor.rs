@@ -121,7 +121,7 @@ fn check_pre_push_symlink(issues: &mut Vec<String>) {
     }
 }
 
-async fn check_remote(cfg: &config::BonesConfig, deploy_on_push: bool, issues: &mut Vec<String>) {
+async fn check_remote(cfg: &config::Bones, deploy_on_push: bool, issues: &mut Vec<String>) {
     let session = match ssh::connect(cfg).await {
         Ok(s) => s,
         Err(e) => {
@@ -185,7 +185,7 @@ async fn check_remote(cfg: &config::BonesConfig, deploy_on_push: bool, issues: &
     let _ = session.close().await;
 }
 
-fn check_rsync_sync(cfg: &config::BonesConfig, issues: &mut Vec<String>) {
+fn check_rsync_sync(cfg: &config::Bones, issues: &mut Vec<String>) {
     let user = default_deploy_user();
     let host = &cfg.host;
     let port = &cfg.port;

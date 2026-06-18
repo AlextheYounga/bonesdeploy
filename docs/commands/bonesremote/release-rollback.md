@@ -54,7 +54,7 @@ let releases = release_state::list_releases_sorted(&cfg)?;
 **Implementation:** `release_state.rs:87-105`
 
 ```rust
-pub fn list_releases_sorted(cfg: &BonesConfig) -> Result<Vec<String>> {
+pub fn list_releases_sorted(cfg: &Bones) -> Result<Vec<String>> {
     let releases_dir = releases_dir(cfg);
     if !releases_dir.exists() {
         return Ok(Vec::new());
@@ -125,7 +125,7 @@ let current_idx = releases
 **Implementation:** `release_state.rs:79-85`
 
 ```rust
-pub fn current_release_name(cfg: &BonesConfig) -> Result<String> {
+pub fn current_release_name(cfg: &Bones) -> Result<String> {
     let current_release = current_release_dir(cfg)?;
     current_release
         .file_name()

@@ -68,31 +68,6 @@ fn base_command(checkout: &Path) -> Command {
     command
 }
 
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use anyhow::Result;
-
-    use super::{base_command, parse_json_output};
-
-    #[test]
-    fn base_command_launches_bonesinfra_via_uv() {
-        let command = base_command(Path::new("/tmp/bonesinfra"));
-
-        assert_eq!(command.get_program().to_string_lossy(), "uv");
-        let args: Vec<String> = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
-        assert_eq!(args, ["run", "--project", "/tmp/bonesinfra", "bonesinfra"]);
-    }
-
-    #[test]
-    fn parse_json_output_reads_cli_stdout() -> Result<()> {
-        let parsed = parse_json_output("[\"django\",\"rails\"]")?;
-        assert_eq!(parsed, serde_json::json!(["django", "rails"]));
-        Ok(())
-    }
-}
-
 /// Returns the list of available runtime names from Python.
 pub fn list_runtimes() -> Result<Vec<String>> {
     let value = run_python_json(&["runtime", "list"])?;
@@ -117,4 +92,29 @@ pub fn runtime_defaults(runtime: &str) -> Result<Value> {
     let toml_value: toml::Value = toml::from_str(&content)
         .with_context(|| format!("Failed to parse runtime.toml at {}", toml_path.display()))?;
     serde_json::to_value(toml_value).context("Failed to convert runtime.toml to JSON")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use anyhow::Result;
+
+    use super::{base_command, parse_json_output};
+
+    #[test]
+    fn base_command_launches_bonesinfra_via_uv() {
+        let command = base_command(Path::new("/tmp/bonesinfra"));
+
+        assert_eq!(command.get_program().to_string_lossy(), "uv");
+        let args: Vec<String> = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        assert_eq!(args, ["run", "--project", "/tmp/bonesinfra", "bonesinfra"]);
+    }
+
+    #[test]
+    fn parse_json_output_reads_cli_stdout() -> Result<()> {
+        let parsed = parse_json_output("[\"django\",\"rails\"]")?;
+        assert_eq!(parsed, serde_json::json!(["django", "rails"]));
+        Ok(())
+    }
 }

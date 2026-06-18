@@ -139,7 +139,7 @@ release_state::write_staged_release(&cfg, &release_name)?;
 
 **Implementation:** `release_state.rs:28-37`
 ```rust
-pub fn write_staged_release(cfg: &BonesConfig, release: &str) -> Result<()> {
+pub fn write_staged_release(cfg: &Bones, release: &str) -> Result<()> {
     let path = staged_release_path(cfg);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)

@@ -193,7 +193,7 @@ release_state::clear_staged_release(&cfg)?;
 **Implementation:** `release_state.rs:39-45`
 
 ```rust
-pub fn clear_staged_release(cfg: &BonesConfig) -> Result<()> {
+pub fn clear_staged_release(cfg: &Bones) -> Result<()> {
     let path = staged_release_path(cfg);
     if path.exists() {
         fs::remove_file(&path).with_context(|| format!("Failed to remove staged release state: {}", path.display()))?;

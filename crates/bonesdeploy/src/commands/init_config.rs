@@ -16,9 +16,9 @@ pub struct InitArgs {
 
 pub fn collect_non_interactive(
     project_name_hint: &str,
-    existing_config: Option<&config::BonesConfig>,
+    existing_config: Option<&config::Bones>,
     args: &InitArgs,
-) -> Result<config::BonesConfig> {
+) -> Result<config::Bones> {
     let project_name = resolve_project_name(args, existing_config, project_name_hint)?;
     let remote_name = resolve_remote_name(args, existing_config);
     let inferred_remote = infer_remote_details(&remote_name)?;
@@ -32,7 +32,7 @@ pub fn collect_non_interactive(
 
 fn resolve_project_name(
     args: &InitArgs,
-    existing_config: Option<&config::BonesConfig>,
+    existing_config: Option<&config::Bones>,
     project_name_hint: &str,
 ) -> Result<String> {
     args.project_name
@@ -52,7 +52,7 @@ fn resolve_project_name(
         })
 }
 
-fn resolve_remote_name(args: &InitArgs, existing_config: Option<&config::BonesConfig>) -> String {
+fn resolve_remote_name(args: &InitArgs, existing_config: Option<&config::Bones>) -> String {
     args.remote
         .clone()
         .filter(|v| !v.is_empty())
@@ -66,7 +66,7 @@ fn infer_remote_details(remote_name: &str) -> Result<Option<git::RemoteConnectio
 
 fn resolve_host(
     args: &InitArgs,
-    existing_config: Option<&config::BonesConfig>,
+    existing_config: Option<&config::Bones>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> Result<String> {
     args.host
@@ -83,7 +83,7 @@ fn resolve_host(
         })
 }
 
-fn resolve_branch(args: &InitArgs, existing_config: Option<&config::BonesConfig>) -> String {
+fn resolve_branch(args: &InitArgs, existing_config: Option<&config::Bones>) -> String {
     args.branch
         .clone()
         .filter(|v| !v.is_empty())
@@ -93,7 +93,7 @@ fn resolve_branch(args: &InitArgs, existing_config: Option<&config::BonesConfig>
 
 fn resolve_port(
     args: &InitArgs,
-    existing_config: Option<&config::BonesConfig>,
+    existing_config: Option<&config::Bones>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> String {
     args.port
@@ -114,9 +114,9 @@ struct NonInteractiveValues {
 
 fn build_config(
     values: NonInteractiveValues,
-    existing_config: Option<&config::BonesConfig>,
+    existing_config: Option<&config::Bones>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> config::BonesConfig {
+) -> config::Bones {
     let NonInteractiveValues { project_name, remote_name, branch, host, port } = values;
 
     let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote);
@@ -133,7 +133,7 @@ fn build_config(
     let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
     let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 
-    config::BonesConfig {
+    config::Bones {
         remote_name,
         project_name,
         host,
@@ -157,7 +157,7 @@ pub fn non_empty(value: &str) -> Option<String> {
 
 pub fn resolve_repo_path(
     project_name: &str,
-    existing_config: Option<&config::BonesConfig>,
+    existing_config: Option<&config::Bones>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> String {
     if let Some(details) = inferred_remote {
@@ -171,8 +171,8 @@ pub fn resolve_repo_path(
 }
 
 pub fn seed_path_override(
-    existing_config: Option<&config::BonesConfig>,
-    field: impl Fn(&config::BonesConfig) -> &String,
+    existing_config: Option<&config::Bones>,
+    field: impl Fn(&config::Bones) -> &String,
     current_project_name: &str,
     default_for: fn(&str) -> String,
 ) -> String {

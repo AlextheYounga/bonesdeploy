@@ -18,7 +18,7 @@ pub fn run(config_path: &str) -> Result<()> {
     Ok(())
 }
 
-fn prune_old_releases(cfg: &config::BonesConfig) -> Result<Vec<String>> {
+fn prune_old_releases(cfg: &config::Bones) -> Result<Vec<String>> {
     let active_release = release_state::current_release_name(cfg)?;
     let mut releases = release_state::list_releases_sorted(cfg)?;
     let keep = cfg.releases_keep.max(1);
@@ -52,7 +52,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::config::BonesConfig;
+    use shared::config::Bones;
     use shared::paths;
 
     use super::prune_old_releases;
@@ -64,8 +64,8 @@ mod tests {
         Ok(path)
     }
 
-    fn config_for(temp_root: &Path, keep: usize) -> BonesConfig {
-        BonesConfig {
+    fn config_for(temp_root: &Path, keep: usize) -> Bones {
+        Bones {
             remote_name: String::from("production"),
             project_name: String::from("acme"),
             host: String::from("example.com"),

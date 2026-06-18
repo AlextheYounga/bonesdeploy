@@ -56,7 +56,7 @@ pub fn run(config_path: &str) -> Result<()> {
     result.and(cleanup_result)
 }
 
-fn run_loop(terminal: &mut Terminal<CrosstermBackend<Stdout>>, cfg: &config::BonesConfig, app: &mut App) -> Result<()> {
+fn run_loop(terminal: &mut Terminal<CrosstermBackend<Stdout>>, cfg: &config::Bones, app: &mut App) -> Result<()> {
     app.refresh_releases(cfg);
 
     loop {
@@ -104,7 +104,7 @@ fn handle_home_key(app: &mut App, code: KeyCode) {
     }
 }
 
-fn handle_releases_key(app: &mut App, cfg: &config::BonesConfig, code: KeyCode) {
+fn handle_releases_key(app: &mut App, cfg: &config::Bones, code: KeyCode) {
     match code {
         KeyCode::Char('q') => app.should_quit = true,
         KeyCode::Esc | KeyCode::Char('b') => {
@@ -284,7 +284,7 @@ impl App {
         }
     }
 
-    fn refresh_releases(&mut self, cfg: &config::BonesConfig) {
+    fn refresh_releases(&mut self, cfg: &config::Bones) {
         self.releases = Some(match load_release_snapshot(cfg) {
             Ok(snapshot) => {
                 self.status = "Release state refreshed".to_string();
@@ -334,7 +334,7 @@ impl ReleaseSnapshot {
     }
 }
 
-fn load_release_snapshot(cfg: &config::BonesConfig) -> Result<ReleaseSnapshot> {
+fn load_release_snapshot(cfg: &config::Bones) -> Result<ReleaseSnapshot> {
     Ok(ReleaseSnapshot {
         current: release_state::current_release_name(cfg).ok(),
         staged: release_state::read_staged_release(cfg).ok(),

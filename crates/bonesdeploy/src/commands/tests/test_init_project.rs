@@ -11,7 +11,7 @@ use anyhow::{Result, bail};
 use shared::paths;
 use tempfile::TempDir;
 
-use crate::config::BonesConfig;
+use crate::config::Bones;
 
 fn test_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
@@ -96,8 +96,8 @@ fn with_temp_repo(test: impl FnOnce(&Path, &Path) -> Result<()>) -> Result<()> {
     test(&repo_dir, &home_dir)
 }
 
-fn incomplete_seed(project_name: &str) -> BonesConfig {
-    BonesConfig {
+fn incomplete_seed(project_name: &str) -> Bones {
+    Bones {
         remote_name: String::from("production"),
         project_name: String::from(project_name),
         host: String::new(),

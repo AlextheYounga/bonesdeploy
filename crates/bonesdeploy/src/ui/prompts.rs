@@ -4,7 +4,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use console::style;
 use inquire::{Confirm, Select, Text};
 
-use crate::config::BonesConfig;
+use crate::config::Bones;
 use crate::git;
 
 pub fn prompt_runtime_questions(
@@ -84,7 +84,7 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
     Ok(Some(template_name))
 }
 
-pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&BonesConfig>) -> Result<String> {
+pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bones>) -> Result<String> {
     let default_project_name = existing_config
         .map(|cfg| cfg.project_name.as_str())
         .filter(|value| !value.is_empty())
@@ -96,7 +96,7 @@ pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bon
         .map_err(|err| anyhow!(err))
 }
 
-pub fn prompt_branch(existing_config: Option<&BonesConfig>) -> Result<String> {
+pub fn prompt_branch(existing_config: Option<&Bones>) -> Result<String> {
     let default_branch =
         existing_config.map(|cfg| cfg.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("main");
     Text::new("Branch:")
@@ -106,7 +106,7 @@ pub fn prompt_branch(existing_config: Option<&BonesConfig>) -> Result<String> {
         .map_err(|err| anyhow!(err))
 }
 
-pub fn prompt_remote_name(existing_config: Option<&BonesConfig>) -> Result<String> {
+pub fn prompt_remote_name(existing_config: Option<&Bones>) -> Result<String> {
     const CREATE_REMOTE_OPTION: &str = "Create new deployment remote";
 
     let remotes = git::list_remotes_with_urls()?;
@@ -178,7 +178,7 @@ fn remote_display_label(remote: &git::RemoteInfo) -> String {
 }
 
 pub fn prompt_host(
-    existing_config: Option<&BonesConfig>,
+    existing_config: Option<&Bones>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> Result<String> {
     if let Some(details) = inferred_remote {
@@ -196,7 +196,7 @@ pub fn prompt_host(
 }
 
 pub fn prompt_port(
-    existing_config: Option<&BonesConfig>,
+    existing_config: Option<&Bones>,
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> Result<String> {
     if let Some(details) = inferred_remote {
@@ -290,7 +290,7 @@ fn confirm_with_lines<const N: usize>(lines: [&'static str; N], prompt: &str) ->
     Ok(is_affirmative(&answer))
 }
 
-fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<String> {
+fn prompt_remote_name_text(existing_config: Option<&Bones>) -> Result<String> {
     let default_remote = existing_config
         .map(|cfg| cfg.remote_name.as_str())
         .filter(|value| !value.is_empty())
@@ -303,7 +303,7 @@ fn prompt_remote_name_text(existing_config: Option<&BonesConfig>) -> Result<Stri
         .map_err(|err| anyhow!(err))
 }
 
-pub fn prompt_ssl_domain(existing_config: Option<&BonesConfig>) -> Result<String> {
+pub fn prompt_ssl_domain(existing_config: Option<&Bones>) -> Result<String> {
     let default_domain =
         existing_config.map(|cfg| cfg.domain.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
     Text::new("SSL domain:")
@@ -314,7 +314,7 @@ pub fn prompt_ssl_domain(existing_config: Option<&BonesConfig>) -> Result<String
         .map_err(|err| anyhow!(err))
 }
 
-pub fn prompt_ssl_email(existing_config: Option<&BonesConfig>) -> Result<String> {
+pub fn prompt_ssl_email(existing_config: Option<&Bones>) -> Result<String> {
     let default_email =
         existing_config.map(|cfg| cfg.email.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
     Text::new("SSL email:")

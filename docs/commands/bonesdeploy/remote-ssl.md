@@ -65,7 +65,7 @@ bonesdeploy remote ssl --host <host> --ssh-user root --ssh-port 22 --domain app.
 - `nginx_ssl_certificate_path` — path to fullchain.pem
 - `nginx_ssl_certificate_key_path` — path to privkey.pem
 - `project_name`, `service_user`, `group` — deployment metadata
-- `paths.*` — computed `DeploymentPaths` fields, flattened as dotted keys (e.g. `paths.repo`, `paths.current`)
+- `paths.*` — computed `Deployment` fields, flattened as dotted keys (e.g. `paths.repo`, `paths.current`)
 
 ### 5. SSL Deploy Tasks
 

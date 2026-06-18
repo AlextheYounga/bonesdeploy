@@ -1,6 +1,6 @@
 use shared::paths;
 
-pub use shared::config::{BonesConfig, load};
+pub use shared::config::{Bones, load};
 
 pub struct Constants;
 

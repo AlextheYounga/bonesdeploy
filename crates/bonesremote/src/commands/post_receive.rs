@@ -66,7 +66,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::config::BonesConfig;
+    use shared::config::Bones;
     use shared::paths;
 
     use super::run;
@@ -84,7 +84,7 @@ mod tests {
     }
 
     fn write_config(path: &Path, repo_path: &Path, project_root: &Path, branch: &str) -> Result<()> {
-        let cfg = BonesConfig {
+        let cfg = Bones {
             remote_name: String::from("production"),
             project_name: String::from("postreceive"),
             host: String::from("localhost"),

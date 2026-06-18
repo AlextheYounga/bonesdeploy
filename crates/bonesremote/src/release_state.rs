@@ -6,18 +6,18 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 
-use crate::config::{BonesConfig, Constants};
-use shared::paths::{self as shared_paths, DeploymentPaths};
+use crate::config::{Bones, Constants};
+use shared::paths::{self as shared_paths, Deployment};
 
-fn deployment_paths(cfg: &BonesConfig) -> DeploymentPaths {
+fn deployment_paths(cfg: &Bones) -> Deployment {
     cfg.deployment_paths(shared_paths::DEFAULT_WEB_ROOT)
 }
 
-pub fn staged_release_path(cfg: &BonesConfig) -> PathBuf {
+pub fn staged_release_path(cfg: &Bones) -> PathBuf {
     Path::new(&deployment_paths(cfg).repo_bones).join(Constants::STAGED_RELEASE_FILE)
 }
 
-pub fn read_staged_release(cfg: &BonesConfig) -> Result<String> {
+pub fn read_staged_release(cfg: &Bones) -> Result<String> {
     let path = staged_release_path(cfg);
     let value = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read staged release state at {}", path.display()))?;
@@ -30,7 +30,7 @@ pub fn read_staged_release(cfg: &BonesConfig) -> Result<String> {
     Ok(release)
 }
 
-pub fn write_staged_release(cfg: &BonesConfig, release: &str) -> Result<()> {
+pub fn write_staged_release(cfg: &Bones, release: &str) -> Result<()> {
     let path = staged_release_path(cfg);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
@@ -41,7 +41,7 @@ pub fn write_staged_release(cfg: &BonesConfig, release: &str) -> Result<()> {
         .with_context(|| format!("Failed to write staged release state: {}", path.display()))
 }
 
-pub fn clear_staged_release(cfg: &BonesConfig) -> Result<()> {
+pub fn clear_staged_release(cfg: &Bones) -> Result<()> {
     let path = staged_release_path(cfg);
     if path.exists() {
         fs::remove_file(&path).with_context(|| format!("Failed to remove staged release state: {}", path.display()))?;
@@ -49,27 +49,27 @@ pub fn clear_staged_release(cfg: &BonesConfig) -> Result<()> {
     Ok(())
 }
 
-pub fn release_dir(cfg: &BonesConfig, release: &str) -> PathBuf {
+pub fn release_dir(cfg: &Bones, release: &str) -> PathBuf {
     releases_dir(cfg).join(release)
 }
 
-pub fn releases_dir(cfg: &BonesConfig) -> PathBuf {
+pub fn releases_dir(cfg: &Bones) -> PathBuf {
     PathBuf::from(deployment_paths(cfg).releases)
 }
 
-pub fn build_root(cfg: &BonesConfig) -> PathBuf {
+pub fn build_root(cfg: &Bones) -> PathBuf {
     PathBuf::from(deployment_paths(cfg).build_root)
 }
 
-pub fn shared_dir(cfg: &BonesConfig) -> PathBuf {
+pub fn shared_dir(cfg: &Bones) -> PathBuf {
     PathBuf::from(deployment_paths(cfg).shared)
 }
 
-pub fn current_link(cfg: &BonesConfig) -> PathBuf {
+pub fn current_link(cfg: &Bones) -> PathBuf {
     PathBuf::from(deployment_paths(cfg).current)
 }
 
-pub fn current_release_dir(cfg: &BonesConfig) -> Result<PathBuf> {
+pub fn current_release_dir(cfg: &Bones) -> Result<PathBuf> {
     let current_link = current_link(cfg);
     let active_target =
         fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
@@ -81,7 +81,7 @@ pub fn current_release_dir(cfg: &BonesConfig) -> Result<PathBuf> {
     })
 }
 
-pub fn current_release_name(cfg: &BonesConfig) -> Result<String> {
+pub fn current_release_name(cfg: &Bones) -> Result<String> {
     let current_release = current_release_dir(cfg)?;
     current_release
         .file_name()
@@ -89,7 +89,7 @@ pub fn current_release_name(cfg: &BonesConfig) -> Result<String> {
         .ok_or_else(|| anyhow::anyhow!("Failed to resolve current release name from {}", current_release.display()))
 }
 
-pub fn list_releases_sorted(cfg: &BonesConfig) -> Result<Vec<String>> {
+pub fn list_releases_sorted(cfg: &Bones) -> Result<Vec<String>> {
     let releases_dir = releases_dir(cfg);
     if !releases_dir.exists() {
         return Ok(Vec::new());
@@ -144,7 +144,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::config::BonesConfig;
+    use shared::config::Bones;
     use shared::paths;
 
     use super::{
@@ -157,9 +157,9 @@ mod tests {
         env::temp_dir().join(format!("bonesremote_release_state_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
-    fn sample_config(root: &Path) -> BonesConfig {
+    fn sample_config(root: &Path) -> Bones {
         let project = "unitapp";
-        BonesConfig {
+        Bones {
             remote_name: String::from("production"),
             project_name: String::from(project),
             host: String::from("deploy.example.com"),

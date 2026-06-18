@@ -4,11 +4,11 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::paths;
+use crate::paths::{self, Deployment};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
-pub struct BonesConfig {
+pub struct Bones {
     pub remote_name: String,
     pub project_name: String,
 	pub ssh_user: String,
@@ -30,7 +30,7 @@ pub struct BonesConfig {
     pub email: String,
 }
 
-impl Default for BonesConfig {
+impl Default for Bones {
     fn default() -> Self {
         Self {
             remote_name: String::new(),
@@ -51,24 +51,29 @@ impl Default for BonesConfig {
     }
 }
 
-impl BonesConfig {
-    pub fn deployment_paths(&self, web_root: &str) -> crate::paths::DeploymentPaths {
-        crate::paths::DeploymentPaths::new(&self.project_name, &self.repo_path, &self.project_root, web_root)
+impl Bones {
+    #[must_use]
+    pub fn deployment_paths(&self, web_root: &str) -> Deployment {
+        Deployment::new(&self.project_name, &self.repo_path, &self.project_root, web_root)
     }
 }
 
+#[must_use]
 pub fn default_deploy_user() -> String {
     paths::DEPLOY_USER.to_string()
 }
 
+#[must_use]
 pub fn runtime_user_for(project_name: &str) -> String {
     project_name.to_string()
 }
 
+#[must_use]
 pub fn runtime_group_for(project_name: &str) -> String {
     project_name.to_string()
 }
 
+#[must_use]
 pub fn release_group_for(project_name: &str) -> String {
     format!("{project_name}-release")
 }
@@ -109,14 +114,17 @@ pub struct PathOverride {
     pub path_type: Option<PathType>,
 }
 
+#[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
     paths::default_repo_path_for(project_name)
 }
 
+#[must_use]
 pub fn default_project_root_for(project_name: &str) -> String {
     paths::default_project_root_for(project_name)
 }
 
+#[must_use]
 pub fn default_preview_domain_for(project_name: &str, host: &str) -> String {
     let project = sanitize_domain_label(project_name);
     let host = sanitize_domain_label(host);
@@ -141,7 +149,7 @@ fn sanitize_domain_label(value: &str) -> String {
 const RUNTIME_TOML: &str = "runtime.toml";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RuntimeConfig {
+pub struct Runtime {
     #[serde(default = "paths::default_web_root")]
     pub web_root: String,
     #[serde(default)]
@@ -152,7 +160,12 @@ pub struct RuntimeConfig {
     pub release_group: String,
 }
 
-pub fn load_runtime_config(config_dir: &Path) -> Result<RuntimeConfig> {
+/// Loads the runtime configuration from a TOML file, falling back to defaults.
+///
+/// # Errors
+///
+/// Returns an error if the file exists but cannot be read or parsed.
+pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
     let path = config_dir.join(RUNTIME_TOML);
     if path.exists() {
         let content = fs::read_to_string(&path)
@@ -160,11 +173,11 @@ pub fn load_runtime_config(config_dir: &Path) -> Result<RuntimeConfig> {
         Ok(toml::from_str(&content)
             .with_context(|| format!("Failed to parse {}", path.display()))?)
     } else {
-        Ok(RuntimeConfig { web_root: paths::default_web_root(), runtime_user: String::new(), runtime_group: String::new(), release_group: String::new() })
+        Ok(Runtime { web_root: paths::default_web_root(), runtime_user: String::new(), runtime_group: String::new(), release_group: String::new() })
     }
 }
 
-pub fn apply_derived_defaults(config: &mut BonesConfig) {
+pub fn apply_derived_defaults(config: &mut Bones) {
     let project_name = &config.project_name;
 
     if config.ssh_user.is_empty() {
@@ -181,9 +194,14 @@ pub fn apply_derived_defaults(config: &mut BonesConfig) {
     }
 }
 
-pub fn load(path: &Path) -> Result<BonesConfig> {
+/// Loads and parses a `bones.toml` configuration file, applying derived defaults.
+///
+/// # Errors
+///
+/// Returns an error if the file cannot be read or the TOML is invalid.
+pub fn load(path: &Path) -> Result<Bones> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let mut config: BonesConfig = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    let mut config: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     apply_derived_defaults(&mut config);
     Ok(config)
 }

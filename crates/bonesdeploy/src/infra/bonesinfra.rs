@@ -89,6 +89,7 @@ fn checkout_dir() -> PathBuf {
 mod tests {
     use std::fs;
 
+    use anyhow::Result;
     use shared::paths;
     use tempfile::TempDir;
 
@@ -100,24 +101,26 @@ mod tests {
     }
 
     #[test]
-    fn reset_checkout_removes_stale_directory() {
-        let temp_dir = TempDir::new().expect("temp dir");
+    fn reset_checkout_removes_stale_directory() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let checkout = temp_dir.path().join("bonesinfra");
-        fs::create_dir_all(checkout.join("nested")).expect("create stale checkout");
+        fs::create_dir_all(checkout.join("nested"))?;
 
-        reset_checkout(&checkout).expect("reset stale checkout");
+        reset_checkout(&checkout)?;
 
         assert!(!checkout.exists());
+        Ok(())
     }
 
     #[test]
-    fn reset_checkout_removes_stale_file() {
-        let temp_dir = TempDir::new().expect("temp dir");
+    fn reset_checkout_removes_stale_file() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let checkout = temp_dir.path().join("bonesinfra");
-        fs::write(&checkout, "stale").expect("create stale file");
+        fs::write(&checkout, "stale")?;
 
-        reset_checkout(&checkout).expect("reset stale file");
+        reset_checkout(&checkout)?;
 
         assert!(!checkout.exists());
+        Ok(())
     }
 }

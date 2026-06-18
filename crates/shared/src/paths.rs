@@ -63,52 +63,63 @@ pub const DEFAULT_NGINX_SITE: &str = "default";
 
 const RUNTIME_SOCKET_PARENT: &str = "/run";
 
+#[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
     Path::new(DEFAULT_REPO_PARENT).join(format!("{project_name}.git")).display().to_string()
 }
 
+#[must_use]
 pub fn default_project_root_for(project_name: &str) -> String {
     Path::new(DEFAULT_PROJECT_ROOT_PARENT).join(project_name).display().to_string()
 }
 
+#[must_use]
 pub fn default_web_root() -> String {
     DEFAULT_WEB_ROOT.to_string()
 }
 
+#[must_use]
 pub fn ssl_certificate_path(domain: &str) -> String {
     Path::new(ETC_LETSENCRYPT_LIVE).join(domain).join("fullchain.pem").display().to_string()
 }
 
+#[must_use]
 pub fn ssl_certificate_key_path(domain: &str) -> String {
     Path::new(ETC_LETSENCRYPT_LIVE).join(domain).join("privkey.pem").display().to_string()
 }
 
+#[must_use]
 pub fn bonesremote_staging_path(version: &str) -> String {
     Path::new(TMP_ROOT).join(format!("{BONESREMOTE_BINARY}-{version}")).display().to_string()
 }
 
+#[must_use]
 pub fn install_root() -> PathBuf {
     PathBuf::from(OPT_BONESDEPLOY)
 }
 
+#[must_use]
 pub fn install_versions_dir() -> PathBuf {
     install_root().join(INSTALL_VERSIONS_DIR)
 }
 
+#[must_use]
 pub fn install_current_dir() -> PathBuf {
     install_root().join(INSTALL_CURRENT_LINK)
 }
 
+#[must_use]
 pub fn bonesdeploy_global_link() -> PathBuf {
     Path::new(USR_LOCAL_BIN).join(BONESDEPLOY_BINARY)
 }
 
+#[must_use]
 pub fn bonesremote_global_link() -> PathBuf {
     Path::new(USR_LOCAL_BIN).join(BONESREMOTE_BINARY)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct DeploymentPaths {
+pub struct Deployment {
     pub repo: String,
     pub repo_parent: String,
     pub repo_head: String,
@@ -144,7 +155,8 @@ pub struct DeploymentPaths {
     pub apparmor_profiles: String,
 }
 
-impl DeploymentPaths {
+impl Deployment {
+    #[must_use]
     pub fn new(project_name: &str, repo_path: &str, project_root: &str, web_root: &str) -> Self {
         let repo = repo_path.to_string();
         let project_root = project_root.to_string();
@@ -215,9 +227,10 @@ fn parent_or_default(path: &str, fallback: &str) -> String {
 }
 
 fn home_dir() -> PathBuf {
-    env::var("HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from("/root"))
+    env::var("HOME").map_or_else(|_| PathBuf::from("/root"), PathBuf::from)
 }
 
+#[must_use]
 pub fn bones_config_root() -> PathBuf {
     if let Some(dir) = env::var("XDG_CONFIG_HOME").ok().filter(|v| !v.is_empty()) {
         Path::new(&dir).join("bonesdeploy")
@@ -226,6 +239,7 @@ pub fn bones_config_root() -> PathBuf {
     }
 }
 
+#[must_use]
 pub fn bones_state_root() -> PathBuf {
     if let Some(dir) = env::var("XDG_STATE_HOME").ok().filter(|v| !v.is_empty()) {
         Path::new(&dir).join("bonesdeploy")
@@ -238,7 +252,7 @@ pub fn bones_state_root() -> PathBuf {
 mod tests {
     use super::*;
 
-    /// Falls back to XDG_CONFIG_HOME when available.
+    /// Falls back to `XDG_CONFIG_HOME` when available.
     #[test]
     fn bones_config_root_uses_xdg_config_home() {
         let home = home_dir();
@@ -246,7 +260,7 @@ mod tests {
         assert_eq!(bones_config_root(), expected);
     }
 
-    /// Falls back to XDG_STATE_HOME when available.
+    /// Falls back to `XDG_STATE_HOME` when available.
     #[test]
     fn bones_state_root_uses_xdg_state_home() {
         let home = home_dir();

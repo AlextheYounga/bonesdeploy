@@ -5,7 +5,7 @@ use shared::paths::{ssl_certificate_key_path, ssl_certificate_path};
 
 use crate::config;
 
-fn base(cfg: &config::BonesConfig, web_root: &str) -> Result<Map<String, Value>> {
+fn base(cfg: &config::Bones, web_root: &str) -> Result<Map<String, Value>> {
     let paths = cfg.deployment_paths(web_root);
     let mut vars = Map::new();
 
@@ -34,14 +34,14 @@ fn base(cfg: &config::BonesConfig, web_root: &str) -> Result<Map<String, Value>>
     Ok(vars)
 }
 
-pub fn setup(cfg: &config::BonesConfig, web_root: &str, deploy_authorized_key: &str) -> Result<Value> {
+pub fn setup(cfg: &config::Bones, web_root: &str, deploy_authorized_key: &str) -> Result<Value> {
     let mut vars = base(cfg, web_root)?;
     vars.insert(String::from("deploy_authorized_key"), Value::String(deploy_authorized_key.to_string()));
     vars.insert(String::from("setup_label"), Value::String(String::from("bonesdeploy")));
     Ok(Value::Object(vars))
 }
 
-pub fn ssl(cfg: &config::BonesConfig, web_root: &str, domain: &str, email: &str) -> Result<Value> {
+pub fn ssl(cfg: &config::Bones, web_root: &str, domain: &str, email: &str) -> Result<Value> {
     let mut vars = base(cfg, web_root)?;
     vars.insert(String::from("ssl_domain"), Value::String(domain.to_string()));
     vars.insert(String::from("ssl_email"), Value::String(email.to_string()));
@@ -52,12 +52,12 @@ pub fn ssl(cfg: &config::BonesConfig, web_root: &str, domain: &str, email: &str)
 
 #[cfg(test)]
 mod tests {
-    use crate::config::BonesConfig;
+    use crate::config::Bones;
 
     use super::{base, ssl};
 
-    fn test_cfg() -> BonesConfig {
-        BonesConfig {
+    fn test_cfg() -> Bones {
+        Bones {
             project_name: String::from("test"),
             repo_path: String::from("/home/git/test.git"),
             project_root: String::from("/srv/test"),
