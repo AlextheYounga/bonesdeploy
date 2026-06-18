@@ -117,6 +117,7 @@ bonesinfra
     │   └── test_no_suspicious_fallback.py
     ├── helpers.py
     ├── test_cli.py
+    ├── test_context.py
     ├── test_deploy_structure.py
     ├── test_paths.py
     ├── test_runtimes.py
@@ -373,8 +374,8 @@ from bonesinfra.deploys.runtime.plan import deploy_runtime
 from bonesinfra.domain.context import DeployContext
 
 
-def apply(config_path: str, runtime_config_path: str, ssh_user: str) -> None:
-    ctx = DeployContext.from_files(config_path, runtime_config_path, ssh_user)
+def apply(config_path: str, runtime_config_path: str) -> None:
+    ctx = DeployContext.from_files(config_path, runtime_config_path)
     run_plan(deploy_runtime, ctx)
 
 ```
@@ -706,9 +707,8 @@ def runtime_questions(
 def runtime_apply_cmd(
     config: str = typer.Option(..., "--config", help="Path to bones.toml"),
     runtime_config: str = typer.Option(..., "--runtime-config", help="Path to runtime.toml"),
-    ssh_user: str = typer.Option(..., "--ssh-user", help="SSH user for remote connection"),
 ):
-    runtime_apply.apply(config, runtime_config, ssh_user)
+    runtime_apply.apply(config, runtime_config)
 
 
 @setup_app.command("apply")
@@ -849,7 +849,7 @@ def setup(data, paths, here):
         _sudo=True,
     )
 
-    nginx_server_name = data.get("ssl_domain", "_")
+    nginx_server_name = data.get("ssl_domain") or "_"
     nginx_ssl_enabled = bool(data.get("ssl_cert_path") and data.get("ssl_key_path"))
 
     render(
@@ -885,6 +885,8 @@ def setup(data, paths, here):
         _sudo=True,
     )
 
+
+def start_services(paths):
     systemd.service(
         name="Ensure nginx service is enabled and started",
         service="nginx",
@@ -946,6 +948,7 @@ def deploy_runtime():
     apparmor.setup(data, paths, here)
     nginx.setup(data, paths, here)
     template_runtime.load(data)
+    nginx.start_services(paths)
     doctor.run(data)
 
 ```
@@ -1465,8 +1468,9 @@ class DeployContext:
         flat_data["web_root"] = web_root
         flat_data["repo_path"] = repo_path
         flat_data["deploy_user"] = data.get("deploy_user", "git")
-        flat_data["runtime_user"] = data.get("runtime_user", "www-data")
-        flat_data["runtime_group"] = data.get("runtime_group", "www-data")
+        runtime_identity = project_name or "www-data"
+        flat_data["runtime_user"] = data.get("runtime_user", runtime_identity)
+        flat_data["runtime_group"] = data.get("runtime_group", runtime_identity)
         flat_data["release_group"] = data.get("release_group", "deployers")
         flat_data["project_root_parent"] = paths.project_root_parent
         flat_data["ssh_port"] = port
@@ -1666,18 +1670,27 @@ def render(name, src, dest, user="root", group="root", mode="0644", **data):
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Iterator
 from contextlib import contextmanager
 
 from pyinfra.api.output import set_echo, set_formatter
+from pyinfra.api.state import BaseStateCallback, State
 from rich.console import Console
 from rich.markup import escape
 from rich.panel import Panel
+from rich.status import Status
 from rich.table import Table
 from rich.text import Text
 
 console = Console(stderr=True)
 _err = Console(stderr=True)
+
+_STATUS_STYLES = {
+    "Success": "bold green",
+    "No changes": "cyan",
+    "Failure": "bold red",
+}
 
 
 class _PyinfraLogHandler(logging.Handler):
@@ -1685,7 +1698,55 @@ class _PyinfraLogHandler(logging.Handler):
         console.print(self.format(record), markup=True, highlight=False)
 
 
+class BonesDeployCallback(BaseStateCallback):
+    _status: Status | None = None
+
+    @classmethod
+    def _stop_status(cls) -> None:
+        if cls._status is not None:
+            cls._status.stop()
+            cls._status = None
+
+    @staticmethod
+    def operation_start(state: State, op_hash: str) -> None:
+        BonesDeployCallback._stop_status()
+        op_meta = state.get_op_meta(op_hash)
+        op_name = ", ".join(op_meta.names) or "Operation"
+        BonesDeployCallback._status = console.status(
+            f"[bold cyan]☠[/]  Running operation: [bold]{escape(op_name)}[/]",
+            spinner="dots",
+        )
+        BonesDeployCallback._status.start()
+
+    @staticmethod
+    def operation_end(state: State, op_hash: str) -> None:
+        BonesDeployCallback._stop_status()
+        op_meta = state.get_op_meta(op_hash)
+        op_name = ", ".join(op_meta.names) or "Operation"
+        status = "No changes"
+
+        for host in state.inventory:
+            try:
+                op_data = state.get_op_data_for_host(host, op_hash)
+            except KeyError:
+                continue
+
+            operation_meta = op_data.operation_meta
+            if not operation_meta.is_complete() or operation_meta.did_error():
+                status = "Failure"
+                break
+
+            if operation_meta.did_change():
+                status = "Success"
+
+        status_style = _STATUS_STYLES.get(status, "dim")
+        console.print(f"☠  {op_name}", end=" ")
+        console.print(f"[{status_style}]{status}[/{status_style}]")
+
+
 def setup_output() -> None:
+    os.environ["PYINFRA_PROGRESS"] = "off"
+
     def bones_echo(message=None, **kwargs):
         del kwargs
         if message is not None:
@@ -1711,8 +1772,9 @@ def setup_output() -> None:
     pyinfra_logger.handlers.clear()
     handler = _PyinfraLogHandler()
     handler.setFormatter(logging.Formatter("%(message)s"))
+    handler.setLevel(logging.WARNING)
     pyinfra_logger.addHandler(handler)
-    pyinfra_logger.setLevel(logging.INFO)
+    pyinfra_logger.setLevel(logging.WARNING)
     pyinfra_logger.propagate = False
 
 
@@ -1729,6 +1791,15 @@ def print_target(hostname: str, user: str) -> None:
     info.add_row("target:", f"{user}@{hostname}")
     console.print(info)
     console.print()
+
+
+def print_connected() -> None:
+    console.print("☠  [bold cyan]connected[/]")
+    console.print()
+
+
+def stop_live_output() -> None:
+    BonesDeployCallback._stop_status()
 
 
 def print_done(success: bool) -> None:
@@ -1762,7 +1833,16 @@ from pyinfra.api.exceptions import PyinfraError
 from pyinfra.api.operations import run_ops
 from pyinfra.context import ctx_config, ctx_host, ctx_inventory, ctx_state
 
-from bonesinfra.infra.output import activity, print_banner, print_done, print_target, setup_output
+from bonesinfra.infra.output import (
+    BonesDeployCallback,
+    activity,
+    print_banner,
+    print_connected,
+    print_done,
+    print_target,
+    setup_output,
+    stop_live_output,
+)
 
 
 def run(
@@ -1795,10 +1875,13 @@ def run(
     print_target(hostname, ssh_user)
 
     try:
-        connect_all(state)
+        with activity("connecting"):
+            connect_all(state)
     except PyinfraError:
         print_done(success=False)
         sys.exit(1)
+
+    print_connected()
 
     with (
         ctx_state.use(state),
@@ -1809,16 +1892,21 @@ def run(
     ):
         deploy()
 
+    state.add_callback_handler(BonesDeployCallback())
+
     try:
         run_ops(state)
     except PyinfraError:
+        stop_live_output()
         print_done(success=False)
         sys.exit(1)
 
     if state.failed_hosts:
+        stop_live_output()
         print_done(success=False)
         sys.exit(1)
 
+    stop_live_output()
     print_done(success=True)
 
 ```
@@ -2278,8 +2366,8 @@ def deploy():
     php_packages.install_php(php_version)
 
     php_fpm.setup_storage_directories(paths, data)
-    php_fpm.setup_pool(here, data, paths, php_version)
     apparmor.setup_php_fpm(data, here)
+    php_fpm.setup_pool(here, data, paths, php_version)
     nginx.setup(here, data, paths)
 
 ```
@@ -2385,7 +2473,7 @@ def questions():
             "key": "php_version",
             "type": "choice",
             "label": "PHP version",
-            "choices": ["8.2", "8.3", "8.4"],
+            "choices": ["8.2", "8.3", "8.4", "8.5"],
             "default": "8.5",
         },
         {
@@ -2401,11 +2489,10 @@ def questions():
 `src/bonesinfra/runtimes/laravel/nginx.py`:
 
 ```py
-from pyinfra.operations import files, server, systemd
+from pyinfra.operations import files, server
 
 
 def setup(here, data, paths):
-    project = data["project_name"]
     runtime_user = data["runtime_user"]
     runtime_group = data["runtime_group"]
     php_fpm_socket_path = paths["runtime_php_fpm_socket"]
@@ -2437,13 +2524,6 @@ def setup(here, data, paths):
         _sudo=True,
     )
 
-    systemd.service(
-        name="Restart per-site nginx with Laravel config",
-        service=f"{project}-nginx",
-        restarted=True,
-        _sudo=True,
-    )
-
 ```
 
 `src/bonesinfra/runtimes/laravel/php_fpm.py`:
@@ -2472,6 +2552,8 @@ def setup_pool(here, data, paths, php_version):
     runtime_group = data["runtime_group"]
     pool_config_path = f"/srv/conf/{project}/php-fpm.conf"
     php_fpm_socket_path = paths["runtime_php_fpm_socket"]
+    php_fpm_binary = f"/usr/sbin/php-fpm{php_version}"
+    apparmor_profile_name = f"bonesdeploy-{project}-php-fpm"
 
     files.directory(
         name="Ensure conf directory exists",
@@ -2504,14 +2586,26 @@ def setup_pool(here, data, paths, php_version):
         mode="0644",
         laravel_php_fpm_pool_config_path=pool_config_path,
         laravel_php_version_resolved=php_version,
-        apparmor_profile_name=f"bonesdeploy-{project}-php-fpm",
+        apparmor_profile_name=apparmor_profile_name,
         **data,
         _sudo=True,
     )
 
     server.shell(
+        name="Verify PHP-FPM binary exists",
+        commands=[f"test -x {php_fpm_binary}"],
+        _sudo=True,
+    )
+
+    server.shell(
         name="Validate PHP-FPM configuration",
-        commands=[f"/usr/sbin/php-fpm{php_version} --test --fpm-config {pool_config_path}"],
+        commands=[f"{php_fpm_binary} --test --fpm-config {pool_config_path}"],
+        _sudo=True,
+    )
+
+    server.shell(
+        name="Verify PHP-FPM AppArmor profile is loaded",
+        commands=[f"grep -q '^{apparmor_profile_name} ' /sys/kernel/security/apparmor/profiles"],
         _sudo=True,
     )
 
@@ -3466,15 +3560,67 @@ def test_setup_apply_rejects_missing_host():
     assert "missing host" in result.stderr.lower()
 
 
-def test_runtime_apply_requires_ssh_user():
+def test_runtime_apply_rejects_missing_host():
     result = _run_no_input("runtime", "apply", "--config", "/dev/null", "--runtime-config", "/dev/null")
-    assert result.returncode != 0, "Expected non-zero exit for missing --ssh-user"
+    assert result.returncode == 3, f"Expected exit 3 for missing host, got {result.returncode}"
+    assert "missing host" in result.stderr.lower()
 
 
 def test_ssl_apply_rejects_missing_host():
     result = _run_no_input("ssl", "apply", "--config", "/dev/null")
     assert result.returncode == 3, f"Expected exit 3 for missing host, got {result.returncode}"
     assert "missing host" in result.stderr.lower()
+
+```
+
+`tests/test_context.py`:
+
+```py
+"""Deploy context defaults should preserve per-project identity."""
+
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from bonesinfra.domain.context import DeployContext
+
+
+def test_runtime_identity_defaults_to_project_name():
+    with TemporaryDirectory() as tmp:
+        config_path = Path(tmp) / "bones.toml"
+        config_path.write_text(
+            """
+[data]
+project_name = "lawsnipe"
+repo_path = "/home/git/lawsnipe.git"
+project_root = "/srv/sites/lawsnipe"
+host = "example.com"
+""".lstrip()
+        )
+
+        ctx = DeployContext.from_files(str(config_path))
+
+    assert ctx.flat_data["runtime_user"] == "lawsnipe"
+    assert ctx.flat_data["runtime_group"] == "lawsnipe"
+
+
+def test_runtime_identity_respects_explicit_override():
+    with TemporaryDirectory() as tmp:
+        config_path = Path(tmp) / "bones.toml"
+        config_path.write_text(
+            """
+[data]
+project_name = "lawsnipe"
+repo_path = "/home/git/lawsnipe.git"
+project_root = "/srv/sites/lawsnipe"
+runtime_user = "lawsnipe-web"
+runtime_group = "lawsnipe-web"
+""".lstrip()
+        )
+
+        ctx = DeployContext.from_files(str(config_path))
+
+    assert ctx.flat_data["runtime_user"] == "lawsnipe-web"
+    assert ctx.flat_data["runtime_group"] == "lawsnipe-web"
 
 ```
 
@@ -3623,6 +3769,7 @@ def test_runtime_plan_calls_all_steps():
     helpers.assert_contains(c, "apparmor.setup")
     helpers.assert_contains(c, "nginx.setup")
     helpers.assert_contains(c, "template_runtime.load")
+    helpers.assert_contains(c, "nginx.start_services")
     helpers.assert_contains(c, "doctor.run")
 
 
@@ -3640,7 +3787,9 @@ def test_runtime_plan_ordering():
     helpers.assert_ordering(
         c,
         "packages.install_apt",
+        "nginx.setup",
         "template_runtime.load",
+        "nginx.start_services",
     )
 
 
@@ -3699,6 +3848,11 @@ def test_ssl_defines_nginx_inline():
     helpers.assert_contains(c, "nginx -t")
 
 
+def test_runtime_nginx_falls_back_when_ssl_domain_empty():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/runtime/nginx.py")
+    helpers.assert_contains(c, 'data.get("ssl_domain") or "_"')
+
+
 def test_ssl_uses_current_web_root():
     c = helpers.read(SSL_PLAN)
     helpers.assert_contains(c, "current_web_root")
@@ -3721,7 +3875,18 @@ def test_laravel_php_fpm_validates_before_enable():
     helpers.assert_ordering(
         c,
         "--test --fpm-config",
+        "Verify PHP-FPM AppArmor profile is loaded",
         "Enable and start per-project PHP-FPM service",
+    )
+
+
+def test_laravel_loads_apparmor_before_php_fpm_service_setup():
+    c = helpers.read(LARAVEL_DEPLOY)
+    helpers.assert_ordering(
+        c,
+        "php_fpm.setup_storage_directories",
+        "apparmor.setup_php_fpm",
+        "php_fpm.setup_pool",
     )
 
 
@@ -3732,6 +3897,11 @@ def test_laravel_creates_socket_dir_before_nginx_validation():
         "Ensure runtime socket directory exists before nginx validation",
         "nginx -t",
     )
+
+
+def test_laravel_nginx_does_not_restart_site_service_early():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/nginx.py")
+    helpers.assert_not_contains(c, "Restart per-site nginx with Laravel config")
 
 ```
 
