@@ -7,46 +7,56 @@ use shared::paths;
 
 const REPOSITORY_URL: &str = "https://github.com/AlextheYounga/bonesinfra.git";
 const CHECKOUT_DIR: &str = "bonesinfra";
+const EXECUTABLE_NAME: &str = "bonesinfra";
 
-pub(super) fn checkout_path() -> Result<PathBuf> {
+pub(super) fn executable_path() -> Result<PathBuf> {
     ensure_available()
 }
 
 fn ensure_available() -> Result<PathBuf> {
     let checkout = checkout_dir();
-    let pyproject = checkout.join("pyproject.toml");
-    if pyproject.is_file() {
-        return Ok(checkout);
+    let executable = checkout.join("dist").join(EXECUTABLE_NAME);
+    let build_script = checkout.join("build.sh");
+
+    if executable.is_file() {
+        return Ok(executable);
     }
 
-    if fs::symlink_metadata(&checkout).is_ok() {
-        reset_checkout(&checkout)?;
-    }
-
-    install_checkout(&checkout)?;
-
-    if !pyproject.is_file() {
-        let contents: Vec<_> = fs::read_dir(&checkout)
-            .into_iter()
-            .flatten()
-            .filter_map(Result::ok)
-            .map(|e| e.path().display().to_string())
-            .collect();
-        if contents.is_empty() {
-            bail!(
-                "Git clone succeeded but checkout is empty at {}. The repository may have no default branch.",
-                checkout.display()
-            );
+    if let Ok(metadata) = fs::symlink_metadata(&checkout) {
+        if !metadata.file_type().is_dir() {
+            reset_checkout(&checkout)?;
         }
-        bail!(
-            "Installed bonesinfra checkout at {}, but {} is missing.\nContents of checkout:\n  {}",
-            checkout.display(),
-            pyproject.display(),
-            contents.join("\n  ")
-        );
     }
 
-    Ok(checkout)
+    if !checkout.is_dir() || !build_script.is_file() {
+        if checkout.is_dir() {
+            reset_checkout(&checkout)?;
+        }
+        install_checkout(&checkout)?;
+    }
+
+    build_checkout(&checkout)?;
+
+    if executable.is_file() {
+        return Ok(executable);
+    }
+
+    let contents: Vec<_> = fs::read_dir(&checkout)
+        .into_iter()
+        .flatten()
+        .filter_map(Result::ok)
+        .map(|e| e.path().display().to_string())
+        .collect();
+    if contents.is_empty() {
+        bail!("bonesinfra build finished but checkout is empty at {}.", checkout.display());
+    }
+
+    bail!(
+        "Built bonesinfra at {}, but {} is missing.\nContents of checkout:\n  {}",
+        checkout.display(),
+        executable.display(),
+        contents.join("\n  ")
+    );
 }
 
 fn reset_checkout(checkout: &Path) -> Result<()> {
@@ -72,32 +82,46 @@ fn install_checkout(checkout: &Path) -> Result<()> {
     let status = Command::new("git")
         .args(["clone", "--depth", "1", REPOSITORY_URL, &checkout.to_string_lossy()])
         .status()
-        .context("Failed to run git clone for hidden bonesinfra checkout")?;
+        .context("Failed to run git clone for bonesinfra install")?;
 
     if !status.success() {
-        bail!("Failed to install hidden bonesinfra checkout from {} into {}.", REPOSITORY_URL, checkout.display());
+        bail!("Failed to install bonesinfra from {} into {}.", REPOSITORY_URL, checkout.display());
+    }
+
+    Ok(())
+}
+
+fn build_checkout(checkout: &Path) -> Result<()> {
+    let status = Command::new("bash")
+        .arg("build.sh")
+        .current_dir(checkout)
+        .status()
+        .with_context(|| format!("Failed to run build.sh in {}", checkout.display()))?;
+
+    if !status.success() {
+        bail!("Failed to build bonesinfra in {}.", checkout.display());
     }
 
     Ok(())
 }
 
 fn checkout_dir() -> PathBuf {
-    paths::bones_state_root().join(CHECKOUT_DIR)
+    Path::new(paths::LOCAL_BONES_DIR).join(".lib").join(CHECKOUT_DIR)
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::path::Path;
 
     use anyhow::Result;
-    use shared::paths;
     use tempfile::TempDir;
 
     use super::{checkout_dir, reset_checkout};
 
     #[test]
-    fn checkout_dir_lives_under_bones_state_root() {
-        assert_eq!(checkout_dir(), paths::bones_state_root().join("bonesinfra"));
+    fn checkout_dir_lives_under_local_bones_lib() {
+        assert_eq!(checkout_dir(), Path::new(".bones/.lib").join("bonesinfra"));
     }
 
     #[test]

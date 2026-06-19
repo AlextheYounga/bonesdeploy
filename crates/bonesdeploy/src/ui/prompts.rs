@@ -256,7 +256,7 @@ fn remote_setup_prompt_lines() -> [&'static str; 12] {
         "  - Create the appropriate deployment and release directories for your project.",
         "  - Install the bonesremote binary on the server, used to facilitate deployments.",
         "",
-        "For more information, check the hidden bonesinfra checkout managed by bonesdeploy.",
+        "For more information, check the local bonesinfra install managed by bonesdeploy.",
     ]
 }
 
@@ -270,7 +270,7 @@ fn remote_runtime_prompt_lines() -> [&'static str; 9] {
         "  - Provision runtime-specific services, like PHP-FPM, Python, or Ruby, depending on your runtime template.",
         "  - Configure AppArmor, nginx, and systemd services are configured for this site.",
         "",
-        "For more information, check the hidden bonesinfra checkout managed by bonesdeploy.",
+        "For more information, check the local bonesinfra install managed by bonesdeploy.",
     ]
 }
 

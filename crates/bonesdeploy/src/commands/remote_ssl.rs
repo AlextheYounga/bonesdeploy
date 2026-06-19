@@ -62,10 +62,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    python::run_python_with_stdin(
-        &["ssl", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")],
-        &json,
-    )?;
+    python::run_with_stdin(&["ssl", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")], &json)?;
 
     config::save(&cfg, bones_toml)?;
     push_state::sync_bones_directory(&cfg)?;

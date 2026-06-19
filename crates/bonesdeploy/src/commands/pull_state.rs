@@ -78,7 +78,7 @@ fn rsync_bones(target: &git::RemoteConnectionDetails) -> Result<()> {
     let source = format!("{}@{}:{}/{}/", target.user, target.host, target.repo_path, paths::BONES_DIR);
     let ssh_arg = format!("ssh -p {} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null", target.port);
     let dest = format!("{}/", paths::LOCAL_BONES_DIR);
-    let status = rsync::status(&["-av", "--delete", "-e", &ssh_arg, &source, &dest])?;
+    let status = rsync::status(&["-av", "--delete", "--exclude=.lib/", "-e", &ssh_arg, &source, &dest])?;
 
     if !status.success() {
         bail!("rsync failed");

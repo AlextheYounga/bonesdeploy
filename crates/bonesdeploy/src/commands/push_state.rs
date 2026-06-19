@@ -56,7 +56,7 @@ pub(crate) fn sync_bones_directory(cfg: &config::Bones) -> Result<()> {
 
     let ssh_arg = format!("ssh -p {port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null");
     let source = format!("{}/", paths::LOCAL_BONES_DIR);
-    let status = rsync::status(&["-av", "--delete", "-e", &ssh_arg, &source, &dest])?;
+    let status = rsync::status(&["-av", "--delete", "--exclude=.lib/", "-e", &ssh_arg, &source, &dest])?;
 
     if !status.success() {
         bail!("rsync failed");

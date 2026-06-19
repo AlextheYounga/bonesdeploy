@@ -21,7 +21,7 @@ pub fn run() -> Result<()> {
     }
 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    println!("Applying runtime using hidden bonesinfra ...");
+    println!("Applying runtime using local bonesinfra ...");
 
     python::run(&[
         "runtime",
