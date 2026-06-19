@@ -189,7 +189,7 @@ fn check_rsync_sync(cfg: &config::Bones, issues: &mut Vec<String>) {
 
     let ssh_arg = format!("ssh -p {port}");
     let source = format!("{}/", paths::LOCAL_BONES_DIR);
-    let output = match rsync::output(&["-avnc", "--delete", "--exclude=.lib/", "-e", &ssh_arg, &source, &dest]) {
+    let output = match rsync::output(&["-avnc", "--delete", "-e", &ssh_arg, &source, &dest]) {
         Ok(output) => output,
         Err(e) => {
             issues.push(format!("Failed to run rsync sync check: {e}"));

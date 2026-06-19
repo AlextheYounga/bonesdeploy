@@ -110,22 +110,22 @@ fn build_checkout(checkout: &Path) -> Result<()> {
 }
 
 fn checkout_dir() -> PathBuf {
-    Path::new(paths::LOCAL_BONES_DIR).join(".lib").join(CHECKOUT_DIR)
+    paths::bones_config_root().join(CHECKOUT_DIR)
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
-    use std::path::Path;
 
     use anyhow::Result;
+    use shared::paths;
     use tempfile::TempDir;
 
     use super::{checkout_dir, reset_checkout};
 
     #[test]
-    fn checkout_dir_lives_under_local_bones_lib() {
-        assert_eq!(checkout_dir(), Path::new(".bones/.lib").join("bonesinfra"));
+    fn checkout_dir_lives_under_bones_config_root() {
+        assert_eq!(checkout_dir(), paths::bones_config_root().join("bonesinfra"));
     }
 
     #[test]
