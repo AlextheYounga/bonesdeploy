@@ -1,7 +1,6 @@
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::thread;
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
@@ -10,17 +9,18 @@ use serde_json::Value;
 pub fn run(args: &[&str]) -> Result<String> {
     let executable = super::bonesinfra::executable_path()?;
 
-    run_command(&executable, args, None)
+    run_interactive(&executable, args, None)
 }
 
 /// Runs the local bonesinfra executable with JSON piped to stdin.
 pub fn run_with_stdin(args: &[&str], stdin_json: &str) -> Result<String> {
     let executable = super::bonesinfra::executable_path()?;
 
-    run_command(&executable, args, Some(stdin_json))
+    run_interactive(&executable, args, Some(stdin_json))
 }
 pub fn run_json(args: &[&str]) -> Result<Value> {
-    let stdout = run(args)?;
+    let executable = super::bonesinfra::executable_path()?;
+    let stdout = run_captured(&executable, args)?;
     parse_json_output(&stdout)
 }
 
@@ -32,9 +32,9 @@ fn base_command(executable: &Path) -> Command {
     Command::new(executable)
 }
 
-fn run_command(executable: &Path, args: &[&str], stdin_json: Option<&str>) -> Result<String> {
+fn run_interactive(executable: &Path, args: &[&str], stdin_json: Option<&str>) -> Result<String> {
     let mut command = base_command(executable);
-    command.args(args).stdout(Stdio::piped()).stderr(Stdio::piped());
+    command.args(args);
     if stdin_json.is_some() {
         command.stdin(Stdio::piped());
     }
@@ -48,42 +48,29 @@ fn run_command(executable: &Path, args: &[&str], stdin_json: Option<&str>) -> Re
         stdin.write_all(stdin_json.as_bytes()).context("Failed to write JSON data to bonesinfra stdin")?;
     }
 
-    let stdout = child.stdout.take().context("Failed to capture bonesinfra stdout")?;
-    let stderr = child.stderr.take().context("Failed to capture bonesinfra stderr")?;
-
-    let stdout_handle = thread::spawn(move || stream_reader(stdout, std::io::stdout()));
-    let stderr_handle = thread::spawn(move || stream_reader(stderr, std::io::stderr()));
-
     let status = child
         .wait()
         .with_context(|| format!("Failed to wait on bonesinfra {} from {}", args.join(" "), executable.display()))?;
-
-    let stdout = stdout_handle.join().map_err(|_| anyhow::anyhow!("Failed to join bonesinfra stdout reader"))??;
-    stderr_handle.join().map_err(|_| anyhow::anyhow!("Failed to join bonesinfra stderr reader"))??;
 
     if !status.success() {
         bail!("bonesinfra failed");
     }
 
-    Ok(stdout)
+    Ok(String::new())
 }
 
-fn stream_reader<R: Read, W: Write>(mut reader: R, mut writer: W) -> Result<String> {
-    let mut buffer = [0_u8; 8192];
-    let mut collected = Vec::new();
+fn run_captured(executable: &Path, args: &[&str]) -> Result<String> {
+    let output = base_command(executable)
+        .args(args)
+        .output()
+        .with_context(|| format!("Failed to run bonesinfra {} from {}", args.join(" "), executable.display()))?;
 
-    loop {
-        let count = reader.read(&mut buffer).context("Failed to read bonesinfra output")?;
-        if count == 0 {
-            break;
-        }
-
-        writer.write_all(&buffer[..count]).context("Failed to write bonesinfra output")?;
-        writer.flush().context("Failed to flush bonesinfra output")?;
-        collected.extend_from_slice(&buffer[..count]);
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("bonesinfra failed:\n{}", stderr.trim());
     }
 
-    String::from_utf8(collected).context("bonesinfra output was not valid UTF-8")
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 /// Returns the questions for a given runtime from bonesinfra.
