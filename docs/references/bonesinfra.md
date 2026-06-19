@@ -4,7 +4,9 @@ Source Tree:
 
 ```txt
 bonesinfra
+├── AGENTS.md
 ├── README.md
+├── build.sh
 ├── docs
 ├── pyproject.toml
 ├── ruff.toml
@@ -56,6 +58,23 @@ bonesinfra
 │       │   └── utils.py
 │       └── runtimes
 │           ├── __init__.py
+│           ├── common
+│           │   ├── __init__.py
+│           │   ├── apparmor.py
+│           │   ├── assets
+│           │   │   ├── app-profile.j2
+│           │   │   ├── app-site-nginx.conf.j2
+│           │   │   ├── app.service.j2
+│           │   │   └── static-site-nginx.conf.j2
+│           │   ├── logs.py
+│           │   ├── nginx.py
+│           │   ├── node.py
+│           │   ├── paths.py
+│           │   ├── php_fpm_pool.py
+│           │   ├── python.py
+│           │   ├── ruby.py
+│           │   ├── service.py
+│           │   └── validation.py
 │           ├── django
 │           │   ├── deployment
 │           │   │   ├── 01_install_build_deps.sh
@@ -64,14 +83,11 @@ bonesinfra
 │           │   └── runtime.toml
 │           ├── laravel
 │           │   ├── __init__.py
-│           │   ├── apparmor.py
 │           │   ├── assets
 │           │   │   ├── nginx
 │           │   │   │   └── laravel-site-nginx.conf.j2
 │           │   │   └── php
-│           │   │       ├── php-fpm-pool.conf.j2
-│           │   │       ├── site-php-fpm-profile.j2
-│           │   │       └── site-php-fpm.service.j2
+│           │   │       └── php-fpm-pool.conf.j2
 │           │   ├── deploy.py
 │           │   ├── deployment
 │           │   │   ├── 01_install_build_deps.sh
@@ -120,11 +136,44 @@ bonesinfra
     ├── test_context.py
     ├── test_deploy_structure.py
     ├── test_paths.py
+    ├── test_pyinfra_runner.py
+    ├── test_runtime_nginx.py
     ├── test_runtimes.py
     ├── test_syntax.py
     ├── test_templates_j2.py
     └── test_tripwires.py
 
+```
+
+`AGENTS.md`:
+
+```md
+You are a lazy senior developer. Lazy means efficient, not careless. The best code is the code never written.
+
+Before writing any code, stop at the first rung that holds:
+
+1. Does this need to be built at all? (YAGNI)
+2. Does the standard library already do this? Use it.
+3. Does a native platform feature cover it? Use it.
+4. Does an already-installed dependency solve it? Use it.
+5. Can this be one line? Make it one line.
+6. Only then: write the minimum code that works.
+
+When you are done, please run `ruff check .`. Do not ignore errors or warnings.
+
+Rules:
+
+- No abstractions that weren't explicitly requested.
+- No new dependency if it can be avoided.
+- No boilerplate nobody asked for.
+- Deletion over addition. Boring over clever. Fewest files possible.
+- Question complex requests: "Do you actually need X, or does Y cover it?"
+- Pick the edge-case-correct option when two stdlib approaches are the same size, lazy means less code, not the flimsier algorithm.
+- Mark intentional simplifications with a `ponytail:` comment. If the shortcut has a known ceiling (global lock, O(n²) scan, naive heuristic), the comment names the ceiling and the upgrade path.
+
+Not lazy about: input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal, a clock drifts, a sensor reads off), anything explicitly requested. Lazy code without its check is unfinished: non-trivial logic leaves ONE runnable check behind, the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.
+
+(Yes, this file also applies to agents working on the ponytail repo itself. Especially to them.)
 ```
 
 `README.md`:
@@ -169,6 +218,41 @@ Defined in `pyproject.toml`. Not embedded — the user's local `pyinfra` install
 
 ```
 
+`build.sh`:
+
+```sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON="${PYTHON:-python3}"
+
+if command -v uv >/dev/null 2>&1; then
+  exec uv run --with pyinstaller --project "$ROOT" python -m PyInstaller \
+    --clean \
+    --noconfirm \
+    --onefile \
+    --name bonesinfra \
+    --paths "$ROOT/src" \
+    --collect-data bonesinfra \
+    --collect-submodules pyinfra \
+    "$ROOT/src/bonesinfra/__main__.py"
+fi
+
+"$PYTHON" -m pip install --upgrade pyinstaller
+
+exec "$PYTHON" -m PyInstaller \
+  --clean \
+  --noconfirm \
+  --onefile \
+  --name bonesinfra \
+  --paths "$ROOT/src" \
+  --collect-data bonesinfra \
+  --collect-submodules pyinfra \
+  "$ROOT/src/bonesinfra/__main__.py"
+
+```
+
 `pyproject.toml`:
 
 ```toml
@@ -200,6 +284,11 @@ bonesinfra = [
     "runtimes/**/assets/**/*.j2",
     "runtimes/**/deployment/*.sh",
     "runtimes/**/runtime.toml",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
 ]
 
 ```
@@ -356,13 +445,7 @@ def run_plan(deploy, ctx):
     if not ctx.host:
         print("Error: missing host in bones.toml", file=sys.stderr)
         sys.exit(3)
-    run_deploy(
-        hostname=ctx.host,
-        ssh_user=ctx.ssh_user,
-        ssh_port=ctx.ssh_port,
-        data=ctx.flat_data,
-        deploy=deploy,
-    )
+    run_deploy(ctx=ctx, deploy=deploy)
 
 ```
 
@@ -392,7 +475,7 @@ def list_all() -> list[str]:
 
 def get_questions(runtime_name: str) -> list[dict]:
     module = get_runtime(runtime_name)
-    return module.questions() if hasattr(module, "questions") else []
+    return module.questions()
 
 ```
 
@@ -404,8 +487,8 @@ from bonesinfra.deploys.setup.plan import deploy_setup
 from bonesinfra.domain.context import DeployContext
 
 
-def apply(config_path: str, ssh_user: str = "root") -> None:
-    ctx = DeployContext.from_files(config_path, ssh_user=ssh_user)
+def apply(config_path: str) -> None:
+    ctx = DeployContext.from_files(config_path)
     run_plan(deploy_setup, ctx)
 
 ```
@@ -420,12 +503,12 @@ from bonesinfra.deploys.ssl.plan import deploy_ssl
 from bonesinfra.domain.context import DeployContext
 
 
-def apply(config_path: str, ssh_user: str = "root") -> None:
-    ctx = DeployContext.from_files(config_path, ssh_user=ssh_user)
+def apply(config_path: str) -> None:
+    ctx = DeployContext.from_files(config_path)
     if not ctx.host:
         print("Error: missing host in bones.toml", file=sys.stderr)
         sys.exit(3)
-    if not ctx.flat_data.get("ssl_domain") or not ctx.flat_data.get("ssl_email"):
+    if not ctx.config.domain or not ctx.config.email:
         print("Error: ssl.domain and ssl.email are required in bones.toml", file=sys.stderr)
         sys.exit(3)
     run_plan(deploy_ssl, ctx)
@@ -469,8 +552,16 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-ngi
   {{ paths.repo_bones_toml }} r,
   {{ paths.site_nginx_config }} r,
 
-  {{ paths.runtime_socket_dir }}/ rw,
-  {{ paths.runtime_socket_dir }}/** rwk,
+  {{ paths.runtime_nginx_dir }}/ rw,
+  {{ paths.runtime_nginx_dir }}/** rwk,
+
+  # ponytail: glob grant on app sockets — per-app profiles are leaf-scoped,
+  # but the per-site nginx must reach every app socket under /run/<project>/.
+  # Upgrade path: enumerate explicit socket paths per runtime when runtimes
+  # become dynamic.
+  {{ paths.runtime_socket_dir }}/ r,
+  {{ paths.runtime_socket_dir }}/*/ r,
+  {{ paths.runtime_socket_dir }}/*/*.sock rw,
 
   # repo_path defaults to /home/{{ deploy_user }}/<project>.git, so global /home denies
   # would block bonesremote reading config and nginx config from repo-local bones files.
@@ -590,22 +681,26 @@ server {
 
 ```j2
 worker_processes 1;
-pid {{ paths.runtime_socket_dir }}/nginx.pid;
-error_log {{ paths.runtime_socket_dir }}/error.log notice;
+pid {{ paths.runtime_nginx_pid }};
+error_log {{ paths.runtime_nginx_dir }}/error.log notice;
 
 events {
     worker_connections 1024;
 }
 
 http {
-    access_log {{ paths.runtime_socket_dir }}/access.log;
-    client_body_temp_path {{ paths.runtime_socket_dir }}/client_body;
-    proxy_temp_path {{ paths.runtime_socket_dir }}/proxy;
-    fastcgi_temp_path {{ paths.runtime_socket_dir }}/fastcgi;
-    uwsgi_temp_path {{ paths.runtime_socket_dir }}/uwsgi;
-    scgi_temp_path {{ paths.runtime_socket_dir }}/scgi;
+    access_log {{ paths.runtime_nginx_dir }}/access.log;
+    client_body_temp_path {{ paths.runtime_nginx_dir }}/client_body;
+    proxy_temp_path {{ paths.runtime_nginx_dir }}/proxy;
+    fastcgi_temp_path {{ paths.runtime_nginx_dir }}/fastcgi;
+    uwsgi_temp_path {{ paths.runtime_nginx_dir }}/uwsgi;
+    scgi_temp_path {{ paths.runtime_nginx_dir }}/scgi;
 
     server {
+        # ponytail: socket inherits umask, typically 0666 — any local user
+        # can connect directly, bypassing the system nginx router. Acceptable
+        # on single-tenant deploy servers. Upgrade path: set the per-site
+        # nginx group to www-data and use a 0660 socket mode directive.
         listen unix:{{ paths.runtime_nginx_socket }};
         root {{ paths.current_web_root }};
         index index.html;
@@ -636,8 +731,10 @@ User={{ runtime_user }}
 Group={{ runtime_group }}
 SupplementaryGroups={{ release_group }}
 WorkingDirectory={{ paths.current }}
-RuntimeDirectory={{ project_name }}
-RuntimeDirectoryMode=0750
+# 0711: system nginx (www-data) must traverse this dir to reach the socket.
+# 0750 causes 502 — www-data is not in the runtime group.
+RuntimeDirectory={{ project_name }}/nginx
+RuntimeDirectoryMode=0711
 StandardOutput=journal
 StandardError=journal
 
@@ -662,7 +759,7 @@ PrivateTmp=yes
 ProtectHome=yes
 ProtectSystem=strict
 
-ReadWritePaths={{ paths.runtime_socket_dir }}
+ReadWritePaths={{ paths.runtime_nginx_dir }}
 ReadOnlyPaths={{ paths.current }} {{ paths.site_nginx_config }}
 
 Restart=always
@@ -714,17 +811,15 @@ def runtime_apply_cmd(
 @setup_app.command("apply")
 def setup_apply_cmd(
     config: str = typer.Option(..., "--config", help="Path to bones.toml"),
-    ssh_user: str = typer.Option("root", "--ssh-user", help="SSH user for remote connection"),
 ):
-    setup_apply.apply(config, ssh_user)
+    setup_apply.apply(config)
 
 
 @ssl_app.command("apply")
 def ssl_apply_cmd(
     config: str = typer.Option(..., "--config", help="Path to bones.toml"),
-    ssh_user: str = typer.Option("root", "--ssh-user", help="SSH user for remote connection"),
 ):
-    ssl_apply.apply(config, ssh_user)
+    ssl_apply.apply(config)
 
 ```
 
@@ -733,10 +828,11 @@ def ssl_apply_cmd(
 ```py
 from pyinfra.operations import server, systemd
 
+from bonesinfra.domain.context import template_data
 from bonesinfra.infra.deploy_helpers import render
 
 
-def setup(data, paths, here):
+def setup(ctx, paths, here):
     systemd.service(
         name="Ensure apparmor service is enabled and started",
         service="apparmor",
@@ -751,7 +847,7 @@ def setup(data, paths, here):
         _sudo=True,
     )
 
-    apparmor_profile_name = f"bonesdeploy-{data['project_name']}-nginx"
+    apparmor_profile_name = f"bonesdeploy-{ctx.config.project_name}-nginx"
     apparmor_profile_path = f"/etc/apparmor.d/{apparmor_profile_name}"
 
     render(
@@ -760,7 +856,7 @@ def setup(data, paths, here):
         apparmor_profile_path,
         mode="0644",
         apparmor_profile_name=apparmor_profile_name,
-        **data,
+        **template_data(ctx, paths=paths),
     )
 
     server.shell(
@@ -791,12 +887,12 @@ def _user_env_command(user, command):
     return f"HOME={home} XDG_CONFIG_HOME={home}/.config {command}"
 
 
-def run(data):
+def run(ctx):
     server.shell(
         name="Run bonesremote doctor as deploy user",
-        commands=[_user_env_command(data["deploy_user"], "/usr/local/bin/bonesremote doctor")],
+        commands=[_user_env_command(ctx.config.deploy_user, "/usr/local/bin/bonesremote doctor")],
         _sudo=True,
-        _sudo_user=data["deploy_user"],
+        _sudo_user=ctx.config.deploy_user,
     )
 
 ```
@@ -808,22 +904,33 @@ from pathlib import Path
 
 from pyinfra.operations import files, server, systemd
 
+from bonesinfra.domain.context import template_data
 from bonesinfra.infra.deploy_helpers import mkdir, render
 
 
-def setup(data, paths, here):
+def setup(ctx, paths, here):
+    # 0711: system nginx (www-data) needs traversal to reach the per-site
+    # nginx socket at /run/<project>/nginx/nginx.sock. 0750 would block it.
     mkdir(
         name="Ensure socket directory exists",
         path=paths["runtime_socket_dir"],
-        user=data["runtime_user"],
-        group=data["runtime_group"],
-        mode="0750",
+        user=ctx.runtime.runtime_user,
+        group=ctx.runtime.runtime_group,
+        mode="0711",
+    )
+
+    mkdir(
+        name="Ensure nginx runtime directory exists",
+        path=paths["runtime_nginx_dir"],
+        user=ctx.runtime.runtime_user,
+        group=ctx.runtime.runtime_group,
+        mode="0711",
     )
 
     mkdir(
         name="Ensure conf directory exists",
         path=paths["conf_root"],
-        group=data["runtime_group"],
+        group=ctx.runtime.runtime_group,
         mode="0750",
     )
 
@@ -831,9 +938,9 @@ def setup(data, paths, here):
         "Deploy per-site nginx config",
         here / "assets/nginx/site-nginx.conf.j2",
         paths["site_nginx_config"],
-        group=data["runtime_group"],
+        group=ctx.runtime.runtime_group,
         mode="0640",
-        **data,
+        **template_data(ctx, paths=paths),
     )
 
     render(
@@ -841,7 +948,7 @@ def setup(data, paths, here):
         here / "assets/nginx/site-nginx.service.j2",
         paths["systemd_site_nginx_service"],
         mode="0644",
-        **data,
+        **template_data(ctx, paths=paths),
     )
 
     systemd.daemon_reload(
@@ -849,8 +956,13 @@ def setup(data, paths, here):
         _sudo=True,
     )
 
-    nginx_server_name = data.get("ssl_domain") or "_"
-    nginx_ssl_enabled = bool(data.get("ssl_cert_path") and data.get("ssl_key_path"))
+    nginx_server_name = ctx.config.domain or ctx.config.preview_domain
+    if not nginx_server_name:
+        raise ValueError("domain or preview_domain is required for nginx config")
+    nginx_ssl_enabled = bool(
+        ctx.runtime.runtime_data.get("ssl_cert_path")
+        and ctx.runtime.runtime_data.get("ssl_key_path")
+    )
 
     render(
         "Deploy router nginx config",
@@ -859,9 +971,9 @@ def setup(data, paths, here):
         mode="0644",
         nginx_server_name=nginx_server_name,
         nginx_ssl_enabled=nginx_ssl_enabled,
-        nginx_ssl_certificate_path=data.get("ssl_cert_path", ""),
-        nginx_ssl_certificate_key_path=data.get("ssl_key_path", ""),
-        **data,
+        nginx_ssl_certificate_path=ctx.runtime.runtime_data.get("ssl_cert_path", ""),
+        nginx_ssl_certificate_key_path=ctx.runtime.runtime_data.get("ssl_key_path", ""),
+        **template_data(ctx, paths=paths),
     )
 
     files.link(
@@ -913,8 +1025,8 @@ def start_services(paths):
 from pyinfra.operations import apt
 
 
-def install_apt(data):
-    pkgs = data.get("runtime_apt_packages", [])
+def install_apt(ctx):
+    pkgs = ctx.runtime.runtime_data.get("runtime_apt_packages", [])
     if not pkgs:
         return
     apt.packages(
@@ -933,41 +1045,43 @@ def install_apt(data):
 ```py
 from pathlib import Path
 
-from pyinfra import host
-
 from bonesinfra.deploys.runtime import apparmor, doctor, nginx, packages, template_runtime
-from bonesinfra.infra.utils import unflatten
+from bonesinfra.domain.paths import DeploymentPaths
 
 
-def deploy_runtime():
-    data = unflatten(host.data.dict())
-    paths = data.get("paths", {})
+def deploy_runtime(ctx):
+    paths = DeploymentPaths.new(
+        ctx.config.project_name,
+        ctx.config.repo_path,
+        ctx.config.project_root,
+        ctx.runtime.web_root,
+    ).__dict__
     here = Path(__file__).parent.parent.parent
 
-    packages.install_apt(data)
-    apparmor.setup(data, paths, here)
-    nginx.setup(data, paths, here)
-    template_runtime.load(data)
+    packages.install_apt(ctx)
+    apparmor.setup(ctx, paths, here)
+    nginx.setup(ctx, paths, here)
+    template_runtime.load(ctx)
     nginx.start_services(paths)
-    doctor.run(data)
+    doctor.run(ctx)
 
 ```
 
 `src/bonesinfra/deploys/runtime/template_runtime.py`:
 
 ```py
-def load(data):
-    template = data.get("template")
+def load(ctx):
+    template = ctx.runtime.runtime_data.get("template")
     if not template:
         return
-    try:
-        from bonesinfra.runtimes import get_runtime
 
-        mod = get_runtime(template)
-        if hasattr(mod, "deploy"):
-            mod.deploy()
-    except (ImportError, KeyError):
-        pass
+    from bonesinfra.runtimes import get_runtime
+
+    runtime = get_runtime(template)
+    if not hasattr(runtime, "deploy"):
+        raise RuntimeError(f"Runtime {template} does not expose deploy(ctx)")
+
+    runtime.deploy(ctx)
 
 ```
 
@@ -994,13 +1108,13 @@ def install():
     )
 
 
-def install_authorized_key(data):
-    if not data.get("deploy_authorized_key"):
+def install_authorized_key(ctx):
+    if not ctx.runtime.runtime_data.get("deploy_authorized_key"):
         return
     server.user(
         name="Ensure deploy user authorized key is installed",
-        user=data["deploy_user"],
-        public_keys=[data["deploy_authorized_key"]],
+        user=ctx.config.deploy_user,
+        public_keys=[ctx.runtime.runtime_data["deploy_authorized_key"]],
         _sudo=True,
     )
 
@@ -1023,26 +1137,26 @@ def _user_env_command(user, command):
     return f"HOME={home} XDG_CONFIG_HOME={home}/.config {command}"
 
 
-def setup_repo_and_project(data, paths):
+def setup_repo_and_project(ctx, paths):
     mkdir(
         name="Ensure bare repo parent directory exists",
         path=paths["repo_parent"],
-        user=data["deploy_user"],
-        group=data["deploy_user"],
+        user=ctx.config.deploy_user,
+        group=ctx.config.deploy_user,
     )
 
     server.shell(
         name="Initialize bare git repo",
-        commands=[_user_env_command(data["deploy_user"], f"git init --bare {quote(paths['repo'])}")],
+        commands=[_user_env_command(ctx.config.deploy_user, f"git init --bare {quote(paths['repo'])}")],
         _sudo=True,
-        _sudo_user=data["deploy_user"],
+        _sudo_user=ctx.config.deploy_user,
     )
 
     mkdir(
         name="Ensure bare repo bones directory exists",
         path=paths["repo_bones"],
-        user=data["deploy_user"],
-        group=data["deploy_user"],
+        user=ctx.config.deploy_user,
+        group=ctx.config.deploy_user,
     )
 
     mkdir(
@@ -1053,41 +1167,41 @@ def setup_repo_and_project(data, paths):
 
     mkdir(
         name="Ensure project root with setgid for release group",
-        path=data["project_root"],
-        user=data["deploy_user"],
-        group=data["release_group"],
+        path=ctx.config.project_root,
+        user=ctx.config.deploy_user,
+        group=ctx.runtime.release_group,
         mode="2751",
     )
 
     mkdir(
         name="Ensure releases directory with setgid",
         path=paths["releases"],
-        user=data["deploy_user"],
-        group=data["release_group"],
+        user=ctx.config.deploy_user,
+        group=ctx.runtime.release_group,
         mode="2750",
     )
 
     mkdir(
         name="Ensure build directory (private to deploy user)",
-        path=str(Path(data["project_root"]) / "build"),
-        user=data["deploy_user"],
-        group=data["deploy_user"],
+        path=str(Path(ctx.config.project_root) / "build"),
+        user=ctx.config.deploy_user,
+        group=ctx.config.deploy_user,
         mode="0700",
     )
 
     mkdir(
         name="Ensure shared directory (owned by runtime user)",
         path=paths["shared"],
-        user=data["runtime_user"],
-        group=data["runtime_group"],
+        user=ctx.runtime.runtime_user,
+        group=ctx.runtime.runtime_group,
         mode="0711",
     )
 
     mkdir(
         name="Ensure placeholder release directory exists",
         path=paths["placeholder_web_root"],
-        user=data["deploy_user"],
-        group=data["release_group"],
+        user=ctx.config.deploy_user,
+        group=ctx.runtime.release_group,
         mode="0750",
     )
 
@@ -1099,16 +1213,16 @@ def setup_repo_and_project(data, paths):
 from pyinfra.operations import server
 
 
-def configure(data):
-    if not data.get("firewall_enabled", True):
+def configure(ctx):
+    if not ctx.runtime.runtime_data.get("firewall_enabled", True):
         return
 
-    ssh_port = int(data.get("ssh_port", 22))
-    allowed_ports = data.get("firewall_allowed_ports", ["http", "https"])
-    port_aliases = data.get("firewall_port_aliases", {"http": 80, "https": 443})
-    rate_limit = data.get("firewall_ssh_rate_limit", False)
-    ssh_cidrs = data.get("firewall_ssh_allowed_cidrs", [])
-    manage_ssh = data.get("firewall_manage_ssh", True)
+    ssh_port = int(ctx.runtime.runtime_data.get("ssh_port", int(ctx.config.port)))
+    allowed_ports = ctx.runtime.runtime_data.get("firewall_allowed_ports", ["http", "https"])
+    port_aliases = ctx.runtime.runtime_data.get("firewall_port_aliases", {"http": 80, "https": 443})
+    rate_limit = ctx.runtime.runtime_data.get("firewall_ssh_rate_limit", False)
+    ssh_cidrs = ctx.runtime.runtime_data.get("firewall_ssh_allowed_cidrs", [])
+    manage_ssh = ctx.runtime.runtime_data.get("firewall_manage_ssh", True)
 
     cmds = []
 
@@ -1125,8 +1239,10 @@ def configure(data):
         port_num = port_aliases.get(port, port)
         cmds.append(f"ufw allow {port_num}/tcp")
 
-    cmds.append(f"ufw --force default {data.get('firewall_default_incoming_policy', 'deny')} incoming")
-    cmds.append(f"ufw --force default {data.get('firewall_default_outgoing_policy', 'allow')} outgoing")
+    incoming = ctx.runtime.runtime_data.get("firewall_default_incoming_policy", "deny")
+    outgoing = ctx.runtime.runtime_data.get("firewall_default_outgoing_policy", "allow")
+    cmds.append(f"ufw --force default {incoming} incoming")
+    cmds.append(f"ufw --force default {outgoing} outgoing")
     cmds.append("ufw --force enable")
 
     server.shell(
@@ -1135,7 +1251,7 @@ def configure(data):
         _sudo=True,
     )
 
-    if data.get("firewall_show_status", True):
+    if ctx.runtime.runtime_data.get("firewall_show_status", True):
         server.shell(
             name="Display UFW status",
             commands=["ufw status verbose"],
@@ -1222,18 +1338,19 @@ def install_system(packages):
 ```py
 from pyinfra.operations import files
 
+from bonesinfra.domain.context import template_data
 from bonesinfra.infra.deploy_helpers import render
 
 
-def seed(data, paths, here):
+def seed(ctx, paths, here):
     render(
         "Seed placeholder index page",
         here / "assets/nginx/index.html.j2",
         paths["placeholder_index"],
-        user=data["deploy_user"],
-        group=data["release_group"],
+        user=ctx.config.deploy_user,
+        group=ctx.runtime.release_group,
         mode="0640",
-        **data,
+        **template_data(ctx, paths=paths),
     )
 
     files.link(
@@ -1251,26 +1368,28 @@ def seed(data, paths, here):
 ```py
 from pathlib import Path
 
-from pyinfra import host
-
 from bonesinfra.deploys.setup import bonesremote, directories, firewall, packages, placeholder, users
 from bonesinfra.deploys.setup.packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
-from bonesinfra.infra.utils import unflatten
+from bonesinfra.domain.paths import DeploymentPaths
 
 
-def deploy_setup():
-    data = unflatten(host.data.dict())
-    paths = data.get("paths", {})
+def deploy_setup(ctx):
+    paths = DeploymentPaths.new(
+        ctx.config.project_name,
+        ctx.config.repo_path,
+        ctx.config.project_root,
+        ctx.runtime.web_root,
+    ).__dict__
     here = Path(__file__).parent.parent.parent
     all_pkgs = BASE_SYSTEM_PACKAGES + SUPPLEMENTARY_PACKAGES
 
     packages.install_system(all_pkgs)
     users.install_rust()
-    users.ensure_users_and_groups(data)
-    directories.setup_repo_and_project(data, paths)
-    placeholder.seed(data, paths, here)
-    firewall.configure(data)
-    bonesremote.install_authorized_key(data)
+    users.ensure_users_and_groups(ctx)
+    directories.setup_repo_and_project(ctx, paths)
+    placeholder.seed(ctx, paths, here)
+    firewall.configure(ctx)
+    bonesremote.install_authorized_key(ctx)
     bonesremote.install()
 
 ```
@@ -1303,10 +1422,10 @@ def _ensure_group_membership(user, group):
     )
 
 
-def ensure_users_and_groups(data):
+def ensure_users_and_groups(ctx):
     server.user(
         name="Ensure deploy user exists",
-        user=data["deploy_user"],
+        user=ctx.config.deploy_user,
         shell="/bin/bash",
         ensure_home=True,
         _sudo=True,
@@ -1314,39 +1433,39 @@ def ensure_users_and_groups(data):
 
     server.group(
         name="Ensure runtime group exists",
-        group=data["runtime_group"],
+        group=ctx.runtime.runtime_group,
         _sudo=True,
     )
 
     server.group(
         name="Ensure release-read group exists",
-        group=data["release_group"],
+        group=ctx.runtime.release_group,
         _sudo=True,
     )
 
-    existing_user = host.get_fact(Users).get(data["runtime_user"])
+    existing_user = host.get_fact(Users).get(ctx.runtime.runtime_user)
 
     if existing_user is None:
         server.user(
             name="Ensure runtime user exists with groups",
-            user=data["runtime_user"],
+            user=ctx.runtime.runtime_user,
             system=True,
             home="/nonexistent",
             shell="/usr/sbin/nologin",
             create_home=False,
-            groups=[data["runtime_group"], data["release_group"]],
+            groups=[ctx.runtime.runtime_group, ctx.runtime.release_group],
             _sudo=True,
         )
         return
 
     required_groups = []
-    for group in (data["runtime_group"], data["release_group"]):
+    for group in (ctx.runtime.runtime_group, ctx.runtime.release_group):
         if group not in required_groups:
             required_groups.append(group)
 
     for group in required_groups:
         if group != existing_user["group"] and group not in existing_user["groups"]:
-            _ensure_group_membership(data["runtime_user"], group)
+            _ensure_group_membership(ctx.runtime.runtime_user, group)
 
 ```
 
@@ -1356,36 +1475,44 @@ def ensure_users_and_groups(data):
 import sys
 from pathlib import Path
 
-from pyinfra import host
 from pyinfra.operations import server, systemd
 
+from bonesinfra.domain.context import template_data
+from bonesinfra.domain.paths import DeploymentPaths
 from bonesinfra.infra.deploy_helpers import render
-from bonesinfra.infra.utils import unflatten
 
 
-def deploy_ssl():
-    data = unflatten(host.data.dict())
-    paths = data.get("paths", {})
+def deploy_ssl(ctx):
+    paths = DeploymentPaths.new(
+        ctx.config.project_name,
+        ctx.config.repo_path,
+        ctx.config.project_root,
+        ctx.runtime.web_root,
+    ).__dict__
     here = Path(__file__).parent.parent.parent
 
-    if not data.get("ssl_domain") or not data.get("ssl_email"):
+    if not ctx.config.domain or not ctx.config.email:
         print("Error: ssl_domain and ssl_email are required", file=sys.stderr)
         sys.exit(1)
 
-    _render_router_config(data, paths, here, ssl_enabled=False, stage="certbot challenge")
-    obtain_certificate(data, paths)
-    _render_router_config(data, paths, here, ssl_enabled=True, stage="SSL enable")
+    _render_router_config(ctx, paths, here, ssl_enabled=False, stage="certbot challenge")
+    obtain_certificate(ctx, paths)
+    _render_router_config(ctx, paths, here, ssl_enabled=True, stage="SSL enable")
 
 
-def _render_router_config(data, paths, here, ssl_enabled, stage):
+def _render_router_config(ctx, paths, here, ssl_enabled, stage):
+    nginx_server_name = ctx.config.domain
+    if not nginx_server_name:
+        raise ValueError("domain is required for ssl nginx config")
+
     render(
         f"Render nginx config ({stage})",
         here / "assets/nginx/router.conf.j2",
         paths["nginx_site_available"],
         mode="0644",
-        nginx_server_name=data["ssl_domain"],
+        nginx_server_name=nginx_server_name,
         nginx_ssl_enabled=ssl_enabled,
-        **data,
+        **template_data(ctx, paths=paths),
     )
 
     server.shell(
@@ -1402,15 +1529,15 @@ def _render_router_config(data, paths, here, ssl_enabled, stage):
     )
 
 
-def obtain_certificate(data, paths):
+def obtain_certificate(ctx, paths):
     server.shell(
         name="Obtain or renew certificate",
         commands=[
             "certbot certonly --non-interactive --agree-tos "
-            f"--email {data['ssl_email']} "
+            f"--email {ctx.config.email} "
             "--webroot "
             f"-w {paths['current_web_root']} "
-            f"-d {data['ssl_domain']} "
+            f"-d {ctx.config.domain} "
             "--keep-until-expiring"
         ],
         _sudo=True,
@@ -1430,29 +1557,30 @@ from typing import Any
 from bonesinfra.domain.paths import DeploymentPaths
 from bonesinfra.infra.toml_store import load_toml
 
+DEPLOY_USER = "git"
+
+DEFAULT_SSH_USER = "root"
+DEFAULT_SSH_PORT = "22"
+DEFAULT_WEB_ROOT = "public"
+
 
 @dataclass
 class DeployContext:
-    host: str
-    ssh_user: str
-    ssh_port: int
-    flat_data: dict[str, Any] = field(default_factory=dict)
+    config: BonesConfig
+    runtime: RuntimeConfig
 
     @classmethod
     def from_files(
         cls,
         config_path: str,
         runtime_config_path: str | None = None,
-        ssh_user: str = "root",
     ) -> DeployContext:
         bones_cfg = load_toml(config_path)
-        data = bones_cfg.get("data", {})
-        project_name = data.get("project_name", "")
-        repo_path = data.get("repo_path", "")
-        project_root = data.get("project_root", "")
-        web_root = data.get("web_root", "public")
-        host = data.get("host", "")
-        port = int(data.get("port", 22))
+        project_name = bones_cfg.get("project_name", "")
+        repo_path = bones_cfg.get("repo_path", "")
+        project_root = bones_cfg.get("project_root", "")
+        host = bones_cfg.get("host", "")
+        port = int(bones_cfg.get("port", DEFAULT_SSH_PORT))
 
         runtime_cfg = {}
         if runtime_config_path:
@@ -1460,31 +1588,99 @@ class DeployContext:
             if rpath.exists():
                 runtime_cfg = load_toml(str(rpath))
 
-        paths = DeploymentPaths.new(project_name, repo_path, project_root, web_root)
+        config = BonesConfig(
+            remote_name=bones_cfg.get("remote_name", ""),
+            project_name=project_name,
+            ssh_user=bones_cfg.get("ssh_user", DEFAULT_SSH_USER),
+            host=host,
+            port=str(port),
+            repo_path=repo_path,
+            project_root=project_root,
+            branch=bones_cfg.get("branch", ""),
+            preview_domain=bones_cfg.get("preview_domain", ""),
+            releases_keep=int(bones_cfg.get("releases_keep", 5)),
+            ssl_enabled=bones_cfg.get("ssl_enabled", False),
+            domain=bones_cfg.get("domain", ""),
+            email=bones_cfg.get("email", ""),
+            deploy_user=DEPLOY_USER,
+        )
 
-        flat_data: dict[str, Any] = {}
-        flat_data["project_name"] = project_name
-        flat_data["project_root"] = project_root
-        flat_data["web_root"] = web_root
-        flat_data["repo_path"] = repo_path
-        flat_data["deploy_user"] = data.get("deploy_user", "git")
-        runtime_identity = project_name or "www-data"
-        flat_data["runtime_user"] = data.get("runtime_user", runtime_identity)
-        flat_data["runtime_group"] = data.get("runtime_group", runtime_identity)
-        flat_data["release_group"] = data.get("release_group", "deployers")
-        flat_data["project_root_parent"] = paths.project_root_parent
-        flat_data["ssh_port"] = port
-        flat_data["paths"] = paths.__dict__
+        runtime = RuntimeConfig(
+            web_root=runtime_cfg.get("web_root", DEFAULT_WEB_ROOT),
+            runtime_user=runtime_cfg.get("runtime_user", project_name),
+            runtime_group=runtime_cfg.get("runtime_group", project_name),
+            release_group=runtime_cfg.get("release_group", f"{project_name}-release"),
+            runtime_data=runtime_cfg,
+        )
 
-        for key, value in runtime_cfg.items():
-            if key not in flat_data:
-                flat_data[key] = value
+        return cls(config=config, runtime=runtime)
 
-        ssl_cfg = bones_cfg.get("ssl", {})
-        flat_data["ssl_domain"] = ssl_cfg.get("domain", "")
-        flat_data["ssl_email"] = ssl_cfg.get("email", "")
+    @property
+    def host(self) -> str:
+        return self.config.host
 
-        return cls(host=host, ssh_user=ssh_user, ssh_port=port, flat_data=flat_data)
+    @property
+    def ssh_port(self) -> int:
+        return int(self.config.port)
+
+
+def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **extra: Any) -> dict[str, Any]:
+    """Build flat template context from DeployContext for Jinja2 template rendering."""
+    if paths is None:
+        p = DeploymentPaths.new(
+            ctx.config.project_name, ctx.config.repo_path, ctx.config.project_root, ctx.runtime.web_root
+        )
+        paths = p.__dict__
+
+    data: dict[str, Any] = {}
+    data["project_name"] = ctx.config.project_name
+    data["project_root"] = ctx.config.project_root
+    data["web_root"] = ctx.runtime.web_root
+    data["repo_path"] = ctx.config.repo_path
+    data["deploy_user"] = ctx.config.deploy_user
+    data["runtime_user"] = ctx.runtime.runtime_user
+    data["runtime_group"] = ctx.runtime.runtime_group
+    data["release_group"] = ctx.runtime.release_group
+    data["project_root_parent"] = paths.get("project_root_parent", "")
+    data["ssh_port"] = int(ctx.config.port)
+    data["paths"] = paths
+    data["ssl_domain"] = ctx.config.domain
+    data["ssl_email"] = ctx.config.email
+    data["preview_domain"] = ctx.config.preview_domain
+
+    for key, value in ctx.runtime.runtime_data.items():
+        if key not in data:
+            data[key] = value
+
+    data.update(extra)
+    return data
+
+
+@dataclass
+class BonesConfig:
+    remote_name: str
+    project_name: str
+    ssh_user: str
+    host: str
+    port: str
+    repo_path: str
+    project_root: str
+    branch: str
+    preview_domain: str
+    releases_keep: int
+    ssl_enabled: bool
+    domain: str
+    email: str
+    deploy_user: str
+
+
+@dataclass
+class RuntimeConfig:
+    web_root: str
+    runtime_user: str
+    runtime_group: str
+    release_group: str
+    runtime_data: dict[str, Any] = field(default_factory=dict)
 
 ```
 
@@ -1569,6 +1765,7 @@ class DeploymentPaths:
     systemd_site_nginx_service: str
     apparmor_profile_path: str
     runtime_socket_dir: str
+    runtime_nginx_dir: str
     runtime_nginx_socket: str
     runtime_nginx_pid: str
     runtime_php_fpm_socket: str
@@ -1592,6 +1789,7 @@ class DeploymentPaths:
         placeholder_release = Path(project_root) / RELEASES_DIR / PLACEHOLDER_RELEASE_NAME
         current = Path(project_root) / CURRENT_LINK
         runtime_socket_dir = Path(RUNTIME_SOCKET_PARENT) / project_name
+        runtime_nginx_dir = runtime_socket_dir / "nginx"
         repo_bones = Path(repo_path) / BONES_DIR
         conf_root = Path(DEFAULT_CONF_ROOT_PARENT) / project_name
 
@@ -1621,8 +1819,9 @@ class DeploymentPaths:
             systemd_site_nginx_service=str(Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}-nginx.service"),
             apparmor_profile_path=str(Path(ETC_APPARMOR_D) / f"bonesdeploy-{project_name}-nginx"),
             runtime_socket_dir=str(runtime_socket_dir),
-            runtime_nginx_socket=str(runtime_socket_dir / NGINX_SOCKET),
-            runtime_nginx_pid=str(runtime_socket_dir / NGINX_PID),
+            runtime_nginx_dir=str(runtime_nginx_dir),
+            runtime_nginx_socket=str(runtime_nginx_dir / NGINX_SOCKET),
+            runtime_nginx_pid=str(runtime_nginx_dir / NGINX_PID),
             runtime_php_fpm_socket=str(runtime_socket_dir / PHP_FPM_SOCKET),
             sudoers_path=str(Path(ETC_SUDOERS_D) / "bonesdeploy"),
             usr_local_bin=USR_LOCAL_BIN,
@@ -1825,7 +2024,6 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable
-from typing import Any
 
 from pyinfra.api import Config, Inventory, State
 from pyinfra.api.connect import connect_all
@@ -1833,6 +2031,7 @@ from pyinfra.api.exceptions import PyinfraError
 from pyinfra.api.operations import run_ops
 from pyinfra.context import ctx_config, ctx_host, ctx_inventory, ctx_state
 
+from bonesinfra.domain.context import DeployContext
 from bonesinfra.infra.output import (
     BonesDeployCallback,
     activity,
@@ -1847,27 +2046,26 @@ from bonesinfra.infra.output import (
 
 def run(
     *,
-    hostname: str,
-    ssh_user: str,
-    ssh_port: int = 22,
+    ctx: DeployContext,
     ssh_key: str | None = None,
-    data: dict[str, Any],
-    deploy: Callable[[], None],
+    deploy: Callable[[DeployContext], None],
 ) -> None:
     setup_output()
 
-    data = dict(data)
-    data["ssh_user"] = ssh_user
-    data["ssh_port"] = int(data.get("ssh_port", ssh_port))
-    if ssh_key:
-        data["ssh_key"] = ssh_key
+    hostname = ctx.config.host
+    ssh_user = ctx.config.ssh_user
+    ssh_port = int(ctx.config.port)
 
-    config = Config(SSH_USER=ssh_user, SSH_PORT=ssh_port)
+    host_data: dict[str, object] = {
+        "ssh_user": ssh_user,
+        "ssh_port": ssh_port,
+    }
     if ssh_key:
-        config.SSH_KEY = ssh_key
-        config.SSH_STRICT_HOST_KEY_CHECKING = False
+        host_data["ssh_key"] = ssh_key
 
-    inventory = Inventory(([(hostname, data)], {}))
+    config = Config()
+
+    inventory = Inventory(([(hostname, host_data)], {}))
     state = State(inventory, config)
     target_host = next(iter(inventory))
 
@@ -1890,7 +2088,7 @@ def run(
         ctx_host.use(target_host),
         activity("planning deploy operations"),
     ):
-        deploy()
+        deploy(ctx)
 
     state.add_callback_handler(BonesDeployCallback())
 
@@ -1953,44 +2151,653 @@ def unflatten(data_dict: Mapping[str, Any]) -> dict[str, Any]:
 `src/bonesinfra/runtimes/__init__.py`:
 
 ```py
-import importlib
 import sys
 
-_REGISTRY = {}
+from bonesinfra.runtimes import laravel
+from bonesinfra.runtimes.django import django
+from bonesinfra.runtimes.next import next as next_runtime
+from bonesinfra.runtimes.nuxt import nuxt
+from bonesinfra.runtimes.rails import rails
+from bonesinfra.runtimes.sveltekit import svelte
+from bonesinfra.runtimes.vue import vue
 
-_MODULE_PATHS = {
-    "laravel": "bonesinfra.runtimes.laravel",
-    "django": "bonesinfra.runtimes.django.django",
-    "next": "bonesinfra.runtimes.next.next",
-    "nuxt": "bonesinfra.runtimes.nuxt.nuxt",
-    "rails": "bonesinfra.runtimes.rails.rails",
-    "sveltekit": "bonesinfra.runtimes.sveltekit.svelte",
-    "vue": "bonesinfra.runtimes.vue.vue",
+RUNTIMES = {
+    "laravel": laravel,
+    "django": django,
+    "next": next_runtime,
+    "nuxt": nuxt,
+    "rails": rails,
+    "sveltekit": svelte,
+    "vue": vue,
 }
 
 
-def _discover():
-    for name, module_path in _MODULE_PATHS.items():
-        try:
-            module = importlib.import_module(module_path)
-            _REGISTRY[name] = module
-        except ImportError:
-            pass
-
-
-_discover()
-
-
 def list_runtimes():
-    return sorted(_REGISTRY.keys())
+    return sorted(RUNTIMES.keys())
 
 
 def get_runtime(name):
-    module = _REGISTRY.get(name)
+    module = RUNTIMES.get(name)
     if module is None:
         print(f"Unknown runtime: {name}. Available: {', '.join(list_runtimes())}", file=sys.stderr)
         sys.exit(1)
     return module
+
+```
+
+`src/bonesinfra/runtimes/common/__init__.py`:
+
+```py
+from bonesinfra.runtimes.common import apparmor, logs, nginx, node, paths, python, ruby, service, validation
+
+__all__ = ["apparmor", "logs", "nginx", "node", "paths", "python", "ruby", "service", "validation"]
+
+```
+
+`src/bonesinfra/runtimes/common/apparmor.py`:
+
+```py
+from pathlib import Path
+
+from pyinfra.operations import files, server
+
+from bonesinfra.domain.context import template_data
+
+
+def render_app_profile(  # noqa: PLR0913
+    ctx,
+    *,
+    paths,
+    runtime,
+    apparmor_exec_paths,
+    apparmor_writable_paths,
+    apparmor_network="network unix stream,",
+):
+    here = Path(__file__).parent
+    profile_name = f"bonesdeploy-{ctx.config.project_name}-{runtime}"
+    profile_path = f"/etc/apparmor.d/{profile_name}"
+    files.template(
+        name=f"Deploy {runtime} AppArmor profile",
+        src=str(here / "assets/app-profile.j2"),
+        dest=profile_path,
+        user="root",
+        group="root",
+        mode="0644",
+        apparmor_profile_name=profile_name,
+        apparmor_runtime=runtime,
+        apparmor_exec_paths=apparmor_exec_paths,
+        apparmor_writable_paths=apparmor_writable_paths,
+        apparmor_network=apparmor_network,
+        **template_data(ctx, paths=paths),
+        _sudo=True,
+    )
+    server.shell(
+        name=f"Load {runtime} AppArmor profile",
+        commands=[f"apparmor_parser -r -T -W {profile_path}"],
+        _sudo=True,
+    )
+    server.shell(
+        name=f"Enforce {runtime} AppArmor profile",
+        commands=[f"aa-enforce {profile_name}"],
+        _sudo=True,
+    )
+    return profile_name
+
+```
+
+`src/bonesinfra/runtimes/common/assets/app-profile.j2`:
+
+```j2
+#include <tunables/global>
+
+profile {{ apparmor_profile_name }} flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  {{ apparmor_network | default("network unix stream,") }}
+
+{% for exec_path in apparmor_exec_paths %}
+  {{ exec_path }} mrix,
+{% endfor %}
+
+  /usr/** r,
+  /bin/** r,
+  /sbin/** r,
+  /lib/** r,
+  /lib64/** r,
+  /etc/** r,
+  /proc/** r,
+  /sys/devices/system/cpu/online r,
+
+  {{ paths.current }}/** r,
+{% for write_path in apparmor_writable_paths %}
+  {{ write_path }}/ rw,
+  {{ write_path }}/** rwk,
+{% endfor %}
+
+  {{ paths.runtime_socket_dir }}/{{ apparmor_runtime }}/ rw,
+  {{ paths.runtime_socket_dir }}/{{ apparmor_runtime }}/** rwk,
+
+  /var/log/bonesdeploy/{{ project_name }}/ rw,
+  /var/log/bonesdeploy/{{ project_name }}/** rwk,
+
+  deny /root/** r,
+  deny /etc/ssh/** r,
+}
+
+```
+
+`src/bonesinfra/runtimes/common/assets/app-site-nginx.conf.j2`:
+
+```j2
+worker_processes 1;
+pid {{ paths.runtime_nginx_pid }};
+error_log {{ paths.runtime_nginx_dir }}/error.log notice;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    access_log {{ paths.runtime_nginx_dir }}/access.log;
+    client_body_temp_path {{ paths.runtime_nginx_dir }}/client_body;
+    proxy_temp_path {{ paths.runtime_nginx_dir }}/proxy;
+    fastcgi_temp_path {{ paths.runtime_nginx_dir }}/fastcgi;
+    uwsgi_temp_path {{ paths.runtime_nginx_dir }}/uwsgi;
+    scgi_temp_path {{ paths.runtime_nginx_dir }}/scgi;
+
+    server {
+        listen unix:{{ paths.runtime_nginx_socket }};
+        root {{ paths.current_web_root }};
+
+        location / {
+            proxy_pass {{ app_proxy_target }};
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+        }
+
+        location ^~ /.well-known/acme-challenge/ {
+            try_files $uri =404;
+        }
+    }
+}
+
+```
+
+`src/bonesinfra/runtimes/common/assets/app.service.j2`:
+
+```j2
+[Unit]
+Description={{ runtime_label }} for {{ project_name }}
+After=network.target apparmor.service
+Requires=apparmor.service
+
+[Service]
+Type=simple
+User={{ runtime_user }}
+Group={{ runtime_group }}
+SupplementaryGroups={{ release_group }}
+WorkingDirectory={{ paths.current }}
+RuntimeDirectory={{ project_name }}/{{ runtime_name }}
+RuntimeDirectoryMode=0750
+EnvironmentFile=-{{ paths.conf_root }}/runtime.env
+ExecStart={{ runtime_exec }}
+
+AppArmorProfile={{ apparmor_profile_name }}
+
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies={{ runtime_address_families | default("AF_UNIX") }}
+
+ReadOnlyPaths={{ paths.current }}
+ReadWritePaths={{ paths.runtime_socket_dir }}/{{ runtime_name }} {{ runtime_write_paths }} /var/log/bonesdeploy/{{ project_name }}
+
+StandardOutput=journal
+StandardError=journal
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
+
+```
+
+`src/bonesinfra/runtimes/common/assets/static-site-nginx.conf.j2`:
+
+```j2
+worker_processes 1;
+pid {{ paths.runtime_nginx_pid }};
+error_log {{ paths.runtime_nginx_dir }}/error.log notice;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    access_log {{ paths.runtime_nginx_dir }}/access.log;
+    client_body_temp_path {{ paths.runtime_nginx_dir }}/client_body;
+    proxy_temp_path {{ paths.runtime_nginx_dir }}/proxy;
+    fastcgi_temp_path {{ paths.runtime_nginx_dir }}/fastcgi;
+    uwsgi_temp_path {{ paths.runtime_nginx_dir }}/uwsgi;
+    scgi_temp_path {{ paths.runtime_nginx_dir }}/scgi;
+
+    server {
+        listen unix:{{ paths.runtime_nginx_socket }};
+        root {{ paths.current }}/dist;
+        index index.html;
+
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+
+        location ^~ /.well-known/acme-challenge/ {
+            try_files $uri =404;
+        }
+    }
+}
+
+```
+
+`src/bonesinfra/runtimes/common/logs.py`:
+
+```py
+from pyinfra.operations import files
+
+BONESDEPLOY_LOG_ROOT = "/var/log/bonesdeploy"
+
+
+def ensure(ctx):
+    """Provision /var/log/bonesdeploy and /var/log/bonesdeploy/<project>.
+
+    The root is root-owned; the per-project dir is owned by the runtime user
+    so the service (and validation) can write logs without root.
+    """
+    files.directory(
+        name="Ensure BonesDeploy log root exists",
+        path=BONESDEPLOY_LOG_ROOT,
+        user="root",
+        group="root",
+        mode="0755",
+        _sudo=True,
+    )
+
+    files.directory(
+        name="Ensure per-project log directory exists",
+        path=f"{BONESDEPLOY_LOG_ROOT}/{ctx.config.project_name}",
+        user=ctx.runtime.runtime_user,
+        group=ctx.runtime.runtime_group,
+        mode="0750",
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/runtimes/common/nginx.py`:
+
+```py
+from pathlib import Path
+
+from pyinfra.operations import files, server
+
+from bonesinfra.domain.context import template_data
+
+
+def _ensure_runtime_socket_dir(ctx, paths):
+    # 0711: system nginx (www-data) must traverse to reach per-site sockets.
+    files.directory(
+        name="Ensure runtime socket directory exists before nginx validation",
+        path=paths["runtime_socket_dir"],
+        user=ctx.runtime.runtime_user,
+        group=ctx.runtime.runtime_group,
+        mode="0711",
+        _sudo=True,
+    )
+    files.directory(
+        name="Ensure nginx runtime directory exists before nginx validation",
+        path=paths["runtime_nginx_dir"],
+        user=ctx.runtime.runtime_user,
+        group=ctx.runtime.runtime_group,
+        mode="0711",
+        _sudo=True,
+    )
+
+
+def render_proxy(ctx, *, paths, socket_path=None, port=None):
+    here = Path(__file__).parent
+    app_proxy_target = f"http://unix:{socket_path}:" if socket_path else f"http://127.0.0.1:{port}"
+    files.template(
+        name="Deploy per-site app nginx config",
+        src=str(here / "assets/app-site-nginx.conf.j2"),
+        dest=paths["site_nginx_config"],
+        user="root",
+        group=ctx.runtime.runtime_group,
+        mode="0640",
+        app_proxy_target=app_proxy_target,
+        **template_data(ctx, paths=paths),
+        _sudo=True,
+    )
+    _ensure_runtime_socket_dir(ctx, paths)
+    server.shell(
+        name="Validate nginx configuration with app config",
+        commands=[f"nginx -t -c {paths['site_nginx_config']}"],
+        _sudo=True,
+    )
+
+
+def render_static(ctx, *, paths):
+    here = Path(__file__).parent
+    files.template(
+        name="Deploy per-site static nginx config",
+        src=str(here / "assets/static-site-nginx.conf.j2"),
+        dest=paths["site_nginx_config"],
+        user="root",
+        group=ctx.runtime.runtime_group,
+        mode="0640",
+        **template_data(ctx, paths=paths),
+        _sudo=True,
+    )
+    _ensure_runtime_socket_dir(ctx, paths)
+    server.shell(
+        name="Validate nginx configuration with static config",
+        commands=[f"nginx -t -c {paths['site_nginx_config']}"],
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/runtimes/common/node.py`:
+
+```py
+from pyinfra.operations import apt
+
+NODE_PACKAGES = ["nodejs", "npm"]
+
+
+def install_packages():
+    apt.packages(
+        name="Install Node.js runtime packages",
+        packages=NODE_PACKAGES,
+        present=True,
+        update=True,
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/runtimes/common/paths.py`:
+
+```py
+from pyinfra.operations import files
+
+from bonesinfra.domain.paths import RUNTIME_SOCKET_PARENT
+
+
+def ensure_runtime_dirs(ctx):
+    """Create /run/<project> as the runtime user before validation or service start.
+
+    RuntimeDirectory= in the systemd unit also does this at start time, but
+    validation runs before start, so we provision it here too.
+    """
+    # 0711: system nginx (www-data) must traverse /run/<project>/ to reach
+    # the per-site nginx socket. 0750 would cause 502 on every public request.
+    project = ctx.config.project_name
+    files.directory(
+        name="Ensure runtime socket directory exists",
+        path=f"{RUNTIME_SOCKET_PARENT}/{project}",
+        user=ctx.runtime.runtime_user,
+        group=ctx.runtime.runtime_group,
+        mode="0711",
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/runtimes/common/php_fpm_pool.py`:
+
+```py
+from pyinfra.operations import files, server, systemd
+
+from bonesinfra.domain.context import template_data
+from bonesinfra.runtimes.common import logs
+
+PHP_FPM_SOCKET_PARENT = "/run/php"
+
+
+def socket_path(project, php_version):
+    return f"{PHP_FPM_SOCKET_PARENT}/php{php_version}-fpm-{project}.sock"
+
+
+def pool_config_path(project, php_version):
+    return f"/etc/php/{php_version}/fpm/pool.d/{project}.conf"
+
+
+def ensure_log_dir(ctx):
+    logs.ensure(ctx)
+
+
+def render_pool(ctx, *, here, paths, php_version):
+    project = ctx.config.project_name
+    files.template(
+        name="Deploy Laravel PHP-FPM pool config",
+        src=str(here / "assets/php/php-fpm-pool.conf.j2"),
+        dest=pool_config_path(project, php_version),
+        user="root",
+        group="root",
+        mode="0644",
+        laravel_php_fpm_pool_name=project,
+        laravel_php_fpm_socket_path=socket_path(project, php_version),
+        **template_data(ctx, paths=paths),
+        _sudo=True,
+    )
+
+
+def validate_php_fpm(php_version):
+    server.shell(
+        name="Validate PHP-FPM configuration",
+        commands=[f"php-fpm{php_version} --test"],
+        _sudo=True,
+    )
+
+
+def reload_php_fpm(php_version):
+    # ponytail: reload may fail on a fresh install where the unit is inactive,
+    # so we restart (always valid) rather than `systemctl reload`. Upgrade path
+    # is a dedicated "ensure active then reload" sequence once first-boot is
+    # handled out of band.
+    systemd.service(
+        name="Enable and restart PHP-FPM service",
+        service=f"php{php_version}-fpm",
+        enabled=True,
+        running=True,
+        restarted=True,
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/runtimes/common/python.py`:
+
+```py
+from pyinfra.operations import apt
+
+PYTHON_PACKAGES = [
+    "python3",
+    "python3-dev",
+    "python3-pip",
+    "python3-venv",
+    "libpq-dev",
+]
+
+
+def install_packages():
+    apt.packages(
+        name="Install Python runtime packages",
+        packages=PYTHON_PACKAGES,
+        present=True,
+        update=True,
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/runtimes/common/ruby.py`:
+
+```py
+from pyinfra.operations import apt
+
+RUBY_PACKAGES = [
+    "ruby-full",
+    "ruby-bundler",
+    "libffi-dev",
+    "libpq-dev",
+    "libyaml-dev",
+    "shared-mime-info",
+    "zlib1g-dev",
+]
+
+
+def install_packages():
+    apt.packages(
+        name="Install Ruby runtime packages",
+        packages=RUBY_PACKAGES,
+        present=True,
+        update=True,
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/runtimes/common/service.py`:
+
+```py
+from pathlib import Path
+
+from pyinfra.operations import files, systemd
+
+from bonesinfra.domain.context import template_data
+from bonesinfra.domain.paths import DeploymentPaths
+from bonesinfra.runtimes.common import validation
+
+
+def runtime_paths(ctx):
+    return DeploymentPaths.new(
+        ctx.config.project_name,
+        ctx.config.repo_path,
+        ctx.config.project_root,
+        ctx.runtime.web_root,
+    ).__dict__
+
+
+def render_app_service(  # noqa: PLR0913
+    ctx,
+    *,
+    paths,
+    name,
+    runtime_label,
+    runtime_exec,
+    apparmor_profile_name,
+    runtime_write_paths,
+    runtime_address_families="AF_UNIX",
+):
+    here = Path(__file__).parent
+    project = ctx.config.project_name
+    files.template(
+        name=f"Deploy {name} systemd service",
+        src=str(here / "assets/app.service.j2"),
+        dest=f"/etc/systemd/system/{project}-{name}.service",
+        user="root",
+        group="root",
+        mode="0644",
+        runtime_name=name,
+        runtime_label=runtime_label,
+        runtime_exec=runtime_exec,
+        apparmor_profile_name=apparmor_profile_name,
+        runtime_write_paths=" ".join(runtime_write_paths),
+        runtime_address_families=runtime_address_families,
+        **template_data(ctx, paths=paths),
+        _sudo=True,
+    )
+
+
+def enable_and_start(ctx, name, *, apparmor_profile_name=None):
+    service = f"{ctx.config.project_name}-{name}.service"
+    systemd.service(
+        name=f"Enable and start {name} service",
+        service=service,
+        enabled=True,
+        running=True,
+        daemon_reload=True,
+        _sudo=True,
+    )
+    if apparmor_profile_name:
+        validation.verify_profile_attached(service, apparmor_profile_name)
+
+```
+
+`src/bonesinfra/runtimes/common/validation.py`:
+
+```py
+from shlex import quote
+
+from pyinfra.operations import server
+
+
+def run_as_runtime_user(ctx, name, command):
+    """Validate a runtime command as the runtime user, never as root.
+
+    Root provisioning must not also be the thing that proves the service can
+    start: a root-owned validation artifact (e.g. a log file) would later be
+    unwritable by the service. Runs the command with HOME/XDG_CONFIG_HOME set
+    so user-scoped config resolution matches the real service environment.
+    """
+    user = ctx.runtime.runtime_user
+    q_user = quote(user)
+    home = f"$(getent passwd {q_user} | cut -d: -f6)"
+    wrapped = f"HOME={home} XDG_CONFIG_HOME={home}/.config {command}"
+    server.shell(
+        name=name,
+        commands=[wrapped],
+        _sudo=True,
+        _sudo_user=user,
+    )
+
+
+def verify_profile_attached(service_name, profile_name, *, name=None):
+    """Verify the service's main PID is confined to the expected AppArmor profile.
+
+    A loaded-but-unattached profile is a silent isolation failure: the service
+    runs unrestricted. Reads /proc/<MainPID>/attr/current and fails if the
+    profile name is not present. Deliberately run as root (needs /proc access
+    to other users' attr and systemctl show).
+    """
+    q_service = quote(service_name)
+    q_profile = quote(profile_name)
+    cmd = (
+        f"pid=$(systemctl show -p MainPID --value {q_service}); "
+        f'[ "$pid" != "0" ] && [ -n "$pid" ] && '
+        f'grep -q "{q_profile}" /proc/$pid/attr/current'
+    )
+    server.shell(
+        name=name or f"Verify {service_name} attached to {profile_name}",
+        commands=[cmd],
+        _sudo=True,
+    )
 
 ```
 
@@ -2066,18 +2873,17 @@ fi
 `src/bonesinfra/runtimes/django/django.py`:
 
 ```py
-PYTHON_PACKAGES = [
-    "python3",
-    "python3-dev",
-    "python3-pip",
-    "python3-venv",
-    "python3-gunicorn",
-    "libpq-dev",
-]
+from bonesinfra.runtimes.common import apparmor, logs, nginx, paths as common_paths, python, service, validation
 
 
 def questions():
     return [
+        {
+            "key": "wsgi_module",
+            "type": "text",
+            "label": "WSGI module",
+            "default": "config.wsgi:application",
+        },
         {
             "key": "python_version",
             "type": "choice",
@@ -2091,19 +2897,55 @@ def questions():
             "label": "Install PostgreSQL client libraries?",
             "default": False,
         },
+        {
+            "key": "static_root",
+            "type": "text",
+            "label": "Static root",
+            "default": "staticfiles",
+        },
+        {
+            "key": "media_root",
+            "type": "text",
+            "label": "Media root",
+            "default": "media",
+        },
     ]
 
 
-def deploy():
-    from pyinfra.operations import apt
-
-    apt.packages(
-        name="Install Python repo prerequisites",
-        packages=PYTHON_PACKAGES,
-        present=True,
-        update=True,
-        _sudo=True,
+def deploy(ctx):
+    paths = service.runtime_paths(ctx)
+    socket_path = f"{paths['runtime_socket_dir']}/gunicorn/gunicorn.sock"
+    wsgi_module = ctx.runtime.runtime_data.get("wsgi_module", "config.wsgi:application")
+    static_root = f"{paths['current']}/{ctx.runtime.runtime_data.get('static_root', 'staticfiles')}"
+    media_root = f"{paths['current']}/{ctx.runtime.runtime_data.get('media_root', 'media')}"
+    writable = [static_root, media_root]
+    gunicorn_bin = f"{paths['current']}/.venv/bin/gunicorn"
+    python.install_packages()
+    common_paths.ensure_runtime_dirs(ctx)
+    logs.ensure(ctx)
+    apparmor_profile_name = apparmor.render_app_profile(
+        ctx,
+        paths=paths,
+        runtime="gunicorn",
+        apparmor_exec_paths=[gunicorn_bin],
+        apparmor_writable_paths=writable,
     )
+    validation.run_as_runtime_user(
+        ctx,
+        "Validate Gunicorn configuration as runtime user",
+        f"{gunicorn_bin} --check-config {wsgi_module}",
+    )
+    service.render_app_service(
+        ctx,
+        paths=paths,
+        name="gunicorn",
+        runtime_label="Gunicorn",
+        runtime_exec=f"{gunicorn_bin} {wsgi_module} --bind unix:{socket_path}",
+        apparmor_profile_name=apparmor_profile_name,
+        runtime_write_paths=writable,
+    )
+    nginx.render_proxy(ctx, paths=paths, socket_path=socket_path)
+    service.enable_and_start(ctx, "gunicorn", apparmor_profile_name=apparmor_profile_name)
 
 ```
 
@@ -2137,55 +2979,24 @@ from bonesinfra.runtimes.laravel.metadata import questions
 
 ```
 
-`src/bonesinfra/runtimes/laravel/apparmor.py`:
-
-```py
-from pyinfra.operations import files, server
-
-
-def setup_php_fpm(data, here):
-    project = data["project_name"]
-    profile_name = f"bonesdeploy-{project}-php-fpm"
-    profile_path = f"/etc/apparmor.d/{profile_name}"
-
-    files.template(
-        name="Deploy PHP-FPM AppArmor profile",
-        src=str(here / "assets/php/site-php-fpm-profile.j2"),
-        dest=profile_path,
-        user="root",
-        group="root",
-        mode="0644",
-        apparmor_profile_name=profile_name,
-        **data,
-        _sudo=True,
-    )
-
-    server.shell(
-        name="Load PHP-FPM AppArmor profile",
-        commands=[f"apparmor_parser -r -T -W {profile_path}"],
-        _sudo=True,
-    )
-
-```
-
 `src/bonesinfra/runtimes/laravel/assets/nginx/laravel-site-nginx.conf.j2`:
 
 ```j2
 worker_processes 1;
 pid {{ paths.runtime_nginx_pid }};
-error_log {{ paths.runtime_socket_dir }}/error.log notice;
+error_log {{ paths.runtime_nginx_dir }}/error.log notice;
 
 events {
     worker_connections 1024;
 }
 
 http {
-    access_log {{ paths.runtime_socket_dir }}/access.log;
-    client_body_temp_path {{ paths.runtime_socket_dir }}/client_body;
-    proxy_temp_path {{ paths.runtime_socket_dir }}/proxy;
-    fastcgi_temp_path {{ paths.runtime_socket_dir }}/fastcgi;
-    uwsgi_temp_path {{ paths.runtime_socket_dir }}/uwsgi;
-    scgi_temp_path {{ paths.runtime_socket_dir }}/scgi;
+    access_log {{ paths.runtime_nginx_dir }}/access.log;
+    client_body_temp_path {{ paths.runtime_nginx_dir }}/client_body;
+    proxy_temp_path {{ paths.runtime_nginx_dir }}/proxy;
+    fastcgi_temp_path {{ paths.runtime_nginx_dir }}/fastcgi;
+    uwsgi_temp_path {{ paths.runtime_nginx_dir }}/uwsgi;
+    scgi_temp_path {{ paths.runtime_nginx_dir }}/scgi;
 
     server {
         listen unix:{{ paths.runtime_nginx_socket }};
@@ -2219,17 +3030,13 @@ http {
 `src/bonesinfra/runtimes/laravel/assets/php/php-fpm-pool.conf.j2`:
 
 ```j2
-[global]
-error_log = /proc/self/fd/2
-daemonize = no
-
 [{{ laravel_php_fpm_pool_name }}]
 user = {{ runtime_user }}
 group = {{ runtime_group }}
 
 listen = {{ laravel_php_fpm_socket_path }}
-listen.owner = {{ runtime_user }}
-listen.group = {{ runtime_group }}
+listen.owner = www-data
+listen.group = www-data
 listen.mode = 0660
 
 pm = dynamic
@@ -2241,105 +3048,14 @@ pm.max_spare_servers = 3
 chdir = {{ paths.current }}
 clear_env = no
 
-```
+catch_workers_output = yes
+decorate_workers_output = no
 
-`src/bonesinfra/runtimes/laravel/assets/php/site-php-fpm-profile.j2`:
+php_admin_flag[log_errors] = on
+php_admin_value[error_log] = /var/log/bonesdeploy/{{ project_name }}/php-worker-error.log
 
-```j2
-#include <tunables/global>
-
-profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-php-fpm") }} flags=(attach_disconnected,mediate_deleted) {
-  #include <abstractions/base>
-  #include <abstractions/php>
-
-  network unix stream,
-
-  # Allow the FPM master to drop privileges and chown the socket.
-  capability chown,
-  capability setgid,
-  capability setuid,
-
-  /usr/sbin/php-fpm* mrix,
-
-  /usr/** r,
-  /bin/** r,
-  /sbin/** r,
-  /lib/** r,
-  /lib64/** r,
-  /etc/php/** r,
-  /etc/ssl/** r,
-  /etc/hosts r,
-  /etc/resolv.conf r,
-  /etc/nsswitch.conf r,
-  /etc/passwd r,
-  /etc/group r,
-  /proc/** r,
-  /sys/devices/system/cpu/online r,
-
-  {{ paths.conf_root }}/ r,
-  {{ paths.conf_root }}/** r,
-
-  {{ paths.current }}/** r,
-  {{ paths.current }}/storage/** rw,
-  {{ paths.current }}/bootstrap/cache/** rw,
-
-  {{ paths.runtime_socket_dir }}/ rw,
-  {{ paths.runtime_socket_dir }}/** rwk,
-
-  deny /root/** r,
-  deny /etc/ssh/** r,
-}
-
-```
-
-`src/bonesinfra/runtimes/laravel/assets/php/site-php-fpm.service.j2`:
-
-```j2
-[Unit]
-Description=Per-site PHP-FPM for {{ project_name }}
-After=network.target apparmor.service
-Requires=apparmor.service
-
-[Service]
-Type=simple
-User={{ runtime_user }}
-Group={{ runtime_group }}
-SupplementaryGroups={{ release_group }}
-WorkingDirectory={{ paths.current }}
-RuntimeDirectory={{ project_name }}
-RuntimeDirectoryMode=0750
-StandardOutput=journal
-StandardError=journal
-
-ExecStart=/usr/sbin/php-fpm{{ laravel_php_version_resolved }} --nodaemonize --fpm-config {{ laravel_php_fpm_pool_config_path }}
-
-AppArmorProfile={{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-php-fpm") }}
-
-NoNewPrivileges=yes
-RestrictNamespaces=yes
-LockPersonality=yes
-RestrictRealtime=yes
-SystemCallArchitectures=native
-CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_CHOWN
-AmbientCapabilities=
-PrivateDevices=yes
-ProtectKernelTunables=yes
-ProtectKernelModules=yes
-ProtectControlGroups=yes
-RestrictAddressFamilies=AF_UNIX
-
-PrivateTmp=yes
-ProtectHome=yes
-ProtectSystem=strict
-
-ReadWritePaths={{ paths.runtime_socket_dir }} {{ paths.current }}/storage
-ReadOnlyPaths={{ paths.current }}
-
-Restart=always
-RestartSec=2
-
-[Install]
-WantedBy=multi-user.target
+access.log = /var/log/bonesdeploy/{{ project_name }}/php-fpm-access.log
+slowlog = /var/log/bonesdeploy/{{ project_name }}/php-fpm-slow.log
 
 ```
 
@@ -2348,27 +3064,26 @@ WantedBy=multi-user.target
 ```py
 from pathlib import Path
 
-from pyinfra import host
-
-from bonesinfra.infra.toml_store import load_runtime_config
-from bonesinfra.infra.utils import unflatten
-from bonesinfra.runtimes.laravel import apparmor, nginx, php_fpm, php_packages, php_repo
+from bonesinfra.domain.paths import DeploymentPaths
+from bonesinfra.runtimes.laravel import nginx, php_fpm, php_packages, php_repo
 
 
-def deploy():
+def deploy(ctx):
     here = Path(__file__).parent
-    data = unflatten(host.data.dict())
-    runtime = load_runtime_config(__file__)
-    php_version = runtime.get("php_version", "8.3")
-    paths = data["paths"]
+    php_version = ctx.runtime.runtime_data.get("php_version", "8.3")
+    paths = DeploymentPaths.new(
+        ctx.config.project_name,
+        ctx.config.repo_path,
+        ctx.config.project_root,
+        ctx.runtime.web_root,
+    ).__dict__
 
     php_repo.add_php_apt_source()
     php_packages.install_php(php_version)
 
-    php_fpm.setup_storage_directories(paths, data)
-    apparmor.setup_php_fpm(data, here)
-    php_fpm.setup_pool(here, data, paths, php_version)
-    nginx.setup(here, data, paths)
+    php_fpm.setup_storage_directories(paths, ctx)
+    php_fpm.setup_pool(here, ctx, paths, php_version)
+    nginx.setup(here, ctx, paths, php_version)
 
 ```
 
@@ -2491,11 +3206,13 @@ def questions():
 ```py
 from pyinfra.operations import files, server
 
+from bonesinfra.domain.context import template_data
+from bonesinfra.runtimes.common import php_fpm_pool
 
-def setup(here, data, paths):
-    runtime_user = data["runtime_user"]
-    runtime_group = data["runtime_group"]
-    php_fpm_socket_path = paths["runtime_php_fpm_socket"]
+
+def setup(here, ctx, paths, php_version):
+    runtime_group = ctx.runtime.runtime_group
+    php_fpm_socket_path = php_fpm_pool.socket_path(ctx.config.project_name, php_version)
 
     files.template(
         name="Deploy Laravel-specific per-site nginx config",
@@ -2505,16 +3222,7 @@ def setup(here, data, paths):
         group=runtime_group,
         mode="0640",
         laravel_php_fpm_socket_path=php_fpm_socket_path,
-        **data,
-        _sudo=True,
-    )
-
-    files.directory(
-        name="Ensure runtime socket directory exists before nginx validation",
-        path=paths["runtime_socket_dir"],
-        user=runtime_user,
-        group=runtime_group,
-        mode="0750",
+        **template_data(ctx, paths=paths),
         _sudo=True,
     )
 
@@ -2529,12 +3237,14 @@ def setup(here, data, paths):
 `src/bonesinfra/runtimes/laravel/php_fpm.py`:
 
 ```py
-from pyinfra.operations import files, server, systemd
+from pyinfra.operations import files
+
+from bonesinfra.runtimes.common import php_fpm_pool
 
 
-def setup_storage_directories(paths, data):
-    runtime_user = data["runtime_user"]
-    runtime_group = data["runtime_group"]
+def setup_storage_directories(paths, ctx):
+    runtime_user = ctx.runtime.runtime_user
+    runtime_group = ctx.runtime.runtime_group
     subdirs = ["logs", "framework/cache", "framework/sessions", "framework/views"]
     for subdir in subdirs:
         files.directory(
@@ -2547,76 +3257,11 @@ def setup_storage_directories(paths, data):
         )
 
 
-def setup_pool(here, data, paths, php_version):
-    project = data["project_name"]
-    runtime_group = data["runtime_group"]
-    pool_config_path = f"/srv/conf/{project}/php-fpm.conf"
-    php_fpm_socket_path = paths["runtime_php_fpm_socket"]
-    php_fpm_binary = f"/usr/sbin/php-fpm{php_version}"
-    apparmor_profile_name = f"bonesdeploy-{project}-php-fpm"
-
-    files.directory(
-        name="Ensure conf directory exists",
-        path=paths["conf_root"],
-        user="root",
-        group=runtime_group,
-        mode="0750",
-        _sudo=True,
-    )
-
-    files.template(
-        name="Deploy PHP-FPM pool config",
-        src=str(here / "assets/php/php-fpm-pool.conf.j2"),
-        dest=pool_config_path,
-        user="root",
-        group="root",
-        mode="0644",
-        laravel_php_fpm_pool_name=project,
-        laravel_php_fpm_socket_path=php_fpm_socket_path,
-        **data,
-        _sudo=True,
-    )
-
-    files.template(
-        name="Deploy PHP-FPM systemd service",
-        src=str(here / "assets/php/site-php-fpm.service.j2"),
-        dest=f"/etc/systemd/system/{project}-php-fpm.service",
-        user="root",
-        group="root",
-        mode="0644",
-        laravel_php_fpm_pool_config_path=pool_config_path,
-        laravel_php_version_resolved=php_version,
-        apparmor_profile_name=apparmor_profile_name,
-        **data,
-        _sudo=True,
-    )
-
-    server.shell(
-        name="Verify PHP-FPM binary exists",
-        commands=[f"test -x {php_fpm_binary}"],
-        _sudo=True,
-    )
-
-    server.shell(
-        name="Validate PHP-FPM configuration",
-        commands=[f"{php_fpm_binary} --test --fpm-config {pool_config_path}"],
-        _sudo=True,
-    )
-
-    server.shell(
-        name="Verify PHP-FPM AppArmor profile is loaded",
-        commands=[f"grep -q '^{apparmor_profile_name} ' /sys/kernel/security/apparmor/profiles"],
-        _sudo=True,
-    )
-
-    systemd.service(
-        name="Enable and start per-project PHP-FPM service",
-        service=f"{project}-php-fpm.service",
-        enabled=True,
-        running=True,
-        daemon_reload=True,
-        _sudo=True,
-    )
+def setup_pool(here, ctx, paths, php_version):
+    php_fpm_pool.ensure_log_dir(ctx)
+    php_fpm_pool.render_pool(ctx, here=here, paths=paths, php_version=php_version)
+    php_fpm_pool.validate_php_fpm(php_version)
+    php_fpm_pool.reload_php_fpm(php_version)
 
 ```
 
@@ -2752,12 +3397,47 @@ paths = [
 `src/bonesinfra/runtimes/next/next.py`:
 
 ```py
+from bonesinfra.runtimes.common import apparmor, logs, nginx, node, paths as common_paths, service, validation
+
+
 def questions():
     return []
 
 
-def deploy():
-    pass
+def deploy(ctx):
+    paths = service.runtime_paths(ctx)
+    port = ctx.runtime.runtime_data.get("internal_port", 3100)
+    node.install_packages()
+    common_paths.ensure_runtime_dirs(ctx)
+    logs.ensure(ctx)
+    apparmor_profile_name = apparmor.render_app_profile(
+        ctx,
+        paths=paths,
+        runtime="next",
+        apparmor_exec_paths=["/usr/bin/node"],
+        apparmor_writable_paths=[],
+        apparmor_network="network inet stream,",
+    )
+    validation.run_as_runtime_user(
+        ctx,
+        "Validate Next.js standalone server exists as runtime user",
+        "test -f .next/standalone/server.js",
+    )
+    service.render_app_service(
+        ctx,
+        paths=paths,
+        name="next",
+        runtime_label="Next.js app server",
+        runtime_exec=(
+            f"/usr/bin/env NODE_ENV=production PORT={port} HOSTNAME=127.0.0.1 "
+            "node .next/standalone/server.js"
+        ),
+        apparmor_profile_name=apparmor_profile_name,
+        runtime_write_paths=[],
+        runtime_address_families="AF_UNIX AF_INET",
+    )
+    nginx.render_proxy(ctx, paths=paths, port=port)
+    service.enable_and_start(ctx, "next", apparmor_profile_name=apparmor_profile_name)
 
 ```
 
@@ -2843,12 +3523,45 @@ fi
 `src/bonesinfra/runtimes/nuxt/nuxt.py`:
 
 ```py
+from bonesinfra.runtimes.common import apparmor, logs, nginx, node, paths as common_paths, service, validation
+
+
 def questions():
     return []
 
 
-def deploy():
-    pass
+def deploy(ctx):
+    paths = service.runtime_paths(ctx)
+    socket_path = f"{paths['runtime_socket_dir']}/nuxt/nuxt.sock"
+    node.install_packages()
+    common_paths.ensure_runtime_dirs(ctx)
+    logs.ensure(ctx)
+    apparmor_profile_name = apparmor.render_app_profile(
+        ctx,
+        paths=paths,
+        runtime="nuxt",
+        apparmor_exec_paths=["/usr/bin/node"],
+        apparmor_writable_paths=[],
+    )
+    validation.run_as_runtime_user(
+        ctx,
+        "Validate Nuxt server entrypoint exists as runtime user",
+        "test -f .output/server/index.mjs",
+    )
+    service.render_app_service(
+        ctx,
+        paths=paths,
+        name="nuxt",
+        runtime_label="Nuxt app server",
+        runtime_exec=(
+            f"/usr/bin/env NODE_ENV=production NITRO_UNIX_SOCKET={socket_path} "
+            "node .output/server/index.mjs"
+        ),
+        apparmor_profile_name=apparmor_profile_name,
+        runtime_write_paths=[],
+    )
+    nginx.render_proxy(ctx, paths=paths, socket_path=socket_path)
+    service.enable_and_start(ctx, "nuxt", apparmor_profile_name=apparmor_profile_name)
 
 ```
 
@@ -2945,15 +3658,7 @@ fi
 `src/bonesinfra/runtimes/rails/rails.py`:
 
 ```py
-RUBY_PACKAGES = [
-    "ruby-full",
-    "ruby-bundler",
-    "libffi-dev",
-    "libpq-dev",
-    "libyaml-dev",
-    "shared-mime-info",
-    "zlib1g-dev",
-]
+from bonesinfra.runtimes.common import apparmor, logs, nginx, paths as common_paths, ruby, service, validation
 
 
 def questions():
@@ -2977,19 +3682,50 @@ def questions():
             "label": "Install Redis?",
             "default": False,
         },
+        {
+            "key": "rails_env",
+            "type": "text",
+            "label": "Rails environment",
+            "default": "production",
+        },
     ]
 
 
-def deploy():
-    from pyinfra.operations import apt
-
-    apt.packages(
-        name="Install Rails repo prerequisites",
-        packages=RUBY_PACKAGES,
-        present=True,
-        update=True,
-        _sudo=True,
+def deploy(ctx):
+    paths = service.runtime_paths(ctx)
+    socket_path = f"{paths['runtime_socket_dir']}/puma/puma.sock"
+    runtime_write_paths = [
+        f"{paths['current']}/tmp",  # noqa: S108
+        f"{paths['current']}/log",
+        f"{paths['current']}/storage",
+    ]
+    rails_env = ctx.runtime.runtime_data.get("rails_env", "production")
+    ruby.install_packages()
+    common_paths.ensure_runtime_dirs(ctx)
+    logs.ensure(ctx)
+    apparmor_profile_name = apparmor.render_app_profile(
+        ctx,
+        paths=paths,
+        runtime="puma",
+        apparmor_exec_paths=["/usr/bin/ruby*", "/usr/bin/bundle*"],
+        apparmor_writable_paths=runtime_write_paths,
     )
+    validation.run_as_runtime_user(
+        ctx,
+        "Validate Puma availability as runtime user",
+        "bundle exec puma --help >/dev/null",
+    )
+    service.render_app_service(
+        ctx,
+        paths=paths,
+        name="puma",
+        runtime_label="Puma",
+        runtime_exec=f"/usr/bin/env RAILS_ENV={rails_env} bundle exec puma -e {rails_env} -b unix://{socket_path}",
+        apparmor_profile_name=apparmor_profile_name,
+        runtime_write_paths=runtime_write_paths,
+    )
+    nginx.render_proxy(ctx, paths=paths, socket_path=socket_path)
+    service.enable_and_start(ctx, "puma", apparmor_profile_name=apparmor_profile_name)
 
 ```
 
@@ -3104,12 +3840,46 @@ paths = [
 `src/bonesinfra/runtimes/sveltekit/svelte.py`:
 
 ```py
+from bonesinfra.runtimes.common import apparmor, logs, nginx, node, paths as common_paths, service, validation
+
+
 def questions():
     return []
 
 
-def deploy():
-    pass
+def deploy(ctx):
+    paths = service.runtime_paths(ctx)
+    socket_path = f"{paths['runtime_socket_dir']}/sveltekit/sveltekit.sock"
+    origin = f"https://{ctx.config.domain}" if ctx.config.domain else "https://localhost"
+    node.install_packages()
+    common_paths.ensure_runtime_dirs(ctx)
+    logs.ensure(ctx)
+    apparmor_profile_name = apparmor.render_app_profile(
+        ctx,
+        paths=paths,
+        runtime="sveltekit",
+        apparmor_exec_paths=["/usr/bin/node"],
+        apparmor_writable_paths=[],
+    )
+    validation.run_as_runtime_user(
+        ctx,
+        "Validate SvelteKit build entrypoint exists as runtime user",
+        "test -e build",
+    )
+    service.render_app_service(
+        ctx,
+        paths=paths,
+        name="sveltekit",
+        runtime_label="SvelteKit app server",
+        runtime_exec=(
+            f"/usr/bin/env --chdir={paths['current']} NODE_ENV=production SOCKET_PATH={socket_path} "
+            f"ORIGIN={origin} node --env-file=.env build"
+        ),
+        apparmor_profile_name=apparmor_profile_name,
+        runtime_write_paths=[],
+    )
+    nginx.render_proxy(ctx, paths=paths, socket_path=socket_path)
+    service.enable_and_start(ctx, "sveltekit", apparmor_profile_name=apparmor_profile_name)
 
 ```
 
@@ -3200,12 +3970,16 @@ paths = [
 `src/bonesinfra/runtimes/vue/vue.py`:
 
 ```py
+from bonesinfra.runtimes.common import nginx, service
+
+
 def questions():
     return []
 
 
-def deploy():
-    pass
+def deploy(ctx):
+    paths = service.runtime_paths(ctx)
+    nginx.render_static(ctx, paths=paths)
 
 ```
 
@@ -3581,7 +4355,7 @@ def test_ssl_apply_rejects_missing_host():
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from bonesinfra.domain.context import DeployContext
+from bonesinfra.domain.context import DeployContext, template_data
 
 
 def test_runtime_identity_defaults_to_project_name():
@@ -3589,7 +4363,6 @@ def test_runtime_identity_defaults_to_project_name():
         config_path = Path(tmp) / "bones.toml"
         config_path.write_text(
             """
-[data]
 project_name = "lawsnipe"
 repo_path = "/home/git/lawsnipe.git"
 project_root = "/srv/sites/lawsnipe"
@@ -3599,8 +4372,18 @@ host = "example.com"
 
         ctx = DeployContext.from_files(str(config_path))
 
-    assert ctx.flat_data["runtime_user"] == "lawsnipe"
-    assert ctx.flat_data["runtime_group"] == "lawsnipe"
+    assert ctx.config.project_name == "lawsnipe"
+    assert ctx.config.host == "example.com"
+    assert ctx.config.ssh_user == "root"
+    assert ctx.runtime.web_root == "public"
+    assert ctx.runtime.runtime_user == "lawsnipe"
+    assert ctx.runtime.runtime_group == "lawsnipe"
+    assert ctx.runtime.release_group == "lawsnipe-release"
+    assert ctx.ssh_port == 22
+
+    td = template_data(ctx)
+    assert td["runtime_user"] == "lawsnipe"
+    assert td["runtime_group"] == "lawsnipe"
 
 
 def test_runtime_identity_respects_explicit_override():
@@ -3608,19 +4391,26 @@ def test_runtime_identity_respects_explicit_override():
         config_path = Path(tmp) / "bones.toml"
         config_path.write_text(
             """
-[data]
 project_name = "lawsnipe"
 repo_path = "/home/git/lawsnipe.git"
 project_root = "/srv/sites/lawsnipe"
+host = "example.com"
+""".lstrip()
+        )
+        runtime_config_path = Path(tmp) / "runtime.toml"
+        runtime_config_path.write_text(
+            """
 runtime_user = "lawsnipe-web"
 runtime_group = "lawsnipe-web"
 """.lstrip()
         )
 
-        ctx = DeployContext.from_files(str(config_path))
+        ctx = DeployContext.from_files(str(config_path), str(runtime_config_path))
 
-    assert ctx.flat_data["runtime_user"] == "lawsnipe-web"
-    assert ctx.flat_data["runtime_group"] == "lawsnipe-web"
+    assert ctx.config.project_name == "lawsnipe"
+    assert ctx.runtime.web_root == "public"
+    assert ctx.runtime.runtime_user == "lawsnipe-web"
+    assert ctx.runtime.runtime_group == "lawsnipe-web"
 
 ```
 
@@ -3782,6 +4572,47 @@ def test_runtime_applies_apparmor_and_nginx():
     helpers.assert_contains(c2, "per-site nginx")
 
 
+def test_common_apparmor_enforces_after_load():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/apparmor.py")
+    helpers.assert_ordering(
+        c,
+        "apparmor_parser -r",
+        "aa-enforce",
+    )
+
+
+def test_common_service_verifies_profile_attached():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/service.py")
+    helpers.assert_contains(c, "validation.verify_profile_attached")
+    helpers.assert_contains(c, "apparmor_profile_name=None")
+
+
+def test_common_validation_verifies_proc_attr_current():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/validation.py")
+    helpers.assert_contains(c, "def verify_profile_attached")
+    helpers.assert_contains(c, "attr/current")
+    helpers.assert_contains(c, "MainPID")
+
+
+def test_app_service_uses_per_service_runtime_directory_leaf():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/assets/app.service.j2")
+    helpers.assert_contains(c, "RuntimeDirectory={{ project_name }}/{{ runtime_name }}")
+
+
+def test_site_nginx_service_uses_nginx_runtime_directory_leaf():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/assets/nginx/site-nginx.service.j2")
+    helpers.assert_contains(c, "RuntimeDirectory={{ project_name }}/nginx")
+    helpers.assert_contains(c, "ReadWritePaths={{ paths.runtime_nginx_dir }}")
+
+
+def test_project_nginx_profile_grants_nginx_dir_and_app_sockets():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/assets/apparmor/project-nginx-profile.j2")
+    helpers.assert_contains(c, "{{ paths.runtime_nginx_dir }}/ rw,")
+    helpers.assert_contains(c, "{{ paths.runtime_nginx_dir }}/** rwk,")
+    helpers.assert_contains(c, "{{ paths.runtime_socket_dir }}/*/*.sock rw,")
+    helpers.assert_not_contains(c, "{{ paths.runtime_socket_dir }}/** rwk,")
+
+
 def test_runtime_plan_ordering():
     c = helpers.read(RUNTIME_PLAN)
     helpers.assert_ordering(
@@ -3801,9 +4632,12 @@ def test_runtime_excludes_ssl_logic():
 def test_runtime_socket_dir_runtime_user_owned():
     c = helpers.read(RUNTIME_NGINX)
     helpers.assert_contains(c, 'path=paths["runtime_socket_dir"]')
-    helpers.assert_contains(c, 'user=data["runtime_user"]')
-    helpers.assert_contains(c, 'group=data["runtime_group"]')
-    helpers.assert_contains(c, 'mode="0750"')
+    helpers.assert_contains(c, 'path=paths["runtime_nginx_dir"]')
+    helpers.assert_contains(c, "user=ctx.runtime.runtime_user")
+    helpers.assert_contains(c, "group=ctx.runtime.runtime_group")
+    # 0711: system nginx (www-data) must traverse /run/<project>/ and
+    # /run/<project>/nginx/ to reach the per-site nginx socket. 0750 causes 502.
+    helpers.assert_contains(c, 'mode="0711"')
 
 
 def test_runtime_uses_template_runtime():
@@ -3848,9 +4682,18 @@ def test_ssl_defines_nginx_inline():
     helpers.assert_contains(c, "nginx -t")
 
 
-def test_runtime_nginx_falls_back_when_ssl_domain_empty():
+def test_runtime_nginx_falls_back_when_domain_empty():
     c = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/runtime/nginx.py")
-    helpers.assert_contains(c, 'data.get("ssl_domain") or "_"')
+    helpers.assert_contains(c, "ctx.config.domain or ctx.config.preview_domain")
+    helpers.assert_contains(
+        c,
+        'raise ValueError("domain or preview_domain is required for nginx config")',
+    )
+
+
+def test_ssl_requires_real_domain_for_router_render():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/ssl/plan.py")
+    helpers.assert_contains(c, 'raise ValueError("domain is required for ssl nginx config")')
 
 
 def test_ssl_uses_current_web_root():
@@ -3870,38 +4713,81 @@ def test_laravel_validates_php_fpm_before_start():
     )
 
 
-def test_laravel_php_fpm_validates_before_enable():
+def test_laravel_validates_php_fpm_before_reload():
     c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py")
     helpers.assert_ordering(
         c,
-        "--test --fpm-config",
-        "Verify PHP-FPM AppArmor profile is loaded",
-        "Enable and start per-project PHP-FPM service",
+        "php_fpm_pool.render_pool",
+        "php_fpm_pool.validate_php_fpm",
+        "php_fpm_pool.reload_php_fpm",
     )
 
 
-def test_laravel_loads_apparmor_before_php_fpm_service_setup():
+def test_laravel_deploy_does_not_setup_php_fpm_apparmor():
     c = helpers.read(LARAVEL_DEPLOY)
+    helpers.assert_not_contains(c, "apparmor")
     helpers.assert_ordering(
         c,
         "php_fpm.setup_storage_directories",
-        "apparmor.setup_php_fpm",
         "php_fpm.setup_pool",
+        "nginx.setup",
     )
 
 
-def test_laravel_creates_socket_dir_before_nginx_validation():
+def test_laravel_nginx_validates_without_creating_runtime_dir():
     c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/nginx.py")
     helpers.assert_ordering(
         c,
-        "Ensure runtime socket directory exists before nginx validation",
+        "laravel-site-nginx.conf.j2",
         "nginx -t",
     )
+    helpers.assert_not_contains(c, "runtime_socket_dir")
 
 
 def test_laravel_nginx_does_not_restart_site_service_early():
     c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/nginx.py")
     helpers.assert_not_contains(c, "Restart per-site nginx with Laravel config")
+
+
+# ---- Runtime directory traversal for system nginx (www-data) ----
+
+
+def test_runtime_socket_dir_is_traversable_by_system_nginx():
+    """Regression: /run/<project>/ must be 0711, not 0750, so system nginx
+    (www-data) can traverse it to reach /run/<project>/nginx/nginx.sock.
+
+    0750 caused 502 on every public request after the per-site nginx layout
+    change moved the socket under /run/<project>/nginx/.
+    """
+    runtime_nginx = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/runtime/nginx.py")
+    # Both runtime dir mkdirs must use 0711; the conf dir (0750) is unrelated.
+    socket_dir_block = runtime_nginx.split('path=paths["runtime_socket_dir"]')[1].split(")")[0]
+    helpers.assert_contains(socket_dir_block, 'mode="0711"')
+    nginx_dir_block = runtime_nginx.split('path=paths["runtime_nginx_dir"]')[1].split(")")[0]
+    helpers.assert_contains(nginx_dir_block, 'mode="0711"')
+
+    common_paths = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/paths.py")
+    helpers.assert_contains(common_paths, 'mode="0711"')
+    helpers.assert_not_contains(common_paths, 'mode="0750"')
+
+    common_nginx = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/nginx.py")
+    helpers.assert_contains(common_nginx, 'mode="0711"')
+    helpers.assert_not_contains(common_nginx, 'mode="0750"')
+
+
+def test_site_nginx_service_runtime_dir_is_traversable():
+    """The per-site nginx RuntimeDirectory must be 0711 so www-data can
+    traverse into /run/<project>/nginx/ to reach the socket."""
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/assets/nginx/site-nginx.service.j2")
+    helpers.assert_contains(c, "RuntimeDirectoryMode=0711")
+    helpers.assert_not_contains(c, "RuntimeDirectoryMode=0750")
+
+
+def test_app_service_runtime_dir_stays_private():
+    """App runtime dirs stay 0750 — only the per-site nginx (same runtime
+    user) needs to reach app sockets, so no world traversal is required."""
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/assets/app.service.j2")
+    helpers.assert_contains(c, "RuntimeDirectoryMode=0750")
 
 ```
 
@@ -3928,12 +4814,181 @@ def test_paths_has_build_logs_constant():
 
 ```
 
+`tests/test_pyinfra_runner.py`:
+
+```py
+from contextlib import contextmanager
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+import pyinfra.connectors.ssh as pyinfra_ssh
+
+from bonesinfra.domain.context import DeployContext
+from bonesinfra.infra import pyinfra_runner
+
+sentinel_key = object()
+
+
+@contextmanager
+def _noop_activity(_message):
+    yield
+
+
+def _noop_print_target(*args, **kwargs):
+    del args, kwargs
+
+
+def _noop_run_ops(state):
+    del state
+
+
+def _noop_get_private_key(*args, **kwargs):
+    del args, kwargs
+    return sentinel_key
+
+
+def _noop_deploy(*args, **kwargs):
+    del args, kwargs
+
+
+def test_run_passes_ssh_auth_through_inventory(monkeypatch):
+    with TemporaryDirectory() as tmp:
+        config_path = Path(tmp) / "bones.toml"
+        config_path.write_text(
+            """
+project_name = "lawsnipe"
+repo_path = "/home/git/lawsnipe.git"
+project_root = "/srv/sites/lawsnipe"
+host = "example.com"
+ssh_user = "root"
+port = 2222
+""".lstrip()
+        )
+
+        ctx = DeployContext.from_files(str(config_path))
+
+    seen = {}
+
+    monkeypatch.setattr(pyinfra_runner, "setup_output", lambda: None)
+    monkeypatch.setattr(pyinfra_runner, "print_banner", lambda: None)
+    monkeypatch.setattr(pyinfra_runner, "print_target", _noop_print_target)
+    monkeypatch.setattr(pyinfra_runner, "print_connected", lambda: None)
+    monkeypatch.setattr(pyinfra_runner, "print_done", lambda success: seen.setdefault("done", success))
+    monkeypatch.setattr(pyinfra_runner, "stop_live_output", lambda: None)
+    monkeypatch.setattr(pyinfra_runner, "activity", _noop_activity)
+    monkeypatch.setattr(pyinfra_runner, "run_ops", _noop_run_ops)
+    monkeypatch.setattr(pyinfra_ssh, "get_private_key", _noop_get_private_key)
+
+    def fake_connect_all(state):
+        host = next(iter(state.inventory))
+        seen["kwargs"] = host.connector.make_paramiko_kwargs()
+
+    monkeypatch.setattr(pyinfra_runner, "connect_all", fake_connect_all)
+
+    pyinfra_runner.run(ctx=ctx, ssh_key="~/.ssh/id_ed25519", deploy=_noop_deploy)
+
+    assert seen["kwargs"]["username"] == "root"
+    assert seen["kwargs"]["port"] == 2222
+    assert seen["kwargs"]["pkey"] is sentinel_key
+    assert seen["kwargs"]["allow_agent"] is False
+    assert seen["kwargs"]["look_for_keys"] is False
+    assert seen["done"] is True
+
+```
+
+`tests/test_runtime_nginx.py`:
+
+```py
+
+import pytest
+
+from bonesinfra.deploys.runtime import nginx as runtime_nginx
+from bonesinfra.deploys.ssl import plan as ssl_plan
+from bonesinfra.domain.context import DeployContext
+from bonesinfra.domain.paths import DeploymentPaths
+
+
+def _make_ctx(tmp_path, *, domain: str = "", preview_domain: str = "preview.example.com"):
+    config_path = tmp_path / "bones.toml"
+    config_path.write_text(
+        f"""
+project_name = "lawsnipe"
+repo_path = "/home/git/lawsnipe.git"
+project_root = "/srv/sites/lawsnipe"
+host = "example.com"
+domain = "{domain}"
+preview_domain = "{preview_domain}"
+email = "ops@example.com"
+""".lstrip()
+    )
+    return DeployContext.from_files(str(config_path))
+
+
+def _noop(*args, **kwargs):
+    del args, kwargs
+
+
+def test_runtime_nginx_uses_preview_domain_when_domain_is_empty(tmp_path, monkeypatch):
+    ctx = _make_ctx(tmp_path, domain="", preview_domain="preview.example.com")
+    paths = DeploymentPaths.new(
+        ctx.config.project_name,
+        ctx.config.repo_path,
+        ctx.config.project_root,
+        ctx.runtime.web_root,
+    ).__dict__
+    calls = []
+
+    monkeypatch.setattr(runtime_nginx, "mkdir", _noop)
+    monkeypatch.setattr(runtime_nginx.files, "link", _noop)
+    monkeypatch.setattr(runtime_nginx.server, "shell", _noop)
+    monkeypatch.setattr(runtime_nginx.systemd, "daemon_reload", _noop)
+
+    def fake_render(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(runtime_nginx, "render", fake_render)
+
+    runtime_nginx.setup(ctx, paths, tmp_path)
+
+    router_call = next(call for _, call in calls if "nginx_server_name" in call)
+    assert router_call["nginx_server_name"] == "preview.example.com"
+    assert router_call["preview_domain"] == "preview.example.com"
+
+
+def test_runtime_nginx_requires_a_real_name(tmp_path, monkeypatch):
+    ctx = _make_ctx(tmp_path, domain="", preview_domain="")
+    paths = DeploymentPaths.new(
+        ctx.config.project_name,
+        ctx.config.repo_path,
+        ctx.config.project_root,
+        ctx.runtime.web_root,
+    ).__dict__
+
+    monkeypatch.setattr(runtime_nginx, "mkdir", _noop)
+    monkeypatch.setattr(runtime_nginx.files, "link", _noop)
+    monkeypatch.setattr(runtime_nginx.server, "shell", _noop)
+    monkeypatch.setattr(runtime_nginx.systemd, "daemon_reload", _noop)
+    monkeypatch.setattr(runtime_nginx, "render", _noop)
+
+    with pytest.raises(ValueError, match="domain or preview_domain"):
+        runtime_nginx.setup(ctx, paths, tmp_path)
+
+
+def test_ssl_setup_requires_a_real_domain(tmp_path):
+    ctx = _make_ctx(tmp_path, domain="", preview_domain="preview.example.com")
+
+    with pytest.raises(SystemExit, match="1"):
+        ssl_plan.deploy_ssl(ctx)
+
+```
+
 `tests/test_runtimes.py`:
 
 ```py
-"""Every runtime module must export questions() and deploy()."""
-
 import importlib
+
+from bonesinfra.app import runtime_catalog
+from bonesinfra.runtimes import list_runtimes
 
 from . import helpers
 
@@ -3955,9 +5010,161 @@ def test_runtimes_have_questions_and_deploy():
         assert callable(getattr(mod, "deploy", None)), f"{name}: missing deploy()"
 
 
-def test_laravel_uses_host_data():
+def test_runtime_registry_is_explicit():
+    assert list_runtimes() == sorted(RUNTIMES_MODULES)
+
+
+def test_laravel_questions_are_exposed():
+    assert runtime_catalog.get_questions("laravel")
+
+
+def test_laravel_deploy_accepts_ctx():
     content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/deploy.py")
-    helpers.assert_contains(content, "host.data", "laravel must use host.data")
+    helpers.assert_contains(content, "def deploy(ctx):", "laravel deploy must accept ctx")
+
+
+def test_laravel_php_fpm_uses_distro_pool_model():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py")
+    helpers.assert_contains(content, "php_fpm_pool.render_pool")
+    helpers.assert_contains(content, "php_fpm_pool.validate_php_fpm")
+    helpers.assert_contains(content, "php_fpm_pool.reload_php_fpm")
+
+
+def test_laravel_php_fpm_does_not_use_custom_service():
+    """Regression guard: Laravel must not render or start a per-project
+    php-fpm systemd service, nor validate via a custom --fpm-config."""
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py")
+    helpers.assert_not_contains(content, "site-php-fpm.service.j2")
+    helpers.assert_not_contains(content, "-php-fpm.service")
+    helpers.assert_not_contains(content, "--fpm-config")
+    helpers.assert_not_contains(content, "apparmor")
+
+
+def test_laravel_deploy_does_not_setup_php_fpm_apparmor():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/deploy.py")
+    helpers.assert_not_contains(content, "apparmor.setup_php_fpm")
+    helpers.assert_not_contains(content, "apparmor")
+
+
+def test_common_php_fpm_pool_socket_path_is_distro_standard():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/php_fpm_pool.py")
+    helpers.assert_contains(content, '"/run/php"')
+    helpers.assert_contains(content, "fpm/pool.d/{project}.conf")
+    helpers.assert_contains(content, "php-fpm{php_version} --test")
+    helpers.assert_contains(content, "php{php_version}-fpm")
+
+
+def test_common_php_fpm_pool_ensures_bonesdeploy_log_dir():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/php_fpm_pool.py")
+    helpers.assert_contains(content, "logs.ensure(ctx)")
+
+
+def test_laravel_nginx_uses_distro_php_socket_and_no_runtime_chown():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/nginx.py")
+    helpers.assert_contains(content, "php_fpm_pool.socket_path")
+    helpers.assert_not_contains(content, "runtime_socket_dir")
+    helpers.assert_not_contains(content, "files.directory")
+
+
+def test_common_validation_runs_as_runtime_user_not_root():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/validation.py")
+    helpers.assert_contains(content, "_sudo_user=user")
+    helpers.assert_contains(content, "def run_as_runtime_user(ctx, name, command):")
+
+
+def test_common_logs_provisions_runtime_owned_dir():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/logs.py")
+    helpers.assert_contains(content, "/var/log/bonesdeploy")
+    helpers.assert_contains(content, "user=ctx.runtime.runtime_user")
+    helpers.assert_contains(content, 'name="Ensure BonesDeploy log root exists"')
+
+
+def test_template_runtime_load_fails_loudly_without_silent_swallow():
+    content = helpers.read(
+        helpers.SRC_DIR / "bonesinfra/deploys/runtime/template_runtime.py"
+    )
+    helpers.assert_not_contains(content, "except (ImportError, KeyError)")
+    helpers.assert_not_contains(content, "    pass")
+    helpers.assert_contains(content, 'raise RuntimeError(f"Runtime {template} does not expose deploy(ctx)")')
+
+
+def test_template_runtime_load_requires_deploy_attribute():
+    content = helpers.read(
+        helpers.SRC_DIR / "bonesinfra/deploys/runtime/template_runtime.py"
+    )
+    helpers.assert_contains(content, 'if not hasattr(runtime, "deploy")')
+
+
+def test_all_runtimes_use_common_service_layer():
+    """Non-Laravel dynamic runtimes must wire through common.service, not pass."""
+    runtime_to_module_file = {
+        "django": "bonesinfra/runtimes/django/django.py",
+        "next": "bonesinfra/runtimes/next/next.py",
+        "nuxt": "bonesinfra/runtimes/nuxt/nuxt.py",
+        "rails": "bonesinfra/runtimes/rails/rails.py",
+        "sveltekit": "bonesinfra/runtimes/sveltekit/svelte.py",
+        "vue": "bonesinfra/runtimes/vue/vue.py",
+    }
+    for name, rel in runtime_to_module_file.items():
+        content = helpers.read(helpers.SRC_DIR / rel)
+        helpers.assert_not_contains(content, "    pass", msg=name)
+        helpers.assert_contains(content, "service.runtime_paths(ctx)", msg=name)
+
+
+def test_vue_is_static_only():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/vue/vue.py")
+    helpers.assert_contains(content, "nginx.render_static")
+    helpers.assert_not_contains(content, "render_app_service")
+
+
+def test_next_uses_tcp_localhost():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/next/next.py")
+    helpers.assert_contains(content, "HOSTNAME=127.0.0.1")
+    helpers.assert_contains(content, "port=port")
+    helpers.assert_contains(content, 'runtime_address_families="AF_UNIX AF_INET"')
+
+
+def test_nuxt_uses_nitro_unix_socket():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/nuxt/nuxt.py")
+    helpers.assert_contains(content, "NITRO_UNIX_SOCKET=")
+    helpers.assert_contains(content, "socket_path=socket_path")
+
+
+def test_sveltekit_uses_socket_path_env():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/sveltekit/svelte.py")
+    helpers.assert_contains(content, "SOCKET_PATH=")
+    helpers.assert_contains(content, "ORIGIN=")
+
+
+def test_django_uses_gunicorn_unix_socket():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/django/django.py")
+    helpers.assert_contains(content, "gunicorn")
+    helpers.assert_contains(content, "--bind unix:")
+    helpers.assert_contains(content, "wsgi_module")
+    helpers.assert_not_contains(content, "python3-gunicorn")
+
+
+def test_app_runtimes_use_per_service_socket_leaf():
+    """Each app runtime must place its socket in its own leaf dir under
+    /run/<project>/<runtime>/, not in the shared /run/<project>/."""
+    for slug, rel in [
+        ("gunicorn", "bonesinfra/runtimes/django/django.py"),
+        ("puma", "bonesinfra/runtimes/rails/rails.py"),
+        ("nuxt", "bonesinfra/runtimes/nuxt/nuxt.py"),
+        ("sveltekit", "bonesinfra/runtimes/sveltekit/svelte.py"),
+    ]:
+        content = helpers.read(helpers.SRC_DIR / rel)
+        helpers.assert_contains(
+            content,
+            f"runtime_socket_dir']}}/{slug}/{slug}.sock",
+            msg=slug,
+        )
+
+
+def test_rails_uses_puma_unix_socket():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/rails/rails.py")
+    helpers.assert_contains(content, "bundle exec puma")
+    helpers.assert_contains(content, "-b unix://")
 
 ```
 
@@ -4039,10 +5246,10 @@ def test_nginx_service_waits_for_apparmor():
 # ---- Base nginx config ----
 
 
-def test_site_nginx_config_logs_under_runtime_socket_dir():
+def test_site_nginx_config_logs_under_runtime_nginx_dir():
     c = _read("assets/nginx/site-nginx.conf.j2")
-    helpers.assert_contains(c, "error_log {{ paths.runtime_socket_dir }}/error.log")
-    helpers.assert_contains(c, "access_log {{ paths.runtime_socket_dir }}/access.log")
+    helpers.assert_contains(c, "error_log {{ paths.runtime_nginx_dir }}/error.log")
+    helpers.assert_contains(c, "access_log {{ paths.runtime_nginx_dir }}/access.log")
     helpers.assert_not_contains(c, "access_log stderr")
 
 
@@ -4058,63 +5265,46 @@ def test_router_config_uses_resolved_socket_path():
 # ---- Laravel PHP-FPM pool config ----
 
 
-def test_laravel_php_fpm_config_has_global_section():
+def test_laravel_php_fpm_pool_has_no_global_section():
     c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
-    helpers.assert_contains(c, "[global]")
-    helpers.assert_contains(c, "error_log = /proc/self/fd/2")
-    helpers.assert_contains(c, "daemonize = no")
+    helpers.assert_not_contains(c, "[global]")
+    helpers.assert_not_contains(c, "daemonize")
+    helpers.assert_not_contains(c, "/var/log/php-fpm.log")
 
 
-def test_laravel_php_fpm_config_uses_resolved_current_path():
+def test_laravel_php_fpm_pool_uses_distro_run_php_socket():
+    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
+    helpers.assert_contains(c, "listen = {{ laravel_php_fpm_socket_path }}")
+    helpers.assert_not_contains(c, "{{ paths.runtime_socket_dir }}")
+    helpers.assert_not_contains(c, "/run/{{ project_name }}")
+
+
+def test_laravel_php_fpm_pool_listens_as_www_data():
+    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
+    helpers.assert_contains(c, "listen.owner = www-data")
+    helpers.assert_contains(c, "listen.group = www-data")
+    helpers.assert_contains(c, "listen.mode = 0660")
+
+
+def test_laravel_php_fpm_pool_runs_as_runtime_user():
+    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
+    helpers.assert_contains(c, "user = {{ runtime_user }}")
+    helpers.assert_contains(c, "group = {{ runtime_group }}")
+
+
+def test_laravel_php_fpm_pool_logs_under_bonesdeploy():
+    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
+    helpers.assert_contains(c, "/var/log/bonesdeploy/{{ project_name }}/php-worker-error.log")
+    helpers.assert_contains(c, "access.log = /var/log/bonesdeploy/{{ project_name }}/php-fpm-access.log")
+    helpers.assert_contains(c, "slowlog = /var/log/bonesdeploy/{{ project_name }}/php-fpm-slow.log")
+    helpers.assert_not_contains(c, "{{ paths.runtime_socket_dir }}")
+
+
+def test_laravel_php_fpm_pool_uses_resolved_current_path():
     c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
     helpers.assert_contains(c, "chdir = {{ paths.current }}")
-    helpers.assert_not_contains(c, "{{ project_root }}/current")
-
-
-# ---- Laravel PHP-FPM systemd service ----
-
-
-def test_laravel_php_fpm_service_runs_as_runtime_user():
-    c = _read("runtimes/laravel/assets/php/site-php-fpm.service.j2")
-    helpers.assert_contains(c, "User={{ runtime_user }}")
-    helpers.assert_contains(c, "Group={{ runtime_group }}")
-    helpers.assert_contains(c, "SupplementaryGroups={{ release_group }}")
-    helpers.assert_contains(
-        c,
-        "ExecStart=/usr/sbin/php-fpm{{ laravel_php_version_resolved }} "
-        "--nodaemonize --fpm-config {{ laravel_php_fpm_pool_config_path }}",
-    )
-    helpers.assert_contains(c, "RuntimeDirectory={{ project_name }}")
-    helpers.assert_contains(c, "RuntimeDirectoryMode=0750")
-    helpers.assert_contains(c, "StandardOutput=journal")
-    helpers.assert_contains(c, "StandardError=journal")
-
-
-def test_laravel_php_fpm_service_grants_required_capabilities():
-    c = _read("runtimes/laravel/assets/php/site-php-fpm.service.j2")
-    helpers.assert_contains(c, "CapabilityBoundingSet=CAP_SETUID CAP_SETGID CAP_CHOWN")
-    helpers.assert_contains(c, "AmbientCapabilities=")
-
-
-# ---- Laravel PHP-FPM AppArmor profile ----
-
-
-def test_laravel_php_fpm_apparmor_allows_site_conf_root():
-    c = _read("runtimes/laravel/assets/php/site-php-fpm-profile.j2")
-    helpers.assert_contains(c, "{{ paths.conf_root }}/ r,")
-    helpers.assert_contains(c, "{{ paths.conf_root }}/** r,")
-
-
-def test_laravel_php_fpm_apparmor_has_minimal_capabilities():
-    c = _read("runtimes/laravel/assets/php/site-php-fpm-profile.j2")
-    helpers.assert_contains(c, "capability chown,")
-    helpers.assert_contains(c, "capability setgid,")
-    helpers.assert_contains(c, "capability setuid,")
-    helpers.assert_not_contains(c, "capability dac_override,")
-    helpers.assert_not_contains(c, "capability dac_read_search,")
-    helpers.assert_not_contains(c, "capability fsetid,")
-    for line in c.splitlines():
-        assert line.strip() != "/ rw,", "Must not allow root filesystem read-write"
+    helpers.assert_contains(c, "catch_workers_output = yes")
+    helpers.assert_contains(c, "php_admin_flag[log_errors] = on")
 
 
 # ---- Laravel nginx config ----
@@ -4136,15 +5326,15 @@ def test_laravel_nginx_uses_resolved_path_manifest():
     helpers.assert_contains(c, "pid {{ paths.runtime_nginx_pid }}")
     helpers.assert_contains(c, "listen unix:{{ paths.runtime_nginx_socket }}")
     helpers.assert_contains(c, "root {{ paths.current_web_root }}")
-    helpers.assert_contains(c, "{{ paths.runtime_socket_dir }}/")
+    helpers.assert_contains(c, "{{ paths.runtime_nginx_dir }}/")
     helpers.assert_not_contains(c, "/run/{{ project_name }}")
     helpers.assert_not_contains(c, "{{ project_root }}/current/{{ web_root }}")
 
 
-def test_laravel_nginx_logs_under_runtime_socket_dir():
+def test_laravel_nginx_logs_under_runtime_nginx_dir():
     c = _read("runtimes/laravel/assets/nginx/laravel-site-nginx.conf.j2")
-    helpers.assert_contains(c, "error_log {{ paths.runtime_socket_dir }}/error.log")
-    helpers.assert_contains(c, "access_log {{ paths.runtime_socket_dir }}/access.log")
+    helpers.assert_contains(c, "error_log {{ paths.runtime_nginx_dir }}/error.log")
+    helpers.assert_contains(c, "access_log {{ paths.runtime_nginx_dir }}/access.log")
     helpers.assert_not_contains(c, "access_log stderr")
 
 
@@ -4170,6 +5360,121 @@ def test_laravel_build_script_labels_each_phase():
         "Rebuilding Laravel caches",
     ]:
         helpers.assert_contains(c, label)
+
+
+# ---- Common app service template ----
+
+
+def test_common_app_service_runs_as_runtime_user():
+    c = _read("runtimes/common/assets/app.service.j2")
+    helpers.assert_contains(c, "User={{ runtime_user }}")
+    helpers.assert_contains(c, "Group={{ runtime_group }}")
+    helpers.assert_contains(c, "SupplementaryGroups={{ release_group }}")
+    helpers.assert_contains(c, "WorkingDirectory={{ paths.current }}")
+    helpers.assert_contains(c, "RuntimeDirectory={{ project_name }}/{{ runtime_name }}")
+    helpers.assert_contains(c, "RuntimeDirectoryMode=0750")
+    helpers.assert_contains(c, "EnvironmentFile=-{{ paths.conf_root }}/runtime.env")
+    helpers.assert_contains(c, "ExecStart={{ runtime_exec }}")
+    helpers.assert_contains(c, "AppArmorProfile={{ apparmor_profile_name }}")
+
+
+def test_common_app_service_is_tight_sandbox():
+    c = _read("runtimes/common/assets/app.service.j2")
+    helpers.assert_contains(c, "NoNewPrivileges=yes")
+    helpers.assert_contains(c, "PrivateTmp=yes")
+    helpers.assert_contains(c, "ProtectHome=yes")
+    helpers.assert_contains(c, "ProtectSystem=strict")
+    helpers.assert_contains(c, "RestrictNamespaces=yes")
+    helpers.assert_contains(c, "LockPersonality=yes")
+    helpers.assert_contains(c, "RestrictRealtime=yes")
+    helpers.assert_contains(c, "SystemCallArchitectures=native")
+    helpers.assert_contains(c, "CapabilityBoundingSet=")
+    helpers.assert_contains(c, "AmbientCapabilities=")
+    helpers.assert_contains(c, "PrivateDevices=yes")
+    helpers.assert_contains(c, "ProtectKernelTunables=yes")
+    helpers.assert_contains(c, "ProtectKernelModules=yes")
+    helpers.assert_contains(c, "ProtectControlGroups=yes")
+    helpers.assert_contains(c, 'RestrictAddressFamilies={{ runtime_address_families | default("AF_UNIX") }}')
+
+
+def test_common_app_service_writes_to_runtime_and_logs_dirs():
+    c = _read("runtimes/common/assets/app.service.j2")
+    helpers.assert_contains(c, "ReadOnlyPaths={{ paths.current }}")
+    helpers.assert_contains(
+        c,
+        "ReadWritePaths={{ paths.runtime_socket_dir }}/{{ runtime_name }} "
+        "{{ runtime_write_paths }} /var/log/bonesdeploy/{{ project_name }}",
+    )
+    helpers.assert_contains(c, "StandardOutput=journal")
+    helpers.assert_contains(c, "StandardError=journal")
+    helpers.assert_contains(c, "Restart=always")
+    helpers.assert_contains(c, "RestartSec=2")
+    helpers.assert_contains(c, "WantedBy=multi-user.target")
+
+
+# ---- Common app nginx proxy template ----
+
+
+def test_common_app_nginx_proxies_to_socket():
+    c = _read("runtimes/common/assets/app-site-nginx.conf.j2")
+    helpers.assert_contains(c, "proxy_pass {{ app_proxy_target }}")
+    helpers.assert_contains(c, "proxy_set_header Host $host")
+    helpers.assert_contains(c, "proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for")
+    helpers.assert_contains(c, "proxy_set_header X-Forwarded-Proto $scheme")
+    helpers.assert_contains(c, "proxy_set_header X-Real-IP $remote_addr")
+    helpers.assert_contains(c, "proxy_http_version 1.1")
+    helpers.assert_contains(c, 'proxy_set_header Connection ""')
+
+
+def test_common_app_nginx_logs_under_runtime_nginx_dir():
+    c = _read("runtimes/common/assets/app-site-nginx.conf.j2")
+    helpers.assert_contains(c, "error_log {{ paths.runtime_nginx_dir }}/error.log")
+    helpers.assert_contains(c, "access_log {{ paths.runtime_nginx_dir }}/access.log")
+    helpers.assert_not_contains(c, "access_log stderr")
+
+
+# ---- Common static nginx template ----
+
+
+def test_common_static_nginx_serves_dist():
+    c = _read("runtimes/common/assets/static-site-nginx.conf.j2")
+    helpers.assert_contains(c, "root {{ paths.current }}/dist")
+    helpers.assert_contains(c, "index index.html")
+    helpers.assert_contains(c, "try_files $uri $uri/ /index.html")
+
+
+def test_common_static_nginx_has_no_proxy_pass():
+    c = _read("runtimes/common/assets/static-site-nginx.conf.j2")
+    helpers.assert_not_contains(c, "proxy_pass")
+
+
+# ---- Common app AppArmor profile ----
+
+
+def test_common_apparmor_profile_includes_exec_paths():
+    c = _read("runtimes/common/assets/app-profile.j2")
+    helpers.assert_contains(c, "{{ apparmor_profile_name }}")
+    helpers.assert_contains(c, "{% for exec_path in apparmor_exec_paths %}")
+    helpers.assert_contains(c, "mrix")
+
+
+def test_common_apparmor_profile_allows_runtime_and_log_dirs():
+    c = _read("runtimes/common/assets/app-profile.j2")
+    helpers.assert_contains(c, "{{ paths.runtime_socket_dir }}/{{ apparmor_runtime }}/ rw,")
+    helpers.assert_contains(c, "{{ paths.runtime_socket_dir }}/{{ apparmor_runtime }}/** rwk,")
+    helpers.assert_contains(c, "/var/log/bonesdeploy/{{ project_name }}/ rw,")
+    helpers.assert_contains(c, "/var/log/bonesdeploy/{{ project_name }}/** rwk,")
+
+
+def test_common_apparmor_profile_uses_configurable_network():
+    c = _read("runtimes/common/assets/app-profile.j2")
+    helpers.assert_contains(c, '{{ apparmor_network | default("network unix stream,") }}')
+
+
+def test_common_apparmor_profile_denies_root_and_ssh():
+    c = _read("runtimes/common/assets/app-profile.j2")
+    helpers.assert_contains(c, "deny /root/** r,")
+    helpers.assert_contains(c, "deny /etc/ssh/** r,")
 
 ```
 
