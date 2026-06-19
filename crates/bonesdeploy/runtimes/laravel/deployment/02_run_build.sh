@@ -17,18 +17,8 @@ echo "[bonesdeploy] Entering Laravel maintenance mode..."
 php artisan down --render="errors::503"
 trap 'php artisan up || true' EXIT
 
-# Frontend build
-if [ -f "./.nvmrc" ]; then
-  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-  if [ -s "$NVM_DIR/nvm.sh" ]; then
-    # shellcheck disable=SC1090
-    source "$NVM_DIR/nvm.sh"
-  elif [ -s "$HOME/.config/nvm/nvm.sh" ]; then
-    # shellcheck disable=SC1090
-    source "$HOME/.config/nvm/nvm.sh"
-  fi
-  nvm install
-fi
+# Frontend build. Node was installed by 01_install_build_deps.sh at $PROJECT_ROOT/build/node.
+export PATH="${PROJECT_ROOT:-.}/build/node/bin:$PATH"
 
 command -v pnpm >/dev/null 2>&1 || {
   echo "pnpm not found. Install it globally or enable it via corepack before deploy."
