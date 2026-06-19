@@ -1,4 +1,3 @@
-use std::fs;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -68,30 +67,9 @@ fn base_command(checkout: &Path) -> Command {
     command
 }
 
-/// Returns the list of available runtime names from Python.
-pub fn list_runtimes() -> Result<Vec<String>> {
-    let value = run_python_json(&["runtime", "list"])?;
-    match value {
-        Value::Array(runtimes) => {
-            runtimes.into_iter().map(|v| v.as_str().map(String::from).context("Runtime name is not a string")).collect()
-        }
-        _ => bail!("Expected JSON array from runtime list"),
-    }
-}
-
 /// Returns the questions for a given runtime from Python.
 pub fn runtime_questions(runtime: &str) -> Result<Value> {
     run_python_json(&["runtime", "questions", runtime])
-}
-
-pub fn runtime_defaults(runtime: &str) -> Result<Value> {
-    let checkout = super::bonesinfra::checkout_path()?;
-    let toml_path = checkout.join("src").join("bonesinfra").join("runtimes").join(runtime).join("runtime.toml");
-    let content = fs::read_to_string(&toml_path)
-        .with_context(|| format!("Failed to read runtime defaults from {}", toml_path.display()))?;
-    let toml_value: toml::Value =
-        toml::from_str(&content).with_context(|| format!("Failed to parse runtime.toml at {}", toml_path.display()))?;
-    serde_json::to_value(toml_value).context("Failed to convert runtime.toml to JSON")
 }
 
 #[cfg(test)]

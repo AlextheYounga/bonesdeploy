@@ -90,30 +90,30 @@ fn print_follow_up_hint() {
     println!("Run {} to sync {} to the remote.", style("bonesdeploy push").cyan(), style(".bones/").cyan());
 }
 
-fn seed_runtime_config(args: &InitArgs, project_name: &str, _bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
+fn seed_runtime_config(args: &InitArgs, project_name: &str, bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
     let template = if args.non_interactive {
         None
     } else {
-        let available = python::list_runtimes()?;
+        let available = embedded::runtime_names();
         prompts::choose_template(&available)?
     };
 
     if let Some(ref template_name) = template {
-        let defaults = python::runtime_defaults(template_name)?;
+        let defaults = embedded::runtime_defaults(template_name)?;
         let answers = if args.non_interactive {
-            defaults
+            serde_json::Value::Object(defaults.clone())
         } else {
             let questions = python::runtime_questions(template_name)?;
-            prompts::prompt_runtime_questions(&questions, &defaults)?
+            prompts::prompt_runtime_questions(&questions, &serde_json::Value::Object(defaults.clone()))?
         };
-        let mut map = answers.as_object().cloned().unwrap_or_default();
+        let mut map = answers.as_object().cloned().unwrap_or(defaults);
         inject_runtime_identity(&mut map, project_name);
-        let toml_str = toml::to_string(&map).context("Failed to serialize runtime config")?;
-        fs::write(runtime_toml, toml_str)?;
+        config::save_runtime(&map, runtime_toml)?;
+        embedded::scaffold_runtime_deployment(template_name, bones_dir)?;
         println!("Applied runtime template: {template_name}");
         println!("Saved runtime config to {}", paths::LOCAL_BONES_RUNTIME_TOML);
     } else {
-        let mut vars = serde_json::Map::new();
+        let mut vars = embedded::base_runtime_defaults()?;
         inject_runtime_identity(&mut vars, project_name);
         config::save_runtime(&vars, runtime_toml)?;
         println!("Seeded {} from kit defaults", paths::LOCAL_BONES_RUNTIME_TOML);

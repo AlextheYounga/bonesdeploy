@@ -170,6 +170,10 @@ fn init_materializes_base_bones_assets() -> Result<()> {
         assert!(bones_dir.join("hooks/hooks.sh").is_file());
         assert!(bones_dir.join("deployment/01_install_build_deps.sh").is_file());
         assert!(bones_dir.join("deployment/02_run_build.sh").is_file());
+        let runtime_toml = fs::read_to_string(bones_dir.join("runtime.toml"))?;
+        assert!(runtime_toml.contains("runtime_user = \"atlas\""));
+        assert!(runtime_toml.contains("permissions"));
+        assert!(runtime_toml.contains("shared"));
 
         let config_root = paths::bones_config_root().join("atlas.bones");
         assert!(config_root.join("hooks/hooks.sh").is_file());

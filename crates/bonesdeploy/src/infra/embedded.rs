@@ -1,15 +1,21 @@
+use std::collections::BTreeSet;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use rust_embed::Embed;
+use serde_json::{Map, Value};
 
 use shared::paths;
 
 #[derive(Embed)]
 #[folder = "./kit/"]
 struct Kit;
+
+#[derive(Embed)]
+#[folder = "./runtimes/"]
+struct RuntimeAssets;
 
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
@@ -20,6 +26,63 @@ pub fn scaffold(bones_dir: &Path) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub fn runtime_names() -> Vec<String> {
+    RuntimeAssets::iter()
+        .filter_map(|path| path.split('/').next().map(str::to_string))
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+pub fn base_runtime_defaults() -> Result<Map<String, Value>> {
+    runtime_defaults_from_bytes("kit/runtime.toml", Kit::get("runtime.toml").map(|asset| asset.data))
+}
+
+pub fn runtime_defaults(runtime: &str) -> Result<Map<String, Value>> {
+    let asset_path = format!("{runtime}/runtime.toml");
+    runtime_defaults_from_bytes(&asset_path, RuntimeAssets::get(&asset_path).map(|asset| asset.data))
+}
+
+pub fn scaffold_runtime_deployment(runtime: &str, bones_dir: &Path) -> Result<()> {
+    let runtime_prefix = format!("{runtime}/");
+
+    for file_path in RuntimeAssets::iter() {
+        let Some(stripped) = file_path.strip_prefix(&runtime_prefix) else {
+            continue;
+        };
+
+        if !stripped.starts_with(paths::KIT_DEPLOYMENT_DIR) {
+            continue;
+        }
+
+        let Some(asset) = RuntimeAssets::get(&file_path) else {
+            continue;
+        };
+
+        write_asset(bones_dir, stripped, asset.data.as_ref())?;
+    }
+
+    Ok(())
+}
+
+fn runtime_defaults_from_bytes(asset_path: &str, bytes: Option<impl AsRef<[u8]>>) -> Result<Map<String, Value>> {
+    let Some(bytes) = bytes else {
+        bail!("Missing embedded runtime defaults at {asset_path}");
+    };
+
+    let content = std::str::from_utf8(bytes.as_ref())
+        .with_context(|| format!("Embedded asset {asset_path} is not valid UTF-8"))?;
+    let toml_value: toml::Value = toml::from_str(content)
+        .with_context(|| format!("Failed to parse embedded runtime defaults at {asset_path}"))?;
+    let json_value = serde_json::to_value(toml_value)
+        .with_context(|| format!("Failed to convert embedded runtime defaults at {asset_path} to JSON"))?;
+
+    json_value
+        .as_object()
+        .cloned()
+        .ok_or_else(|| anyhow!("Embedded runtime defaults at {asset_path} are not a TOML table"))
 }
 
 fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()> {
@@ -37,4 +100,53 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use anyhow::Result;
+    use tempfile::TempDir;
+
+    use super::{base_runtime_defaults, runtime_defaults, runtime_names, scaffold_runtime_deployment};
+    use serde_json::Value;
+
+    #[test]
+    fn runtime_names_come_from_embedded_assets() {
+        let runtimes = runtime_names();
+
+        assert!(runtimes.contains(&String::from("laravel")));
+        assert!(runtimes.contains(&String::from("next")));
+    }
+
+    #[test]
+    fn runtime_defaults_read_local_runtime_toml() -> Result<()> {
+        let defaults = runtime_defaults("laravel")?;
+
+        assert_eq!(defaults.get("template"), Some(&Value::String(String::from("laravel"))));
+        assert_eq!(defaults.get("php_version"), Some(&Value::String(String::from("8.5"))));
+        Ok(())
+    }
+
+    #[test]
+    fn base_runtime_defaults_read_embedded_kit_runtime() -> Result<()> {
+        let defaults = base_runtime_defaults()?;
+
+        assert!(defaults.contains_key("permissions"));
+        assert!(defaults.contains_key("shared"));
+        Ok(())
+    }
+
+    #[test]
+    fn scaffold_runtime_deployment_writes_runtime_scripts() -> Result<()> {
+        let temp = TempDir::new()?;
+
+        scaffold_runtime_deployment("laravel", temp.path())?;
+
+        let script = temp.path().join("deployment/02_run_build.sh");
+        let content = fs::read_to_string(script)?;
+        assert!(content.contains("composer install"));
+        Ok(())
+    }
 }

@@ -125,10 +125,26 @@ fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Resul
 
     let kit_root = source_dir.join("crates/bonesdeploy/kit");
     sync_tree(&kit_root.join("hooks"), &bones_dir.join("hooks"), true)?;
-    sync_tree(&kit_root.join("deployment"), &bones_dir.join("deployment"), true)?;
+    sync_tree(&deployment_source_root(source_dir, bones_dir), &bones_dir.join("deployment"), true)?;
 
     println!("{} Local .bones scaffold refreshed.", style("Done!").green());
     Ok(())
+}
+
+fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> PathBuf {
+    let runtime_toml = bones_dir.join("runtime.toml");
+    let Some(template) = selected_runtime_template(&runtime_toml) else {
+        return source_dir.join("crates/bonesdeploy/kit/deployment");
+    };
+
+    let runtime_deployment = source_dir.join("crates/bonesdeploy/runtimes").join(template).join("deployment");
+    if runtime_deployment.is_dir() { runtime_deployment } else { source_dir.join("crates/bonesdeploy/kit/deployment") }
+}
+
+fn selected_runtime_template(runtime_toml: &Path) -> Option<String> {
+    let content = fs::read_to_string(runtime_toml).ok()?;
+    let value: toml::Value = toml::from_str(&content).ok()?;
+    value.get("template")?.as_str().map(String::from)
 }
 
 fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {
@@ -220,7 +236,8 @@ version = "not-this"
         let bones_dir = temp.path().join(".bones");
 
         write(&source_dir.join("crates/bonesdeploy/kit/hooks/pre-push"), "new hook")?;
-        write(&source_dir.join("crates/bonesdeploy/kit/deployment/01_build.sh"), "new deploy")?;
+        write(&source_dir.join("crates/bonesdeploy/kit/deployment/01_build.sh"), "generic deploy")?;
+        write(&source_dir.join("crates/bonesdeploy/runtimes/laravel/deployment/01_build.sh"), "laravel deploy")?;
 
         write(&bones_dir.join("bones.toml"), "keep = 'config'\n")?;
         write(&bones_dir.join("runtime.toml"), "template = 'laravel'\n")?;
@@ -230,7 +247,7 @@ version = "not-this"
         assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "keep = 'config'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("runtime.toml"))?, "template = 'laravel'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("hooks/pre-push"))?, "new hook");
-        assert_eq!(fs::read_to_string(bones_dir.join("deployment/01_build.sh"))?, "new deploy");
+        assert_eq!(fs::read_to_string(bones_dir.join("deployment/01_build.sh"))?, "laravel deploy");
 
         let hook_mode = fs::metadata(bones_dir.join("hooks/pre-push"))?.permissions().mode() & 0o777;
         let deploy_mode = fs::metadata(bones_dir.join("deployment/01_build.sh"))?.permissions().mode() & 0o777;
