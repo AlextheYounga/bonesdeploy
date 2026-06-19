@@ -10,7 +10,10 @@ use shared::paths;
 pub use shared::config::{Bones, load};
 
 pub fn is_configured(config: &Bones) -> bool {
-    !config.remote_name.is_empty() && !config.project_name.is_empty() && !config.host.is_empty() && !config.repo_path.is_empty()
+    !config.remote_name.is_empty()
+        && !config.project_name.is_empty()
+        && !config.host.is_empty()
+        && !config.repo_path.is_empty()
 }
 
 pub fn default_project_root_for(project_name: &str) -> String {

@@ -3,10 +3,8 @@ use std::fs;
 use anyhow::{Context, Result, bail};
 
 pub fn run(file: &str, key: &str) -> Result<()> {
-    let content = fs::read_to_string(file)
-        .with_context(|| format!("Failed to read config file: {file}"))?;
-    let value: toml::Value =
-        toml::from_str(&content).with_context(|| format!("Failed to parse TOML: {file}"))?;
+    let content = fs::read_to_string(file).with_context(|| format!("Failed to read config file: {file}"))?;
+    let value: toml::Value = toml::from_str(&content).with_context(|| format!("Failed to parse TOML: {file}"))?;
 
     let result = value.get(key);
     let Some(toml_value) = result else {

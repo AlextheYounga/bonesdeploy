@@ -12,10 +12,12 @@ pub(crate) fn resolve(config_ssh_user: Option<&str>) -> String {
 }
 
 fn resolve_from(value: Option<&str>) -> String {
-    value.and_then(|raw| {
-        let trimmed = raw.trim().to_string();
-        if trimmed.is_empty() { None } else { Some(trimmed) }
-    }).unwrap_or_else(|| String::from("root"))
+    value
+        .and_then(|raw| {
+            let trimmed = raw.trim().to_string();
+            if trimmed.is_empty() { None } else { Some(trimmed) }
+        })
+        .unwrap_or_else(|| String::from("root"))
 }
 
 #[cfg(test)]

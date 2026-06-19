@@ -13,7 +13,7 @@ use crate::embedded;
 use crate::git;
 use crate::prompts;
 use crate::python;
-use shared::config::{default_deploy_user, runtime_group_for, runtime_user_for, release_group_for};
+use shared::config::{default_deploy_user, release_group_for, runtime_group_for, runtime_user_for};
 use shared::paths;
 
 pub fn run(args: &InitArgs) -> Result<bool> {
@@ -123,18 +123,9 @@ fn seed_runtime_config(args: &InitArgs, project_name: &str, _bones_dir: &Path, r
 }
 
 fn inject_runtime_identity(vars: &mut serde_json::Map<String, serde_json::Value>, project_name: &str) {
-    vars.insert(
-        "runtime_user".into(),
-        serde_json::Value::String(runtime_user_for(project_name)),
-    );
-    vars.insert(
-        "runtime_group".into(),
-        serde_json::Value::String(runtime_group_for(project_name)),
-    );
-    vars.insert(
-        "release_group".into(),
-        serde_json::Value::String(release_group_for(project_name)),
-    );
+    vars.insert("runtime_user".into(), serde_json::Value::String(runtime_user_for(project_name)));
+    vars.insert("runtime_group".into(), serde_json::Value::String(runtime_group_for(project_name)));
+    vars.insert("release_group".into(), serde_json::Value::String(release_group_for(project_name)));
 }
 
 fn collect_from_seed(
@@ -151,8 +142,10 @@ fn collect_from_seed(
     let remote_name = cli_or_prompt(args.remote.as_ref(), None, || prompts::prompt_remote_name(existing_config))?;
     let inferred_remote =
         if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
-    let host = cli_or_prompt(args.host.as_ref(), None, || prompts::prompt_host(existing_config, inferred_remote.as_ref()))?;
-    let port = cli_or_prompt(args.port.as_ref(), None, || prompts::prompt_port(existing_config, inferred_remote.as_ref()))?;
+    let host =
+        cli_or_prompt(args.host.as_ref(), None, || prompts::prompt_host(existing_config, inferred_remote.as_ref()))?;
+    let port =
+        cli_or_prompt(args.port.as_ref(), None, || prompts::prompt_port(existing_config, inferred_remote.as_ref()))?;
     let repo_path = init_config::resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
     let project_root = init_config::seed_path_override(
         existing_config,

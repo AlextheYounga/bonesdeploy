@@ -139,10 +139,7 @@ async fn check_remote(cfg: &config::Bones, deploy_on_push: bool, issues: &mut Ve
 
     let check_bones = format!("test -d {repo_path}/{}", paths::BONES_DIR);
     if ssh::run_cmd(&session, &check_bones).await.is_err() {
-        issues.push(format!(
-            "{repo_path}/{}/ does not exist on remote (run 'bonesdeploy push')",
-            paths::BONES_DIR
-        ));
+        issues.push(format!("{repo_path}/{}/ does not exist on remote (run 'bonesdeploy push')", paths::BONES_DIR));
     }
 
     check_rsync_sync(cfg, issues);
@@ -150,34 +147,34 @@ async fn check_remote(cfg: &config::Bones, deploy_on_push: bool, issues: &mut Ve
     // Check hooks are symlinked properly (only when git-triggered deploy is enabled)
     if deploy_on_push {
         let check_hooks = format!(
-        "for hook in {repo_path}/{}/{}/{}; do \
+            "for hook in {repo_path}/{}/{}/{}; do \
             name=$(basename \"$hook\"); \
             link=\"{repo_path}/{}/$name\"; \
             if [ ! -L \"$link\" ] || [ \"$(readlink \"$link\")\" != \"$hook\" ]; then \
                 echo \"$name\"; \
             fi; \
          done",
-        paths::BONES_DIR,
-        paths::HOOKS_DIR,
-        "*",
-        paths::HOOKS_DIR
-    );
-    match ssh::run_cmd(&session, &check_hooks).await {
-        Ok(output) => {
-            for hook in output.lines() {
-                let hook = hook.trim();
-                if !hook.is_empty() {
-                    issues.push(format!(
-                        "{repo_path}/{}/{hook} is not properly symlinked to {}/{}/{hook}",
-                        paths::HOOKS_DIR,
-                        paths::BONES_DIR,
-                        paths::HOOKS_DIR
-                    ));
+            paths::BONES_DIR,
+            paths::HOOKS_DIR,
+            "*",
+            paths::HOOKS_DIR
+        );
+        match ssh::run_cmd(&session, &check_hooks).await {
+            Ok(output) => {
+                for hook in output.lines() {
+                    let hook = hook.trim();
+                    if !hook.is_empty() {
+                        issues.push(format!(
+                            "{repo_path}/{}/{hook} is not properly symlinked to {}/{}/{hook}",
+                            paths::HOOKS_DIR,
+                            paths::BONES_DIR,
+                            paths::HOOKS_DIR
+                        ));
+                    }
                 }
             }
+            Err(e) => issues.push(format!("Failed to check remote hook symlinks: {e}")),
         }
-        Err(e) => issues.push(format!("Failed to check remote hook symlinks: {e}")),
-    }
     }
 
     let _ = session.close().await;

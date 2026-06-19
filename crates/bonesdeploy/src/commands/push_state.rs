@@ -24,10 +24,7 @@ pub async fn run() -> Result<()> {
     let session = ssh::connect(&cfg).await?;
 
     println!("Cleaning sample hooks from remote...");
-    let cmd = format!(
-        "find {repo_path}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true",
-        paths::HOOKS_DIR
-    );
+    let cmd = format!("find {repo_path}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true", paths::HOOKS_DIR);
     ssh::run_cmd(&session, &cmd).await?;
 
     println!("Symlinking hooks...");

@@ -11,18 +11,9 @@ pub(super) fn base(cfg: &config::Bones, web_root: &str) -> Result<Map<String, Va
 
     vars.insert(String::from("ssh_port"), Value::String(cfg.port.clone()));
     vars.insert(String::from("deploy_user"), Value::String(shared_config::default_deploy_user()));
-    vars.insert(
-        String::from("runtime_user"),
-        Value::String(shared_config::runtime_user_for(&cfg.project_name)),
-    );
-    vars.insert(
-        String::from("runtime_group"),
-        Value::String(shared_config::runtime_group_for(&cfg.project_name)),
-    );
-    vars.insert(
-        String::from("release_group"),
-        Value::String(shared_config::release_group_for(&cfg.project_name)),
-    );
+    vars.insert(String::from("runtime_user"), Value::String(shared_config::runtime_user_for(&cfg.project_name)));
+    vars.insert(String::from("runtime_group"), Value::String(shared_config::runtime_group_for(&cfg.project_name)));
+    vars.insert(String::from("release_group"), Value::String(shared_config::release_group_for(&cfg.project_name)));
     vars.insert(String::from("project_root_parent"), Value::String(paths.project_root_parent.clone()));
     vars.insert(String::from("project_root"), Value::String(cfg.project_root.clone()));
     vars.insert(String::from("web_root"), Value::String(web_root.to_string()));

@@ -2,8 +2,8 @@ use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, ReleaseCommand, ServiceCommand};
 use crate::commands::{
-    activate_release, config, deploy, doctor, drop_failed_release, init, rollback, service, stage_release,
-    version, wire_release,
+    activate_release, config, deploy, doctor, drop_failed_release, init, rollback, service, stage_release, version,
+    wire_release,
 };
 
 pub fn run(cli: &Cli) -> Result<()> {

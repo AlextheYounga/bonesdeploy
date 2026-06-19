@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::paths::{self, Deployment};
@@ -11,7 +11,7 @@ use crate::paths::{self, Deployment};
 pub struct Bones {
     pub remote_name: String,
     pub project_name: String,
-	pub ssh_user: String,
+    pub ssh_user: String,
     pub host: String,
     pub port: String,
     #[serde(skip_serializing_if = "String::is_empty")]
@@ -35,7 +35,7 @@ impl Default for Bones {
         Self {
             remote_name: String::new(),
             project_name: String::new(),
-			ssh_user: String::from("root"),
+            ssh_user: String::from("root"),
             host: String::new(),
             port: "22".into(),
             repo_path: String::new(),
@@ -165,12 +165,15 @@ pub struct Runtime {
 pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
     let path = config_dir.join(RUNTIME_TOML);
     if path.exists() {
-        let content = fs::read_to_string(&path)
-            .with_context(|| format!("Failed to read {}", path.display()))?;
-        Ok(toml::from_str(&content)
-            .with_context(|| format!("Failed to parse {}", path.display()))?)
+        let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+        Ok(toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?)
     } else {
-        Ok(Runtime { web_root: paths::default_web_root(), runtime_user: String::new(), runtime_group: String::new(), release_group: String::new() })
+        Ok(Runtime {
+            web_root: paths::default_web_root(),
+            runtime_user: String::new(),
+            runtime_group: String::new(),
+            release_group: String::new(),
+        })
     }
 }
 

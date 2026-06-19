@@ -17,8 +17,7 @@ pub fn run() -> Result<()> {
     git::ensure_git_repository()?;
 
     let target = resolve_pull_target()?;
-    let remote_bones =
-        format!("{}@{}:{}/{}/", target.user, target.host, target.repo_path, paths::BONES_DIR);
+    let remote_bones = format!("{}@{}:{}/{}/", target.user, target.host, target.repo_path, paths::BONES_DIR);
 
     println!("Pulling .bones/ from {remote_bones}...");
 
@@ -76,8 +75,7 @@ fn resolve_remote_name() -> Result<String> {
 }
 
 fn rsync_bones(target: &git::RemoteConnectionDetails) -> Result<()> {
-    let source =
-        format!("{}@{}:{}/{}/", target.user, target.host, target.repo_path, paths::BONES_DIR);
+    let source = format!("{}@{}:{}/{}/", target.user, target.host, target.repo_path, paths::BONES_DIR);
     let ssh_arg = format!("ssh -p {} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null", target.port);
     let dest = format!("{}/", paths::LOCAL_BONES_DIR);
     let status = rsync::status(&["-av", "--delete", "-e", &ssh_arg, &source, &dest])?;

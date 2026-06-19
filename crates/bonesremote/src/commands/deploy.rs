@@ -49,9 +49,7 @@ pub fn run(config_path: &str) -> Result<()> {
     let release_name = release_state::read_staged_release(&cfg)?;
     let release_path = release_state::release_dir(&cfg, &release_name);
     let build_root = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root);
-    let runtime = shared_config::load_runtime(
-        Path::new(config_path).parent().unwrap_or_else(|| Path::new(".")),
-    )?;
+    let runtime = shared_config::load_runtime(Path::new(config_path).parent().unwrap_or_else(|| Path::new(".")))?;
     let deployment_paths = cfg.deployment_paths(&runtime.web_root);
     let deployment_dir = PathBuf::from(&deployment_paths.repo_deployment);
 

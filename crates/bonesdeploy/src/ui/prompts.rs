@@ -5,7 +5,11 @@ use inquire::{Confirm, Select, Text};
 use crate::config::Bones;
 use crate::git;
 
-fn config_default<'a>(existing_config: Option<&'a Bones>, accessor: impl Fn(&'a Bones) -> &'a str, fallback: &'a str) -> &'a str {
+fn config_default<'a>(
+    existing_config: Option<&'a Bones>,
+    accessor: impl Fn(&'a Bones) -> &'a str,
+    fallback: &'a str,
+) -> &'a str {
     existing_config
         .and_then(|cfg| {
             let value = accessor(cfg);
@@ -222,10 +226,7 @@ pub fn confirm_remote_setup() -> Result<bool> {
         println!("{line}");
     }
     println!();
-    Confirm::new("Set up the server now?")
-        .with_default(false)
-        .prompt()
-        .map_err(|err| anyhow!(err))
+    Confirm::new("Set up the server now?").with_default(false).prompt().map_err(|err| anyhow!(err))
 }
 
 pub fn confirm_remote_runtime() -> Result<bool> {
@@ -234,10 +235,7 @@ pub fn confirm_remote_runtime() -> Result<bool> {
         println!("{line}");
     }
     println!();
-    Confirm::new("Apply the runtime on the server now?")
-        .with_default(false)
-        .prompt()
-        .map_err(|err| anyhow!(err))
+    Confirm::new("Apply the runtime on the server now?").with_default(false).prompt().map_err(|err| anyhow!(err))
 }
 
 #[cfg(test)]
@@ -282,10 +280,7 @@ pub fn confirm_remote_ssl() -> Result<bool> {
         println!("{line}");
     }
     println!();
-    Confirm::new("Set up HTTPS now?")
-        .with_default(false)
-        .prompt()
-        .map_err(|err| anyhow!(err))
+    Confirm::new("Set up HTTPS now?").with_default(false).prompt().map_err(|err| anyhow!(err))
 }
 
 fn remote_ssl_prompt_lines() -> [&'static str; 5] {
@@ -299,10 +294,8 @@ fn remote_ssl_prompt_lines() -> [&'static str; 5] {
 }
 
 fn prompt_remote_name_text(existing_config: Option<&Bones>) -> Result<String> {
-    let default_remote = existing_config
-        .map(|cfg| cfg.remote_name.as_str())
-        .filter(|value| !value.is_empty())
-        .unwrap_or("production");
+    let default_remote =
+        existing_config.map(|cfg| cfg.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
     Text::new("Deployment remote name:")
         .with_default(default_remote)
         .with_help_message("bonesdeploy will add this local git remote if it does not exist")

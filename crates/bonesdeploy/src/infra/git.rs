@@ -73,9 +73,15 @@ pub fn list_remotes_with_urls() -> Result<Vec<RemoteInfo>> {
     let mut remotes = Vec::new();
     for line in String::from_utf8_lossy(&output.stdout).lines() {
         let mut parts = line.split_whitespace();
-        let Some(name) = parts.next() else { continue; };
-        let Some(url) = parts.next() else { continue; };
-        let Some(kind) = parts.next() else { continue; };
+        let Some(name) = parts.next() else {
+            continue;
+        };
+        let Some(url) = parts.next() else {
+            continue;
+        };
+        let Some(kind) = parts.next() else {
+            continue;
+        };
         if kind != "(fetch)" {
             continue;
         }

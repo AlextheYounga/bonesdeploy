@@ -29,12 +29,8 @@ pub(crate) fn collect_non_interactive(
     validate_host(&host)?;
 
     let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
-    let project_root = seed_path_override(
-        existing_config,
-        |cfg| &cfg.project_root,
-        &project_name,
-        config::default_project_root_for,
-    );
+    let project_root =
+        seed_path_override(existing_config, |cfg| &cfg.project_root, &project_name, config::default_project_root_for);
     let deploy_on_push = existing_config.is_none_or(|cfg| cfg.deploy_on_push);
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
 
@@ -165,9 +161,5 @@ pub fn seed_path_override(
         return String::new();
     }
     let resolved = value.replace("<project_name>", current_project_name);
-    if resolved == default_for(current_project_name) {
-        String::new()
-    } else {
-        resolved
-    }
+    if resolved == default_for(current_project_name) { String::new() } else { resolved }
 }

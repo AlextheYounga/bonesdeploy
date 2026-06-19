@@ -7,12 +7,12 @@ use serde_json::Value;
 use shared::config as shared_config;
 use shared::paths;
 
-use crate::bootstrap_ssh;
 use super::push_state;
+use super::remote_data;
+use crate::bootstrap_ssh;
 use crate::config;
 use crate::prompts;
 use crate::python;
-use super::remote_data;
 
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);

@@ -22,8 +22,10 @@ pub fn run(config_path: &str) -> Result<()> {
     let _runtime = shared_config::load_runtime(config_dir)?;
     let runtime_path = config_dir.join("runtime.toml");
     let shared_paths = if runtime_path.exists() {
-        let content = fs::read_to_string(&runtime_path).with_context(|| format!("Failed to read {}", runtime_path.display()))?;
-        let runtime: Shared = toml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
+        let content =
+            fs::read_to_string(&runtime_path).with_context(|| format!("Failed to read {}", runtime_path.display()))?;
+        let runtime: Shared =
+            toml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
         runtime.paths
     } else {
         Vec::new()

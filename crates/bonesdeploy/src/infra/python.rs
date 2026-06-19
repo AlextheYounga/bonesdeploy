@@ -89,8 +89,8 @@ pub fn runtime_defaults(runtime: &str) -> Result<Value> {
     let toml_path = checkout.join("src").join("bonesinfra").join("runtimes").join(runtime).join("runtime.toml");
     let content = fs::read_to_string(&toml_path)
         .with_context(|| format!("Failed to read runtime defaults from {}", toml_path.display()))?;
-    let toml_value: toml::Value = toml::from_str(&content)
-        .with_context(|| format!("Failed to parse runtime.toml at {}", toml_path.display()))?;
+    let toml_value: toml::Value =
+        toml::from_str(&content).with_context(|| format!("Failed to parse runtime.toml at {}", toml_path.display()))?;
     serde_json::to_value(toml_value).context("Failed to convert runtime.toml to JSON")
 }
 

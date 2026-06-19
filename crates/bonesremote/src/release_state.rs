@@ -131,7 +131,10 @@ mod tests {
     use shared::config::Bones;
     use shared::paths;
 
-    use super::{clear_staged_release, current_release_name, list_releases_sorted, point_symlink_atomically, read_staged_release, releases_dir, staged_release_path, write_staged_release};
+    use super::{
+        clear_staged_release, current_release_name, list_releases_sorted, point_symlink_atomically,
+        read_staged_release, releases_dir, staged_release_path, write_staged_release,
+    };
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
