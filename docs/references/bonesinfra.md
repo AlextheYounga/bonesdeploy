@@ -76,11 +76,7 @@ bonesinfra
 │           │   ├── service.py
 │           │   └── validation.py
 │           ├── django
-│           │   ├── deployment
-│           │   │   ├── 01_install_build_deps.sh
-│           │   │   └── 02_run_build.sh
-│           │   ├── django.py
-│           │   └── runtime.toml
+│           │   └── django.py
 │           ├── laravel
 │           │   ├── __init__.py
 │           │   ├── assets
@@ -89,41 +85,20 @@ bonesinfra
 │           │   │   └── php
 │           │   │       └── php-fpm-pool.conf.j2
 │           │   ├── deploy.py
-│           │   ├── deployment
-│           │   │   ├── 01_install_build_deps.sh
-│           │   │   └── 02_run_build.sh
 │           │   ├── metadata.py
 │           │   ├── nginx.py
 │           │   ├── php_fpm.py
 │           │   ├── php_packages.py
-│           │   ├── php_repo.py
-│           │   └── runtime.toml
+│           │   └── php_repo.py
 │           ├── next
-│           │   ├── next.py
-│           │   └── runtime.toml
+│           │   └── next.py
 │           ├── nuxt
-│           │   ├── deployment
-│           │   │   ├── 01_install_build_deps.sh
-│           │   │   └── 02_run_build.sh
-│           │   ├── nuxt.py
-│           │   └── runtime.toml
+│           │   └── nuxt.py
 │           ├── rails
-│           │   ├── deployment
-│           │   │   ├── 01_install_build_deps.sh
-│           │   │   └── 02_run_build.sh
-│           │   ├── rails.py
-│           │   └── runtime.toml
+│           │   └── rails.py
 │           ├── sveltekit
-│           │   ├── deployment
-│           │   │   ├── 01_install_build_deps.sh
-│           │   │   └── 02_run_build.sh
-│           │   ├── runtime.toml
 │           │   └── svelte.py
 │           └── vue
-│               ├── deployment
-│               │   ├── 01_install_build_deps.sh
-│               │   └── 02_run_build.sh
-│               ├── runtime.toml
 │               └── vue.py
 └── tests
     ├── __init__.py
@@ -179,42 +154,29 @@ Not lazy about: input validation at trust boundaries, error handling that preven
 `README.md`:
 
 ```md
-# kit/infra
+# bonesinfra
 
-This directory contains the three pyinfra deploy scripts that drive `bonesdeploy remote setup|runtime|ssl`, plus Jinja2 template assets. Every file is embedded into the `bonesdeploy` binary and written to `<project>/.bones/infra/` during `bonesdeploy init` and `bonesdeploy remote runtime`.
+Hidden Python provisioning engine for BonesDeploy.
 
-## Deploy Scripts
+It handles pyinfra-based setup, runtime, and SSL provisioning. BonesDeploy owns TOML creation and uses this package as the private execution layer.
 
-### `setup.py` — Machine Bootstrap
-Runs once per project as root. Provisions the bare Git repo, placeholder release, system users (deploy + service), firewall (UFW), and builds/installs `bonesremote` from source.
+## Interface
 
-### `runtime.py` — Per-Site Runtime
-Runs as the deploy user. Installs template-specific packages (via loading `../runtime/operations.py`), deploys AppArmor profile, nginx router config, per-site nginx config, and per-site systemd service.
+- `bonesinfra runtime list`
+- `bonesinfra runtime questions <runtime>`
+- `bonesinfra setup apply --config <bones.toml>`
+- `bonesinfra runtime apply --config <bones.toml> --runtime-config <runtime.toml>`
+- `bonesinfra ssl apply --config <bones.toml>`
 
-### `ssl.py` — TLS Certificates
-Runs as root. Obtains certbot certificates via webroot challenge and re-renders the nginx router with TLS enabled.
+## Runtime metadata
 
-## Jinja2 Templates
+Runtime modules expose `questions()` so BonesDeploy can prompt users and write `runtime.toml` on the Rust side.
 
-### `assets/apparmor/project-nginx-profile.j2`
-Per-project AppArmor profile template. Variables: `socket_path`, `conf_root`, `runtime_binaries`, `project_root`, `current_web_root`.
+## Notes
 
-### `assets/nginx/router.conf.j2`
-Top-level nginx server block for the project domain. Two modes: HTTP-only (for certbot challenges) and HTTPS (post-SSL). Variables: `server_name`, `site_nginx_config`, `socket_path`, `ssl_enabled`, `ssl_cert_path`, `ssl_cert_key_path`.
-
-### `assets/nginx/site-nginx.conf.j2`
-Per-site upstream nginx config that proxies to the project's Unix socket. Included by `router.conf.j2`. Variables: `socket_path`, `nginx_runtime_group`.
-
-### `assets/nginx/site-nginx.service.j2`
-Per-project systemd service unit for the site-local nginx. Variables: `project_name`, `conf_root` (`/srv/conf/<project>/nginx.conf`), `apparmor_profile_path`.
-
-## Data Format
-
-All deploy scripts receive data via pyinfra `--data key=value` CLI flags. Nested objects (like `DeploymentPaths`) are flattened to dotted keys (e.g. `--data paths.repo=/home/git/myapp.git`). Each script calls `_unflatten(host.data.dict())` to reconstruct nested dicts for template rendering. Direct access uses `DEPLOY_DATA["key"]` or `DEPLOY_DATA.get("key")`.
-
-## Python Dependencies
-
-Defined in `pyproject.toml`. Not embedded — the user's local `pyinfra` installation handles dependency resolution. The `.venv/` and `__pycache__/` directories are excluded from embedding.
+- `bonesinfra` reads `bones.toml` and `runtime.toml`.
+- It does not create those files.
+- It does not own deployment scripts.
 
 ```
 
@@ -282,8 +244,6 @@ bonesinfra = "bonesinfra.__main__:main"
 bonesinfra = [
     "assets/**/*.j2",
     "runtimes/**/assets/**/*.j2",
-    "runtimes/**/deployment/*.sh",
-    "runtimes/**/runtime.toml",
 ]
 
 [dependency-groups]
@@ -1017,6 +977,14 @@ def start_services(paths):
         _sudo=True,
     )
 
+    # ponytail: reload only after the per-site nginx socket exists, so the
+    # router never flips over to a missing upstream and briefly serves 502s.
+    server.shell(
+        name="Reload nginx to apply site config changes",
+        commands=["systemctl reload nginx"],
+        _sudo=True,
+    )
+
 ```
 
 `src/bonesinfra/deploys/runtime/packages.py`:
@@ -1104,17 +1072,6 @@ def install():
     server.shell(
         name="Run bonesremote init",
         commands=["/usr/local/bin/bonesremote init"],
-        _sudo=True,
-    )
-
-
-def install_authorized_key(ctx):
-    if not ctx.runtime.runtime_data.get("deploy_authorized_key"):
-        return
-    server.user(
-        name="Ensure deploy user authorized key is installed",
-        user=ctx.config.deploy_user,
-        public_keys=[ctx.runtime.runtime_data["deploy_authorized_key"]],
         _sudo=True,
     )
 
@@ -1389,7 +1346,7 @@ def deploy_setup(ctx):
     directories.setup_repo_and_project(ctx, paths)
     placeholder.seed(ctx, paths, here)
     firewall.configure(ctx)
-    bonesremote.install_authorized_key(ctx)
+    users.install_authorized_key(ctx)
     bonesremote.install()
 
 ```
@@ -1466,6 +1423,25 @@ def ensure_users_and_groups(ctx):
     for group in required_groups:
         if group != existing_user["group"] and group not in existing_user["groups"]:
             _ensure_group_membership(ctx.runtime.runtime_user, group)
+
+
+def install_authorized_key(ctx):
+    deploy_user = ctx.config.deploy_user
+    ssh_user = ctx.config.ssh_user
+    server.shell(
+        name=f"Copy {ssh_user} SSH key to deploy user {deploy_user}",
+        commands=[
+            f"install -d -o {deploy_user} -g {deploy_user} -m 0700 /home/{deploy_user}/.ssh",
+            (
+                f'src=$(eval echo ~{ssh_user}/.ssh/authorized_keys); '
+                f'[ -f "$src" ] || {{ echo "ERROR: $src not found" >&2; exit 1; }}; '
+                f'cp "$src" /home/{deploy_user}/.ssh/authorized_keys'
+            ),
+            f"chown {deploy_user}:{deploy_user} /home/{deploy_user}/.ssh/authorized_keys",
+            f"chmod 0600 /home/{deploy_user}/.ssh/authorized_keys",
+        ],
+        _sudo=True,
+    )
 
 ```
 
@@ -1707,7 +1683,6 @@ BONES_TOML = "bones.toml"
 NGINX_CONF = "nginx.conf"
 INDEX_HTML = "index.html"
 GIT_HEAD = "HEAD"
-DEPLOYMENT_DIR = "deployment"
 RELEASES_DIR = "releases"
 SHARED_DIR = "shared"
 BUILD_DIR = "build"
@@ -1745,7 +1720,6 @@ class DeploymentPaths:
     repo_head: str
     repo_bones: str
     repo_bones_toml: str
-    repo_deployment: str
     site_nginx_config: str
     conf_root: str
     project_root: str
@@ -1800,7 +1774,6 @@ class DeploymentPaths:
             repo_bones=str(repo_bones),
             repo_bones_toml=str(repo_bones / BONES_TOML),
             site_nginx_config=str(conf_root / NGINX_CONF),
-            repo_deployment=str(repo_bones / DEPLOYMENT_DIR),
             conf_root=str(conf_root),
             project_root=project_root,
             project_root_parent=_parent_or_default(project_root, DEFAULT_PROJECT_ROOT_PARENT),
@@ -2801,75 +2774,6 @@ def verify_profile_attached(service_name, profile_name, *, name=None):
 
 ```
 
-`src/bonesinfra/runtimes/django/deployment/01_install_build_deps.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-NVM_INSTALL_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh"
-
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  exit 0
-fi
-
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$NVM_INSTALL_URL" | PROFILE=/dev/null NVM_DIR="$NVM_DIR" bash
-else
-  echo "curl or wget is required to install nvm."
-  exit 1
-fi
-```
-
-`src/bonesinfra/runtimes/django/deployment/02_run_build.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-command -v python3 >/dev/null 2>&1 || { echo "python3 not found"; exit 1; }
-
-# Activate virtualenv
-VENV_DIR="${VENV_DIR:-venv}"
-if [ -d "./$VENV_DIR" ]; then
-  # shellcheck disable=SC1090
-  source "./$VENV_DIR/bin/activate"
-else
-  echo "Virtual environment not found at ./$VENV_DIR"
-  echo "Create one on the server: python3 -m venv $VENV_DIR"
-  exit 1
-fi
-
-# Install dependencies
-if [ -f "./requirements.txt" ]; then
-  pip install -r requirements.txt --quiet
-elif [ -f "./pyproject.toml" ]; then
-  pip install . --quiet
-fi
-
-# Run migrations
-python3 manage.py migrate --noinput
-
-# Collect static files
-python3 manage.py collectstatic --noinput
-
-# Restart gunicorn via systemd
-SERVICE_NAME="$PROJECT_NAME"
-if ! command -v systemctl >/dev/null 2>&1; then
-  echo "systemctl not found. Restart your app server manually."
-elif systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-  systemctl restart "$SERVICE_NAME"
-elif systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
-  systemctl start "$SERVICE_NAME"
-else
-  echo "No systemd service found for $SERVICE_NAME. Restart your app server manually."
-fi
-
-```
-
 `src/bonesinfra/runtimes/django/django.py`:
 
 ```py
@@ -2946,28 +2850,6 @@ def deploy(ctx):
     )
     nginx.render_proxy(ctx, paths=paths, socket_path=socket_path)
     service.enable_and_start(ctx, "gunicorn", apparmor_profile_name=apparmor_profile_name)
-
-```
-
-`src/bonesinfra/runtimes/django/runtime.toml`:
-
-```toml
-template = "django"
-web_root = "public"
-
-[permissions]
-paths = [
-    { path = "*", type = "dir", mode = "750" },
-    { path = "*", type = "file", mode = "640" },
-    { path = "static", type = "dir", mode = "750", recursive = true },
-    { path = "media", type = "dir", mode = "770", recursive = true },
-]
-
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]
 
 ```
 
@@ -3084,98 +2966,6 @@ def deploy(ctx):
     php_fpm.setup_storage_directories(paths, ctx)
     php_fpm.setup_pool(here, ctx, paths, php_version)
     nginx.setup(here, ctx, paths, php_version)
-
-```
-
-`src/bonesinfra/runtimes/laravel/deployment/01_install_build_deps.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-NVM_INSTALL_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh"
-
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  exit 0
-fi
-
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$NVM_INSTALL_URL" | PROFILE=/dev/null NVM_DIR="$NVM_DIR" bash
-else
-  echo "curl or wget is required to install nvm."
-  exit 1
-fi
-```
-
-`src/bonesinfra/runtimes/laravel/deployment/02_run_build.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-trap 'status=$?; echo "[bonesdeploy] Failed at line $LINENO: $BASH_COMMAND (status $status)" >&2; exit "$status"' ERR
-
-[ -f artisan ] || { echo "artisan not found"; exit 1; }
-command -v php >/dev/null 2>&1 || { echo "php not found"; exit 1; }
-command -v composer >/dev/null 2>&1 || { echo "composer not found"; exit 1; }
-
-# Install PHP dependencies first — artisan requires vendor/autoload.php
-echo "[bonesdeploy] Installing Composer dependencies..."
-composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
-
-# Maintenance mode once the app can boot
-echo "[bonesdeploy] Entering Laravel maintenance mode..."
-php artisan down --render="errors::503"
-trap 'php artisan up || true' EXIT
-
-# Frontend build
-if [ -f "./.nvmrc" ]; then
-  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-  if [ -s "$NVM_DIR/nvm.sh" ]; then
-    # shellcheck disable=SC1090
-    source "$NVM_DIR/nvm.sh"
-  elif [ -s "$HOME/.config/nvm/nvm.sh" ]; then
-    # shellcheck disable=SC1090
-    source "$HOME/.config/nvm/nvm.sh"
-  fi
-  nvm install
-fi
-
-command -v pnpm >/dev/null 2>&1 || {
-  echo "pnpm not found. Install it globally or enable it via corepack before deploy."
-  exit 1
-}
-
-echo "[bonesdeploy] Installing frontend dependencies..."
-pnpm install --frozen-lockfile
-echo "[bonesdeploy] Building frontend assets..."
-pnpm run build
-
-if php artisan list | grep -q 'wayfinder:generate'; then
-  php artisan wayfinder:generate
-fi
-
-if [ ! -f .env ] || ! grep -Eq '^APP_KEY=base64:' .env; then
-  php artisan key:generate --force
-fi
-
-echo "[bonesdeploy] Running migrations..."
-php artisan migrate --force
-
-# Clear old caches and rebuild them back-to-back
-echo "[bonesdeploy] Rebuilding Laravel caches..."
-php artisan optimize:clear
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-php artisan event:cache || true
-php artisan queue:restart || true
-
-php artisan up
-trap - EXIT
 
 ```
 
@@ -3369,31 +3159,6 @@ def add_php_apt_source():
 
 ```
 
-`src/bonesinfra/runtimes/laravel/runtime.toml`:
-
-```toml
-template = "laravel"
-web_root = "public"
-php_version = "8.5"
-
-[permissions]
-paths = [
-    { path = "*", type = "dir", mode = "750" },
-    { path = "*", type = "file", mode = "640" },
-    { path = "storage", type = "dir", mode = "770", recursive = true },
-    { path = "bootstrap/cache", type = "dir", mode = "770", recursive = true },
-    { path = "database", type = "dir", mode = "770", recursive = false },
-    { path = "database/database.sqlite", type = "file", mode = "660", recursive = false },
-]
-
-[shared]
-paths = [
-    { path = "storage", type = "dir" },
-    { path = ".env", type = "file" },
-]
-
-```
-
 `src/bonesinfra/runtimes/next/next.py`:
 
 ```py
@@ -3441,85 +3206,6 @@ def deploy(ctx):
 
 ```
 
-`src/bonesinfra/runtimes/next/runtime.toml`:
-
-```toml
-template = "next"
-web_root = "public"
-
-[permissions]
-paths = [
-    { path = "*", type = "dir", mode = "750" },
-    { path = "*", type = "file", mode = "640" },
-    { path = ".next", type = "dir", mode = "770", recursive = true },
-]
-
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]
-
-```
-
-`src/bonesinfra/runtimes/nuxt/deployment/01_install_build_deps.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-NVM_INSTALL_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh"
-
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  exit 0
-fi
-
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$NVM_INSTALL_URL" | PROFILE=/dev/null NVM_DIR="$NVM_DIR" bash
-else
-  echo "curl or wget is required to install nvm."
-  exit 1
-fi
-```
-
-`src/bonesinfra/runtimes/nuxt/deployment/02_run_build.sh`:
-
-```sh
-  #!/usr/bin/env bash
-  set -Eeuo pipefail
-
-  if [ -f "./.nvmrc" ]; then
-    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-    if [ -s "$NVM_DIR/nvm.sh" ]; then
-      # shellcheck disable=SC1090
-      source "$NVM_DIR/nvm.sh"
-    elif [ -s "$HOME/.config/nvm/nvm.sh" ]; then
-      # shellcheck disable=SC1090
-      source "$HOME/.config/nvm/nvm.sh"
-    fi
-    nvm install
-  fi
-
-  if [ -f "./pnpm-lock.yaml" ]; then
-    npm install -g pnpm
-    pnpm install --frozen-lockfile
-    pnpm generate
-  elif [ -f "./yarn.lock" ]; then
-    command -v corepack >/dev/null 2>&1 && corepack enable || true
-    yarn install --frozen-lockfile
-    yarn generate
-  elif [ -f "./package-lock.json" ]; then
-    npm ci --include=optional
-    npm run generate
-  else
-    echo "No lockfile found. Run your package manager locally first."
-    exit 1
-  fi
-
-```
-
 `src/bonesinfra/runtimes/nuxt/nuxt.py`:
 
 ```py
@@ -3562,96 +3248,6 @@ def deploy(ctx):
     )
     nginx.render_proxy(ctx, paths=paths, socket_path=socket_path)
     service.enable_and_start(ctx, "nuxt", apparmor_profile_name=apparmor_profile_name)
-
-```
-
-`src/bonesinfra/runtimes/nuxt/runtime.toml`:
-
-```toml
-template = "nuxt"
-web_root = ".output/public"
-
-[permissions]
-paths = [
-    { path = "*", type = "dir", mode = "750" },
-    { path = "*", type = "file", mode = "640" },
-    { path = ".output", type = "dir", mode = "770", recursive = true },
-    { path = ".nuxt", type = "dir", mode = "770", recursive = true },
-]
-
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]
-
-```
-
-`src/bonesinfra/runtimes/rails/deployment/01_install_build_deps.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-NVM_INSTALL_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh"
-
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  exit 0
-fi
-
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$NVM_INSTALL_URL" | PROFILE=/dev/null NVM_DIR="$NVM_DIR" bash
-else
-  echo "curl or wget is required to install nvm."
-  exit 1
-fi
-```
-
-`src/bonesinfra/runtimes/rails/deployment/02_run_build.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-command -v ruby >/dev/null 2>&1 || { echo "ruby not found"; exit 1; }
-command -v bundle >/dev/null 2>&1 || { echo "bundler not found"; exit 1; }
-
-# Load rbenv if available
-if [ -d "$HOME/.rbenv" ]; then
-  export PATH="$HOME/.rbenv/bin:$PATH"
-  eval "$(rbenv init -)"
-fi
-
-# Install Ruby version from .ruby-version if rbenv is available
-if [ -f "./.ruby-version" ] && command -v rbenv >/dev/null 2>&1; then
-  rbenv install --skip-existing
-fi
-
-# Install dependencies
-bundle install --deployment --without development test
-
-# Precompile assets
-if bundle exec rails assets:precompile 2>/dev/null; then
-  echo "Assets precompiled."
-fi
-
-# Run database migrations
-RAILS_ENV=production bundle exec rails db:migrate
-
-# Restart puma via systemd
-SERVICE_NAME="$PROJECT_NAME"
-if ! command -v systemctl >/dev/null 2>&1; then
-  echo "systemctl not found. Restart your app server manually."
-elif systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-  systemctl restart "$SERVICE_NAME"
-elif systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
-  systemctl start "$SERVICE_NAME"
-else
-  echo "No systemd service found for $SERVICE_NAME. Restart your app server manually."
-fi
 
 ```
 
@@ -3729,114 +3325,6 @@ def deploy(ctx):
 
 ```
 
-`src/bonesinfra/runtimes/rails/runtime.toml`:
-
-```toml
-template = "rails"
-web_root = "public"
-
-[permissions]
-paths = [
-    { path = "*", type = "dir", mode = "750" },
-    { path = "*", type = "file", mode = "640" },
-    { path = "tmp", type = "dir", mode = "770", recursive = true },
-    { path = "log", type = "dir", mode = "770", recursive = true },
-    { path = "storage", type = "dir", mode = "770", recursive = true },
-    { path = "public/assets", type = "dir", mode = "750", recursive = true },
-]
-
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]
-
-```
-
-`src/bonesinfra/runtimes/sveltekit/deployment/01_install_build_deps.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-NVM_INSTALL_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh"
-
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  exit 0
-fi
-
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$NVM_INSTALL_URL" | PROFILE=/dev/null NVM_DIR="$NVM_DIR" bash
-else
-  echo "curl or wget is required to install nvm."
-  exit 1
-fi
-```
-
-`src/bonesinfra/runtimes/sveltekit/deployment/02_run_build.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-# Load nvm if .nvmrc is present
-if [ -f "./.nvmrc" ]; then
-  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-  if [ -s "$NVM_DIR/nvm.sh" ]; then
-    # shellcheck disable=SC1090
-    source "$NVM_DIR/nvm.sh"
-  elif [ -s "$HOME/.config/nvm/nvm.sh" ]; then
-    # shellcheck disable=SC1090
-    source "$HOME/.config/nvm/nvm.sh"
-  fi
-  nvm install
-fi
-
-# Clean install and build
-rm -rf node_modules
-
-if [ -f "./pnpm-lock.yaml" ]; then
-  npm install -g pnpm
-  pnpm install --frozen-lockfile
-  pnpm build
-elif [ -f "./yarn.lock" ]; then
-  command -v corepack >/dev/null 2>&1 && corepack enable || true
-  yarn install --frozen-lockfile
-  yarn build
-elif [ -f "./package-lock.json" ]; then
-  npm install --include=optional
-  npm run build
-else
-  echo "No lockfile found. Run your package manager locally first."
-  exit 1
-fi
-
-```
-
-`src/bonesinfra/runtimes/sveltekit/runtime.toml`:
-
-```toml
-template = "sveltekit"
-web_root = "build"
-
-[permissions]
-paths = [
-    { path = "*", type = "dir", mode = "750" },
-    { path = "*", type = "file", mode = "640" },
-    { path = "build", type = "dir", mode = "770", recursive = true },
-]
-
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]
-
-```
-
 `src/bonesinfra/runtimes/sveltekit/svelte.py`:
 
 ```py
@@ -3880,90 +3368,6 @@ def deploy(ctx):
     )
     nginx.render_proxy(ctx, paths=paths, socket_path=socket_path)
     service.enable_and_start(ctx, "sveltekit", apparmor_profile_name=apparmor_profile_name)
-
-```
-
-`src/bonesinfra/runtimes/vue/deployment/01_install_build_deps.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-NVM_INSTALL_URL="https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.5/install.sh"
-
-if [ -s "$NVM_DIR/nvm.sh" ]; then
-  exit 0
-fi
-
-if command -v curl >/dev/null 2>&1; then
-  curl -fsSL "$NVM_INSTALL_URL" | PROFILE=/dev/null NVM_DIR="$NVM_DIR" bash
-else
-  echo "curl or wget is required to install nvm."
-  exit 1
-fi
-```
-
-`src/bonesinfra/runtimes/vue/deployment/02_run_build.sh`:
-
-```sh
-#!/usr/bin/env bash
-
-set -Eeuo pipefail
-
-# Load nvm if .nvmrc is present
-if [ -f "./.nvmrc" ]; then
-  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-  if [ -s "$NVM_DIR/nvm.sh" ]; then
-    # shellcheck disable=SC1090
-    source "$NVM_DIR/nvm.sh"
-  elif [ -s "$HOME/.config/nvm/nvm.sh" ]; then
-    # shellcheck disable=SC1090
-    source "$HOME/.config/nvm/nvm.sh"
-  fi
-  nvm install
-fi
-
-# Clean install and build
-rm -rf node_modules
-
-if [ -f "./pnpm-lock.yaml" ]; then
-  npm install -g pnpm
-  pnpm install --frozen-lockfile
-  pnpm build
-elif [ -f "./yarn.lock" ]; then
-  command -v corepack >/dev/null 2>&1 && corepack enable || true
-  yarn install --frozen-lockfile
-  yarn build
-elif [ -f "./package-lock.json" ]; then
-  npm install --include=optional
-  npm run build
-else
-  echo "No lockfile found. Run your package manager locally first."
-  exit 1
-fi
-
-```
-
-`src/bonesinfra/runtimes/vue/runtime.toml`:
-
-```toml
-template = "vue"
-web_root = "dist/public"
-
-[permissions]
-paths = [
-    { path = "*", type = "dir", mode = "750" },
-    { path = "*", type = "file", mode = "640" },
-    { path = "dist", type = "dir", mode = "755", recursive = true },
-]
-
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]
 
 ```
 
@@ -4449,7 +3853,7 @@ def test_setup_plan_calls_all_steps():
     helpers.assert_contains(c, "directories.setup_repo_and_project")
     helpers.assert_contains(c, "placeholder.seed")
     helpers.assert_contains(c, "firewall.configure")
-    helpers.assert_contains(c, "bonesremote.install_authorized_key")
+    helpers.assert_contains(c, "users.install_authorized_key")
     helpers.assert_contains(c, "bonesremote.install")
 
 
@@ -4788,6 +4192,18 @@ def test_app_service_runtime_dir_stays_private():
     user) needs to reach app sockets, so no world traversal is required."""
     c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/assets/app.service.j2")
     helpers.assert_contains(c, "RuntimeDirectoryMode=0750")
+
+
+def test_runtime_nginx_reloads_after_config_change():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/runtime/nginx.py")
+    helpers.assert_ordering(
+        c,
+        "Enable router nginx site",
+        "nginx -t",
+        "Ensure nginx service is enabled and started",
+        "Ensure per-site nginx service is enabled and started",
+        "systemctl reload nginx",
+    )
 
 ```
 
@@ -5336,30 +4752,6 @@ def test_laravel_nginx_logs_under_runtime_nginx_dir():
     helpers.assert_contains(c, "error_log {{ paths.runtime_nginx_dir }}/error.log")
     helpers.assert_contains(c, "access_log {{ paths.runtime_nginx_dir }}/access.log")
     helpers.assert_not_contains(c, "access_log stderr")
-
-
-# ---- Laravel build script ----
-
-
-def test_laravel_build_script_has_err_trap():
-    c = _read("runtimes/laravel/deployment/02_run_build.sh")
-    helpers.assert_contains(c, "trap '")
-    helpers.assert_contains(c, "ERR")
-    helpers.assert_contains(c, "$LINENO")
-    helpers.assert_contains(c, "$BASH_COMMAND")
-
-
-def test_laravel_build_script_labels_each_phase():
-    c = _read("runtimes/laravel/deployment/02_run_build.sh")
-    for label in [
-        "Installing Composer dependencies",
-        "Entering Laravel maintenance mode",
-        "Installing frontend dependencies",
-        "Building frontend assets",
-        "Running migrations",
-        "Rebuilding Laravel caches",
-    ]:
-        helpers.assert_contains(c, label)
 
 
 # ---- Common app service template ----
