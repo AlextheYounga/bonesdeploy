@@ -2,8 +2,8 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
+use crate::infra::bonesinfra_cli;
 use crate::infra::git;
-use crate::infra::python;
 use crate::ui::prompts;
 use shared::paths;
 
@@ -23,7 +23,7 @@ pub fn run() -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     println!("Applying runtime using local bonesinfra ...");
 
-    python::run(&[
+    bonesinfra_cli::run(&[
         "runtime",
         "apply",
         "--config",

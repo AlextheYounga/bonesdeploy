@@ -10,8 +10,8 @@ use shared::paths;
 use super::push_state;
 use super::remote_data;
 use crate::config;
+use crate::infra::bonesinfra_cli;
 use crate::infra::bootstrap_ssh;
-use crate::infra::python;
 use crate::ui::prompts;
 
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
@@ -62,7 +62,10 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    python::run_with_stdin(&["ssl", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")], &json)?;
+    bonesinfra_cli::run_with_stdin(
+        &["ssl", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")],
+        &json,
+    )?;
 
     config::save(&cfg, bones_toml)?;
     push_state::sync_bones_directory(&cfg)?;

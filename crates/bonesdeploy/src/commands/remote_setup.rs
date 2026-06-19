@@ -9,8 +9,8 @@ use shared::paths;
 
 use super::remote_data;
 use crate::config;
+use crate::infra::bonesinfra_cli;
 use crate::infra::bootstrap_ssh;
-use crate::infra::python;
 
 pub fn run() -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
@@ -27,7 +27,10 @@ pub fn run() -> Result<()> {
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    python::run_with_stdin(&["setup", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")], &json)?;
+    bonesinfra_cli::run_with_stdin(
+        &["setup", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")],
+        &json,
+    )?;
 
     println!("{} Remote setup complete.", style("Done!").green().bold());
 

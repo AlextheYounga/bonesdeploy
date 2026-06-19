@@ -10,15 +10,19 @@ pub use crate::commands::init_config::InitArgs;
 use crate::commands::remote_setup;
 use crate::config;
 use crate::infra::bonesinfra;
+use crate::infra::bonesinfra_cli;
 use crate::infra::embedded;
 use crate::infra::git;
-use crate::infra::python;
 use crate::ui::prompts;
 use shared::config::{default_deploy_user, release_group_for, runtime_group_for, runtime_user_for};
 use shared::paths;
 
 pub fn run(args: &InitArgs) -> Result<bool> {
     git::ensure_git_repository()?;
+
+    println!("Preparing local bonesinfra...");
+    bonesinfra::prefetch()?;
+    println!("Local bonesinfra ready.");
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     let had_bones_entry = fs::symlink_metadata(bones_dir).is_ok();
@@ -55,10 +59,6 @@ pub fn run(args: &InitArgs) -> Result<bool> {
     }
 
     update_gitignore()?;
-
-    println!("Preparing local bonesinfra...");
-    bonesinfra::prefetch()?;
-    println!("Local bonesinfra ready.");
 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = load_or_collect_config(bones_toml, args)?;
@@ -114,7 +114,7 @@ fn seed_runtime_config(args: &InitArgs, project_name: &str, bones_dir: &Path, ru
         let answers = if args.non_interactive {
             serde_json::Value::Object(defaults.clone())
         } else {
-            let questions = python::runtime_questions(template_name)?;
+            let questions = bonesinfra_cli::runtime_questions(template_name)?;
             prompts::prompt_runtime_questions(&questions, &serde_json::Value::Object(defaults.clone()))?
         };
         let mut map = answers.as_object().cloned().unwrap_or(defaults);
