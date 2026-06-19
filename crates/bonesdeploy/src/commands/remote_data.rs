@@ -34,11 +34,8 @@ fn base(cfg: &config::Bones, web_root: &str) -> Result<Map<String, Value>> {
     Ok(vars)
 }
 
-pub fn setup(cfg: &config::Bones, web_root: &str, deploy_authorized_key: &str) -> Result<Value> {
-    let mut vars = base(cfg, web_root)?;
-    vars.insert(String::from("deploy_authorized_key"), Value::String(deploy_authorized_key.to_string()));
-    vars.insert(String::from("setup_label"), Value::String(String::from("bonesdeploy")));
-    Ok(Value::Object(vars))
+pub fn setup(cfg: &config::Bones, web_root: &str) -> Result<Value> {
+    base(cfg, web_root).map(Value::Object)
 }
 
 pub fn ssl(cfg: &config::Bones, web_root: &str, domain: &str, email: &str) -> Result<Value> {
