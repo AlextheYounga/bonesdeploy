@@ -9,6 +9,7 @@ use crate::commands::init_config;
 pub use crate::commands::init_config::InitArgs;
 use crate::commands::remote_setup;
 use crate::config;
+use crate::infra::bonesinfra;
 use crate::infra::embedded;
 use crate::infra::git;
 use crate::infra::python;
@@ -54,6 +55,10 @@ pub fn run(args: &InitArgs) -> Result<bool> {
     }
 
     update_gitignore()?;
+
+    println!("Preparing local bonesinfra...");
+    bonesinfra::prefetch()?;
+    println!("Local bonesinfra ready.");
 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = load_or_collect_config(bones_toml, args)?;

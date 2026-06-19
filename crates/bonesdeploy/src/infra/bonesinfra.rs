@@ -9,6 +9,10 @@ const REPOSITORY_URL: &str = "https://github.com/AlextheYounga/bonesinfra.git";
 const CHECKOUT_DIR: &str = "bonesinfra";
 const EXECUTABLE_NAME: &str = "bonesinfra";
 
+pub fn prefetch() -> Result<()> {
+    ensure_available().map(|_| ())
+}
+
 pub(super) fn executable_path() -> Result<PathBuf> {
     ensure_available()
 }
