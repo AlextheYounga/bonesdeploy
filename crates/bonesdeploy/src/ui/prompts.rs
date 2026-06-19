@@ -1,11 +1,18 @@
-use std::io::{self, Write};
-
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Result, anyhow, bail};
 use console::style;
 use inquire::{Confirm, Select, Text};
 
 use crate::config::Bones;
 use crate::git;
+
+fn config_default<'a>(existing_config: Option<&'a Bones>, accessor: impl Fn(&'a Bones) -> &'a str, fallback: &'a str) -> &'a str {
+    existing_config
+        .and_then(|cfg| {
+            let value = accessor(cfg);
+            (!value.is_empty()).then_some(value)
+        })
+        .unwrap_or(fallback)
+}
 
 pub fn prompt_runtime_questions(
     questions: &serde_json::Value,
@@ -85,10 +92,7 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
 }
 
 pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bones>) -> Result<String> {
-    let default_project_name = existing_config
-        .map(|cfg| cfg.project_name.as_str())
-        .filter(|value| !value.is_empty())
-        .unwrap_or(project_name_hint);
+    let default_project_name = config_default(existing_config, |cfg| cfg.project_name.as_str(), project_name_hint);
     Text::new("Project name:")
         .with_default(default_project_name)
         .prompt()
@@ -97,8 +101,7 @@ pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bon
 }
 
 pub fn prompt_branch(existing_config: Option<&Bones>) -> Result<String> {
-    let default_branch =
-        existing_config.map(|cfg| cfg.branch.as_str()).filter(|value| !value.is_empty()).unwrap_or("main");
+    let default_branch = config_default(existing_config, |cfg| cfg.branch.as_str(), "main");
     Text::new("Branch:")
         .with_default(default_branch)
         .prompt()
@@ -114,7 +117,10 @@ pub fn prompt_remote_name(existing_config: Option<&Bones>) -> Result<String> {
         return prompt_remote_name_text(existing_config);
     }
 
-    let default_remote = existing_config.map(|cfg| cfg.remote_name.clone()).filter(|value| !value.is_empty());
+    let default_remote = existing_config.and_then(|cfg| {
+        let value = cfg.remote_name.as_str();
+        (!value.is_empty()).then(|| cfg.remote_name.clone())
+    });
 
     let preferred = default_remote.or_else(|| {
         let has_production = remotes.iter().any(|r| r.name == "production");
@@ -185,8 +191,7 @@ pub fn prompt_host(
         return Ok(details.host.clone());
     }
 
-    let default_host =
-        existing_config.map(|cfg| cfg.host.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
+    let default_host = config_default(existing_config, |cfg| cfg.host.as_str(), "");
     Text::new("Server host or IP:")
         .with_default(default_host)
         .with_help_message("e.g. deploy.example.com or 203.0.113.10")
@@ -203,8 +208,7 @@ pub fn prompt_port(
         return Ok(details.port.clone());
     }
 
-    let default_port =
-        existing_config.map(|cfg| cfg.port.as_str()).filter(|value| !value.is_empty()).unwrap_or("22");
+    let default_port = config_default(existing_config, |cfg| cfg.port.as_str(), "22");
     Text::new("SSH port:")
         .with_default(default_port)
         .prompt()
@@ -213,13 +217,30 @@ pub fn prompt_port(
 }
 
 pub fn confirm_remote_setup() -> Result<bool> {
-    confirm_with_lines(remote_setup_prompt_lines(), "Set up the server now?")
+    println!();
+    for line in remote_setup_prompt_lines() {
+        println!("{line}");
+    }
+    println!();
+    Confirm::new("Set up the server now?")
+        .with_default(false)
+        .prompt()
+        .map_err(|err| anyhow!(err))
 }
 
 pub fn confirm_remote_runtime() -> Result<bool> {
-    confirm_with_lines(remote_runtime_prompt_lines(), "Apply the runtime on the server now?")
+    println!();
+    for line in remote_runtime_prompt_lines() {
+        println!("{line}");
+    }
+    println!();
+    Confirm::new("Apply the runtime on the server now?")
+        .with_default(false)
+        .prompt()
+        .map_err(|err| anyhow!(err))
 }
 
+#[cfg(test)]
 fn is_affirmative(answer: &str) -> bool {
     matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
@@ -256,7 +277,15 @@ fn remote_runtime_prompt_lines() -> [&'static str; 9] {
 }
 
 pub fn confirm_remote_ssl() -> Result<bool> {
-    confirm_with_lines(remote_ssl_prompt_lines(), "Set up HTTPS now?")
+    println!();
+    for line in remote_ssl_prompt_lines() {
+        println!("{line}");
+    }
+    println!();
+    Confirm::new("Set up HTTPS now?")
+        .with_default(false)
+        .prompt()
+        .map_err(|err| anyhow!(err))
 }
 
 fn remote_ssl_prompt_lines() -> [&'static str; 5] {
@@ -267,27 +296,6 @@ fn remote_ssl_prompt_lines() -> [&'static str; 5] {
         "Common DNS providers are Namecheap, GoDaddy, Cloudflare, etc.",
         "If you have not completed this step, certificate creation will fail on this step.",
     ]
-}
-
-fn confirm_with_lines<const N: usize>(lines: [&'static str; N], prompt: &str) -> Result<bool> {
-    println!();
-    let mut lines = lines.into_iter();
-    if let Some(header) = lines.next() {
-        println!("{}", style(header).cyan().bold());
-    }
-    for line in lines {
-        println!("{line}");
-    }
-    println!();
-    print!("{prompt} [y/N] ");
-    io::stdout().flush().context("Failed to flush confirmation prompt")?;
-
-    let mut answer = String::new();
-    if io::stdin().read_line(&mut answer).is_err() {
-        return Ok(false);
-    }
-
-    Ok(is_affirmative(&answer))
 }
 
 fn prompt_remote_name_text(existing_config: Option<&Bones>) -> Result<String> {
@@ -304,8 +312,7 @@ fn prompt_remote_name_text(existing_config: Option<&Bones>) -> Result<String> {
 }
 
 pub fn prompt_ssl_domain(existing_config: Option<&Bones>) -> Result<String> {
-    let default_domain =
-        existing_config.map(|cfg| cfg.domain.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
+    let default_domain = config_default(existing_config, |cfg| cfg.domain.as_str(), "");
     Text::new("SSL domain:")
         .with_default(default_domain)
         .with_help_message("e.g. app.example.com")
@@ -315,8 +322,7 @@ pub fn prompt_ssl_domain(existing_config: Option<&Bones>) -> Result<String> {
 }
 
 pub fn prompt_ssl_email(existing_config: Option<&Bones>) -> Result<String> {
-    let default_email =
-        existing_config.map(|cfg| cfg.email.as_str()).filter(|value| !value.is_empty()).unwrap_or("");
+    let default_email = config_default(existing_config, |cfg| cfg.email.as_str(), "");
     Text::new("SSL email:")
         .with_default(default_email)
         .with_help_message("e.g. ops@example.com")

@@ -61,6 +61,14 @@ pub const NGINX_PID: &str = "nginx.pid";
 pub const PHP_FPM_SOCKET: &str = "php-fpm.sock";
 pub const DEFAULT_NGINX_SITE: &str = "default";
 
+pub const GIT_HOOKS_DIR: &str = ".git/hooks";
+pub const GIT_PRE_PUSH_HOOK: &str = ".git/hooks/pre-push";
+pub const PRE_PUSH_HOOK_NAME: &str = "pre-push";
+pub const PRE_PUSH_HOOK_TARGET: &str = "../../.bones/hooks/pre-push";
+pub const HOOKS_DIR: &str = "hooks";
+pub const KIT_HOOKS_DIR: &str = "hooks/";
+pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";
+
 const RUNTIME_SOCKET_PARENT: &str = "/run";
 
 #[must_use]
@@ -252,7 +260,6 @@ pub fn bones_state_root() -> PathBuf {
 mod tests {
     use super::*;
 
-    /// Falls back to `XDG_CONFIG_HOME` when available.
     #[test]
     fn bones_config_root_uses_xdg_config_home() {
         let home = home_dir();
@@ -260,7 +267,6 @@ mod tests {
         assert_eq!(bones_config_root(), expected);
     }
 
-    /// Falls back to `XDG_STATE_HOME` when available.
     #[test]
     fn bones_state_root_uses_xdg_state_home() {
         let home = home_dir();

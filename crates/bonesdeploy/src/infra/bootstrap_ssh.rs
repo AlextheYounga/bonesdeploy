@@ -22,21 +22,18 @@ fn resolve_from(value: Option<&str>) -> String {
 mod tests {
     use super::resolve_from;
 
-    /// Defaults the bootstrap SSH user to root when no config or env value is provided.
     #[test]
     fn defaults_to_root() {
         let user = resolve_from(None);
         assert_eq!(user, "root");
     }
 
-    /// Uses the config value when provided.
     #[test]
     fn uses_config_value() {
         let user = resolve_from(Some("ubuntu"));
         assert_eq!(user, "ubuntu");
     }
 
-    /// Trims whitespace and falls back to root when the value is blank.
     #[test]
     fn trims_and_rejects_blank_values() {
         let user = resolve_from(Some("   "));

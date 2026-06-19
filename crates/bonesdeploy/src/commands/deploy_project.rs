@@ -7,7 +7,7 @@ use crate::config;
 use crate::ssh;
 
 pub async fn run() -> Result<()> {
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
     let remote_bones_toml = cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).repo_bones_toml;

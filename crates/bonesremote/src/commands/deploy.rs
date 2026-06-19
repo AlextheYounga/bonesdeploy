@@ -4,6 +4,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use shared::config as shared_config;
+use shared::paths;
 
 use crate::config;
 use crate::release_state;
@@ -47,12 +48,12 @@ pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
     let release_path = release_state::release_dir(&cfg, &release_name);
-    let build_root = release_state::build_root(&cfg);
+    let build_root = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root);
     let runtime = shared_config::load_runtime(
         Path::new(config_path).parent().unwrap_or_else(|| Path::new(".")),
     )?;
-    let paths = cfg.deployment_paths(&runtime.web_root);
-    let deployment_dir = PathBuf::from(&paths.repo_deployment);
+    let deployment_paths = cfg.deployment_paths(&runtime.web_root);
+    let deployment_dir = PathBuf::from(&deployment_paths.repo_deployment);
 
     if !release_path.exists() {
         bail!("Staged release directory does not exist: {}", release_path.display());
@@ -68,7 +69,7 @@ pub fn run(config_path: &str) -> Result<()> {
     } else {
         for script in scripts {
             let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
-            let log_path = deploy_output::deployment_log_path(&paths, &release_name, script_name);
+            let log_path = deploy_output::deployment_log_path(&deployment_paths, &release_name, script_name);
             println!("Running {script_name}...");
             println!("Log: {}", log_path.display());
 
@@ -102,7 +103,7 @@ pub fn run(config_path: &str) -> Result<()> {
 
 fn restart_services(config_path: &str) -> Result<()> {
     let status = Command::new("sudo")
-        .arg(config::Constants::BINARY_NAME)
+        .arg(paths::BONESREMOTE_BINARY)
         .args(["service", "restart", "--config", config_path])
         .status()
         .context("Failed to restart site services")?;

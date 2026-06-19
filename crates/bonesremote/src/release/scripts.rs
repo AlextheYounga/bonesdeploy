@@ -240,7 +240,6 @@ mod tests {
         Ok(())
     }
 
-    /// Duplicates every byte into both writers.
     #[test]
     fn tee_writer_writes_to_both_targets() -> Result<()> {
         let stdout = Cursor::new(Vec::new());
@@ -256,7 +255,6 @@ mod tests {
         Ok(())
     }
 
-    /// Streams deployment output into both console targets and the log file.
     #[test]
     fn run_deployment_script_streams_output_to_console_and_log() -> Result<()> {
         let root = temp_dir("bonesremote_deploy_runner_stream")?;
@@ -302,7 +300,6 @@ mod tests {
         Ok(())
     }
 
-    /// Preserves the failing script's exit status after tee-ing output to the log file.
     #[test]
     fn run_deployment_script_preserves_failing_exit_status() -> Result<()> {
         let root = temp_dir("bonesremote_deploy_runner_failing")?;
@@ -339,7 +336,6 @@ mod tests {
         Ok(())
     }
 
-    /// Creates the log directory on demand so the deploy runner can write into a fresh project root.
     #[test]
     fn run_deployment_script_creates_missing_log_directory() -> Result<()> {
         let root = temp_dir("bonesremote_deploy_runner_mkdir")?;
@@ -372,7 +368,6 @@ mod tests {
         Ok(())
     }
 
-    /// Builds the log path under the centralized `project_root/build/logs` directory.
     #[test]
     fn deployment_log_path_lives_under_build_logs() {
         let paths = Deployment::new("demo", "/home/git/demo.git", "/srv/deployments/demo", "public");

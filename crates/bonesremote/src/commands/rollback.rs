@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
+use shared::paths;
 
 use crate::config;
 use crate::release_state;
@@ -24,7 +25,7 @@ pub fn run(config_path: &str) -> Result<()> {
 
     let previous_name = releases[current_idx - 1].clone();
     let previous_dir = release_state::release_dir(&cfg, &previous_name);
-    let current_link = release_state::current_link(&cfg);
+    let current_link = std::path::PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
     release_state::point_symlink_atomically(&current_link, &previous_dir)?;
 
     println!("Rollback complete: {current_name} -> {previous_name}");

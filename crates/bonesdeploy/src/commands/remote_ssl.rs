@@ -5,6 +5,7 @@ use console::style;
 use serde_json::Value;
 
 use shared::config as shared_config;
+use shared::paths;
 
 use crate::bootstrap_ssh;
 use super::push_state;
@@ -14,9 +15,9 @@ use crate::python;
 use super::remote_data;
 
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let mut cfg = config::load(bones_toml)?;
-    let runtime = shared_config::load_runtime(Path::new(config::Constants::BONES_DIR))?;
+    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
 
     if let Some(value) = domain {
         cfg.domain = value.trim().to_string();

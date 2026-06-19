@@ -14,15 +14,12 @@ use crate::git;
 use crate::prompts;
 use crate::python;
 use shared::config::{default_deploy_user, runtime_group_for, runtime_user_for, release_group_for};
+use shared::paths;
 
-pub struct InitOutcome {
-    pub remote_setup_ran: bool,
-}
-
-pub fn run(args: &InitArgs) -> Result<InitOutcome> {
+pub fn run(args: &InitArgs) -> Result<bool> {
     git::ensure_git_repository()?;
 
-    let bones_dir = Path::new(config::Constants::BONES_DIR);
+    let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     let is_fresh = !bones_dir.exists();
 
     let mut initial_project_name: Option<String> = None;
@@ -43,7 +40,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
         println!("Symlinked .bones -> {}", config_dir.display());
 
         let seed = config::Bones { project_name: project_name.clone(), ..Default::default() };
-        config::save(&seed, Path::new(config::Constants::BONES_TOML))?;
+        config::save(&seed, Path::new(paths::LOCAL_BONES_TOML))?;
 
         initial_project_name = Some(project_name);
     } else {
@@ -52,7 +49,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
 
     update_gitignore()?;
 
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = load_or_collect_config(bones_toml, args)?;
 
     if let Some(ref initial) = initial_project_name
@@ -67,10 +64,10 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
     }
 
     config::save(&cfg, bones_toml)?;
-    println!("Saved config to {}", config::Constants::BONES_TOML);
+    println!("Saved config to {}", paths::LOCAL_BONES_TOML);
 
     if is_fresh {
-        let runtime_toml = Path::new(config::Constants::BONES_RUNTIME_TOML);
+        let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
         seed_runtime_config(args, &cfg.project_name, bones_dir, runtime_toml)?;
     }
     ensure_local_remote(&cfg)?;
@@ -84,7 +81,7 @@ pub fn run(args: &InitArgs) -> Result<InitOutcome> {
         print_follow_up_hint();
     }
 
-    Ok(InitOutcome { remote_setup_ran })
+    Ok(remote_setup_ran)
 }
 
 fn print_follow_up_hint() {
@@ -114,12 +111,12 @@ fn seed_runtime_config(args: &InitArgs, project_name: &str, _bones_dir: &Path, r
         let toml_str = toml::to_string(&map).context("Failed to serialize runtime config")?;
         fs::write(runtime_toml, toml_str)?;
         println!("Applied runtime template: {template_name}");
-        println!("Saved runtime config to {}", config::Constants::BONES_RUNTIME_TOML);
+        println!("Saved runtime config to {}", paths::LOCAL_BONES_RUNTIME_TOML);
     } else {
         let mut vars = serde_json::Map::new();
         inject_runtime_identity(&mut vars, project_name);
         config::save_runtime(&vars, runtime_toml)?;
-        println!("Seeded {} from kit defaults", config::Constants::BONES_RUNTIME_TOML);
+        println!("Seeded {} from kit defaults", paths::LOCAL_BONES_RUNTIME_TOML);
     }
 
     Ok(())
@@ -140,26 +137,22 @@ fn inject_runtime_identity(vars: &mut serde_json::Map<String, serde_json::Value>
     );
 }
 
-fn collect(project_name_hint: &str, args: &InitArgs) -> Result<config::Bones> {
-    collect_from_seed(project_name_hint, None, args)
-}
-
 fn collect_from_seed(
     project_name_hint: &str,
     existing_config: Option<&config::Bones>,
     args: &InitArgs,
 ) -> Result<config::Bones> {
-    let project_name = cli_existing_or_prompt(
+    let project_name = cli_or_prompt(
         args.project_name.as_ref(),
         existing_config.and_then(|cfg| init_config::non_empty(&cfg.project_name)),
         || prompts::prompt_project_name(project_name_hint, existing_config),
     )?;
-    let branch = cli_or_prompt(args.branch.as_ref(), || prompts::prompt_branch(existing_config))?;
-    let remote_name = cli_or_prompt(args.remote.as_ref(), || prompts::prompt_remote_name(existing_config))?;
+    let branch = cli_or_prompt(args.branch.as_ref(), None, || prompts::prompt_branch(existing_config))?;
+    let remote_name = cli_or_prompt(args.remote.as_ref(), None, || prompts::prompt_remote_name(existing_config))?;
     let inferred_remote =
         if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
-    let host = cli_or_prompt(args.host.as_ref(), || prompts::prompt_host(existing_config, inferred_remote.as_ref()))?;
-    let port = cli_or_prompt(args.port.as_ref(), || prompts::prompt_port(existing_config, inferred_remote.as_ref()))?;
+    let host = cli_or_prompt(args.host.as_ref(), None, || prompts::prompt_host(existing_config, inferred_remote.as_ref()))?;
+    let port = cli_or_prompt(args.port.as_ref(), None, || prompts::prompt_port(existing_config, inferred_remote.as_ref()))?;
     let repo_path = init_config::resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
     let project_root = init_config::seed_path_override(
         existing_config,
@@ -213,14 +206,7 @@ fn resolve_project_name(args: &InitArgs) -> Result<String> {
     prompts::prompt_project_name(&hint, None)
 }
 
-fn cli_or_prompt(cli_value: Option<&String>, prompt: impl FnOnce() -> Result<String>) -> Result<String> {
-    match cli_value {
-        Some(v) if !v.is_empty() => Ok(v.trim().to_string()),
-        _ => prompt(),
-    }
-}
-
-fn cli_existing_or_prompt(
+fn cli_or_prompt(
     cli_value: Option<&String>,
     existing_value: Option<String>,
     prompt: impl FnOnce() -> Result<String>,
@@ -235,7 +221,7 @@ fn load_or_collect_config(bones_toml: &Path, args: &InitArgs) -> Result<config::
     if bones_toml.exists() {
         let existing = config::load(bones_toml)?;
         if config::is_configured(&existing) {
-            println!("Loading existing config from {}...", config::Constants::BONES_TOML);
+            println!("Loading existing config from {}...", paths::LOCAL_BONES_TOML);
             return Ok(existing);
         }
         let project_name = config::repo_directory_name()?;
@@ -251,12 +237,12 @@ fn load_or_collect_config(bones_toml: &Path, args: &InitArgs) -> Result<config::
         return init_config::collect_non_interactive(&project_name, None, args);
     }
 
-    collect(&project_name, args)
+    collect_from_seed(&project_name, None, args)
 }
 
 fn update_gitignore() -> Result<()> {
     let gitignore = Path::new(".gitignore");
-    let entry = config::Constants::BONES_DIR;
+    let entry = paths::LOCAL_BONES_DIR;
 
     if gitignore.exists() {
         let content = fs::read_to_string(gitignore)?;
@@ -274,11 +260,11 @@ fn update_gitignore() -> Result<()> {
 }
 
 pub(crate) fn symlink_pre_push() -> Result<()> {
-    let hooks_dir = Path::new(config::Constants::GIT_HOOKS_DIR);
+    let hooks_dir = Path::new(paths::GIT_HOOKS_DIR);
     fs::create_dir_all(hooks_dir)?;
 
-    let link = hooks_dir.join(config::Constants::PRE_PUSH_HOOK);
-    let target = Path::new(config::Constants::PRE_PUSH_HOOK_TARGET);
+    let link = hooks_dir.join(paths::PRE_PUSH_HOOK_NAME);
+    let target = Path::new(paths::PRE_PUSH_HOOK_TARGET);
 
     if fs::symlink_metadata(&link).is_ok() {
         fs::remove_file(&link).with_context(|| format!("Failed to remove existing {}", link.display()))?;
@@ -286,7 +272,7 @@ pub(crate) fn symlink_pre_push() -> Result<()> {
 
     unix_fs::symlink(target, &link).with_context(|| format!("Failed to symlink {}", link.display()))?;
 
-    println!("Symlinked {} -> {}", config::Constants::GIT_PRE_PUSH_HOOK_PATH, config::Constants::PRE_PUSH_HOOK_TARGET);
+    println!("Symlinked {} -> {}", paths::GIT_PRE_PUSH_HOOK, paths::PRE_PUSH_HOOK_TARGET);
     Ok(())
 }
 
@@ -304,5 +290,3 @@ fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
 #[cfg(test)]
 #[path = "tests/test_init_project.rs"]
 mod test_init_project;
-
-

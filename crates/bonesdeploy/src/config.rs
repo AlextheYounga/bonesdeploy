@@ -9,27 +9,6 @@ use shared::paths;
 
 pub use shared::config::{Bones, load};
 
-pub struct Constants;
-impl Constants {
-    pub const BONES_DIR: &'static str = paths::LOCAL_BONES_DIR;
-    pub const BONES_TOML: &'static str = paths::LOCAL_BONES_TOML;
-    pub const BONES_HOOKS_SCRIPT: &'static str = paths::LOCAL_BONES_HOOKS_SCRIPT;
-    pub const BONES_HOOKS_DIR: &'static str = paths::LOCAL_BONES_HOOKS_DIR;
-    pub const BONES_DEPLOYMENT_DIR: &'static str = paths::LOCAL_BONES_DEPLOYMENT_DIR;
-    pub const BONES_RUNTIME_TOML: &'static str = paths::LOCAL_BONES_RUNTIME_TOML;
-
-    pub const GIT_HOOKS_DIR: &'static str = ".git/hooks";
-    pub const GIT_PRE_PUSH_HOOK_PATH: &'static str = ".git/hooks/pre-push";
-    pub const PRE_PUSH_HOOK: &'static str = "pre-push";
-    pub const PRE_PUSH_HOOK_TARGET: &'static str = "../../.bones/hooks/pre-push";
-
-    pub const REMOTE_BONES_DIR: &'static str = "bones";
-    pub const REMOTE_HOOKS_DIR: &'static str = "hooks";
-
-    pub const ASSET_HOOKS_DIR: &'static str = "hooks/";
-    pub const ASSET_DEPLOYMENT_DIR: &'static str = "deployment/";
-}
-
 pub fn is_configured(config: &Bones) -> bool {
     !config.remote_name.is_empty() && !config.project_name.is_empty() && !config.host.is_empty() && !config.repo_path.is_empty()
 }
@@ -102,7 +81,6 @@ mod tests {
         }
     }
 
-    /// Derives the default repo path from the project name.
     #[test]
     fn load_applies_default_repo_path_from_project_name() -> Result<()> {
         let path = temp_path("repo_path.toml");
@@ -115,7 +93,6 @@ mod tests {
         Ok(())
     }
 
-    /// Derives the default project root from the project name.
     #[test]
     fn load_applies_default_project_root_from_project_name() -> Result<()> {
         let path = temp_path("project_root.toml");
@@ -128,7 +105,6 @@ mod tests {
         Ok(())
     }
 
-    /// Includes derived repo and project root fields when saving.
     #[test]
     fn save_includes_derived_repo_and_project_root() -> Result<()> {
         let config = sample_config("phoenix");
@@ -144,7 +120,6 @@ mod tests {
         Ok(())
     }
 
-    /// Persists SSL settings (enabled, domain, email) when saving.
     #[test]
     fn save_persists_ssl_settings() -> Result<()> {
         let mut config = sample_config("phoenix");
@@ -164,7 +139,6 @@ mod tests {
         Ok(())
     }
 
-    /// Preserves explicitly configured repo and project root overrides.
     #[test]
     fn load_preserves_explicit_repo_and_project_root_overrides() -> Result<()> {
         let path = temp_path("overrides.toml");

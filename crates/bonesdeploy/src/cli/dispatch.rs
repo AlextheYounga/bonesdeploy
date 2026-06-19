@@ -9,7 +9,7 @@ use crate::commands::{
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init { non_interactive, setup_remote, project_name, branch, remote, host, port } => {
-            let outcome = init_project::run(&init_config::InitArgs {
+            let remote_setup_ran = init_project::run(&init_config::InitArgs {
                 non_interactive: *non_interactive,
                 setup_remote: *setup_remote,
                 project_name: project_name.clone(),
@@ -18,7 +18,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 host: host.clone(),
                 port: port.clone(),
             })?;
-            if outcome.remote_setup_ran {
+            if remote_setup_ran {
                 push_state::run().await?;
             }
             Ok(())

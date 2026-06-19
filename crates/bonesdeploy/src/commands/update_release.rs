@@ -6,14 +6,14 @@ use shared::paths;
 
 use crate::config;
 use crate::ssh;
-use shared::config::default_deploy_user;
+use shared::config::{default_deploy_user, parse_port};
 
 pub fn current_local_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
 pub fn current_remote_version() -> String {
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     if !bones_toml.exists() {
         return String::from("unknown");
     }
@@ -47,13 +47,13 @@ pub fn update_local_from_source(repo_url: &str) -> Result<()> {
 }
 
 pub async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result<()> {
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     if !bones_toml.exists() {
         bail!("No .bones/bones.toml found. Run from a bonesdeploy project directory.");
     }
 
     let cfg = config::load(bones_toml)?;
-    let port: u16 = cfg.port.parse().with_context(|| format!("Invalid port: {}", cfg.port))?;
+    let port = parse_port(&cfg.port)?;
     let session = ssh::connect_as("root", &cfg.host, port).await?;
 
     let install_root = paths::USR_LOCAL_BIN.trim_end_matches("/bin");

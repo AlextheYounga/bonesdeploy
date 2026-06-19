@@ -2,17 +2,17 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
-use crate::config;
 use crate::git;
 use crate::prompts;
 use crate::python;
+use shared::paths;
 
 pub fn run() -> Result<()> {
     git::ensure_git_repository()?;
 
-    let runtime_toml = Path::new(config::Constants::BONES_RUNTIME_TOML);
+    let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
     if !runtime_toml.exists() {
-        bail!("{} does not exist. Run `bonesdeploy init` first.", config::Constants::BONES_RUNTIME_TOML);
+        bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_RUNTIME_TOML);
     }
 
     if !prompts::confirm_remote_runtime()? {
@@ -20,7 +20,7 @@ pub fn run() -> Result<()> {
         return Ok(());
     }
 
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     println!("Applying runtime using hidden bonesinfra ...");
 
     python::run(&[

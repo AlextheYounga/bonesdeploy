@@ -8,7 +8,7 @@ use console::style;
 use tempfile::TempDir;
 
 use super::update_release;
-use crate::config;
+use shared::paths;
 
 const SOURCE_REPO_URL: &str = "https://github.com/AlextheYounga/bonesdeploy.git";
 const SOURCE_BRANCH: &str = "master";
@@ -53,7 +53,7 @@ pub async fn run(options: Options) -> Result<()> {
             println!("{} Local update complete.", style("Done!").green());
         }
 
-        refresh_local_bones_from_source(&source_dir, Path::new(config::Constants::BONES_DIR))?;
+        refresh_local_bones_from_source(&source_dir, Path::new(paths::LOCAL_BONES_DIR))?;
     }
 
     if !options.skip_remote {
@@ -106,29 +106,14 @@ fn read_package_version(manifest: &Path) -> Result<String> {
 }
 
 fn parse_package_version(manifest: &str) -> Result<String> {
-    let mut in_package_section = false;
-
-    for line in manifest.lines() {
-        let trimmed = line.trim();
-        if trimmed == "[package]" {
-            in_package_section = true;
-            continue;
-        }
-        if in_package_section && trimmed.starts_with('[') {
-            break;
-        }
-        if in_package_section && let Some(version) = parse_version_line(trimmed) {
-            return Ok(version);
-        }
-    }
-
-    bail!("missing [package] version")
-}
-
-fn parse_version_line(line: &str) -> Option<String> {
-    let value = line.strip_prefix("version")?.trim_start().strip_prefix('=')?.trim();
-    let version = value.strip_prefix('"')?.strip_suffix('"')?;
-    (!version.is_empty()).then(|| version.to_string())
+    let value: toml::Value = toml::from_str(manifest)?;
+    value
+        .get("package")
+        .and_then(|package| package.get("version"))
+        .and_then(toml::Value::as_str)
+        .filter(|version| !version.is_empty())
+        .map(String::from)
+        .ok_or_else(|| anyhow::anyhow!("missing [package] version"))
 }
 
 fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Result<()> {

@@ -6,15 +6,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 
-use crate::config::{Bones, Constants};
-use shared::paths::{self as shared_paths, Deployment};
-
-fn deployment_paths(cfg: &Bones) -> Deployment {
-    cfg.deployment_paths(shared_paths::DEFAULT_WEB_ROOT)
-}
+use crate::config::Bones;
+use shared::paths;
 
 pub fn staged_release_path(cfg: &Bones) -> PathBuf {
-    Path::new(&deployment_paths(cfg).repo_bones).join(Constants::STAGED_RELEASE_FILE)
+    Path::new(&cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).repo_bones).join(paths::STAGED_RELEASE_FILE)
 }
 
 pub fn read_staged_release(cfg: &Bones) -> Result<String> {
@@ -54,23 +50,11 @@ pub fn release_dir(cfg: &Bones, release: &str) -> PathBuf {
 }
 
 pub fn releases_dir(cfg: &Bones) -> PathBuf {
-    PathBuf::from(deployment_paths(cfg).releases)
-}
-
-pub fn build_root(cfg: &Bones) -> PathBuf {
-    PathBuf::from(deployment_paths(cfg).build_root)
-}
-
-pub fn shared_dir(cfg: &Bones) -> PathBuf {
-    PathBuf::from(deployment_paths(cfg).shared)
-}
-
-pub fn current_link(cfg: &Bones) -> PathBuf {
-    PathBuf::from(deployment_paths(cfg).current)
+    PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).releases)
 }
 
 pub fn current_release_dir(cfg: &Bones) -> Result<PathBuf> {
-    let current_link = current_link(cfg);
+    let current_link = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
     let active_target =
         fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
 
@@ -147,10 +131,7 @@ mod tests {
     use shared::config::Bones;
     use shared::paths;
 
-    use super::{
-        clear_staged_release, current_link, current_release_name, list_releases_sorted, point_symlink_atomically,
-        read_staged_release, releases_dir, staged_release_path, write_staged_release,
-    };
+    use super::{clear_staged_release, current_release_name, list_releases_sorted, point_symlink_atomically, read_staged_release, releases_dir, staged_release_path, write_staged_release};
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -172,7 +153,6 @@ mod tests {
         }
     }
 
-    /// Round-trips a staged release name through write and read.
     #[test]
     fn write_then_read_staged_release_round_trips() -> Result<()> {
         let root = temp_dir_path("round_trip");
@@ -187,7 +167,6 @@ mod tests {
         Ok(())
     }
 
-    /// Returns an error when the staged release file is empty.
     #[test]
     fn read_staged_release_rejects_empty_file() -> Result<()> {
         let root = temp_dir_path("empty_state");
@@ -207,7 +186,6 @@ mod tests {
         Ok(())
     }
 
-    /// Removes the staged release state file from disk.
     #[test]
     fn clear_staged_release_removes_state_file() -> Result<()> {
         let root = temp_dir_path("clear_state");
@@ -222,7 +200,6 @@ mod tests {
         Ok(())
     }
 
-    /// Creates parent directories and atomically points a symlink to its target.
     #[test]
     fn point_symlink_atomically_creates_parent_dirs_and_points_to_target() -> Result<()> {
         let root = temp_dir_path("point_symlink_parent");
@@ -242,7 +219,6 @@ mod tests {
         Ok(())
     }
 
-    /// Atomically repoints an existing symlink to a new target.
     #[test]
     fn point_symlink_atomically_repoints_existing_link() -> Result<()> {
         let root = temp_dir_path("point_symlink_repoint");
@@ -264,7 +240,6 @@ mod tests {
         Ok(())
     }
 
-    /// Returns only directories sorted chronologically, excluding files.
     #[test]
     fn list_releases_sorted_returns_only_directories_in_order() -> Result<()> {
         let root = temp_dir_path("list_releases");
@@ -284,7 +259,6 @@ mod tests {
         Ok(())
     }
 
-    /// Resolves the current release name from the `current` symlink target.
     #[test]
     fn current_release_name_resolves_from_current_symlink() -> Result<()> {
         let root = temp_dir_path("current_release_name");
@@ -295,7 +269,7 @@ mod tests {
         let release = releases_dir.join("20260507_170000");
         fs::create_dir_all(&release)?;
 
-        let current = current_link(&cfg);
+        let current = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
         point_symlink_atomically(&current, &release)?;
 
         let name = current_release_name(&cfg)?;

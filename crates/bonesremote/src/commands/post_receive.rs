@@ -4,13 +4,13 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use shared::paths;
 
 use crate::config;
-use crate::release_state;
 
 pub fn run(config_path: &str, revision: Option<&str>) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
-    let build_root = release_state::build_root(&cfg);
+    let build_root = std::path::PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root);
     ensure_build_workspace_accessible(&build_root)?;
 
     let checkout_target = revision.unwrap_or(cfg.branch.as_str());
@@ -70,7 +70,6 @@ mod tests {
     use shared::paths;
 
     use super::run;
-    use crate::config::Constants;
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -172,7 +171,7 @@ mod tests {
 
         let bare = create_remote_with_master_commit(&root)?;
         let project_root = root.join("deploy");
-        let build_root = project_root.join(Constants::BUILD_DIR).join(paths::WORKSPACE_DIR);
+        let build_root = project_root.join(paths::BUILD_DIR).join(paths::WORKSPACE_DIR);
         fs::create_dir_all(&build_root)?;
 
         let config_path = root.join("bones.toml");
@@ -197,7 +196,7 @@ mod tests {
 
         let bare = create_remote_with_master_commit(&root)?;
         let project_root = root.join("deploy");
-        let build_dir = project_root.join(Constants::BUILD_DIR);
+        let build_dir = project_root.join(paths::BUILD_DIR);
         let build_root = build_dir.join(paths::WORKSPACE_DIR);
         fs::create_dir_all(&build_root)?;
 

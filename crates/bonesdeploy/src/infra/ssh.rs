@@ -3,11 +3,11 @@ use openssh::{KnownHosts, Session, SessionBuilder, Stdio};
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 use crate::config::Bones;
-use shared::config::default_deploy_user;
+use shared::config::{default_deploy_user, parse_port};
 
 pub async fn connect(config: &Bones) -> Result<Session> {
     let host = &config.host;
-    let port: u16 = config.port.parse().with_context(|| format!("Invalid port: {}", config.port))?;
+    let port = parse_port(&config.port)?;
     let user = default_deploy_user();
 
     connect_as(&user, host, port).await

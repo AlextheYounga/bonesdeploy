@@ -64,12 +64,24 @@ pub fn list_remotes() -> Result<Vec<String>> {
 }
 
 pub fn list_remotes_with_urls() -> Result<Vec<RemoteInfo>> {
-    let names = list_remotes()?;
-    let mut remotes = Vec::with_capacity(names.len());
-    for name in names {
-        let url = remote_url(&name)?;
-        remotes.push(RemoteInfo { name, url });
+    let output = Command::new("git").args(["remote", "-v"]).output().context("Failed to run git")?;
+
+    if !output.status.success() {
+        bail!("Failed to list git remotes");
     }
+
+    let mut remotes = Vec::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let mut parts = line.split_whitespace();
+        let Some(name) = parts.next() else { continue; };
+        let Some(url) = parts.next() else { continue; };
+        let Some(kind) = parts.next() else { continue; };
+        if kind != "(fetch)" {
+            continue;
+        }
+        remotes.push(RemoteInfo { name: name.to_string(), url: url.to_string() });
+    }
+
     Ok(remotes)
 }
 
@@ -168,7 +180,6 @@ mod tests {
         paths::default_repo_path_for(name)
     }
 
-    /// Parses the host, port, and repository path from a full SSH-style URL.
     #[test]
     fn parse_ssh_style_url_parses_host_port_and_repo_path() {
         let details = parse_ssh_style_url(&format!("ssh://git@example.com:2222{}", repo_path("myapp")));
@@ -181,7 +192,6 @@ mod tests {
         }
     }
 
-    /// Defaults the SSH port to 22 when not explicitly provided in the URL.
     #[test]
     fn parse_ssh_style_url_defaults_port_to_22() {
         let details = parse_ssh_style_url(&format!("ssh://git@example.com{}", repo_path("myapp")));
@@ -194,7 +204,6 @@ mod tests {
         }
     }
 
-    /// Parses an absolute repo path from an SCP-style remote URL.
     #[test]
     fn parse_scp_style_url_parses_absolute_repo_path() {
         let details = parse_scp_style_url(&format!("git@example.com:{}", repo_path("myapp")));
@@ -207,7 +216,6 @@ mod tests {
         }
     }
 
-    /// Trims whitespace around the host and path in an SCP-style remote URL.
     #[test]
     fn parse_scp_style_url_trims_surrounding_whitespace() {
         let details = parse_scp_style_url("git@example.com : /home/git/myapp.git");
@@ -220,7 +228,6 @@ mod tests {
         }
     }
 
-    /// Rejects repo paths that do not end with `.git`.
     #[test]
     fn parse_remote_url_rejects_non_git_paths() {
         let non_git_path = repo_path("myapp").trim_end_matches(".git").to_string();
@@ -228,13 +235,11 @@ mod tests {
         assert!(parse_remote_url(&format!("git@example.com:{non_git_path}")).is_none());
     }
 
-    /// Rejects relative SCP paths that can resolve differently across hosts.
     #[test]
     fn parse_remote_url_rejects_relative_scp_paths() {
         assert!(parse_remote_url("git@example.com:myapp.git").is_none());
     }
 
-    /// Rejects non-SSH URLs that cannot be used with SSH deployment connections.
     #[test]
     fn parse_remote_url_rejects_non_ssh_urls() {
         assert!(parse_remote_url("https://example.com/org/repo.git").is_none());

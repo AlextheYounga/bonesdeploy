@@ -5,7 +5,7 @@ use shared::paths::{ssl_certificate_key_path, ssl_certificate_path};
 
 use crate::config;
 
-fn base(cfg: &config::Bones, web_root: &str) -> Result<Map<String, Value>> {
+pub(super) fn base(cfg: &config::Bones, web_root: &str) -> Result<Map<String, Value>> {
     let paths = cfg.deployment_paths(web_root);
     let mut vars = Map::new();
 
@@ -32,10 +32,6 @@ fn base(cfg: &config::Bones, web_root: &str) -> Result<Map<String, Value>> {
     vars.insert(String::from("paths"), serde_json::to_value(paths)?);
 
     Ok(vars)
-}
-
-pub fn setup(cfg: &config::Bones, web_root: &str) -> Result<Value> {
-    base(cfg, web_root).map(Value::Object)
 }
 
 pub fn ssl(cfg: &config::Bones, web_root: &str, domain: &str, email: &str) -> Result<Value> {
@@ -67,7 +63,7 @@ mod tests {
         }
     }
 
-    /// Passes the SSL domain and email into the deploy data sent to the infra CLI.
+    /// Passes the SSL domain and email into the deploy data sent to bonesinfra
     #[test]
     fn ssl_data_includes_domain_and_email() -> anyhow::Result<()> {
         let cfg = test_cfg();

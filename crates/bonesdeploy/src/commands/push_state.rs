@@ -1,19 +1,20 @@
 use std::path::Path;
-use std::process::Command;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use console::style;
 
 use crate::config;
+use crate::infra::rsync;
 use crate::ssh;
 use shared::config::default_deploy_user;
+use shared::paths;
 
 pub async fn run() -> Result<()> {
-    let bones_toml = Path::new(config::Constants::BONES_TOML);
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
     let repo_path = &cfg.repo_path;
-    let remote_bones = format!("{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);
+    let remote_bones = format!("{repo_path}/{}/", paths::BONES_DIR);
 
     // rsync .bones/ to remote
     println!("Syncing .bones/ to {remote_bones}...");
@@ -22,25 +23,23 @@ pub async fn run() -> Result<()> {
     // Connect via SSH for post-rsync setup
     let session = ssh::connect(&cfg).await?;
 
-    // Delete sample hooks from bare repo
     println!("Cleaning sample hooks from remote...");
     let cmd = format!(
         "find {repo_path}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true",
-        config::Constants::REMOTE_HOOKS_DIR
+        paths::HOOKS_DIR
     );
     ssh::run_cmd(&session, &cmd).await?;
 
-    // Symlink bones hooks into bare repo hooks
     println!("Symlinking hooks...");
     let cmd = format!(
         "for hook in {repo_path}/{}/{}/{}; do \
             name=$(basename \"$hook\"); \
             ln -sf \"$hook\" \"{repo_path}/{}/$name\"; \
           done",
-        config::Constants::REMOTE_BONES_DIR,
-        config::Constants::REMOTE_HOOKS_DIR,
+        paths::BONES_DIR,
+        paths::HOOKS_DIR,
         "*",
-        config::Constants::REMOTE_HOOKS_DIR
+        paths::HOOKS_DIR
     );
     ssh::run_cmd(&session, &cmd).await?;
 
@@ -56,19 +55,11 @@ pub(crate) fn sync_bones_directory(cfg: &config::Bones) -> Result<()> {
     let host = &cfg.host;
     let port = &cfg.port;
     let repo_path = &cfg.repo_path;
-    let dest = format!("{user}@{host}:{repo_path}/{}/", config::Constants::REMOTE_BONES_DIR);
+    let dest = format!("{user}@{host}:{repo_path}/{}/", paths::BONES_DIR);
 
-    let status = Command::new("rsync")
-        .args([
-            "-av",
-            "--delete",
-            "-e",
-            &format!("ssh -p {port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"),
-            &format!("{}/", config::Constants::BONES_DIR),
-            &dest,
-        ])
-        .status()
-        .context("Failed to run rsync — is it installed?")?;
+    let ssh_arg = format!("ssh -p {port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null");
+    let source = format!("{}/", paths::LOCAL_BONES_DIR);
+    let status = rsync::status(&["-av", "--delete", "-e", &ssh_arg, &source, &dest])?;
 
     if !status.success() {
         bail!("rsync failed");

@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::paths::{self, Deployment};
@@ -64,6 +64,24 @@ pub fn default_deploy_user() -> String {
 }
 
 #[must_use]
+pub fn parse_port(port: &str) -> Result<u16> {
+    port.parse().with_context(|| format!("Invalid port: {port}"))
+}
+
+pub fn validate_host(host: &str) -> Result<()> {
+    let host = host.trim();
+    if host.is_empty() {
+        return Ok(());
+    }
+
+    if host.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-')) {
+        return Ok(());
+    }
+
+    bail!("Invalid host: {host}")
+}
+
+#[must_use]
 pub fn runtime_user_for(project_name: &str) -> String {
     project_name.to_string()
 }
@@ -98,30 +116,9 @@ pub enum PathType {
     Dir,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Permissions {
-    pub paths: Vec<PathOverride>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PathOverride {
-    pub path: String,
-    pub mode: String,
-    #[serde(default)]
-    pub recursive: bool,
-    #[serde(rename = "type", default, skip_serializing_if = "Option::is_none")]
-    pub path_type: Option<PathType>,
-}
-
 #[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
     paths::default_repo_path_for(project_name)
-}
-
-#[must_use]
-pub fn default_project_root_for(project_name: &str) -> String {
-    paths::default_project_root_for(project_name)
 }
 
 #[must_use]
@@ -187,7 +184,7 @@ pub fn apply_derived_defaults(config: &mut Bones) {
         config.repo_path = default_repo_path_for(project_name);
     }
     if config.project_root.is_empty() {
-        config.project_root = default_project_root_for(project_name);
+        config.project_root = paths::default_project_root_for(project_name);
     }
     if config.preview_domain.is_empty() {
         config.preview_domain = default_preview_domain_for(project_name, &config.host);
@@ -203,5 +200,23 @@ pub fn load(path: &Path) -> Result<Bones> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
     let mut config: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     apply_derived_defaults(&mut config);
+    validate_host(&config.host)?;
     Ok(config)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_host;
+
+    #[test]
+    fn validate_host_accepts_hostnames_and_ips() {
+        assert!(validate_host("deploy.example.com").is_ok());
+        assert!(validate_host("192.0.2.10").is_ok());
+        assert!(validate_host("").is_ok());
+    }
+
+    #[test]
+    fn validate_host_rejects_shell_metacharacters() {
+        assert!(validate_host("deploy.example.com;rm -rf /").is_err());
+    }
 }

@@ -3,20 +3,31 @@ use std::os::unix::fs::symlink;
 use std::path::{Component, Path};
 
 use anyhow::{Context, Result, bail};
+use shared::config as shared_config;
+use shared::paths;
 
 use crate::config;
 use crate::release_state;
 
-use shared::config::{Shared, SharedPath};
+use shared::config::Shared;
 
 pub fn run(config_path: &str) -> Result<()> {
     let config_path = Path::new(config_path);
     let cfg = config::load(config_path)?;
     let release_name = release_state::read_staged_release(&cfg)?;
-    let build_root = release_state::build_root(&cfg);
-    let shared_dir = release_state::shared_dir(&cfg);
+    let build_root = std::path::PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root);
+    let shared_dir = std::path::PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).shared);
 
-    let shared_paths = load_runtime_shared_paths(config_path)?;
+    let config_dir = config_path.parent().unwrap_or(Path::new("."));
+    let _runtime = shared_config::load_runtime(config_dir)?;
+    let runtime_path = config_dir.join("runtime.toml");
+    let shared_paths = if runtime_path.exists() {
+        let content = fs::read_to_string(&runtime_path).with_context(|| format!("Failed to read {}", runtime_path.display()))?;
+        let runtime: Shared = toml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
+        runtime.paths
+    } else {
+        Vec::new()
+    };
     for shared_path in &shared_paths {
         validate_shared_path(&shared_path.path)?;
         wire_path(&build_root, &shared_dir, &shared_path.path)?;
@@ -24,23 +35,6 @@ pub fn run(config_path: &str) -> Result<()> {
 
     println!("Wired build workspace for staged release: {release_name}");
     Ok(())
-}
-
-fn load_runtime_shared_paths(config_path: &Path) -> Result<Vec<SharedPath>> {
-    #[derive(serde::Deserialize)]
-    struct RuntimeShared {
-        #[serde(default)]
-        shared: Shared,
-    }
-    let runtime_path = config_path.parent().unwrap_or(Path::new(".")).join("runtime.toml");
-    if !runtime_path.exists() {
-        return Ok(Vec::new());
-    }
-    let content =
-        fs::read_to_string(&runtime_path).with_context(|| format!("Failed to read {}", runtime_path.display()))?;
-    let rt: RuntimeShared =
-        toml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
-    Ok(rt.shared.paths)
 }
 
 fn validate_shared_path(relative_path: &str) -> Result<()> {
@@ -64,7 +58,7 @@ fn wire_path(build_root: &Path, shared_dir: &Path, relative_path: &str) -> Resul
     let release_path = build_root.join(relative_path);
     let shared_path = shared_dir.join(relative_path);
 
-    if !shared_path_exists(&shared_path) {
+    if fs::symlink_metadata(&shared_path).is_err() {
         bail!(
             "shared path does not exist: {}. Provision it first with 'bonesdeploy remote setup'.",
             shared_path.display()
@@ -72,7 +66,7 @@ fn wire_path(build_root: &Path, shared_dir: &Path, relative_path: &str) -> Resul
     }
 
     ensure_parent_exists(&release_path)?;
-    if release_path_is_resolved(&release_path) {
+    if fs::symlink_metadata(&release_path).is_ok() {
         replace_workspace_path_with_shared_symlink(&release_path)?;
     }
 
@@ -91,14 +85,6 @@ fn ensure_parent_exists(path: &Path) -> Result<()> {
             .with_context(|| format!("Failed to create parent directory: {}", parent.display()))?;
     }
     Ok(())
-}
-
-fn shared_path_exists(path: &Path) -> bool {
-    fs::symlink_metadata(path).is_ok()
-}
-
-fn release_path_is_resolved(path: &Path) -> bool {
-    fs::symlink_metadata(path).is_ok()
 }
 
 /// Removes whatever exists at the build workspace path (file, dir, or symlink) so

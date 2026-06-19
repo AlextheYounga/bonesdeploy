@@ -8,7 +8,7 @@ use shared::paths;
 const REPOSITORY_URL: &str = "https://github.com/AlextheYounga/bonesinfra.git";
 const CHECKOUT_DIR: &str = "bonesinfra";
 
-pub fn checkout_path() -> Result<PathBuf> {
+pub(super) fn checkout_path() -> Result<PathBuf> {
     ensure_available()
 }
 

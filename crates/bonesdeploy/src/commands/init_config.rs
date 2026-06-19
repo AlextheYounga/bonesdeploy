@@ -2,6 +2,7 @@ use crate::config;
 use crate::git;
 
 use anyhow::{Result, anyhow};
+use shared::config::validate_host;
 use shared::paths;
 
 pub struct InitArgs {
@@ -14,7 +15,7 @@ pub struct InitArgs {
     pub port: Option<String>,
 }
 
-pub fn collect_non_interactive(
+pub(crate) fn collect_non_interactive(
     project_name_hint: &str,
     existing_config: Option<&config::Bones>,
     args: &InitArgs,
@@ -25,9 +26,37 @@ pub fn collect_non_interactive(
     let host = resolve_host(args, existing_config, inferred_remote.as_ref())?;
     let branch = resolve_branch(args, existing_config);
     let port = resolve_port(args, existing_config, inferred_remote.as_ref());
+    validate_host(&host)?;
 
-    let values = NonInteractiveValues { project_name, remote_name, branch, host, port };
-    Ok(build_config(values, existing_config, inferred_remote.as_ref()))
+    let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
+    let project_root = seed_path_override(
+        existing_config,
+        |cfg| &cfg.project_root,
+        &project_name,
+        config::default_project_root_for,
+    );
+    let deploy_on_push = existing_config.is_none_or(|cfg| cfg.deploy_on_push);
+    let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
+
+    let ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
+    let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
+    let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
+
+    Ok(config::Bones {
+        remote_name,
+        project_name,
+        host,
+        port,
+        repo_path,
+        project_root,
+        branch,
+        deploy_on_push,
+        releases_keep,
+        ssl_enabled,
+        domain,
+        email,
+        ..Default::default()
+    })
 }
 
 fn resolve_project_name(
@@ -102,52 +131,6 @@ fn resolve_port(
         .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.port)))
         .or_else(|| inferred_remote.map(|details| details.port.clone()))
         .unwrap_or_else(|| String::from("22"))
-}
-
-struct NonInteractiveValues {
-    project_name: String,
-    remote_name: String,
-    branch: String,
-    host: String,
-    port: String,
-}
-
-fn build_config(
-    values: NonInteractiveValues,
-    existing_config: Option<&config::Bones>,
-    inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> config::Bones {
-    let NonInteractiveValues { project_name, remote_name, branch, host, port } = values;
-
-    let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote);
-    let project_root = seed_path_override(
-        existing_config,
-        |cfg| &cfg.project_root,
-        &project_name,
-        config::default_project_root_for,
-    );
-    let deploy_on_push = existing_config.is_none_or(|cfg| cfg.deploy_on_push);
-    let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
-
-    let ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
-    let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
-    let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
-
-    config::Bones {
-        remote_name,
-        project_name,
-        host,
-        port,
-        repo_path,
-        project_root,
-        branch,
-        deploy_on_push,
-        releases_keep,
-        ssl_enabled,
-        domain,
-        email,
-        ..Default::default()
-    }
 }
 
 pub fn non_empty(value: &str) -> Option<String> {

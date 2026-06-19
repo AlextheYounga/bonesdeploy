@@ -5,6 +5,7 @@ use anyhow::{Context, Result, bail};
 use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
+use shared::paths;
 
 use crate::config;
 use crate::release_state;
@@ -13,10 +14,10 @@ pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
 
     let project_root = Path::new(&cfg.project_root);
-    let build_dir = project_root.join(config::Constants::BUILD_DIR);
-    let build_root = release_state::build_root(&cfg);
+    let build_dir = project_root.join(paths::BUILD_DIR);
+    let build_root = Path::new(&cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root).to_path_buf();
     let releases_dir = release_state::releases_dir(&cfg);
-    let shared_dir = release_state::shared_dir(&cfg);
+    let shared_dir = Path::new(&cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).shared).to_path_buf();
 
     require_dir(project_root, "project_root")?;
     require_dir(&releases_dir, "releases")?;

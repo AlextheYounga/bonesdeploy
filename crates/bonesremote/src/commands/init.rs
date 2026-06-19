@@ -1,34 +1,33 @@
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 use console::style;
 
-use crate::config;
 use crate::privileges;
 use shared::paths;
 
 pub fn run() -> Result<()> {
     privileges::ensure_root("bonesremote init")?;
 
-    println!("{}", style(format!("{} init", config::Constants::BINARY_NAME)).bold());
+    println!("{}", style(format!("{} init", paths::BONESREMOTE_BINARY)).bold());
 
-    let sudoers_path = config::Constants::SUDOERS_PATH;
+    let sudoers_path = paths::SUDOERS_PATH;
     let bonesdeploy_path = which_bonesdeploy_remote()?;
 
     // Only the commands that need ownership or live-state changes run via sudo.
     let sudoers_content = format!(
         "# Installed by bonesremote init\n\
-             {} ALL=(root) NOPASSWD: {bonesdeploy_path} service restart --config *\n",
-        paths::DEPLOY_USER
+             {} ALL=(root) NOPASSWD: {} service restart --config *\n",
+        paths::DEPLOY_USER,
+        bonesdeploy_path.display()
     );
 
     fs::write(sudoers_path, &sudoers_content).with_context(|| format!("Failed to write {sudoers_path}"))?;
 
-    // Set correct permissions (sudoers drop-ins must be 0440)
     Command::new("chmod").args(["0440", sudoers_path]).status().context("Failed to chmod sudoers drop-in")?;
 
-    // Validate with visudo
     let status = Command::new("visudo").args(["-c", "-f", sudoers_path]).status().context("Failed to run visudo")?;
 
     if !status.success() {
@@ -41,19 +40,47 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-fn which_bonesdeploy_remote() -> Result<String> {
+fn which_bonesdeploy_remote() -> Result<PathBuf> {
     let output = Command::new("which")
-        .arg(config::Constants::BINARY_NAME)
+        .arg(paths::BONESREMOTE_BINARY)
         .output()
-        .context(format!("Failed to run 'which {}'", config::Constants::BINARY_NAME))?;
+        .context(format!("Failed to run 'which {}'", paths::BONESREMOTE_BINARY))?;
 
     if !output.status.success() {
         bail!(
             "{} is not in PATH. \
              Install it globally before running init.",
-            config::Constants::BINARY_NAME
+            paths::BONESREMOTE_BINARY
         );
     }
 
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    let path = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim().to_string());
+    let path = fs::canonicalize(&path).with_context(|| format!("Failed to canonicalize {}", path.display()))?;
+    if !approved_bonesdeploy_path(&path) {
+        bail!("Refusing to write sudoers entry for {}: expected /usr/local/bin or /usr/bin", path.display());
+    }
+
+    Ok(path)
+}
+
+fn approved_bonesdeploy_path(path: &Path) -> bool {
+    path.starts_with("/usr/local/bin") || path.starts_with("/usr/bin")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::approved_bonesdeploy_path;
+
+    #[test]
+    fn approved_bonesdeploy_path_accepts_standard_bin_dirs() {
+        assert!(approved_bonesdeploy_path(Path::new("/usr/local/bin/bonesremote")));
+        assert!(approved_bonesdeploy_path(Path::new("/usr/bin/bonesremote")));
+    }
+
+    #[test]
+    fn approved_bonesdeploy_path_rejects_unexpected_dirs() {
+        assert!(!approved_bonesdeploy_path(Path::new("/home/alex/.local/bin/bonesremote")));
+    }
 }

@@ -7,10 +7,8 @@ use anyhow::Result;
 use console::style;
 use shared::paths;
 
-use crate::config;
-
 pub fn run() -> Result<()> {
-    println!("{}", style(format!("{} doctor", config::Constants::BINARY_NAME)).bold());
+    println!("{}", style(format!("{} doctor", paths::BONESREMOTE_BINARY)).bold());
 
     let mut issues: Vec<String> = Vec::new();
 
@@ -47,16 +45,16 @@ fn check_supported_distribution(issues: &mut Vec<String>) {
 }
 
 fn check_globally_available(issues: &mut Vec<String>) {
-    let result = Command::new(config::Constants::BINARY_NAME).arg("version").output();
+    let result = Command::new(paths::BONESREMOTE_BINARY).arg("version").output();
 
     match result {
         Ok(output) if output.status.success() => {}
-        _ => issues.push(format!("{} is not globally available (not in PATH)", config::Constants::BINARY_NAME)),
+        _ => issues.push(format!("{} is not globally available (not in PATH)", paths::BONESREMOTE_BINARY)),
     }
 }
 
 fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let privileged_commands = [[config::Constants::BINARY_NAME, "service", "restart", "--config", "/nonexistent"]];
+    let privileged_commands = [[paths::BONESREMOTE_BINARY, "service", "restart", "--config", "/nonexistent"]];
 
     for command in privileged_commands {
         let result = Command::new("sudo").arg("-n").arg("-l").args(command).output();
@@ -65,9 +63,9 @@ fn check_passwordless_sudo(issues: &mut Vec<String>) {
             Ok(output) if output.status.success() => {}
             _ => issues.push(format!(
                 "{} is not allowed via passwordless sudo: {} (run 'sudo {} init')",
-                config::Constants::BINARY_NAME,
+                paths::BONESREMOTE_BINARY,
                 command.join(" "),
-                config::Constants::BINARY_NAME
+                paths::BONESREMOTE_BINARY
             )),
         }
     }

@@ -1,5 +1,5 @@
-use crate::config;
+use shared::paths;
 
 pub fn run() {
-    println!("{} {}", config::Constants::BINARY_NAME, env!("CARGO_PKG_VERSION"));
+    println!("{} {}", paths::BONESREMOTE_BINARY, env!("CARGO_PKG_VERSION"));
 }
