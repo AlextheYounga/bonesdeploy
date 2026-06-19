@@ -199,3 +199,21 @@ fn init_rerun_preserves_existing_bones_assets() -> Result<()> {
         Ok(())
     })
 }
+
+/// Repairs a dangling .bones symlink instead of failing with EEXIST.
+#[test]
+fn init_repairs_dangling_bones_symlink() -> Result<()> {
+    with_temp_repo(|repo_dir, home_dir| {
+        let config_root = home_dir.join(".config/bonesdeploy");
+        fs::create_dir_all(&config_root)?;
+        std::os::unix::fs::symlink(config_root.join("missing.bones"), repo_dir.join(".bones"))?;
+
+        run(&init_args())?;
+
+        let bones_dir = repo_dir.join(".bones");
+        assert!(bones_dir.join("bones.toml").is_file());
+        assert_eq!(fs::read_link(&bones_dir)?, paths::bones_config_root().join("atlas.bones"));
+
+        Ok(())
+    })
+}

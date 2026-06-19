@@ -20,7 +20,9 @@ pub fn run(args: &InitArgs) -> Result<bool> {
     git::ensure_git_repository()?;
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
-    let is_fresh = !bones_dir.exists();
+    let had_bones_entry = fs::symlink_metadata(bones_dir).is_ok();
+    let has_live_bones_dir = bones_dir.exists();
+    let is_fresh = !has_live_bones_dir;
 
     let mut initial_project_name: Option<String> = None;
 
@@ -36,6 +38,10 @@ pub fn run(args: &InitArgs) -> Result<bool> {
         fs::create_dir_all(&config_dir)?;
         embedded::scaffold(&config_dir)?;
 
+        if had_bones_entry {
+            fs::remove_file(bones_dir)
+                .with_context(|| format!("Failed to remove stale {} symlink", bones_dir.display()))?;
+        }
         unix_fs::symlink(&config_dir, bones_dir)?;
         println!("Symlinked .bones -> {}", config_dir.display());
 
