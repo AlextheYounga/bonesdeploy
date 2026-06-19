@@ -6,7 +6,7 @@ use anyhow::{Context, Result, bail};
 use console::style;
 
 use crate::config;
-use crate::git;
+use crate::infra::git;
 use crate::infra::rsync;
 use shared::config::default_deploy_user;
 use shared::paths;

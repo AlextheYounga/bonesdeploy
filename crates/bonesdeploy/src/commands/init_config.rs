@@ -1,5 +1,5 @@
 use crate::config;
-use crate::git;
+use crate::infra::git;
 
 use anyhow::{Result, anyhow};
 use shared::config::validate_host;

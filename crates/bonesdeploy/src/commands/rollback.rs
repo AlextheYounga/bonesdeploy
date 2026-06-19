@@ -4,7 +4,7 @@ use anyhow::Result;
 use console::style;
 
 use crate::config;
-use crate::ssh;
+use crate::infra::ssh;
 use shared::paths;
 
 pub async fn run() -> Result<()> {

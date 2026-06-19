@@ -5,7 +5,7 @@ use anyhow::{Context, Result, bail};
 use shared::paths;
 
 use crate::config;
-use crate::ssh;
+use crate::infra::ssh;
 use shared::config::{default_deploy_user, parse_port};
 
 pub fn current_local_version() -> String {

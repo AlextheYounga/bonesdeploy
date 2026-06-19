@@ -9,10 +9,10 @@ use shared::paths;
 
 use super::push_state;
 use super::remote_data;
-use crate::bootstrap_ssh;
 use crate::config;
-use crate::prompts;
-use crate::python;
+use crate::infra::bootstrap_ssh;
+use crate::infra::python;
+use crate::ui::prompts;
 
 pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);

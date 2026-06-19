@@ -2,9 +2,9 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
-use crate::git;
-use crate::prompts;
-use crate::python;
+use crate::infra::git;
+use crate::infra::python;
+use crate::ui::prompts;
 use shared::paths;
 
 pub fn run() -> Result<()> {

@@ -3,7 +3,7 @@ use console::style;
 use inquire::{Confirm, Select, Text};
 
 use crate::config::Bones;
-use crate::git;
+use crate::infra::git;
 
 fn config_default<'a>(
     existing_config: Option<&'a Bones>,

@@ -9,10 +9,10 @@ use crate::commands::init_config;
 pub use crate::commands::init_config::InitArgs;
 use crate::commands::remote_setup;
 use crate::config;
-use crate::embedded;
-use crate::git;
-use crate::prompts;
-use crate::python;
+use crate::infra::embedded;
+use crate::infra::git;
+use crate::infra::python;
+use crate::ui::prompts;
 use shared::config::{default_deploy_user, release_group_for, runtime_group_for, runtime_user_for};
 use shared::paths;
 

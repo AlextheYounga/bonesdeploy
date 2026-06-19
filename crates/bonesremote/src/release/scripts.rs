@@ -2,7 +2,6 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus, Stdio};
-use std::sync::{Arc, Mutex};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
@@ -19,71 +18,45 @@ pub(super) struct ScriptEnv<'a> {
     pub(super) web_root: &'a str,
 }
 
-pub(super) struct DeploymentRun<'a, Out, Err> {
-    script: &'a Path,
-    build_root: &'a Path,
-    log_path: &'a Path,
-    env: ScriptEnv<'a>,
-    consoles: ConsoleTargets<Out, Err>,
-}
-
 pub(super) fn run_deployment_script(
     script: &Path,
     build_root: &Path,
     log_path: &Path,
     env: &ScriptEnv<'_>,
 ) -> Result<ExitStatus> {
-    run_deployment_script_with_consoles(DeploymentRun {
-        script,
-        build_root,
-        log_path,
-        env: ScriptEnv {
-            project_name: env.project_name,
-            project_root: env.project_root,
-            repo_path: env.repo_path,
-            web_root: env.web_root,
-        },
-        consoles: ConsoleTargets::system(),
-    })
-}
-
-pub(super) fn run_deployment_script_with_consoles<Out, Err>(run: DeploymentRun<'_, Out, Err>) -> Result<ExitStatus>
-where
-    Out: Write + Send + 'static,
-    Err: Write + Send + 'static,
-{
-    if let Some(parent) = run.log_path.parent() {
+    if let Some(parent) = log_path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("Failed to create log directory {}", parent.display()))?;
     }
 
-    let log_file = SharedWriter::new(
-        fs::File::create(run.log_path)
-            .with_context(|| format!("Failed to open deployment log {}", run.log_path.display()))?,
-    );
+    let log_file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .with_context(|| format!("Failed to open deployment log {}", log_path.display()))?;
 
     let mut child = Command::new("bash")
-        .arg(run.script)
-        .current_dir(run.build_root)
-        .env("PROJECT_NAME", run.env.project_name)
-        .env("PROJECT_ROOT", run.env.project_root)
-        .env("REPO_PATH", run.env.repo_path)
-        .env("WEB_ROOT", run.env.web_root)
-        .env("SERVICE_USER", run.env.project_name)
+        .arg(script)
+        .current_dir(build_root)
+        .env("PROJECT_NAME", env.project_name)
+        .env("PROJECT_ROOT", env.project_root)
+        .env("REPO_PATH", env.repo_path)
+        .env("WEB_ROOT", env.web_root)
+        .env("SERVICE_USER", env.project_name)
         .env("DEPLOY_USER", paths::DEPLOY_USER)
         .env("GROUP", paths::DEFAULT_GROUP)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .with_context(|| format!("Failed to execute deployment script {}", run.script.display()))?;
+        .with_context(|| format!("Failed to execute deployment script {}", script.display()))?;
 
     let stdout = child.stdout.take().context("Failed to capture deployment script stdout")?;
     let stderr = child.stderr.take().context("Failed to capture deployment script stderr")?;
 
-    let stdout_handle = spawn_stream(stdout, TeeWriter::new(run.consoles.stdout, log_file.clone()));
-    let stderr_handle = spawn_stream(stderr, TeeWriter::new(run.consoles.stderr, log_file));
+    let stdout_handle =
+        spawn_stream(stdout, io::stdout(), log_file.try_clone().context("Failed to clone deployment log")?);
+    let stderr_handle = spawn_stream(stderr, io::stderr(), log_file);
 
-    let status =
-        child.wait().with_context(|| format!("Failed to wait for deployment script {}", run.script.display()))?;
+    let status = child.wait().with_context(|| format!("Failed to wait for deployment script {}", script.display()))?;
 
     join_stream(stdout_handle, "stdout")?;
     join_stream(stderr_handle, "stderr")?;
@@ -91,100 +64,16 @@ where
     Ok(status)
 }
 
-#[derive(Clone)]
-pub(super) struct ConsoleTargets<Out, Err> {
-    stdout: SharedWriter<Out>,
-    stderr: SharedWriter<Err>,
-}
-
-impl<Out, Err> ConsoleTargets<Out, Err> {
-    pub(super) fn new(stdout: Out, stderr: Err) -> Self {
-        Self { stdout: SharedWriter::new(stdout), stderr: SharedWriter::new(stderr) }
-    }
-}
-
-impl ConsoleTargets<io::Stdout, io::Stderr> {
-    fn system() -> Self {
-        Self::new(io::stdout(), io::stderr())
-    }
-}
-
-#[cfg(test)]
-impl<Out, Err> ConsoleTargets<Out, Err> {
-    fn stdout_snapshot(&self) -> Arc<Mutex<Out>> {
-        self.stdout.inner()
-    }
-
-    fn stderr_snapshot(&self) -> Arc<Mutex<Err>> {
-        self.stderr.inner()
-    }
-}
-
-struct SharedWriter<W> {
-    inner: Arc<Mutex<W>>,
-}
-
-impl<W> Clone for SharedWriter<W> {
-    fn clone(&self) -> Self {
-        Self { inner: Arc::clone(&self.inner) }
-    }
-}
-
-impl<W> SharedWriter<W> {
-    fn new(writer: W) -> Self {
-        Self { inner: Arc::new(Mutex::new(writer)) }
-    }
-
-    #[cfg(test)]
-    fn inner(&self) -> Arc<Mutex<W>> {
-        Arc::clone(&self.inner)
-    }
-}
-
-impl<W: Write> Write for SharedWriter<W> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        let mut writer = self.inner.lock().map_err(|_| io::Error::other("shared writer lock poisoned"))?;
-        writer.write(buf)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        let mut writer = self.inner.lock().map_err(|_| io::Error::other("shared writer lock poisoned"))?;
-        writer.flush()
-    }
-}
-
-struct TeeWriter<A, B> {
-    primary: A,
-    secondary: B,
-}
-
-impl<A, B> TeeWriter<A, B> {
-    fn new(primary: A, secondary: B) -> Self {
-        Self { primary, secondary }
-    }
-}
-
-impl<A: Write, B: Write> Write for TeeWriter<A, B> {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.primary.write_all(buf)?;
-        self.secondary.write_all(buf)?;
-        Ok(buf.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.primary.flush()?;
-        self.secondary.flush()
-    }
-}
-
-fn spawn_stream<R, W>(reader: R, writer: W) -> thread::JoinHandle<Result<()>>
+fn spawn_stream<R, W1, W2>(reader: R, primary: W1, secondary: W2) -> thread::JoinHandle<Result<()>>
 where
     R: Read + Send + 'static,
-    W: Write + Send + 'static,
+    W1: Write + Send + 'static,
+    W2: Write + Send + 'static,
 {
     thread::spawn(move || {
         let mut reader = reader;
-        let mut writer = writer;
+        let mut primary = primary;
+        let mut secondary = secondary;
         let mut buffer = [0_u8; 8192];
 
         loop {
@@ -192,10 +81,12 @@ where
             if read == 0 {
                 break;
             }
-            writer.write_all(&buffer[..read])?;
+            primary.write_all(&buffer[..read])?;
+            secondary.write_all(&buffer[..read])?;
         }
 
-        writer.flush()?;
+        primary.flush()?;
+        secondary.flush()?;
         Ok(())
     })
 }
@@ -211,9 +102,7 @@ fn join_stream(handle: thread::JoinHandle<Result<()>>, stream_name: &str) -> Res
 mod tests {
     use std::env;
     use std::fs;
-    use std::io::{Cursor, Write};
     use std::path::{Path, PathBuf};
-    use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
@@ -221,13 +110,11 @@ mod tests {
 
     use shared::paths::Deployment;
 
-    use super::{
-        ConsoleTargets, DeploymentRun, ScriptEnv, TeeWriter, deployment_log_path, run_deployment_script_with_consoles,
-    };
+    use super::{ScriptEnv, deployment_log_path, run_deployment_script};
 
     fn temp_dir(prefix: &str) -> Result<PathBuf> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
-        let path = env::temp_dir().join(format!("{prefix}_{}_{}", process::id(), nanos));
+        let path = env::temp_dir().join(format!("{prefix}_{nanos}"));
         fs::create_dir_all(&path)?;
         Ok(path)
     }
@@ -237,21 +124,6 @@ mod tests {
             fs::create_dir_all(parent)?;
         }
         fs::write(path, content)?;
-        Ok(())
-    }
-
-    #[test]
-    fn tee_writer_writes_to_both_targets() -> Result<()> {
-        let stdout = Cursor::new(Vec::new());
-        let log = Cursor::new(Vec::new());
-        let mut writer = TeeWriter::new(stdout, log);
-
-        writer.write_all(b"hello\nworld")?;
-        writer.flush()?;
-
-        let TeeWriter { primary: stdout, secondary: log } = writer;
-        assert_eq!(stdout.into_inner(), b"hello\nworld");
-        assert_eq!(log.into_inner(), b"hello\nworld");
         Ok(())
     }
 
@@ -268,29 +140,19 @@ mod tests {
         fs::set_permissions(&script, PermissionsExt::from_mode(0o755))?;
 
         let log_path = logs.join("20260612_211412-00_hello.sh.log");
-        let consoles = ConsoleTargets::new(Cursor::new(Vec::new()), Cursor::new(Vec::new()));
-        let status = run_deployment_script_with_consoles(DeploymentRun {
-            script: &script,
-            build_root: &build_root,
-            log_path: &log_path,
-            env: ScriptEnv {
+        let status = run_deployment_script(
+            &script,
+            &build_root,
+            &log_path,
+            &ScriptEnv {
                 project_name: "demo",
                 project_root: "/srv/deployments/demo",
                 repo_path: "/home/git/demo.git",
                 web_root: "public",
             },
-            consoles: consoles.clone(),
-        })?;
+        )?;
 
         assert!(status.success(), "passing script should exit zero");
-
-        let stdout = consoles.stdout_snapshot();
-        let stderr = consoles.stderr_snapshot();
-
-        let stdout = stdout.lock().map_err(|_| anyhow::anyhow!("stdout writer lock poisoned"))?;
-        let stderr = stderr.lock().map_err(|_| anyhow::anyhow!("stderr writer lock poisoned"))?;
-        assert_eq!(stdout.get_ref(), b"hello-stdout\n");
-        assert_eq!(stderr.get_ref(), b"hello-stderr\n");
 
         let log = fs::read_to_string(&log_path)?;
         assert!(log.contains("hello-stdout"), "log should contain stdout\n{log}");
@@ -313,19 +175,17 @@ mod tests {
         fs::set_permissions(&script, PermissionsExt::from_mode(0o755))?;
 
         let log_path = logs.join("20260612_211412-01_install.sh.log");
-        let consoles = ConsoleTargets::new(Cursor::new(Vec::new()), Cursor::new(Vec::new()));
-        let status = run_deployment_script_with_consoles(DeploymentRun {
-            script: &script,
-            build_root: &build_root,
-            log_path: &log_path,
-            env: ScriptEnv {
+        let status = run_deployment_script(
+            &script,
+            &build_root,
+            &log_path,
+            &ScriptEnv {
                 project_name: "demo",
                 project_root: "/srv/deployments/demo",
                 repo_path: "/home/git/demo.git",
                 web_root: "public",
             },
-            consoles,
-        })?;
+        )?;
 
         assert!(!status.success(), "failing script should exit non-zero");
         assert_eq!(status.code(), Some(7), "failing script should preserve exit code 7");
@@ -347,22 +207,21 @@ mod tests {
         fs::set_permissions(&script, PermissionsExt::from_mode(0o755))?;
 
         let log_path = root.join("build/logs/20260612_211412-00_pass.sh.log");
-        let consoles = ConsoleTargets::new(Cursor::new(Vec::new()), Cursor::new(Vec::new()));
-        let status = run_deployment_script_with_consoles(DeploymentRun {
-            script: &script,
-            build_root: &build_root,
-            log_path: &log_path,
-            env: ScriptEnv {
+        let status = run_deployment_script(
+            &script,
+            &build_root,
+            &log_path,
+            &ScriptEnv {
                 project_name: "demo",
                 project_root: "/srv/deployments/demo",
                 repo_path: "/home/git/demo.git",
                 web_root: "public",
             },
-            consoles,
-        })?;
+        )?;
 
         assert!(status.success());
         assert!(log_path.exists(), "log file should be created even when its directory is missing");
+        assert!(fs::read_to_string(&log_path)?.contains("ok"));
 
         fs::remove_dir_all(root).ok();
         Ok(())

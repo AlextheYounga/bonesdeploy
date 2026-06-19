@@ -3,10 +3,8 @@ mod commands;
 mod config;
 
 mod infra;
-pub(crate) use infra::{bootstrap_ssh, embedded, git, python, ssh};
 
 mod ui;
-pub(crate) use ui::prompts;
 
 use anyhow::Result;
 use clap::Parser;

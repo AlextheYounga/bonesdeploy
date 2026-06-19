@@ -6,7 +6,7 @@ use console::style;
 
 use crate::config;
 use crate::infra::rsync;
-use crate::ssh;
+use crate::infra::ssh;
 use shared::config::default_deploy_user;
 use shared::paths;
 

@@ -4,7 +4,7 @@ use shared::paths;
 use std::path::Path;
 
 use crate::config;
-use crate::ssh;
+use crate::infra::ssh;
 
 pub async fn run() -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
