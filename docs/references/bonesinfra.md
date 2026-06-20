@@ -188,30 +188,18 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PYTHON="${PYTHON:-python3}"
+VENV="$ROOT/.venv"
 
-if command -v uv >/dev/null 2>&1; then
-  exec uv run --with pyinstaller --project "$ROOT" python -m PyInstaller \
-    --clean \
-    --noconfirm \
-    --onefile \
-    --name bonesinfra \
-    --paths "$ROOT/src" \
-    --collect-data bonesinfra \
-    --collect-submodules pyinfra \
-    "$ROOT/src/bonesinfra/__main__.py"
+if [ ! -x "$VENV/bin/python" ]; then
+  "$PYTHON" -m venv "$VENV"
 fi
 
-"$PYTHON" -m pip install --upgrade pyinstaller
+if [ ! -x "$VENV/bin/pip" ]; then
+  "$VENV/bin/python" -m ensurepip --upgrade
+fi
 
-exec "$PYTHON" -m PyInstaller \
-  --clean \
-  --noconfirm \
-  --onefile \
-  --name bonesinfra \
-  --paths "$ROOT/src" \
-  --collect-data bonesinfra \
-  --collect-submodules pyinfra \
-  "$ROOT/src/bonesinfra/__main__.py"
+"$VENV/bin/python" -m pip install --upgrade pip
+"$VENV/bin/python" -m pip install --upgrade --group dev "$ROOT"
 
 ```
 
@@ -224,7 +212,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bonesinfra"
-version = "0.1.0"
+version = "0.1.1"
 description = "Deployment automation for BonesDeploy"
 readme = "README.md"
 requires-python = ">=3.12"
