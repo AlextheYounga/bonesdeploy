@@ -5,14 +5,12 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
 
-/// Runs the local bonesinfra executable with the provided args.
 pub fn run(args: &[&str]) -> Result<String> {
     let executable = super::bonesinfra::executable_path()?;
 
     run_interactive(&executable, args, None)
 }
 
-/// Runs the local bonesinfra executable with JSON piped to stdin.
 pub fn run_with_stdin(args: &[&str], stdin_json: &str) -> Result<String> {
     let executable = super::bonesinfra::executable_path()?;
 
@@ -29,7 +27,9 @@ fn parse_json_output(stdout: &str) -> Result<Value> {
 }
 
 fn base_command(executable: &Path) -> Command {
-    Command::new(executable)
+    let mut cmd = Command::new(executable);
+    cmd.args(["-m", "bonesinfra"]);
+    cmd
 }
 
 fn run_interactive(executable: &Path, args: &[&str], stdin_json: Option<&str>) -> Result<String> {
@@ -87,11 +87,12 @@ mod tests {
     use super::{base_command, parse_json_output};
 
     #[test]
-    fn base_command_launches_bonesinfra_executable() {
-        let command = base_command(Path::new("/tmp/bonesinfra/dist/bonesinfra"));
+    fn base_command_launches_venv_python_with_module_flag() {
+        let command = base_command(Path::new("/tmp/bonesinfra/.venv/bin/python"));
 
-        assert_eq!(command.get_program().to_string_lossy(), "/tmp/bonesinfra/dist/bonesinfra");
-        assert_eq!(command.get_args().count(), 0);
+        assert_eq!(command.get_program().to_string_lossy(), "/tmp/bonesinfra/.venv/bin/python");
+        let args: Vec<_> = command.get_args().map(|a| a.to_string_lossy().to_string()).collect();
+        assert_eq!(args, vec!["-m", "bonesinfra"]);
     }
 
     #[test]

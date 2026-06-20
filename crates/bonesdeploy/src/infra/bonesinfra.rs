@@ -7,7 +7,6 @@ use shared::paths;
 
 const REPOSITORY_URL: &str = "https://github.com/AlextheYounga/bonesinfra.git";
 const CHECKOUT_DIR: &str = "bonesinfra";
-const EXECUTABLE_NAME: &str = "bonesinfra";
 
 pub fn prefetch() -> Result<()> {
     ensure_available().map(|_| ())
@@ -19,12 +18,7 @@ pub(super) fn executable_path() -> Result<PathBuf> {
 
 fn ensure_available() -> Result<PathBuf> {
     let checkout = checkout_dir();
-    let executable = checkout.join("dist").join(EXECUTABLE_NAME);
-    let build_script = checkout.join("build.sh");
-
-    if executable.is_file() {
-        return Ok(executable);
-    }
+    let venv_python = checkout.join(".venv").join("bin").join("python");
 
     if let Ok(metadata) = fs::symlink_metadata(&checkout) {
         if !metadata.file_type().is_dir() {
@@ -32,17 +26,14 @@ fn ensure_available() -> Result<PathBuf> {
         }
     }
 
-    if !checkout.is_dir() || !build_script.is_file() {
-        if checkout.is_dir() {
-            reset_checkout(&checkout)?;
-        }
+    if !checkout.is_dir() {
         install_checkout(&checkout)?;
     }
 
-    build_checkout(&checkout)?;
+    setup_venv(&checkout)?;
 
-    if executable.is_file() {
-        return Ok(executable);
+    if venv_python.is_file() {
+        return Ok(venv_python);
     }
 
     let contents: Vec<_> = fs::read_dir(&checkout)
@@ -52,13 +43,13 @@ fn ensure_available() -> Result<PathBuf> {
         .map(|e| e.path().display().to_string())
         .collect();
     if contents.is_empty() {
-        bail!("bonesinfra build finished but checkout is empty at {}.", checkout.display());
+        bail!("bonesinfra setup finished but checkout is empty at {}.", checkout.display());
     }
 
     bail!(
-        "Built bonesinfra at {}, but {} is missing.\nContents of checkout:\n  {}",
+        "bonesinfra setup finished at {}, but {} is missing.\nContents of checkout:\n  {}",
         checkout.display(),
-        executable.display(),
+        venv_python.display(),
         contents.join("\n  ")
     );
 }
@@ -95,15 +86,38 @@ fn install_checkout(checkout: &Path) -> Result<()> {
     Ok(())
 }
 
-fn build_checkout(checkout: &Path) -> Result<()> {
-    let status = Command::new("bash")
-        .arg("build.sh")
-        .current_dir(checkout)
+fn setup_venv(checkout: &Path) -> Result<()> {
+    let venv_python = checkout.join(".venv").join("bin").join("python");
+
+    if !venv_python.is_file() {
+        let status = Command::new("python3")
+            .args(["-m", "venv", ".venv"])
+            .current_dir(checkout)
+            .status()
+            .with_context(|| format!("Failed to create venv in {}", checkout.display()))?;
+
+        if !status.success() {
+            bail!("Failed to create venv in {}.", checkout.display());
+        }
+    }
+
+    let status = Command::new(&venv_python)
+        .args(["-m", "pip", "install", "--upgrade", "pip"])
         .status()
-        .with_context(|| format!("Failed to run build.sh in {}", checkout.display()))?;
+        .with_context(|| format!("Failed to upgrade pip in {}", checkout.display()))?;
 
     if !status.success() {
-        bail!("Failed to build bonesinfra in {}.", checkout.display());
+        bail!("Failed to upgrade pip in {}.", checkout.display());
+    }
+
+    let status = Command::new(&venv_python)
+        .args(["-m", "pip", "install", "-e", "."])
+        .current_dir(checkout)
+        .status()
+        .with_context(|| format!("Failed to install bonesinfra dependencies in {}", checkout.display()))?;
+
+    if !status.success() {
+        bail!("Failed to install bonesinfra dependencies in {}.", checkout.display());
     }
 
     Ok(())
@@ -151,4 +165,5 @@ mod tests {
         assert!(!checkout.exists());
         Ok(())
     }
+
 }
