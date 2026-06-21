@@ -48,6 +48,19 @@ pub async fn run() -> Result<()> {
 }
 
 pub(crate) fn sync_bones_directory(cfg: &config::Bones) -> Result<()> {
+    let args = rsync_args(cfg);
+    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+
+    let status = rsync::status(&arg_refs)?;
+
+    if !status.success() {
+        bail!("rsync failed");
+    }
+
+    Ok(())
+}
+
+pub(crate) fn rsync_args(cfg: &config::Bones) -> Vec<String> {
     let user = default_deploy_user();
     let host = &cfg.host;
     let port = &cfg.port;
@@ -56,11 +69,38 @@ pub(crate) fn sync_bones_directory(cfg: &config::Bones) -> Result<()> {
 
     let ssh_arg = format!("ssh -p {port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null");
     let source = format!("{}/", paths::LOCAL_BONES_DIR);
-    let status = rsync::status(&["-av", "--delete", "-e", &ssh_arg, &source, &dest])?;
+    vec![
+        String::from("-av"),
+        String::from("--delete"),
+        String::from("--exclude"),
+        String::from("secrets/"),
+        String::from("--exclude"),
+        String::from("secrets.toml"),
+        String::from("-e"),
+        ssh_arg,
+        source,
+        dest,
+    ]
+}
 
-    if !status.success() {
-        bail!("rsync failed");
+#[cfg(test)]
+mod tests {
+    use super::rsync_args;
+    use crate::config::Bones;
+
+    #[test]
+    fn rsync_args_exclude_local_secrets_directory() {
+        let cfg = Bones {
+            host: String::from("deploy.example.com"),
+            port: String::from("22"),
+            repo_path: String::from("/home/git/acme.git"),
+            ..Default::default()
+        };
+
+        let args = rsync_args(&cfg);
+        let excludes =
+            args.windows(2).filter(|pair| pair[0] == "--exclude").map(|pair| pair[1].as_str()).collect::<Vec<_>>();
+
+        assert!(excludes.contains(&"secrets/"));
     }
-
-    Ok(())
 }

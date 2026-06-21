@@ -1,9 +1,9 @@
 use anyhow::Result;
 
-use crate::cli::args::{Cli, Command, RemoteCommand};
+use crate::cli::args::{Cli, Command, RemoteCommand, SecretsCommand};
 use crate::commands::{
     config, deploy_project, doctor, init_config, init_project, manage, pull_state, push_state, remote_runtime,
-    remote_setup, remote_ssl, rollback, update, version,
+    remote_setup, remote_ssl, rollback, secrets, update, version,
 };
 
 pub async fn run(cli: &Cli) -> Result<()> {
@@ -26,6 +26,11 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Push => push_state::run().await,
         Command::Pull => pull_state::run(),
+        Command::Secrets { command } => match command {
+            SecretsCommand::Init { recipient } => secrets::init(recipient),
+            SecretsCommand::Edit { name } => secrets::edit(name),
+            SecretsCommand::Push => secrets::push().await,
+        },
         Command::Deploy => deploy_project::run().await,
         Command::Update { skip_local, skip_remote } => {
             update::run(update::Options { skip_local: *skip_local, skip_remote: *skip_remote }).await

@@ -12,6 +12,7 @@ pub mod remote_runtime;
 pub mod remote_setup;
 pub mod remote_ssl;
 pub mod rollback;
+pub mod secrets;
 pub mod update;
 pub mod update_release;
 pub mod version;

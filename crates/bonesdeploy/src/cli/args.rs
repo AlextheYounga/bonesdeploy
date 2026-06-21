@@ -43,6 +43,11 @@ pub enum Command {
     Push,
     /// Sync .bones/ folder back from the remote bare repo
     Pull,
+    /// Manage encrypted local secrets and push them to remote shared/
+    Secrets {
+        #[command(subcommand)]
+        command: SecretsCommand,
+    },
     /// Deploy the configured project release to the remote server
     Deploy,
     /// Update bonesdeploy and bonesremote to the latest version
@@ -73,6 +78,23 @@ pub enum Command {
     },
     /// Print the version
     Version,
+}
+
+#[derive(Subcommand)]
+pub enum SecretsCommand {
+    /// Create the local secrets config and storage directory
+    Init {
+        /// GPG recipient used for encryption
+        #[arg(long)]
+        recipient: String,
+    },
+    /// Decrypt a secret into a temp file, edit it, then re-encrypt it
+    Edit {
+        /// Secret file name from .bones/secrets.toml
+        name: String,
+    },
+    /// Decrypt local secrets and write them into remote shared/
+    Push,
 }
 
 #[derive(Subcommand)]

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use openssh::{KnownHosts, Session, SessionBuilder, Stdio};
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use crate::config::Bones;
 use shared::config::{default_deploy_user, parse_port};
@@ -77,6 +77,32 @@ pub async fn stream_cmd(session: &Session, cmd: &str) -> Result<()> {
 
     if !status.success() {
         bail!("Remote command failed: {cmd}");
+    }
+
+    Ok(())
+}
+
+pub async fn run_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[u8]) -> Result<()> {
+    let mut child = session
+        .command("bash")
+        .arg("-c")
+        .arg(cmd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .await
+        .with_context(|| format!("Failed to execute remote command: {cmd}"))?;
+
+    let mut stdin = child.stdin().take().ok_or_else(|| anyhow::anyhow!("stdin was not piped"))?;
+    stdin.write_all(stdin_bytes).await.context("Failed to write stdin to remote command")?;
+    stdin.shutdown().await.context("Failed to close stdin for remote command")?;
+    drop(stdin);
+
+    let output = child.wait_with_output().await.context("Failed to wait for remote command")?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("Remote command failed: {cmd}\n{stderr}");
     }
 
     Ok(())
