@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use shared::paths;
@@ -25,7 +25,7 @@ pub fn run(config_path: &str) -> Result<()> {
 
     let previous_name = releases[current_idx - 1].clone();
     let previous_dir = release_state::release_dir(&cfg, &previous_name);
-    let current_link = std::path::PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
+    let current_link = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
     release_state::point_symlink_atomically(&current_link, &previous_dir)?;
 
     println!("Rollback complete: {current_name} -> {previous_name}");

@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use shared::paths;
@@ -10,7 +10,7 @@ pub fn run(config_path: &str) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
     let release_name = release_state::read_staged_release(&cfg)?;
     let release_dir = release_state::release_dir(&cfg, &release_name);
-    let current_link = std::path::PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
+    let current_link = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
 
     if !release_dir.exists() {
         anyhow::bail!("Staged release directory does not exist: {}", release_dir.display());

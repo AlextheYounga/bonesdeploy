@@ -63,11 +63,17 @@ pub fn default_deploy_user() -> String {
     paths::DEPLOY_USER.to_string()
 }
 
-#[must_use]
+/// # Errors
+///
+/// Returns an error if the string cannot be parsed as a `u16` port number.
 pub fn parse_port(port: &str) -> Result<u16> {
     port.parse().with_context(|| format!("Invalid port: {port}"))
 }
 
+/// # Errors
+///
+/// Returns an error if the host contains characters that are not ASCII
+/// alphanumeric, dots, or dashes.
 pub fn validate_host(host: &str) -> Result<()> {
     let host = host.trim();
     if host.is_empty() {

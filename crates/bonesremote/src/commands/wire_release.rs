@@ -1,6 +1,6 @@
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::{Component, Path};
+use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use shared::config as shared_config;
@@ -15,8 +15,8 @@ pub fn run(config_path: &str) -> Result<()> {
     let config_path = Path::new(config_path);
     let cfg = config::load(config_path)?;
     let release_name = release_state::read_staged_release(&cfg)?;
-    let build_root = std::path::PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root);
-    let shared_dir = std::path::PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).shared);
+    let build_root = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root);
+    let shared_dir = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).shared);
 
     let config_dir = config_path.parent().unwrap_or(Path::new("."));
     let _runtime = shared_config::load_runtime(config_dir)?;

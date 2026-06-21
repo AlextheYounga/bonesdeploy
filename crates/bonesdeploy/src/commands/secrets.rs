@@ -2,7 +2,8 @@ use std::env;
 use std::fs::{self, OpenOptions, Permissions};
 use std::io::{ErrorKind, Write as IoWrite};
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
+use std::process;
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -96,10 +97,10 @@ pub fn edit() -> Result<()> {
 
     edit_result?;
     encrypt_result?;
-    if let Err(error) = cleanup_result {
-        if error.kind() != ErrorKind::NotFound {
-            eprintln!("Warning: failed to remove temp file {}: {error}", temp_path.display());
-        }
+    if let Err(error) = cleanup_result
+        && error.kind() != ErrorKind::NotFound
+    {
+        eprintln!("Warning: failed to remove temp file {}: {error}", temp_path.display());
     }
 
     println!("Updated encrypted secret {}", encrypted_path.display());
@@ -132,27 +133,8 @@ pub async fn push() -> Result<()> {
 
     ssh::run_cmd_with_stdin(&session, &cmd, &plaintext).await?;
     session.close().await?;
-    println!("Pushed secret to remote shared/{}", REMOTE_ENV_SECRET);
+    println!("Pushed secret to remote shared/{REMOTE_ENV_SECRET}");
     Ok(())
-}
-
-fn validate_remote_path(remote: &str) -> Result<&str> {
-    if remote.is_empty() {
-        bail!("secret remote path must not be empty");
-    }
-
-    for component in Path::new(remote).components() {
-        match component {
-            Component::Normal(_) => {}
-            Component::CurDir => bail!("secret remote path must not contain ."),
-            Component::ParentDir => bail!("secret remote path must not contain .., got: {remote}"),
-            Component::RootDir | Component::Prefix(_) => {
-                bail!("secret remote path must be relative, got: {remote}")
-            }
-        }
-    }
-
-    Ok(remote)
 }
 
 fn ensure_gpg_installed() -> Result<()> {
@@ -174,7 +156,7 @@ fn ensure_gpg_home() -> Result<()> {
 fn ensure_project_key(project_name: &str) -> Result<String> {
     ensure_gpg_home()?;
 
-    let uid = format!("BonesDeploy secrets: {}", project_name);
+    let uid = format!("BonesDeploy secrets: {project_name}");
 
     if let Some(fingerprint) = find_key_fingerprint(&uid)? {
         return Ok(fingerprint);
@@ -272,7 +254,7 @@ fn open_editor(path: &Path) -> Result<()> {
 
 fn create_temp_edit_path() -> Result<PathBuf> {
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-    let path = env::temp_dir().join(format!("bonesdeploy-env-{}-{nonce}", std::process::id()));
+    let path = env::temp_dir().join(format!("bonesdeploy-env-{}-{nonce}", process::id()));
 
     OpenOptions::new()
         .write(true)
@@ -312,26 +294,8 @@ fn shell_quote_single(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
-
-    use super::{extract_fingerprint, gpg_home, validate_remote_path};
+    use super::{extract_fingerprint, gpg_home};
     use shared::paths;
-
-    #[test]
-    fn validate_remote_path_rejects_empty_absolute_and_dot_paths() {
-        assert!(validate_remote_path("").is_err());
-        assert!(validate_remote_path("/etc/passwd").is_err());
-        assert!(validate_remote_path(".").is_err());
-        assert!(validate_remote_path("../.env").is_err());
-        assert!(validate_remote_path("storage/../app.key").is_err());
-    }
-
-    #[test]
-    fn validate_remote_path_accepts_expected_relative_paths() -> Result<()> {
-        assert_eq!(validate_remote_path(".env")?, ".env");
-        assert_eq!(validate_remote_path("storage/app.key")?, "storage/app.key");
-        Ok(())
-    }
 
     #[test]
     fn gpg_home_resolves_under_bones_config_root() {

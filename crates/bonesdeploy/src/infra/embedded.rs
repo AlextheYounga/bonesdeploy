@@ -2,6 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::str;
 
 use anyhow::{Context, Result, anyhow, bail};
 use rust_embed::Embed;
@@ -72,8 +73,8 @@ fn runtime_defaults_from_bytes(asset_path: &str, bytes: Option<impl AsRef<[u8]>>
         bail!("Missing embedded runtime defaults at {asset_path}");
     };
 
-    let content = std::str::from_utf8(bytes.as_ref())
-        .with_context(|| format!("Embedded asset {asset_path} is not valid UTF-8"))?;
+    let content =
+        str::from_utf8(bytes.as_ref()).with_context(|| format!("Embedded asset {asset_path} is not valid UTF-8"))?;
     let toml_value: toml::Value = toml::from_str(content)
         .with_context(|| format!("Failed to parse embedded runtime defaults at {asset_path}"))?;
     let json_value = serde_json::to_value(toml_value)

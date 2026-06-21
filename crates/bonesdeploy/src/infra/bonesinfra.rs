@@ -20,10 +20,10 @@ fn ensure_available() -> Result<PathBuf> {
     let checkout = checkout_dir();
     let venv_python = checkout.join(".venv").join("bin").join("python");
 
-    if let Ok(metadata) = fs::symlink_metadata(&checkout) {
-        if !metadata.file_type().is_dir() {
-            reset_checkout(&checkout)?;
-        }
+    if let Ok(metadata) = fs::symlink_metadata(&checkout)
+        && !metadata.file_type().is_dir()
+    {
+        reset_checkout(&checkout)?;
     }
 
     if !checkout.is_dir() {

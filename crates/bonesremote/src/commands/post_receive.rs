@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::ErrorKind;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
@@ -10,7 +10,7 @@ use crate::config;
 
 pub fn run(config_path: &str, revision: Option<&str>) -> Result<()> {
     let cfg = config::load(Path::new(config_path))?;
-    let build_root = std::path::PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root);
+    let build_root = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root);
     ensure_build_workspace_accessible(&build_root)?;
 
     let checkout_target = revision.unwrap_or(cfg.branch.as_str());

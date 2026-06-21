@@ -1,5 +1,6 @@
 use std::env;
 use std::fs;
+use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard, OnceLock};
@@ -206,7 +207,7 @@ fn init_repairs_dangling_bones_symlink() -> Result<()> {
     with_temp_repo(|repo_dir, home_dir| {
         let config_root = home_dir.join(".config/bonesdeploy");
         fs::create_dir_all(&config_root)?;
-        std::os::unix::fs::symlink(config_root.join("missing.bones"), repo_dir.join(".bones"))?;
+        symlink(config_root.join("missing.bones"), repo_dir.join(".bones"))?;
 
         run(&init_args())?;
 
