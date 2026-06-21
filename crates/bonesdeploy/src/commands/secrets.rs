@@ -11,6 +11,7 @@ use anyhow::{Context, Result, bail};
 
 use crate::config;
 use crate::infra::{bootstrap_ssh, ssh};
+use shared::config as shared_config;
 use shared::config::parse_port;
 use shared::paths;
 
@@ -111,6 +112,13 @@ pub async fn push() -> Result<()> {
     ensure_gpg_installed()?;
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
+    let runtime_group = if runtime.runtime_group.is_empty() {
+        shared_config::runtime_group_for(&cfg.project_name)
+    } else {
+        runtime.runtime_group
+    };
+
     let deployment = cfg.deployment_paths(paths::DEFAULT_WEB_ROOT);
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     let port = parse_port(&cfg.port)?;
@@ -124,11 +132,11 @@ pub async fn push() -> Result<()> {
     let plaintext = decrypt_secret(encrypted_path)?;
     let target = Path::new(&deployment.shared).join(REMOTE_ENV_SECRET);
     let parent = target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
+    let parent_s = shell_quote_single(&parent.display().to_string());
+    let target_s = shell_quote_single(&target.display().to_string());
+    let group_s = shell_quote_single(&runtime_group);
     let cmd = format!(
-        "mkdir -p {parent} && cat > {target} && chmod {mode} {target}",
-        parent = shell_quote_single(&parent.display().to_string()),
-        target = shell_quote_single(&target.display().to_string()),
-        mode = shell_quote_single(DEFAULT_SECRET_MODE),
+        "mkdir -p {parent_s} && tmp=$(mktemp {target_s}.XXXXXX) && cat > \"$tmp\" && chown root:{group_s} \"$tmp\" && chmod {DEFAULT_SECRET_MODE} \"$tmp\" && mv \"$tmp\" {target_s}",
     );
 
     ssh::run_cmd_with_stdin(&session, &cmd, &plaintext).await?;
