@@ -27,7 +27,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Push => push_state::run().await,
         Command::Pull => pull_state::run(),
         Command::Secrets { command } => match command {
-            SecretsCommand::Init { recipient } => secrets::init(recipient),
+            SecretsCommand::Init => secrets::init(),
             SecretsCommand::Edit { name } => secrets::edit(name),
             SecretsCommand::Push => secrets::push().await,
         },

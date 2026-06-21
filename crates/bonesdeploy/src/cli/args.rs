@@ -83,11 +83,7 @@ pub enum Command {
 #[derive(Subcommand)]
 pub enum SecretsCommand {
     /// Create the local secrets config and storage directory
-    Init {
-        /// GPG recipient used for encryption
-        #[arg(long)]
-        recipient: String,
-    },
+    Init,
     /// Decrypt a secret into a temp file, edit it, then re-encrypt it
     Edit {
         /// Secret file name from .bones/secrets.toml
