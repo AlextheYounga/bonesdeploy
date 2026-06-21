@@ -7,31 +7,16 @@ use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
-use serde::{Deserialize, Serialize};
 
 use crate::config;
 use crate::infra::{bootstrap_ssh, ssh};
 use shared::config::parse_port;
 use shared::paths;
 
-const LOCAL_SECRETS_TOML: &str = ".bones/secrets.toml";
 const LOCAL_SECRETS_DIR: &str = ".bones/secrets";
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SecretsConfig {
-    key_fingerprint: String,
-    #[serde(rename = "file")]
-    files: Vec<SecretFile>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SecretFile {
-    name: String,
-    local: String,
-    remote: String,
-    #[serde(default)]
-    mode: String,
-}
+const LOCAL_ENV_SECRET: &str = ".bones/secrets/.env.gpg";
+const REMOTE_ENV_SECRET: &str = ".env";
+const DEFAULT_SECRET_MODE: &str = "640";
 
 fn gpg_home() -> PathBuf {
     paths::bones_config_root().join("gnupg")
@@ -51,52 +36,33 @@ pub fn init() -> Result<()> {
         bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_DIR);
     }
 
-    let secrets_toml = Path::new(LOCAL_SECRETS_TOML);
+    let secrets_toml = Path::new(".bones/secrets.toml");
     if secrets_toml.exists() {
-        let content =
-            fs::read_to_string(secrets_toml).with_context(|| format!("Failed to read {LOCAL_SECRETS_TOML}"))?;
-        reject_old_recipient_config(&content)?;
-        bail!("{LOCAL_SECRETS_TOML} already exists");
+        bail!(".bones/secrets.toml is no longer used. Remove it and run `bonesdeploy secrets init` again.");
     }
+
+    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let _key_fingerprint = ensure_project_key(&cfg.project_name)?;
+
+    fs::create_dir_all(LOCAL_SECRETS_DIR).with_context(|| format!("Failed to create {LOCAL_SECRETS_DIR}"))?;
+
+    println!("Created {LOCAL_SECRETS_DIR}/ and local project secrets key.");
+    Ok(())
+}
+
+pub fn edit() -> Result<()> {
+    ensure_gpg_installed()?;
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
     let key_fingerprint = ensure_project_key(&cfg.project_name)?;
 
-    fs::create_dir_all(LOCAL_SECRETS_DIR).with_context(|| format!("Failed to create {LOCAL_SECRETS_DIR}"))?;
-
-    let config = SecretsConfig {
-        key_fingerprint,
-        files: vec![SecretFile {
-            name: String::from(".env"),
-            local: String::from("secrets/.env.gpg"),
-            remote: String::from(".env"),
-            mode: String::from("640"),
-        }],
-    };
-
-    let content = toml::to_string(&config).context("Failed to serialize secrets config")?;
-    fs::write(secrets_toml, content).with_context(|| format!("Failed to write {LOCAL_SECRETS_TOML}"))?;
-
-    println!("Created {LOCAL_SECRETS_TOML} and {LOCAL_SECRETS_DIR}/");
-    Ok(())
-}
-
-pub fn edit(name: &str) -> Result<()> {
-    ensure_gpg_installed()?;
-
-    let config = load_secrets_config()?;
-    let file = config
-        .files
-        .iter()
-        .find(|file| file.name == name)
-        .ok_or_else(|| anyhow::anyhow!("Secret not found: {name}"))?;
-    let encrypted_path = local_secret_path(&file.local);
+    let encrypted_path = Path::new(LOCAL_ENV_SECRET);
 
     if let Some(parent) = encrypted_path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
     }
 
-    let temp_path = create_temp_edit_path(name)?;
+    let temp_path = create_temp_edit_path()?;
 
     if encrypted_path.is_file() {
         run_gpg(&[
@@ -119,7 +85,7 @@ pub fn edit(name: &str) -> Result<()> {
             encrypted_path.to_str().ok_or_else(|| anyhow::anyhow!("Invalid encrypted path"))?,
             "--encrypt",
             "--recipient",
-            &config.key_fingerprint,
+            &key_fingerprint,
             temp_path.to_str().ok_or_else(|| anyhow::anyhow!("Invalid temp path"))?,
         ])
     } else {
@@ -144,54 +110,29 @@ pub async fn push() -> Result<()> {
     ensure_gpg_installed()?;
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
-    let secrets = load_secrets_config()?;
     let deployment = cfg.deployment_paths(paths::DEFAULT_WEB_ROOT);
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     let port = parse_port(&cfg.port)?;
     let session = ssh::connect_as(&ssh_user, &cfg.host, port).await?;
 
-    for file in &secrets.files {
-        let remote = validate_remote_path(&file.remote)?;
-        let encrypted_path = local_secret_path(&file.local);
-        if !encrypted_path.is_file() {
-            bail!("Encrypted secret does not exist: {}", encrypted_path.display());
-        }
-
-        let plaintext = decrypt_secret(&encrypted_path)?;
-        let target = Path::new(&deployment.shared).join(remote);
-        let parent =
-            target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
-        let mode = effective_mode(&file.mode);
-        let cmd = format!(
-            "mkdir -p {parent} && cat > {target} && chmod {mode} {target}",
-            parent = shell_quote_single(&parent.display().to_string()),
-            target = shell_quote_single(&target.display().to_string()),
-            mode = shell_quote_single(mode),
-        );
-
-        ssh::run_cmd_with_stdin(&session, &cmd, &plaintext).await?;
-        println!("Pushed secret {} to remote shared/{}", file.name, file.remote);
+    let encrypted_path = Path::new(LOCAL_ENV_SECRET);
+    if !encrypted_path.is_file() {
+        bail!("No encrypted .env found. Run `bonesdeploy secrets edit` first.");
     }
 
+    let plaintext = decrypt_secret(encrypted_path)?;
+    let target = Path::new(&deployment.shared).join(REMOTE_ENV_SECRET);
+    let parent = target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
+    let cmd = format!(
+        "mkdir -p {parent} && cat > {target} && chmod {mode} {target}",
+        parent = shell_quote_single(&parent.display().to_string()),
+        target = shell_quote_single(&target.display().to_string()),
+        mode = shell_quote_single(DEFAULT_SECRET_MODE),
+    );
+
+    ssh::run_cmd_with_stdin(&session, &cmd, &plaintext).await?;
     session.close().await?;
-    Ok(())
-}
-
-fn load_secrets_config() -> Result<SecretsConfig> {
-    let path = Path::new(LOCAL_SECRETS_TOML);
-    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    reject_old_recipient_config(&content)?;
-    toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))
-}
-
-fn reject_old_recipient_config(content: &str) -> Result<()> {
-    let raw: toml::Value = toml::from_str(content).context("Failed to parse secrets config")?;
-    if raw.as_table().map_or(false, |t| t.contains_key("recipient")) {
-        bail!(
-            "Old recipient-based secrets config is no longer supported. \
-             Delete .bones/secrets.toml and run `bonesdeploy secrets init` again."
-        );
-    }
+    println!("Pushed secret to remote shared/{}", REMOTE_ENV_SECRET);
     Ok(())
 }
 
@@ -290,7 +231,7 @@ fn generate_project_key(project_name: &str, uid: &str) -> Result<String> {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .context("Failed to spawngpg --generate-key")?;
+        .context("Failed to spawn gpg --generate-key")?;
 
     {
         let mut stdin = child.stdin.take().ok_or_else(|| anyhow::anyhow!("stdin was not piped"))?;
@@ -329,10 +270,9 @@ fn open_editor(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn create_temp_edit_path(name: &str) -> Result<PathBuf> {
-    let sanitized = name.replace('/', "_");
+fn create_temp_edit_path() -> Result<PathBuf> {
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-    let path = env::temp_dir().join(format!("bonesdeploy-secret-{}-{nonce}-{sanitized}", std::process::id()));
+    let path = env::temp_dir().join(format!("bonesdeploy-env-{}-{nonce}", std::process::id()));
 
     OpenOptions::new()
         .write(true)
@@ -341,10 +281,6 @@ fn create_temp_edit_path(name: &str) -> Result<PathBuf> {
         .with_context(|| format!("Failed to create temp file {}", path.display()))?;
 
     Ok(path)
-}
-
-fn local_secret_path(relative_path: &str) -> PathBuf {
-    Path::new(paths::LOCAL_BONES_DIR).join(relative_path)
 }
 
 fn decrypt_secret(path: &Path) -> Result<Vec<u8>> {
@@ -370,10 +306,6 @@ fn run_gpg(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-fn effective_mode(mode: &str) -> &str {
-    if mode.trim().is_empty() { "640" } else { mode }
-}
-
 fn shell_quote_single(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
@@ -382,7 +314,7 @@ fn shell_quote_single(value: &str) -> String {
 mod tests {
     use anyhow::Result;
 
-    use super::{SecretsConfig, extract_fingerprint, gpg_home, reject_old_recipient_config, validate_remote_path};
+    use super::{extract_fingerprint, gpg_home, validate_remote_path};
     use shared::paths;
 
     #[test]
@@ -399,43 +331,6 @@ mod tests {
         assert_eq!(validate_remote_path(".env")?, ".env");
         assert_eq!(validate_remote_path("storage/app.key")?, "storage/app.key");
         Ok(())
-    }
-
-    #[test]
-    fn parse_secrets_toml_example() -> Result<()> {
-        let config: SecretsConfig = toml::from_str(
-            r#"key_fingerprint = "ABCDEF123456..."
-
-[[file]]
-name = ".env"
-local = "secrets/.env.gpg"
-remote = ".env"
-mode = "640"
-"#,
-        )?;
-
-        assert_eq!(config.key_fingerprint, "ABCDEF123456...");
-        assert_eq!(config.files.len(), 1);
-        assert_eq!(config.files[0].name, ".env");
-        assert_eq!(config.files[0].local, "secrets/.env.gpg");
-        assert_eq!(config.files[0].remote, ".env");
-        assert_eq!(config.files[0].mode, "640");
-        Ok(())
-    }
-
-    #[test]
-    fn old_recipient_config_is_rejected() {
-        let result = reject_old_recipient_config(
-            r#"recipient = "alex@example.com"
-
-[[file]]
-name = ".env"
-local = "secrets/.env.gpg"
-remote = ".env"
-mode = "640"
-"#,
-        );
-        assert!(result.is_err());
     }
 
     #[test]

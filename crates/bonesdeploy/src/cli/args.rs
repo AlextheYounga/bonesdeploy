@@ -84,11 +84,8 @@ pub enum Command {
 pub enum SecretsCommand {
     /// Create the local secrets config and storage directory
     Init,
-    /// Decrypt a secret into a temp file, edit it, then re-encrypt it
-    Edit {
-        /// Secret file name from .bones/secrets.toml
-        name: String,
-    },
+    /// Decrypt the .env secret, edit it, then re-encrypt it
+    Edit,
     /// Decrypt local secrets and write them into remote shared/
     Push,
 }

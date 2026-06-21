@@ -74,8 +74,6 @@ pub(crate) fn rsync_args(cfg: &config::Bones) -> Vec<String> {
         String::from("--delete"),
         String::from("--exclude"),
         String::from("secrets/"),
-        String::from("--exclude"),
-        String::from("secrets.toml"),
         String::from("-e"),
         ssh_arg,
         source,
@@ -89,7 +87,7 @@ mod tests {
     use crate::config::Bones;
 
     #[test]
-    fn rsync_args_exclude_local_secrets_directory() {
+    fn rsync_args_exclude_local_secrets_directory_only() {
         let cfg = Bones {
             host: String::from("deploy.example.com"),
             port: String::from("22"),
@@ -102,5 +100,6 @@ mod tests {
             args.windows(2).filter(|pair| pair[0] == "--exclude").map(|pair| pair[1].as_str()).collect::<Vec<_>>();
 
         assert!(excludes.contains(&"secrets/"));
+        assert!(!excludes.contains(&"secrets.toml"));
     }
 }
