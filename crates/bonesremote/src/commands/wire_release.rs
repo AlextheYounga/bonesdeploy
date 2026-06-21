@@ -11,6 +11,12 @@ use crate::release_state;
 
 use shared::config::Shared;
 
+#[derive(Clone, Debug, Default, serde::Deserialize)]
+#[serde(default)]
+struct RuntimeSharedConfig {
+    shared: Shared,
+}
+
 pub fn run(config_path: &str) -> Result<()> {
     let config_path = Path::new(config_path);
     let cfg = config::load(config_path)?;
@@ -24,18 +30,22 @@ pub fn run(config_path: &str) -> Result<()> {
     let shared_paths = if runtime_path.exists() {
         let content =
             fs::read_to_string(&runtime_path).with_context(|| format!("Failed to read {}", runtime_path.display()))?;
-        let runtime: Shared =
+        let runtime: RuntimeSharedConfig =
             toml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_path.display()))?;
-        runtime.paths
+        runtime.shared.paths
     } else {
         Vec::new()
     };
-    for shared_path in &shared_paths {
-        validate_shared_path(&shared_path.path)?;
-        wire_path(&build_root, &shared_dir, &shared_path.path)?;
+    if shared_paths.is_empty() {
+        println!("No shared paths configured. Nothing to wire for staged release: {release_name}");
+    } else {
+        for shared_path in &shared_paths {
+            validate_shared_path(&shared_path.path)?;
+            wire_path(&build_root, &shared_dir, &shared_path.path)?;
+        }
+        println!("Wired {} shared path(s) for staged release: {release_name}", shared_paths.len());
     }
 
-    println!("Wired build workspace for staged release: {release_name}");
     Ok(())
 }
 
@@ -115,7 +125,8 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{replace_workspace_path_with_shared_symlink, validate_shared_path};
+    use super::{RuntimeSharedConfig, replace_workspace_path_with_shared_symlink, validate_shared_path, wire_path};
+    use shared::config::PathType;
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -156,5 +167,55 @@ mod tests {
         assert!(validate_shared_path("storage/logs").is_ok());
         assert!(validate_shared_path("my..dir").is_ok(), "double-dot filenames are allowed");
         assert!(validate_shared_path("assets..cache/file.txt").is_ok(), "double-dot directory names are allowed");
+    }
+
+    /// Verifies the runtime.toml shape is parsed correctly: `[shared].paths` is
+    /// nested under a `[shared]` table, not at the TOML root.
+    #[test]
+    fn parse_nested_shared_paths_from_runtime_toml() -> Result<()> {
+        let toml = r#"
+[shared]
+paths = [
+  { path = ".env", type = "file" },
+  { path = "storage", type = "dir" },
+]
+"#;
+        let config: RuntimeSharedConfig = toml::from_str(toml)?;
+        assert_eq!(config.shared.paths.len(), 2);
+        assert_eq!(config.shared.paths[0].path, ".env");
+        assert_eq!(config.shared.paths[0].path_type, PathType::File);
+        assert_eq!(config.shared.paths[1].path, "storage");
+        assert_eq!(config.shared.paths[1].path_type, PathType::Dir);
+        Ok(())
+    }
+
+    /// Verifies that parsing a runtime.toml that has `[shared]` but no `paths`
+    /// still succeeds and returns an empty vec.
+    #[test]
+    fn parse_empty_shared_paths() -> Result<()> {
+        let toml = "[shared]\n";
+        let config: RuntimeSharedConfig = toml::from_str(toml)?;
+        assert!(config.shared.paths.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn wire_path_creates_symlink() -> Result<()> {
+        let root = temp_dir_path("wire_path");
+        let build_root = root.join("build");
+        let shared_dir = root.join("shared");
+        fs::create_dir_all(&build_root)?;
+        fs::create_dir_all(&shared_dir)?;
+        fs::write(shared_dir.join(".env"), "SECRET=1")?;
+
+        wire_path(&build_root, &shared_dir, ".env")?;
+
+        let link = build_root.join(".env");
+        assert!(link.is_symlink(), "expected symlink at {}", link.display());
+        let target = fs::read_link(&link)?;
+        assert_eq!(target, shared_dir.join(".env"));
+
+        fs::remove_dir_all(root)?;
+        Ok(())
     }
 }
