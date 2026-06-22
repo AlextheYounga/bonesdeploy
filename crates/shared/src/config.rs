@@ -113,6 +113,13 @@ pub struct SharedPath {
     pub path: String,
     #[serde(rename = "type")]
     pub path_type: PathType,
+    #[serde(default = "default_shared_link")]
+    pub link: bool,
+}
+
+#[must_use]
+pub fn default_shared_link() -> bool {
+    true
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -215,7 +222,8 @@ pub fn load(path: &Path) -> Result<Bones> {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_host;
+    use super::*;
+    use anyhow::Result;
 
     #[test]
     fn validate_host_accepts_hostnames_and_ips() {
@@ -227,5 +235,44 @@ mod tests {
     #[test]
     fn validate_host_rejects_shell_metacharacters() {
         assert!(validate_host("deploy.example.com;rm -rf /").is_err());
+    }
+
+    #[test]
+    fn shared_path_parse_defaults_link_to_true() -> Result<()> {
+        let toml = r#"
+paths = [
+  { path = ".env", type = "file" },
+]
+"#;
+        let shared: Shared = toml::from_str(toml)?;
+        assert_eq!(shared.paths.len(), 1);
+        assert!(shared.paths[0].link, "link should default to true");
+        Ok(())
+    }
+
+    #[test]
+    fn shared_path_parse_link_false() -> Result<()> {
+        let toml = r#"
+paths = [
+  { path = "database", type = "dir", link = false },
+]
+"#;
+        let shared: Shared = toml::from_str(toml)?;
+        assert_eq!(shared.paths.len(), 1);
+        assert!(!shared.paths[0].link);
+        Ok(())
+    }
+
+    #[test]
+    fn shared_path_parse_link_true_explicit() -> Result<()> {
+        let toml = r#"
+paths = [
+  { path = "storage", type = "dir", link = true },
+]
+"#;
+        let shared: Shared = toml::from_str(toml)?;
+        assert_eq!(shared.paths.len(), 1);
+        assert!(shared.paths[0].link);
+        Ok(())
     }
 }

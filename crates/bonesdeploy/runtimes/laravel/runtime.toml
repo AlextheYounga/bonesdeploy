@@ -16,4 +16,5 @@ paths = [
 paths = [
     { path = "storage", type = "dir" },
     { path = ".env", type = "file" },
+    { path = "database", type = "dir", link = false },
 ]

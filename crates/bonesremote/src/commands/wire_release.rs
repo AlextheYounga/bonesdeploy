@@ -39,11 +39,29 @@ pub fn run(config_path: &str) -> Result<()> {
     if shared_paths.is_empty() {
         println!("No shared paths configured. Nothing to wire for staged release: {release_name}");
     } else {
+        let mut wired = 0usize;
+        let mut provisioned = 0usize;
         for shared_path in &shared_paths {
             validate_shared_path(&shared_path.path)?;
-            wire_path(&build_root, &shared_dir, &shared_path.path)?;
+            if shared_path.link {
+                wire_path(&build_root, &shared_dir, &shared_path.path)?;
+                wired += 1;
+            } else {
+                println!("Shared path is provision-only, not linked: {}", shared_path.path);
+                provisioned += 1;
+            }
         }
-        println!("Wired {} shared path(s) for staged release: {release_name}", shared_paths.len());
+        let parts: Vec<String> = {
+            let mut p = Vec::new();
+            if wired > 0 {
+                p.push(format!("{wired} linked"));
+            }
+            if provisioned > 0 {
+                p.push(format!("{provisioned} provision-only"));
+            }
+            p
+        };
+        println!("Shared paths for staged release {release_name}: {}", parts.join(", "));
     }
 
     Ok(())
@@ -170,7 +188,8 @@ mod tests {
     }
 
     /// Verifies the runtime.toml shape is parsed correctly: `[shared].paths` is
-    /// nested under a `[shared]` table, not at the TOML root.
+    /// nested under a `[shared]` table, not at the TOML root. Also verifies
+    /// `link` defaults to `true` when omitted.
     #[test]
     fn parse_nested_shared_paths_from_runtime_toml() -> Result<()> {
         let toml = r#"
@@ -184,8 +203,95 @@ paths = [
         assert_eq!(config.shared.paths.len(), 2);
         assert_eq!(config.shared.paths[0].path, ".env");
         assert_eq!(config.shared.paths[0].path_type, PathType::File);
+        assert!(config.shared.paths[0].link, "link should default to true");
         assert_eq!(config.shared.paths[1].path, "storage");
         assert_eq!(config.shared.paths[1].path_type, PathType::Dir);
+        assert!(config.shared.paths[1].link, "link should default to true");
+        Ok(())
+    }
+
+    #[test]
+    fn parse_link_false_from_runtime_toml() -> Result<()> {
+        let toml = r#"
+[shared]
+paths = [
+  { path = "database", type = "dir", link = false },
+  { path = "storage", type = "dir", link = true },
+]
+"#;
+        let config: RuntimeSharedConfig = toml::from_str(toml)?;
+        assert!(!config.shared.paths[0].link);
+        assert!(config.shared.paths[1].link);
+        Ok(())
+    }
+
+    /// Integration test: calls `run()` with a runtime.toml that has `link =
+    /// false` on `database` and verifies it is not symlinked, while `storage`
+    /// and `.env` are.
+    #[test]
+    fn link_false_skipped_by_wire_release() -> Result<()> {
+        let root = temp_dir_path("link_false");
+        fs::create_dir_all(&root)?;
+        let project_root = root.join("deploy");
+        let repo_path = root.join("repo.git");
+        let build_workspace = project_root.join("build").join("workspace");
+        let shared_dir = project_root.join("shared");
+
+        let bones_toml = format!(
+            r#"
+project_name = "testapp"
+host = "example.com"
+repo_path = "{}"
+project_root = "{}"
+"#,
+            repo_path.display(),
+            project_root.display()
+        );
+        let bones_toml_path = root.join("bones.toml");
+        fs::write(&bones_toml_path, bones_toml)?;
+
+        let runtime_toml = r#"
+[shared]
+paths = [
+  { path = "storage", type = "dir" },
+  { path = ".env", type = "file" },
+  { path = "database", type = "dir", link = false },
+]
+"#;
+        fs::write(root.join("runtime.toml"), runtime_toml)?;
+
+        let staged_file = repo_path.join("bones").join(".staged_release");
+        if let Some(parent) = staged_file.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&staged_file, "20250101_000000\n")?;
+
+        fs::create_dir_all(&build_workspace)?;
+        fs::create_dir_all(build_workspace.join("database").join("migrations"))?;
+        fs::write(build_workspace.join("database").join("migrations").join("create_users.php"), "--")?;
+        fs::create_dir_all(build_workspace.join("storage"))?;
+        fs::write(build_workspace.join(".env"), "APP_NAME=test")?;
+
+        fs::create_dir_all(shared_dir.join("database"))?;
+        fs::create_dir_all(shared_dir.join("storage"))?;
+        fs::write(shared_dir.join(".env"), "APP_KEY=base64:...")?;
+
+        super::run(&bones_toml_path.to_string_lossy())?;
+
+        let db = build_workspace.join("database");
+        assert!(!db.is_symlink(), "database should NOT be a symlink (link=false)");
+        assert!(db.is_dir(), "database should still be a directory");
+        assert!(db.join("migrations").join("create_users.php").exists(), "database contents preserved");
+
+        let storage_link = build_workspace.join("storage");
+        assert!(storage_link.is_symlink(), "storage should be a symlink");
+        assert_eq!(fs::read_link(&storage_link)?, shared_dir.join("storage"));
+
+        let env_link = build_workspace.join(".env");
+        assert!(env_link.is_symlink(), ".env should be a symlink");
+        assert_eq!(fs::read_link(&env_link)?, shared_dir.join(".env"));
+
+        fs::remove_dir_all(root)?;
         Ok(())
     }
 
