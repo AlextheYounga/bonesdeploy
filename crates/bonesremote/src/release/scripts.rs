@@ -35,6 +35,9 @@ pub(super) fn run_deployment_script(
         .with_context(|| format!("Failed to open deployment log {}", log_path.display()))?;
 
     let mut child = Command::new("bash")
+        .arg("-c")
+        .arg("umask 0002\nexec bash \"$@\"")
+        .arg("bonesdeploy-umask")
         .arg(script)
         .current_dir(build_root)
         .env("PROJECT_NAME", env.project_name)
@@ -222,6 +225,40 @@ mod tests {
         assert!(status.success());
         assert!(log_path.exists(), "log file should be created even when its directory is missing");
         assert!(fs::read_to_string(&log_path)?.contains("ok"));
+
+        fs::remove_dir_all(root).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn run_deployment_script_applies_group_writable_umask() -> Result<()> {
+        let root = temp_dir("bonesremote_deploy_runner_umask")?;
+        let build_root = root.join("workspace");
+        let logs = root.join("logs");
+        fs::create_dir_all(&build_root)?;
+        fs::create_dir_all(&logs)?;
+
+        let out_file = build_root.join("umask_probe.txt");
+        let script = root.join("00_probe.sh");
+        write_file(&script, &format!("#!/usr/bin/env bash\necho hi > \"{}\"\n", out_file.display()))?;
+        fs::set_permissions(&script, PermissionsExt::from_mode(0o755))?;
+
+        let log_path = logs.join("20260612_211412-00_probe.sh.log");
+        let status = run_deployment_script(
+            &script,
+            &build_root,
+            &log_path,
+            &ScriptEnv {
+                project_name: "demo",
+                project_root: "/srv/deployments/demo",
+                repo_path: "/home/git/demo.git",
+                web_root: "public",
+            },
+        )?;
+
+        assert!(status.success());
+        let mode = fs::metadata(&out_file)?.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o664, "umask 0002 should make created files group-writable (0664), got {mode:o}");
 
         fs::remove_dir_all(root).ok();
         Ok(())
