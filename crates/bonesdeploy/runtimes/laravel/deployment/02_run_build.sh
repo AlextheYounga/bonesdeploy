@@ -193,15 +193,7 @@ else
   php artisan migrate --force
 fi
 
-echo "[bonesdeploy] Rebuilding Laravel caches..."
 php artisan optimize:clear
-php artisan config:cache
-php artisan route:cache
-php artisan view:cache
-
-if artisan_command_exists "event:cache"; then
-  php artisan event:cache || true
-fi
 
 if artisan_command_exists "queue:restart"; then
   php artisan queue:restart || true
