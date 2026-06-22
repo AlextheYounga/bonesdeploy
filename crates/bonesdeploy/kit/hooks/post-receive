@@ -12,8 +12,8 @@ GIT_DIR=$(cd "$GIT_DIR" && pwd)
 HOOKS_LIB="$GIT_DIR/bones/hooks/hooks.sh"
 
 if [ ! -f "$HOOKS_LIB" ]; then
-    echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"
-    exit 1
+	echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"
+	exit 1
 fi
 
 # shellcheck source=/dev/null
