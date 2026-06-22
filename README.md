@@ -52,13 +52,13 @@ This gives you a clean privilege boundary:
 ### Local (bonesdeploy)
 
 ```sh
-cargo install --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
+cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
 ```
 
 ### Server (bonesremote)
 
 ```sh
-sudo cargo install --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
+sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
 Then run the remote setup:

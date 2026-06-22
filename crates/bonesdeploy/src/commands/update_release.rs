@@ -35,7 +35,7 @@ pub fn current_remote_version() -> String {
 
 pub fn update_local_from_source(repo_url: &str) -> Result<()> {
     let status = Command::new("cargo")
-        .args(["install", "--git", repo_url, paths::BONESDEPLOY_BINARY, "--force"])
+        .args(["install", "--locked", "--git", repo_url, paths::BONESDEPLOY_BINARY, "--force"])
         .status()
         .context("Failed to run cargo install for bonesdeploy")?;
 
@@ -58,8 +58,11 @@ pub async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result
 
     let install_root = paths::USR_LOCAL_BIN.trim_end_matches("/bin");
     println!("Building bonesremote from source on remote...");
-    ssh::stream_cmd(&session, &format!("cargo install --git {repo_url} bonesremote --force --root {install_root}"))
-        .await?;
+    ssh::stream_cmd(
+        &session,
+        &format!("cargo install --locked --git {repo_url} bonesremote --force --root {install_root}"),
+    )
+    .await?;
 
     ssh::stream_cmd(
         &session,

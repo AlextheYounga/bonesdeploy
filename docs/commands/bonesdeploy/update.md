@@ -266,7 +266,7 @@ pub fn update_remote_from_source(repo_url: &str, version: &str) -> Result<()> {
 1. **Load Configuration** — requires `.bones/bones.toml` to exist.
 
 2. **Generate pyinfra Deploy Script** — dynamically writes a temporary `update_bonesremote.py` containing pyinfra operations:
-   - `cargo install --git <repo_url> bonesremote --force --root <install_root>` (with sudo)
+   - `cargo install --locked --git <repo_url> bonesremote --force --root <install_root>` (with sudo)
    - Symlink the installed binary into `/usr/local/bin/bonesremote`
    - Ensure the managed projects root exists
 
