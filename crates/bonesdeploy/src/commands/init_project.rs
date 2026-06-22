@@ -122,6 +122,7 @@ fn seed_runtime_config(args: &InitArgs, project_name: &str, bones_dir: &Path, ru
         inject_runtime_identity(&mut map, project_name);
         config::save_runtime(&map, runtime_toml)?;
         embedded::scaffold_runtime_deployment(template_name, bones_dir)?;
+        embedded::scaffold_runtime_secrets(template_name, bones_dir)?;
         println!("Applied runtime template: {template_name}");
         println!("Saved runtime config to {}", paths::LOCAL_BONES_RUNTIME_TOML);
     } else {

@@ -33,6 +33,7 @@ pub const LOCAL_BONES_HOOKS_DIR: &str = ".bones/hooks";
 pub const LOCAL_BONES_HOOKS_SCRIPT: &str = ".bones/hooks/hooks.sh";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
 pub const LOCAL_BONES_RUNTIME_TOML: &str = ".bones/runtime.toml";
+pub const LOCAL_BONES_SECRETS_DIR: &str = ".bones/secrets";
 
 pub const BONES_DIR: &str = "bones";
 pub const BONES_TOML: &str = "bones.toml";
@@ -68,6 +69,7 @@ pub const PRE_PUSH_HOOK_TARGET: &str = "../../.bones/hooks/pre-push";
 pub const HOOKS_DIR: &str = "hooks";
 pub const KIT_HOOKS_DIR: &str = "hooks/";
 pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";
+pub const KIT_SECRETS_DIR: &str = "secrets/";
 
 const RUNTIME_SOCKET_PARENT: &str = "/run";
 

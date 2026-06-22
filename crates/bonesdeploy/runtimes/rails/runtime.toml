@@ -10,9 +10,3 @@ paths = [
     { path = "storage", type = "dir", mode = "770", recursive = true },
     { path = "public/assets", type = "dir", mode = "750", recursive = true },
 ]
-
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]

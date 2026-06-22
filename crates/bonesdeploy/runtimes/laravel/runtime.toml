@@ -6,15 +6,5 @@ php_version = "8.5"
 paths = [
     { path = "*", type = "dir", mode = "750" },
     { path = "*", type = "file", mode = "640" },
-    { path = "storage", type = "dir", mode = "770", recursive = true },
     { path = "bootstrap/cache", type = "dir", mode = "770", recursive = true },
-    { path = "database", type = "dir", mode = "770", recursive = false },
-    { path = "database/database.sqlite", type = "file", mode = "660", recursive = false },
-]
-
-[shared]
-paths = [
-    { path = "storage", type = "dir" },
-    { path = ".env", type = "file" },
-    { path = "database", type = "dir", link = false },
 ]

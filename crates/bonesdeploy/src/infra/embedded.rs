@@ -47,6 +47,14 @@ pub fn runtime_defaults(runtime: &str) -> Result<Map<String, Value>> {
 }
 
 pub fn scaffold_runtime_deployment(runtime: &str, bones_dir: &Path) -> Result<()> {
+    scaffold_runtime_assets(runtime, bones_dir, paths::KIT_DEPLOYMENT_DIR)
+}
+
+pub fn scaffold_runtime_secrets(runtime: &str, bones_dir: &Path) -> Result<()> {
+    scaffold_runtime_assets(runtime, bones_dir, paths::KIT_SECRETS_DIR)
+}
+
+fn scaffold_runtime_assets(runtime: &str, bones_dir: &Path, asset_prefix: &str) -> Result<()> {
     let runtime_prefix = format!("{runtime}/");
 
     for file_path in RuntimeAssets::iter() {
@@ -54,7 +62,7 @@ pub fn scaffold_runtime_deployment(runtime: &str, bones_dir: &Path) -> Result<()
             continue;
         };
 
-        if !stripped.starts_with(paths::KIT_DEPLOYMENT_DIR) {
+        if !stripped.starts_with(asset_prefix) {
             continue;
         }
 
@@ -135,7 +143,6 @@ mod tests {
         let defaults = base_runtime_defaults()?;
 
         assert!(defaults.contains_key("permissions"));
-        assert!(defaults.contains_key("shared"));
         Ok(())
     }
 

@@ -8,9 +8,4 @@ paths = [
 	{ path = "*", type = "file", mode = "640"},
 ]
 
-[shared]
-paths = [
-	{ path = ".env", type = "file" },
-	{ path = "storage", type = "dir"},
-]
 

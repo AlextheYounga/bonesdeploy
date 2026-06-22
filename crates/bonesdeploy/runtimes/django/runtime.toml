@@ -8,9 +8,3 @@ paths = [
     { path = "static", type = "dir", mode = "750", recursive = true },
     { path = "media", type = "dir", mode = "770", recursive = true },
 ]
-
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]

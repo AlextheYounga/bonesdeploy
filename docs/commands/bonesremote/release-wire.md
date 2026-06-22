@@ -2,7 +2,7 @@
 
 ## Overview
 
-Creates symlinks from the build workspace to the shared directory for all configured shared paths (defined in `runtime.toml`). Called internally by `bonesremote deploy --config <path>` (the recommended unified command) after git checkout.
+Creates a symlink from the build workspace to the shared directory for `.env`. Called internally by `bonesremote deploy --config <path>` (the recommended unified command) after git checkout.
 
 Use this subcommand directly when composing a custom pipeline from individual building blocks.
 
@@ -21,157 +21,50 @@ bonesremote release wire --config <path>
 
 ### 1. Load Configuration
 
-**Source:** `wire_release.rs:15`
-
-```rust
-let cfg = config::load(Path::new(config_path))?;
-```
+**Source:** `wire_release.rs`
 
 Loads deployment configuration to get:
 - Staged release name
-- Shared paths configuration
 - Directory locations
 
 ---
 
-### 3. Read Staged Release Name
-
-**Source:** `wire_release.rs:16`
-
-```rust
-let release_name = release_state::read_staged_release(&cfg)?;
-```
-
-Reads the release name from `<repo_path>/bones/.staged_release`.
-
-**Example:** `20260507_150432`
-
-**Fails if:**
-- State file doesn't exist (no release staged)
-- State file is empty
-- File is not readable
-
----
-
-### 2. Define Build and Shared Paths
-
-**Source:** `wire_release.rs:17-18`
-
-```rust
-let build_root = release_state::build_root(&cfg);
-let shared_dir = release_state::shared_dir(&cfg);
-```
+### 2. Define Paths
 
 **Paths:**
-- `build_root`: `/srv/sites/myapp/build/workspace`
-- `shared_dir`: `/srv/sites/myapp/shared`
+- `shared_env`: `<project_root>/shared/.env`
+- `workspace_env`: `<build_root>/.env`
+- `workspace_env_example`: `<build_root>/.env.example`
 
 ---
 
-### 3. Load and Wire Shared Paths
+### 3. Link .env
 
-**Source:** `wire_release.rs:19-23`
+**Algorithm:**
 
-```rust
-let shared_paths = load_runtime_shared_paths(config_path)?;
-for shared_path in &shared_paths {
-    validate_shared_path(&shared_path.path)?;
-    wire_path(&build_root, &shared_dir, &shared_path.path)?;
-}
-```
+1. If `shared/.env` exists:
+   - Remove `build/workspace/.env` if it exists (build workspace is disposable)
+   - Symlink `build/workspace/.env` -> `shared/.env`
+   - Print: `Linked .env: build/workspace/.env -> shared/.env`
 
-Shared paths are loaded from `runtime.toml` (sibling of `bones.toml` in the bare repo's `bones/` dir):
+2. If `shared/.env` does not exist but `build/workspace/.env.example` exists:
+   - Create `shared/` directory if needed
+   - Copy `build/workspace/.env.example` to `shared/.env`
+   - Set conservative permissions (600) on `shared/.env`
+   - Remove `build/workspace/.env` if it exists
+   - Symlink `build/workspace/.env` -> `shared/.env`
+   - Print: `Created shared .env from .env.example and linked it:`
 
-```toml
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]
-```
+3. If neither `shared/.env` nor `build/workspace/.env.example` exist:
+   - Do not fail
+   - Print: `.env not found and .env.example not found; skipping .env link. Use bonesdeploy secrets to provide .env.`
 
----
-
-### 6. Wire Path Logic
-
-**Source:** `wire_release.rs:28-61`
-
-For each shared path, performs the following steps:
-
-#### 3.1 Validate Path
-
-```rust
-fn validate_shared_path(relative_path: &str) -> Result<()> {
-    if relative_path.is_empty() { bail!("shared path must not be empty"); }
-    if relative_path.starts_with('/') { bail!("shared path must be relative, got: {relative_path}"); }
-    if relative_path.contains("..") { bail!("shared path must not contain .., got: {relative_path}"); }
-    Ok(())
-}
-```
-
-Rejects absolute paths, empty paths, and parent-directory traversal — shared paths must live under the project tree.
-
-#### 3.2 Wire Symlink
-
-```rust
-let release_path = build_root.join(relative_path);
-let shared_path = shared_dir.join(relative_path);
-
-if !shared_path_exists(&shared_path) {
-    bail!("shared path does not exist: {}", shared_path.display());
-}
-
-ensure_parent_exists(&release_path)?;
-if release_path_is_resolved(&release_path) {
-    replace_workspace_path_with_shared_symlink(&release_path)?;
-}
-
-symlink(&shared_path, &release_path)?;
-```
-
-**Example for `.env`:**
-- `release_path`: `/srv/sites/myapp/build/workspace/.env`
-- `shared_path`: `/srv/sites/myapp/shared/.env`
-
-**Flow:**
-1. Verify the shared target already exists (provisioned by `setup.py` or previous deploy)
-2. Ensure parent directories exist in the build workspace
-3. If a file, dir, or old symlink exists at the target path in the workspace, replace it with `replace_workspace_path_with_shared_symlink` (safe because this is a disposable workspace — never `current`, `releases/`, or `shared/`)
-4. Create a symlink from the workspace path to the shared path
-
-**Result:**
-
-```
-build/workspace/.env -> ../../shared/.env
-build/workspace/storage -> ../../shared/storage
-```
-
-**Why no chown?** The shared directory is already owned by the runtime user (provisioned during `bonesdeploy remote setup`). The workspace is owned by the deploy user. Symlinks carry their own permissions (always `0777`), and reads go through the target's ownership — no permission change needed.
-
-#### 6.7 Print Progress
-
-**Source:** `wire_release.rs:58`
-
-```rust
-println!("Linked shared path: {} -> {}", release_path.display(), shared_path.display());
-```
-
----
-
-### 7. Print Success Message
-
-**Source:** `wire_release.rs:24`
-
-```rust
-println!("Wired build workspace for staged release: {release_name}");
-```
-
-**Example Output:**
-```
-Linked shared path: /srv/sites/myapp/build/workspace/.env -> /srv/sites/myapp/shared/.env
-Linked shared path: /srv/sites/myapp/build/workspace/storage -> /srv/sites/myapp/shared/storage
-Wired build workspace for staged release: 20260507_150432
-```
+**Rules:**
+- Never overwrite existing `shared/.env`.
+- Never truncate existing `shared/.env`.
+- It is safe to remove `build/workspace/.env` because `build/workspace` is disposable.
+- Storage, cache, uploads, and database paths are NOT symlinked.
+- Storage, cache, uploads, and database paths are NOT created.
 
 ---
 
@@ -182,51 +75,34 @@ Wired build workspace for staged release: 20260507_150432
 ├── build/
 │   └── workspace/
 │       ├── .env -> ../../shared/.env           # Symlink
-│       ├── storage -> ../../shared/storage     # Symlink
 │       └── (other files from git checkout)
 ├── releases/
 │   └── 20260507_150432/    # (empty, waiting for build)
 ├── shared/
-│   ├── .env                # Actual file, runtime-user-owned
-│   └── storage/            # Actual directory, runtime-user-owned
+│   └── .env                # Actual file, runtime-user-owned
 └── current -> releases/20260507_140000/
 ```
 
 ---
 
-## Why Shared Paths?
+## Runtime State Paths
 
-### Persistence Across Releases
+BonesDeploy no longer manages arbitrary shared symlinks. Only `.env` is linked into releases.
 
-Shared paths solve the problem of data that should persist between deployments:
+Runtime state paths belong in `.env`. Frameworks create their own storage/cache/uploads/database files under `project_root/shared`.
 
-1. **Configuration files** (`.env`)
-   - Contains secrets and environment-specific settings
-   - Should not be in version control
-   - Needs to persist across releases
+For Laravel SQLite, configure via `.env`:
 
-2. **User uploads** (`storage/`, `uploads/`)
-   - User-generated content
-   - Cannot be lost during deployment
-   - Grows over time
+```env
+DB_CONNECTION=sqlite
+DB_DATABASE=/srv/sites/<project>/shared/database.sqlite
 
-3. **Logs** (`logs/`, `var/log/`)
-   - Application logs
-   - Useful for debugging
-   - Should persist for analysis
+STORAGE_PATH=/srv/sites/<project>/shared/storage
+CACHE_PATH=/srv/sites/<project>/shared/cache
+UPLOADS_PATH=/srv/sites/<project>/shared/uploads
+```
 
-4. **Cache** (`cache/`, `tmp/`)
-   - Application cache
-   - Improves performance
-   - Can be lost, but better to preserve
-
-### Atomic Updates
-
-When a new release is activated:
-- Symlink is switched atomically
-- Shared files remain accessible
-- No downtime for file access
-- Old release still has access to shared files (until cleaned up)
+Do not symlink database or storage directories.
 
 ---
 
@@ -241,11 +117,11 @@ git --work-tree=/srv/sites/myapp/build/workspace \
     --git-dir=/home/git/myapp.git \
     checkout -f master
 
-# 3. Wire shared paths
+# 3. Wire .env
 bonesremote release wire --config /home/git/myapp.git/bones/bones.toml
 
 # 4. Build and deploy
-# (deployment scripts run in build/workspace with symlinks active)
+# (deployment scripts run in build/workspace with symlink active)
 
 # 5. Activate release
 bonesremote release activate --config /home/git/myapp.git/bones/bones.toml
@@ -253,34 +129,13 @@ bonesremote release activate --config /home/git/myapp.git/bones/bones.toml
 
 ---
 
-## Edge Cases
+## Secrets Workflow
 
-### First Deployment
-
-**Scenario:** No shared files exist yet.
-
-**Behavior:**
-1. Files from repo (e.g., `.env.example`) moved to shared
-2. Renamed to `.env` (if needed)
-3. Symlink created
-
-### File Exists in Both Locations
-
-**Scenario:** `release_path` and `shared_path` both exist.
-
-**Behavior:**
-- `release_path` is removed (the version from repository)
-- Symlink created to `shared_path` (preserves existing shared file)
-- Repository version is lost (expected behavior)
-
-### Shared Directory Already Exists
-
-**Scenario:** `shared/storage` already exists with files.
-
-**Behavior:**
-- No files moved
-- Symlink created
-- All existing files remain accessible
+1. `bonesdeploy init` copies runtime secrets examples to `.bones/secrets/`
+2. User edits/copies `.bones/secrets/.env.prod.example`
+3. User creates/encrypts real env through `bonesdeploy secrets`
+4. `bonesdeploy secrets push` writes remote `project_root/shared/.env`
+5. Deploy links `build/workspace/.env` to `project_root/shared/.env`
 
 ---
 

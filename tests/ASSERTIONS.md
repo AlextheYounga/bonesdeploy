@@ -85,8 +85,12 @@
 - Rejects a systemd unit that binds an unknown `AppArmor` profile. (apparmor_unit_wiring_rejects_unknown_profile_binding)
 
 ## `crates/bonesremote/src/commands/wire_release.rs`
-- Removes both files and directories, including nested contents, from the build workspace. (replace_workspace_path_removes_files_and_directories)
-- Rejects empty, absolute, and parent-directory paths. Allows benign double-dots in filenames (e.g. "my..dir"). (validate_shared_path_rejects_unsafe_paths)
+- Removes files and directories from the disposable build workspace. (remove_workspace_path_removes_files_and_directories)
+- Links existing shared/.env into build/workspace/.env. (existing_shared_env_is_linked_into_workspace)
+- Copies .env.example to shared/.env and links it when shared/.env is missing. (missing_shared_env_with_env_example_copies_and_links)
+- Never overwrites existing shared/.env with .env.example. (existing_shared_env_is_not_overwritten_by_env_example)
+- Does not fail when .env and .env.example are both missing. (missing_both_env_and_example_does_not_fail)
+- Does not symlink storage. (storage_is_not_symlinked)
 
 ## `crates/bonesremote/src/config.rs`
 - load derives project root and repo path from project name. (load_derives_project_root_and_repo_path_from_project_name)

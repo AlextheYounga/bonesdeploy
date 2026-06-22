@@ -51,7 +51,7 @@ pub enum ReleaseCommand {
         #[arg(long)]
         config: String,
     },
-    /// Wire shared paths into the build workspace
+    /// Wire .env into the build workspace
     Wire {
         #[arg(long)]
         config: String,
