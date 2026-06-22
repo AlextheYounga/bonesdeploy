@@ -91,6 +91,7 @@ dependencies = [
  "console 0.15.11",
  "inquire",
  "openssh",
+ "oxc-toml",
  "rust-embed",
  "serde",
  "serde_json",
@@ -615,6 +616,12 @@ dependencies = [
  "ssh_format_error",
  "thiserror",
 ]
+
+[[package]]
+name = "oxc-toml"
+version = "0.14.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d101351ce46bee825bad68f0f899431c66c2878124a8e0f0237d0d562e214ade"
 
 [[package]]
 name = "parking_lot"

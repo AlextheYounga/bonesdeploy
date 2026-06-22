@@ -34,13 +34,15 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
     shared_config::apply_derived_defaults(&mut to_serialize);
 
-    let toml_str = toml_to_string(&to_serialize).context("Failed to serialize bones config")?;
+    let raw = toml_to_string(&to_serialize).context("Failed to serialize bones config")?;
+    let toml_str = oxc_toml::format(&raw, oxc_toml::Options::default());
     fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
 
 pub fn save_runtime(runtime: &Map<String, Value>, path: &Path) -> Result<()> {
-    let toml_str = toml_to_string(runtime).context("Failed to serialize runtime config")?;
+    let raw = toml_to_string(runtime).context("Failed to serialize runtime config")?;
+    let toml_str = oxc_toml::format(&raw, oxc_toml::Options::default());
     fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
