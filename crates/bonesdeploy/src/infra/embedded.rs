@@ -145,9 +145,14 @@ mod tests {
 
         scaffold_runtime_deployment("laravel", temp.path())?;
 
-        let script = temp.path().join("deployment/02_run_build.sh");
-        let content = fs::read_to_string(script)?;
-        assert!(content.contains("composer install"));
+        let deploy_dir = temp.path().join("deployment");
+        assert!(deploy_dir.is_dir());
+        let entries: Vec<_> = fs::read_dir(&deploy_dir)?.collect::<Result<Vec<_>, _>>()?;
+        assert!(
+            entries.iter().any(|e| fs::read_to_string(e.path()).is_ok_and(|c| c.contains("composer install"))),
+            "no deployment script contains 'composer install'"
+        );
+
         Ok(())
     }
 }

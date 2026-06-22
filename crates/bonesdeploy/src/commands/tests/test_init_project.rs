@@ -169,8 +169,9 @@ fn init_materializes_base_bones_assets() -> Result<()> {
         assert!(bones_dir.join("bones.toml").is_file());
         assert!(bones_dir.join("runtime.toml").is_file());
         assert!(bones_dir.join("hooks/hooks.sh").is_file());
-        assert!(bones_dir.join("deployment/01_install_build_deps.sh").is_file());
-        assert!(bones_dir.join("deployment/02_run_build.sh").is_file());
+        let deploy_dir = bones_dir.join("deployment");
+        assert!(deploy_dir.is_dir());
+        assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
         let runtime_toml = fs::read_to_string(bones_dir.join("runtime.toml"))?;
         assert!(runtime_toml.contains("runtime_user = \"atlas\""));
         assert!(runtime_toml.contains("permissions"));

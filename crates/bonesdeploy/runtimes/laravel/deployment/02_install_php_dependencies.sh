@@ -65,11 +65,6 @@ install_composer_dependencies() {
 		--no-interaction \
 		--optimize-autoloader
 }
-restart_queue_workers() {
-	if artisan_command_exists "queue:restart"; then
-		php artisan queue:restart || true
-	fi
-}
 
 main() {
 	require_environment
