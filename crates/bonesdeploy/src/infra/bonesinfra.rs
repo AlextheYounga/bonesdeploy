@@ -30,6 +30,10 @@ fn ensure_available() -> Result<PathBuf> {
         install_checkout(&checkout)?;
     }
 
+    if venv_python.is_file() {
+        return Ok(venv_python);
+    }
+
     setup_venv(&checkout)?;
 
     if venv_python.is_file() {
