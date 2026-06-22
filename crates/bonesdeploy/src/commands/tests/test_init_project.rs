@@ -180,6 +180,12 @@ fn init_materializes_base_bones_assets() -> Result<()> {
         let config_root = paths::bones_config_root().join("atlas.bones");
         assert!(config_root.join("hooks/hooks.sh").is_file());
 
+        let config_gitignore = paths::bones_config_root().join(".gitignore");
+        assert!(config_gitignore.is_file());
+        let gitignore_content = fs::read_to_string(config_gitignore)?;
+        assert!(gitignore_content.contains("gnupg"));
+        assert!(gitignore_content.contains("atlas.bones"));
+
         Ok(())
     })
 }

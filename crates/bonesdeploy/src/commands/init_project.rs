@@ -62,6 +62,7 @@ pub fn run(args: &InitArgs) -> Result<bool> {
 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = load_or_collect_config(bones_toml, args)?;
+    ensure_config_gitignore(&cfg.project_name)?;
 
     if let Some(ref initial) = initial_project_name
         && cfg.project_name != *initial
@@ -242,6 +243,41 @@ fn load_or_collect_config(bones_toml: &Path, args: &InitArgs) -> Result<config::
     }
 
     collect_from_seed(&project_name, None, args)
+}
+
+fn ensure_config_gitignore(project_name: &str) -> Result<()> {
+    let gitignore = paths::bones_config_root().join(".gitignore");
+    let project_entry = format!("{project_name}.bones");
+
+    if gitignore.exists() {
+        let content = fs::read_to_string(&gitignore)?;
+        let mut missing = Vec::new();
+        for entry in ["gnupg", &project_entry] {
+            if !content.lines().any(|line| line.trim() == entry) {
+                missing.push(entry);
+            }
+        }
+        if missing.is_empty() {
+            return Ok(());
+        }
+        let separator = if content.ends_with('\n') { "" } else { "\n" };
+        let mut append = String::new();
+        for entry in &missing {
+            append.push_str(entry);
+            append.push('\n');
+        }
+        fs::write(&gitignore, format!("{content}{separator}{append}"))?;
+    } else {
+        let mut content = String::new();
+        for entry in ["gnupg", &project_entry] {
+            content.push_str(entry);
+            content.push('\n');
+        }
+        fs::write(&gitignore, content)?;
+        println!("Created config .gitignore at {}", gitignore.display());
+    }
+
+    Ok(())
 }
 
 fn update_gitignore() -> Result<()> {

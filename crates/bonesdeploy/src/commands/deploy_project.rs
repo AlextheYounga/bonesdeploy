@@ -3,6 +3,7 @@ use console::style;
 use shared::paths;
 use std::path::Path;
 
+use crate::commands::push_state;
 use crate::config;
 use crate::infra::ssh;
 
@@ -13,6 +14,9 @@ pub async fn run() -> Result<()> {
     let remote_bones_toml = cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).repo_bones_toml;
 
     println!("Deploying {} on {}...", style(&cfg.project_name).cyan().bold(), style(&cfg.host).cyan());
+
+    // Ensure local .bones/ is synced before triggering the remote deploy
+    push_state::sync_bones_directory(&cfg)?;
 
     let session = ssh::connect(&cfg).await?;
 
