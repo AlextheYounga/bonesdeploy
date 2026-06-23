@@ -85,7 +85,10 @@ pub fn list_releases_sorted(cfg: &Bones) -> Result<Vec<String>> {
     {
         let entry = entry?;
         if entry.file_type()?.is_dir() {
-            names.push(entry.file_name().to_string_lossy().to_string());
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name != paths::PLACEHOLDER_RELEASE_NAME {
+                names.push(name);
+            }
         }
     }
 
@@ -253,6 +256,7 @@ mod tests {
         fs::create_dir_all(&releases)?;
         fs::create_dir_all(releases.join("20260507_120000"))?;
         fs::create_dir_all(releases.join("20260507_110000"))?;
+        fs::create_dir_all(releases.join(paths::PLACEHOLDER_RELEASE_NAME))?;
         fs::write(releases.join("notes.txt"), "not a release")?;
 
         let items = list_releases_sorted(&cfg)?;
