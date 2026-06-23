@@ -47,6 +47,11 @@ pub fn runtime_defaults(runtime: &str) -> Result<Map<String, Value>> {
 }
 
 pub fn scaffold_runtime_deployment(runtime: &str, bones_dir: &Path) -> Result<()> {
+    let deploy_dir = bones_dir.join(paths::DEPLOYMENT_DIR);
+    if deploy_dir.exists() {
+        fs::remove_dir_all(&deploy_dir)
+            .with_context(|| format!("Failed to clear deployment dir: {}", deploy_dir.display()))?;
+    }
     scaffold_runtime_assets(runtime, bones_dir, paths::KIT_DEPLOYMENT_DIR)
 }
 
@@ -118,7 +123,7 @@ mod tests {
     use anyhow::Result;
     use tempfile::TempDir;
 
-    use super::{base_runtime_defaults, runtime_defaults, runtime_names, scaffold_runtime_deployment};
+    use super::{base_runtime_defaults, runtime_defaults, runtime_names, scaffold, scaffold_runtime_deployment};
     use serde_json::Value;
 
     #[test]
@@ -158,6 +163,31 @@ mod tests {
         assert!(
             entries.iter().any(|e| fs::read_to_string(e.path()).is_ok_and(|c| c.contains("composer install"))),
             "no deployment script contains 'composer install'"
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn scaffold_runtime_deployment_replaces_kit_scripts() -> Result<()> {
+        let temp = TempDir::new()?;
+
+        scaffold(temp.path())?;
+        let deploy_dir = temp.path().join("deployment");
+        assert!(deploy_dir.join("02_run_build.sh").exists(), "kit script should exist after scaffold");
+
+        scaffold_runtime_deployment("laravel", temp.path())?;
+
+        let entries: Vec<String> = fs::read_dir(&deploy_dir)?
+            .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().to_string()))
+            .collect();
+        assert!(
+            !entries.iter().any(|n| n == "02_run_build.sh"),
+            "kit script '02_run_build.sh' should be removed after runtime scaffold, got: {entries:?}"
+        );
+        assert!(
+            entries.iter().any(|n| n == "02_install_php_dependencies.sh"),
+            "laravel script should exist after runtime scaffold, got: {entries:?}"
         );
 
         Ok(())
