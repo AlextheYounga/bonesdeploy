@@ -1,4 +1,3 @@
-
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
@@ -27,7 +26,6 @@ require_command() {
 
 	command -v "$name" >/dev/null 2>&1 || die "$name not found"
 }
-
 
 artisan_command_exists() {
 	local command_name="$1"
