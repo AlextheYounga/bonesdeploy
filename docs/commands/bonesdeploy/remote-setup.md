@@ -2,226 +2,139 @@
 
 ## Overview
 
-Provisions the remote server for deployment by running the setup script from the hidden `bonesinfra` checkout managed by `bonesdeploy`. This script sets up the required infrastructure: user accounts, Git bare repository, directory structure, firewall (UFW), and machine-level dependencies. Runs as `root` (or `BONES_BOOTSTRAP_SSH_USER` if set) since it needs to create system users and install packages. This command is typically run once per project during initial setup.
+Provisions the remote server for deployment by delegating to the hidden `bonesinfra` checkout managed by `bonesdeploy`. This command prepares machine-level infrastructure: users, groups, the bare Git repository, deployment directories, firewall rules, system packages, and the server-side `bonesremote` binary.
+
+The command normally connects as `root`. Set `BONES_BOOTSTRAP_SSH_USER` when the first SSH user is not `root` but has the privileges needed by bonesinfra.
 
 ## Detailed Execution Steps
 
 ### 1. Load Configuration
 
-**Source:** `remote_setup.rs`
+**Source:** `crates/bonesdeploy/src/commands/remote_setup.rs`
 
 ```rust
-let bones_toml = Path::new(config::Constants::BONES_TOML);
+let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
 let cfg = config::load(bones_toml)?;
+let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
 ```
 
-Loads deployment configuration from `.bones/bones.toml` to determine:
-- Remote server connection details (`host`, `port`)
-- User accounts and permissions (`deploy_user`, `runtime_user`, `runtime_group`, `release_group`)
-- Directory paths (`repo_path`, `project_root`, `web_root`)
+Loads `.bones/bones.toml` and `.bones/runtime.toml` to gather connection details, project paths, identity names, and the selected runtime `web_root`.
 
 ---
 
-### 2. Verify Deploy Script Exists
-
-**Source:** `remote_setup.rs`
+### 2. Resolve Bootstrap SSH User
 
 ```rust
-let deploy_path = Path::new(config::Constants::BONES_REMOTE_SETUP_DEPLOY);
-if !deploy_path.is_file() {
-    bail!("Missing remote setup deploy: {}", deploy_path.display());
-}
+let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
 ```
 
-Checks for the existence of the hidden `bonesinfra` checkout managed by `bonesdeploy`. This pyinfra deploy script is responsible for:
-- Installing system packages
-- Creating the bare Git repository
-- Creating deploy and service users
-- Setting up the directory structure
-- Configuring firewall (UFW)
-- Installing `bonesremote` from source
+The bootstrap user resolves from `BONES_BOOTSTRAP_SSH_USER` when set, otherwise from `ssh_user` in `bones.toml`.
 
 ---
 
-### 3. Resolve Bootstrap SSH User
-
-**Source:** `remote_setup.rs`
+### 3. Build bonesinfra Input
 
 ```rust
-fn resolve_bootstrap_ssh_user() -> String {
-    if let Ok(user) = std::env::var("BONES_BOOTSTRAP_SSH_USER") {
-        return user;
-    }
-    "root".to_string()
-}
+let mut deploy_data = Value::Object(remote_data::base(&cfg, &runtime.web_root)?);
 ```
 
-Defaults to `root` because setup operations need elevated privileges (user creation, package installation, firewall). Override with `BONES_BOOTSTRAP_SSH_USER` if your host uses a different initial user.
+The command builds a JSON document from the local config and computed deployment paths, then adds the resolved `ssh_user` and `host`. This JSON is passed to bonesinfra on stdin; bonesdeploy does not flatten values into pyinfra `--data` flags.
 
 ---
 
-### 4. Ensure pyinfra is Installed
-
-**Source:** `remote_setup.rs`
+### 4. Run bonesinfra Setup Apply
 
 ```rust
-ensure_pyinfra_installed()?;
+bonesinfra_cli::run_with_stdin(
+    &["setup", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")],
+    &json,
+)?;
 ```
 
-#### 4.1 Check for `pyinfra` Binary
-
-First checks system PATH for `pyinfra`, then a bonesdeploy-managed environment at `~/.local/state/bonesdeploy/pyinfra/.venv/bin/pyinfra` (respecting `XDG_STATE_HOME` when set).
-
-#### 4.2 Auto-Install pyinfra
-
-If not found, automatically installs it into an isolated managed virtualenv:
-
-1. Checks that `python3` is available
-2. Checks that `python3 -m venv` is available
-3. Creates a managed virtualenv under the bonesdeploy state root
-4. Installs `pyinfra` into the virtualenv with its own `pip`
-5. Verifies the managed `pyinfra` binary is now available
-
-If any step fails, BonesDeploy prints explicit instructions for manual installation (e.g. `uv tool install pyinfra` or `pipx install pyinfra`).
-
-Unlike the Ansible era, no remote Python bootstrap is needed — pyinfra installs are purely local.
-
----
-
-### 5. Build Deployment Data
-
-**Source:** `remote_setup.rs`
-
-Constructs data variables passed to pyinfra via repeated `--data key=value` CLI flags. Nested objects (like `Deployment`) are flattened into dotted keys (e.g. `--data paths.repo=/home/git/myapp.git`). The deploy scripts unflatten these back to nested dicts before use.
-
-The deploy user's public SSH key is resolved from `BONES_DEPLOY_PUBLIC_KEY_PATH` (falls back to `~/.ssh/id_ed25519.pub` → `id_ecdsa.pub` → `id_rsa.pub`). This key is installed as an authorized key for the deploy user so future connections (runtime, push, deploy) can connect without root.
-
----
-
-### 6. Run pyinfra Deploy
-
-**Source:** `remote_setup.rs`
-
-Invokes pyinfra with the host directly (no temporary inventory file) and data passed as CLI flags:
+The wrapper runs:
 
 ```bash
-bonesdeploy remote setup --host <host> --ssh-user root --ssh-port 22 --deploy-user git --repo-path /home/git/myapp.git --project-root /srv/deployments/myapp
+python -m bonesinfra setup apply --config .bones/bones.toml
 ```
 
-The pyinfra deploy script performs these operations in order:
-
-1. **System packages** — apt-get installs `build-essential`, `ca-certificates`, `curl`, `git`, `rsync`, `nginx`, `apparmor`, `apparmor-utils`, `certbot`, `ufw`, and any template-specific extras
-2. **Git bare repository** — creates the parent directory, `git init --bare`, creates `bones/` subdirectory
-3. **Placeholder release** — creates `project_root` structure, seeds a placeholder `index.html`, symlinks `current` → placeholder
-4. **Rust toolchain & bonesremote** — installs `rustup`/`cargo`, builds and installs `bonesremote` from source, runs `bonesremote init --deploy-user <user>` to set up sudoers
-5. **Users & groups** — creates `deploy_user` (shell access, home dir), `runtime_user` (system user, no login, dedicated per project), `runtime_group`, and `release_group`, adds runtime user to both groups, creates project root parent with mode `0711`
-6. **SSH key** — installs the deploy user's public key (if one was resolved)
-7. **Firewall (UFW)** — enables UFW, allows SSH on the configured port, default-deny, rate-limited SSH
+with the deployment JSON on stdin. pyinfra is an internal implementation detail of the `bonesinfra` Python module, not something bonesdeploy invokes directly.
 
 ---
 
-### 7. Handle Result and Print
+### 5. Handle Result
 
-If pyinfra exits non-zero, the command fails. On success:
+If bonesinfra exits non-zero, the command fails. On success:
 
+```text
+Done! Remote setup complete.
 ```
-Done! Site setup complete.
-```
-
----
 
 ## What Gets Created
 
-### Server Filesystem
+Exact operations live in the `bonesinfra` repo, but setup is responsible for the initial server contract:
 
-```
-/home/git/myapp.git/                 # bare Git repository
-/home/git/myapp.git/bones/           # bones deploy config directory
-/srv/deployments/myapp/              # project deployment root
-/srv/deployments/myapp/releases/     # release directories
-/srv/deployments/myapp/releases/19700101_000000/  # placeholder release
-/srv/deployments/myapp/releases/19700101_000000/public/index.html
-/srv/deployments/myapp/current -> releases/19700101_000000
-/usr/local/bin/bonesremote           # server-side binary
-/etc/sudoers.d/bonesdeploy           # sudoers drop-in for deploy user
+```text
+/home/git/myapp.git/                       # bare Git repository
+/home/git/myapp.git/bones/                 # synced bones config directory
+/srv/sites/myapp/                          # project deployment root
+/srv/sites/myapp/releases/                 # release directories
+/srv/sites/myapp/current                   # active release symlink
+/usr/local/bin/bonesremote                 # server-side binary
+/etc/sudoers.d/bonesdeploy                 # narrow sudoers drop-in
 ```
 
-### System Users
+## System Identities
 
-- `git` (deploy user) — shell access, ssh key auth, restricted sudo
-- `myapp` (service user) — no shell, no login, owns deployed files
-
----
+- `git` (deploy user by default) — shell access, owns the bare repo and release/build areas.
+- `<project>` runtime user — no login, owns runtime-writable paths.
+- `root` — owns system units, config directories, users, groups, and service provisioning.
 
 ## When to Run
 
-1. **First-time setup**: After `bonesdeploy init` and before the first deployment
-2. **Server migration**: When moving to a new server
-3. **Adding a deploy key**: When updating the deploy user's authorized key
-
----
+1. First-time setup after `bonesdeploy init` and before the first deployment.
+2. Server migration to a new host.
+3. Re-applying machine-level provisioning after changing setup inputs.
 
 ## Typical Setup Workflow
 
 ```bash
-# 1. Initialize project
 bonesdeploy init
-
-# 2. Provision server
 bonesdeploy remote setup
-
-# 3. Sync configuration to remote
-bonesdeploy push
-
-# 4. Configure runtime
 bonesdeploy remote runtime
-
-# 5. Deploy application
-git push production master
+bonesdeploy push
+bonesdeploy deploy
 ```
-
----
 
 ## Prerequisites
 
 ### Local Machine
-- Python 3 with venv support (e.g. `python3` + `python3-venv` on Debian/Ubuntu)
-  - Or `uv` / `pipx` for manual pyinfra installation
-- SSH client
-- SSH key configured for root access to the target host
+
+- Python available for running `python -m bonesinfra` through the bonesdeploy-managed bonesinfra checkout.
+- SSH client.
+- SSH access to the target host as `ssh_user` or `BONES_BOOTSTRAP_SSH_USER`.
 
 ### Remote Server
-- Debian/Ubuntu (the only supported platform)
-- SSH root access (or `BONES_BOOTSTRAP_SSH_USER` configured)
-- Internet access for package installation
 
----
+- Debian/Ubuntu.
+- Internet access for package and Rust toolchain installation.
+- Bootstrap user with privileges required for system provisioning.
 
 ## Customization
 
-The setup process can be customized by editing the `setup.py` file in the `bonesinfra` repo (`https://github.com/AlextheYounga/bonesinfra.git`). The deploy script is part of the hidden `bonesinfra` checkout managed by `bonesdeploy` and belongs to the user — edit freely.
-
-### Adding System Packages
-
-Edit the `SETUP_APT_PACKAGES` list in the `bonesinfra` repo's `setup.py` or override via `setup_apt_packages` in your pyinfra data vars.
-
----
+Setup behavior is customized in the `bonesinfra` repo (`https://github.com/AlextheYounga/bonesinfra.git`). bonesdeploy keeps a hidden checkout at `~/.config/bonesdeploy/bonesinfra/` and delegates setup through that module.
 
 ## Error Scenarios
 
-1. **pyinfra not installed**: Auto-installs into an isolated managed virtualenv
-2. **Python 3 not available locally**: Install Python 3 first (with venv support)
-3. **Python venv module missing**: Install `python3-venv` (Debian/Ubuntu) or equivalent, or install pyinfra manually via `uv`/`pipx`
-4. **SSH connection failed**: Check host, port, and root SSH access
-5. **pyinfra task failure**: pyinfra outputs detailed error message with target host
-6. **Permission denied on remote**: Ensure bootstrap user has sudo
-
----
+1. **Missing local config**: run `bonesdeploy init` first.
+2. **Missing runtime config**: ensure `.bones/runtime.toml` exists.
+3. **bonesinfra failure**: inspect the streamed bonesinfra output.
+4. **SSH connection failed**: check host, port, and bootstrap SSH user.
+5. **Permission denied on remote**: ensure the bootstrap user has provisioning privileges.
 
 ## Related Commands
 
-- `bonesdeploy init` - Initialize project configuration
-- `bonesdeploy remote runtime` - Configure per-site runtime after setup
-- `bonesdeploy remote ssl` - Configure SSL certificates
-- `bonesdeploy push` - Sync configuration to remote
-- `bonesdeploy doctor` - Validate environment
+- `bonesdeploy init` - Initialize project configuration.
+- `bonesdeploy remote runtime` - Configure per-site runtime after setup.
+- `bonesdeploy remote ssl` - Configure SSL certificates.
+- `bonesdeploy push` - Sync configuration to remote.
+- `bonesdeploy doctor` - Validate environment.

@@ -25,15 +25,15 @@ In the current BonesDeploy model, it should serve only from `web_root` under `cu
 Good:
 
 ```text
-/var/www/app1 -> /srv/deployments/app1/current
+/var/www/app1 -> /srv/sites/app1/current
 ```
 
 Bad:
 
 ```text
-web root exposes /srv/deployments/app1/current directly
-web root exposes /srv/deployments/app1
-web root exposes /srv/deployments
+web root exposes /srv/sites/app1/current directly
+web root exposes /srv/sites/app1
+web root exposes /srv/sites
 ```
 
 ## Uploads

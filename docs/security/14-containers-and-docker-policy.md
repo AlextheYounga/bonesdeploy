@@ -40,7 +40,7 @@ Containers should not mount broad host paths such as:
 /home
 /root
 /etc
-/srv/deployments
+/srv/sites
 /var/run/docker.sock
 ```
 

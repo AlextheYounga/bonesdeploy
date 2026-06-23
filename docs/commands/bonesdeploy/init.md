@@ -167,12 +167,12 @@ If configuration is incomplete, prompts for:
    - Only stored in config if explicitly overridden
 
 8. **Deploy Root**
-   - Default: `/srv/deployments/<project_name>`
+   - Default: `/srv/sites/<project_name>`
    - Directory containing all releases, build workspace, and shared files
    - Only stored in config if explicitly overridden
 
 9. **Deploy on Push**
-   - Default: `true`
+   - Default: `false`
    - Whether to trigger deployment on every push
 
 10. **Permission Defaults**
@@ -184,7 +184,7 @@ If configuration is incomplete, prompts for:
 
 11. **Releases**
     - Keep: `5` (number of releases to retain)
-    - Shared Paths: `[".env", "storage"]` (paths to share across releases)
+    - Shared Paths: `[`.env`]` (paths to share across releases)
 
 #### 4.3 Re-initialization Behavior
 
@@ -205,7 +205,7 @@ config::save(&cfg, bones_toml)?;
 println!("Saved config to {}", config::Constants::BONES_TOML);
 ```
 
-Writes the configuration to `.bones/bones.toml` in YAML format.
+Writes the configuration to `.bones/bones.toml` in TOML format.
 
 **Special handling:**
 - Omits `web_root` and `project_root` if they match project-derived defaults (keeps config clean)
@@ -299,4 +299,4 @@ After successful execution:
 
 - `bonesdeploy push` - Syncs `.bones/` to remote bare repository
 - `bonesdeploy doctor` - Validates local and remote setup
-- `bonesdeploy remote setup` - Provisions server with pyinfra
+- `bonesdeploy remote setup` - Provisions server through bonesinfra

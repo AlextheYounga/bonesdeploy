@@ -74,7 +74,7 @@ bonesremote deploy --config '/home/git/myapp.git/bones/bones.toml'
 4. **wire_release** — Reads `runtime.toml` for shared path definitions, creates symlinks from `shared/` into `build/workspace` (e.g., `.env` → `shared/.env`)
 5. **deploy** (inner `run` function) — See section 4.2
 6. **restart_services** — Runs `sudo bonesremote service restart --config <config>` to restart the per-site nginx
-7. **post_deploy** — Prunes old releases beyond the configured `releases.keep` count
+7. **post_deploy** — Prunes old releases beyond the configured `releases` count
 
 On failure at any step from 3-7, **drop_failed_release** cleans up the staged release directory and state.
 

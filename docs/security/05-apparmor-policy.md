@@ -47,13 +47,13 @@ A dedicated profile should restrict:
 For project `app1`, the effective AppArmor intent should approximate:
 
 ```text
-allow read:       /srv/deployments/app1/current/**
-allow read:       /srv/deployments/app1/shared/.env
-allow read/write: /srv/deployments/app1/shared/storage/**
-allow read/write: /srv/deployments/app1/shared/uploads/**
+allow read:       /srv/sites/app1/current/**
+allow read:       /srv/sites/app1/shared/.env
+allow read/write: /srv/sites/app1/shared/storage/**
+allow read/write: /srv/sites/app1/shared/uploads/**
 allow read/write: /run/app1/**
-deny:             /srv/deployments/app2/**
-deny:             /srv/deployments/app3/**
+deny:             /srv/sites/app2/**
+deny:             /srv/sites/app3/**
 deny:             /home/**
 deny:             /root/**
 deny:             /etc/ssh/**

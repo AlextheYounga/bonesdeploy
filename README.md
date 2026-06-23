@@ -89,19 +89,20 @@ This will:
 BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.toml`:
 
 - `port = "22"`
-- `web_root = "public"`
 - `project_root = "/srv/sites/<project_name>"`
 - `deploy_user = "git"`
 - `runtime_user = "<project_name>"`
 - `runtime_group = "<project_name>"`
 - `release_group = "<project_name>-release"`
 
+`web_root` lives in `.bones/runtime.toml` (default `"public"`), not `bones.toml`.
+
 The `init` command creates the local `.bones/` scaffold and records project settings.
-If `pyinfra` is missing, BonesDeploy installs it automatically into an isolated managed environment under `XDG_STATE_HOME` (defaults to `~/.local/state/bonesdeploy/pyinfra/.venv`).
+Infra operations (remote setup, runtime, SSL) are delegated to the `bonesinfra` Python package, which `bonesdeploy` clones into `~/.config/bonesdeploy/bonesinfra/` on first use. `pyinfra` is a dependency of that package and is installed into its venv automatically.
 Template-based projects then use `bonesdeploy remote runtime` to prompt for a framework and scaffold runtime assets (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install Node.js).
 `bonesdeploy remote setup` handles machine bootstrap as root, while `bonesdeploy remote runtime` applies per-site runtime assets such as AppArmor and nginx after a quick confirmation prompt.
 
-To customize nginx behavior, edit the Jinja2 templates in the `src/assets/` directory of the `bonesinfra` repo and re-run `bonesdeploy remote runtime`.
+To customize nginx behavior, edit the Jinja2 templates shipped with the `bonesinfra` checkout and re-run `bonesdeploy remote runtime`.
 
 When DNS is ready, enable SSL with certbot (separate from runtime):
 
@@ -166,7 +167,7 @@ Update BonesDeploy binaries to the latest release:
 bonesdeploy update
 ```
 
-This atomically updates both local (`bonesdeploy`) and remote (`bonesremote`) using symlink flipping for zero-downtime updates with instant rollback capability.
+This rebuilds both local (`bonesdeploy`) and remote (`bonesremote`) from the git source via `cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git`. The remote update runs over SSH as root and also ensures `/srv/sites` exists with the correct ownership and permissions.
 
 ## Configuration
 
@@ -195,15 +196,15 @@ releases = 5
 .bones/
 ├── bones.toml           # project configuration
 ├── runtime.toml         # framework runtime configuration
-├── hooks.sh             # shared hook functions imported by hook entrypoints
-├── deployment/
-│   └── 01_*.sh          # deployment scripts (run sequentially)
-└── hooks/
-    ├── pre-push         # symlinked to .git/hooks/pre-push
-    └── post-receive     # thin adapter → calls bonesremote deploy
+├── hooks/
+│   ├── hooks.sh         # shared hook functions imported by hook entrypoints
+│   ├── pre-push         # symlinked to .git/hooks/pre-push
+│   └── post-receive     # thin adapter → calls bonesremote deploy
+└── deployment/
+    └── 01_*.sh          # deployment scripts (run sequentially)
 ```
 
-Hooks are written to `.bones/hooks/` once during init and import shared functions from `.bones/hooks.sh`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
+Hooks are written to `.bones/hooks/` once during init and import shared functions from `.bones/hooks/hooks.sh`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
 
 Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote deploy`.
 

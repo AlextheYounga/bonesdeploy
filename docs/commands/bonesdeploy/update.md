@@ -2,7 +2,13 @@
 
 ## Overview
 
-Updates `bonesdeploy` (local) and `bonesremote` (server) binaries to the latest release from GitHub. The command performs atomic, zero-downtime updates using symlink flipping, ensuring safe production updates with instant rollback capability.
+Updates the BonesDeploy control-plane binaries from the `master` branch of `https://github.com/AlextheYounga/bonesdeploy.git`.
+
+- Local update installs `bonesdeploy` with `cargo install --locked --git`.
+- Remote update SSHes to the configured host as `root` and installs `bonesremote` with `cargo install --locked --git`.
+- Existing site runtime components, application code, databases, nginx config, and release directories are not redeployed by this command.
+
+There is no GitHub release API lookup, binary asset download, checksum file, or `/opt/bonesdeploy/versions` symlink flip in the current implementation.
 
 ## Command Signature
 
@@ -11,313 +17,147 @@ bonesdeploy update [--skip-local] [--skip-remote]
 ```
 
 **Flags:**
-- `--skip-local`: Skip updating the local `bonesdeploy` binary
-- `--skip-remote`: Skip updating the remote `bonesremote` binary
 
-## Design Principles
-
-### Control-Plane Only
-
-The update command only updates the BonesDeploy control-plane binaries:
-- **Local**: `bonesdeploy` CLI on the developer machine
-- **Remote**: `bonesremote` binary on the deployment server
-
-Site runtime components (nginx, application code, databases) are never touched by this command. This separation ensures:
-- Zero risk to production traffic during updates
-- Clear boundary between deployment tooling and deployed applications
-- Safe updates even for actively serving sites
-
-### Atomic Symlink Flip
-
-Both local and remote updates use the same atomic pattern:
-
-```
-/opt/bonesdeploy/
-├── versions/
-│   ├── 0.1.0/
-│   │   └── bonesdeploy
-│   ├── 0.2.0/
-│   │   └── bonesdeploy
-│   └── 0.3.0/
-│       └── bonesdeploy    # New version
-├── current/
-│   └── bonesdeploy        # -> versions/0.2.0/bonesdeploy (old)
-└── .bonesdeploy_swap      # Temp symlink for atomic swap
-```
-
-**Atomic Swap Process:**
-1. Create temp symlink pointing to new version
-2. Atomically rename temp symlink to final name
-3. `mv -T` ensures atomic replacement
-
-This pattern guarantees:
-- No window where the binary is missing
-- Instant rollback via symlink repoint
-- No partial states
-
-### Stable Symlink Path
-
-`bonesremote init` resolves the sudoers path via `which bonesremote`, meaning:
-- The sudoers entry references whatever path `bonesremote` is at during init
-- Moving `bonesremote` without updating sudoers breaks sudo access
-- Solution: Maintain a stable symlink path at `/opt/bonesdeploy/current/bonesremote`
-
-The update command preserves this stable path by updating the symlink target, not the symlink location.
+- `--skip-local`: Skip updating the local `bonesdeploy` binary.
+- `--skip-remote`: Skip updating the remote `bonesremote` binary.
 
 ## Detailed Execution Steps
 
-### 1. Print Header
+### 1. Print Current Versions
 
-**Source:** `update.rs:30`
+**Source:** `crates/bonesdeploy/src/commands/update.rs:23-29`
 
 ```rust
-println!("{}", style("bonesdeploy update").bold());
+let current_local = update_release::current_local_version();
+let current_remote = update_release::current_remote_version();
 ```
 
-Displays the command header.
+Local version comes from `CARGO_PKG_VERSION`. Remote version is read by running `bonesremote version` over SSH when `.bones/bones.toml` is available; otherwise it reports `unknown`.
 
 ---
 
-### 2. Determine Current Versions
+### 2. Clone the Source Repository
 
-**Source:** `update.rs:32-33`
-
-```rust
-let current_local = get_current_local_version();
-let current_remote = get_current_remote_version();
-```
-
-**Local Version:**
-- Read from compile-time constant `CARGO_PKG_VERSION`
-- No filesystem lookup needed
-
-**Remote Version:**
-- SSH to remote server
-- Run `bonesremote version`
-- Parse output for version string
-- Returns `"unknown"` if unreachable or not installed
-
----
-
-### 3. Fetch Latest Release
-
-**Source:** `update.rs:38`
+**Source:** `crates/bonesdeploy/src/commands/update.rs:36-43`
 
 ```rust
-let release = fetch_latest_release().await?;
+let source_dir = clone_master_source(temp_path)?;
+let master_versions = read_master_versions(&source_dir)?;
 ```
 
-**Implementation:**
-- Query GitHub API: `https://api.github.com/repos/anomalyco/bonesdeploy/releases/latest`
-- Parse JSON response for `tag_name`
-- Strip leading `v` from tag (e.g., `v0.3.0` → `0.3.0`)
-
-**Error Handling:**
-- Network failure → clear error message
-- Non-200 response → report status code
-- Invalid JSON → parse error
-
----
-
-### 4. Check Update Necessity
-
-**Source:** `update.rs:43-49`
-
-```rust
-let local_needs_update = !options.skip_local && current_local != target_version;
-let remote_needs_update = !options.skip_remote && current_remote != target_version;
-
-if !local_needs_update && !remote_needs_update {
-    println!("{}", style("Already up to date.").green());
-    return Ok(());
-}
-```
-
-Skips download/verification if already at target version.
-
----
-
-### 5. Create Temp Directory
-
-**Source:** `update.rs:51-52`
-
-```rust
-let temp_dir = TempDir::new().context("Failed to create temp directory")?;
-let temp_path = temp_dir.path();
-```
-
-Creates a temporary directory for download artifacts. Automatically cleaned up on scope exit.
-
----
-
-### 6. Download Release Assets
-
-**Source:** `update.rs:55`
-
-```rust
-download_release_assets(&release, temp_path).await?;
-```
-
-**Assets Downloaded:**
-- `bonesdeploy-{target}-{version}.tar.gz` — Local binary tarball
-- `bonesremote-{target}-{version}` — Remote binary
-- `checksums-{version}.txt` — SHA256 checksums
-
-**Target Triple Format:** `{arch}-{os}` (e.g., `aarch64-macos`, `x86_64-linux`)
-
-**Download Process:**
-1. Build URL: `https://github.com/anomalyco/bonesdeploy/releases/download/v{version}/{asset_name}`
-2. Stream response to temp file
-3. Extract tarball if present
-
----
-
-### 7. Verify Downloads
-
-**Source:** `update.rs:58`
-
-```rust
-verify_downloads(temp_path)?;
-```
-
-**Verification Steps:**
-1. Read `checksums-{version}.txt`
-2. For each line `hash  filename`:
-   - Read file bytes
-   - Compute SHA256 digest
-   - Compare hex-encoded hash
-3. Bail on mismatch with clear error
-
-**Checksum Format:**
-```
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  bonesdeploy-aarch64-macos-0.3.0.tar.gz
-```
-
----
-
-### 8. Update Local Binary
-
-**Source:** `update.rs:61-64`, `update.rs:244-291`
-
-```rust
-if local_needs_update {
-    update_local_binary(temp_path, &target_version)?;
-}
-```
-
-**Local Update Process:**
-
-1. **Locate Binary in Temp Dir**
-   ```rust
-   let binary_name = format!("bonesdeploy-{target}-{version}");
-   let source_binary = temp_path.join(&binary_name);
-   ```
-
-2. **Create Versioned Directory**
-   ```rust
-   let target_version_dir = versions_dir.join(version);
-   fs::create_dir_all(&target_version_dir)?;
-   ```
-
-3. **Copy Binary to Versioned Location**
-   ```rust
-   let dest_binary = target_version_dir.join("bonesdeploy");
-   fs::copy(&source_binary, &dest_binary)?;
-   fs::set_permissions(&dest_binary, fs::Permissions::from_mode(0o755))?;
-   ```
-
-4. **Verify Binary Works**
-   ```rust
-   verify_binary(&dest_binary)?;
-   ```
-   Runs `bonesdeploy version` to confirm the binary executes.
-
-5. **Atomic Symlink Flip**
-   ```rust
-   let temp_link = current_dir.join(".bonesdeploy_swap");
-   symlink_file(&target_version_dir, &temp_link)?;
-   fs::rename(&temp_link, current_dir.join("bonesdeploy"))?;
-   ```
-
-6. **Update Global Bin Link**
-   ```rust
-   let global_link = Path::new("/usr/local/bin/bonesdeploy");
-   symlink_file(&current_dir.join("bonesdeploy"), global_link)?;
-   ```
-
-**Result:** `/usr/local/bin/bonesdeploy` → `/opt/bonesdeploy/current/bonesdeploy` → `/opt/bonesdeploy/versions/0.3.0/bonesdeploy`
-
----
-
-### 9. Update Remote Binary
-
-**Source:** `update_release.rs`
-
-```rust
-pub fn update_remote_from_source(repo_url: &str, version: &str) -> Result<()> {
-    let cfg = config::load(bones_toml)?;
-    // ...
-    run_pyinfra_deploy(&cfg, &ssh_user, &data_vars, &deploy)?;
-}
-```
-
-**Remote Update Process:**
-
-1. **Load Configuration** — requires `.bones/bones.toml` to exist.
-
-2. **Generate pyinfra Deploy Script** — dynamically writes a temporary `update_bonesremote.py` containing pyinfra operations:
-   - `cargo install --locked --git <repo_url> bonesremote --force --root <install_root>` (with sudo)
-   - Symlink the installed binary into `/usr/local/bin/bonesremote`
-   - Ensure the managed projects root exists
-
-3. **Run pyinfra Deploy (as Root)** — invokes pyinfra against the remote host:
+The command creates a temporary directory and runs:
 
 ```bash
-pyinfra <host> <temp_dir>/update_bonesremote.py --ssh-user root --ssh-port 22 --data ssh_port=22 --data bonesremote_install_root=/usr/local --data bonesremote_binary_path=/opt/bonesdeploy/current/bonesremote --data bonesremote_managed_projects_root=/srv/deployments -vv
+git clone --depth 1 --branch master https://github.com/AlextheYounga/bonesdeploy.git <temp>/source
 ```
 
-The entire remote update is a single pyinfra deploy. No embedded playbooks or additional assets are shipped.
+It then reads package versions from:
 
-- **0**: All updates successful
-- **1**: Update failed (network, verification, permission, etc.)
+- `crates/bonesdeploy/Cargo.toml`
+- `crates/bonesremote/Cargo.toml`
+
+---
+
+### 3. Update Local bonesdeploy
+
+Skipped when `--skip-local` is set. If the installed local version matches the cloned `bonesdeploy` version, the binary install is skipped.
+
+When an update is needed:
+
+```rust
+update_release::update_local_from_source(SOURCE_REPO_URL)?;
+```
+
+which runs:
+
+```bash
+cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy --force
+```
+
+After the local update check, the command refreshes local scaffold files when `.bones/` exists:
+
+```rust
+refresh_local_bones_from_source(&source_dir, Path::new(paths::LOCAL_BONES_DIR))?;
+```
+
+This syncs:
+
+- `crates/bonesdeploy/kit/hooks` -> `.bones/hooks`
+- the selected runtime deployment template -> `.bones/deployment`
+- or `crates/bonesdeploy/kit/deployment` when no selected runtime deployment template exists
+
+It does not overwrite `.bones/bones.toml` or `.bones/runtime.toml`.
+
+---
+
+### 4. Update Remote bonesremote
+
+Skipped when `--skip-remote` is set. If the remote version matches the cloned `bonesremote` version, the remote install is skipped.
+
+When an update is needed:
+
+```rust
+update_release::update_remote_from_source(SOURCE_REPO_URL, &master_versions.bonesremote).await?;
+```
+
+The remote updater requires `.bones/bones.toml`, connects as `root`, and runs:
+
+```bash
+cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force --root /usr/local
+```
+
+It also ensures the project root parent exists with the current default permissions:
+
+```bash
+mkdir -p /srv/sites && chown root:root /srv/sites && chmod 711 /srv/sites
+```
+
+The installed binary is available through Cargo's install root at `/usr/local/bin/bonesremote`.
+
+## What This Command Does Not Do
+
+- Does not query the GitHub releases API.
+- Does not download release tarballs or checksum files.
+- Does not verify SHA256 checksum manifests.
+- Does not maintain versioned binary directories under `/opt/bonesdeploy`.
+- Does not perform an atomic symlink flip.
+- Does not invoke pyinfra or bonesinfra.
+- Does not deploy application code or restart application services.
 
 ## When to Run
 
-1. **After BonesDeploy releases**: Check for and install updates
-2. **Before major deployments**: Ensure tooling is current
-3. **When doctor recommends**: If `bonesdeploy doctor` suggests updating
-4. **CI/CD pipelines**: Automated update checks
+1. After upstream BonesDeploy changes are available on `master`.
+2. Before changing deployment workflows that depend on new command behavior.
+3. When `bonesdeploy version` or `bonesremote version` shows an older installed version.
 
 ## Rollback
 
-Both local and remote updates support instant rollback:
+There is no built-in binary rollback mechanism in the current update implementation. To roll back, reinstall a known-good revision manually with Cargo, for example:
 
-**Local Rollback:**
 ```bash
-sudo ln -sf /opt/bonesdeploy/versions/0.2.0/bonesdeploy /opt/bonesdeploy/current/bonesdeploy
+cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git --rev <commit> bonesdeploy --force
 ```
 
-**Remote Rollback:**
-```bash
-ssh deploy@server 'sudo ln -sf /opt/bonesdeploy/versions/0.2.0/bonesremote /opt/bonesdeploy/current/bonesremote'
-```
-
-The old version directories are preserved until manually cleaned.
+For the remote binary, run the equivalent `cargo install` on the server as root for `bonesremote`.
 
 ## Prerequisites
 
-1. **Local**:
-   - Write access to `/opt/bonesdeploy/` (or use `sudo`)
-   - Write access to `/usr/local/bin/` (or use `sudo`)
+### Local
 
-2. **Remote**:
-   - SSH access to deployment server
-   - `pyinfra` installed locally (or auto-installed via pip)
-   - `sudo` configured on remote for `bonesremote` commands
+- `git`
+- Rust toolchain with `cargo`
+- Network access to `https://github.com/AlextheYounga/bonesdeploy.git`
+
+### Remote
+
+- `.bones/bones.toml` in the local project when updating remote.
+- SSH access to the configured host as `root`.
+- Rust toolchain with `cargo` on the remote server.
+- Network access from the remote server to GitHub.
 
 ## Related Commands
 
-- `bonesdeploy doctor` — Check if updates are recommended
-- `bonesdeploy version` — Show current version
-- `bonesremote version` — Show remote version
-- `bonesremote doctor` — Validate remote environment
+- `bonesdeploy doctor` — Validate local and remote environment.
+- `bonesdeploy version` — Show current local version.
+- `bonesremote version` — Show remote version.
+- `bonesremote doctor` — Validate remote environment.

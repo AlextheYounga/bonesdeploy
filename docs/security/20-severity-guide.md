@@ -17,7 +17,7 @@
 - AppArmor disabled or application services unconfined
 - no cgroup limits on untrusted workers
 - service user can write release or source-code directories
-- broad write access under `/srv/deployments/**`
+- broad write access under `/srv/sites/**`
 - `NoNewPrivileges=false` or absent for application services
 - dangerous capabilities granted unnecessarily
 - secrets passed broadly to build jobs

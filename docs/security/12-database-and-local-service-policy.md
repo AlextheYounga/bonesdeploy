@@ -9,7 +9,7 @@ Databases and local daemons should be isolated per project and should not be exp
 If SQLite is used, database files should be project-specific and protected:
 
 ```text
-/srv/deployments/<project>/shared/database.sqlite
+/srv/sites/<project>/shared/database.sqlite
 ```
 
 Permissions:

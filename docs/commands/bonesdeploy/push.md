@@ -226,15 +226,14 @@ println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
 ```
 .bones/
 ├── bones.toml              # Configuration
-├── hooks.sh                # Helper functions
 ├── hooks/                  # Server-side Git hooks
 │   ├── post-receive        # Triggers deployment
+│   ├── hooks.sh       		# Helper functions
 │   └── pre-push            # (Not used on remote, but synced anyway)
 ├── deployment/             # Deployment scripts
 │   ├── 01_install.sh
 │   ├── 02_build.sh
 │   └── 03_migrate.sh
-└── site/                   # DEPRECATED — no longer used. See infra/ instead.
 ```
 
 ### Files Modified on Remote

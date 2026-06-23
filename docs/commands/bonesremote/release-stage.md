@@ -249,7 +249,7 @@ bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.toml
 ### Directory Creation Failed
 
 ```
-Failed to create project_root: /srv/deployments/myapp
+Failed to create project_root: /srv/sites/myapp
 ```
 
 **Possible causes:**

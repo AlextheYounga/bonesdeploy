@@ -2,7 +2,7 @@
 
 ## Overview
 
-Prompts for a framework template, then applies the runtime configuration from the hidden `bonesinfra` checkout managed by `bonesdeploy` on the server as the deploy user.
+Applies the selected runtime configuration through the hidden `bonesinfra` checkout managed by `bonesdeploy`.
 
 ## Command Signature
 
@@ -32,15 +32,15 @@ Parses the template's `bones.toml` to extract `web_root` and `permissions.paths`
 
 Prompts `y/N` before running the remote deploy. On confirmation:
 
-### 5. Run pyinfra Deploy (as Deploy User)
+### 5. Run bonesinfra Runtime Apply
 
-Connects as the deploy user (from `bones.toml`) — root is not needed since service management and nginx config are handled via `sudo` inside the pyinfra operations.
+Runs the local bonesinfra CLI wrapper after confirmation:
 
 ```bash
-bonesdeploy remote runtime --host <host> --ssh-user git --ssh-port 22 --deploy-user git --project-name myapp --repo-path /home/git/myapp.git
+python -m bonesinfra runtime apply --config .bones/bones.toml --runtime-config .bones/runtime.toml
 ```
 
-The runtime pyinfra deploy performs these operations in order:
+The runtime apply uses the configured `ssh_user` from `bones.toml` and performs these operations in order:
 
 1. **Framework packages** — installs template-defined apt packages and runs template-specific `operations.py` (e.g., Laravel installs PHP-FPM pool, Django installs Gunicorn)
 2. **AppArmor** — ensures `apparmor.service` is running, deploys a per-project AppArmor profile from `assets/apparmor/project-nginx-profile.j2`, loads and enforces it
@@ -53,7 +53,7 @@ The runtime pyinfra deploy performs these operations in order:
 
 - Does not handle SSL/TLS configuration (use `bonesdeploy remote ssl` for TLS)
 - Does not run certbot or certificate challenges
-- Does not pass any SSL-related variables to pyinfra
+- Does not pass any SSL-related variables to bonesinfra
 
 ---
 

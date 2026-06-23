@@ -23,7 +23,7 @@ Both flags are optional if values are already configured in `bones.toml`.
 The SSL command is fully separated from `remote runtime`:
 
 - **`remote runtime`**: Configures framework services, AppArmor, nginx, and runs doctor — no SSL involvement
-- **`remote ssl`**: Runs only the SSL deploy — handles certbot, challenges, and TLS configuration
+- **`remote ssl`**: Runs only the bonesinfra SSL apply — handles certbot, challenges, and TLS configuration
 
 This separation ensures:
 1. Runtime updates don't accidentally trigger certificate operations
@@ -51,25 +51,25 @@ Ensures both domain and email are set before proceeding. These are required for 
 
 Uses the hidden `bonesinfra` checkout managed by `bonesdeploy`, ensuring the SSL deploy script and the nginx router template exist.
 
-### 4. Run pyinfra SSL Deploy (as Root)
+### 4. Run bonesinfra SSL Apply
 
-Connects as root (or `BONES_BOOTSTRAP_SSH_USER`) since certbot and nginx configuration require elevated privileges:
+Runs the local bonesinfra CLI wrapper with JSON input. The bootstrap SSH user resolves from `ssh_user` in `bones.toml`, or `BONES_BOOTSTRAP_SSH_USER` when set:
 
 ```bash
-bonesdeploy remote ssl --host <host> --ssh-user root --ssh-port 22 --domain app.example.com --email ops@example.com --repo-path /home/git/myapp.git
+python -m bonesinfra ssl apply --config .bones/bones.toml
 ```
 
-**pyinfra Data Variables:**
+**JSON input includes:**
 - `ssl_domain` — domain for the certificate
 - `ssl_email` — email for Let's Encrypt
 - `nginx_ssl_certificate_path` — path to fullchain.pem
 - `nginx_ssl_certificate_key_path` — path to privkey.pem
 - `project_name`, `service_user`, `group` — deployment metadata
-- `paths.*` — computed `Deployment` fields, flattened as dotted keys (e.g. `paths.repo`, `paths.current`)
+- `paths` — computed deployment paths
 
 ### 5. SSL Deploy Tasks
 
-The SSL pyinfra deploy performs these operations in order:
+The bonesinfra SSL apply performs these operations in order:
 
 1. **Validate SSL inputs** — ensure domain and email are provided
 2. **Render nginx HTTP challenge config** — temporary HTTP-only router config for certbot challenge

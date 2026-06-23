@@ -76,7 +76,7 @@ pub fn list_releases_sorted(cfg: &Bones) -> Result<Vec<String>> {
 ```
 
 **Process:**
-1. List all directories in `/srv/deployments/myapp/releases/`
+1. List all directories in `/srv/sites/myapp/releases/`
 2. Filter to only directories
 3. Sort chronologically (oldest first)
 
@@ -135,8 +135,8 @@ pub fn current_release_name(cfg: &Bones) -> Result<String> {
 ```
 
 **Process:**
-1. Read `current` symlink: `/srv/deployments/myapp/current`
-2. Resolve to actual directory: `/srv/deployments/myapp/releases/20260507_150000`
+1. Read `current` symlink: `/srv/sites/myapp/current`
+2. Resolve to actual directory: `/srv/sites/myapp/releases/20260507_150000`
 3. Extract directory name: `20260507_150000`
 
 #### 5.2 Find Current Index
@@ -197,8 +197,8 @@ release_state::point_symlink_atomically(&current_link, &previous_dir)?;
 ```
 
 **Process:**
-1. Define previous release directory: `/srv/deployments/myapp/releases/20260507_140000`
-2. Define current link path: `/srv/deployments/myapp/current`
+1. Define previous release directory: `/srv/sites/myapp/releases/20260507_140000`
+2. Define current link path: `/srv/sites/myapp/current`
 3. Atomically switch symlink: `current` → `20260507_140000`
 
 **Atomic Operation:** (same as activation)
@@ -227,7 +227,7 @@ Rollback complete: 20260507_150000 -> 20260507_140000
 ## Directory State Before Rollback
 
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── releases/
 │   ├── 20260507_120000/
 │   ├── 20260507_130000/
@@ -235,13 +235,13 @@ Rollback complete: 20260507_150000 -> 20260507_140000
 │   └── 20260507_150000/    # Current (has bug)
 └── current -> releases/20260507_150000/
 
-/var/www/myapp -> /srv/deployments/myapp/current
+/var/www/myapp -> /srv/sites/myapp/current
 ```
 
 ## Directory State After Rollback
 
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── releases/
 │   ├── 20260507_120000/
 │   ├── 20260507_130000/
@@ -249,7 +249,7 @@ Rollback complete: 20260507_150000 -> 20260507_140000
 │   └── 20260507_150000/    # Still exists, not active
 └── current -> releases/20260507_140000/  # Switched!
 
-/var/www/myapp -> /srv/deployments/myapp/current
+/var/www/myapp -> /srv/sites/myapp/current
 ```
 
 **Note:** The problematic release (`150000`) is NOT deleted. It remains available for:

@@ -34,9 +34,9 @@ Check whether service users:
 
 ```bash
 ls -lah /srv
-ls -lah /srv/deployments
-find /srv/deployments -maxdepth 3 -type d -printf '%m %u %g %p\n'
-find /srv/deployments -name '.env' -o -name '*.sqlite' -o -name '*.db' -o -name '*.pem' -o -name '*.key'
+ls -lah /srv/sites
+find /srv/sites -maxdepth 3 -type d -printf '%m %u %g %p\n'
+find /srv/sites -name '.env' -o -name '*.sqlite' -o -name '*.db' -o -name '*.pem' -o -name '*.key'
 ```
 
 Check permissions, ownership, and public exposure.
@@ -109,7 +109,7 @@ Check socket exposure, capabilities, mounted volumes, users, and security option
 Search for likely secret exposure carefully:
 
 ```bash
-find /srv/deployments -type f \( -name '.env' -o -name '*.pem' -o -name '*.key' -o -name '*credentials*' -o -name '*secret*' \) -printf '%m %u %g %p\n'
+find /srv/sites -type f \( -name '.env' -o -name '*.pem' -o -name '*.key' -o -name '*credentials*' -o -name '*secret*' \) -printf '%m %u %g %p\n'
 ```
 
 Do not print secret contents into logs or reports unless explicitly requested.

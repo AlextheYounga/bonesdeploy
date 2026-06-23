@@ -250,27 +250,27 @@ Rollback complete: 20260507_150000 -> 20260507_140000
 ## Directory State Before Rollback
 
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── releases/
 │   ├── 20260507_130000/
 │   ├── 20260507_140000/
 │   └── 20260507_150000/  # Current (has bug)
 └── current -> releases/20260507_150000/
 
-/var/www/myapp -> /srv/deployments/myapp/current
+/var/www/myapp -> /srv/sites/myapp/current
 ```
 
 ## Directory State After Rollback
 
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── releases/
 │   ├── 20260507_130000/
 │   ├── 20260507_140000/  # Now active
 │   └── 20260507_150000/  # Still exists, just not active
 └── current -> releases/20260507_140000/  # Switched!
 
-/var/www/myapp -> /srv/deployments/myapp/current
+/var/www/myapp -> /srv/sites/myapp/current
 ```
 
 **Note:** The failed/problematic release is not deleted. It remains available for:
@@ -339,7 +339,7 @@ curl https://app.example.com/health
 
 # Debug the issue
 ssh git@app.example.com
-cd /srv/deployments/myapp/releases/20260507_150000
+cd /srv/sites/myapp/releases/20260507_150000
 # Investigate...
 
 # Fix and redeploy
@@ -396,7 +396,7 @@ After rolling back, you may need to:
 4. **Investigate the failed release**:
    ```bash
    ssh git@app.example.com
-   cd /srv/deployments/myapp/releases/20260507_150000
+   cd /srv/sites/myapp/releases/20260507_150000
    # Check deployment logs, app logs, etc.
    ```
 

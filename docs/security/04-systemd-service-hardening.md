@@ -15,12 +15,12 @@ Each app service should use as many of the following settings as practical:
 [Service]
 User=<service-user>
 Group=<service-group>
-WorkingDirectory=/srv/deployments/<project>/current
+WorkingDirectory=/srv/sites/<project>/current
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/srv/deployments/<project>/shared /run/<project>
+ReadWritePaths=/srv/sites/<project>/shared /run/<project>
 CapabilityBoundingSet=
 AmbientCapabilities=
 RestrictSUIDSGID=true

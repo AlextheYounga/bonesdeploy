@@ -84,7 +84,7 @@ Everything else is defaulted or derived for Debian/Ubuntu-first usability:
 - `project_root`: defaults to `/srv/sites/{project_name}`
 - `ssh_user`: defaults to `root`
 - `deploy_on_push`: defaults to `false`
-- `releases.keep`: defaults to `5`
+- `releases`: defaults to `5`
 
 `web_root`, `runtime_user`, `runtime_group`, and `release_group` live in `.bones/runtime.toml`. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively.
 
@@ -128,7 +128,7 @@ All product-owned paths must live in `crates/shared/src/paths.rs`.
 
 Other modules may derive subpaths by joining values from `shared::paths`, but they must not introduce their own independent path roots, filenames, or install locations.
 
-This applies to Rust code, pyinfra deploy scripts, Jinja2 templates, and docs examples that describe the system layout.
+This applies to Rust code, bonesinfra's internal operations/templates, and docs examples that describe the system layout.
 
 ```
 bonesdeploy/
@@ -160,6 +160,12 @@ bonesdeploy/
 Runtime templates ship starter overlays that `bonesdeploy remote runtime` uses when scaffolding infrastructure for a matching framework. Each template lives in the `bonesinfra` repo (`https://github.com/AlextheYounga/bonesinfra.git`) — framework runtime assets (`operations.py`, Jinja2 templates) stay together:
 
 - `runtimes/laravel/`        → Laravel (PHP + PHP-FPM)
+- `runtimes/django/`         → Django (Python + Gunicorn)
+- `runtimes/next/`           → Next.js (Node)
+- `runtimes/nuxt/`           → Nuxt (Node)
+- `runtimes/sveltekit/`     → SvelteKit (Node)
+- `runtimes/vue/`           → Vue (Node)
+- `runtimes/rails/`         → Rails (Ruby)
 
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the `bonesinfra` repo.
 
@@ -176,7 +182,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - This command checks all concerns in your local environment.
   - Loads config from `.bones/bones.toml`
   - Runs local checks:
-    - `.bones` folder is set up correctly. Deployment scripts are named appropriately.
+    - `.bones` folder exists and is a symlink (warns if it is not a symlink to `~/.config/bonesdeploy/<project>.bones/`). Deployment scripts are named appropriately.
+    - Required files exist: `bones.toml`, `hooks/hooks.sh`, `hooks/` dir, `deployment/` dir.
     - Local `pre-push` hook is symlinked properly when `deploy_on_push = true`.
   - Runs remote checks (skipped with `--local`):
     - `bonesremote` executable exists on remote and can be run globally.
@@ -199,8 +206,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Omits the `--revision` flag, so `bonesremote deploy` uses the configured branch from `bones.toml`.
 
 - ****remote setup****
-  - runs the setup script from the hidden `bonesinfra` checkout via `pyinfra` against the configured host as root (or `BONES_BOOTSTRAP_SSH_USER`).
-  - Passes `bones.toml` deployment values plus computed paths and variables as pyinfra data.
+  - Delegates to the hidden `bonesinfra` checkout by running `python -m bonesinfra setup apply --config <path>` against the configured host as root (or `BONES_BOOTSTRAP_SSH_USER`).
+  - Passes `bones.toml` deployment values plus computed paths and variables as JSON on stdin.
   - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
   - Installs `bonesremote` from source and runs `bonesremote init`.
@@ -209,19 +216,34 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **remote runtime**:
   - Prompts for a framework template, refreshes `.bones/runtime/`, and writes `.bones/runtime.toml`.
   - Reapplies template-specific defaults into `.bones/bones.toml` only when they still match generic or previous-template values.
-  - After a `y/N` confirmation, runs the runtime script from the hidden `bonesinfra` checkout via `pyinfra` against the configured host as the deploy user.
+  - After a `y/N` confirmation, delegates to the hidden `bonesinfra` checkout by running `python -m bonesinfra runtime apply --config <path> --runtime-config <path>` against the configured host as the configured `ssh_user`.
   - Loads the template's `operations.py` at runtime to install framework-specific packages and services.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
   - Does not handle SSL; use `remote ssl` for TLS configuration.
 
 - **remote ssl**
-  - Runs the SSL script from the hidden `bonesinfra` checkout via `pyinfra` against the configured host as root.
+  - Delegates to the hidden `bonesinfra` checkout by running `python -m bonesinfra ssl apply --config <path>` against the configured host as root.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
   - Separate from `remote runtime` to keep certificate management decoupled from app runtime concerns.
 
 - **rollback**
   - SSHes into the configured host and runs `bonesremote release rollback --config ...`, which repoints `current` to the previous release without rebuilding.
+
+- **secrets**
+  - Subcommands: `init`, `edit`, `push`.
+  - Manages GPG-encrypted environment secrets under `.bones/secrets/`.
+  - `secrets init` bootstraps the `.bones/secrets/` directory and GPG recipients.
+  - `secrets edit` decrypts `.bones/secrets/.env.gpg` for editing and re-encrypts on save.
+  - `secrets push` uploads the decrypted `.env` to the remote `shared/.env` over SSH.
+
+- **config**
+  - Reads or prints values from `.bones/bones.toml`.
+  - `--file <path>` overrides the config file location.
+  - `<key>` prints a single value when supplied; otherwise dumps the whole file.
+
+- **manage**
+  - Opens an interactive SSH session to the remote and runs `bonesremote manage --config <path>`. Requires `bonesremote manage` to be implemented on the server.
 
 - **version**:
   - Echoes the installed `bonesdeploy` version.
@@ -254,7 +276,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **release rollback**
 	- Repoints `current` to the previous release.
 - **service restart**
-	- Restarts the per-site nginx systemd service. This is the only `bonesremote` command that requires root privileges.
+	- Restarts the per-site nginx systemd service (`<project>-nginx.service`). This is the only `bonesremote` command that requires root privileges.
 - **version**:
   - Echoes the installed `bonesremote` version.
 
@@ -283,7 +305,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
    - **wire_release** — Symlink shared paths from `runtime.toml` into workspace
    - **deploy** (inner) — Run deployment scripts, copy to release, activate symlink
    - **restart_services** — `sudo bonesremote service restart --config ...`
-   - **post_deploy** — Prune old releases beyond `releases.keep`
+   - **post_deploy** — Prune old releases beyond `releases`
    - On failure: **drop_failed_release** — Clean up staged release
 
 ### Hook Event Order on `git push`
@@ -306,7 +328,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
      - **wire_release** — Symlink shared paths from `runtime.toml` into workspace
      - **deploy** (inner) — Run deployment scripts, copy to release, activate symlink
      - **restart_services** — `sudo bonesremote service restart --config ...`
-     - **post_deploy** — Prune old releases beyond `releases.keep`
+     - **post_deploy** — Prune old releases beyond `releases`
      - On failure: **drop_failed_release** — Clean up staged release
 
 `bonesdeploy deploy` performs the same remote pipeline by SSHing into the host and running `bonesremote deploy --config <remote_bones_toml>` directly (without `--revision`, so it uses the configured branch). Git-triggered deploy is optional plumbing, not the primary model.

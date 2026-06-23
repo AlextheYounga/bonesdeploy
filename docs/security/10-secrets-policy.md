@@ -9,7 +9,7 @@ Secrets should be stored only in project-specific protected locations and be rea
 Secrets should be stored only in protected locations such as:
 
 ```text
-/srv/deployments/<project>/shared/.env
+/srv/sites/<project>/shared/.env
 /etc/<project>/env
 systemd EnvironmentFile with strict permissions
 ```

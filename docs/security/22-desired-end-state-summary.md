@@ -5,7 +5,7 @@
 A well-configured BonesDeploy server should look like this:
 
 ```text
-/srv/deployments/<project> layout per project
+/srv/sites/<project> layout per project
 one Unix service user per project
 deploy user separate from service users
 no service users with sudo, docker, or root access

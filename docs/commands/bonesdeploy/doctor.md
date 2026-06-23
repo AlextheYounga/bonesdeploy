@@ -59,6 +59,7 @@ check_bones_structure(&mut issues);
    }
    ```
    If missing, adds issue and skips remaining structure checks.
+   If it exists but is not a symlink, adds a warning issue.
 
 2. **Verify required files and directories exist**
    ```rust
@@ -78,8 +79,8 @@ check_bones_structure(&mut issues);
 ```
 .bones/
 ├── bones.toml
-├── hooks.sh
 ├── hooks/
+│   ├── hooks.sh
 │   ├── pre-push
 │   └── post-receive
 └── deployment/

@@ -82,7 +82,7 @@ Reads the failed release name from the state file.
 let release_dir = release_state::release_dir(&cfg, &release_name);
 ```
 
-**Path:** `/srv/deployments/myapp/releases/20260507_150432`
+**Path:** `/srv/sites/myapp/releases/20260507_150432`
 
 ---
 
@@ -183,7 +183,7 @@ Can be run manually to clean up after:
 ### Before (Failed Deployment)
 
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── releases/
 │   ├── 20260507_140000/    # Previous release (still current)
 │   └── 20260507_150432/    # Failed release (partial/incomplete)
@@ -197,7 +197,7 @@ Can be run manually to clean up after:
 ### After (drop-failed)
 
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── releases/
 │   └── 20260507_140000/    # Still current
 └── current -> releases/20260507_140000/
@@ -238,7 +238,7 @@ Can be run manually to clean up after:
 ```bash
 # 1. Deployment starts
 sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.toml
-# Created: /srv/deployments/myapp/releases/20260507_150432/
+# Created: /srv/sites/myapp/releases/20260507_150432/
 
 # 2. Checkout and wire
 # ...
@@ -248,7 +248,7 @@ bonesremote hooks deploy --config /home/git/myapp.git/bones/bones.toml
 # Script: 03_migrate.sh fails
 
 # 4. Automatic cleanup
-# - Removes /srv/deployments/myapp/releases/20260507_150432/
+# - Removes /srv/sites/myapp/releases/20260507_150432/
 # - Removes .staged_release
 
 # 5. Deployment aborts
@@ -294,13 +294,13 @@ bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.toml
 
 ### Shared Files
 
-- Files in `/srv/deployments/myapp/shared/` are NOT touched
+- Files in `/srv/sites/myapp/shared/` are NOT touched
 - These persist across deployments
 - Even if deployment failed
 
 ### Build Workspace
 
-- `/srv/deployments/myapp/build/workspace/` is NOT cleaned
+- `/srv/sites/myapp/build/workspace/` is NOT cleaned
 - May contain useful debugging information
 - Will be overwritten by next deployment
 
@@ -317,7 +317,7 @@ bonesremote release drop-failed --config /home/git/myapp.git/bones/bones.toml
 ### Permission Denied
 
 ```
-Failed to remove failed release /srv/deployments/myapp/releases/20260507_150432
+Failed to remove failed release /srv/sites/myapp/releases/20260507_150432
 ```
 
 **Possible causes:**

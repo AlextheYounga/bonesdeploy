@@ -67,8 +67,8 @@ let current_link = release_state::current_link(&cfg);
 ```
 
 **Paths:**
-- `release_dir`: `/srv/deployments/myapp/releases/20260507_150432`
-- `current_link`: `/srv/deployments/myapp/current`
+- `release_dir`: `/srv/sites/myapp/releases/20260507_150432`
+- `current_link`: `/srv/sites/myapp/current`
 
 ---
 
@@ -107,7 +107,7 @@ if current_link.exists() && !current_link.is_symlink() {
 
 **Example Error:**
 ```
-current exists and is not a symlink: /srv/deployments/myapp/current
+current exists and is not a symlink: /srv/sites/myapp/current
 ```
 
 **Solution:** Remove or rename the directory, then re-run.
@@ -122,7 +122,7 @@ current exists and is not a symlink: /srv/deployments/myapp/current
 let current_link = release_state::current_link(&cfg);
 ```
 
-**Path:** `/srv/deployments/myapp/current`
+**Path:** `/srv/sites/myapp/current`
 
 ---
 
@@ -134,7 +134,7 @@ let current_link = release_state::current_link(&cfg);
 release_state::point_symlink_atomically(&current_link, &release_dir)?;
 ```
 
-**Creates:** `/srv/deployments/myapp/current` → `/srv/deployments/myapp/releases/20260507_150432`
+**Creates:** `/srv/sites/myapp/current` → `/srv/sites/myapp/releases/20260507_150432`
 
 **Purpose:** Points `current` to the new release.
 
@@ -226,7 +226,7 @@ Activated release: 20260507_150432
 ## Directory Structure After Activation
 
 ```
-/srv/deployments/myapp/
+/srv/sites/myapp/
 ├── releases/
 │   ├── 20260507_130000/
 │   ├── 20260507_140000/
@@ -236,7 +236,7 @@ Activated release: 20260507_150432
 │   └── storage/
 └── current -> releases/20260507_150432/  # Switched!
 
-/var/www/myapp -> /srv/deployments/myapp/current  # Updated!
+/var/www/myapp -> /srv/sites/myapp/current  # Updated!
 
 /home/git/myapp.git/bones/
 ├── bones.toml
@@ -252,14 +252,14 @@ After activation, the symlink chain is:
 ```
 /var/www/myapp (web_root)
     ↓
-/srv/deployments/myapp/current (current link)
+/srv/sites/myapp/current (current link)
     ↓
-/srv/deployments/myapp/releases/20260507_150432 (actual release)
+/srv/sites/myapp/releases/20260507_150432 (actual release)
 ```
 
 **Why two levels?**
 1. **web_root**: User-facing path, typically in `/var/www/`
-2. **current**: Deployment path, in `/srv/deployments/`
+2. **current**: Deployment path, in `/srv/sites/`
 3. **Separation of concerns**: Web server uses `web_root`, deployment manages `current`
 
 ---
@@ -297,14 +297,14 @@ After activation, the symlink chain is:
 
 **Missing release directory:**
 ```
-Staged release directory does not exist: /srv/deployments/myapp/releases/20260507_150432
+Staged release directory does not exist: /srv/sites/myapp/releases/20260507_150432
 ```
 - Deployment failed or didn't run
 - No release to activate
 
 **current is not symlink:**
 ```
-current exists and is not a symlink: /srv/deployments/myapp/current
+current exists and is not a symlink: /srv/sites/myapp/current
 ```
 - Someone manually created a directory
 - Would conflict with symlink creation
@@ -319,7 +319,7 @@ current exists and is not a symlink: /srv/deployments/myapp/current
 sudo bonesremote release stage --config /home/git/myapp.git/bones/bones.toml
 
 # 2. Check out code
-git --work-tree=/srv/deployments/myapp/build/workspace \
+git --work-tree=/srv/sites/myapp/build/workspace \
     --git-dir=/home/git/myapp.git \
     checkout -f master
 
@@ -351,7 +351,7 @@ Failed to read staged release state at /home/git/myapp.git/bones/.staged_release
 ### Release Directory Missing
 
 ```
-Staged release directory does not exist: /srv/deployments/myapp/releases/20260507_150432
+Staged release directory does not exist: /srv/sites/myapp/releases/20260507_150432
 ```
 
 **Solution:** Deployment scripts didn't complete. Check deployment logs.
@@ -359,7 +359,7 @@ Staged release directory does not exist: /srv/deployments/myapp/releases/2026050
 ### Symlink Creation Failed
 
 ```
-Failed to atomically switch symlink /srv/deployments/myapp/current -> /srv/deployments/myapp/releases/20260507_150432
+Failed to atomically switch symlink /srv/sites/myapp/current -> /srv/sites/myapp/releases/20260507_150432
 ```
 
 **Possible causes:**
