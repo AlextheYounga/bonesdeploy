@@ -5,6 +5,7 @@ Source Tree:
 ```txt
 bonesinfra
 ├── AGENTS.md
+├── LICENSE
 ├── README.md
 ├── build.sh
 ├── docs
@@ -71,12 +72,11 @@ bonesinfra
 │           │   ├── node.py
 │           │   ├── paths.py
 │           │   ├── php_fpm_pool.py
-│           │   ├── python.py
-│           │   ├── ruby.py
 │           │   ├── service.py
 │           │   └── validation.py
 │           ├── django
-│           │   └── django.py
+│           │   ├── django.py
+│           │   └── python_packages.py
 │           ├── laravel
 │           │   ├── __init__.py
 │           │   ├── assets
@@ -95,14 +95,14 @@ bonesinfra
 │           ├── nuxt
 │           │   └── nuxt.py
 │           ├── rails
-│           │   └── rails.py
+│           │   ├── rails.py
+│           │   └── ruby_packages.py
 │           ├── sveltekit
 │           │   └── svelte.py
 │           └── vue
 │               └── vue.py
 └── tests
     ├── __init__.py
-    ├── __main__.py
     ├── cleancode
     │   ├── test_no_provably_unnecessary_fallback.py
     │   └── test_no_suspicious_fallback.py
@@ -114,6 +114,7 @@ bonesinfra
     ├── test_pyinfra_runner.py
     ├── test_runtime_nginx.py
     ├── test_runtimes.py
+    ├── test_shared_paths.py
     ├── test_syntax.py
     ├── test_templates_j2.py
     └── test_tripwires.py
@@ -148,7 +149,224 @@ Rules:
 
 Not lazy about: input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal, a clock drifts, a sensor reads off), anything explicitly requested. Lazy code without its check is unfinished: non-trivial logic leaves ONE runnable check behind, the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.
 
-(Yes, this file also applies to agents working on the ponytail repo itself. Especially to them.)
+
+When you are done working, please run and address all warnings/errors:
+- `ruff check .`
+- `ruff format .`
+- `uv run pytest`
+
+And finally, please update any related documentation **if necessary, use your best judgement**:
+- `docs/PROJECT.md`
+- `docs/commands/*`
+- `docs/security/*`
+
+```
+
+`LICENSE`:
+
+```
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   1. Definitions.
+
+      "License" shall mean the terms and conditions for use, reproduction,
+      and distribution as defined by Sections 1 through 9 of this document.
+
+      "Licensor" shall mean the copyright owner or entity authorized by
+      the copyright owner that is granting the License.
+
+      "Legal Entity" shall mean the union of the acting entity and all
+      other entities that control, are controlled by, or are under common
+      control with that entity. For the purposes of this definition,
+      "control" means (i) the power, direct or indirect, to cause the
+      direction or management of such entity, whether by contract or
+      otherwise, or (ii) ownership of fifty percent (50%) or more of the
+      outstanding shares, or (iii) beneficial ownership of such entity.
+
+      "You" (or "Your") shall mean an individual or Legal Entity
+      exercising permissions granted by this License.
+
+      "Source" form shall mean the preferred form for making modifications,
+      including but not limited to software source code, documentation
+      source, and configuration files.
+
+      "Object" form shall mean any form resulting from mechanical
+      transformation or translation of a Source form, including but
+      not limited to compiled object code, generated documentation,
+      and conversions to other media types.
+
+      "Work" shall mean the work of authorship, whether in Source or
+      Object form, made available under the License, as indicated by a
+      copyright notice that is included in or attached to the work
+      (an example is provided in the Appendix below).
+
+      "Derivative Works" shall mean any work, whether in Source or Object
+      form, that is based on (or derived from) the Work and for which the
+      editorial revisions, annotations, elaborations, or other modifications
+      represent, as a whole, an original work of authorship. For the purposes
+      of this License, Derivative Works shall not include works that remain
+      separable from, or merely link (or bind by name) to the interfaces of,
+      the Work and Derivative Works thereof.
+
+      "Contribution" shall mean any work of authorship, including
+      the original version of the Work and any modifications or additions
+      to that Work or Derivative Works thereof, that is intentionally
+      submitted to Licensor for inclusion in the Work by the copyright owner
+      or by an individual or Legal Entity authorized to submit on behalf of
+      the copyright owner. For the purposes of this definition, "submitted"
+      means any form of electronic, verbal, or written communication sent
+      to the Licensor or its representatives, including but not limited to
+      communication on electronic mailing lists, source code control systems,
+      and issue tracking systems that are managed by, or on behalf of, the
+      Licensor for the purpose of discussing and improving the Work, but
+      excluding communication that is conspicuously marked or otherwise
+      designated in writing by the copyright owner as "Not a Contribution."
+
+      "Contributor" shall mean Licensor and any individual or Legal Entity
+      on behalf of whom a Contribution has been received by Licensor and
+      subsequently incorporated within the Work.
+
+   2. Grant of Copyright License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      copyright license to reproduce, prepare Derivative Works of,
+      publicly display, publicly perform, sublicense, and distribute the
+      Work and such Derivative Works in Source or Object form.
+
+   3. Grant of Patent License. Subject to the terms and conditions of
+      this License, each Contributor hereby grants to You a perpetual,
+      worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+      (except as stated in this section) patent license to make, have made,
+      use, offer to sell, sell, import, and otherwise transfer the Work,
+      where such license applies only to those patent claims licensable
+      by such Contributor that are necessarily infringed by their
+      Contribution(s) alone or by combination of their Contribution(s)
+      with the Work to which such Contribution(s) was submitted. If You
+      institute patent litigation against any entity (including a
+      cross-claim or counterclaim in a lawsuit) alleging that the Work
+      or a Contribution incorporated within the Work constitutes direct
+      or contributory patent infringement, then any patent licenses
+      granted to You under this License for that Work shall terminate
+      as of the date such litigation is filed.
+
+   4. Redistribution. You may reproduce and distribute copies of the
+      Work or Derivative Works thereof in any medium, with or without
+      modifications, and in Source or Object form, provided that You
+      meet the following conditions:
+
+      (a) You must give any other recipients of the Work or
+          Derivative Works a copy of this License; and
+
+      (b) You must cause any modified files to carry prominent notices
+          stating that You changed the files; and
+
+      (c) You must retain, in the Source form of any Derivative Works
+          that You distribute, all copyright, patent, trademark, and
+          attribution notices from the Source form of the Work,
+          excluding those notices that do not pertain to any part of
+          the Derivative Works; and
+
+      (d) If the Work includes a "NOTICE" text file as part of its
+          distribution, then any Derivative Works that You distribute must
+          include a readable copy of the attribution notices contained
+          within such NOTICE file, excluding those notices that do not
+          pertain to any part of the Derivative Works, in at least one
+          of the following places: within a NOTICE text file distributed
+          as part of the Derivative Works; within the Source form or
+          documentation, if provided along with the Derivative Works; or,
+          within a display generated by the Derivative Works, if and
+          wherever such third-party notices normally appear. The contents
+          of the NOTICE file are for informational purposes only and
+          do not modify the License. You may add Your own attribution
+          notices within Derivative Works that You distribute, alongside
+          or as an addendum to the NOTICE text from the Work, provided
+          that such additional attribution notices cannot be construed
+          as modifying the License.
+
+      You may add Your own copyright statement to Your modifications and
+      may provide additional or different license terms and conditions
+      for use, reproduction, or distribution of Your modifications, or
+      for any such Derivative Works as a whole, provided Your use,
+      reproduction, and distribution of the Work otherwise complies with
+      the conditions stated in this License.
+
+   5. Submission of Contributions. Unless You explicitly state otherwise,
+      any Contribution intentionally submitted for inclusion in the Work
+      by You to the Licensor shall be under the terms and conditions of
+      this License, without any additional terms or conditions.
+      Notwithstanding the above, nothing herein shall supersede or modify
+      the terms of any separate license agreement you may have executed
+      with Licensor regarding such Contributions.
+
+   6. Trademarks. This License does not grant permission to use the trade
+      names, trademarks, service marks, or product names of the Licensor,
+      except as required for reasonable and customary use in describing the
+      origin of the Work and reproducing the content of the NOTICE file.
+
+   7. Disclaimer of Warranty. Unless required by applicable law or
+      agreed to in writing, Licensor provides the Work (and each
+      Contributor provides its Contributions) on an "AS IS" BASIS,
+      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+      implied, including, without limitation, any warranties or conditions
+      of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any
+      risks associated with Your exercise of permissions under this License.
+
+   8. Limitation of Liability. In no event and under no legal theory,
+      whether in tort (including negligence), contract, or otherwise,
+      unless required by applicable law (such as deliberate and grossly
+      negligent acts) or agreed to in writing, shall any Contributor be
+      liable to You for damages, including any direct, indirect, special,
+      incidental, or consequential damages of any character arising as a
+      result of this License or out of the use or inability to use the
+      Work (including but not limited to damages for loss of goodwill,
+      work stoppage, computer failure or malfunction, or any and all
+      other commercial damages or losses), even if such Contributor
+      has been advised of the possibility of such damages.
+
+   9. Accepting Warranty or Additional Liability. While redistributing
+      the Work or Derivative Works thereof, You may choose to offer,
+      and charge a fee for, acceptance of support, warranty, indemnity,
+      or other liability obligations and/or rights consistent with this
+      License. However, in accepting such obligations, You may act only
+      on Your own behalf and on Your sole responsibility, not on behalf
+      of any other Contributor, and only if You agree to indemnify,
+      defend, and hold each Contributor harmless for any liability
+      incurred by, or claims asserted against, such Contributor by reason
+      of your accepting any such warranty or additional liability.
+
+   END OF TERMS AND CONDITIONS
+
+   APPENDIX: How to apply the Apache License to your work.
+
+      To apply the Apache License to your work, attach the following
+      boilerplate notice, with the fields enclosed by brackets "[]"
+      replaced with your own identifying information. (Don't include
+      the brackets!)  The text should be enclosed in the appropriate
+      comment syntax for the file format. We also recommend that a
+      file or class name and description of purpose be included on the
+      same "printed page" as the copyright notice for easier
+      identification within third-party archives.
+
+   Copyright 2026 Alex Younger
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
 ```
 
 `README.md`:
@@ -212,7 +430,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bonesinfra"
-version = "0.1.1"
+version = "0.1.8"
 description = "Deployment automation for BonesDeploy"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -238,6 +456,10 @@ bonesinfra = [
 dev = [
     "pytest>=9.0.3",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
 
 ```
 
@@ -585,6 +807,16 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-ngi
 `src/bonesinfra/assets/nginx/router.conf.j2`:
 
 ```j2
+{% if preview_domain and ssl_domain and preview_domain != ssl_domain %}
+# When a real domain is configured, preview_domain redirects to it.
+server {
+    listen 80;
+    listen [::]:80;
+    server_name {{ preview_domain }};
+    return 301 https://{{ ssl_domain }}$request_uri;
+}
+
+{% endif %}
 server {
     listen 80;
     listen [::]:80;
@@ -599,7 +831,7 @@ server {
     }
 
     location ^~ /.well-known/acme-challenge/ {
-        root {{ paths.current_web_root }};
+        root {{ paths.acme_webroot }};
         try_files $uri =404;
     }
 }
@@ -637,6 +869,9 @@ events {
 }
 
 http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
     access_log {{ paths.runtime_nginx_dir }}/access.log;
     client_body_temp_path {{ paths.runtime_nginx_dir }}/client_body;
     proxy_temp_path {{ paths.runtime_nginx_dir }}/proxy;
@@ -853,7 +1088,7 @@ from pathlib import Path
 from pyinfra.operations import files, server, systemd
 
 from bonesinfra.domain.context import template_data
-from bonesinfra.infra.deploy_helpers import mkdir, render
+from bonesinfra.infra.deploy_helpers import letsencrypt_cert_paths, mkdir, render
 
 
 def setup(ctx, paths, here):
@@ -907,10 +1142,12 @@ def setup(ctx, paths, here):
     nginx_server_name = ctx.config.domain or ctx.config.preview_domain
     if not nginx_server_name:
         raise ValueError("domain or preview_domain is required for nginx config")
-    nginx_ssl_enabled = bool(
-        ctx.runtime.runtime_data.get("ssl_cert_path")
-        and ctx.runtime.runtime_data.get("ssl_key_path")
-    )
+
+    # SSL state comes from bones.toml (ssl_enabled), not runtime.toml — SSL is
+    # owned by `ssl apply`, not `runtime apply`. This keeps runtime apply from
+    # clobbering the SSL router config that ssl apply wrote.
+    nginx_ssl_enabled = ctx.config.ssl_enabled and bool(ctx.config.domain)
+    cert_path, key_path = letsencrypt_cert_paths(ctx.config.domain or nginx_server_name)
 
     render(
         "Deploy router nginx config",
@@ -919,8 +1156,8 @@ def setup(ctx, paths, here):
         mode="0644",
         nginx_server_name=nginx_server_name,
         nginx_ssl_enabled=nginx_ssl_enabled,
-        nginx_ssl_certificate_path=ctx.runtime.runtime_data.get("ssl_cert_path", ""),
-        nginx_ssl_certificate_key_path=ctx.runtime.runtime_data.get("ssl_key_path", ""),
+        nginx_ssl_certificate_path=cert_path,
+        nginx_ssl_certificate_key_path=key_path,
         **template_data(ctx, paths=paths),
     )
 
@@ -1139,7 +1376,7 @@ def setup_repo_and_project(ctx, paths):
         path=paths["shared"],
         user=ctx.runtime.runtime_user,
         group=ctx.runtime.runtime_group,
-        mode="0711",
+        mode="2775",
     )
 
     mkdir(
@@ -1388,6 +1625,8 @@ def ensure_users_and_groups(ctx):
         _sudo=True,
     )
 
+    _ensure_group_membership(ctx.config.deploy_user, ctx.runtime.runtime_group)
+
     existing_user = host.get_fact(Users).get(ctx.runtime.runtime_user)
 
     if existing_user is None:
@@ -1421,7 +1660,7 @@ def install_authorized_key(ctx):
         commands=[
             f"install -d -o {deploy_user} -g {deploy_user} -m 0700 /home/{deploy_user}/.ssh",
             (
-                f'src=$(eval echo ~{ssh_user}/.ssh/authorized_keys); '
+                f"src=$(eval echo ~{ssh_user}/.ssh/authorized_keys); "
                 f'[ -f "$src" ] || {{ echo "ERROR: $src not found" >&2; exit 1; }}; '
                 f'cp "$src" /home/{deploy_user}/.ssh/authorized_keys'
             ),
@@ -1443,7 +1682,7 @@ from pyinfra.operations import server, systemd
 
 from bonesinfra.domain.context import template_data
 from bonesinfra.domain.paths import DeploymentPaths
-from bonesinfra.infra.deploy_helpers import render
+from bonesinfra.infra.deploy_helpers import letsencrypt_cert_paths, mkdir, render
 
 
 def deploy_ssl(ctx):
@@ -1459,6 +1698,14 @@ def deploy_ssl(ctx):
         print("Error: ssl_domain and ssl_email are required", file=sys.stderr)
         sys.exit(1)
 
+    # Dedicated, www-data-traversable webroot so the ACME challenge never
+    # depends on the release tree's permissions (SSL is separate from runtime).
+    mkdir(
+        name="Ensure ACME webroot exists",
+        path=paths["acme_webroot"],
+        mode="0755",
+    )
+
     _render_router_config(ctx, paths, here, ssl_enabled=False, stage="certbot challenge")
     obtain_certificate(ctx, paths)
     _render_router_config(ctx, paths, here, ssl_enabled=True, stage="SSL enable")
@@ -1469,13 +1716,21 @@ def _render_router_config(ctx, paths, here, ssl_enabled, stage):
     if not nginx_server_name:
         raise ValueError("domain is required for ssl nginx config")
 
+    extra = {
+        "nginx_server_name": nginx_server_name,
+        "nginx_ssl_enabled": ssl_enabled,
+    }
+    if ssl_enabled:
+        cert_path, key_path = letsencrypt_cert_paths(nginx_server_name)
+        extra["nginx_ssl_certificate_path"] = cert_path
+        extra["nginx_ssl_certificate_key_path"] = key_path
+
     render(
         f"Render nginx config ({stage})",
         here / "assets/nginx/router.conf.j2",
         paths["nginx_site_available"],
         mode="0644",
-        nginx_server_name=nginx_server_name,
-        nginx_ssl_enabled=ssl_enabled,
+        **extra,
         **template_data(ctx, paths=paths),
     )
 
@@ -1499,8 +1754,8 @@ def obtain_certificate(ctx, paths):
         commands=[
             "certbot certonly --non-interactive --agree-tos "
             f"--email {ctx.config.email} "
-            "--webroot "
-            f"-w {paths['current_web_root']} "
+            f"--webroot "
+            f"-w {paths['acme_webroot']} "
             f"-d {ctx.config.domain} "
             "--keep-until-expiring"
         ],
@@ -1731,6 +1986,7 @@ class DeploymentPaths:
     runtime_nginx_socket: str
     runtime_nginx_pid: str
     runtime_php_fpm_socket: str
+    acme_webroot: str
     sudoers_path: str
     usr_local_bin: str
     bonesremote_global_link: str
@@ -1784,6 +2040,7 @@ class DeploymentPaths:
             runtime_nginx_socket=str(runtime_nginx_dir / NGINX_SOCKET),
             runtime_nginx_pid=str(runtime_nginx_dir / NGINX_PID),
             runtime_php_fpm_socket=str(runtime_socket_dir / PHP_FPM_SOCKET),
+            acme_webroot=f"/var/www/{project_name}",
             sudoers_path=str(Path(ETC_SUDOERS_D) / "bonesdeploy"),
             usr_local_bin=USR_LOCAL_BIN,
             bonesremote_global_link=str(Path(USR_LOCAL_BIN) / BONESREMOTE_BINARY),
@@ -1821,6 +2078,11 @@ def render(name, src, dest, user="root", group="root", mode="0644", **data):
         **data,
         _sudo=True,
     )
+
+
+def letsencrypt_cert_paths(domain: str) -> tuple[str, str]:
+    live = f"/etc/letsencrypt/live/{domain}"
+    return f"{live}/fullchain.pem", f"{live}/privkey.pem"
 
 ```
 
@@ -2149,9 +2411,9 @@ def get_runtime(name):
 `src/bonesinfra/runtimes/common/__init__.py`:
 
 ```py
-from bonesinfra.runtimes.common import apparmor, logs, nginx, node, paths, python, ruby, service, validation
+from bonesinfra.runtimes.common import apparmor, logs, nginx, node, paths, service, validation
 
-__all__ = ["apparmor", "logs", "nginx", "node", "paths", "python", "ruby", "service", "validation"]
+__all__ = ["apparmor", "logs", "nginx", "node", "paths", "service", "validation"]
 
 ```
 
@@ -2259,6 +2521,9 @@ events {
 }
 
 http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
     access_log {{ paths.runtime_nginx_dir }}/access.log;
     client_body_temp_path {{ paths.runtime_nginx_dir }}/client_body;
     proxy_temp_path {{ paths.runtime_nginx_dir }}/proxy;
@@ -2351,6 +2616,9 @@ events {
 }
 
 http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
     access_log {{ paths.runtime_nginx_dir }}/access.log;
     client_body_temp_path {{ paths.runtime_nginx_dir }}/client_body;
     proxy_temp_path {{ paths.runtime_nginx_dir }}/proxy;
@@ -2360,7 +2628,7 @@ http {
 
     server {
         listen unix:{{ paths.runtime_nginx_socket }};
-        root {{ paths.current }}/dist;
+        root {{ paths.current }}/{{ static_root }};
         index index.html;
 
         location / {
@@ -2461,7 +2729,7 @@ def render_proxy(ctx, *, paths, socket_path=None, port=None):
     )
 
 
-def render_static(ctx, *, paths):
+def render_static(ctx, *, paths, root="dist"):
     here = Path(__file__).parent
     files.template(
         name="Deploy per-site static nginx config",
@@ -2470,6 +2738,7 @@ def render_static(ctx, *, paths):
         user="root",
         group=ctx.runtime.runtime_group,
         mode="0640",
+        static_root=root,
         **template_data(ctx, paths=paths),
         _sudo=True,
     )
@@ -2587,58 +2856,6 @@ def reload_php_fpm(php_version):
         enabled=True,
         running=True,
         restarted=True,
-        _sudo=True,
-    )
-
-```
-
-`src/bonesinfra/runtimes/common/python.py`:
-
-```py
-from pyinfra.operations import apt
-
-PYTHON_PACKAGES = [
-    "python3",
-    "python3-dev",
-    "python3-pip",
-    "python3-venv",
-    "libpq-dev",
-]
-
-
-def install_packages():
-    apt.packages(
-        name="Install Python runtime packages",
-        packages=PYTHON_PACKAGES,
-        present=True,
-        update=True,
-        _sudo=True,
-    )
-
-```
-
-`src/bonesinfra/runtimes/common/ruby.py`:
-
-```py
-from pyinfra.operations import apt
-
-RUBY_PACKAGES = [
-    "ruby-full",
-    "ruby-bundler",
-    "libffi-dev",
-    "libpq-dev",
-    "libyaml-dev",
-    "shared-mime-info",
-    "zlib1g-dev",
-]
-
-
-def install_packages():
-    apt.packages(
-        name="Install Ruby runtime packages",
-        packages=RUBY_PACKAGES,
-        present=True,
-        update=True,
         _sudo=True,
     )
 
@@ -2765,7 +2982,8 @@ def verify_profile_attached(service_name, profile_name, *, name=None):
 `src/bonesinfra/runtimes/django/django.py`:
 
 ```py
-from bonesinfra.runtimes.common import apparmor, logs, nginx, paths as common_paths, python, service, validation
+from bonesinfra.runtimes.common import apparmor, logs, nginx, paths as common_paths, service, validation
+from bonesinfra.runtimes.django import python_packages
 
 
 def questions():
@@ -2812,7 +3030,7 @@ def deploy(ctx):
     media_root = f"{paths['current']}/{ctx.runtime.runtime_data.get('media_root', 'media')}"
     writable = [static_root, media_root]
     gunicorn_bin = f"{paths['current']}/.venv/bin/gunicorn"
-    python.install_packages()
+    python_packages.install_packages()
     common_paths.ensure_runtime_dirs(ctx)
     logs.ensure(ctx)
     apparmor_profile_name = apparmor.render_app_profile(
@@ -2841,6 +3059,31 @@ def deploy(ctx):
 
 ```
 
+`src/bonesinfra/runtimes/django/python_packages.py`:
+
+```py
+from pyinfra.operations import apt
+
+PYTHON_PACKAGES = [
+    "python3",
+    "python3-dev",
+    "python3-pip",
+    "python3-venv",
+    "libpq-dev",
+]
+
+
+def install_packages():
+    apt.packages(
+        name="Install Python runtime packages",
+        packages=PYTHON_PACKAGES,
+        present=True,
+        update=True,
+        _sudo=True,
+    )
+
+```
+
 `src/bonesinfra/runtimes/laravel/__init__.py`:
 
 ```py
@@ -2861,12 +3104,22 @@ events {
 }
 
 http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
     access_log {{ paths.runtime_nginx_dir }}/access.log;
     client_body_temp_path {{ paths.runtime_nginx_dir }}/client_body;
     proxy_temp_path {{ paths.runtime_nginx_dir }}/proxy;
     fastcgi_temp_path {{ paths.runtime_nginx_dir }}/fastcgi;
     uwsgi_temp_path {{ paths.runtime_nginx_dir }}/uwsgi;
     scgi_temp_path {{ paths.runtime_nginx_dir }}/scgi;
+
+    # The SSL-terminating router sets X-Forwarded-Proto; mirror it to PHP-FPM
+    # so url()/asset_url() generate https:// links under SSL.
+    map $http_x_forwarded_proto $fastcgi_https_flag {
+        default "";
+        https  on;
+    }
 
     server {
         listen unix:{{ paths.runtime_nginx_socket }};
@@ -2882,6 +3135,7 @@ http {
             fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
             include /etc/nginx/fastcgi_params;
             fastcgi_param DOCUMENT_ROOT $realpath_root;
+            fastcgi_param HTTPS $fastcgi_https_flag;
             internal;
         }
 
@@ -2905,8 +3159,8 @@ user = {{ runtime_user }}
 group = {{ runtime_group }}
 
 listen = {{ laravel_php_fpm_socket_path }}
-listen.owner = www-data
-listen.group = www-data
+listen.owner = {{ runtime_user }}
+listen.group = {{ runtime_group }}
 listen.mode = 0660
 
 pm = dynamic
@@ -2940,7 +3194,7 @@ from bonesinfra.runtimes.laravel import nginx, php_fpm, php_packages, php_repo
 
 def deploy(ctx):
     here = Path(__file__).parent
-    php_version = ctx.runtime.runtime_data.get("php_version", "8.3")
+    php_version = ctx.runtime.runtime_data.get("php_version", "8.5")
     paths = DeploymentPaths.new(
         ctx.config.project_name,
         ctx.config.repo_path,
@@ -2951,7 +3205,6 @@ def deploy(ctx):
     php_repo.add_php_apt_source()
     php_packages.install_php(php_version)
 
-    php_fpm.setup_storage_directories(paths, ctx)
     php_fpm.setup_pool(here, ctx, paths, php_version)
     nginx.setup(here, ctx, paths, php_version)
 
@@ -3015,28 +3268,38 @@ def setup(here, ctx, paths, php_version):
 `src/bonesinfra/runtimes/laravel/php_fpm.py`:
 
 ```py
-from pyinfra.operations import files
+from pyinfra.operations import server
 
 from bonesinfra.runtimes.common import php_fpm_pool
 
 
-def setup_storage_directories(paths, ctx):
-    runtime_user = ctx.runtime.runtime_user
-    runtime_group = ctx.runtime.runtime_group
-    subdirs = ["logs", "framework/cache", "framework/sessions", "framework/views"]
-    for subdir in subdirs:
-        files.directory(
-            name=f"Ensure storage/{subdir} exists",
-            path=f"{paths['current']}/storage/{subdir}",
-            user=runtime_user,
-            group=runtime_group,
-            mode="0775",
-            _sudo=True,
-        )
+def cleanup_orphaned_pools(ctx, php_version):
+    project = ctx.config.project_name
+    current_pool = php_fpm_pool.pool_config_path(project, php_version)
+    command = "\n".join(
+        [
+            f'project="{project}"',
+            f'current_pool="{current_pool}"',
+            'for pool in /etc/php/*/fpm/pool.d/"$project".conf; do',
+            '  [ -e "$pool" ] || continue',
+            '  [ "$pool" = "$current_pool" ] && continue',
+            "  version=${pool#/etc/php/}",
+            "  version=${version%%/*}",
+            '  rm -f "$pool"',
+            '  systemctl reload-or-restart "php${version}-fpm"',
+            "done",
+        ]
+    )
+    server.shell(
+        name="Remove orphaned Laravel PHP-FPM pools from other PHP versions",
+        commands=[command],
+        _sudo=True,
+    )
 
 
 def setup_pool(here, ctx, paths, php_version):
     php_fpm_pool.ensure_log_dir(ctx)
+    cleanup_orphaned_pools(ctx, php_version)
     php_fpm_pool.render_pool(ctx, here=here, paths=paths, php_version=php_version)
     php_fpm_pool.validate_php_fpm(php_version)
     php_fpm_pool.reload_php_fpm(php_version)
@@ -3182,8 +3445,7 @@ def deploy(ctx):
         name="next",
         runtime_label="Next.js app server",
         runtime_exec=(
-            f"/usr/bin/env NODE_ENV=production PORT={port} HOSTNAME=127.0.0.1 "
-            "node .next/standalone/server.js"
+            f"/usr/bin/env NODE_ENV=production PORT={port} HOSTNAME=127.0.0.1 node .next/standalone/server.js"
         ),
         apparmor_profile_name=apparmor_profile_name,
         runtime_write_paths=[],
@@ -3197,15 +3459,52 @@ def deploy(ctx):
 `src/bonesinfra/runtimes/nuxt/nuxt.py`:
 
 ```py
-from bonesinfra.runtimes.common import apparmor, logs, nginx, node, paths as common_paths, service, validation
+from pathlib import Path
+
+from bonesinfra.domain.context import template_data
+from bonesinfra.infra.deploy_helpers import mkdir, render
+from bonesinfra.runtimes.common import apparmor, logs, nginx, node, paths as common_paths, service
+
+STATIC_ROOT = ".output/public"
 
 
 def questions():
-    return []
+    return [
+        {
+            "key": "is_static",
+            "type": "bool",
+            "label": "Is this Nuxt site static?",
+            "default": True,
+        },
+    ]
 
 
 def deploy(ctx):
+    is_static = ctx.runtime.runtime_data.get("is_static", True)
     paths = service.runtime_paths(ctx)
+
+    if is_static:
+        common_paths.ensure_runtime_dirs(ctx)
+        static_web_root = f"{paths['placeholder_release']}/{STATIC_ROOT}"
+        mkdir(
+            name="Ensure Nuxt static placeholder output directory exists",
+            path=static_web_root,
+            user=ctx.config.deploy_user,
+            group=ctx.runtime.release_group,
+            mode="0750",
+        )
+        render(
+            "Seed Nuxt static placeholder index page",
+            Path(__file__).parents[2] / "assets/nginx/index.html.j2",
+            f"{static_web_root}/index.html",
+            user=ctx.config.deploy_user,
+            group=ctx.runtime.release_group,
+            mode="0640",
+            **template_data(ctx, paths=paths),
+        )
+        nginx.render_static(ctx, paths=paths, root=STATIC_ROOT)
+        return
+
     socket_path = f"{paths['runtime_socket_dir']}/nuxt/nuxt.sock"
     node.install_packages()
     common_paths.ensure_runtime_dirs(ctx)
@@ -3217,19 +3516,13 @@ def deploy(ctx):
         apparmor_exec_paths=["/usr/bin/node"],
         apparmor_writable_paths=[],
     )
-    validation.run_as_runtime_user(
-        ctx,
-        "Validate Nuxt server entrypoint exists as runtime user",
-        "test -f .output/server/index.mjs",
-    )
     service.render_app_service(
         ctx,
         paths=paths,
         name="nuxt",
         runtime_label="Nuxt app server",
         runtime_exec=(
-            f"/usr/bin/env NODE_ENV=production NITRO_UNIX_SOCKET={socket_path} "
-            "node .output/server/index.mjs"
+            f"/usr/bin/env NODE_ENV=production NITRO_UNIX_SOCKET={socket_path} node .output/server/index.mjs"
         ),
         apparmor_profile_name=apparmor_profile_name,
         runtime_write_paths=[],
@@ -3242,7 +3535,8 @@ def deploy(ctx):
 `src/bonesinfra/runtimes/rails/rails.py`:
 
 ```py
-from bonesinfra.runtimes.common import apparmor, logs, nginx, paths as common_paths, ruby, service, validation
+from bonesinfra.runtimes.common import apparmor, logs, nginx, paths as common_paths, service, validation
+from bonesinfra.runtimes.rails import ruby_packages
 
 
 def questions():
@@ -3284,7 +3578,7 @@ def deploy(ctx):
         f"{paths['current']}/storage",
     ]
     rails_env = ctx.runtime.runtime_data.get("rails_env", "production")
-    ruby.install_packages()
+    ruby_packages.install_packages()
     common_paths.ensure_runtime_dirs(ctx)
     logs.ensure(ctx)
     apparmor_profile_name = apparmor.render_app_profile(
@@ -3310,6 +3604,33 @@ def deploy(ctx):
     )
     nginx.render_proxy(ctx, paths=paths, socket_path=socket_path)
     service.enable_and_start(ctx, "puma", apparmor_profile_name=apparmor_profile_name)
+
+```
+
+`src/bonesinfra/runtimes/rails/ruby_packages.py`:
+
+```py
+from pyinfra.operations import apt
+
+RUBY_PACKAGES = [
+    "ruby-full",
+    "ruby-bundler",
+    "libffi-dev",
+    "libpq-dev",
+    "libyaml-dev",
+    "shared-mime-info",
+    "zlib1g-dev",
+]
+
+
+def install_packages():
+    apt.packages(
+        name="Install Ruby runtime packages",
+        packages=RUBY_PACKAGES,
+        present=True,
+        update=True,
+        _sudo=True,
+    )
 
 ```
 
@@ -3372,55 +3693,6 @@ def questions():
 def deploy(ctx):
     paths = service.runtime_paths(ctx)
     nginx.render_static(ctx, paths=paths)
-
-```
-
-`tests/__main__.py`:
-
-```py
-"""Test discovery runner — no external deps required."""
-
-import importlib
-import traceback
-from pathlib import Path
-
-
-def discover_tests():
-    root = Path(__file__).parent
-    for file in sorted(root.glob("test_*.py")):
-        mod = file.stem
-        print(f"\n=== {mod} ===")
-        m = importlib.import_module(f"tests.{mod}")
-        for name in sorted(dir(m)):
-            if not name.startswith("test_"):
-                continue
-            fn = getattr(m, name)
-            if not callable(fn):
-                continue
-            yield mod, name, fn
-
-
-def main():
-    passed = 0
-    failed = 0
-
-    for _, test_name, fn in discover_tests():
-        try:
-            fn()
-            print(f"  OK: {test_name}")
-            passed += 1
-        except AssertionError:
-            print(f"  FAIL: {test_name}")
-            for line in traceback.format_exc().splitlines()[-3:]:
-                print(f"        {line}")
-            failed += 1
-
-    print(f"\n{passed} passed, {failed} failed")
-    return 1 if failed else 0
-
-
-if __name__ == "__main__":
-    raise SystemExit(main())
 
 ```
 
@@ -3899,6 +4171,17 @@ def test_setup_avoids_usermod_for_existing_runtime_user():
     helpers.assert_contains(c, "gpasswd -a")
 
 
+def test_setup_adds_deploy_user_to_runtime_group():
+    c = helpers.read(SETUP_USERS)
+    helpers.assert_contains(c, "_ensure_group_membership(ctx.config.deploy_user, ctx.runtime.runtime_group)")
+
+
+def test_setup_shared_dir_is_setgid_and_traversable():
+    c = helpers.read(SETUP_DIRECTORIES)
+    shared_block = c.split('path=paths["shared"]')[1].split(")")[0]
+    helpers.assert_contains(shared_block, 'mode="2775"')
+
+
 def test_setup_deploy_user_commands_set_user_home():
     c = helpers.read(SETUP_DIRECTORIES)
     helpers.assert_contains(c, "XDG_CONFIG_HOME={home}/.config")
@@ -4088,9 +4371,9 @@ def test_ssl_requires_real_domain_for_router_render():
     helpers.assert_contains(c, 'raise ValueError("domain is required for ssl nginx config")')
 
 
-def test_ssl_uses_current_web_root():
+def test_ssl_uses_acme_webroot():
     c = helpers.read(SSL_PLAN)
-    helpers.assert_contains(c, "current_web_root")
+    helpers.assert_contains(c, "acme_webroot")
 
 
 # ---- Laravel-specific ordering ----
@@ -4109,6 +4392,7 @@ def test_laravel_validates_php_fpm_before_reload():
     c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py")
     helpers.assert_ordering(
         c,
+        "cleanup_orphaned_pools(ctx, php_version)",
         "php_fpm_pool.render_pool",
         "php_fpm_pool.validate_php_fpm",
         "php_fpm_pool.reload_php_fpm",
@@ -4120,7 +4404,6 @@ def test_laravel_deploy_does_not_setup_php_fpm_apparmor():
     helpers.assert_not_contains(c, "apparmor")
     helpers.assert_ordering(
         c,
-        "php_fpm.setup_storage_directories",
         "php_fpm.setup_pool",
         "nginx.setup",
     )
@@ -4303,7 +4586,6 @@ port = 2222
 `tests/test_runtime_nginx.py`:
 
 ```py
-
 import pytest
 
 from bonesinfra.deploys.runtime import nginx as runtime_nginx
@@ -4390,9 +4672,11 @@ def test_ssl_setup_requires_a_real_domain(tmp_path):
 
 ```py
 import importlib
+from types import SimpleNamespace
 
 from bonesinfra.app import runtime_catalog
 from bonesinfra.runtimes import list_runtimes
+from bonesinfra.runtimes.laravel import php_fpm
 
 from . import helpers
 
@@ -4429,6 +4713,7 @@ def test_laravel_deploy_accepts_ctx():
 
 def test_laravel_php_fpm_uses_distro_pool_model():
     content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py")
+    helpers.assert_contains(content, "cleanup_orphaned_pools(ctx, php_version)")
     helpers.assert_contains(content, "php_fpm_pool.render_pool")
     helpers.assert_contains(content, "php_fpm_pool.validate_php_fpm")
     helpers.assert_contains(content, "php_fpm_pool.reload_php_fpm")
@@ -4463,6 +4748,25 @@ def test_common_php_fpm_pool_ensures_bonesdeploy_log_dir():
     helpers.assert_contains(content, "logs.ensure(ctx)")
 
 
+def test_laravel_php_fpm_cleans_orphaned_project_pools(monkeypatch):
+    calls = []
+
+    def fake_shell(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(php_fpm.server, "shell", fake_shell)
+    ctx = SimpleNamespace(config=SimpleNamespace(project_name="demo"))
+
+    php_fpm.cleanup_orphaned_pools(ctx, "8.5")
+
+    assert len(calls) == 1
+    command = calls[0]["commands"][0]
+    assert '/etc/php/*/fpm/pool.d/"$project".conf' in command
+    assert '[ "$pool" = "$current_pool" ] && continue' in command
+    assert 'rm -f "$pool"' in command
+    assert 'systemctl reload-or-restart "php${version}-fpm"' in command
+
+
 def test_laravel_nginx_uses_distro_php_socket_and_no_runtime_chown():
     content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/nginx.py")
     helpers.assert_contains(content, "php_fpm_pool.socket_path")
@@ -4484,18 +4788,14 @@ def test_common_logs_provisions_runtime_owned_dir():
 
 
 def test_template_runtime_load_fails_loudly_without_silent_swallow():
-    content = helpers.read(
-        helpers.SRC_DIR / "bonesinfra/deploys/runtime/template_runtime.py"
-    )
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/runtime/template_runtime.py")
     helpers.assert_not_contains(content, "except (ImportError, KeyError)")
     helpers.assert_not_contains(content, "    pass")
     helpers.assert_contains(content, 'raise RuntimeError(f"Runtime {template} does not expose deploy(ctx)")')
 
 
 def test_template_runtime_load_requires_deploy_attribute():
-    content = helpers.read(
-        helpers.SRC_DIR / "bonesinfra/deploys/runtime/template_runtime.py"
-    )
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/runtime/template_runtime.py")
     helpers.assert_contains(content, 'if not hasattr(runtime, "deploy")')
 
 
@@ -4534,6 +4834,47 @@ def test_nuxt_uses_nitro_unix_socket():
     helpers.assert_contains(content, "socket_path=socket_path")
 
 
+def test_nuxt_questions_include_is_static_default_true():
+    mod = importlib.import_module("bonesinfra.runtimes.nuxt.nuxt")
+    qs = mod.questions()
+    keys = {q["key"]: q for q in qs}
+    assert "is_static" in keys
+    assert keys["is_static"]["default"] is True
+    assert keys["is_static"]["type"] == "bool"
+
+
+def test_nuxt_does_not_validate_build_artifact():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/nuxt/nuxt.py")
+    helpers.assert_not_contains(content, "test -f .output/server/index.mjs")
+    helpers.assert_not_contains(content, "validation.run_as_runtime_user")
+
+
+def test_nuxt_static_path_uses_render_static():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/nuxt/nuxt.py")
+    helpers.assert_contains(content, "nginx.render_static")
+    helpers.assert_contains(content, "STATIC_ROOT")
+
+
+def test_nuxt_static_runtime_seeds_placeholder_output():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/nuxt/nuxt.py")
+    helpers.assert_contains(content, 'STATIC_ROOT = ".output/public"')
+    helpers.assert_contains(content, "paths['placeholder_release']")
+    helpers.assert_contains(content, '"Seed Nuxt static placeholder index page"')
+    helpers.assert_contains(content, 'f"{static_web_root}/index.html"')
+
+
+def test_static_nginx_template_uses_static_root_variable():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/assets/static-site-nginx.conf.j2")
+    helpers.assert_contains(c, "{{ static_root }}")
+    helpers.assert_not_contains(c, "{{ paths.current }}/dist;")
+
+
+def test_vue_static_uses_default_dist_root():
+    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/vue/vue.py")
+    helpers.assert_contains(content, "nginx.render_static")
+    helpers.assert_not_contains(content, 'root="')
+
+
 def test_sveltekit_uses_socket_path_env():
     content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/sveltekit/svelte.py")
     helpers.assert_contains(content, "SOCKET_PATH=")
@@ -4569,6 +4910,76 @@ def test_rails_uses_puma_unix_socket():
     content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/rails/rails.py")
     helpers.assert_contains(content, "bundle exec puma")
     helpers.assert_contains(content, "-b unix://")
+
+```
+
+`tests/test_shared_paths.py`:
+
+```py
+"""Tests for shared-path provisioning removal.
+
+BonesInfra no longer creates framework shared paths.
+It creates only project_root/shared with mode 2775.
+"""
+
+from . import helpers
+
+SETUP_DIRECTORIES = helpers.SRC_DIR / "bonesinfra/deploys/setup/directories.py"
+SETUP_USERS = helpers.SRC_DIR / "bonesinfra/deploys/setup/users.py"
+RUNTIME_PLAN = helpers.SRC_DIR / "bonesinfra/deploys/runtime/plan.py"
+LARAVEL_PHP_FPM = helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py"
+LARAVEL_DEPLOY = helpers.SRC_DIR / "bonesinfra/runtimes/laravel/deploy.py"
+SHARED_PATHS_PY = helpers.SRC_DIR / "bonesinfra/deploys/runtime/shared_paths.py"
+
+
+def test_shared_paths_module_is_deleted():
+    assert not SHARED_PATHS_PY.exists(), "shared_paths.py must be deleted"
+
+
+def test_runtime_plan_does_not_call_shared_paths():
+    c = helpers.read(RUNTIME_PLAN)
+    helpers.assert_not_contains(c, "shared_paths")
+    helpers.assert_not_contains(c, "shared.paths")
+
+
+def test_shared_root_is_created_with_mode_2775():
+    c = helpers.read(SETUP_DIRECTORIES)
+    helpers.assert_contains(c, 'path=paths["shared"]')
+    helpers.assert_contains(c, 'mode="2775"')
+
+
+def test_deploy_user_is_added_to_runtime_group():
+    c = helpers.read(SETUP_USERS)
+    helpers.assert_contains(c, "_ensure_group_membership(ctx.config.deploy_user, ctx.runtime.runtime_group)")
+
+
+def test_laravel_does_not_create_storage_subdirectories():
+    c = helpers.read(LARAVEL_PHP_FPM)
+    helpers.assert_not_contains(c, "setup_storage_directories")
+    helpers.assert_not_contains(c, "storage/logs")
+    helpers.assert_not_contains(c, "framework/cache")
+    helpers.assert_not_contains(c, "framework/sessions")
+    helpers.assert_not_contains(c, "framework/views")
+
+
+def test_laravel_deploy_does_not_call_storage_setup():
+    c = helpers.read(LARAVEL_DEPLOY)
+    helpers.assert_not_contains(c, "setup_storage_directories")
+
+
+def test_bonesinfra_does_not_create_env_file():
+    # BonesInfra must not create shared/.env anywhere
+    for f in [SETUP_DIRECTORIES, RUNTIME_PLAN, LARAVEL_PHP_FPM, LARAVEL_DEPLOY]:
+        c = helpers.read(f)
+        helpers.assert_not_contains(c, "touch")
+        # Only "exists" is from non-file-creation contexts like "project not exists"
+        if ".env" in c:
+            assert "Ensure shared file" not in c, f"{f} must not create .env"
+
+
+def test_runtime_plan_does_not_inspect_shared_in_runtime_data():
+    c = helpers.read(RUNTIME_PLAN)
+    helpers.assert_not_contains(c, '["shared"]')
 
 ```
 
@@ -4683,10 +5094,10 @@ def test_laravel_php_fpm_pool_uses_distro_run_php_socket():
     helpers.assert_not_contains(c, "/run/{{ project_name }}")
 
 
-def test_laravel_php_fpm_pool_listens_as_www_data():
+def test_laravel_php_fpm_pool_listens_as_runtime_user():
     c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
-    helpers.assert_contains(c, "listen.owner = www-data")
-    helpers.assert_contains(c, "listen.group = www-data")
+    helpers.assert_contains(c, "listen.owner = {{ runtime_user }}")
+    helpers.assert_contains(c, "listen.group = {{ runtime_group }}")
     helpers.assert_contains(c, "listen.mode = 0660")
 
 
@@ -4818,7 +5229,7 @@ def test_common_app_nginx_logs_under_runtime_nginx_dir():
 
 def test_common_static_nginx_serves_dist():
     c = _read("runtimes/common/assets/static-site-nginx.conf.j2")
-    helpers.assert_contains(c, "root {{ paths.current }}/dist")
+    helpers.assert_contains(c, "root {{ paths.current }}/{{ static_root }}")
     helpers.assert_contains(c, "index index.html")
     helpers.assert_contains(c, "try_files $uri $uri/ /index.html")
 
