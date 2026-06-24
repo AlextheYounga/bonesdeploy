@@ -78,18 +78,17 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
     }
 
     let choice = Select::new(
-        "Would you like to use a template or build from scratch?",
+        "Runtime template:",
         vec![String::from("Use a template"), String::from("Build from scratch")],
     )
-    .with_help_message("Pick a stack to scaffold, or start from scratch")
+    .with_help_message("Choose the app runtime to configure")
     .prompt()?;
 
     if choice == "Build from scratch" {
         return Ok(None);
     }
 
-    let template_name = Select::new("Which template stack would you like to use?", available_templates.to_vec())
-        .with_help_message("Choose the framework stack to scaffold")
+    let template_name = Select::new("Template:", available_templates.to_vec())
         .prompt()?;
 
     Ok(Some(template_name))
@@ -146,9 +145,7 @@ pub fn prompt_remote_name(existing_config: Option<&Bones>) -> Result<String> {
     display_options.push(String::from(CREATE_REMOTE_OPTION));
 
     let choice = Select::new("Deployment remote:", display_options)
-        .with_help_message(
-            "Choose the git remote that points to a fresh VPS for production deployment. Do not use 'origin' — that is your code host, not a deployment target.",
-        )
+        .with_help_message("Choose the VPS remote, not your code host.")
         .raw_prompt()
         .map_err(|err| anyhow!(err))?;
 
@@ -159,20 +156,14 @@ pub fn prompt_remote_name(existing_config: Option<&Bones>) -> Result<String> {
     let chosen = ordered_remotes[choice.index].name.clone();
 
     if chosen == "origin" {
-        println!();
-        println!("{}", style("WARNING:").yellow().bold());
-        println!("You selected 'origin' as your deployment remote.");
-        println!("'origin' typically points to your code host (e.g. GitHub, GitLab) — not to a VPS");
-        println!("where bonesdeploy can deploy your application. Using it here will likely misconfigure");
-        println!("deployment and push deployment infrastructure to the wrong place.");
-        println!();
+        println!("{} {}", style("Warning:").yellow().bold(), "origin usually points to your code host, not your VPS.");
         let proceed = Confirm::new("Use 'origin' anyway?")
             .with_default(false)
-            .with_help_message("Choose 'No' and create a new deployment remote instead")
+            .with_help_message("Choose No unless origin points to your VPS.")
             .prompt()
             .map_err(|err| anyhow!(err))?;
         if !proceed {
-            bail!("Aborted: choose a remote that points to a fresh VPS, or create a new one.");
+            bail!("Choose a deployment remote that points to your VPS.");
         }
     }
 
@@ -226,7 +217,7 @@ pub fn confirm_remote_setup() -> Result<bool> {
         println!("{line}");
     }
     println!();
-    Confirm::new("Set up the server now?").with_default(false).prompt().map_err(|err| anyhow!(err))
+    Confirm::new("Bootstrap remote server?").with_default(false).prompt().map_err(|err| anyhow!(err))
 }
 
 pub fn confirm_remote_runtime() -> Result<bool> {
@@ -235,7 +226,7 @@ pub fn confirm_remote_runtime() -> Result<bool> {
         println!("{line}");
     }
     println!();
-    Confirm::new("Apply the runtime on the server now?").with_default(false).prompt().map_err(|err| anyhow!(err))
+    Confirm::new("Apply runtime setup?").with_default(false).prompt().map_err(|err| anyhow!(err))
 }
 
 #[cfg(test)]
@@ -243,35 +234,12 @@ fn is_affirmative(answer: &str) -> bool {
     matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
 }
 
-fn remote_setup_prompt_lines() -> [&'static str; 12] {
-    [
-        "Remote setup",
-        "This is intended for a fresh VPS, but is idempotent (can be run multiple times).",
-        "You can use this to set up as many sites on your VPS as you would like. Run this once per site.",
-        "",
-        "This step will:",
-        "  - Ensure necessary prerequisite packages are installed the server.",
-        "  - Ensure correct user groups, roles, and firewalls are configured the server.",
-        "  - Set up a git bare repo for this project on the server.",
-        "  - Create the appropriate deployment and release directories for your project.",
-        "  - Install the bonesremote binary on the server, used to facilitate deployments.",
-        "",
-        "For more information, check the local bonesinfra install managed by bonesdeploy.",
-    ]
+fn remote_setup_prompt_lines() -> [&'static str; 1] {
+    ["Remote bootstrap prepares the VPS for this project."]
 }
 
-fn remote_runtime_prompt_lines() -> [&'static str; 9] {
-    [
-        "Remote runtime",
-        "This applies per-site runtime configurations to the server.",
-        "",
-        "It will:",
-        "  - Ensure runtime-specific packages are installed.",
-        "  - Provision runtime-specific services, like PHP-FPM, Python, or Ruby, depending on your runtime template.",
-        "  - Configure AppArmor, nginx, and systemd services are configured for this site.",
-        "",
-        "For more information, check the local bonesinfra install managed by bonesdeploy.",
-    ]
+fn remote_runtime_prompt_lines() -> [&'static str; 1] {
+    ["Runtime setup installs app services for this project."]
 }
 
 pub fn confirm_remote_ssl() -> Result<bool> {
@@ -280,17 +248,11 @@ pub fn confirm_remote_ssl() -> Result<bool> {
         println!("{line}");
     }
     println!();
-    Confirm::new("Set up HTTPS now?").with_default(false).prompt().map_err(|err| anyhow!(err))
+    Confirm::new("Configure HTTPS?").with_default(false).prompt().map_err(|err| anyhow!(err))
 }
 
-fn remote_ssl_prompt_lines() -> [&'static str; 5] {
-    [
-        "Remote SSL setup",
-        "This applies per-site SSL configurations to allow HTTPS traffic to your site.",
-        "Before beginning this step, please ensure you have set up the appropriate A or CNAME DNS record on your DNS provider which points to this server.",
-        "Common DNS providers are Namecheap, GoDaddy, Cloudflare, etc.",
-        "If you have not completed this step, certificate creation will fail on this step.",
-    ]
+fn remote_ssl_prompt_lines() -> [&'static str; 1] {
+    ["HTTPS requires DNS to point at this server."]
 }
 
 fn prompt_remote_name_text(existing_config: Option<&Bones>) -> Result<String> {
@@ -298,7 +260,7 @@ fn prompt_remote_name_text(existing_config: Option<&Bones>) -> Result<String> {
         existing_config.map(|cfg| cfg.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
     Text::new("Deployment remote name:")
         .with_default(default_remote)
-        .with_help_message("bonesdeploy will add this local git remote if it does not exist")
+        .with_help_message("Created if missing.")
         .prompt()
         .map(|value| value.trim().to_string())
         .map_err(|err| anyhow!(err))
@@ -306,7 +268,7 @@ fn prompt_remote_name_text(existing_config: Option<&Bones>) -> Result<String> {
 
 pub fn prompt_ssl_domain(existing_config: Option<&Bones>) -> Result<String> {
     let default_domain = config_default(existing_config, |cfg| cfg.domain.as_str(), "");
-    Text::new("SSL domain:")
+    Text::new("Domain:")
         .with_default(default_domain)
         .with_help_message("e.g. app.example.com")
         .prompt()
@@ -316,7 +278,7 @@ pub fn prompt_ssl_domain(existing_config: Option<&Bones>) -> Result<String> {
 
 pub fn prompt_ssl_email(existing_config: Option<&Bones>) -> Result<String> {
     let default_email = config_default(existing_config, |cfg| cfg.email.as_str(), "");
-    Text::new("SSL email:")
+    Text::new("Let's Encrypt email:")
         .with_default(default_email)
         .with_help_message("e.g. ops@example.com")
         .prompt()
@@ -344,19 +306,19 @@ mod tests {
         assert!(!is_affirmative("no"));
     }
 
-    /// Describes firewall configuration in the remote setup prompt.
+    /// Mentions VPS in the remote bootstrap prompt.
     #[test]
-    fn remote_setup_prompt_lines_include_firewall_configuration() {
+    fn remote_setup_prompt_lines_mention_vps() {
         let joined = remote_setup_prompt_lines().join("\n");
 
-        assert!(joined.contains("firewalls"), "remote setup prompt should describe firewall configuration\n{joined}");
+        assert!(joined.contains("VPS"), "remote bootstrap prompt should mention VPS\n{joined}");
     }
 
-    /// Describes `AppArmor` and nginx in the remote runtime prompt.
+    /// Mentions app services in the remote runtime prompt.
     #[test]
-    fn remote_runtime_prompt_lines_include_site_runtime_concerns() {
+    fn remote_runtime_prompt_lines_mention_app_services() {
         let joined = remote_runtime_prompt_lines().join("\n");
 
-        assert!(joined.contains("AppArmor") || joined.contains("nginx"));
+        assert!(joined.contains("app services"), "remote runtime prompt should mention app services\n{joined}");
     }
 }

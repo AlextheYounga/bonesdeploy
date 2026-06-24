@@ -20,9 +20,8 @@ use shared::paths;
 pub fn run(args: &InitArgs) -> Result<bool> {
     git::ensure_git_repository()?;
 
-    println!("Preparing local bonesinfra...");
+    println!("Initializing bonesdeploy...");
     bonesinfra::prefetch()?;
-    println!("Local bonesinfra ready.");
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     let had_bones_entry = fs::symlink_metadata(bones_dir).is_ok();
