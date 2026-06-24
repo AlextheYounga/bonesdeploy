@@ -17,6 +17,8 @@ No pretending your VPS is a tiny Kubernetes cluster.
 
 It gives you versioned releases, rollback, shared runtime state, service restarts, and per-site Linux isolation using the tools already on the box.
 
+**It's also AI agent friendly, with dedicated commands to help your agent understand how to setup and manage your server without ever leaving your machine.**
+
 BonesDeploy builds two binaries:
 
 - **`bonesdeploy`** — the local CLI
