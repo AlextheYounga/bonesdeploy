@@ -9,6 +9,7 @@ pub(crate) mod post_receive;
 pub(crate) mod rollback;
 pub(crate) mod service;
 pub(crate) mod stage_release;
+pub(crate) mod status;
 pub(crate) mod version;
 pub(crate) mod wire_release;
 

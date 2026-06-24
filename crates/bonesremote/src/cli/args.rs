@@ -13,6 +13,12 @@ pub enum Command {
     Init,
     /// Check server environment health
     Doctor,
+    /// Print site status as JSON
+    Status {
+        /// Path to bones.toml config file
+        #[arg(long)]
+        config: String,
+    },
     /// Run the full remote deployment lifecycle
     Deploy {
         /// Path to bones.toml config file

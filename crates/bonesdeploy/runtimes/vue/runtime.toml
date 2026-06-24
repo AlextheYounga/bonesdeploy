@@ -1,5 +1,5 @@
 template = "vue"
-web_root = "dist/public"
+web_root = "dist"
 
 [permissions]
 paths = [

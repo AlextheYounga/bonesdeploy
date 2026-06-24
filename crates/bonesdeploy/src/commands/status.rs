@@ -1,12 +1,33 @@
 use std::path::Path;
 
 use anyhow::Result;
+use serde::Deserialize;
 use shared::config as shared_config;
 use shared::paths;
 
 use crate::commands::guide;
 use crate::config;
 use crate::infra::ssh;
+
+#[derive(Debug, Deserialize)]
+struct RemoteReport {
+    current_release: String,
+    ssl: RemoteSslStatus,
+    services: Vec<RemoteServiceStatus>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RemoteSslStatus {
+    enabled: bool,
+    domain: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RemoteServiceStatus {
+    name: String,
+    state: String,
+    enabled: String,
+}
 
 pub async fn run() -> Result<()> {
     let report = guide::build_report().await?;
@@ -21,47 +42,75 @@ pub async fn run() -> Result<()> {
 
     println!("State: {}", report.state_label);
 
-    let (current_release, service_state, ssl_state) = if let Some(cfg) = cfg {
-        remote_status(cfg).await.unwrap_or((String::from("unknown"), String::from("unknown"), ssl_state(cfg, false)))
+    let remote = if let Some(cfg) = cfg {
+        remote_status(cfg).await.unwrap_or_else(|_| fallback_remote_status(cfg))
     } else {
-        (String::from("unknown"), String::from("unknown"), String::from("unknown"))
+        empty_remote_status()
     };
 
-    println!("Current release: {current_release}");
-    println!("Service: {service_state}");
-    println!("SSL: {ssl_state}");
+    println!("Current release: {}", remote.current_release);
+    println!("SSL: {}", ssl_state(&remote.ssl));
+    println!();
+    println!("Services:");
+    for service in &remote.services {
+        println!("{} {} {}/{}", service_marker(&service.state), service.name, service.state, service.enabled);
+    }
     println!();
     println!("Next: {}", report.commands[0]);
 
     Ok(())
 }
 
-async fn remote_status(cfg: &config::Bones) -> Result<(String, String, String)> {
+async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
     let session = ssh::connect(cfg).await?;
     let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
     let deployment = cfg.deployment_paths(&runtime.web_root);
-
-    let release = ssh::run_cmd(&session, &format!("readlink -f {}", shell_quote(&deployment.current))).await.ok();
-    let current_release = release.map_or_else(|| String::from("unknown"), |value| release_name(value.trim()));
-
-    let service =
-        ssh::run_cmd(&session, &format!("systemctl is-active {}", shell_quote(&deployment.systemd_site_nginx_service)))
-            .await
-            .map_or_else(|_| String::from("unknown"), |value| value.trim().to_string());
-
-    let remote_ssl_enabled = guide::remote_ssl_enabled(cfg, &runtime.web_root).await.unwrap_or(false);
-
+    let command = format!("bonesremote status --config {}", shell_quote(&deployment.repo_bones_toml));
+    let output = ssh::run_cmd(&session, &command).await;
     session.close().await?;
 
-    Ok((current_release, service, ssl_state(cfg, remote_ssl_enabled)))
+    Ok(serde_json::from_str(&output?)?)
 }
 
-fn ssl_state(cfg: &config::Bones, remote_ssl_enabled: bool) -> String {
-    if cfg.ssl_enabled || remote_ssl_enabled {
-        if cfg.domain.is_empty() { String::from("enabled") } else { format!("enabled ({})", cfg.domain) }
+fn fallback_remote_status(cfg: &config::Bones) -> RemoteReport {
+    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR)).ok();
+    let current_release = runtime.as_ref().map_or_else(
+        || String::from("unknown"),
+        |runtime| {
+            let deployment = cfg.deployment_paths(&runtime.web_root);
+            release_name(&deployment.current)
+        },
+    );
+
+    RemoteReport {
+        current_release,
+        ssl: RemoteSslStatus { enabled: cfg.ssl_enabled, domain: cfg.domain.clone() },
+        services: vec![RemoteServiceStatus {
+            name: format!("{}-nginx.service", cfg.project_name),
+            state: String::from("unknown"),
+            enabled: String::from("unknown"),
+        }],
+    }
+}
+
+fn empty_remote_status() -> RemoteReport {
+    RemoteReport {
+        current_release: String::from("unknown"),
+        ssl: RemoteSslStatus { enabled: false, domain: String::new() },
+        services: Vec::new(),
+    }
+}
+
+fn ssl_state(ssl: &RemoteSslStatus) -> String {
+    if ssl.enabled {
+        if ssl.domain.is_empty() { String::from("enabled") } else { format!("enabled ({})", ssl.domain) }
     } else {
         String::from("disabled")
     }
+}
+
+fn service_marker(state: &str) -> &'static str {
+    if state == "active" { "✓" } else { "✗" }
 }
 
 fn release_name(value: &str) -> String {
@@ -74,13 +123,19 @@ fn shell_quote(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::ssl_state;
-    use crate::config::Bones;
+    use super::{RemoteSslStatus, service_marker, ssl_state};
 
     #[test]
     fn ssl_state_uses_remote_state_when_local_flag_is_stale() {
-        let cfg = Bones { domain: String::from("app.example.com"), ssl_enabled: false, ..Default::default() };
+        let ssl = RemoteSslStatus { domain: String::from("app.example.com"), enabled: true };
 
-        assert_eq!(ssl_state(&cfg, true), "enabled (app.example.com)");
+        assert_eq!(ssl_state(&ssl), "enabled (app.example.com)");
+    }
+
+    #[test]
+    fn service_marker_marks_only_active_as_ok() {
+        assert_eq!(service_marker("active"), "✓");
+        assert_eq!(service_marker("failed"), "✗");
+        assert_eq!(service_marker("unknown"), "✗");
     }
 }

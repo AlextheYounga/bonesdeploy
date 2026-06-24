@@ -144,6 +144,14 @@ mod tests {
     }
 
     #[test]
+    fn vue_runtime_uses_vite_dist_web_root() -> Result<()> {
+        let defaults = runtime_defaults("vue")?;
+
+        assert_eq!(defaults.get("web_root"), Some(&Value::String(String::from("dist"))));
+        Ok(())
+    }
+
+    #[test]
     fn base_runtime_defaults_read_embedded_kit_runtime() -> Result<()> {
         let defaults = base_runtime_defaults()?;
 
@@ -186,7 +194,7 @@ mod tests {
             "kit script '02_run_build.sh' should be removed after runtime scaffold, got: {entries:?}"
         );
         assert!(
-            entries.iter().any(|n| n == "02_install_php_dependencies.sh"),
+            entries.iter().any(|n| n == "02_install_php_deps.sh"),
             "laravel script should exist after runtime scaffold, got: {entries:?}"
         );
 
