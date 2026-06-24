@@ -7,7 +7,7 @@ use crate::infra::git;
 use crate::ui::prompts;
 use shared::paths;
 
-pub fn run() -> Result<()> {
+pub fn run(yes: bool) -> Result<()> {
     git::ensure_git_repository()?;
 
     let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
@@ -15,7 +15,7 @@ pub fn run() -> Result<()> {
         bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_RUNTIME_TOML);
     }
 
-    if !prompts::confirm_remote_runtime()? {
+    if !yes && !prompts::confirm_remote_runtime()? {
         println!("Skipped runtime setup.");
         println!();
         println!("Next: run bonesdeploy remote runtime when ready.");

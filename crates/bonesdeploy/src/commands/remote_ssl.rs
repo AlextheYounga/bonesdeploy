@@ -13,20 +13,20 @@ use crate::infra::bonesinfra_cli;
 use crate::infra::bootstrap_ssh;
 use crate::ui::prompts;
 
-pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
+pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let mut cfg = config::load(bones_toml)?;
     let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
 
     if let Some(value) = domain {
         cfg.domain = value.trim().to_string();
-    } else if cfg.domain.is_empty() {
+    } else if cfg.domain.is_empty() && !yes {
         cfg.domain = prompts::prompt_ssl_domain(Some(&cfg))?;
     }
 
     if let Some(value) = email {
         cfg.email = value.trim().to_string();
-    } else if cfg.email.is_empty() {
+    } else if cfg.email.is_empty() && !yes {
         cfg.email = prompts::prompt_ssl_email(Some(&cfg))?;
     }
 
@@ -40,7 +40,7 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
 
     config::save(&cfg, bones_toml)?;
 
-    if !prompts::confirm_remote_ssl()? {
+    if !yes && !prompts::confirm_remote_ssl()? {
         println!("Skipped HTTPS setup.");
         println!();
         println!("Next: run bonesdeploy remote ssl when DNS is ready.");

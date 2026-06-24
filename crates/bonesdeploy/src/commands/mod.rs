@@ -3,6 +3,7 @@ pub(crate) mod init_config;
 
 pub mod deploy_project;
 pub mod doctor;
+pub mod guide;
 pub mod init_project;
 pub mod manage;
 pub mod pull_state;
@@ -13,6 +14,8 @@ pub mod remote_setup;
 pub mod remote_ssl;
 pub mod rollback;
 pub mod secrets;
+pub mod setup;
+pub mod status;
 pub mod update;
 pub mod update_release;
 pub mod version;

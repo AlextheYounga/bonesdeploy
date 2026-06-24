@@ -2,8 +2,8 @@ use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, RemoteCommand, SecretsCommand};
 use crate::commands::{
-    config, deploy_project, doctor, init_config, init_project, manage, pull_state, push_state, remote_runtime,
-    remote_setup, remote_ssl, rollback, secrets, update, version,
+    config, deploy_project, doctor, guide, init_config, init_project, manage, pull_state, push_state, remote_runtime,
+    remote_setup, remote_ssl, rollback, secrets, setup, status, update, version,
 };
 
 pub async fn run(cli: &Cli) -> Result<()> {
@@ -23,7 +23,10 @@ pub async fn run(cli: &Cli) -> Result<()> {
             }
             Ok(())
         }
+        Command::Setup { yes } => setup::run(*yes).await,
         Command::Doctor { local } => doctor::run(*local).await,
+        Command::Status => status::run().await,
+        Command::Guide { format } => guide::run(*format).await,
         Command::Push => push_state::run(true).await,
         Command::Pull => pull_state::run(),
         Command::Secrets { command } => match command {
@@ -37,9 +40,9 @@ pub async fn run(cli: &Cli) -> Result<()> {
         }
         Command::Manage => manage::run(),
         Command::Remote { command } => match command {
-            RemoteCommand::Setup => remote_setup::run(),
-            RemoteCommand::Runtime => remote_runtime::run(),
-            RemoteCommand::Ssl { domain, email } => remote_ssl::run(domain.clone(), email.clone()),
+            RemoteCommand::Bootstrap => remote_setup::run(),
+            RemoteCommand::Runtime { yes } => remote_runtime::run(*yes),
+            RemoteCommand::Ssl { yes, domain, email } => remote_ssl::run(*yes, domain.clone(), email.clone()),
         },
         Command::Rollback => rollback::run().await,
         Command::Config { file, key } => config::run(file, key),

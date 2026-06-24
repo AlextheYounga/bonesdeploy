@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
 #[command(name = "bonesdeploy", about = "Remote release deployment tool")]
@@ -33,11 +33,25 @@ pub enum Command {
         #[arg(long)]
         port: Option<String>,
     },
+    /// Run the full first-time deployment setup
+    Setup {
+        /// Skip runtime confirmation prompts
+        #[arg(long)]
+        yes: bool,
+    },
     /// Check local and remote environment health
     Doctor {
         /// Skip remote checks
         #[arg(long)]
         local: bool,
+    },
+    /// Show the current deployment state and next steps
+    Status,
+    /// Suggest the next prompt-free command to run
+    Guide {
+        /// Output format
+        #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
+        format: GuideFormat,
     },
     /// Sync .bones/ folder to the remote bare repo
     Push,
@@ -92,12 +106,20 @@ pub enum SecretsCommand {
 
 #[derive(Subcommand)]
 pub enum RemoteCommand {
-    /// Run remote setup against configured host
-    Setup,
+    /// Run remote bootstrap against configured host
+    #[command(alias = "setup")]
+    Bootstrap,
     /// Apply the configured runtime against configured host
-    Runtime,
+    Runtime {
+        /// Skip runtime confirmation prompts
+        #[arg(long)]
+        yes: bool,
+    },
     /// Obtain and configure SSL certificates with certbot
     Ssl {
+        /// Skip SSL confirmation prompts
+        #[arg(long)]
+        yes: bool,
         /// Domain name for the certificate (e.g. app.example.com)
         #[arg(long)]
         domain: Option<String>,
@@ -105,4 +127,10 @@ pub enum RemoteCommand {
         #[arg(long)]
         email: Option<String>,
     },
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum GuideFormat {
+    Text,
+    Json,
 }
