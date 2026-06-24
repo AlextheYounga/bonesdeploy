@@ -1,26 +1,20 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-if [ -f "./.nvmrc" ]; then
-	export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-	if [ -s "$NVM_DIR/nvm.sh" ]; then
-		# shellcheck disable=SC1090
-		source "$NVM_DIR/nvm.sh"
-	elif [ -s "$HOME/.config/nvm/nvm.sh" ]; then
-		# shellcheck disable=SC1090
-		source "$HOME/.config/nvm/nvm.sh"
-	fi
-	nvm install
+export PATH="$PROJECT_ROOT/build/node/bin:$PATH"
+
+if ! command -v corepack >/dev/null 2>&1; then
+	npm install -g corepack@latest
 fi
 
+corepack enable --install-directory "$(dirname "$(command -v node)")" 2>/dev/null || true
+
 if [ -f "./pnpm-lock.yaml" ]; then
-	npm install -g pnpm
-	pnpm install --frozen-lockfile
-	pnpm generate
+	corepack pnpm install --frozen-lockfile
+	corepack pnpm generate
 elif [ -f "./yarn.lock" ]; then
-	command -v corepack >/dev/null 2>&1 && corepack enable || true
-	yarn install --frozen-lockfile
-	yarn generate
+	corepack yarn install --frozen-lockfile
+	corepack yarn generate
 elif [ -f "./package-lock.json" ]; then
 	npm ci --include=optional
 	npm run generate
