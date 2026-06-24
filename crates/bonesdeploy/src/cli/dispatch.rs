@@ -40,8 +40,8 @@ pub async fn run(cli: &Cli) -> Result<()> {
         }
         Command::Manage => manage::run(),
         Command::Remote { command } => match command {
-            RemoteCommand::Bootstrap => remote_setup::run(),
-            RemoteCommand::Runtime { yes } => remote_runtime::run(*yes),
+            RemoteCommand::Bootstrap => remote_setup::run(true),
+            RemoteCommand::Runtime { yes } => remote_runtime::run(*yes, true),
             RemoteCommand::Ssl { yes, domain, email } => remote_ssl::run(*yes, domain.clone(), email.clone()),
         },
         Command::Rollback => rollback::run().await,

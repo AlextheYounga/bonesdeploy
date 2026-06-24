@@ -10,8 +10,9 @@ use super::remote_data;
 use crate::config;
 use crate::infra::bonesinfra_cli;
 use crate::infra::bootstrap_ssh;
+use crate::ui::output;
 
-pub fn run() -> Result<()> {
+pub fn run(show_next: bool) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
     let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
@@ -34,8 +35,10 @@ pub fn run() -> Result<()> {
     )?;
 
     println!("Remote bootstrap complete.");
-    println!();
-    println!("Next: run bonesdeploy remote runtime.");
+    if show_next {
+        println!();
+        output::next("bonesdeploy remote runtime");
+    }
 
     Ok(())
 }
