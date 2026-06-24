@@ -16,10 +16,14 @@ use shared::config::{default_deploy_user, release_group_for, runtime_group_for, 
 use shared::paths;
 
 pub fn run(args: &InitArgs) -> Result<bool> {
+    run_with_prefetch(args, bonesinfra::prefetch)
+}
+
+fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Result<()>) -> Result<bool> {
     git::ensure_git_repository()?;
 
     println!("Initializing bonesdeploy...");
-    bonesinfra::prefetch()?;
+    prefetch_bonesinfra()?;
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     let had_bones_entry = fs::symlink_metadata(bones_dir).is_ok();

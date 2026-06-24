@@ -15,7 +15,6 @@ use shared::config as shared_config;
 use shared::config::parse_port;
 use shared::paths;
 
-const LOCAL_SECRETS_DIR: &str = ".bones/secrets";
 const LOCAL_ENV_SECRET: &str = ".bones/secrets/.env.gpg";
 const REMOTE_ENV_SECRET: &str = ".env";
 const DEFAULT_SECRET_MODE: &str = "640";
@@ -46,7 +45,8 @@ pub fn init() -> Result<()> {
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
     let _key_fingerprint = ensure_project_key(&cfg.project_name)?;
 
-    fs::create_dir_all(LOCAL_SECRETS_DIR).with_context(|| format!("Failed to create {LOCAL_SECRETS_DIR}"))?;
+    fs::create_dir_all(paths::LOCAL_BONES_SECRETS_DIR)
+        .with_context(|| format!("Failed to create {}", paths::LOCAL_BONES_SECRETS_DIR))?;
 
     println!("Secrets initialized.");
     println!();

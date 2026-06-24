@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
-use super::{collect_non_interactive, run};
+use super::{collect_non_interactive, run_with_prefetch};
 use crate::commands::init_config::InitArgs;
 
 use anyhow::{Result, bail};
@@ -23,6 +23,7 @@ struct TestEnvironment {
     _lock: MutexGuard<'static, ()>,
     original_dir: PathBuf,
     original_home: Option<String>,
+    original_xdg_config_home: Option<String>,
 }
 
 impl TestEnvironment {
@@ -30,15 +31,17 @@ impl TestEnvironment {
         let lock = test_lock().lock().map_err(|_| anyhow::anyhow!("test lock poisoned"))?;
         let original_dir = env::current_dir()?;
         let original_home = env::var("HOME").ok();
+        let original_xdg_config_home = env::var("XDG_CONFIG_HOME").ok();
 
         env::set_current_dir(repo_dir)?;
 
-        // Safety: these tests serialize access with a process-wide mutex and restore HOME on drop.
+        // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
         unsafe {
             env::set_var("HOME", home_dir);
+            env::set_var("XDG_CONFIG_HOME", home_dir.join(".config"));
         }
 
-        Ok(Self { _lock: lock, original_dir, original_home })
+        Ok(Self { _lock: lock, original_dir, original_home, original_xdg_config_home })
     }
 }
 
@@ -48,15 +51,30 @@ impl Drop for TestEnvironment {
 
         match &self.original_home {
             Some(home) => {
-                // Safety: these tests serialize access with a process-wide mutex and restore HOME on drop.
+                // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
                 unsafe {
                     env::set_var("HOME", home);
                 }
             }
             None => {
-                // Safety: these tests serialize access with a process-wide mutex and restore HOME on drop.
+                // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
                 unsafe {
                     env::remove_var("HOME");
+                }
+            }
+        }
+
+        match &self.original_xdg_config_home {
+            Some(home) => {
+                // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
+                unsafe {
+                    env::set_var("XDG_CONFIG_HOME", home);
+                }
+            }
+            None => {
+                // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
+                unsafe {
+                    env::remove_var("XDG_CONFIG_HOME");
                 }
             }
         }
@@ -73,6 +91,10 @@ fn init_args() -> InitArgs {
         host: Some(String::from("deploy.example.com")),
         port: None,
     }
+}
+
+fn run_init() -> Result<bool> {
+    run_with_prefetch(&init_args(), || Ok(()))
 }
 
 fn create_git_repo(path: &Path) -> Result<()> {
@@ -163,7 +185,7 @@ fn collect_non_interactive_requires_host_when_existing_and_cli_are_missing_it() 
 #[test]
 fn init_materializes_base_bones_assets() -> Result<()> {
     with_temp_repo(|repo_dir, _home_dir| {
-        run(&init_args())?;
+        run_init()?;
 
         let bones_dir = repo_dir.join(".bones");
         assert!(bones_dir.join("bones.toml").is_file());
@@ -193,12 +215,12 @@ fn init_materializes_base_bones_assets() -> Result<()> {
 #[test]
 fn init_rerun_preserves_existing_bones_assets() -> Result<()> {
     with_temp_repo(|repo_dir, _home_dir| {
-        run(&init_args())?;
+        run_init()?;
 
         let sentinel = repo_dir.join(".bones/hooks/hooks.sh");
         let original = fs::read_to_string(&sentinel)?;
 
-        run(&init_args())?;
+        run_init()?;
 
         assert!(sentinel.is_file());
         assert_eq!(fs::read_to_string(&sentinel)?, original);
@@ -215,7 +237,7 @@ fn init_repairs_dangling_bones_symlink() -> Result<()> {
         fs::create_dir_all(&config_root)?;
         symlink(config_root.join("missing.bones"), repo_dir.join(".bones"))?;
 
-        run(&init_args())?;
+        run_init()?;
 
         let bones_dir = repo_dir.join(".bones");
         assert!(bones_dir.join("bones.toml").is_file());

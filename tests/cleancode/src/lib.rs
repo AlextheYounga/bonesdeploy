@@ -3,6 +3,8 @@
 #[cfg(test)]
 mod cleancode_file_too_long;
 #[cfg(test)]
+mod cleancode_no_duplicated_state;
+#[cfg(test)]
 mod cleancode_no_legacy_terms;
 #[cfg(test)]
 mod cleancode_no_literal_wrapped_fallback;
