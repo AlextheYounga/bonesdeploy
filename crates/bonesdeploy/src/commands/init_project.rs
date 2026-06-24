@@ -45,8 +45,8 @@ pub fn run(args: &InitArgs) -> Result<bool> {
         }
         unix_fs::symlink(&config_dir, bones_dir)?;
 
-        let seed = config::Bones { project_name: project_name.clone(), ..Default::default() };
-        config::save(&seed, Path::new(paths::LOCAL_BONES_TOML))?;
+        let existing = config::Bones { project_name: project_name.clone(), ..Default::default() };
+        config::save(&existing, Path::new(paths::LOCAL_BONES_TOML))?;
 
         initial_project_name = Some(project_name);
     } else {
@@ -79,7 +79,7 @@ pub fn run(args: &InitArgs) -> Result<bool> {
 
     if is_fresh {
         let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
-        seed_runtime_config(args, &cfg.project_name, bones_dir, runtime_toml)?;
+        existing_runtime_config(args, &cfg.project_name, bones_dir, runtime_toml)?;
     }
     ensure_local_remote(&cfg)?;
 
@@ -100,7 +100,7 @@ fn print_follow_up_hint() {
     println!("Next: run bonesdeploy setup.");
 }
 
-fn seed_runtime_config(args: &InitArgs, project_name: &str, bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
+fn existing_runtime_config(args: &InitArgs, project_name: &str, bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
     let template = if args.non_interactive {
         None
     } else {
@@ -138,7 +138,7 @@ fn inject_runtime_identity(vars: &mut serde_json::Map<String, serde_json::Value>
     vars.insert("release_group".into(), serde_json::Value::String(release_group_for(project_name)));
 }
 
-fn collect_from_seed(
+fn collect_from_existing(
     project_name_hint: &str,
     existing_config: Option<&config::Bones>,
     args: &InitArgs,
@@ -157,7 +157,7 @@ fn collect_from_seed(
     let port =
         cli_or_prompt(args.port.as_ref(), None, || prompts::prompt_port(existing_config, inferred_remote.as_ref()))?;
     let repo_path = init_config::resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
-    let project_root = init_config::seed_path_override(
+    let project_root = init_config::existing_path_override(
         existing_config,
         |cfg| &cfg.project_root,
         &project_name,
@@ -230,7 +230,7 @@ fn load_or_collect_config(bones_toml: &Path, args: &InitArgs) -> Result<config::
         if args.non_interactive {
             return init_config::collect_non_interactive(&project_name, Some(&existing), args);
         }
-        return collect_from_seed(&project_name, Some(&existing), args);
+        return collect_from_existing(&project_name, Some(&existing), args);
     }
 
     let project_name = config::repo_directory_name()?;
@@ -239,7 +239,7 @@ fn load_or_collect_config(bones_toml: &Path, args: &InitArgs) -> Result<config::
         return init_config::collect_non_interactive(&project_name, None, args);
     }
 
-    collect_from_seed(&project_name, None, args)
+    collect_from_existing(&project_name, None, args)
 }
 
 fn ensure_config_gitignore(project_name: &str) -> Result<()> {

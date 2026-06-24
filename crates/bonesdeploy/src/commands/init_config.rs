@@ -29,8 +29,12 @@ pub(crate) fn collect_non_interactive(
     validate_host(&host)?;
 
     let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
-    let project_root =
-        seed_path_override(existing_config, |cfg| &cfg.project_root, &project_name, config::default_project_root_for);
+    let project_root = existing_path_override(
+        existing_config,
+        |cfg| &cfg.project_root,
+        &project_name,
+        config::default_project_root_for,
+    );
     let deploy_on_push = existing_config.is_none_or(|cfg| cfg.deploy_on_push);
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
 
@@ -143,13 +147,17 @@ pub fn resolve_repo_path(
         return details.repo_path.clone();
     }
 
-    existing_config.map(|cfg| cfg.repo_path.as_str()).filter(|value| !value.is_empty()).map_or_else(
-        || paths::default_repo_path_for(project_name),
-        |value| value.replace("<project_name>", project_name),
-    )
+    let configured_repo_path = existing_config.as_ref().map(|cfg| cfg.repo_path.as_str());
+
+    let repo_path = match configured_repo_path {
+        Some(path) if !path.is_empty() => path.replace("<project_name>", project_name),
+        _ => paths::default_repo_path_for(project_name),
+    };
+
+    repo_path
 }
 
-pub fn seed_path_override(
+pub fn existing_path_override(
     existing_config: Option<&config::Bones>,
     field: impl Fn(&config::Bones) -> &String,
     current_project_name: &str,

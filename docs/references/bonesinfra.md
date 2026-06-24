@@ -1524,7 +1524,7 @@ from bonesinfra.domain.context import template_data
 from bonesinfra.infra.deploy_helpers import render
 
 
-def seed(ctx, paths, here):
+def existing(ctx, paths, here):
     render(
         "Seed placeholder index page",
         here / "assets/nginx/index.html.j2",
@@ -1569,7 +1569,7 @@ def deploy_setup(ctx):
     users.install_rust()
     users.ensure_users_and_groups(ctx)
     directories.setup_repo_and_project(ctx, paths)
-    placeholder.seed(ctx, paths, here)
+    placeholder.existing(ctx, paths, here)
     firewall.configure(ctx)
     users.install_authorized_key(ctx)
     bonesremote.install()
@@ -4111,7 +4111,7 @@ def test_setup_plan_calls_all_steps():
     helpers.assert_contains(c, "users.install_rust")
     helpers.assert_contains(c, "users.ensure_users_and_groups")
     helpers.assert_contains(c, "directories.setup_repo_and_project")
-    helpers.assert_contains(c, "placeholder.seed")
+    helpers.assert_contains(c, "placeholder.existing")
     helpers.assert_contains(c, "firewall.configure")
     helpers.assert_contains(c, "users.install_authorized_key")
     helpers.assert_contains(c, "bonesremote.install")
@@ -4855,7 +4855,7 @@ def test_nuxt_static_path_uses_render_static():
     helpers.assert_contains(content, "STATIC_ROOT")
 
 
-def test_nuxt_static_runtime_seeds_placeholder_output():
+def test_nuxt_static_runtime_existings_placeholder_output():
     content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/nuxt/nuxt.py")
     helpers.assert_contains(content, 'STATIC_ROOT = ".output/public"')
     helpers.assert_contains(content, "paths['placeholder_release']")

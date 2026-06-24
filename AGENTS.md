@@ -6,13 +6,13 @@ Before writing any code, stop at the first rung that holds:
 2. Does the standard library already do this? Use it.
 3. Does a native platform feature cover it? Use it.
 4. Does an already-installed dependency solve it? Use it.
-5. Can this be one line? Make it one line.
-6. Only then: write the minimum code that works.
+5. Only then: write the minimum code that works.
 
 Rules:
 
 - No abstractions that weren't explicitly requested.
 - No new dependency if it can be avoided.
+- Prefer readability to cleverness.
 - No boilerplate nobody asked for.
 - Deletion over addition. Boring over clever. Fewest files possible.
 - Question complex requests: "Do you actually need X, or does Y cover it?"

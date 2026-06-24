@@ -97,7 +97,7 @@ fn with_temp_repo(test: impl FnOnce(&Path, &Path) -> Result<()>) -> Result<()> {
     test(&repo_dir, &home_dir)
 }
 
-fn incomplete_seed(project_name: &str) -> Bones {
+fn incomplete_existing(project_name: &str) -> Bones {
     Bones {
         remote_name: String::from("production"),
         project_name: String::from(project_name),
@@ -111,10 +111,10 @@ fn incomplete_seed(project_name: &str) -> Bones {
     }
 }
 
-/// Uses seed config and CLI values without prompting when non-interactive mode is active.
+/// Uses existing config and CLI values without prompting when non-interactive mode is active.
 #[test]
-fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Result<()> {
-    let seed = incomplete_seed("atlas");
+fn collect_non_interactive_uses_existing_and_cli_values_without_prompting() -> Result<()> {
+    let existing = incomplete_existing("atlas");
     let args = InitArgs {
         non_interactive: true,
         setup_remote: false,
@@ -125,7 +125,7 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
         port: None,
     };
 
-    let cfg = collect_non_interactive("workspace", Some(&seed), &args)?;
+    let cfg = collect_non_interactive("workspace", Some(&existing), &args)?;
 
     assert_eq!(cfg.project_name, "atlas");
     assert_eq!(cfg.host, "deploy.example.com");
@@ -136,10 +136,10 @@ fn collect_non_interactive_uses_seed_and_cli_values_without_prompting() -> Resul
     Ok(())
 }
 
-/// Requires a host when neither seed config nor CLI provide one.
+/// Requires a host when neither existing config nor CLI provide one.
 #[test]
-fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() -> Result<()> {
-    let seed = incomplete_seed("atlas");
+fn collect_non_interactive_requires_host_when_existing_and_cli_are_missing_it() -> Result<()> {
+    let existing = incomplete_existing("atlas");
     let args = InitArgs {
         non_interactive: true,
         setup_remote: false,
@@ -150,7 +150,7 @@ fn collect_non_interactive_requires_host_when_seed_and_cli_are_missing_it() -> R
         port: None,
     };
 
-    let result = collect_non_interactive("workspace", Some(&seed), &args);
+    let result = collect_non_interactive("workspace", Some(&existing), &args);
     let Err(err) = result else {
         bail!("missing host should fail");
     };
