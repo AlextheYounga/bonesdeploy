@@ -44,17 +44,17 @@ That is what BonesDeploy is for.
 
 This is the part I care about.
 
-BonesDeploy treats each site as its own thing on the server.
+BonesDeploy treats each site as its own thing on the server. Each site gets its own isolated services via systemd.
 
 Each site can get its own:
 
 - Linux user
 - Linux group
 - writable shared paths
-- systemd service
+- systemd runtime services
 - nginx config
-- AppArmor policy where supported
-- narrow sudo rules for deployment
+- AppArmor policy
+- Seccomps configs
 
 The deploy user deploys.  
 The runtime user runs the app.  
@@ -62,13 +62,13 @@ Root provisions the machine.
 
 That is the whole model.
 
-A normal deploy should not need to recursively `chown` half the server. If it does, the server was set up wrong.
-
 ## Why Not Just Docker?
 
 Docker is useful. It gives you packaging, repeatability, and another layer of isolation.
 
-But Docker is also where a lot of people hide from Linux.
+But Docker is heavy, and slow, and you see this when you try running multiple Docker sites on a machine with less than 8GB of RAM. 
+
+Docker is also where a lot of people hide from Linux.
 
 Instead of setting up users, groups, permissions, services, sockets, nginx, PHP-FPM, AppArmor, and runtime directories correctly, we stuff the app in a container and call it done.
 
