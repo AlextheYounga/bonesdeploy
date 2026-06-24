@@ -16,6 +16,8 @@ pub fn run() -> Result<()> {
 
     let target = format!("{}@{}", default_deploy_user(), cfg.host);
 
+    println!("Opening remote manage session...");
+
     let status = Command::new("ssh")
         .arg("-t")
         .arg("-p")
@@ -26,7 +28,7 @@ pub fn run() -> Result<()> {
         .context("Failed to launch ssh for remote manage session")?;
 
     if !status.success() {
-        bail!("Remote manage session failed with status {status}");
+        bail!("Could not open remote manage session.\n\nNext: run bonesdeploy status or check SSH access.");
     }
 
     Ok(())

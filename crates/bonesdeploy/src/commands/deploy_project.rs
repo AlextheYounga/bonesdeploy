@@ -1,5 +1,4 @@
 use anyhow::Result;
-use console::style;
 use shared::paths;
 use std::path::Path;
 
@@ -13,7 +12,7 @@ pub async fn run() -> Result<()> {
 
     let remote_bones_toml = cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).repo_bones_toml;
 
-    println!("Deploying {} on {}...", style(&cfg.project_name).cyan().bold(), style(&cfg.host).cyan());
+    println!("Deploying {} to {}...", cfg.project_name, cfg.host);
 
     // Ensure local .bones/ is synced before triggering the remote deploy
     push_state::sync_bones_directory(&cfg)?;
@@ -25,7 +24,7 @@ pub async fn run() -> Result<()> {
 
     session.close().await?;
 
-    println!("\n{} Deployment complete.", style("Done!").green().bold());
+    println!("Deployment complete.");
 
     Ok(())
 }

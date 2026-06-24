@@ -1,0 +1,2 @@
+- [ ] database.sqlite needs 0660. Currently getting 0664 by Laravel
+- [ ] shared is currently git:<project> readable. If we want to avoid this, seems impossible not to have a permissions flip

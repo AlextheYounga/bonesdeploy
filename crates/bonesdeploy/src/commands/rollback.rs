@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use anyhow::Result;
-use console::style;
 
 use crate::config;
 use crate::infra::ssh;
@@ -13,14 +12,16 @@ pub async fn run() -> Result<()> {
 
     let remote_bones_toml = cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).repo_bones_toml;
 
-    println!("Rolling back {} on {}...", style(&cfg.project_name).cyan().bold(), style(&cfg.host).cyan());
+    println!("Rolling back {} on {}...", cfg.project_name, cfg.host);
 
     let session = ssh::connect(&cfg).await?;
     let command = format!("bonesremote release rollback --config '{remote_bones_toml}'");
     ssh::stream_cmd(&session, &command).await?;
     session.close().await?;
 
-    println!("\n{} Rollback complete.", style("Done!").green().bold());
+    println!("Rollback complete.");
+    println!();
+    println!("Next: run bonesdeploy status.");
 
     Ok(())
 }

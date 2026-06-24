@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
-use console::style;
 use serde_json::Value;
 
 use shared::config as shared_config;
@@ -42,16 +41,13 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     config::save(&cfg, bones_toml)?;
 
     if !prompts::confirm_remote_ssl()? {
-        println!("Skipped remote SSL setup.");
+        println!("Skipped HTTPS setup.");
+        println!();
+        println!("Next: run bonesdeploy remote ssl when DNS is ready.");
         return Ok(());
     }
 
-    println!(
-        "Running {} against {} for {}...",
-        style("remote ssl").cyan().bold(),
-        style(&cfg.host).cyan(),
-        style(&cfg.domain).cyan(),
-    );
+    println!("Configuring HTTPS for {}...", cfg.domain);
 
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     let mut deploy_data = remote_data::ssl(&cfg, &runtime.web_root, &cfg.domain, &cfg.email)?;
@@ -70,7 +66,9 @@ pub fn run(domain: Option<String>, email: Option<String>) -> Result<()> {
     config::save(&cfg, bones_toml)?;
     push_state::sync_bones_directory(&cfg)?;
 
-    println!("\n{} SSL setup complete.", style("Done!").green().bold());
+    println!("HTTPS configured.");
+    println!();
+    println!("Next: run bonesdeploy deploy.");
 
     Ok(())
 }

@@ -2,9 +2,6 @@ use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
-use console::style;
-
 use crate::commands::init_config;
 pub use crate::commands::init_config::InitArgs;
 use crate::commands::remote_setup;
@@ -14,6 +11,7 @@ use crate::infra::bonesinfra_cli;
 use crate::infra::embedded;
 use crate::infra::git;
 use crate::ui::prompts;
+use anyhow::{Context, Result, bail};
 use shared::config::{default_deploy_user, release_group_for, runtime_group_for, runtime_user_for};
 use shared::paths;
 
@@ -34,7 +32,6 @@ pub fn run(args: &InitArgs) -> Result<bool> {
         let project_name = resolve_project_name(args)?;
         let config_dir = config::bones_config_dir(&project_name);
 
-        println!("Creating {}...", config_dir.display());
         if config_dir.exists() && !config_dir.is_dir() {
             fs::remove_file(&config_dir)
                 .with_context(|| format!("Stale file at {}, cannot create directory", config_dir.display()))?;
@@ -47,14 +44,13 @@ pub fn run(args: &InitArgs) -> Result<bool> {
                 .with_context(|| format!("Failed to remove stale {} symlink", bones_dir.display()))?;
         }
         unix_fs::symlink(&config_dir, bones_dir)?;
-        println!("Symlinked .bones -> {}", config_dir.display());
 
         let seed = config::Bones { project_name: project_name.clone(), ..Default::default() };
         config::save(&seed, Path::new(paths::LOCAL_BONES_TOML))?;
 
         initial_project_name = Some(project_name);
     } else {
-        println!(".bones/ already exists, keeping existing local bones state.");
+        println!("Using existing .bones config.");
     }
 
     update_gitignore()?;
@@ -71,11 +67,15 @@ pub fn run(args: &InitArgs) -> Result<bool> {
         fs::rename(&old_dir, &new_dir)?;
         fs::remove_file(bones_dir)?;
         unix_fs::symlink(&new_dir, bones_dir)?;
-        println!("Renamed centralized folder to {}.bones", cfg.project_name);
     }
 
     config::save(&cfg, bones_toml)?;
-    println!("Saved config to {}", paths::LOCAL_BONES_TOML);
+
+    if is_fresh {
+        println!("bonesdeploy initialized.");
+    } else {
+        println!("bonesdeploy config updated.");
+    }
 
     if is_fresh {
         let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
@@ -97,8 +97,7 @@ pub fn run(args: &InitArgs) -> Result<bool> {
 
 fn print_follow_up_hint() {
     println!();
-    println!("{}", style("Next:").cyan().bold());
-    println!("Run {} to sync {} to the remote.", style("bonesdeploy push").cyan(), style(".bones/").cyan());
+    println!("Next: run bonesdeploy setup.");
 }
 
 fn seed_runtime_config(args: &InitArgs, project_name: &str, bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
@@ -122,13 +121,12 @@ fn seed_runtime_config(args: &InitArgs, project_name: &str, bones_dir: &Path, ru
         config::save_runtime(&map, runtime_toml)?;
         embedded::scaffold_runtime_deployment(template_name, bones_dir)?;
         embedded::scaffold_runtime_secrets(template_name, bones_dir)?;
-        println!("Applied runtime template: {template_name}");
-        println!("Saved runtime config to {}", paths::LOCAL_BONES_RUNTIME_TOML);
+        println!("Runtime template: {template_name}");
     } else {
         let mut vars = embedded::base_runtime_defaults()?;
         inject_runtime_identity(&mut vars, project_name);
         config::save_runtime(&vars, runtime_toml)?;
-        println!("Seeded {} from kit defaults", paths::LOCAL_BONES_RUNTIME_TOML);
+        println!("Runtime template: custom");
     }
 
     Ok(())
@@ -226,7 +224,6 @@ fn load_or_collect_config(bones_toml: &Path, args: &InitArgs) -> Result<config::
     if bones_toml.exists() {
         let existing = config::load(bones_toml)?;
         if config::is_configured(&existing) {
-            println!("Loading existing config from {}...", paths::LOCAL_BONES_TOML);
             return Ok(existing);
         }
         let project_name = config::repo_directory_name()?;
@@ -274,7 +271,6 @@ fn ensure_config_gitignore(project_name: &str) -> Result<()> {
             content.push('\n');
         }
         fs::write(&gitignore, content)?;
-        println!("Created config .gitignore at {}", gitignore.display());
     }
 
     Ok(())
@@ -295,7 +291,6 @@ fn update_gitignore() -> Result<()> {
         fs::write(gitignore, format!("{entry}\n"))?;
     }
 
-    println!("Added .bones to .gitignore");
     Ok(())
 }
 
@@ -312,7 +307,6 @@ pub(crate) fn symlink_pre_push() -> Result<()> {
 
     unix_fs::symlink(target, &link).with_context(|| format!("Failed to symlink {}", link.display()))?;
 
-    println!("Symlinked {} -> {}", paths::GIT_PRE_PUSH_HOOK, paths::PRE_PUSH_HOOK_TARGET);
     Ok(())
 }
 
@@ -323,7 +317,6 @@ fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
 
     let remote_url = format!("{}@{}:{}", default_deploy_user(), cfg.host, cfg.repo_path);
     git::add_remote(&cfg.remote_name, &remote_url)?;
-    println!("Configured local git remote {} -> {}", cfg.remote_name, remote_url);
     Ok(())
 }
 

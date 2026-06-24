@@ -16,12 +16,14 @@ pub fn run() -> Result<()> {
     }
 
     if !prompts::confirm_remote_runtime()? {
-        println!("Skipped remote runtime apply.");
+        println!("Skipped runtime setup.");
+        println!();
+        println!("Next: run bonesdeploy remote runtime when ready.");
         return Ok(());
     }
 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    println!("Applying runtime using local bonesinfra ...");
+    println!("Applying runtime...");
 
     bonesinfra_cli::run(&[
         "runtime",
@@ -32,6 +34,8 @@ pub fn run() -> Result<()> {
         runtime_toml.to_str().unwrap_or(".bones/runtime.toml"),
     ])?;
 
-    println!("Runtime apply completed.");
+    println!("Runtime applied.");
+    println!();
+    println!("Next: run bonesdeploy push.");
     Ok(())
 }

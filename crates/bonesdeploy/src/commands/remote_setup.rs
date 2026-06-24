@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use console::style;
 use serde_json::Value;
 
 use shared::config as shared_config;
@@ -19,6 +18,8 @@ pub fn run() -> Result<()> {
 
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
 
+    println!("Bootstrapping remote server...");
+
     let mut deploy_data = Value::Object(remote_data::base(&cfg, &runtime.web_root)?);
     let host = cfg.host;
     if let Value::Object(ref mut map) = deploy_data {
@@ -32,7 +33,9 @@ pub fn run() -> Result<()> {
         &json,
     )?;
 
-    println!("{} Remote setup complete.", style("Done!").green().bold());
+    println!("Remote bootstrap complete.");
+    println!();
+    println!("Next: run bonesdeploy remote runtime.");
 
     Ok(())
 }

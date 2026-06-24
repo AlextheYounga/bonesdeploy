@@ -35,12 +35,12 @@ pub fn init() -> Result<()> {
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     if !bones_dir.is_dir() {
-        bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_DIR);
+        bail!("Missing .bones config\n\nNext: run bonesdeploy init.");
     }
 
     let secrets_toml = Path::new(".bones/secrets.toml");
     if secrets_toml.exists() {
-        bail!(".bones/secrets.toml is no longer used. Remove it and run `bonesdeploy secrets init` again.");
+        bail!("Missing encrypted secrets\n\nNext: run bonesdeploy secrets edit.");
     }
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
@@ -48,7 +48,9 @@ pub fn init() -> Result<()> {
 
     fs::create_dir_all(LOCAL_SECRETS_DIR).with_context(|| format!("Failed to create {LOCAL_SECRETS_DIR}"))?;
 
-    println!("Created {LOCAL_SECRETS_DIR}/ and local project secrets key.");
+    println!("Secrets initialized.");
+    println!();
+    println!("Next: run bonesdeploy secrets edit.");
     Ok(())
 }
 
@@ -101,10 +103,12 @@ pub fn edit() -> Result<()> {
     if let Err(error) = cleanup_result
         && error.kind() != ErrorKind::NotFound
     {
-        eprintln!("Warning: failed to remove temp file {}: {error}", temp_path.display());
+        eprintln!("Warning: could not remove temporary secret file: {}", temp_path.display());
     }
 
-    println!("Updated encrypted secret {}", encrypted_path.display());
+    println!("Secrets updated.");
+    println!();
+    println!("Next: run bonesdeploy secrets push.");
     Ok(())
 }
 
@@ -126,7 +130,7 @@ pub async fn push() -> Result<()> {
 
     let encrypted_path = Path::new(LOCAL_ENV_SECRET);
     if !encrypted_path.is_file() {
-        bail!("No encrypted .env found. Run `bonesdeploy secrets edit` first.");
+        bail!("Missing encrypted secrets\n\nNext: run bonesdeploy secrets edit.");
     }
 
     let plaintext = decrypt_secret(encrypted_path)?;
@@ -141,14 +145,14 @@ pub async fn push() -> Result<()> {
 
     ssh::run_cmd_with_stdin(&session, &cmd, &plaintext).await?;
     session.close().await?;
-    println!("Pushed secret to remote shared/{REMOTE_ENV_SECRET}");
+    println!("Secrets pushed.");
     Ok(())
 }
 
 fn ensure_gpg_installed() -> Result<()> {
-    let output = Command::new("gpg").arg("--version").output().context("Failed to run gpg — is it installed?")?;
+    let output = Command::new("gpg").arg("--version").output().context("gpg is required.")?;
     if !output.status.success() {
-        bail!("gpg is required but unavailable")
+        bail!("gpg is required.")
     }
     Ok(())
 }

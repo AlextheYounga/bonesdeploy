@@ -1,7 +1,6 @@
 use std::path::Path;
 
-use anyhow::{Result, bail};
-use console::style;
+use anyhow::{Context, Result, bail};
 
 use crate::config;
 use crate::infra::rsync;
@@ -9,25 +8,17 @@ use crate::infra::ssh;
 use shared::config::default_deploy_user;
 use shared::paths;
 
-pub async fn run() -> Result<()> {
+pub async fn run(show_next: bool) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
-
     let repo_path = &cfg.repo_path;
-    let remote_bones = format!("{repo_path}/{}/", paths::BONES_DIR);
 
-    // rsync .bones/ to remote
-    println!("Syncing .bones/ to {remote_bones}...");
-    sync_bones_directory(&cfg)?;
+    println!("Syncing .bones...");
+    sync_bones_directory(&cfg).context("Failed to sync .bones.")?;
 
-    // Connect via SSH for post-rsync setup
     let session = ssh::connect(&cfg).await?;
-
-    println!("Cleaning sample hooks from remote...");
     let cmd = format!("find {repo_path}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true", paths::HOOKS_DIR);
     ssh::run_cmd(&session, &cmd).await?;
-
-    println!("Symlinking hooks...");
     let cmd = format!(
         "for hook in {repo_path}/{}/{}/{}; do \
             name=$(basename \"$hook\"); \
@@ -42,7 +33,11 @@ pub async fn run() -> Result<()> {
 
     session.close().await?;
 
-    println!("\n{} .bones/ synced to remote.", style("Done!").green().bold());
+    println!(".bones synced.");
+    if show_next {
+        println!();
+        println!("Next: run bonesdeploy doctor.");
+    }
 
     Ok(())
 }

@@ -77,19 +77,16 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
         return Ok(None);
     }
 
-    let choice = Select::new(
-        "Runtime template:",
-        vec![String::from("Use a template"), String::from("Build from scratch")],
-    )
-    .with_help_message("Choose the app runtime to configure")
-    .prompt()?;
+    let choice =
+        Select::new("Runtime template:", vec![String::from("Use a template"), String::from("Build from scratch")])
+            .with_help_message("Choose the app runtime to configure")
+            .prompt()?;
 
     if choice == "Build from scratch" {
         return Ok(None);
     }
 
-    let template_name = Select::new("Template:", available_templates.to_vec())
-        .prompt()?;
+    let template_name = Select::new("Template:", available_templates.to_vec()).prompt()?;
 
     Ok(Some(template_name))
 }
@@ -156,7 +153,7 @@ pub fn prompt_remote_name(existing_config: Option<&Bones>) -> Result<String> {
     let chosen = ordered_remotes[choice.index].name.clone();
 
     if chosen == "origin" {
-        println!("{} {}", style("Warning:").yellow().bold(), "origin usually points to your code host, not your VPS.");
+        println!("{} origin usually points to your code host, not your VPS.", style("Warning:").yellow().bold());
         let proceed = Confirm::new("Use 'origin' anyway?")
             .with_default(false)
             .with_help_message("Choose No unless origin points to your VPS.")

@@ -2,7 +2,6 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
-use console::style;
 
 use crate::config;
 use crate::infra::rsync;
@@ -11,176 +10,148 @@ use shared::config::default_deploy_user;
 use shared::paths;
 
 pub async fn run(local_only: bool) -> Result<()> {
-    println!("{}", style("bonesdeploy doctor").bold());
-
-    let mut issues: Vec<String> = Vec::new();
+    println!("Checking deployment...");
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML)).ok();
     let deploy_on_push = cfg.as_ref().is_some_and(|c| c.deploy_on_push);
 
-    check_bones_structure(&mut issues);
-    check_deployment_naming(&mut issues);
+    let mut issues = 0usize;
+
+    issues += print_check(".bones config", check_bones_config(), Some("run bonesdeploy init"));
+    issues += print_check(
+        "deployment scripts",
+        check_deployment_scripts(),
+        Some("rename it with a numeric prefix, like 01_build.sh"),
+    );
 
     if deploy_on_push {
-        check_pre_push_symlink(&mut issues);
+        issues += print_check("pre-push hook", check_pre_push_hook(), Some("run bonesdeploy init"));
     }
 
     if !local_only {
         match &cfg {
-            Some(cfg) => check_remote(cfg, deploy_on_push, &mut issues).await,
-            None => issues.push("Cannot load .bones/bones.toml; skipping remote checks".into()),
+            Some(cfg) => {
+                let remote_ssh_issue = check_remote_ssh(cfg).await;
+                issues +=
+                    print_check("remote SSH", remote_ssh_issue.clone(), Some("check host, port, and SSH access."));
+                if remote_ssh_issue.is_none() {
+                    issues += print_check(
+                        "bonesremote",
+                        check_bonesremote(cfg).await,
+                        Some("run bonesdeploy remote bootstrap"),
+                    );
+                    issues += print_check(".bones sync", check_bones_sync(cfg), Some("run bonesdeploy push"));
+                }
+            }
+            None => {
+                issues += print_failure("remote SSH", "Missing .bones config", Some("run bonesdeploy init"));
+            }
         }
     }
 
-    if issues.is_empty() {
-        println!("\n{} All checks passed.", style("OK").green().bold());
+    if issues == 0 {
+        println!();
+        println!("All checks passed.");
         Ok(())
     } else {
         println!();
-        for issue in &issues {
-            println!("  {} {issue}", style("!").red().bold());
-        }
-        anyhow::bail!("Doctor found {} issue{}", issues.len(), if issues.len() == 1 { "" } else { "s" });
+        let issue_word = if issues == 1 { "issue" } else { "issues" };
+        anyhow::bail!("Doctor found {issues} {issue_word}.");
     }
 }
 
-fn check_bones_structure(issues: &mut Vec<String>) {
+fn print_check(label: &str, issue: Option<String>, next: Option<&str>) -> usize {
+    match issue {
+        None => {
+            println!("✓ {label}");
+            0
+        }
+        Some(issue) => print_failure(label, &issue, next),
+    }
+}
+
+fn print_failure(label: &str, issue: &str, next: Option<&str>) -> usize {
+    println!("✗ {label}");
+    let issue = issue.replace('\n', "\n  ");
+    println!("  {issue}");
+    if let Some(next) = next {
+        println!("  Next: {next}");
+    }
+    1
+}
+
+fn check_bones_config() -> Option<String> {
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
 
     if !bones_dir.exists() {
-        issues.push(format!("{}/ does not exist", paths::LOCAL_BONES_DIR));
-        return;
+        return Some(String::from("Missing .bones config"));
     }
 
     if !bones_dir.is_symlink() {
-        issues.push(format!(
-            "{}/ is not a symlink — expected a symlink to ~/.config/bonesdeploy/<project>.bones/",
-            paths::LOCAL_BONES_DIR
-        ));
-        return;
+        return Some(String::from(".bones is not managed by bonesdeploy"));
     }
 
-    let expected = [
-        paths::LOCAL_BONES_TOML,
-        paths::LOCAL_BONES_HOOKS_SCRIPT,
-        paths::LOCAL_BONES_HOOKS_DIR,
-        paths::LOCAL_BONES_DEPLOYMENT_DIR,
-    ];
-
-    for path in &expected {
-        if !Path::new(path).exists() {
-            issues.push(format!("{path} is missing"));
-        }
+    if !Path::new(paths::LOCAL_BONES_TOML).exists() {
+        return Some(String::from("Missing .bones/bones.toml"));
     }
+
+    None
 }
 
-fn check_deployment_naming(issues: &mut Vec<String>) {
+fn check_deployment_scripts() -> Option<String> {
     let deployment_dir = Path::new(paths::LOCAL_BONES_DEPLOYMENT_DIR);
     if !deployment_dir.exists() {
-        return;
+        return None;
     }
 
-    let Ok(entries) = fs::read_dir(deployment_dir) else {
-        return;
-    };
-
-    for entry in entries {
-        let Ok(entry) = entry else { continue };
+    let entries = fs::read_dir(deployment_dir).ok()?;
+    for entry in entries.flatten() {
         let name = entry.file_name();
         let name = name.to_string_lossy();
-
-        // Scripts must start with a numeric prefix like "01_"
         let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
-
         if !has_numeric_prefix {
-            issues.push(format!("Deployment script '{name}' does not start with a numeric prefix (e.g. 01_)"));
+            return Some(format!("Deployment script is not ordered: {name}"));
         }
     }
+
+    None
 }
 
-fn check_pre_push_symlink(issues: &mut Vec<String>) {
+fn check_pre_push_hook() -> Option<String> {
     let link = Path::new(paths::GIT_PRE_PUSH_HOOK);
 
     if !link.symlink_metadata().is_ok_and(|m| m.is_symlink()) {
-        issues.push(format!("{} is not symlinked", paths::GIT_PRE_PUSH_HOOK));
-        return;
+        return Some(String::from("pre-push hook is not installed"));
     }
 
-    let Ok(target) = fs::read_link(link) else {
-        issues.push(format!("{}: cannot read symlink target", paths::GIT_PRE_PUSH_HOOK));
-        return;
-    };
-
+    let target = fs::read_link(link).ok()?;
     let expected = Path::new(paths::PRE_PUSH_HOOK_TARGET);
     if target != expected {
-        issues.push(format!(
-            "{} points to '{}', expected '{}'",
-            paths::GIT_PRE_PUSH_HOOK,
-            target.display(),
-            expected.display()
-        ));
+        return Some(String::from("pre-push hook is not installed"));
+    }
+
+    None
+}
+
+async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
+    match ssh::connect(cfg).await {
+        Ok(session) => {
+            let _ = session.close().await;
+            None
+        }
+        Err(error) => Some(format!("Cannot connect to remote\n  {error}")),
     }
 }
 
-async fn check_remote(cfg: &config::Bones, deploy_on_push: bool, issues: &mut Vec<String>) {
-    let session = match ssh::connect(cfg).await {
-        Ok(s) => s,
-        Err(e) => {
-            issues.push(format!("Cannot connect to remote: {e}"));
-            return;
-        }
-    };
-
-    let repo_path = &cfg.repo_path;
-
-    if ssh::run_cmd(&session, "command -v bonesremote").await.is_err() {
-        issues.push("bonesremote is not available on the remote".into());
-    }
-
-    let check_bones = format!("test -d {repo_path}/{}", paths::BONES_DIR);
-    if ssh::run_cmd(&session, &check_bones).await.is_err() {
-        issues.push(format!("{repo_path}/{}/ does not exist on remote (run 'bonesdeploy push')", paths::BONES_DIR));
-    }
-
-    check_rsync_sync(cfg, issues);
-
-    // Check hooks are symlinked properly (only when git-triggered deploy is enabled)
-    if deploy_on_push {
-        let check_hooks = format!(
-            "for hook in {repo_path}/{}/{}/{}; do \
-            name=$(basename \"$hook\"); \
-            link=\"{repo_path}/{}/$name\"; \
-            if [ ! -L \"$link\" ] || [ \"$(readlink \"$link\")\" != \"$hook\" ]; then \
-                echo \"$name\"; \
-            fi; \
-         done",
-            paths::BONES_DIR,
-            paths::HOOKS_DIR,
-            "*",
-            paths::HOOKS_DIR
-        );
-        match ssh::run_cmd(&session, &check_hooks).await {
-            Ok(output) => {
-                for hook in output.lines() {
-                    let hook = hook.trim();
-                    if !hook.is_empty() {
-                        issues.push(format!(
-                            "{repo_path}/{}/{hook} is not properly symlinked to {}/{}/{hook}",
-                            paths::HOOKS_DIR,
-                            paths::BONES_DIR,
-                            paths::HOOKS_DIR
-                        ));
-                    }
-                }
-            }
-            Err(e) => issues.push(format!("Failed to check remote hook symlinks: {e}")),
-        }
-    }
-
+async fn check_bonesremote(cfg: &config::Bones) -> Option<String> {
+    let session = ssh::connect(cfg).await.ok()?;
+    let result = ssh::run_cmd(&session, "command -v bonesremote").await;
     let _ = session.close().await;
+
+    if result.is_ok() { None } else { Some(String::from("bonesremote is missing")) }
 }
 
-fn check_rsync_sync(cfg: &config::Bones, issues: &mut Vec<String>) {
+fn check_bones_sync(cfg: &config::Bones) -> Option<String> {
     let user = default_deploy_user();
     let host = &cfg.host;
     let port = &cfg.port;
@@ -189,38 +160,24 @@ fn check_rsync_sync(cfg: &config::Bones, issues: &mut Vec<String>) {
 
     let ssh_arg = format!("ssh -p {port}");
     let source = format!("{}/", paths::LOCAL_BONES_DIR);
-    let output = match rsync::output(&["-avnc", "--delete", "-e", &ssh_arg, &source, &dest]) {
-        Ok(output) => output,
-        Err(e) => {
-            issues.push(format!("Failed to run rsync sync check: {e}"));
-            return;
-        }
-    };
+    let output = rsync::output(&["-avnc", "--delete", "-e", &ssh_arg, &source, &dest]).ok()?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        issues.push(format!("rsync sync check failed: {stderr}"));
-        return;
+        return Some(String::from(".bones sync check failed"));
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let changed: Vec<&str> = stdout
+    let changed = stdout
         .lines()
         .filter(|line| {
             let line = line.trim();
-            // Skip rsync summary/header lines and directory-only entries
             !line.is_empty()
                 && !line.starts_with("sending ")
                 && !line.starts_with("sent ")
                 && !line.starts_with("total ")
                 && !line.ends_with('/')
         })
-        .collect();
+        .collect::<Vec<_>>();
 
-    if !changed.is_empty() {
-        issues.push(format!(
-            "Local .bones/ is out of sync with remote (run 'bonesdeploy push'). Changed files:\n{}",
-            changed.iter().map(|f| format!("      {f}")).collect::<Vec<_>>().join("\n")
-        ));
-    }
+    if changed.is_empty() { None } else { Some(String::from(".bones is not synced to the remote")) }
 }

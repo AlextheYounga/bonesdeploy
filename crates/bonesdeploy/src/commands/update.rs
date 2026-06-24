@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use console::style;
 use tempfile::TempDir;
 
 use super::update_release;
@@ -20,53 +19,44 @@ pub struct Options {
 }
 
 pub async fn run(options: Options) -> Result<()> {
-    println!("{}", style("bonesdeploy update").bold());
-
+    println!("Checking for updates...");
     let current_local = update_release::current_local_version();
     let current_remote = update_release::current_remote_version();
 
-    println!("Current local version: {}", style(&current_local).cyan());
-    println!("Current remote version: {}", style(&current_remote).cyan());
-
     if options.skip_local && options.skip_remote {
-        println!("{} Nothing to update.", style("Done!").green());
+        println!("Already up to date.");
         return Ok(());
     }
-
-    println!("Source branch: {}", style(SOURCE_BRANCH).cyan());
 
     let temp_dir = TempDir::new().context("Failed to create temp directory")?;
     let temp_path = temp_dir.path();
 
-    println!("Checking master version from {}...", style(SOURCE_REPO_URL).cyan());
     let source_dir = clone_master_source(temp_path)?;
     let master_versions = read_master_versions(&source_dir)?;
-    println!("Master bonesdeploy version: {}", style(&master_versions.bonesdeploy).cyan());
-    println!("Master bonesremote version: {}", style(&master_versions.bonesremote).cyan());
+
+    let mut updated = false;
 
     if !options.skip_local {
-        if current_local == master_versions.bonesdeploy {
-            println!("{} Local bonesdeploy is already current.", style("Done!").green());
-        } else {
-            println!("{}", style("Updating local bonesdeploy...").cyan());
+        if current_local != master_versions.bonesdeploy {
+            println!("Updating bonesdeploy...");
             update_release::update_local_from_source(SOURCE_REPO_URL)?;
-            println!("{} Local update complete.", style("Done!").green());
+            updated = true;
         }
 
         refresh_local_bones_from_source(&source_dir, Path::new(paths::LOCAL_BONES_DIR))?;
     }
 
-    if !options.skip_remote {
-        if current_remote == master_versions.bonesremote {
-            println!("{} Remote bonesremote is already current.", style("Done!").green());
-        } else {
-            println!("{}", style("Updating remote bonesremote...").cyan());
-            update_release::update_remote_from_source(SOURCE_REPO_URL, &master_versions.bonesremote).await?;
-            println!("{} Remote update complete.", style("Done!").green());
-        }
+    if !options.skip_remote && current_remote != master_versions.bonesremote {
+        println!("Updating bonesremote...");
+        update_release::update_remote_from_source(SOURCE_REPO_URL, &master_versions.bonesremote).await?;
+        updated = true;
     }
 
-    println!("\n{} All updates complete.", style("Done!").green());
+    if updated {
+        println!("Update complete.");
+    } else {
+        println!("Already up to date.");
+    }
 
     Ok(())
 }
@@ -121,13 +111,10 @@ fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Resul
         return Ok(());
     }
 
-    println!("{}", style("Refreshing local .bones scaffold...").cyan());
-
     let kit_root = source_dir.join("crates/bonesdeploy/kit");
     sync_tree(&kit_root.join("hooks"), &bones_dir.join("hooks"), true)?;
     sync_tree(&deployment_source_root(source_dir, bones_dir), &bones_dir.join("deployment"), true)?;
 
-    println!("{} Local .bones scaffold refreshed.", style("Done!").green());
     Ok(())
 }
 

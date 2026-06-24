@@ -2,12 +2,10 @@ use std::fs;
 use std::os::unix::fs as unix_fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
-use console::style;
-
 use crate::config;
 use crate::infra::git;
 use crate::infra::rsync;
+use anyhow::{Context, Result, bail};
 use shared::config::default_deploy_user;
 use shared::paths;
 
@@ -17,9 +15,8 @@ pub fn run() -> Result<()> {
     git::ensure_git_repository()?;
 
     let target = resolve_pull_target()?;
-    let remote_bones = format!("{}@{}:{}/{}/", target.user, target.host, target.repo_path, paths::BONES_DIR);
 
-    println!("Pulling .bones/ from {remote_bones}...");
+    println!("Pulling .bones...");
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     if !bones_dir.exists() {
@@ -33,10 +30,12 @@ pub fn run() -> Result<()> {
         unix_fs::symlink(&config_dir, bones_dir)?;
     }
 
-    rsync_bones(&target)?;
+    rsync_bones(&target).context("Failed to pull .bones.")?;
     init_project::symlink_pre_push()?;
 
-    println!("\n{} .bones/ pulled from remote.", style("Done!").green().bold());
+    println!(".bones pulled.");
+    println!();
+    println!("Next: run bonesdeploy doctor.");
     Ok(())
 }
 
