@@ -49,7 +49,7 @@ pub fn update_local_from_source(repo_url: &str) -> Result<()> {
 pub async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     if !bones_toml.exists() {
-        bail!("No .bones/bones.toml found. Run from a bonesdeploy project directory.");
+        bail!("No {} found. Run from a bonesdeploy project directory.", paths::LOCAL_BONES_TOML);
     }
 
     let cfg = config::load(bones_toml)?;

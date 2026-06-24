@@ -92,7 +92,7 @@ fn check_bones_config() -> Option<String> {
     }
 
     if !Path::new(paths::LOCAL_BONES_TOML).exists() {
-        return Some(String::from("Missing .bones/bones.toml"));
+        return Some(format!("Missing {}", paths::LOCAL_BONES_TOML));
     }
 
     None

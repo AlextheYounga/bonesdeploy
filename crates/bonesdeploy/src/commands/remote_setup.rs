@@ -23,15 +23,12 @@ pub fn run() -> Result<()> {
     let mut deploy_data = Value::Object(remote_data::base(&cfg, &runtime.web_root)?);
     let host = cfg.host;
     if let Value::Object(ref mut map) = deploy_data {
-        map.insert(String::from("ssh_user"), Value::String(ssh_user));
+        map.insert(String::from(shared_config::bonesinfra_input::SSH_USER), Value::String(ssh_user));
         map.insert(String::from("host"), Value::String(host));
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    bonesinfra_cli::run_with_stdin(
-        &["setup", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")],
-        &json,
-    )?;
+    bonesinfra_cli::run_with_stdin(&["setup", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
 
     println!("Remote bootstrap complete.");
     println!();

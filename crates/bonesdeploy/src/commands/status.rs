@@ -86,7 +86,7 @@ fn fallback_remote_status(cfg: &config::Bones) -> RemoteReport {
         current_release,
         ssl: RemoteSslStatus { enabled: cfg.ssl_enabled, domain: cfg.domain.clone() },
         services: vec![RemoteServiceStatus {
-            name: format!("{}-nginx.service", cfg.project_name),
+            name: paths::nginx_service_name(&cfg.project_name),
             state: String::from("unknown"),
             enabled: String::from("unknown"),
         }],

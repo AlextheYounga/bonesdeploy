@@ -15,8 +15,8 @@ pub fn run(config_path: &str) -> Result<()> {
     let build_root = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root);
     let shared_dir = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).shared);
 
-    let shared_env = shared_dir.join(".env");
-    let workspace_env = build_root.join(".env");
+    let shared_env = shared_dir.join(paths::DOT_ENV);
+    let workspace_env = build_root.join(paths::DOT_ENV);
     let workspace_env_example = build_root.join(".env.example");
 
     if shared_env.exists() {

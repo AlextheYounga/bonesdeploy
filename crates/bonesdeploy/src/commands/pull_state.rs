@@ -68,7 +68,10 @@ fn resolve_remote_name() -> Result<String> {
         [] => bail!("No git remotes configured. Add a deployment remote before running bonesdeploy pull."),
         [remote] => Ok(remote.clone()),
         _ => {
-            bail!("Multiple git remotes configured. Keep .bones/bones.toml or name the deployment remote 'production'.")
+            bail!(
+                "Multiple git remotes configured. Keep {} or name the deployment remote 'production'.",
+                paths::LOCAL_BONES_TOML
+            )
         }
     }
 }

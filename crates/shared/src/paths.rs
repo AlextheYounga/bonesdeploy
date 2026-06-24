@@ -34,6 +34,8 @@ pub const LOCAL_BONES_HOOKS_SCRIPT: &str = ".bones/hooks/hooks.sh";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
 pub const LOCAL_BONES_RUNTIME_TOML: &str = ".bones/runtime.toml";
 pub const LOCAL_BONES_SECRETS_DIR: &str = ".bones/secrets";
+pub const DOT_ENV: &str = ".env";
+pub const RUNTIME_TOML: &str = "runtime.toml";
 
 pub const BONES_DIR: &str = "bones";
 pub const BONES_TOML: &str = "bones.toml";
@@ -96,6 +98,11 @@ pub fn ssl_certificate_path(domain: &str) -> String {
 #[must_use]
 pub fn ssl_certificate_key_path(domain: &str) -> String {
     Path::new(ETC_LETSENCRYPT_LIVE).join(domain).join("privkey.pem").display().to_string()
+}
+
+#[must_use]
+pub fn nginx_service_name(project_name: &str) -> String {
+    format!("{project_name}-nginx.service")
 }
 
 #[must_use]
@@ -209,7 +216,7 @@ impl Deployment {
                 .display()
                 .to_string(),
             systemd_site_nginx_service: Path::new(ETC_SYSTEMD_SYSTEM)
-                .join(format!("{project_name}-nginx.service"))
+                .join(nginx_service_name(project_name))
                 .display()
                 .to_string(),
             apparmor_profile_path: Path::new(ETC_APPARMOR_D)

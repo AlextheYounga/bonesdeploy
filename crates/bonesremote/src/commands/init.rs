@@ -57,14 +57,14 @@ fn which_bonesdeploy_remote() -> Result<PathBuf> {
     let path = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim().to_string());
     let path = fs::canonicalize(&path).with_context(|| format!("Failed to canonicalize {}", path.display()))?;
     if !approved_bonesdeploy_path(&path) {
-        bail!("Refusing to write sudoers entry for {}: expected /usr/local/bin or /usr/bin", path.display());
+        bail!("Refusing to write sudoers entry for {}: expected {} or /usr/bin", path.display(), paths::USR_LOCAL_BIN);
     }
 
     Ok(path)
 }
 
 fn approved_bonesdeploy_path(path: &Path) -> bool {
-    path.starts_with("/usr/local/bin") || path.starts_with("/usr/bin")
+    path.starts_with(paths::USR_LOCAL_BIN) || path.starts_with("/usr/bin")
 }
 
 #[cfg(test)]

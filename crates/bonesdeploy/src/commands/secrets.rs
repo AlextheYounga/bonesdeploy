@@ -16,7 +16,6 @@ use shared::config::parse_port;
 use shared::paths;
 
 const LOCAL_ENV_SECRET: &str = ".bones/secrets/.env.gpg";
-const REMOTE_ENV_SECRET: &str = ".env";
 const DEFAULT_SECRET_MODE: &str = "640";
 
 fn gpg_home() -> PathBuf {
@@ -134,7 +133,7 @@ pub async fn push() -> Result<()> {
     }
 
     let plaintext = decrypt_secret(encrypted_path)?;
-    let target = Path::new(&deployment.shared).join(REMOTE_ENV_SECRET);
+    let target = Path::new(&deployment.shared).join(paths::DOT_ENV);
     let parent = target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
     let parent_s = shell_quote_single(&parent.display().to_string());
     let target_s = shell_quote_single(&target.display().to_string());

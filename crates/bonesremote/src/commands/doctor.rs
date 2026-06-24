@@ -207,7 +207,7 @@ fn apparmor_unit_name_for_profile(profile_name: &str) -> Option<String> {
     profile_name
         .strip_prefix("bonesdeploy-")
         .and_then(|name| name.strip_suffix("-nginx"))
-        .map(|project_name| format!("{project_name}-nginx.service"))
+        .map(|project_name| paths::nginx_service_name(&project_name))
 }
 
 fn systemd_directive_values<'a>(contents: &'a str, directive: &str) -> Vec<&'a str> {

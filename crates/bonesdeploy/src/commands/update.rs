@@ -119,7 +119,7 @@ fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Resul
 }
 
 fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> PathBuf {
-    let runtime_toml = bones_dir.join("runtime.toml");
+    let runtime_toml = bones_dir.join(paths::RUNTIME_TOML);
     let Some(template) = selected_runtime_template(&runtime_toml) else {
         return source_dir.join("crates/bonesdeploy/kit/deployment");
     };

@@ -22,16 +22,15 @@ pub fn run(yes: bool) -> Result<()> {
         return Ok(());
     }
 
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     println!("Applying runtime...");
 
     bonesinfra_cli::run(&[
         "runtime",
         "apply",
         "--config",
-        bones_toml.to_str().unwrap_or(".bones/bones.toml"),
+        paths::LOCAL_BONES_TOML,
         "--runtime-config",
-        runtime_toml.to_str().unwrap_or(".bones/runtime.toml"),
+        paths::LOCAL_BONES_RUNTIME_TOML,
     ])?;
 
     println!("Runtime applied.");

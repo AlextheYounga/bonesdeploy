@@ -52,16 +52,13 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     let mut deploy_data = remote_data::ssl(&cfg, &runtime.web_root, &cfg.domain, &cfg.email)?;
     if let Value::Object(ref mut map) = deploy_data {
-        map.insert(String::from("ssh_user"), Value::String(ssh_user));
+        map.insert(String::from(shared_config::bonesinfra_input::SSH_USER), Value::String(ssh_user));
         map.insert(String::from("host"), Value::String(cfg.host.clone()));
-        map.insert(String::from("ssh_port"), Value::String(cfg.port.clone()));
+        map.insert(String::from(shared_config::bonesinfra_input::SSH_PORT), Value::String(cfg.port.clone()));
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    bonesinfra_cli::run_with_stdin(
-        &["ssl", "apply", "--config", bones_toml.to_str().unwrap_or(".bones/bones.toml")],
-        &json,
-    )?;
+    bonesinfra_cli::run_with_stdin(&["ssl", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
 
     cfg.ssl_enabled = true;
     config::save(&cfg, bones_toml)?;

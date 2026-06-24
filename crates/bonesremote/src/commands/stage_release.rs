@@ -19,7 +19,7 @@ pub fn run(config_path: &str) -> Result<()> {
     let releases_dir = release_state::releases_dir(&cfg);
     let shared_dir = Path::new(&cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).shared).to_path_buf();
 
-    require_dir(project_root, "project_root")?;
+    require_dir(project_root, "project_root directory")?;
     require_dir(&releases_dir, "releases")?;
     require_dir(&build_dir, "build")?;
     require_dir(&shared_dir, "shared")?;

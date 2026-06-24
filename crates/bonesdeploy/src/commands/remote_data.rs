@@ -9,13 +9,25 @@ pub(super) fn base(cfg: &config::Bones, web_root: &str) -> Result<Map<String, Va
     let paths = cfg.deployment_paths(web_root);
     let mut vars = Map::new();
 
-    vars.insert(String::from("ssh_port"), Value::String(cfg.port.clone()));
-    vars.insert(String::from("deploy_user"), Value::String(shared_config::default_deploy_user()));
-    vars.insert(String::from("runtime_user"), Value::String(shared_config::runtime_user_for(&cfg.project_name)));
-    vars.insert(String::from("runtime_group"), Value::String(shared_config::runtime_group_for(&cfg.project_name)));
-    vars.insert(String::from("release_group"), Value::String(shared_config::release_group_for(&cfg.project_name)));
+    vars.insert(String::from(shared_config::bonesinfra_input::SSH_PORT), Value::String(cfg.port.clone()));
+    vars.insert(
+        String::from(shared_config::bonesinfra_input::DEPLOY_USER),
+        Value::String(shared_config::default_deploy_user()),
+    );
+    vars.insert(
+        String::from(shared_config::bonesinfra_input::RUNTIME_USER),
+        Value::String(shared_config::runtime_user_for(&cfg.project_name)),
+    );
+    vars.insert(
+        String::from(shared_config::bonesinfra_input::RUNTIME_GROUP),
+        Value::String(shared_config::runtime_group_for(&cfg.project_name)),
+    );
+    vars.insert(
+        String::from(shared_config::bonesinfra_input::RELEASE_GROUP),
+        Value::String(shared_config::release_group_for(&cfg.project_name)),
+    );
     vars.insert(String::from("project_root_parent"), Value::String(paths.project_root_parent.clone()));
-    vars.insert(String::from("project_root"), Value::String(cfg.project_root.clone()));
+    vars.insert(String::from(shared_config::bonesinfra_input::PROJECT_ROOT), Value::String(cfg.project_root.clone()));
     vars.insert(String::from("web_root"), Value::String(web_root.to_string()));
     vars.insert(String::from("project_name"), Value::String(cfg.project_name.clone()));
     vars.insert(String::from("preview_domain"), Value::String(cfg.preview_domain.clone()));

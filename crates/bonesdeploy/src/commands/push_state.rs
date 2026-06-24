@@ -68,7 +68,7 @@ pub(crate) fn rsync_args(cfg: &config::Bones) -> Vec<String> {
         String::from("-av"),
         String::from("--delete"),
         String::from("--exclude"),
-        String::from("secrets/"),
+        String::from(paths::KIT_SECRETS_DIR),
         String::from("-e"),
         ssh_arg,
         source,

@@ -101,11 +101,19 @@ fn collect_file_literals(project_root: &Path, path: &Path, literals: &mut Vec<St
             continue;
         }
 
+        if line.contains("env!(\"") {
+            continue;
+        }
+
         let relative = path.strip_prefix(project_root).unwrap_or(path);
         for value in parse_string_literals(line) {
             let Some(kind) = state_kind(&value) else {
                 continue;
             };
+
+            if is_noise_value(&value) {
+                continue;
+            }
 
             literals.push(StateLiteral {
                 value,
@@ -271,6 +279,10 @@ fn literals_are_duplicated_state(literals: &[StateLiteral]) -> bool {
 
 fn file_path(location: &str) -> &str {
     location.rsplit_once(':').map_or(location, |(path, _)| path)
+}
+
+fn is_noise_value(value: &str) -> bool {
+    matches!(value, "." | "{}/" | "{}")
 }
 
 fn format_violation(kind: StateKind, value: &str, literals: &[StateLiteral]) -> String {

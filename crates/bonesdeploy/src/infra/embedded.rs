@@ -38,7 +38,7 @@ pub fn runtime_names() -> Vec<String> {
 }
 
 pub fn base_runtime_defaults() -> Result<Map<String, Value>> {
-    runtime_defaults_from_bytes("kit/runtime.toml", Kit::get("runtime.toml").map(|asset| asset.data))
+    runtime_defaults_from_bytes("kit/runtime.toml", Kit::get(paths::RUNTIME_TOML).map(|asset| asset.data))
 }
 
 pub fn runtime_defaults(runtime: &str) -> Result<Map<String, Value>> {

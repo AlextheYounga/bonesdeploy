@@ -6,6 +6,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::paths::{self, Deployment};
 
+/// Keys in the JSON object that bonesdeploy sends to bonesinfra.
+pub mod bonesinfra_input {
+    pub const SSH_PORT: &str = "ssh_port";
+    pub const SSH_USER: &str = "ssh_user";
+    pub const DEPLOY_USER: &str = "deploy_user";
+    pub const PROJECT_ROOT: &str = "project_root";
+    pub const RUNTIME_USER: &str = "runtime_user";
+    pub const RUNTIME_GROUP: &str = "runtime_group";
+    pub const RELEASE_GROUP: &str = "release_group";
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Bones {
@@ -129,8 +140,6 @@ fn sanitize_domain_label(value: &str) -> String {
         .to_string()
 }
 
-const RUNTIME_TOML: &str = "runtime.toml";
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Runtime {
     #[serde(default = "paths::default_web_root")]
@@ -149,7 +158,7 @@ pub struct Runtime {
 ///
 /// Returns an error if the file exists but cannot be read or parsed.
 pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
-    let path = config_dir.join(RUNTIME_TOML);
+    let path = config_dir.join(paths::RUNTIME_TOML);
     if path.exists() {
         let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
         Ok(toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?)

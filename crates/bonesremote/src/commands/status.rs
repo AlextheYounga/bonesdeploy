@@ -6,6 +6,7 @@ use std::process::Command;
 use anyhow::Result;
 use serde::Serialize;
 use shared::config;
+use shared::paths;
 
 #[derive(Debug, Serialize)]
 struct Report {
@@ -64,7 +65,7 @@ fn ssl_status(cfg: &config::Bones, nginx_config_path: &str) -> SslStatus {
 }
 
 fn services(project_name: &str) -> Vec<ServiceStatus> {
-    let expected = format!("{project_name}-nginx.service");
+    let expected = paths::nginx_service_name(project_name);
     let mut services = BTreeMap::from([(
         expected.clone(),
         ServiceStatus {
