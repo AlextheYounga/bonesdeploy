@@ -3,10 +3,10 @@ use std::path::Path;
 
 use anyhow::Result;
 
+use super::push_state;
 use crate::config;
 use crate::infra::rsync;
 use crate::infra::ssh;
-use shared::config::default_deploy_user;
 use shared::paths;
 
 pub async fn run(local_only: bool) -> Result<()> {
@@ -152,15 +152,9 @@ async fn check_bonesremote(cfg: &config::Bones) -> Option<String> {
 }
 
 fn check_bones_sync(cfg: &config::Bones) -> Option<String> {
-    let user = default_deploy_user();
-    let host = &cfg.host;
-    let port = &cfg.port;
-    let repo_path = &cfg.repo_path;
-    let dest = format!("{user}@{host}:{repo_path}/{}/", paths::BONES_DIR);
-
-    let ssh_arg = format!("ssh -p {port}");
-    let source = format!("{}/", paths::LOCAL_BONES_DIR);
-    let output = rsync::output(&["-avnc", "--delete", "-e", &ssh_arg, &source, &dest]).ok()?;
+    let args = dry_run_rsync_args(cfg);
+    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    let output = rsync::output(&arg_refs).ok()?;
 
     if !output.status.success() {
         return Some(String::from(".bones sync check failed"));
@@ -180,4 +174,33 @@ fn check_bones_sync(cfg: &config::Bones) -> Option<String> {
         .collect::<Vec<_>>();
 
     if changed.is_empty() { None } else { Some(String::from(".bones is not synced to the remote")) }
+}
+
+fn dry_run_rsync_args(cfg: &config::Bones) -> Vec<String> {
+    let mut args = push_state::rsync_args(cfg);
+    args.insert(1, String::from("--dry-run"));
+    args.insert(2, String::from("--checksum"));
+    args
+}
+
+#[cfg(test)]
+mod tests {
+    use super::dry_run_rsync_args;
+    use crate::config::Bones;
+
+    #[test]
+    fn sync_check_uses_same_excludes_as_push() {
+        let cfg = Bones {
+            host: String::from("deploy.example.com"),
+            port: String::from("22"),
+            repo_path: String::from("/home/git/acme.git"),
+            ..Default::default()
+        };
+
+        let args = dry_run_rsync_args(&cfg);
+
+        assert!(args.contains(&String::from("--dry-run")));
+        assert!(args.contains(&String::from("--checksum")));
+        assert!(args.windows(2).any(|pair| pair[0] == "--exclude" && pair[1] == "secrets/"));
+    }
 }
