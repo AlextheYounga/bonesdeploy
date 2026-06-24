@@ -22,7 +22,7 @@ pub async fn run() -> Result<()> {
     println!("State: {}", report.state_label);
 
     let (current_release, service_state, ssl_state) = if let Some(cfg) = cfg {
-        remote_status(cfg).await.unwrap_or((String::from("unknown"), String::from("unknown"), ssl_state(cfg)))
+        remote_status(cfg).await.unwrap_or((String::from("unknown"), String::from("unknown"), ssl_state(cfg, false)))
     } else {
         (String::from("unknown"), String::from("unknown"), String::from("unknown"))
     };
@@ -49,13 +49,15 @@ async fn remote_status(cfg: &config::Bones) -> Result<(String, String, String)> 
             .await
             .map_or_else(|_| String::from("unknown"), |value| value.trim().to_string());
 
+    let remote_ssl_enabled = guide::remote_ssl_enabled(cfg, &runtime.web_root).await.unwrap_or(false);
+
     session.close().await?;
 
-    Ok((current_release, service, ssl_state(cfg)))
+    Ok((current_release, service, ssl_state(cfg, remote_ssl_enabled)))
 }
 
-fn ssl_state(cfg: &config::Bones) -> String {
-    if cfg.ssl_enabled {
+fn ssl_state(cfg: &config::Bones, remote_ssl_enabled: bool) -> String {
+    if cfg.ssl_enabled || remote_ssl_enabled {
         if cfg.domain.is_empty() { String::from("enabled") } else { format!("enabled ({})", cfg.domain) }
     } else {
         String::from("disabled")
@@ -68,4 +70,17 @@ fn release_name(value: &str) -> String {
 
 fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ssl_state;
+    use crate::config::Bones;
+
+    #[test]
+    fn ssl_state_uses_remote_state_when_local_flag_is_stale() {
+        let cfg = Bones { domain: String::from("app.example.com"), ssl_enabled: false, ..Default::default() };
+
+        assert_eq!(ssl_state(&cfg, true), "enabled (app.example.com)");
+    }
 }

@@ -57,7 +57,9 @@ pub async fn build_report() -> Result<Report> {
         return Ok(initialized_report(cfg, false));
     }
 
-    if cfg.ssl_enabled { Ok(ready_report(cfg)) } else { Ok(initialized_report(cfg, true)) }
+    let ssl_enabled = cfg.ssl_enabled || remote_ssl_enabled(&cfg, &web_root).await.unwrap_or(false);
+
+    if ssl_enabled { Ok(ready_report(cfg)) } else { Ok(initialized_report(cfg, true)) }
 }
 
 pub(crate) fn prompt_free_init_command(project: &str) -> String {
@@ -169,6 +171,24 @@ async fn remote_setup_complete(cfg: &config::Bones, web_root: &str) -> Result<bo
     session.close().await?;
 
     Ok(sync_ok && current_ok)
+}
+
+pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones, web_root: &str) -> Result<bool> {
+    if cfg.domain.is_empty() {
+        return Ok(false);
+    }
+
+    let session = ssh::connect(cfg).await?;
+    let path = cfg.deployment_paths(web_root).nginx_site_available;
+    let command = format!(
+        "test -r {path} && grep -Fq {domain} {path} && grep -Fq 'listen 443 ssl;' {path}",
+        path = shell_quote(&path),
+        domain = shell_quote(&format!("server_name {};", cfg.domain)),
+    );
+    let enabled = ssh::run_cmd(&session, &command).await.is_ok();
+    session.close().await?;
+
+    Ok(enabled)
 }
 
 fn shell_quote(value: &str) -> String {

@@ -63,6 +63,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
         &json,
     )?;
 
+    cfg.ssl_enabled = true;
     config::save(&cfg, bones_toml)?;
     push_state::sync_bones_directory(&cfg)?;
 
