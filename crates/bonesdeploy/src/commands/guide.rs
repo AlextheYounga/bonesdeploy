@@ -151,7 +151,7 @@ fn runtime_web_root() -> Result<String> {
 }
 
 async fn remote_setup_complete(cfg: &config::Bones, web_root: &str) -> Result<bool> {
-    let Ok(session) = ssh::connect(cfg).await else {
+    let Ok(session) = ssh::connect_privileged(cfg).await else {
         return Ok(false);
     };
 

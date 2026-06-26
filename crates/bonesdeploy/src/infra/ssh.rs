@@ -15,6 +15,13 @@ pub async fn connect(config: &Bones) -> Result<Session> {
     connect_as(&user, host, port).await
 }
 
+pub async fn connect_privileged(config: &Bones) -> Result<Session> {
+    let host = &config.host;
+    let port = parse_port(&config.port)?;
+
+    connect_as(&config.ssh_user, host, port).await
+}
+
 pub async fn connect_as(user: &str, host: &str, port: u16) -> Result<Session> {
     SessionBuilder::default()
         .known_hosts_check(KnownHosts::Accept)

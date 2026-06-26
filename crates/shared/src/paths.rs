@@ -139,6 +139,11 @@ pub fn bonesremote_registry_path(site: &str) -> PathBuf {
 }
 
 #[must_use]
+pub fn bonesremote_bones_toml_path(site: &str) -> PathBuf {
+    bonesremote_site_root(site).join(BONES_TOML)
+}
+
+#[must_use]
 pub fn install_versions_dir() -> PathBuf {
     install_root().join(INSTALL_VERSIONS_DIR)
 }

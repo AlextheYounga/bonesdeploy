@@ -54,7 +54,10 @@ fn check_globally_available(issues: &mut Vec<String>) {
 }
 
 fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let privileged_commands = [[paths::BONESREMOTE_BINARY, "service", "restart", "--config", "/nonexistent"]];
+    let privileged_commands = [
+        [paths::BONESREMOTE_BINARY, "hook", "post-receive", "--site", "nonexistent"],
+        [paths::BONESREMOTE_BINARY, "service", "restart", "--config", "/nonexistent"],
+    ];
 
     for command in privileged_commands {
         let result = Command::new("sudo").arg("-n").arg("-l").args(command).output();

@@ -157,7 +157,7 @@ fn check_bones_sync(cfg: &config::Bones) -> Option<String> {
     let Ok(runtime) = Runtime::new() else {
         return Some(String::from("Could not start runtime to check remote site state"));
     };
-    let Ok(session) = runtime.block_on(ssh::connect(cfg)) else {
+    let Ok(session) = runtime.block_on(ssh::connect_privileged(cfg)) else {
         return Some(String::from("Could not connect to remote site state"));
     };
     let ok = runtime.block_on(ssh::run_cmd(&session, &command)).is_ok();

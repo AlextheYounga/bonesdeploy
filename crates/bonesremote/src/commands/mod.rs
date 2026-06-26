@@ -3,6 +3,7 @@ pub(crate) mod config;
 pub(crate) mod deploy;
 pub(crate) mod doctor;
 pub(crate) mod drop_failed_release;
+pub(crate) mod hook;
 pub(crate) mod init;
 pub(crate) mod post_deploy;
 pub(crate) mod post_receive;

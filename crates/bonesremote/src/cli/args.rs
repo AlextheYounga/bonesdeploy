@@ -28,6 +28,11 @@ pub enum Command {
         #[arg(long)]
         revision: Option<String>,
     },
+    /// Thin git-hook entrypoints
+    Hook {
+        #[command(subcommand)]
+        command: HookCommand,
+    },
     /// Import or export root-owned remote site state
     Site {
         #[command(subcommand)]
@@ -53,6 +58,15 @@ pub enum Command {
     },
     /// Print the version
     Version,
+}
+
+#[derive(Subcommand)]
+pub enum HookCommand {
+    /// Resolve a post-receive push and delegate deployment
+    PostReceive {
+        #[arg(long)]
+        site: String,
+    },
 }
 
 #[derive(Subcommand)]
