@@ -60,7 +60,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 ├── bones.toml
 ├── runtime.toml
 ├── hooks
-│   ├── hooks.sh                      # shared hook library, sourced by every hook
+│   ├── hooks.sh                      # (legacy; pre-push only used to source from here)
 │   ├── post-receive
 │   └── pre-push
 ├── deployment
@@ -109,7 +109,7 @@ releases = 5
 ```
 
 ### Hooks
-Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`. `pre-push` sources shared functions from `.bones/hooks/hooks.sh`; remote `post-receive` is now a standalone thin trigger. After that, they belong to the user and can be edited freely. They are published into `bonesremote`'s root-owned remote site state via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
+Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`: a local `pre-push` guard and a remote `post-receive` thin trigger. The previous shared `hooks.sh` library is gone; `pre-push` is now self-contained and `post-receive` delegates directly to `sudo bonesremote hook post-receive --site <project>`. After that, they belong to the user and can be edited freely. They are published into `bonesremote`'s root-owned remote site state via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor --local` and we fail if the doctor command expresses any warning or errors.
 - `post-receive` => Thin trigger that derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/` instead of the bare repo.
@@ -183,7 +183,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Loads config from `.bones/bones.toml`
   - Runs local checks:
     - `.bones` folder exists and is a symlink (warns if it is not a symlink to `~/.config/bonesdeploy/<project>.bones/`). Deployment scripts are named appropriately.
-    - Required files exist: `bones.toml`, `hooks/hooks.sh`, `hooks/` dir, `deployment/` dir.
+    - Required files exist: `bones.toml`, `hooks/pre-push`, `hooks/post-receive`, `deployment/` dir.
     - Local `pre-push` hook is symlinked properly when `deploy_on_push = true`.
   - Runs remote checks (skipped with `--local`):
     - `bonesremote` executable exists on remote and can be run globally.

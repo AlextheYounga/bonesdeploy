@@ -196,14 +196,14 @@ releases = 5
 ├── bones.toml           # project configuration
 ├── runtime.toml         # framework runtime configuration
 ├── hooks/
-│   ├── hooks.sh         # shared hook functions imported by hook entrypoints
+│   ├── hooks.sh         # (legacy) shared hook functions imported by hook entrypoints
 │   ├── pre-push         # symlinked to .git/hooks/pre-push
 │   └── post-receive     # thin adapter → calls bonesremote deploy
 └── deployment/
     └── 01_*.sh          # deployment scripts (run sequentially)
 ```
 
-Hooks are written to `.bones/hooks/` once during init. `pre-push` still uses `.bones/hooks/hooks.sh`; remote `post-receive` is now a standalone thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
+Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
 
 Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote hook post-receive`, which resolves policy from bonesremote-managed site state.
 

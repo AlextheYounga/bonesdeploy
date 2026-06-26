@@ -63,10 +63,7 @@ pub async fn run() -> Result<()> {
 
 async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
     let session = ssh::connect_privileged(cfg).await?;
-    let command = format!(
-        "bonesremote status --config {}",
-        shell_quote(&paths::bonesremote_bones_toml_path(&cfg.project_name).display().to_string())
-    );
+    let command = format!("bonesremote status --site '{}'", shell_quote(&cfg.project_name));
     let output = ssh::run_cmd(&session, &command).await;
     session.close().await?;
 

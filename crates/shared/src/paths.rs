@@ -30,7 +30,6 @@ pub const TMP_ROOT: &str = "/tmp";
 pub const LOCAL_BONES_DIR: &str = ".bones";
 pub const LOCAL_BONES_TOML: &str = ".bones/bones.toml";
 pub const LOCAL_BONES_HOOKS_DIR: &str = ".bones/hooks";
-pub const LOCAL_BONES_HOOKS_SCRIPT: &str = ".bones/hooks/hooks.sh";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
 pub const LOCAL_BONES_RUNTIME_TOML: &str = ".bones/runtime.toml";
 pub const LOCAL_BONES_SECRETS_DIR: &str = ".bones/secrets";
@@ -50,12 +49,13 @@ pub const BUILD_DIR: &str = "build";
 pub const WORKSPACE_DIR: &str = "workspace";
 pub const LOGS_DIR: &str = "logs";
 pub const CURRENT_LINK: &str = "current";
+pub const STAGED_RELEASE_FILE: &str = "staged-release";
+pub const TMP_BUILDS_DIR: &str = "tmp";
 pub const INSTALL_VERSIONS_DIR: &str = "versions";
 pub const INSTALL_CURRENT_LINK: &str = "current";
 pub const BONESDEPLOY_SWAP_LINK: &str = ".bonesdeploy_swap";
 pub const BONESREMOTE_SWAP_LINK_PREFIX: &str = ".bonesremote_swap_";
 pub const PLACEHOLDER_RELEASE_NAME: &str = "19700101_000000";
-pub const STAGED_RELEASE_FILE: &str = ".staged_release";
 pub const SUDOERS_FILE: &str = "bonesdeploy";
 pub const SUDOERS_PATH: &str = "/etc/sudoers.d/bonesdeploy";
 pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
@@ -141,6 +141,30 @@ pub fn bonesremote_registry_path(site: &str) -> PathBuf {
 #[must_use]
 pub fn bonesremote_bones_toml_path(site: &str) -> PathBuf {
     bonesremote_site_root(site).join(BONES_TOML)
+}
+
+#[must_use]
+pub fn bonesremote_staged_release_path(site: &str) -> PathBuf {
+    bonesremote_site_root(site).join(STAGED_RELEASE_FILE)
+}
+
+#[must_use]
+pub fn bonesremote_tmp_builds_root(site: &str) -> PathBuf {
+    bonesremote_site_root(site).join(TMP_BUILDS_DIR)
+}
+
+/// Canonical list of release-tree paths that should be linked from `shared/`.
+pub const SHARED_LEAVES: &[&str] = &[DOT_ENV, "storage", "bootstrap/cache", "database/database.sqlite"];
+
+#[must_use]
+pub fn bonesremote_sites_root_resolved() -> PathBuf {
+    if let Some(root) = std::env::var_os("BONESREMOTE_SITES_ROOT") {
+        let raw = root.to_string_lossy().to_string();
+        if !raw.trim().is_empty() {
+            return PathBuf::from(raw);
+        }
+    }
+    bonesremote_sites_root()
 }
 
 #[must_use]

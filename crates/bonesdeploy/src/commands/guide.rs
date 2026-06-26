@@ -177,7 +177,7 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones, web_root: &str) -> R
         return Ok(false);
     }
 
-    let session = ssh::connect(cfg).await?;
+    let session = ssh::connect_privileged(cfg).await?;
     let path = cfg.deployment_paths(web_root).nginx_site_available;
     let command = format!(
         "test -r {path} && grep -Fq {domain} {path} && grep -Fq 'listen 443 ssl;' {path}",

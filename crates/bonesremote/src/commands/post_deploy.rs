@@ -1,14 +1,14 @@
 use std::fs;
-use std::path::Path;
 
 use anyhow::{Context, Result};
 
 use crate::config;
 use crate::release_state;
 
-pub fn run(config_path: &str) -> Result<()> {
-    let config_path = Path::new(config_path);
-    let cfg = config::load(config_path)?;
+pub fn run(site: &str) -> Result<()> {
+    let registry = shared::paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&registry)
+        .with_context(|| format!("Failed to load remote site state from {}", registry.display()))?;
 
     let pruned = prune_old_releases(&cfg)?;
     if !pruned.is_empty() {
@@ -93,7 +93,6 @@ mod tests {
         Ok(())
     }
 
-    /// Prunes the oldest inactive releases when the active release count exceeds the keep limit.
     #[test]
     fn prune_old_releases_removes_oldest_inactive_releases_up_to_keep_limit() -> Result<()> {
         let root = temp_dir("bonesremote_post_deploy_prune")?;
@@ -115,7 +114,6 @@ mod tests {
         Ok(())
     }
 
-    /// Keeps all releases when the active release count is within the keep limit.
     #[test]
     fn prune_old_releases_keeps_active_release_when_within_keep_limit() -> Result<()> {
         let root = temp_dir("bonesremote_post_deploy_prune_active")?;

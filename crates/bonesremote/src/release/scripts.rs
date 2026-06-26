@@ -5,7 +5,7 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use shared::paths::{self, Deployment};
+use shared::paths::Deployment;
 
 pub(super) fn deployment_log_path(paths: &Deployment, release_name: &str, script_name: &str) -> PathBuf {
     Path::new(&paths.build_logs).join(format!("{release_name}-{script_name}.log"))
@@ -45,8 +45,6 @@ pub(super) fn run_deployment_script(
         .env("REPO_PATH", env.repo_path)
         .env("WEB_ROOT", env.web_root)
         .env("SERVICE_USER", env.project_name)
-        .env("DEPLOY_USER", paths::DEPLOY_USER)
-        .env("GROUP", paths::DEFAULT_GROUP)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
