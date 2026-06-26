@@ -6,6 +6,7 @@ use std::process::{Command, Stdio};
 
 use crate::config;
 use crate::infra::git;
+use crate::infra::ssh;
 use anyhow::{Context, Result, bail};
 use shared::paths;
 
@@ -80,17 +81,8 @@ fn resolve_remote_name() -> Result<String> {
 
 fn fetch_remote_archive(target: &git::RemoteConnectionDetails) -> Result<Vec<u8>> {
     let site = site_name_from_repo_path(&target.repo_path)?;
-    let output = Command::new("ssh")
-        .args([
-            "-p",
-            &target.port,
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            &format!("{}@{}", target.user, target.host),
-            &format!("bonesremote site export --site '{site}'"),
-        ])
+    let output = ssh::external_command(&target.user, &target.host, &target.port)
+        .arg(format!("bonesremote site export --site '{site}'"))
         .output()
         .context("Failed to export remote site state")?;
 

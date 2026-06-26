@@ -5,6 +5,7 @@ use anyhow::{Context, Result, bail};
 use std::io::Write as _;
 
 use crate::config;
+use crate::infra::ssh;
 use shared::paths;
 
 pub fn run(show_next: bool) -> Result<()> {
@@ -25,17 +26,8 @@ pub fn run(show_next: bool) -> Result<()> {
 
 pub(crate) fn sync_bones_directory(cfg: &config::Bones) -> Result<()> {
     let archive = archive_bones_directory()?;
-    let mut child = Command::new("ssh")
-        .args([
-            "-p",
-            &cfg.port,
-            "-o",
-            "StrictHostKeyChecking=no",
-            "-o",
-            "UserKnownHostsFile=/dev/null",
-            &format!("{}@{}", cfg.ssh_user, cfg.host),
-            &remote_import_command(&cfg.project_name),
-        ])
+    let mut child = ssh::external_command(&cfg.ssh_user, &cfg.host, &cfg.port)
+        .arg(remote_import_command(&cfg.project_name))
         .stdin(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -77,6 +69,7 @@ mod tests {
     use std::path::Path;
 
     use super::remote_import_command;
+    use shared::paths;
 
     #[test]
     fn local_secrets_path_stays_under_bones_dir() {
