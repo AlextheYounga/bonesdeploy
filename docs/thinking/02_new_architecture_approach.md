@@ -49,7 +49,7 @@ root owns host control and sealed releases.
 Target layout:
 
 ```text
-/srv/git/foo.git
+/home/git/foo.git
   git:git
   bare repo, ingress only
 
@@ -105,7 +105,7 @@ The deploy flow should become:
 4. bonesremote exports source into a temporary build context.
 5. podman runs the build.
 6. podman receives no shared/, no .env, no SQLite, no current release.
-7. podman produces an artifact directory.
+7. build scripts mutate the source tree into deployable shape.
 8. container is destroyed.
 9. temporary build context is deleted after promotion/failure.
 ```
@@ -114,7 +114,6 @@ The build container should see only something like:
 
 ```text
 /workspace/source
-/workspace/output
 /cache/composer
 /cache/npm
 /tmp
@@ -126,7 +125,7 @@ It should not see:
 /srv/sites/foo/shared
 /srv/sites/foo/current
 /srv/sites/foo/releases
-/srv/git/foo.git
+/home/git/foo.git
 /etc/bonesdeploy
 /root
 ```
@@ -146,15 +145,17 @@ Do not run migrations, config caching, storage linking, queue restarts, or servi
 
 ## Phase 4: promote artifacts through bonesremote
 
-After the Podman build succeeds, BonesRemote should promote the artifact.
+After the Podman build succeeds, BonesRemote should promote the mutated source tree.
 
 Conceptually:
 
 ```text
-artifact output -> /srv/sites/foo/releases/<release_id>
+/workspace/source -> /srv/sites/foo/releases/<release_id>
 ```
 
-But BonesRemote must treat artifact output as untrusted. It should normalize and seal it:
+Build scripts run with `cwd=/workspace/source` and write everything needed for runtime into that tree. They must not depend on `.git`, because source export should not expose Git history to the build container.
+
+But BonesRemote must treat the built source tree as untrusted. It should normalize and seal it:
 
 ```text
 owner: root
@@ -320,7 +321,7 @@ git removed from site groups
 root-owned site registry
 ephemeral Podman builds
 no shared/.env mounted into build
-artifact promotion
+source-tree promotion
 root:foo sealed releases
 foo-owned shared state
 Laravel shared symlinks
@@ -342,6 +343,6 @@ complex ACL/group designs
 
 ## The one-sentence implementation path
 
-First make `git` ingress-only, then make `foo` the only site identity, then move builds into temporary Podman containers with no runtime mounts, then promote only the artifact into root-owned sealed releases, then run Laravel runtime commands as `foo` against shared state, then activate through BonesRemote.
+First make `git` ingress-only, then make `foo` the only site identity, then move builds into temporary Podman containers with no runtime mounts, then promote the mutated source tree into root-owned sealed releases, then run Laravel runtime commands as `foo` against shared state, then activate through BonesRemote.
 
 That is the cleanest v1 we have arrived at.

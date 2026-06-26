@@ -47,6 +47,48 @@ Their responsibilities are not:
 
 `bonesdeploy` is the local operator interface. It should prepare project-owned configuration, invoke remote commands, and synchronize project deployment assets.
 
+### Remote Control-Plane Sync
+
+`bonesdeploy push` should no longer copy `.bones/` into each bare Git repository. Bare repos should stay boring: they receive source code and trigger deployments, but they should not store the deployment control plane.
+
+Instead, `bonesdeploy push` should send a deployment dataset to `bonesremote`, and `bonesremote` should import that dataset into its own central remote state, for example:
+
+```text
+/root/.config/bonesremote/
+  sites/
+    foo/
+      registry.toml
+      runtime.toml
+      deployment/
+        build/
+          01_install_deps.sh
+          02_build_assets.sh
+        prepare/
+          01_migrate.sh
+          02_optimize.sh
+```
+
+The important split is authority:
+
+- `registry.toml` is canonical remote state accepted and written by `bonesremote` after validation.
+- deployment scripts are user-provided data, stored by `bonesremote`, but they do not authorize privileged paths, users, groups, or service names.
+- the bare repo remains under `/home/git/<project>.git` and is only source ingress.
+
+This keeps the existing operator-facing command name, but changes its meaning from "sync `.bones/` into Git internals" to "publish the deployment dataset to the remote control plane."
+
+`bonesremote` should validate and normalize the incoming dataset before making it current. Privileged values should be derived or constrained server-side. For v1, convention over configurability is preferred: paths like `/home/git/<project>.git`, `/srv/sites/<project>`, `/srv/sites/<project>/shared`, and service names like `<project>-nginx.service` should not be freely supplied by repo-owned config.
+
+Imports should be transactional enough to avoid half-updated remote state, but v1 does not need a generation/history model. Write a temporary sibling directory, validate it, then atomically replace the current site directory.
+
+```text
+/root/.config/bonesremote/sites/foo/
+  registry.toml
+  runtime.toml
+  deployment/
+```
+
+The drift model is intentional: editing local `.bones/` does nothing remotely until `bonesdeploy push` publishes a new deployment dataset.
+
 ### Local Project Configuration
 
 `bonesdeploy` owns local project setup concerns:
@@ -65,7 +107,8 @@ Their responsibilities are not:
 
 - `init` for local project scaffolding.
 - `doctor` for local checks and remote reachability checks.
-- `push` and `pull` for syncing `.bones/` assets to and from the remote repo area.
+- `push` for publishing the local `.bones/` deployment dataset into `bonesremote`'s remote control-plane state.
+- `pull` for recovering the currently published deployment dataset from `bonesremote` when needed.
 - `deploy` for explicitly asking the remote host to deploy the configured site.
 - `rollback` for explicitly asking the remote host to roll back the configured site.
 - `secrets` commands for local encrypted secret editing and remote secret delivery.
@@ -172,10 +215,10 @@ The build context should be disposable and deleted after success or failure.
 It should:
 
 - run builds in a temporary Podman container.
-- mount only source, output, caches, and temporary directories required for the build.
+- mount only source, caches, and temporary directories required for the build.
 - avoid mounting `shared/`, `.env`, SQLite databases, `current`, `releases/`, `/etc/bonesdeploy`, `/root`, or the bare repo.
 - treat build scripts as project-controlled and untrusted.
-- require the build to produce an artifact directory.
+- run build scripts with `cwd=/workspace/source` and promote the mutated source tree.
 
 It should not install Podman, configure registries, install language packages on the host, or create cache directories. Those are `bonesinfra` concerns.
 
@@ -187,7 +230,7 @@ Podman output is not a release. It is raw build output produced by project-contr
 
 `bonesremote` should:
 
-- copy accepted artifact output into a new release directory.
+- copy accepted built source into a new release directory.
 - set release ownership to `root:foo`.
 - set directory modes to `0750`.
 - set regular file modes to `0640`.
@@ -291,7 +334,7 @@ The following concerns belong to `bonesinfra`, not `bonesdeploy` or `bonesremote
 - creating the `git` user.
 - creating the per-site `foo` user and group.
 - removing `git` from site groups.
-- creating `/srv/git`, `/srv/sites/foo`, `/srv/sites/foo/shared`, `/srv/sites/foo/releases`, `/run/foo`, or cache roots.
+- creating `/home/git`, `/srv/sites/foo`, `/srv/sites/foo/shared`, `/srv/sites/foo/releases`, `/run/foo`, or cache roots.
 - setting base ownership and modes for provisioned directories.
 - installing `bonesremote` onto the host.
 - installing Podman.
