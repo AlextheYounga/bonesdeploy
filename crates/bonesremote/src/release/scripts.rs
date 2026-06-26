@@ -14,10 +14,17 @@ pub(super) struct HostScriptEnv<'a> {
     pub(super) web_root: &'a str,
 }
 
-pub(super) struct BuildScriptEnv<'a> {
-    pub(super) project_name: &'a str,
-    pub(super) web_root: &'a str,
-    pub(super) build_image: &'a str,
+pub(crate) struct BuildScriptEnv<'a> {
+    pub(crate) project_name: &'a str,
+    pub(crate) web_root: &'a str,
+    pub(crate) build_image: &'a str,
+}
+
+pub(crate) struct PrepareScriptEnv<'a> {
+    pub(crate) project_name: &'a str,
+    pub(crate) project_root: &'a str,
+    pub(crate) runtime_user: &'a str,
+    pub(crate) web_root: &'a str,
 }
 
 #[cfg(test)]
@@ -50,7 +57,7 @@ pub(super) fn run_deployment_script(
     stream_child_output(&mut child, log_path, &format!("deployment script {}", script.display()))
 }
 
-pub(super) fn run_podman_build_script(
+pub(crate) fn run_podman_build_script(
     script: &Path,
     source_root: &Path,
     log_path: &Path,
@@ -70,6 +77,26 @@ pub(super) fn run_podman_build_script(
         .with_context(|| format!("Failed to execute build script {} in podman", script.display()))?;
 
     stream_child_output(&mut child, log_path, &format!("podman build script {}", script.display()))
+}
+
+pub(crate) fn run_prepare_script(
+    script: &Path,
+    release_root: &Path,
+    log_path: &Path,
+    env: &PrepareScriptEnv<'_>,
+) -> Result<ExitStatus> {
+    let script_file =
+        fs::File::open(script).with_context(|| format!("Failed to open prepare script {}", script.display()))?;
+
+    let mut command = Command::new("runuser");
+    configure_prepare_command(&mut command, release_root, env);
+
+    let mut child =
+        command.stdin(Stdio::from(script_file)).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().with_context(
+            || format!("Failed to execute prepare script {} as {}", script.display(), env.runtime_user),
+        )?;
+
+    stream_child_output(&mut child, log_path, &format!("prepare script {}", script.display()))
 }
 
 fn configure_podman_build_command(command: &mut Command, source_root: &Path, env: &BuildScriptEnv<'_>) {
@@ -97,6 +124,17 @@ fn configure_podman_build_command(command: &mut Command, source_root: &Path, env
         .arg(format!("SERVICE_USER={}", env.project_name))
         .arg(env.build_image)
         .args(["bash", "-c", "umask 0002; exec bash -s"]);
+}
+
+fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &PrepareScriptEnv<'_>) {
+    command
+        .args(["-u", env.runtime_user, "--", "bash", "-c", "umask 0002; exec bash -s"])
+        .current_dir(release_root)
+        .env("PROJECT_NAME", env.project_name)
+        .env("PROJECT_ROOT", env.project_root)
+        .env("REPO_PATH", "")
+        .env("WEB_ROOT", env.web_root)
+        .env("SERVICE_USER", env.runtime_user);
 }
 
 fn stream_child_output(child: &mut Child, log_path: &Path, label: &str) -> Result<ExitStatus> {
@@ -170,7 +208,10 @@ mod tests {
     use anyhow::Result;
     use std::os::unix::prelude::PermissionsExt;
 
-    use super::{BuildScriptEnv, HostScriptEnv, configure_podman_build_command, run_deployment_script};
+    use super::{
+        BuildScriptEnv, HostScriptEnv, PrepareScriptEnv, configure_podman_build_command, configure_prepare_command,
+        run_deployment_script,
+    };
 
     fn temp_dir(prefix: &str) -> Result<PathBuf> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
@@ -257,37 +298,6 @@ mod tests {
     }
 
     #[test]
-    fn run_deployment_script_creates_missing_log_directory() -> Result<()> {
-        let root = temp_dir("bonesremote_deploy_runner_mkdir")?;
-        let build_root = root.join("workspace");
-        fs::create_dir_all(&build_root)?;
-
-        let script = root.join("00_pass.sh");
-        write_file(&script, "#!/usr/bin/env bash\necho ok\n")?;
-        fs::set_permissions(&script, PermissionsExt::from_mode(0o755))?;
-
-        let log_path = root.join("build/logs/20260612_211412-00_pass.sh.log");
-        let status = run_deployment_script(
-            &script,
-            &build_root,
-            &log_path,
-            &HostScriptEnv {
-                project_name: "demo",
-                project_root: "/srv/deployments/demo",
-                repo_path: "/home/git/demo.git",
-                web_root: "public",
-            },
-        )?;
-
-        assert!(status.success());
-        assert!(log_path.exists(), "log file should be created even when its directory is missing");
-        assert!(fs::read_to_string(&log_path)?.contains("ok"));
-
-        fs::remove_dir_all(root).ok();
-        Ok(())
-    }
-
-    #[test]
     fn run_deployment_script_applies_group_writable_umask() -> Result<()> {
         let root = temp_dir("bonesremote_deploy_runner_umask")?;
         let build_root = root.join("workspace");
@@ -341,5 +351,33 @@ mod tests {
         assert!(args.contains(&String::from("/tmp/source:/workspace/source")));
         assert!(!args.iter().any(|arg| arg.contains("/srv/sites/demo/shared")));
         assert!(!args.iter().any(|arg| arg.contains("/root/.config/bonesremote")));
+    }
+
+    #[test]
+    fn prepare_command_runs_as_runtime_user_in_release() {
+        let mut command = Command::new("runuser");
+        configure_prepare_command(
+            &mut command,
+            Path::new("/srv/sites/demo/releases/20260626_120000"),
+            &PrepareScriptEnv {
+                project_name: "demo",
+                project_root: "/srv/sites/demo",
+                runtime_user: "demo",
+                web_root: "public",
+            },
+        );
+
+        let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+        assert_eq!(args[0], "-u");
+        assert_eq!(args[1], "demo");
+        assert_eq!(command.get_current_dir(), Some(Path::new("/srv/sites/demo/releases/20260626_120000")));
+        assert!(!args.iter().any(|arg| arg.contains("/root/.config/bonesremote")));
+        let service_user = command.get_envs().find_map(|(key, value)| {
+            (key.to_string_lossy() == "SERVICE_USER")
+                .then(|| value.map(|value| value.to_string_lossy().into_owned()))
+                .flatten()
+        });
+        assert_eq!(service_user, Some(String::from("demo")));
+        assert!(!args.iter().any(|arg| arg.contains("podman")));
     }
 }

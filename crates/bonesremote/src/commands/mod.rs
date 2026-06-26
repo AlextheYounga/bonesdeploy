@@ -7,6 +7,7 @@ pub(crate) mod init;
 pub(crate) mod post_deploy;
 pub(crate) mod release_build;
 pub(crate) mod release_checkout;
+pub(crate) mod release_prepare;
 pub(crate) mod service;
 pub(crate) mod site;
 pub(crate) mod stage_release;

@@ -5,8 +5,8 @@ use shared::paths;
 use shared::registry;
 
 use crate::commands::{
-    activate_release, drop_failed_release, post_deploy, release_build, release_checkout, service, stage_release,
-    wire_shared,
+    activate_release, drop_failed_release, post_deploy, release_build, release_checkout, release_prepare, service,
+    stage_release, wire_shared,
 };
 use crate::privileges;
 use crate::release_state;
@@ -42,6 +42,12 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     }
 
     if let Err(error) = wire_shared::run(site) {
+        cleanup(site, Some(&context_dir));
+        drop_failed_release::run(site).ok();
+        return Err(error);
+    }
+
+    if let Err(error) = release_prepare::run(site) {
         cleanup(site, Some(&context_dir));
         drop_failed_release::run(site).ok();
         return Err(error);

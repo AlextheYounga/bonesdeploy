@@ -51,6 +51,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 - `releases/` contains root-promoted artifacts sealed as `root:<site>`.
 - `shared/` is owned by the runtime user (`<site>:<site>`) — only the app writes here.
 - Build input is temporary and disposable; build scripts run in Podman with the source mounted at `/workspace/source`.
+- Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed.
 - Git hooks only trigger `bonesremote`; they do not check out source, run builds, write releases, or restart services.
 - `bonesremote` is the privileged mediator for promotion, activation, and service restart.
 
@@ -115,7 +116,7 @@ Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are wr
 - `post-receive` => Thin trigger that derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/` instead of the bare repo.
 
 ### Deployment Folder
-This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`, and run inside the `build_image` from `.bones/runtime.toml` with `cwd=/workspace/source`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files.
+This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`, and run inside the `build_image` from `.bones/runtime.toml` with `cwd=/workspace/source`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, run in lexical order as the site runtime user with `cwd` set to the sealed release, and are the right place for migrations, cache warmups, and other runtime-state work.
 
 ## Crate Structure
 This Cargo workspace has three crates under `crates/`:
@@ -227,7 +228,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Separate from `remote runtime` to keep certificate management decoupled from app runtime concerns.
 
 - **rollback**
-  - SSHes into the configured host and runs `bonesremote release rollback --site <project>`, which repoints `current` to the previous release without rebuilding and restarts the approved service.
+  - SSHes into the configured host and runs `bonesremote release rollback --site <project>`, which repoints `current` to the previous release without rebuilding and restarts `<project>-nginx.service`.
 
 - **secrets**
   - Subcommands: `init`, `edit`, `push`.
@@ -303,8 +304,9 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
    - **release_build** — Run `deployment/build/*.sh` in disposable Podman containers at `/workspace/source`
    - **release_promote** — Copy safe artifacts into a sealed `root:<site>` release
    - **wire_shared** — Symlink declared shared paths into the sealed release
+   - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user in the sealed release
    - **activate_release** — Atomically repoint `current`
-   - **restart_services** — Restart the registry-approved service
+   - **restart_services** — Restart `<site>-nginx.service`
    - **post_deploy** — Prune old releases beyond `releases`
    - On failure: **drop_failed_release** — Clean up staged release
 
@@ -327,8 +329,9 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
       - **release_build** — Run `deployment/build/*.sh` in Podman at `/workspace/source`
       - **release_promote** — Seal safe artifacts into `releases/<release>`
       - **wire_shared** — Link shared runtime paths
+      - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
       - **activate_release** — Repoint `current`
-      - **restart_services** — Restart the registry-approved service
+      - **restart_services** — Restart `<site>-nginx.service`
       - **post_deploy** — Prune old releases beyond `releases`
       - On failure: **drop_failed_release** — Clean up staged release
 

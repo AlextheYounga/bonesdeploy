@@ -10,6 +10,7 @@ use shared::paths::default_web_root;
 use shared::registry;
 
 use crate::privileges;
+use crate::release::scripts as deploy_output;
 use crate::release_state;
 
 pub fn run(site: &str, context: &Path) -> Result<()> {
@@ -263,9 +264,6 @@ fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
     scripts.sort();
     Ok(scripts)
 }
-
-#[path = "../release/scripts.rs"]
-mod deploy_output;
 
 #[cfg(test)]
 mod tests {
