@@ -1,4 +1,7 @@
-use anyhow::{bail, Result};
+use std::fs;
+use std::path::Path;
+
+use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::{config, paths};
@@ -36,6 +39,21 @@ impl Registry {
             releases_keep: bones.releases_keep,
         }
     }
+
+    #[must_use]
+    pub fn deployment_paths(&self, web_root: &str) -> paths::Deployment {
+        paths::Deployment::new(&self.site, &self.repo_path, &self.site_root, web_root)
+    }
+}
+
+/// # Errors
+///
+/// Returns an error if the registry file cannot be read or parsed.
+pub fn load(path: &Path) -> Result<Registry> {
+    let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let registry: Registry = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    validate_site_name(&registry.site)?;
+    Ok(registry)
 }
 
 /// # Errors
@@ -56,7 +74,13 @@ pub fn validate_site_name(site: &str) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate_site_name, Registry};
+    use std::env;
+    use std::fs;
+    use std::process;
+
+    use anyhow::Result;
+
+    use super::{load, validate_site_name, Registry};
     use crate::config::Bones;
 
     #[test]
@@ -85,5 +109,33 @@ mod tests {
         assert_eq!(registry.runtime_user, "acme");
         assert_eq!(registry.branch, "main");
         assert!(registry.deploy_on_push);
+    }
+
+    #[test]
+    fn load_reads_registry_toml() -> Result<()> {
+        let path = env::temp_dir().join(format!("bonesremote-registry-{}.toml", process::id()));
+        fs::write(
+            &path,
+            r#"
+site = "acme"
+repo_path = "/home/git/acme.git"
+site_root = "/srv/sites/acme"
+shared_root = "/srv/sites/acme/shared"
+releases_root = "/srv/sites/acme/releases"
+current_path = "/srv/sites/acme/current"
+runtime_user = "acme"
+runtime_group = "acme"
+branch = "main"
+deploy_on_push = true
+releases_keep = 5
+"#,
+        )?;
+
+        let registry = load(&path)?;
+        fs::remove_file(&path).ok();
+
+        assert_eq!(registry.site, "acme");
+        assert_eq!(registry.releases_root, "/srv/sites/acme/releases");
+        Ok(())
     }
 }

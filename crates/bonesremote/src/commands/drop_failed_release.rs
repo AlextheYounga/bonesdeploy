@@ -1,6 +1,8 @@
 use std::fs;
 
 use anyhow::{Context, Result};
+use shared::paths;
+use shared::registry;
 
 use crate::privileges;
 use crate::release_state;
@@ -20,9 +22,9 @@ pub fn run(site: &str) -> Result<()> {
         return Ok(());
     };
 
-    let registry = shared::paths::bonesremote_bones_toml_path(site);
-    let cfg = crate::config::load(&registry)
-        .with_context(|| format!("Failed to load remote site state from {}", registry.display()))?;
+    let registry_path = paths::bonesremote_registry_path(site);
+    let cfg = registry::load(&registry_path)
+        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
 
     let release_dir = release_state::release_dir(&cfg, &release_name);
     if release_dir.exists() {

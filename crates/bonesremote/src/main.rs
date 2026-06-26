@@ -1,6 +1,5 @@
 mod cli;
 mod commands;
-mod config;
 mod privileges;
 mod release_state;
 

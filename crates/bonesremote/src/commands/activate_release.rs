@@ -2,20 +2,21 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
 use shared::paths;
+use shared::registry;
 
-use crate::config;
 use crate::privileges;
 use crate::release_state;
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release activate")?;
 
-    let registry = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&registry).map_err(|error| anyhow::anyhow!("Failed to load remote site state: {error}"))?;
+    let registry_path = paths::bonesremote_registry_path(site);
+    let cfg =
+        registry::load(&registry_path).map_err(|error| anyhow::anyhow!("Failed to load remote site state: {error}"))?;
 
     let release_name = release_state::read_staged_release(site)?;
     let release_dir = release_state::release_dir(&cfg, &release_name);
-    let current_link = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
+    let current_link = PathBuf::from(&cfg.current_path);
 
     if !release_dir.exists() {
         anyhow::bail!("Promoted release directory does not exist: {}", release_dir.display());

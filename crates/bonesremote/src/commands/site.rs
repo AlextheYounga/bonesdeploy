@@ -166,7 +166,9 @@ fn unique_site_path(parent: &Path, site: &str, suffix: &str) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::fs;
+    use std::process;
 
     use anyhow::Result;
 
@@ -174,7 +176,7 @@ mod tests {
 
     #[test]
     fn validate_top_level_entries_rejects_unexpected_file() -> Result<()> {
-        let root = std::env::temp_dir().join(format!("bonesremote-site-test-{}", std::process::id()));
+        let root = env::temp_dir().join(format!("bonesremote-site-test-{}", process::id()));
         if root.exists() {
             fs::remove_dir_all(&root)?;
         }

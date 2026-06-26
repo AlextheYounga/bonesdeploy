@@ -1,20 +1,23 @@
 use std::fs;
 use std::os::unix::fs::chown;
-use std::path::{Path, PathBuf};
+use std::os::unix::fs::{PermissionsExt, symlink};
+use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
+use shared::config::{Runtime, load_runtime};
 use shared::paths;
+use shared::paths::default_web_root;
+use shared::registry;
 
-use crate::config;
 use crate::privileges;
 use crate::release_state;
 
 pub fn run(site: &str, context: &Path) -> Result<()> {
     privileges::ensure_root("bonesremote release build")?;
 
-    let config_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&config_path)
-        .with_context(|| format!("Failed to load remote site state from {}", config_path.display()))?;
+    let registry_path = paths::bonesremote_registry_path(site);
+    let cfg = registry::load(&registry_path)
+        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
 
     if !context.is_dir() {
         bail!("Build context does not exist: {}", context.display());
@@ -39,21 +42,19 @@ pub fn run(site: &str, context: &Path) -> Result<()> {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
         println!("Running build script {script_name}...");
 
-        let runtime = shared::config::load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| {
-            shared::config::Runtime {
-                web_root: shared::paths::default_web_root(),
-                runtime_user: String::new(),
-                runtime_group: String::new(),
-                release_group: String::new(),
-            }
+        let runtime = load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
+            web_root: default_web_root(),
+            runtime_user: String::new(),
+            runtime_group: String::new(),
+            release_group: String::new(),
         });
         let status = deploy_output::run_deployment_script(
             &script,
             context,
             &context.join(format!("{script_name}.log")),
             &deploy_output::ScriptEnv {
-                project_name: &cfg.project_name,
-                project_root: &cfg.project_root,
+                project_name: &cfg.site,
+                project_root: &cfg.site_root,
                 repo_path: &cfg.repo_path,
                 web_root: &runtime.web_root,
             },
@@ -71,19 +72,20 @@ pub fn run(site: &str, context: &Path) -> Result<()> {
 pub fn promote(site: &str, context: &Path) -> Result<PathBuf> {
     privileges::ensure_root("bonesremote release promote")?;
 
-    let config_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&config_path)
-        .with_context(|| format!("Failed to load remote site state from {}", config_path.display()))?;
+    let registry_path = paths::bonesremote_registry_path(site);
+    let cfg = registry::load(&registry_path)
+        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
 
     let release_name = release_state::read_staged_release(site)?;
     let release_dir = release_state::release_dir(&cfg, &release_name);
-    harden_release_tree(context, &release_dir).with_context(|| format!("Failed to promote release {release_name}"))?;
+    harden_release_tree(context, &release_dir, &cfg)
+        .with_context(|| format!("Failed to promote release {release_name}"))?;
 
     println!("Promoted release {release_name} into {}", release_dir.display());
     Ok(release_dir)
 }
 
-fn harden_release_tree(source: &Path, destination: &Path) -> Result<()> {
+fn harden_release_tree(source: &Path, destination: &Path, cfg: &registry::Registry) -> Result<()> {
     if !source.is_dir() {
         bail!("Source tree is not a directory: {}", source.display());
     }
@@ -92,55 +94,111 @@ fn harden_release_tree(source: &Path, destination: &Path) -> Result<()> {
         .with_context(|| format!("Failed to create release directory {}", destination.display()))?;
     clear_directory_children(destination)?;
 
-    copy_hardened(source, destination)?;
-    seal_release(destination)?;
+    copy_hardened(source, destination, source)?;
+    seal_release(destination, cfg)?;
     Ok(())
 }
 
-fn copy_hardened(source: &Path, destination: &Path) -> Result<()> {
-    let status = std::process::Command::new("cp")
-        .arg("-a")
-        .arg(source.join("."))
-        .arg(destination)
-        .status()
-        .with_context(|| format!("Failed to copy source {} into {}", source.display(), destination.display()))?;
+fn copy_hardened(source: &Path, destination: &Path, tree_root: &Path) -> Result<()> {
+    for entry in fs::read_dir(source).with_context(|| format!("Failed to read source tree {}", source.display()))? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let dest_path = destination.join(entry.file_name());
+        let metadata = fs::symlink_metadata(&source_path)
+            .with_context(|| format!("Failed to inspect build artifact {}", source_path.display()))?;
+        let file_type = metadata.file_type();
 
-    if !status.success() {
-        bail!("Failed to promote source {} into {}: status {status}", source.display(), destination.display());
+        if file_type.is_dir() {
+            fs::create_dir_all(&dest_path)
+                .with_context(|| format!("Failed to create release directory {}", dest_path.display()))?;
+            copy_hardened(&source_path, &dest_path, tree_root)?;
+            continue;
+        }
+
+        if file_type.is_file() {
+            fs::copy(&source_path, &dest_path).with_context(|| {
+                format!("Failed to copy build artifact {} into {}", source_path.display(), dest_path.display())
+            })?;
+            continue;
+        }
+
+        if file_type.is_symlink() {
+            let target = fs::read_link(&source_path)
+                .with_context(|| format!("Failed to read symlink {}", source_path.display()))?;
+            validate_symlink_target(&source_path, &target, tree_root)?;
+            symlink(&target, &dest_path)
+                .with_context(|| format!("Failed to recreate symlink {}", dest_path.display()))?;
+            continue;
+        }
+
+        bail!("Unsupported artifact type in promoted release: {}", source_path.display());
     }
 
     Ok(())
 }
 
-fn seal_release(destination: &Path) -> Result<()> {
+fn validate_symlink_target(link_path: &Path, target: &Path, tree_root: &Path) -> Result<()> {
+    if target.is_absolute() {
+        bail!("Absolute symlink is not allowed in release artifacts: {} -> {}", link_path.display(), target.display());
+    }
+
+    let link_parent = link_path.parent().unwrap_or(tree_root);
+    let candidate = normalize_relative_path(&link_parent.join(target), tree_root)?;
+    if !candidate.starts_with(tree_root) {
+        bail!("Symlink escapes release tree: {} -> {}", link_path.display(), target.display());
+    }
+
+    Ok(())
+}
+
+fn normalize_relative_path(path: &Path, root: &Path) -> Result<PathBuf> {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => normalized.push(component.as_os_str()),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if normalized == root || !normalized.pop() {
+                    bail!("Path escapes release tree: {}", path.display());
+                }
+            }
+            Component::Normal(part) => normalized.push(part),
+        }
+    }
+    Ok(normalized)
+}
+
+fn seal_release(destination: &Path, cfg: &registry::Registry) -> Result<()> {
     use std::os::unix::fs::MetadataExt;
 
-    let gid = site_group_gid()?;
+    let gid = site_group_gid(&cfg.runtime_group)?;
     let uid = root_uid()?;
 
     let metadata = fs::symlink_metadata(destination)
         .with_context(|| format!("Failed to inspect {} for sealing", destination.display()))?;
+    if metadata.file_type().is_symlink() {
+        return Ok(());
+    }
+
     chown(destination, Some(uid), Some(gid))
-        .with_context(|| format!("Failed to chown {} to root:<site>", destination.display()))?;
+        .with_context(|| format!("Failed to chown {} to root:{}", destination.display(), cfg.runtime_group))?;
+
+    let mode = if metadata.file_type().is_dir() {
+        0o750
+    } else if metadata.mode() & 0o111 != 0 {
+        0o750
+    } else {
+        0o640
+    };
+    fs::set_permissions(destination, fs::Permissions::from_mode(mode))
+        .with_context(|| format!("Failed to set permissions on {}", destination.display()))?;
 
     if metadata.file_type().is_dir() {
         for entry in fs::read_dir(destination)
             .with_context(|| format!("Failed to read {} for sealing", destination.display()))?
         {
             let entry = entry?;
-            let entry_type = entry.file_type()?;
-            if entry_type.is_symlink() {
-                continue;
-            }
-            let path = entry.path();
-            let sub_metadata = fs::symlink_metadata(&path)
-                .with_context(|| format!("Failed to inspect {} for sealing", path.display()))?;
-            chown(&path, Some(uid), Some(gid))
-                .with_context(|| format!("Failed to chown {} to root:<site>", path.display()))?;
-            if sub_metadata.file_type().is_dir() {
-                let _ = sub_metadata;
-                seal_release(&path)?;
-            }
+            seal_release(&entry.path(), cfg)?;
         }
     }
 
@@ -148,7 +206,7 @@ fn seal_release(destination: &Path) -> Result<()> {
 }
 
 fn root_uid() -> Result<u32> {
-    let passwd = std::fs::read_to_string("/etc/passwd").context("Failed to read /etc/passwd while sealing release")?;
+    let passwd = fs::read_to_string("/etc/passwd").context("Failed to read /etc/passwd while sealing release")?;
     let line = passwd.lines().find(|line| line.starts_with("root:")).context("root entry missing from /etc/passwd")?;
     let fields: Vec<&str> = line.split(':').collect();
     let uid = fields
@@ -159,10 +217,8 @@ fn root_uid() -> Result<u32> {
     Ok(uid)
 }
 
-fn site_group_gid() -> Result<u32> {
-    let cfg = load_active_cfg_for_seal()?;
-    let group = shared::config::runtime_group_for(&cfg.project_name);
-    let groupfile = std::fs::read_to_string("/etc/group").context("Failed to read /etc/group while sealing release")?;
+fn site_group_gid(group: &str) -> Result<u32> {
+    let groupfile = fs::read_to_string("/etc/group").context("Failed to read /etc/group while sealing release")?;
     let line = groupfile
         .lines()
         .find(|line| line.starts_with(&format!("{group}:")))
@@ -176,34 +232,12 @@ fn site_group_gid() -> Result<u32> {
     Ok(gid)
 }
 
-fn load_active_cfg_for_seal() -> Result<config::Bones> {
-    let sites = paths::bonesremote_sites_root();
-    if !sites.exists() {
-        bail!("bonesremote site root missing while sealing release");
-    }
-
-    for entry in fs::read_dir(&sites)? {
-        let entry = entry?;
-        if !entry.file_type()?.is_dir() {
-            continue;
-        }
-        let toml = entry.path().join(paths::BONES_TOML);
-        if toml.is_file() {
-            return config::load(&toml);
-        }
-    }
-
-    bail!("No site bones.toml found under {}", sites.display());
-}
-
 fn clear_directory_children(path: &Path) -> Result<()> {
     for entry in fs::read_dir(path).with_context(|| format!("Failed to read release directory {}", path.display()))? {
         let entry = entry?;
         let entry_type = entry.file_type()?;
         if entry_type.is_dir() {
             fs::remove_dir_all(entry.path())?;
-        } else if entry_type.is_symlink() {
-            fs::remove_file(entry.path())?;
         } else {
             fs::remove_file(entry.path())?;
         }
@@ -231,14 +265,17 @@ mod deploy_output;
 
 #[cfg(test)]
 mod tests {
-    use super::clear_directory_children;
+    use super::{clear_directory_children, normalize_relative_path, validate_symlink_target};
+    use std::env;
     use std::fs;
+    use std::path::Path;
+    use std::process;
 
     use anyhow::Result;
 
     #[test]
     fn clear_directory_children_only_removes_entries() -> Result<()> {
-        let root = std::env::temp_dir().join(format!("bonesremote-promote-clear-{}", std::process::id()));
+        let root = env::temp_dir().join(format!("bonesremote-promote-clear-{}", process::id()));
         if root.exists() {
             fs::remove_dir_all(&root)?;
         }
@@ -253,5 +290,21 @@ mod tests {
 
         fs::remove_dir_all(&root).ok();
         Ok(())
+    }
+
+    #[test]
+    fn normalize_relative_path_rejects_escape() {
+        let root = Path::new("/tmp/release-root");
+        let escaped = normalize_relative_path(Path::new("/tmp/release-root/app/../../etc/passwd"), root);
+        assert!(escaped.is_err());
+    }
+
+    #[test]
+    fn validate_symlink_target_rejects_absolute_and_escaping_targets() {
+        let root = Path::new("/tmp/release-root");
+        assert!(validate_symlink_target(Path::new("/tmp/release-root/x"), Path::new("/etc/passwd"), root).is_err());
+        assert!(
+            validate_symlink_target(Path::new("/tmp/release-root/public/x"), Path::new("../../evil"), root).is_err()
+        );
     }
 }

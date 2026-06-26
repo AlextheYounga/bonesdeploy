@@ -2,22 +2,21 @@ use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process;
-use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{cell::RefCell, thread_local};
 
 use anyhow::{Context, Result, bail};
 
-use crate::config::Bones;
 use shared::paths;
+use shared::registry::Registry;
 
-static SITES_ROOT_OVERRIDE: Mutex<Option<PathBuf>> = Mutex::new(None);
+thread_local! {
+    static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+}
 
 #[cfg(test)]
 pub(crate) fn set_sites_root_for_tests(root: PathBuf) -> ScopedRoot {
-    let mut guard = SITES_ROOT_OVERRIDE
-        .lock()
-        .unwrap_or_else(|poison| poison.into_inner());
-    let prev = guard.replace(root);
+    let prev = SITES_ROOT_OVERRIDE.with(|slot| slot.replace(Some(root)));
     ScopedRoot(prev)
 }
 
@@ -27,19 +26,15 @@ pub(crate) struct ScopedRoot(Option<PathBuf>);
 #[cfg(test)]
 impl Drop for ScopedRoot {
     fn drop(&mut self) {
-        let mut guard = SITES_ROOT_OVERRIDE
-            .lock()
-            .unwrap_or_else(|poison| poison.into_inner());
-        *guard = self.0.take();
+        let previous = self.0.take();
+        SITES_ROOT_OVERRIDE.with(|slot| {
+            slot.replace(previous);
+        });
     }
 }
 
 fn resolved_sites_root() -> PathBuf {
-    SITES_ROOT_OVERRIDE
-        .lock()
-        .unwrap_or_else(|poison| poison.into_inner())
-        .clone()
-        .unwrap_or_else(paths::bonesremote_sites_root)
+    SITES_ROOT_OVERRIDE.with(|slot| slot.borrow().clone()).unwrap_or_else(paths::bonesremote_sites_root)
 }
 
 fn resolved_site_root(site: &str) -> PathBuf {
@@ -82,20 +77,20 @@ pub fn clear_staged_release(site: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn release_dir(cfg: &Bones, release: &str) -> PathBuf {
+pub fn release_dir(cfg: &Registry, release: &str) -> PathBuf {
     releases_dir(cfg).join(release)
 }
 
-pub fn releases_dir(cfg: &Bones) -> PathBuf {
-    PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).releases)
+pub fn releases_dir(cfg: &Registry) -> PathBuf {
+    PathBuf::from(&cfg.releases_root)
 }
 
-pub fn shared_dir(cfg: &Bones) -> PathBuf {
-    PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).shared)
+pub fn shared_dir(cfg: &Registry) -> PathBuf {
+    PathBuf::from(&cfg.shared_root)
 }
 
-pub fn current_release_dir(cfg: &Bones) -> Result<PathBuf> {
-    let current_link = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
+pub fn current_release_dir(cfg: &Registry) -> Result<PathBuf> {
+    let current_link = PathBuf::from(&cfg.current_path);
     let active_target =
         fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
 
@@ -106,7 +101,7 @@ pub fn current_release_dir(cfg: &Bones) -> Result<PathBuf> {
     })
 }
 
-pub fn current_release_name(cfg: &Bones) -> Result<String> {
+pub fn current_release_name(cfg: &Registry) -> Result<String> {
     let current_release = current_release_dir(cfg)?;
     current_release
         .file_name()
@@ -114,7 +109,7 @@ pub fn current_release_name(cfg: &Bones) -> Result<String> {
         .ok_or_else(|| anyhow::anyhow!("Failed to resolve current release name from {}", current_release.display()))
 }
 
-pub fn list_releases_sorted(cfg: &Bones) -> Result<Vec<String>> {
+pub fn list_releases_sorted(cfg: &Registry) -> Result<Vec<String>> {
     let releases_dir = releases_dir(cfg);
     if !releases_dir.exists() {
         return Ok(Vec::new());
@@ -171,8 +166,8 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::config::Bones;
     use shared::paths;
+    use shared::registry::Registry;
 
     use super::{
         ScopedRoot, clear_staged_release, current_release_name, list_releases_sorted, point_symlink_atomically,
@@ -184,29 +179,32 @@ mod tests {
         env::temp_dir().join(format!("bonesremote_release_state_test_{}_{}_{}", process::id(), nanos, test_name))
     }
 
-    fn temp_root(test_name: &str) -> (ScopedRoot, PathBuf) {
+    fn temp_root(test_name: &str) -> Result<(ScopedRoot, PathBuf)> {
         let path = temp_dir_path(test_name);
-        fs::create_dir_all(&path).unwrap();
-        (set_sites_root_for_tests(path.clone()), path)
+        fs::create_dir_all(&path)?;
+        Ok((set_sites_root_for_tests(path.clone()), path))
     }
 
-    fn sample_config(root: &Path, site: &str) -> Bones {
-        Bones {
-            remote_name: String::from("production"),
-            project_name: String::from(site),
-            host: String::from("deploy.example.com"),
-            port: String::from("22"),
+    fn sample_config(root: &Path, site: &str) -> Registry {
+        let site_root = root.join("deploy");
+        Registry {
+            site: String::from(site),
             repo_path: root.join("repo.git").to_string_lossy().to_string(),
-            project_root: root.join("deploy").to_string_lossy().to_string(),
+            site_root: site_root.to_string_lossy().to_string(),
+            shared_root: site_root.join(paths::SHARED_DIR).to_string_lossy().to_string(),
+            releases_root: site_root.join(paths::RELEASES_DIR).to_string_lossy().to_string(),
+            current_path: site_root.join(paths::CURRENT_LINK).to_string_lossy().to_string(),
+            runtime_user: String::from(site),
+            runtime_group: String::from(site),
             branch: String::from("master"),
             deploy_on_push: true,
-            ..Default::default()
+            releases_keep: 5,
         }
     }
 
     #[test]
     fn write_then_read_staged_release_round_trips() -> Result<()> {
-        let (_guard, _root) = temp_root("round_trip");
+        let (_guard, _root) = temp_root("round_trip")?;
 
         write_staged_release("unitapp", "20260507_151500")?;
         let release_name = read_staged_release("unitapp")?;
@@ -217,7 +215,7 @@ mod tests {
 
     #[test]
     fn read_staged_release_rejects_empty_file() -> Result<()> {
-        let (_guard, root) = temp_root("empty_state");
+        let (_guard, root) = temp_root("empty_state")?;
         let state_path = root.join("emptyapp").join(paths::STAGED_RELEASE_FILE);
         if let Some(parent) = state_path.parent() {
             fs::create_dir_all(parent)?;
@@ -232,7 +230,7 @@ mod tests {
 
     #[test]
     fn clear_staged_release_removes_state_file() -> Result<()> {
-        let (_guard, _root) = temp_root("clear_state");
+        let (_guard, _root) = temp_root("clear_state")?;
 
         write_staged_release("clearapp", "20260507_151501")?;
         clear_staged_release("clearapp")?;

@@ -201,7 +201,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Recreates the local `.git/hooks/pre-push` symlink so the repository regains its pre-push check after recovery.
 
 - **deploy**
-  - SSHes into the configured host and runs `bonesremote deploy --config <remote_bones_toml>` directly, without pushing commits or using git hooks.
+  - Publishes the local `.bones/` dataset into remote bonesremote site state first, then SSHes into the configured host and runs `bonesremote deploy --site <project>` directly.
   - Omits the `--revision` flag, so `bonesremote deploy` uses the configured branch from `bones.toml`.
 
 - ****remote setup****
@@ -227,7 +227,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Separate from `remote runtime` to keep certificate management decoupled from app runtime concerns.
 
 - **rollback**
-  - SSHes into the configured host and runs `bonesremote release rollback --config ...`, which repoints `current` to the previous release without rebuilding.
+  - SSHes into the configured host and runs `bonesremote release rollback --site <project>`, which repoints `current` to the previous release without rebuilding and restarts the approved service.
 
 - **secrets**
   - Subcommands: `init`, `edit`, `push`.
@@ -252,9 +252,9 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **Service commands** live under `bonesremote service ...`
 - **deploy**:
   - Runs the full deployment lifecycle as a single command (the primary entrypoint used by both `post-receive` hook and `bonesdeploy deploy`).
-  - Orchestrates: doctor → stage_release → post_receive (git checkout) → wire_release → deploy scripts → activate → service restart → post_deploy.
+  - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → release promotion/hardening → shared wiring → activate → service restart → post-deploy pruning.
   - On failure, automatically drops the staged release.
-  - `--config <path>`: path to `bones.toml`
+  - `--site <name>`: imported site identifier used to load root-owned registry state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
 - **init**:
   - Must be run as sudo.

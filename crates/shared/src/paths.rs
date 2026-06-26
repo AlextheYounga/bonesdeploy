@@ -158,7 +158,7 @@ pub const SHARED_LEAVES: &[&str] = &[DOT_ENV, "storage", "bootstrap/cache", "dat
 
 #[must_use]
 pub fn bonesremote_sites_root_resolved() -> PathBuf {
-    if let Some(root) = std::env::var_os("BONESREMOTE_SITES_ROOT") {
+    if let Some(root) = env::var_os("BONESREMOTE_SITES_ROOT") {
         let raw = root.to_string_lossy().to_string();
         if !raw.trim().is_empty() {
             return PathBuf::from(raw);

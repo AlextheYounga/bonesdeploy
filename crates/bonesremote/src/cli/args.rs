@@ -22,6 +22,11 @@ pub enum Command {
         #[arg(long)]
         revision: Option<String>,
     },
+    /// Print remote deployment status as JSON
+    Status {
+        #[arg(long)]
+        site: String,
+    },
     /// Thin git-hook entrypoints
     Hook {
         #[command(subcommand)]

@@ -5,7 +5,6 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use shared::{paths, registry};
 
-use crate::config;
 use crate::privileges;
 use crate::release_state;
 
@@ -13,8 +12,8 @@ pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release wire")?;
     registry::validate_site_name(site)?;
 
-    let config_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&config_path).context(super::deploy::registry_load_error())?;
+    let registry_path = paths::bonesremote_registry_path(site);
+    let cfg = registry::load(&registry_path).context(super::deploy::registry_load_error())?;
 
     let release_name = release_state::read_staged_release(site)?;
     let release_dir = release_state::release_dir(&cfg, &release_name);
@@ -23,34 +22,30 @@ pub fn run(site: &str) -> Result<()> {
     }
 
     let shared_dir = release_state::shared_dir(&cfg);
-    fs::create_dir_all(&shared_dir)
-        .with_context(|| format!("Failed to ensure shared dir exists: {}", shared_dir.display()))?;
+    if !shared_dir.is_dir() {
+        bail!(
+            "Shared root is missing: {}. Run 'bonesdeploy remote setup' or runtime provisioning first.",
+            shared_dir.display()
+        );
+    }
 
     for leaf in paths::SHARED_LEAVES {
-        ensure_shared_leaf(&shared_dir, leaf)?;
-        link_relative(&release_dir, leaf, &shared_dir.join(leaf))?;
+        let target = shared_dir.join(leaf);
+        ensure_shared_leaf(&target)?;
+        link_relative(&release_dir, leaf, &target)?;
     }
+
+    link_public_storage(&release_dir)?;
 
     Ok(())
 }
 
-fn ensure_shared_leaf(shared_dir: &Path, leaf: &str) -> Result<()> {
-    let path = shared_dir.join(leaf);
+fn ensure_shared_leaf(path: &Path) -> Result<()> {
     if path.exists() {
         return Ok(());
     }
 
-    if leaf.ends_with(".sqlite") || leaf == paths::DOT_ENV {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create shared leaf parent {}", parent.display()))?;
-        }
-        fs::write(&path, "").with_context(|| format!("Failed to create shared leaf {}", path.display()))?;
-        return Ok(());
-    }
-
-    fs::create_dir_all(&path).with_context(|| format!("Failed to create shared leaf {}", path.display()))?;
-    Ok(())
+    bail!("Required shared path is missing: {}. Provision the runtime shared paths before deploying.", path.display())
 }
 
 fn link_relative(release_dir: &Path, relative: &str, target: &Path) -> Result<()> {
@@ -74,18 +69,33 @@ fn remove_if_present(path: &Path) -> Result<()> {
     Ok(())
 }
 
+fn link_public_storage(release_dir: &Path) -> Result<()> {
+    let public_dir = release_dir.join("public");
+    if !public_dir.is_dir() {
+        return Ok(());
+    }
+
+    let link_path = public_dir.join("storage");
+    remove_if_present(&link_path)?;
+    symlink(Path::new("../storage/app/public"), &link_path)
+        .with_context(|| format!("Failed to link {} -> ../storage/app/public", link_path.display()))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
     use std::path::PathBuf;
+    use std::process;
 
     use anyhow::Result;
 
-    use super::{ensure_shared_leaf, link_relative, remove_if_present};
+    use super::{ensure_shared_leaf, link_public_storage, link_relative, remove_if_present};
 
     fn temp_dir(label: &str) -> Result<PathBuf> {
-        let dir = std::env::temp_dir().join(format!("bonesremote-wire-{label}-{}", std::process::id()));
+        let dir = env::temp_dir().join(format!("bonesremote-wire-{label}-{}", process::id()));
         if dir.exists() {
             fs::remove_dir_all(&dir)?;
         }
@@ -94,15 +104,13 @@ mod tests {
     }
 
     #[test]
-    fn ensure_shared_leaf_creates_missing_files_and_dirs() -> Result<()> {
+    fn ensure_shared_leaf_requires_existing_path() -> Result<()> {
         let root = temp_dir("ensure_leaves")?;
-        ensure_shared_leaf(&root, "storage")?;
-        ensure_shared_leaf(&root, ".env")?;
-        ensure_shared_leaf(&root, "database/database.sqlite")?;
+        let missing = root.join("storage");
+        assert!(ensure_shared_leaf(&missing).is_err());
 
-        assert!(root.join("storage").is_dir());
-        assert!(root.join(".env").is_file());
-        assert!(root.join("database/database.sqlite").is_file());
+        fs::create_dir_all(&missing)?;
+        ensure_shared_leaf(&missing)?;
 
         fs::remove_dir_all(&root).ok();
         Ok(())
@@ -112,7 +120,8 @@ mod tests {
     fn link_relative_creates_symlink_to_shared_target() -> Result<()> {
         let root = temp_dir("link_relative")?;
         let shared = root.join("shared/.env");
-        fs::create_dir_all(shared.parent().unwrap())?;
+        let parent = shared.parent().ok_or_else(|| anyhow::anyhow!("shared test path should have a parent"))?;
+        fs::create_dir_all(parent)?;
         fs::write(&shared, "FOO=bar\n")?;
         fs::set_permissions(&shared, PermissionsExt::from_mode(0o600))?;
 
@@ -145,6 +154,22 @@ mod tests {
         fs::create_dir_all(&dir)?;
         remove_if_present(&dir)?;
         assert!(!dir.exists());
+
+        fs::remove_dir_all(&root).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn link_public_storage_links_into_release_storage_tree() -> Result<()> {
+        let root = temp_dir("public_storage")?;
+        let release = root.join("releases/now");
+        fs::create_dir_all(release.join("public"))?;
+
+        link_public_storage(&release)?;
+
+        let link = release.join("public/storage");
+        assert!(link.is_symlink());
+        assert_eq!(fs::read_link(&link)?, PathBuf::from("../storage/app/public"));
 
         fs::remove_dir_all(&root).ok();
         Ok(())

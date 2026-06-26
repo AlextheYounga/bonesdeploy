@@ -2,32 +2,32 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use shared::paths;
+use shared::registry;
 
 use crate::commands::{
-    activate_release, drop_failed_release, release_build, release_checkout, stage_release, wire_shared,
+    activate_release, drop_failed_release, post_deploy, release_build, release_checkout, service, stage_release,
+    wire_shared,
 };
-use crate::config;
 use crate::privileges;
 use crate::release_state;
 
 pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     privileges::ensure_root("bonesremote deploy")?;
-    let registry = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&registry)
-        .with_context(|| format!("Failed to load remote site state from {}", registry.display()))?;
+    let registry_path = paths::bonesremote_registry_path(site);
+    let cfg = registry::load(&registry_path)
+        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
 
-    let target_revision = revision.map(ToOwned::to_owned).unwrap_or_else(|| cfg.branch.clone());
+    let target_revision = revision.map_or_else(|| cfg.branch.clone(), ToOwned::to_owned);
 
     stage_release::run(site)?;
 
-    let context_dir = match run_checkout(site, &target_revision) {
-        Ok(context) => context,
-        Err(error) => {
-            cleanup(site, None);
-            drop_failed_release::run(site).ok();
-            return Err(error);
-        }
-    };
+    let context_dir = release_checkout::ensure_build_context(site)?;
+
+    if let Err(error) = release_checkout::run(site, &target_revision, &context_dir) {
+        cleanup(site, Some(&context_dir));
+        drop_failed_release::run(site).ok();
+        return Err(error);
+    }
 
     if let Err(error) = release_build::run(site, &context_dir) {
         cleanup(site, Some(&context_dir));
@@ -53,14 +53,19 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
         return Err(error);
     }
 
+    if let Err(error) = service::run(site) {
+        cleanup(site, Some(&context_dir));
+        drop_failed_release::run(site).ok();
+        return Err(error);
+    }
+
+    if let Err(error) = post_deploy::run(site) {
+        cleanup(site, Some(&context_dir));
+        return Err(error);
+    }
+
     cleanup(site, Some(&context_dir));
     Ok(())
-}
-
-fn run_checkout(site: &str, revision: &str) -> Result<PathBuf> {
-    let context = release_checkout::ensure_build_context(site)?;
-    release_checkout::run(site, revision)?;
-    Ok(context)
 }
 
 fn cleanup(site: &str, context: Option<&Path>) {
@@ -71,8 +76,7 @@ fn cleanup(site: &str, context: Option<&Path>) {
 
 pub fn rollback(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release rollback")?;
-    let registry = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&registry).context(registry_load_error())?;
+    let cfg = registry::load(&paths::bonesremote_registry_path(site)).context(registry_load_error())?;
 
     let releases = release_state::list_releases_sorted(&cfg)?;
     if releases.len() < 2 {
@@ -91,8 +95,9 @@ pub fn rollback(site: &str) -> Result<()> {
 
     let previous_name = releases[current_idx - 1].clone();
     let previous_dir = release_state::release_dir(&cfg, &previous_name);
-    let current_link = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
+    let current_link = PathBuf::from(&cfg.current_path);
     release_state::point_symlink_atomically(&current_link, &previous_dir)?;
+    service::run(site)?;
 
     println!("Rollback complete: {current_name} -> {previous_name}");
     Ok(())

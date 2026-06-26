@@ -1,15 +1,10 @@
 use std::fs;
 use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use shared::paths::Deployment;
-
-pub(super) fn deployment_log_path(paths: &Deployment, release_name: &str, script_name: &str) -> PathBuf {
-    Path::new(&paths.build_logs).join(format!("{release_name}-{script_name}.log"))
-}
 
 pub(super) struct ScriptEnv<'a> {
     pub(super) project_name: &'a str,
@@ -109,9 +104,7 @@ mod tests {
     use anyhow::Result;
     use std::os::unix::prelude::PermissionsExt;
 
-    use shared::paths::Deployment;
-
-    use super::{ScriptEnv, deployment_log_path, run_deployment_script};
+    use super::{ScriptEnv, run_deployment_script};
 
     fn temp_dir(prefix: &str) -> Result<PathBuf> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
@@ -260,17 +253,5 @@ mod tests {
 
         fs::remove_dir_all(root).ok();
         Ok(())
-    }
-
-    #[test]
-    fn deployment_log_path_lives_under_build_logs() {
-        let paths = Deployment::new("demo", "/home/git/demo.git", "/srv/deployments/demo", "public");
-        let log = deployment_log_path(&paths, "20260612_211412", "02_run_build.sh");
-
-        assert_eq!(
-            log,
-            PathBuf::from("/srv/deployments/demo/build/logs/20260612_211412-02_run_build.sh.log"),
-            "log path should derive from centralized build_logs directory"
-        );
     }
 }

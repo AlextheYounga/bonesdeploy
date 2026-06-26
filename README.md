@@ -6,7 +6,7 @@
 
 > WARNING: BonesDeploy is still under active development. There may be some cool bugs!
 
-BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, syncs them to the remote, and manages permissions through provisioning-time contracts (setgid directories + systemd sandboxing) without forcing containers, a control plane, or a platform layer.
+BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, publishes the `.bones/` dataset into root-owned `bonesremote` site state, and runs the release lifecycle remotely without turning the bare Git repo into the control plane.
 
 It produces two binaries:
 - **`bonesdeploy`** — local CLI for init, config, deployment, and management
@@ -120,7 +120,7 @@ After editing hooks or deployment scripts in `.bones/`:
 bonesdeploy push
 ```
 
-This rsyncs `.bones/` to the remote bare repo and symlinks the hooks.
+This archives the local `.bones/` dataset and streams it to `bonesremote site import --site <project>`. The remote site state is stored under `/root/.config/bonesremote/sites/<project>/`, not inside the bare repo.
 
 ### Deploying
 
@@ -130,7 +130,7 @@ Deploy the configured project release:
 bonesdeploy deploy
 ```
 
-This SSHs into the host and runs `bonesremote deploy --config <remote bones.toml>`, which orchestrates the full server-side pipeline: doctor check → stage release → checkout → wire shared paths → run deployment scripts → activate → restart services → prune old releases.
+This SSHs into the host and runs `bonesremote deploy --site <project>`, which orchestrates the current server-side pipeline: stage release → export source from the bare repo into a temp build context → run deployment scripts → promote the release → wire shared paths → activate → restart services → prune old releases.
 
 To roll back to the previous release without rebuilding:
 

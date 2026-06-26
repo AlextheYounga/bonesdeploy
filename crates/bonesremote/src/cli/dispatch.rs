@@ -1,13 +1,14 @@
 use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, HookCommand, ReleaseCommand, ServiceCommand, SiteCommand};
-use crate::commands::{deploy, doctor, drop_failed_release, hook, init, post_deploy, service, site, version};
+use crate::commands::{deploy, doctor, drop_failed_release, hook, init, post_deploy, service, site, status, version};
 
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init => init::run(),
         Command::Doctor => doctor::run(),
         Command::Deploy { site, revision } => deploy::run_full(site, revision.as_deref()),
+        Command::Status { site } => status::run(site),
         Command::Hook { command } => match command {
             HookCommand::PostReceive { site: site_name } => hook::post_receive(site_name),
         },
