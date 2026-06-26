@@ -1,6 +1,7 @@
 runtime_user = ""
 runtime_group = ""
 release_group = ""
+build_image = "docker.io/library/buildpack-deps:bookworm"
 
 [permissions]
 paths = [{ path = "*", type = "dir", mode = "750" }, { path = "*", type = "file", mode = "640" }]

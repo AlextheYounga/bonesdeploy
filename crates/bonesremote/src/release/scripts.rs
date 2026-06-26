@@ -1,33 +1,35 @@
 use std::fs;
 use std::io::{self, Read, Write};
 use std::path::Path;
-use std::process::{Command, ExitStatus, Stdio};
+use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
 
-pub(super) struct ScriptEnv<'a> {
+#[cfg(test)]
+pub(super) struct HostScriptEnv<'a> {
     pub(super) project_name: &'a str,
     pub(super) project_root: &'a str,
     pub(super) repo_path: &'a str,
     pub(super) web_root: &'a str,
 }
 
+pub(super) struct BuildScriptEnv<'a> {
+    pub(super) project_name: &'a str,
+    pub(super) web_root: &'a str,
+    pub(super) build_image: &'a str,
+}
+
+#[cfg(test)]
 pub(super) fn run_deployment_script(
     script: &Path,
     build_root: &Path,
     log_path: &Path,
-    env: &ScriptEnv<'_>,
+    env: &HostScriptEnv<'_>,
 ) -> Result<ExitStatus> {
     if let Some(parent) = log_path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("Failed to create log directory {}", parent.display()))?;
     }
-
-    let log_file = fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(log_path)
-        .with_context(|| format!("Failed to open deployment log {}", log_path.display()))?;
 
     let mut child = Command::new("bash")
         .arg("-c")
@@ -45,14 +47,77 @@ pub(super) fn run_deployment_script(
         .spawn()
         .with_context(|| format!("Failed to execute deployment script {}", script.display()))?;
 
-    let stdout = child.stdout.take().context("Failed to capture deployment script stdout")?;
-    let stderr = child.stderr.take().context("Failed to capture deployment script stderr")?;
+    stream_child_output(&mut child, log_path, &format!("deployment script {}", script.display()))
+}
+
+pub(super) fn run_podman_build_script(
+    script: &Path,
+    source_root: &Path,
+    log_path: &Path,
+    env: &BuildScriptEnv<'_>,
+) -> Result<ExitStatus> {
+    let script_file =
+        fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
+
+    let mut command = Command::new("podman");
+    configure_podman_build_command(&mut command, source_root, env);
+
+    let mut child = command
+        .stdin(Stdio::from(script_file))
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("Failed to execute build script {} in podman", script.display()))?;
+
+    stream_child_output(&mut child, log_path, &format!("podman build script {}", script.display()))
+}
+
+fn configure_podman_build_command(command: &mut Command, source_root: &Path, env: &BuildScriptEnv<'_>) {
+    let mount = format!("{}:/workspace/source", source_root.display());
+    command
+        .args([
+            "run",
+            "--rm",
+            "--pull=missing",
+            "--security-opt=no-new-privileges",
+            "--cap-drop=all",
+            "--workdir=/workspace/source",
+            "--volume",
+        ])
+        .arg(mount)
+        .arg("--env")
+        .arg(format!("PROJECT_NAME={}", env.project_name))
+        .arg("--env")
+        .arg("PROJECT_ROOT=/workspace")
+        .arg("--env")
+        .arg("REPO_PATH=")
+        .arg("--env")
+        .arg(format!("WEB_ROOT={}", env.web_root))
+        .arg("--env")
+        .arg(format!("SERVICE_USER={}", env.project_name))
+        .arg(env.build_image)
+        .args(["bash", "-c", "umask 0002; exec bash -s"]);
+}
+
+fn stream_child_output(child: &mut Child, log_path: &Path, label: &str) -> Result<ExitStatus> {
+    if let Some(parent) = log_path.parent() {
+        fs::create_dir_all(parent).with_context(|| format!("Failed to create log directory {}", parent.display()))?;
+    }
+
+    let log_file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .with_context(|| format!("Failed to open deployment log {}", log_path.display()))?;
+
+    let stdout = child.stdout.take().context("Failed to capture deployment stdout")?;
+    let stderr = child.stderr.take().context("Failed to capture deployment stderr")?;
 
     let stdout_handle =
         spawn_stream(stdout, io::stdout(), log_file.try_clone().context("Failed to clone deployment log")?);
     let stderr_handle = spawn_stream(stderr, io::stderr(), log_file);
 
-    let status = child.wait().with_context(|| format!("Failed to wait for deployment script {}", script.display()))?;
+    let status = child.wait().with_context(|| format!("Failed to wait for {label}"))?;
 
     join_stream(stdout_handle, "stdout")?;
     join_stream(stderr_handle, "stderr")?;
@@ -99,12 +164,13 @@ mod tests {
     use std::env;
     use std::fs;
     use std::path::{Path, PathBuf};
+    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
     use std::os::unix::prelude::PermissionsExt;
 
-    use super::{ScriptEnv, run_deployment_script};
+    use super::{BuildScriptEnv, HostScriptEnv, configure_podman_build_command, run_deployment_script};
 
     fn temp_dir(prefix: &str) -> Result<PathBuf> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
@@ -138,7 +204,7 @@ mod tests {
             &script,
             &build_root,
             &log_path,
-            &ScriptEnv {
+            &HostScriptEnv {
                 project_name: "demo",
                 project_root: "/srv/deployments/demo",
                 repo_path: "/home/git/demo.git",
@@ -173,7 +239,7 @@ mod tests {
             &script,
             &build_root,
             &log_path,
-            &ScriptEnv {
+            &HostScriptEnv {
                 project_name: "demo",
                 project_root: "/srv/deployments/demo",
                 repo_path: "/home/git/demo.git",
@@ -205,7 +271,7 @@ mod tests {
             &script,
             &build_root,
             &log_path,
-            &ScriptEnv {
+            &HostScriptEnv {
                 project_name: "demo",
                 project_root: "/srv/deployments/demo",
                 repo_path: "/home/git/demo.git",
@@ -239,7 +305,7 @@ mod tests {
             &script,
             &build_root,
             &log_path,
-            &ScriptEnv {
+            &HostScriptEnv {
                 project_name: "demo",
                 project_root: "/srv/deployments/demo",
                 repo_path: "/home/git/demo.git",
@@ -253,5 +319,27 @@ mod tests {
 
         fs::remove_dir_all(root).ok();
         Ok(())
+    }
+
+    #[test]
+    fn podman_build_command_mounts_only_source_tree() {
+        let mut command = Command::new("podman");
+        configure_podman_build_command(
+            &mut command,
+            Path::new("/tmp/source"),
+            &BuildScriptEnv {
+                project_name: "demo",
+                web_root: "public",
+                build_image: "docker.io/library/node:22-bookworm",
+            },
+        );
+
+        let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+        assert!(args.contains(&String::from("--rm")));
+        assert!(args.contains(&String::from("--security-opt=no-new-privileges")));
+        assert!(args.contains(&String::from("--cap-drop=all")));
+        assert!(args.contains(&String::from("/tmp/source:/workspace/source")));
+        assert!(!args.iter().any(|arg| arg.contains("/srv/sites/demo/shared")));
+        assert!(!args.iter().any(|arg| arg.contains("/root/.config/bonesremote")));
     }
 }

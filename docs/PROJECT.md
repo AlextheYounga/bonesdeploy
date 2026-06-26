@@ -42,17 +42,17 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 | Identity | Owner of | Scope |
 |----------|----------|-------|
-| `git` (deploy user) | Bare repo, release dirs, build workspace | Creates immutable release artifacts |
+| `git` (deploy user) | Bare repo | Ingress only |
 | `<site>` (runtime user) | Shared files, `/run/<site>`, writable paths | Mutates runtime state |
-| `root` | System units, config dirs, users/groups | Provisions and restarts services |
+| `root` | System units, config dirs, users/groups, sealed releases | Provisions, deploys, and restarts services |
 
 **Key mechanics:**
 
-- `releases/` has the setgid bit (`2750`) so group `foo-release` is inherited by new release dirs without chown.
-- `shared/` is owned by the runtime user (`foo:foo 0711`) — only the app writes here.
-- `build/` is private to the deploy user (`git:git 0700`) — invisible to other processes.
-- `bonesremote service restart` is the only command that needs `sudo` — a narrow sudoers drop-in allows it.
-- No deploy step calls `chown`, `chmod -R`, or otherwise mutates ownership after provisioning.
+- `releases/` contains root-promoted artifacts sealed as `root:<site>`.
+- `shared/` is owned by the runtime user (`<site>:<site>`) — only the app writes here.
+- Build input is temporary and disposable; build scripts run in Podman with the source mounted at `/workspace/source`.
+- Git hooks only trigger `bonesremote`; they do not check out source, run builds, write releases, or restart services.
+- `bonesremote` is the privileged mediator for promotion, activation, and service restart.
 
 ## Bones Scaffolding
 ```
@@ -115,7 +115,7 @@ Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are wr
 - `post-receive` => Thin trigger that derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/` instead of the bare repo.
 
 ### Deployment Folder
-This folder stores deployment scripts that are run by `bonesremote deploy`. Files in this folder must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`. They are named in numerical order and all of these scripts are always run.
+This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`, and run inside the `build_image` from `.bones/runtime.toml` with `cwd=/workspace/source`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files.
 
 ## Crate Structure
 This Cargo workspace has three crates under `crates/`:
@@ -289,21 +289,22 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 ## Flow
 - User runs `bonesdeploy init`, and the procedures outlined above are executed.
-- User can make any changes to their deployment scripts or hooks in `.bones/` (e.g., customizing `deployment/` files or adding project-specific logic).
-- User runs `bonesdeploy push` to sync the `.bones/` folder to the remote bare repo.
+- User can make any changes to their deployment scripts or hooks in `.bones/` (e.g., customizing `deployment/build/` files or adding project-specific logic).
+- User runs `bonesdeploy push` to publish the `.bones/` dataset to bonesremote site state under `/root/.config/bonesremote/sites/<site>/`.
 - User runs `bonesdeploy deploy` to perform the actual remote release deployment.
 
 ### Primary Deploy Flow
 
-1. `bonesdeploy deploy` SSHes into the configured host.
-2. It runs `bonesremote deploy --config <remote_bones_toml>`.
+1. `bonesdeploy deploy` publishes local `.bones/` state, then SSHes into the configured host.
+2. It runs `bonesremote deploy --site <site>`.
 3. `bonesremote deploy` orchestrates the full pipeline:
-   - **doctor** — Check server environment
-   - **stage_release** — Create timestamped release dir, ensure build workspace
-   - **post_receive** — `git checkout -f <branch>` into `build/workspace`
-   - **wire_release** — Symlink shared paths from `runtime.toml` into workspace
-   - **deploy** (inner) — Run deployment scripts, copy to release, activate symlink
-   - **restart_services** — `sudo bonesremote service restart --config ...`
+   - **stage_release** — Create timestamped release state
+   - **release_checkout** — Export the approved revision with `git archive` into a temporary source tree
+   - **release_build** — Run `deployment/build/*.sh` in disposable Podman containers at `/workspace/source`
+   - **release_promote** — Copy safe artifacts into a sealed `root:<site>` release
+   - **wire_shared** — Symlink declared shared paths into the sealed release
+   - **activate_release** — Atomically repoint `current`
+   - **restart_services** — Restart the registry-approved service
    - **post_deploy** — Prune old releases beyond `releases`
    - On failure: **drop_failed_release** — Clean up staged release
 
@@ -316,18 +317,19 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 3. **post-receive** (remote): Resolves the configured deployment ref from stdin:
    - If `deploy_on_push = false`, exits early without deploying.
    - If the configured branch wasn't pushed, or the push deleted it, exits without deploying.
-   - Otherwise runs a single unified command:
-     ```
-     bonesremote deploy --config "$BONES_TOML" --revision <newrev>
-     ```
+    - Otherwise runs a single unified command:
+      ```
+      bonesremote deploy --site <site> --revision <newrev>
+      ```
    - This command orchestrates the full pipeline:
-     - **doctor** — Check server environment
-     - **stage_release** — Create timestamped release dir, ensure build workspace
-     - **post_receive** — `git checkout -f <branch>` into `build/workspace`
-     - **wire_release** — Symlink shared paths from `runtime.toml` into workspace
-     - **deploy** (inner) — Run deployment scripts, copy to release, activate symlink
-     - **restart_services** — `sudo bonesremote service restart --config ...`
-     - **post_deploy** — Prune old releases beyond `releases`
-     - On failure: **drop_failed_release** — Clean up staged release
+      - **stage_release** — Create timestamped release state
+      - **release_checkout** — Export source from the bare repo into temporary context
+      - **release_build** — Run `deployment/build/*.sh` in Podman at `/workspace/source`
+      - **release_promote** — Seal safe artifacts into `releases/<release>`
+      - **wire_shared** — Link shared runtime paths
+      - **activate_release** — Repoint `current`
+      - **restart_services** — Restart the registry-approved service
+      - **post_deploy** — Prune old releases beyond `releases`
+      - On failure: **drop_failed_release** — Clean up staged release
 
-`bonesdeploy deploy` performs the same remote pipeline by SSHing into the host and running `bonesremote deploy --config <remote_bones_toml>` directly (without `--revision`, so it uses the configured branch). Git-triggered deploy is optional plumbing, not the primary model.
+`bonesdeploy deploy` performs the same remote pipeline by SSHing into the host and running `bonesremote deploy --site <site>` directly (without `--revision`, so it uses the configured branch). Git-triggered deploy is optional plumbing, not the primary model.

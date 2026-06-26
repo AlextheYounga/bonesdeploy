@@ -1,5 +1,6 @@
 template = "rails"
 web_root = "public"
+build_image = "docker.io/library/ruby:3.4-bookworm"
 
 [permissions]
 paths = [

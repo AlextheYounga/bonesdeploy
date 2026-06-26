@@ -1,5 +1,6 @@
 template = "django"
 web_root = "public"
+build_image = "docker.io/library/python:3.13-bookworm"
 
 [permissions]
 paths = [

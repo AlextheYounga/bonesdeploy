@@ -130,7 +130,7 @@ Deploy the configured project release:
 bonesdeploy deploy
 ```
 
-This SSHs into the host and runs `bonesremote deploy --site <project>`, which orchestrates the current server-side pipeline: stage release → export source from the bare repo into a temp build context → run deployment scripts → promote the release → wire shared paths → activate → restart services → prune old releases.
+This SSHs into the host and runs `bonesremote deploy --site <project>`, which orchestrates the current server-side pipeline: stage release → export source from the bare repo into a temp build context → run `deployment/build/*.sh` in Podman → promote the release → wire shared paths → activate → restart services → prune old releases.
 
 To roll back to the previous release without rebuilding:
 
@@ -200,10 +200,11 @@ releases = 5
 │   ├── pre-push         # symlinked to .git/hooks/pre-push
 │   └── post-receive     # thin adapter → calls bonesremote deploy
 └── deployment/
-    └── 01_*.sh          # deployment scripts (run sequentially)
+    └── build/
+        └── 01_*.sh      # build scripts (run sequentially in Podman)
 ```
 
-Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
+Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you — edit freely. Build scripts in `.bones/deployment/build/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order inside the `build_image` configured in `.bones/runtime.toml`.
 
 Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote hook post-receive`, which resolves policy from bonesremote-managed site state.
 

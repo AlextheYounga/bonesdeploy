@@ -23,7 +23,7 @@ pub fn run(site: &str, context: &Path) -> Result<()> {
         bail!("Build context does not exist: {}", context.display());
     }
 
-    let scripts_dir = paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR);
+    let scripts_dir = paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR).join(paths::DEPLOYMENT_BUILD_DIR);
     if !scripts_dir.is_dir() {
         println!(
             "No deployment scripts at {}; running build steps directly on the exported source tree.",
@@ -44,19 +44,23 @@ pub fn run(site: &str, context: &Path) -> Result<()> {
 
         let runtime = load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
             web_root: default_web_root(),
+            build_image: String::new(),
             runtime_user: String::new(),
             runtime_group: String::new(),
             release_group: String::new(),
         });
-        let status = deploy_output::run_deployment_script(
+        if runtime.build_image.is_empty() {
+            bail!("Build scripts require build_image in runtime.toml");
+        }
+
+        let status = deploy_output::run_podman_build_script(
             &script,
             context,
             &context.join(format!("{script_name}.log")),
-            &deploy_output::ScriptEnv {
+            &deploy_output::BuildScriptEnv {
                 project_name: &cfg.site,
-                project_root: &cfg.site_root,
-                repo_path: &cfg.repo_path,
                 web_root: &runtime.web_root,
+                build_image: &runtime.build_image,
             },
         )
         .with_context(|| format!("Failed to execute build script {}", script.display()))?;

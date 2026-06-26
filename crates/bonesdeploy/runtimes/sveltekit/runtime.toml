@@ -1,5 +1,6 @@
 template = "sveltekit"
 web_root = "build"
+build_image = "docker.io/library/node:24-bookworm"
 
 [permissions]
 paths = [
