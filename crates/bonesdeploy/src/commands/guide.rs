@@ -4,11 +4,11 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use shared::config as shared_config;
 use shared::paths;
+use shared::paths::bonesremote_registry_path;
 
 use crate::cli::args::GuideFormat;
-use crate::commands::push_state;
 use crate::config;
-use crate::infra::{rsync, ssh};
+use crate::infra::ssh;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Report {
@@ -160,10 +160,9 @@ async fn remote_setup_complete(cfg: &config::Bones, web_root: &str) -> Result<bo
         return Ok(false);
     }
 
-    let mut args = push_state::rsync_args(cfg);
-    args.insert(1, String::from("--dry-run"));
-    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
-    let sync_ok = rsync::status(&arg_refs).is_ok_and(|status| status.success());
+    let registry_path = bonesremote_registry_path(&cfg.project_name);
+    let sync_ok =
+        ssh::run_cmd(&session, &format!("test -r {}", shell_quote(&registry_path.display().to_string()))).await.is_ok();
 
     let paths = cfg.deployment_paths(web_root);
     let current_ok = ssh::run_cmd(&session, &format!("test -e {}", shell_quote(&paths.current))).await.is_ok();

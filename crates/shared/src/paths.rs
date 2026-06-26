@@ -36,6 +36,7 @@ pub const LOCAL_BONES_RUNTIME_TOML: &str = ".bones/runtime.toml";
 pub const LOCAL_BONES_SECRETS_DIR: &str = ".bones/secrets";
 pub const DOT_ENV: &str = ".env";
 pub const RUNTIME_TOML: &str = "runtime.toml";
+pub const REGISTRY_TOML: &str = "registry.toml";
 
 pub const BONES_DIR: &str = "bones";
 pub const BONES_TOML: &str = "bones.toml";
@@ -59,6 +60,8 @@ pub const SUDOERS_FILE: &str = "bonesdeploy";
 pub const SUDOERS_PATH: &str = "/etc/sudoers.d/bonesdeploy";
 pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
 pub const BONESREMOTE_BINARY: &str = "bonesremote";
+pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
+pub const BONESREMOTE_SITES_DIR: &str = "sites";
 pub const NGINX_SOCKET: &str = "nginx.sock";
 pub const NGINX_PID: &str = "nginx.pid";
 pub const PHP_FPM_SOCKET: &str = "php-fpm.sock";
@@ -113,6 +116,26 @@ pub fn bonesremote_staging_path(version: &str) -> String {
 #[must_use]
 pub fn install_root() -> PathBuf {
     PathBuf::from(OPT_BONESDEPLOY)
+}
+
+#[must_use]
+pub fn bonesremote_config_root() -> PathBuf {
+    PathBuf::from(BONESREMOTE_CONFIG_DIR)
+}
+
+#[must_use]
+pub fn bonesremote_sites_root() -> PathBuf {
+    bonesremote_config_root().join(BONESREMOTE_SITES_DIR)
+}
+
+#[must_use]
+pub fn bonesremote_site_root(site: &str) -> PathBuf {
+    bonesremote_sites_root().join(site)
+}
+
+#[must_use]
+pub fn bonesremote_registry_path(site: &str) -> PathBuf {
+    bonesremote_site_root(site).join(REGISTRY_TOML)
 }
 
 #[must_use]

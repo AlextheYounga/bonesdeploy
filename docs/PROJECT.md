@@ -109,10 +109,10 @@ releases = 5
 ```
 
 ### Hooks
-Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks/hooks.sh`. After that, they belong to the user and can be edited freely. They are synced to the remote bare repo via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
+Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`, and they source shared functions from `.bones/hooks/hooks.sh`. After that, they belong to the user and can be edited freely. They are published into `bonesremote`'s root-owned remote site state via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
 
 - `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor --local` and we fail if the doctor command expresses any warning or errors.
-- `post-receive` => Resolves the configured deployment ref from stdin, then runs a single `bonesremote deploy --config "$BONES_TOML" --revision <newrev>` command. This unified command orchestrates the full pipeline: doctor → stage_release → post_receive (git checkout) → wire_release → deploy (scripts + activate) → service restart → post_deploy (prune). If the push didn't touch the configured branch, or the branch was deleted, post-receive exits without deploying.
+- `post-receive` => Current behavior still resolves the configured deployment ref from stdin and runs `bonesremote deploy --config "$BONES_TOML" --revision <newrev>`. This is a transitional hook shape: the migration direction is for hooks to become thin triggers that read branch policy from `bonesremote`'s remote site state instead of the bare repo.
 
 ### Deployment Folder
 This folder stores deployment scripts that are run by `bonesremote deploy`. Files in this folder must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`. They are named in numerical order and all of these scripts are always run.
@@ -192,13 +192,12 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys.
 
 - **push**
-  - Uses an `rsync -av --delete` command to push up our local `.bones` folder to the bare repo.
-  - We will create a `bones` folder under our `{project_name}.git/` folder so that everything is self-contained inside git.
-  - Deletes sample git hooks in bare repo, so that our files will be the only files to worry about in the `{project_name}.git/hooks` folder.
-  - Runs commands on remote that symlinks our `{project_name}.git/bones/hooks` files are symlinked with `{project_name}.git/hooks` properly.
+  - Archives the local `.bones/` dataset, excluding local secrets, and streams it to `bonesremote site import --site <project>` over SSH.
+  - `bonesremote` validates the dataset, derives a root-owned `registry.toml`, and atomically replaces the current remote site state under `/root/.config/bonesremote/sites/<project>/`.
+  - The bare repo is no longer the control-plane storage target for `push`.
 
 - **pull**
-  - Uses an `rsync -av --delete` command to pull the remote `{project_name}.git/bones/` folder back into local `.bones/`.
+  - Streams the current remote site dataset back from `bonesremote site export --site <project>` and extracts it into local `.bones/`.
   - Recreates the local `.git/hooks/pre-push` symlink so the repository regains its pre-push check after recovery.
 
 - **deploy**

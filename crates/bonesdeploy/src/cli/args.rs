@@ -53,9 +53,9 @@ pub enum Command {
         #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
         format: GuideFormat,
     },
-    /// Sync .bones/ folder to the remote bare repo
+    /// Publish .bones/ into bonesremote's remote control-plane state
     Push,
-    /// Sync .bones/ folder back from the remote bare repo
+    /// Recover .bones/ from bonesremote's remote control-plane state
     Pull,
     /// Manage encrypted local secrets and push them to remote shared/
     Secrets {

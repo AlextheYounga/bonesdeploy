@@ -28,6 +28,11 @@ pub enum Command {
         #[arg(long)]
         revision: Option<String>,
     },
+    /// Import or export root-owned remote site state
+    Site {
+        #[command(subcommand)]
+        command: SiteCommand,
+    },
     /// Release lifecycle operations
     Release {
         #[command(subcommand)]
@@ -48,6 +53,20 @@ pub enum Command {
     },
     /// Print the version
     Version,
+}
+
+#[derive(Subcommand)]
+pub enum SiteCommand {
+    /// Import a deployment dataset from stdin
+    Import {
+        #[arg(long)]
+        site: String,
+    },
+    /// Export the current deployment dataset to stdout
+    Export {
+        #[arg(long)]
+        site: String,
+    },
 }
 
 #[derive(Subcommand)]

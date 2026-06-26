@@ -2,10 +2,10 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use shared::paths::bonesremote_registry_path;
+use tokio::runtime::Runtime;
 
-use super::push_state;
 use crate::config;
-use crate::infra::rsync;
 use crate::infra::ssh;
 use shared::paths;
 
@@ -152,55 +152,36 @@ async fn check_bonesremote(cfg: &config::Bones) -> Option<String> {
 }
 
 fn check_bones_sync(cfg: &config::Bones) -> Option<String> {
-    let args = dry_run_rsync_args(cfg);
-    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
-    let output = rsync::output(&arg_refs).ok()?;
+    let registry_path = bonesremote_registry_path(&cfg.project_name);
+    let command = format!("test -r {}", shell_quote(&registry_path.display().to_string()));
+    let Ok(runtime) = Runtime::new() else {
+        return Some(String::from("Could not start runtime to check remote site state"));
+    };
+    let Ok(session) = runtime.block_on(ssh::connect(cfg)) else {
+        return Some(String::from("Could not connect to remote site state"));
+    };
+    let ok = runtime.block_on(ssh::run_cmd(&session, &command)).is_ok();
+    let _ = runtime.block_on(session.close());
 
-    if !output.status.success() {
-        return Some(String::from(".bones sync check failed"));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let changed = stdout
-        .lines()
-        .filter(|line| {
-            let line = line.trim();
-            !line.is_empty()
-                && !line.starts_with("sending ")
-                && !line.starts_with("sent ")
-                && !line.starts_with("total ")
-                && !line.ends_with('/')
-        })
-        .collect::<Vec<_>>();
-
-    if changed.is_empty() { None } else { Some(String::from(".bones is not synced to the remote")) }
+    if ok { None } else { Some(String::from("remote bonesremote site state is missing; run bonesdeploy push")) }
 }
 
-fn dry_run_rsync_args(cfg: &config::Bones) -> Vec<String> {
-    let mut args = push_state::rsync_args(cfg);
-    args.insert(1, String::from("--dry-run"));
-    args.insert(2, String::from("--checksum"));
-    args
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::dry_run_rsync_args;
-    use crate::config::Bones;
+    use super::shell_quote;
+    use crate::commands::push_state;
 
     #[test]
-    fn sync_check_uses_same_excludes_as_push() {
-        let cfg = Bones {
-            host: String::from("deploy.example.com"),
-            port: String::from("22"),
-            repo_path: String::from("/home/git/acme.git"),
-            ..Default::default()
-        };
+    fn doctor_points_at_new_remote_import_flow() {
+        assert_eq!(push_state::remote_import_command("acme"), "bonesremote site import --site 'acme'");
+    }
 
-        let args = dry_run_rsync_args(&cfg);
-
-        assert!(args.contains(&String::from("--dry-run")));
-        assert!(args.contains(&String::from("--checksum")));
-        assert!(args.windows(2).any(|pair| pair[0] == "--exclude" && pair[1] == "secrets/"));
+    #[test]
+    fn shell_quote_escapes_single_quotes() {
+        assert_eq!(shell_quote("a'b"), "'a'\\''b'");
     }
 }

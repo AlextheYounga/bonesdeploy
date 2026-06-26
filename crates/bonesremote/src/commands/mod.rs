@@ -8,6 +8,7 @@ pub(crate) mod post_deploy;
 pub(crate) mod post_receive;
 pub(crate) mod rollback;
 pub(crate) mod service;
+pub(crate) mod site;
 pub(crate) mod stage_release;
 pub(crate) mod status;
 pub(crate) mod version;
