@@ -62,10 +62,8 @@ pub async fn run() -> Result<()> {
 }
 
 async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
-    let session = ssh::connect(cfg).await?;
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
-    let deployment = cfg.deployment_paths(&runtime.web_root);
-    let command = format!("bonesremote status --config {}", shell_quote(&deployment.repo_bones_toml));
+    let session = ssh::connect_privileged(cfg).await?;
+    let command = format!("bonesremote status --site '{}'", shell_quote(&cfg.project_name));
     let output = ssh::run_cmd(&session, &command).await;
     session.close().await?;
 

@@ -3,9 +3,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use super::push_state;
 use crate::config;
-use crate::infra::rsync;
 use crate::infra::ssh;
 use shared::paths;
 
@@ -36,11 +34,10 @@ pub async fn run(local_only: bool) -> Result<()> {
                     print_check("remote SSH", remote_ssh_issue.clone(), Some("check host, port, and SSH access."));
                 if remote_ssh_issue.is_none() {
                     issues += print_check(
-                        "bonesremote",
-                        check_bonesremote(cfg).await,
-                        Some("run bonesdeploy remote bootstrap"),
+                        "remote doctor",
+                        check_remote_doctor(cfg).await,
+                        Some("run bonesdeploy push or remote setup"),
                     );
-                    issues += print_check(".bones sync", check_bones_sync(cfg), Some("run bonesdeploy push"));
                 }
             }
             None => {
@@ -104,13 +101,24 @@ fn check_deployment_scripts() -> Option<String> {
         return None;
     }
 
-    let entries = fs::read_dir(deployment_dir).ok()?;
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
-        if !has_numeric_prefix {
-            return Some(format!("Deployment script is not ordered: {name}"));
+    for subdir in ["build", "prepare"] {
+        let scripts_dir = deployment_dir.join(subdir);
+        if !scripts_dir.exists() {
+            continue;
+        }
+
+        let entries = fs::read_dir(&scripts_dir).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
+            if !has_numeric_prefix {
+                return Some(format!("Deployment script is not ordered: {subdir}/{name}"));
+            }
         }
     }
 
@@ -143,64 +151,61 @@ async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
     }
 }
 
-async fn check_bonesremote(cfg: &config::Bones) -> Option<String> {
-    let session = ssh::connect(cfg).await.ok()?;
-    let result = ssh::run_cmd(&session, "command -v bonesremote").await;
+async fn check_remote_doctor(cfg: &config::Bones) -> Option<String> {
+    let session = match ssh::connect_privileged(cfg).await {
+        Ok(session) => session,
+        Err(error) => return Some(format!("Cannot connect as privileged remote user\n  {error}")),
+    };
+    let command = format!("bonesremote doctor --site {}", shell_quote(&cfg.project_name));
+    let result = ssh::run_cmd(&session, &command).await;
     let _ = session.close().await;
 
-    if result.is_ok() { None } else { Some(String::from("bonesremote is missing")) }
+    result.err().map(|error| format!("remote doctor failed\n  {error}"))
 }
 
-fn check_bones_sync(cfg: &config::Bones) -> Option<String> {
-    let args = dry_run_rsync_args(cfg);
-    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
-    let output = rsync::output(&arg_refs).ok()?;
-
-    if !output.status.success() {
-        return Some(String::from(".bones sync check failed"));
-    }
-
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let changed = stdout
-        .lines()
-        .filter(|line| {
-            let line = line.trim();
-            !line.is_empty()
-                && !line.starts_with("sending ")
-                && !line.starts_with("sent ")
-                && !line.starts_with("total ")
-                && !line.ends_with('/')
-        })
-        .collect::<Vec<_>>();
-
-    if changed.is_empty() { None } else { Some(String::from(".bones is not synced to the remote")) }
-}
-
-fn dry_run_rsync_args(cfg: &config::Bones) -> Vec<String> {
-    let mut args = push_state::rsync_args(cfg);
-    args.insert(1, String::from("--dry-run"));
-    args.insert(2, String::from("--checksum"));
-    args
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::dry_run_rsync_args;
-    use crate::config::Bones;
+    use std::env;
+    use std::fs;
+    use std::process;
+
+    use anyhow::Result;
+
+    use super::{check_deployment_scripts, shell_quote};
+    use crate::commands::push_state;
 
     #[test]
-    fn sync_check_uses_same_excludes_as_push() {
-        let cfg = Bones {
-            host: String::from("deploy.example.com"),
-            port: String::from("22"),
-            repo_path: String::from("/home/git/acme.git"),
-            ..Default::default()
-        };
+    fn doctor_points_at_new_remote_import_flow() {
+        assert_eq!(push_state::remote_import_command("acme"), "bonesremote site import --site 'acme'");
+    }
 
-        let args = dry_run_rsync_args(&cfg);
+    #[test]
+    fn shell_quote_escapes_single_quotes() {
+        assert_eq!(shell_quote("a'b"), "'a'\\''b'");
+    }
 
-        assert!(args.contains(&String::from("--dry-run")));
-        assert!(args.contains(&String::from("--checksum")));
-        assert!(args.windows(2).any(|pair| pair[0] == "--exclude" && pair[1] == "secrets/"));
+    #[test]
+    fn deployment_script_check_accepts_nested_build_and_prepare_layout() -> Result<()> {
+        let cwd = env::current_dir()?;
+        let root = env::temp_dir().join(format!("bonesdeploy-doctor-nested-layout-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(root.join(".bones/deployment/build"))?;
+        fs::create_dir_all(root.join(".bones/deployment/prepare"))?;
+        fs::write(root.join(".bones/deployment/build/01_build.sh"), "")?;
+        fs::write(root.join(".bones/deployment/prepare/02_prepare.sh"), "")?;
+
+        env::set_current_dir(&root)?;
+        let result = check_deployment_scripts();
+        env::set_current_dir(cwd)?;
+
+        fs::remove_dir_all(&root).ok();
+        assert!(result.is_none(), "nested deployment layout should be accepted: {result:?}");
+        Ok(())
     }
 }

@@ -14,7 +14,7 @@ pub async fn run(_yes: bool) -> Result<()> {
 
     remote_setup::run().with_context(|| setup_error("bootstrapping remote server"))?;
     remote_runtime::run(true).with_context(|| setup_error("applying runtime"))?;
-    push_state::run(false).await.with_context(|| setup_error("syncing .bones"))?;
+    push_state::run(false).with_context(|| setup_error("syncing .bones"))?;
     doctor::run(false).await.with_context(|| setup_error("checking deployment"))?;
 
     println!();

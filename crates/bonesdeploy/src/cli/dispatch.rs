@@ -19,7 +19,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 port: port.clone(),
             })?;
             if remote_setup_ran {
-                push_state::run(false).await?;
+                push_state::run(false)?;
             }
             Ok(())
         }
@@ -27,7 +27,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Doctor { local } => doctor::run(*local).await,
         Command::Status => status::run().await,
         Command::Guide { format } => guide::run(*format).await,
-        Command::Push => push_state::run(true).await,
+        Command::Push => push_state::run(true),
         Command::Pull => pull_state::run(),
         Command::Secrets { command } => match command {
             SecretsCommand::Init => secrets::init(),

@@ -1,12 +1,13 @@
 use std::fs;
+use std::io::Write as _;
 use std::os::unix::fs as unix_fs;
 use std::path::Path;
+use std::process::{Command, Stdio};
 
 use crate::config;
 use crate::infra::git;
-use crate::infra::rsync;
+use crate::infra::ssh;
 use anyhow::{Context, Result, bail};
-use shared::config::default_deploy_user;
 use shared::paths;
 
 use crate::commands::init_project;
@@ -30,7 +31,9 @@ pub fn run() -> Result<()> {
         unix_fs::symlink(&config_dir, bones_dir)?;
     }
 
-    rsync_bones(&target).context("Failed to pull .bones.")?;
+    let archive = fetch_remote_archive(&target)?;
+    clear_managed_bones_entries(bones_dir)?;
+    extract_bones_archive(bones_dir, &archive)?;
     init_project::symlink_pre_push()?;
 
     println!(".bones pulled.");
@@ -44,7 +47,7 @@ fn resolve_pull_target() -> Result<git::RemoteConnectionDetails> {
     if bones_toml.exists() {
         let cfg = config::load(bones_toml)?;
         return Ok(git::RemoteConnectionDetails {
-            user: default_deploy_user(),
+            user: cfg.ssh_user,
             host: cfg.host,
             port: cfg.port,
             repo_path: cfg.repo_path,
@@ -55,7 +58,7 @@ fn resolve_pull_target() -> Result<git::RemoteConnectionDetails> {
     let details = git::infer_remote_connection_details(&remote_name)?
         .with_context(|| format!("Remote '{remote_name}' must use an SSH-style URL ending in .git"))?;
 
-    Ok(details)
+    Ok(git::RemoteConnectionDetails { user: String::from("root"), ..details })
 }
 
 fn resolve_remote_name() -> Result<String> {
@@ -76,15 +79,62 @@ fn resolve_remote_name() -> Result<String> {
     }
 }
 
-fn rsync_bones(target: &git::RemoteConnectionDetails) -> Result<()> {
-    let source = format!("{}@{}:{}/{}/", target.user, target.host, target.repo_path, paths::BONES_DIR);
-    let ssh_arg = format!("ssh -p {} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null", target.port);
-    let dest = format!("{}/", paths::LOCAL_BONES_DIR);
-    let status = rsync::status(&["-av", "--delete", "-e", &ssh_arg, &source, &dest])?;
+fn fetch_remote_archive(target: &git::RemoteConnectionDetails) -> Result<Vec<u8>> {
+    let site = site_name_from_repo_path(&target.repo_path)?;
+    let output = ssh::external_command(&target.user, &target.host, &target.port)
+        .arg(format!("bonesremote site export --site '{site}'"))
+        .output()
+        .context("Failed to export remote site state")?;
 
-    if !status.success() {
-        bail!("rsync failed");
+    if output.status.success() {
+        return Ok(output.stdout);
     }
 
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    bail!("Failed to export remote site state\n{stderr}")
+}
+
+fn clear_managed_bones_entries(bones_dir: &Path) -> Result<()> {
+    for name in [paths::BONES_TOML, paths::RUNTIME_TOML, paths::DEPLOYMENT_DIR, paths::HOOKS_DIR] {
+        let path = bones_dir.join(name);
+        if !path.exists() {
+            continue;
+        }
+        if path.is_dir() {
+            fs::remove_dir_all(&path).with_context(|| format!("Failed to remove {}", path.display()))?;
+        } else {
+            fs::remove_file(&path).with_context(|| format!("Failed to remove {}", path.display()))?;
+        }
+    }
     Ok(())
+}
+
+fn extract_bones_archive(bones_dir: &Path, archive: &[u8]) -> Result<()> {
+    let mut child = Command::new("tar")
+        .args(["-xzf", "-", "-C"])
+        .arg(bones_dir)
+        .stdin(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("Failed to run tar for pull")?;
+
+    let mut stdin = child.stdin.take().context("tar stdin was not piped")?;
+    stdin.write_all(archive).context("Failed to write pulled archive to tar")?;
+    drop(stdin);
+
+    let output = child.wait_with_output().context("Failed to finish extracting .bones")?;
+    if output.status.success() {
+        return Ok(());
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    bail!("Failed to extract .bones\n{stderr}")
+}
+
+fn site_name_from_repo_path(repo_path: &str) -> Result<String> {
+    let repo_name = Path::new(repo_path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .context("Remote repo path must end in a site name")?;
+    repo_name.strip_suffix(".git").map(ToOwned::to_owned).context("Remote repo path must end in .git")
 }

@@ -1,9 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::Path;
 use std::process::Command;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::Serialize;
 use shared::config;
 use shared::paths;
@@ -29,16 +28,16 @@ struct ServiceStatus {
     enabled: String,
 }
 
-pub fn run(config_path: &str) -> Result<()> {
-    let report = build_report(config_path)?;
+pub fn run(site: &str) -> Result<()> {
+    let report = build_report(site)?;
     println!("{}", serde_json::to_string(&report)?);
     Ok(())
 }
 
-fn build_report(config_path: &str) -> Result<Report> {
-    let config_path = Path::new(config_path);
-    let cfg = config::load(config_path)?;
-    let runtime = config::load_runtime(config_path.parent().unwrap_or_else(|| Path::new(".")))?;
+fn build_report(site: &str) -> Result<Report> {
+    let config_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&config_path).context("Failed to load site registry")?;
+    let runtime = config::load_runtime(&paths::bonesremote_site_root(site))?;
     let deployment = cfg.deployment_paths(&runtime.web_root);
 
     Ok(Report {

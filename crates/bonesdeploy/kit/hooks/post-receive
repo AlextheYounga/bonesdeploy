@@ -9,28 +9,12 @@ set -euo pipefail
 
 GIT_DIR="${GIT_DIR:-.}"
 GIT_DIR=$(cd "$GIT_DIR" && pwd)
-HOOKS_LIB="$GIT_DIR/bones/hooks/hooks.sh"
+SITE=$(basename "$GIT_DIR")
+SITE=${SITE%.git}
 
-if [ ! -f "$HOOKS_LIB" ]; then
-	echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"
+if [ -z "$SITE" ] || [ "$SITE" = "." ] || [ "$SITE" = "/" ]; then
+	echo "[bonesdeploy] Could not derive site name from GIT_DIR=$GIT_DIR"
 	exit 1
 fi
 
-# shellcheck source=/dev/null
-. "$HOOKS_LIB"
-bones_init_remote_context "$GIT_DIR"
-
-main() {
-	if ! bones_should_deploy_on_push; then
-		echo "[bonesdeploy] deploy_on_push=false, skipping deployment on push."
-		exit 0
-	fi
-
-	if ! bones_resolve_deploy_push_target; then
-		exit 0
-	fi
-
-	bones_run_remote_deploy "$BONES_DEPLOY_NEWREV"
-}
-
-main
+exec sudo bonesremote hook post-receive --site "$SITE"

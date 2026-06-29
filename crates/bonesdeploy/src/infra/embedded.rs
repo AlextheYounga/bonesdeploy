@@ -167,10 +167,11 @@ mod tests {
 
         let deploy_dir = temp.path().join("deployment");
         assert!(deploy_dir.is_dir());
-        let entries: Vec<_> = fs::read_dir(&deploy_dir)?.collect::<Result<Vec<_>, _>>()?;
+        let build_script = deploy_dir.join("build/02_install_php_deps.sh");
         assert!(
-            entries.iter().any(|e| fs::read_to_string(e.path()).is_ok_and(|c| c.contains("composer install"))),
-            "no deployment script contains 'composer install'"
+            fs::read_to_string(&build_script)?.contains("composer install"),
+            "{} does not contain 'composer install'",
+            build_script.display()
         );
 
         Ok(())
@@ -182,11 +183,12 @@ mod tests {
 
         scaffold(temp.path())?;
         let deploy_dir = temp.path().join("deployment");
-        assert!(deploy_dir.join("02_run_build.sh").exists(), "kit script should exist after scaffold");
+        assert!(deploy_dir.join("build/02_run_build.sh").exists(), "kit script should exist after scaffold");
 
         scaffold_runtime_deployment("laravel", temp.path())?;
 
-        let entries: Vec<String> = fs::read_dir(&deploy_dir)?
+        let build_dir = deploy_dir.join("build");
+        let entries: Vec<String> = fs::read_dir(&build_dir)?
             .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().to_string()))
             .collect();
         assert!(
