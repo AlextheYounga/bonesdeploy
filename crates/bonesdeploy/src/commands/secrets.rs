@@ -19,7 +19,7 @@ const LOCAL_ENV_SECRET: &str = ".bones/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
 
 fn gpg_home() -> PathBuf {
-    paths::bones_config_root().join("gnupg")
+    paths::bones_config_lib_root().join("gnupg")
 }
 
 fn gpg_command() -> Command {
@@ -309,8 +309,8 @@ mod tests {
     use shared::paths;
 
     #[test]
-    fn gpg_home_resolves_under_bones_config_root() {
-        assert_eq!(gpg_home(), paths::bones_config_root().join("gnupg"));
+    fn gpg_home_resolves_under_bones_config_lib_root() {
+        assert_eq!(gpg_home(), paths::bones_config_lib_root().join("gnupg"));
     }
 
     #[test]
