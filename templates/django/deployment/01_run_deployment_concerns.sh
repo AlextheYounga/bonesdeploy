@@ -2,24 +2,27 @@
 
 set -Eeuo pipefail
 
-command -v python3 >/dev/null 2>&1 || { echo "python3 not found"; exit 1; }
+command -v python3 >/dev/null 2>&1 || {
+	echo "python3 not found"
+	exit 1
+}
 
 # Activate virtualenv
 VENV_DIR="${VENV_DIR:-venv}"
 if [ -d "./$VENV_DIR" ]; then
-  # shellcheck disable=SC1090
-  source "./$VENV_DIR/bin/activate"
+	# shellcheck disable=SC1090
+	source "./$VENV_DIR/bin/activate"
 else
-  echo "Virtual environment not found at ./$VENV_DIR"
-  echo "Create one on the server: python3 -m venv $VENV_DIR"
-  exit 1
+	echo "Virtual environment not found at ./$VENV_DIR"
+	echo "Create one on the server: python3 -m venv $VENV_DIR"
+	exit 1
 fi
 
 # Install dependencies
 if [ -f "./requirements.txt" ]; then
-  pip install -r requirements.txt --quiet
+	pip install -r requirements.txt --quiet
 elif [ -f "./pyproject.toml" ]; then
-  pip install . --quiet
+	pip install . --quiet
 fi
 
 # Run migrations
@@ -32,11 +35,11 @@ python3 manage.py collectstatic --noinput
 # Adjust the service name to match your systemd unit
 SERVICE_NAME="${PROJECT_NAME:-gunicorn}"
 if ! command -v systemctl >/dev/null 2>&1; then
-  echo "systemctl not found. Restart your app server manually."
+	echo "systemctl not found. Restart your app server manually."
 elif systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-  systemctl restart "$SERVICE_NAME"
+	systemctl restart "$SERVICE_NAME"
 elif systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
-  systemctl start "$SERVICE_NAME"
+	systemctl start "$SERVICE_NAME"
 else
-  echo "No systemd service found for $SERVICE_NAME. Restart your app server manually."
+	echo "No systemd service found for $SERVICE_NAME. Restart your app server manually."
 fi
