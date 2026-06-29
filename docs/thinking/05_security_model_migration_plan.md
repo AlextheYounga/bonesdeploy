@@ -22,7 +22,11 @@ Hard decisions already made:
 - No control-plane generations/history model.
 - Build scripts mutate `/workspace/source`; no required `/workspace/output`.
 - Prepare scripts run on the host as `foo` after shared paths are wired and before activation.
-- Privileged paths, users, groups, and services come from bonesremote-controlled state, not repo-owned config.
+- Privileged paths, users, and groups come from bonesremote-controlled state, not repo-owned config.
+- Service restart names use the existing `<project>-nginx.service` convention.
+- Build containers do not mount caches.
+- Secret delivery remains user-managed through `bonesdeploy secrets push`.
+- The secret target is always `shared/.env`.
 
 ## Phase 0: Freeze the Contract
 
@@ -55,7 +59,7 @@ promote mutated source into sealed release
 wire shared paths
 run prepare scripts as foo
 activate current as root
-restart registry-approved services
+restart `<project>-nginx.service`
 prune and cleanup
 ```
 
@@ -108,7 +112,7 @@ Keep it simple:
 - `current_path = /srv/sites/<project>/current`.
 - `runtime_user = <project>`.
 - `runtime_group = <project>`.
-- service names come from a constrained server-side convention or allowlist.
+- service names use the existing `<project>-nginx.service` convention.
 - `branch` and `deploy_on_push` live here because hook filtering belongs to bonesremote.
 
 Exit criteria:
@@ -209,7 +213,6 @@ Build execution:
 
 - Run a configured image from `runtime.toml` after validation.
 - Mount exported source as `/workspace/source`.
-- Mount only approved cache dirs such as `/var/cache/bonesremote/<project>/composer` or npm cache when needed.
 - Run build scripts in lexical order.
 - Treat non-zero exit as deployment failure.
 - Return the mutated `/workspace/source` path to the promotion step.
@@ -316,7 +319,7 @@ Activation:
 
 Service control:
 
-- Restart/reload only registry-approved services.
+- Restart/reload the fixed `<project>-nginx.service` service.
 - Do not accept service names from repo-owned config or hook input.
 
 Pruning:
@@ -328,29 +331,10 @@ Pruning:
 Exit criteria:
 
 - Deploy failure before activation leaves the active release running.
-- Rollback repoints `current` to a previous sealed release and restarts the approved service.
+- Rollback repoints `current` to a previous sealed release and restarts `<project>-nginx.service`.
 - Old inactive releases are pruned according to the configured keep count.
 
-## Phase 10: Move Secrets Placement Behind BonesRemote
-
-This can land after the core pipeline if needed, but it must be done before calling the security model complete.
-
-`bonesdeploy` keeps local encrypted secret editing and transport.
-
-`bonesremote` owns final placement:
-
-- destination path from registry/control-plane state.
-- owner/group from registry/control-plane state.
-- file mode from bonesremote policy.
-- atomic write to `shared/.env` or equivalent declared secret target.
-
-Exit criteria:
-
-- No `chown root:<group>` decision uses repo-owned `runtime.toml` as authority.
-- Secret delivery cannot write outside the registry-approved shared path.
-- Runtime user can read the secret file through wired paths.
-
-## Phase 11: Update Doctor and Documentation
+## Phase 10: Update Doctor and Documentation
 
 Doctor checks should match the new boundary.
 
@@ -364,7 +348,7 @@ Remote checks:
 - `/srv/sites/<project>/shared`, `releases`, and `current` parent exist with expected ownership shape.
 - runtime user exists and is not `git`.
 - `git` is not in the site group.
-- approved services exist.
+- `<project>-nginx.service` exists.
 
 Docs to update:
 
@@ -392,9 +376,8 @@ Exit criteria:
 8. Replace shared wiring.
 9. Add prepare script runner as site user.
 10. Rewrite deploy orchestration around the new phases.
-11. Move secrets final placement into bonesremote.
-12. Update doctor checks and docs.
-13. Delete obsolete stage/post-receive/old deployment-script code.
+11. Update doctor checks and docs.
+12. Delete obsolete stage/post-receive/old deployment-script code.
 
 This order keeps the trust boundary moving in one direction: first move authority out of Git, then make Git a trigger, then replace the deploy pipeline.
 

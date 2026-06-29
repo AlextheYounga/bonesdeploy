@@ -1,3 +1,5 @@
+use std::process::Command;
+
 use anyhow::{Context, Result, bail};
 use openssh::{KnownHosts, Session, SessionBuilder, Stdio};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -13,6 +15,13 @@ pub async fn connect(config: &Bones) -> Result<Session> {
     connect_as(&user, host, port).await
 }
 
+pub async fn connect_privileged(config: &Bones) -> Result<Session> {
+    let host = &config.host;
+    let port = parse_port(&config.port)?;
+
+    connect_as(&config.ssh_user, host, port).await
+}
+
 pub async fn connect_as(user: &str, host: &str, port: u16) -> Result<Session> {
     SessionBuilder::default()
         .known_hosts_check(KnownHosts::Accept)
@@ -21,6 +30,14 @@ pub async fn connect_as(user: &str, host: &str, port: u16) -> Result<Session> {
         .connect(host)
         .await
         .with_context(|| format!("Failed to connect to {user}@{host}:{port}"))
+}
+
+pub fn external_command(user: &str, host: &str, port: &str) -> Command {
+    let mut command = Command::new("ssh");
+    command
+        .args(["-p", port, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"])
+        .arg(format!("{user}@{host}"));
+    command
 }
 
 pub async fn run_cmd(session: &Session, cmd: &str) -> Result<String> {
@@ -106,4 +123,29 @@ pub async fn run_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[u8]
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::external_command;
+
+    #[test]
+    fn external_command_uses_expected_ssh_options() {
+        let command = external_command("root", "deploy.example.com", "2222");
+        let args = command.get_args();
+        let args = args.map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+
+        assert_eq!(
+            args,
+            vec![
+                String::from("-p"),
+                String::from("2222"),
+                String::from("-o"),
+                String::from("StrictHostKeyChecking=no"),
+                String::from("-o"),
+                String::from("UserKnownHostsFile=/dev/null"),
+                String::from("root@deploy.example.com"),
+            ]
+        );
+    }
 }

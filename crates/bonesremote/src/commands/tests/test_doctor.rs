@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use super::{
     AppArmorUnitWiringStatus, apparmor_kernel_enabled, apparmor_profile_binding, apparmor_profile_filename,
-    apparmor_unit_name_for_profile, apparmor_unit_wiring_status,
+    apparmor_unit_name_for_profile, apparmor_unit_wiring_status, deploy_user_sudo_check_command,
 };
 
 /// Accepts a yes value as indicating `AppArmor` is enabled in the kernel.
@@ -83,5 +83,16 @@ fn apparmor_profile_binding_reads_first_profile_assignment() {
     assert_eq!(
         apparmor_profile_binding("[Service]\nAppArmorProfile=bonesdeploy-demo-nginx\n"),
         Some("bonesdeploy-demo-nginx")
+    );
+}
+
+#[test]
+fn sudoers_check_runs_as_deploy_user() {
+    let command = deploy_user_sudo_check_command(["bonesremote", "hook", "post-receive", "--site", "demo"]);
+    let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+
+    assert_eq!(
+        args,
+        vec!["-n", "-u", "git", "sudo", "-n", "-l", "bonesremote", "hook", "post-receive", "--site", "demo"]
     );
 }

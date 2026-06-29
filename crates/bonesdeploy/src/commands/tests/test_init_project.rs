@@ -190,7 +190,8 @@ fn init_materializes_base_bones_assets() -> Result<()> {
         let bones_dir = repo_dir.join(".bones");
         assert!(bones_dir.join("bones.toml").is_file());
         assert!(bones_dir.join("runtime.toml").is_file());
-        assert!(bones_dir.join("hooks/hooks.sh").is_file());
+        assert!(bones_dir.join("hooks/pre-push").is_file());
+        assert!(bones_dir.join("hooks/post-receive").is_file());
         let deploy_dir = bones_dir.join("deployment");
         assert!(deploy_dir.is_dir());
         assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
@@ -199,7 +200,8 @@ fn init_materializes_base_bones_assets() -> Result<()> {
         assert!(runtime_toml.contains("permissions"));
 
         let config_root = paths::bones_config_root().join("atlas.bones");
-        assert!(config_root.join("hooks/hooks.sh").is_file());
+        assert!(config_root.join("hooks/pre-push").is_file());
+        assert!(config_root.join("hooks/post-receive").is_file());
 
         let config_gitignore = paths::bones_config_root().join(".gitignore");
         assert!(config_gitignore.is_file());
@@ -217,7 +219,7 @@ fn init_rerun_preserves_existing_bones_assets() -> Result<()> {
     with_temp_repo(|repo_dir, _home_dir| {
         run_init()?;
 
-        let sentinel = repo_dir.join(".bones/hooks/hooks.sh");
+        let sentinel = repo_dir.join(".bones/hooks/pre-push");
         let original = fs::read_to_string(&sentinel)?;
 
         run_init()?;

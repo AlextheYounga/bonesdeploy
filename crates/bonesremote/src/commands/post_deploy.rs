@@ -1,14 +1,19 @@
 use std::fs;
-use std::path::Path;
 
 use anyhow::{Context, Result};
+use shared::paths;
+use shared::registry;
 
-use crate::config;
+use crate::privileges;
 use crate::release_state;
 
-pub fn run(config_path: &str) -> Result<()> {
-    let config_path = Path::new(config_path);
-    let cfg = config::load(config_path)?;
+pub fn run(site: &str) -> Result<()> {
+    privileges::ensure_root("bonesremote release prune")?;
+    registry::validate_site_name(site)?;
+
+    let registry_path = paths::bonesremote_registry_path(site);
+    let cfg = registry::load(&registry_path)
+        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
 
     let pruned = prune_old_releases(&cfg)?;
     if !pruned.is_empty() {
@@ -18,7 +23,7 @@ pub fn run(config_path: &str) -> Result<()> {
     Ok(())
 }
 
-fn prune_old_releases(cfg: &config::Bones) -> Result<Vec<String>> {
+fn prune_old_releases(cfg: &registry::Registry) -> Result<Vec<String>> {
     let active_release = release_state::current_release_name(cfg)?;
     let mut releases = release_state::list_releases_sorted(cfg)?;
     let keep = cfg.releases_keep.max(1);
@@ -52,8 +57,8 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::config::Bones;
     use shared::paths;
+    use shared::registry::Registry;
 
     use super::prune_old_releases;
 
@@ -64,18 +69,20 @@ mod tests {
         Ok(path)
     }
 
-    fn config_for(temp_root: &Path, keep: usize) -> Bones {
-        Bones {
-            remote_name: String::from("production"),
-            project_name: String::from("acme"),
-            host: String::from("example.com"),
-            port: String::from("22"),
+    fn config_for(temp_root: &Path, keep: usize) -> Registry {
+        let site_root = temp_root.join("project_root");
+        Registry {
+            site: String::from("acme"),
             repo_path: temp_root.join("repo.git").to_string_lossy().to_string(),
-            project_root: temp_root.join("project_root").to_string_lossy().to_string(),
+            site_root: site_root.to_string_lossy().to_string(),
+            shared_root: site_root.join(paths::SHARED_DIR).to_string_lossy().to_string(),
+            releases_root: site_root.join(paths::RELEASES_DIR).to_string_lossy().to_string(),
+            current_path: site_root.join(paths::CURRENT_LINK).to_string_lossy().to_string(),
+            runtime_user: String::from("acme"),
+            runtime_group: String::from("acme"),
             branch: String::from("main"),
             deploy_on_push: true,
             releases_keep: keep,
-            ..Default::default()
         }
     }
 
@@ -93,7 +100,6 @@ mod tests {
         Ok(())
     }
 
-    /// Prunes the oldest inactive releases when the active release count exceeds the keep limit.
     #[test]
     fn prune_old_releases_removes_oldest_inactive_releases_up_to_keep_limit() -> Result<()> {
         let root = temp_dir("bonesremote_post_deploy_prune")?;
@@ -115,7 +121,6 @@ mod tests {
         Ok(())
     }
 
-    /// Keeps all releases when the active release count is within the keep limit.
     #[test]
     fn prune_old_releases_keeps_active_release_when_within_keep_limit() -> Result<()> {
         let root = temp_dir("bonesremote_post_deploy_prune_active")?;

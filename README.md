@@ -8,7 +8,7 @@ A deployment CLI for plain Linux servers.
 
 > WARNING: BonesDeploy is still under active development. You probably shouldn't use this yet. There may be some cool bugs!
 
-BonesDeploy deploys apps to a Linux server over SSH.
+BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, publishes the `.bones/` dataset into root-owned `bonesremote` site state, and runs the release lifecycle remotely without turning the bare Git repo into the control plane.
 
 No platform.  
 No control plane.  
@@ -239,33 +239,26 @@ releases = 5
 
 Common defaults:
 
-```toml
-deploy_user = "git"
-runtime_user = "<project_name>"
-runtime_group = "<project_name>"
-release_group = "<project_name>-release"
-project_root = "/srv/sites/<project_name>"
+## Project Structure
+
+```
+.bones/
+├── bones.toml           # project configuration
+├── runtime.toml         # framework runtime configuration
+├── hooks/
+│   ├── hooks.sh         # (legacy) shared hook functions imported by hook entrypoints
+│   ├── pre-push         # symlinked to .git/hooks/pre-push
+│   └── post-receive     # thin adapter → calls bonesremote deploy
+└── deployment/
+    ├── build/
+    │   └── 01_*.sh      # build scripts (run sequentially in Podman)
+    └── prepare/
+        └── 01_*.sh      # prepare scripts (run as the site user before activation)
 ```
 
-The web root lives in `.bones/runtime.toml`:
+Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you and can be edited freely. Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside the `build_image` configured in `.bones/runtime.toml`. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation.
 
-```toml
-web_root = "public"
-```
-
-## Release Layout
-
-A deploy creates a new release directory.
-
-Shared state lives outside the release.
-
-The active release is switched after the deployment scripts pass.
-
-Old releases are pruned.
-
-Rollback points the site back to the previous release without rebuilding.
-
-That is enough for a lot of apps.
+Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote hook post-receive`, which resolves policy from bonesremote-managed site state.
 
 ## Good Fit
 

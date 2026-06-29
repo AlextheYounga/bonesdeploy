@@ -1,7 +1,7 @@
 mod cli;
 mod commands;
-mod config;
 mod privileges;
+mod release;
 mod release_state;
 
 use anyhow::Result;
