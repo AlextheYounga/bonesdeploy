@@ -130,7 +130,7 @@ Deploy the configured project release:
 bonesdeploy deploy
 ```
 
-This SSHs into the host and runs `bonesremote deploy --site <project>`, which orchestrates the current server-side pipeline: stage release → export source from the bare repo into a temp build context → run `deployment/build/*.sh` in Podman → promote the release → wire shared paths → activate → restart services → prune old releases.
+This SSHs into the host and runs `bonesremote deploy --site <project>`, which orchestrates the current server-side pipeline: stage release → export source from the bare repo into a temp build context → run `deployment/build/*.sh` in Podman → promote the release → wire shared paths → run `deployment/prepare/*.sh` as the site user → activate → restart `<project>-nginx.service` → prune old releases.
 
 To roll back to the previous release without rebuilding:
 
@@ -154,9 +154,11 @@ If `deploy_on_push = false` (the default), pushes only update refs. Run `bonesde
 ### Health Checks
 
 ```sh
-bonesdeploy doctor          # check local + remote
+bonesdeploy doctor          # check local + remote site boundary
 bonesdeploy doctor --local  # check local only
 ```
+
+Remote doctor now runs `bonesremote doctor --site <project>` over privileged SSH and verifies the imported control-plane state, Podman, deploy-user sudo wiring, the bare repo and thin hook, runtime identity, shared/release layout, and `<project>-nginx.service`.
 
 ### Updating
 
@@ -200,11 +202,13 @@ releases = 5
 │   ├── pre-push         # symlinked to .git/hooks/pre-push
 │   └── post-receive     # thin adapter → calls bonesremote deploy
 └── deployment/
-    └── build/
-        └── 01_*.sh      # build scripts (run sequentially in Podman)
+    ├── build/
+    │   └── 01_*.sh      # build scripts (run sequentially in Podman)
+    └── prepare/
+        └── 01_*.sh      # prepare scripts (run as the site user before activation)
 ```
 
-Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you — edit freely. Build scripts in `.bones/deployment/build/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order inside the `build_image` configured in `.bones/runtime.toml`.
+Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you and can be edited freely. Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside the `build_image` configured in `.bones/runtime.toml`. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation.
 
 Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote hook post-receive`, which resolves policy from bonesremote-managed site state.
 

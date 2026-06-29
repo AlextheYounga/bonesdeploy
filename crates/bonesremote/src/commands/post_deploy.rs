@@ -4,9 +4,13 @@ use anyhow::{Context, Result};
 use shared::paths;
 use shared::registry;
 
+use crate::privileges;
 use crate::release_state;
 
 pub fn run(site: &str) -> Result<()> {
+    privileges::ensure_root("bonesremote release prune")?;
+    registry::validate_site_name(site)?;
+
     let registry_path = paths::bonesremote_registry_path(site);
     let cfg = registry::load(&registry_path)
         .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;

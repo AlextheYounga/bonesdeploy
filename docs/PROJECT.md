@@ -183,13 +183,12 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - This command checks all concerns in your local environment.
   - Loads config from `.bones/bones.toml`
   - Runs local checks:
-    - `.bones` folder exists and is a symlink (warns if it is not a symlink to `~/.config/bonesdeploy/<project>.bones/`). Deployment scripts are named appropriately.
-    - Required files exist: `bones.toml`, `hooks/pre-push`, `hooks/post-receive`, `deployment/` dir.
+    - `.bones` folder exists and is a symlink (warns if it is not a symlink to `~/.config/bonesdeploy/<project>.bones/`).
+    - Deployment scripts under `.bones/deployment/build/` and `.bones/deployment/prepare/` are ordered with numeric prefixes.
     - Local `pre-push` hook is symlinked properly when `deploy_on_push = true`.
   - Runs remote checks (skipped with `--local`):
-    - `bonesremote` executable exists on remote and can be run globally.
-    - `{project_name}.git/bones` folder exists on remote (needs `bonesdeploy push` warning)
-    - `{project_name}.git/bones/hooks` matches with `{project_name}.git/hooks` inside the remote bare repo when `deploy_on_push = true`.
+    - Opens a privileged SSH session and runs `bonesremote doctor --site <project>`.
+    - `bonesremote doctor --site <project>` checks `bonesremote` itself, Podman availability, deploy-user sudo wiring, AppArmor, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`.
   - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys.
 
 - **push**
@@ -253,18 +252,16 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **Service commands** live under `bonesremote service ...`
 - **deploy**:
   - Runs the full deployment lifecycle as a single command (the primary entrypoint used by both `post-receive` hook and `bonesdeploy deploy`).
-  - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → release promotion/hardening → shared wiring → activate → service restart → post-deploy pruning.
+  - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → release promotion/hardening → shared wiring → prepare scripts as the site user → activate → restart `<site>-nginx.service` → post-deploy pruning.
   - On failure, automatically drops the staged release.
   - `--site <name>`: imported site identifier used to load root-owned registry state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
 - **init**:
   - Must be run as sudo.
-  - Installs a drop-in file at `/etc/sudoers.d/bonesdeploy` to allow only `sudo bonesremote service restart --config *` without requiring password.
+  - Installs a drop-in file at `/etc/sudoers.d/bonesdeploy` to allow only the thin hook, service restart, rollback, failed-release cleanup, and prune commands without requiring a password.
 - **doctor**:
-  - Checks to see if the server is set up properly:
-    - `bonesremote` is globally available.
-    - AppArmor support is available on the host.
-    - Sudoers drop-in is correctly configured.
+  - Host mode checks `bonesremote` in `PATH`, Podman, AppArmor support, and the deploy-user sudoers drop-in.
+  - `--site <name>` also checks the imported site boundary: validated control-plane state, bare repo and thin hook, runtime identity constraints, `shared/` and `releases/` layout, and `<site>-nginx.service`.
 - **release stage**
 	- Creates a staged release tree under `releases/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout.
 - **release wire**

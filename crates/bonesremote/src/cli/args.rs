@@ -12,7 +12,11 @@ pub enum Command {
     /// Install sudoers drop-in for passwordless bonesremote
     Init,
     /// Check server environment health
-    Doctor,
+    Doctor {
+        /// Also validate the imported site state and runtime boundary for one site
+        #[arg(long)]
+        site: Option<String>,
+    },
     /// Run the full remote deployment lifecycle
     Deploy {
         /// Site identifier (must match an imported site directory)

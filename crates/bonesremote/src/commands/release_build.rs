@@ -211,7 +211,8 @@ fn seal_release(destination: &Path, cfg: &registry::Registry) -> Result<()> {
 }
 
 fn root_uid() -> Result<u32> {
-    let passwd = fs::read_to_string("/etc/passwd").context("Failed to read /etc/passwd while sealing release")?;
+    let passwd = fs::read_to_string(paths::ETC_PASSWD)
+        .with_context(|| format!("Failed to read {} while sealing release", paths::ETC_PASSWD))?;
     let line = passwd.lines().find(|line| line.starts_with("root:")).context("root entry missing from /etc/passwd")?;
     let fields: Vec<&str> = line.split(':').collect();
     let uid = fields
@@ -223,7 +224,8 @@ fn root_uid() -> Result<u32> {
 }
 
 fn site_group_gid(group: &str) -> Result<u32> {
-    let groupfile = fs::read_to_string("/etc/group").context("Failed to read /etc/group while sealing release")?;
+    let groupfile = fs::read_to_string(paths::ETC_GROUP)
+        .with_context(|| format!("Failed to read {} while sealing release", paths::ETC_GROUP))?;
     let line = groupfile
         .lines()
         .find(|line| line.starts_with(&format!("{group}:")))

@@ -6,7 +6,7 @@ use crate::commands::{deploy, doctor, drop_failed_release, hook, init, post_depl
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init => init::run(),
-        Command::Doctor => doctor::run(),
+        Command::Doctor { site } => doctor::run(site.as_deref()),
         Command::Deploy { site, revision } => deploy::run_full(site, revision.as_deref()),
         Command::Status { site } => status::run(site),
         Command::Hook { command } => match command {

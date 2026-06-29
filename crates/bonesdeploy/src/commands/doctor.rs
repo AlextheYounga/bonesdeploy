@@ -2,8 +2,6 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
-use shared::paths::bonesremote_registry_path;
-use tokio::runtime::Runtime;
 
 use crate::config;
 use crate::infra::ssh;
@@ -36,11 +34,10 @@ pub async fn run(local_only: bool) -> Result<()> {
                     print_check("remote SSH", remote_ssh_issue.clone(), Some("check host, port, and SSH access."));
                 if remote_ssh_issue.is_none() {
                     issues += print_check(
-                        "bonesremote",
-                        check_bonesremote(cfg).await,
-                        Some("run bonesdeploy remote bootstrap"),
+                        "remote doctor",
+                        check_remote_doctor(cfg).await,
+                        Some("run bonesdeploy push or remote setup"),
                     );
-                    issues += print_check(".bones sync", check_bones_sync(cfg), Some("run bonesdeploy push"));
                 }
             }
             None => {
@@ -104,13 +101,24 @@ fn check_deployment_scripts() -> Option<String> {
         return None;
     }
 
-    let entries = fs::read_dir(deployment_dir).ok()?;
-    for entry in entries.flatten() {
-        let name = entry.file_name();
-        let name = name.to_string_lossy();
-        let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
-        if !has_numeric_prefix {
-            return Some(format!("Deployment script is not ordered: {name}"));
+    for subdir in ["build", "prepare"] {
+        let scripts_dir = deployment_dir.join(subdir);
+        if !scripts_dir.exists() {
+            continue;
+        }
+
+        let entries = fs::read_dir(&scripts_dir).ok()?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
+            }
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
+            if !has_numeric_prefix {
+                return Some(format!("Deployment script is not ordered: {subdir}/{name}"));
+            }
         }
     }
 
@@ -143,27 +151,16 @@ async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
     }
 }
 
-async fn check_bonesremote(cfg: &config::Bones) -> Option<String> {
-    let session = ssh::connect(cfg).await.ok()?;
-    let result = ssh::run_cmd(&session, "command -v bonesremote").await;
+async fn check_remote_doctor(cfg: &config::Bones) -> Option<String> {
+    let session = match ssh::connect_privileged(cfg).await {
+        Ok(session) => session,
+        Err(error) => return Some(format!("Cannot connect as privileged remote user\n  {error}")),
+    };
+    let command = format!("bonesremote doctor --site {}", shell_quote(&cfg.project_name));
+    let result = ssh::run_cmd(&session, &command).await;
     let _ = session.close().await;
 
-    if result.is_ok() { None } else { Some(String::from("bonesremote is missing")) }
-}
-
-fn check_bones_sync(cfg: &config::Bones) -> Option<String> {
-    let registry_path = bonesremote_registry_path(&cfg.project_name);
-    let command = format!("test -r {}", shell_quote(&registry_path.display().to_string()));
-    let Ok(runtime) = Runtime::new() else {
-        return Some(String::from("Could not start runtime to check remote site state"));
-    };
-    let Ok(session) = runtime.block_on(ssh::connect_privileged(cfg)) else {
-        return Some(String::from("Could not connect to remote site state"));
-    };
-    let ok = runtime.block_on(ssh::run_cmd(&session, &command)).is_ok();
-    let _ = runtime.block_on(session.close());
-
-    if ok { None } else { Some(String::from("remote bonesremote site state is missing; run bonesdeploy push")) }
+    result.err().map(|error| format!("remote doctor failed\n  {error}"))
 }
 
 fn shell_quote(value: &str) -> String {
@@ -172,7 +169,13 @@ fn shell_quote(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::shell_quote;
+    use std::env;
+    use std::fs;
+    use std::process;
+
+    use anyhow::Result;
+
+    use super::{check_deployment_scripts, shell_quote};
     use crate::commands::push_state;
 
     #[test]
@@ -183,5 +186,26 @@ mod tests {
     #[test]
     fn shell_quote_escapes_single_quotes() {
         assert_eq!(shell_quote("a'b"), "'a'\\''b'");
+    }
+
+    #[test]
+    fn deployment_script_check_accepts_nested_build_and_prepare_layout() -> Result<()> {
+        let cwd = env::current_dir()?;
+        let root = env::temp_dir().join(format!("bonesdeploy-doctor-nested-layout-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(root.join(".bones/deployment/build"))?;
+        fs::create_dir_all(root.join(".bones/deployment/prepare"))?;
+        fs::write(root.join(".bones/deployment/build/01_build.sh"), "")?;
+        fs::write(root.join(".bones/deployment/prepare/02_prepare.sh"), "")?;
+
+        env::set_current_dir(&root)?;
+        let result = check_deployment_scripts();
+        env::set_current_dir(cwd)?;
+
+        fs::remove_dir_all(&root).ok();
+        assert!(result.is_none(), "nested deployment layout should be accepted: {result:?}");
+        Ok(())
     }
 }
