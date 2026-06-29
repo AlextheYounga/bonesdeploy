@@ -231,6 +231,25 @@ fn init_rerun_preserves_existing_bones_assets() -> Result<()> {
     })
 }
 
+/// Does not leave managed config directories behind when required prompt data is missing.
+#[test]
+fn init_failure_before_completed_prompts_leaves_no_bones_assets() -> Result<()> {
+    with_temp_repo(|repo_dir, _home_dir| {
+        let mut args = init_args();
+        args.host = None;
+
+        let result = run_with_prefetch(&args, || Ok(()));
+        let Err(err) = result else {
+            bail!("init without host should fail");
+        };
+        assert!(err.to_string().contains("--host is required"));
+        assert!(!repo_dir.join(".bones").exists());
+        assert!(!paths::bones_config_root().join("atlas.bones").exists());
+
+        Ok(())
+    })
+}
+
 /// Repairs a dangling .bones symlink instead of failing with EEXIST.
 #[test]
 fn init_repairs_dangling_bones_symlink() -> Result<()> {

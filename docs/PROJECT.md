@@ -172,9 +172,9 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 ### BonesDeploy CLI Commands
 - **init**:
-  - Gets or creates the `.bones` folder with our default scaffolding.
-  - Updates `.gitignore` to add .bones folder.
   - Loads existing config from `.bones/bones.toml` or collects user input via prompts.
+  - For fresh init, waits until prompts complete before creating `.config/bonesdeploy/<project>.bones/` and the local `.bones` symlink.
+  - Updates `.gitignore` to add .bones folder.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy remote setup` and `bonesdeploy remote runtime` before first deploy.
   - Saves config to `.bones/bones.toml`.
