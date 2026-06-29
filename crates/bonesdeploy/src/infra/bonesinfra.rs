@@ -128,7 +128,7 @@ fn setup_venv(checkout: &Path) -> Result<()> {
 }
 
 fn checkout_dir() -> PathBuf {
-    paths::bones_config_root().join(CHECKOUT_DIR)
+    paths::bones_config_lib_root().join(CHECKOUT_DIR)
 }
 
 #[cfg(test)]
@@ -142,8 +142,8 @@ mod tests {
     use super::{checkout_dir, reset_checkout};
 
     #[test]
-    fn checkout_dir_lives_under_bones_config_root() {
-        assert_eq!(checkout_dir(), paths::bones_config_root().join("bonesinfra"));
+    fn checkout_dir_lives_under_bones_config_lib_root() {
+        assert_eq!(checkout_dir(), paths::bones_config_lib_root().join("bonesinfra"));
     }
 
     #[test]

@@ -68,7 +68,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 │   └── 02_run_build.sh
 ```
 
-Python infra scripts and templates are managed separately by the hidden `bonesinfra` checkout; see `crates/bonesdeploy/src/infra/bonesinfra.rs`.
+Python infra scripts and templates are managed separately by the hidden `bonesinfra` checkout under `~/.config/bonesdeploy/_lib/bonesinfra`; see `crates/bonesdeploy/src/infra/bonesinfra.rs`.
 
 ### Bones TOML
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
