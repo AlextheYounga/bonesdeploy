@@ -1,255 +1,330 @@
 # BonesDeploy
 
-## Remote release deployment tool for simple Linux servers
+A deployment CLI for plain Linux servers.
 
-<div style="margin:0 auto; display: block;"><img width=600 height=600 src="docs/images/bonesdeploy.png" alt="BonesDeploy" /></div>
+<div style="margin:0 auto; display: block;">
+  <img width="600" height="600" src="docs/images/bonesdeploy.png" alt="BonesDeploy" />
+</div>
 
-> WARNING: BonesDeploy is still under active development. There may be some cool bugs!
+> WARNING: BonesDeploy is still under active development. You probably shouldn't use this yet. There may be some cool bugs!
 
-BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, syncs them to the remote, and manages permissions through provisioning-time contracts (setgid directories + systemd sandboxing) without forcing containers, a control plane, or a platform layer.
+BonesDeploy deploys apps to a Linux server over SSH.
 
-It produces two binaries:
-- **`bonesdeploy`** — local CLI for init, config, deployment, and management
-- **`bonesremote`** — server-side release lifecycle executor, installed on the deployment host
+No platform.  
+No control plane.  
+No required Docker setup.  
+No pretending your VPS is a tiny Kubernetes cluster.
 
-## Why BonesDeploy
+It gives you versioned releases, rollback, shared runtime state, service restarts, and per-site Linux isolation using the tools already on the box.
 
-BonesDeploy is built for developers who want direct server deploys without handing deployment over to a PaaS or rebuilding everything around Docker.
+**It's also AI agent friendly, with dedicated commands to help your agent understand how to setup and manage your server without ever leaving your machine.**
 
-- **Drop-in** — add it to an existing repo, scaffold `.bones/`, and deploy over your existing SSH workflow
-- **Simple lifecycle** — `bonesdeploy deploy` runs the full deployment pipeline on the remote server; `bonesremote deploy` owns the lifecycle
-- **Permission-aware** — BonesDeploy treats deploy-user to service-user handoff as a first-class concern instead of leaving shared groups or ACL sprawl behind
-- **Self-hosted and lightweight** — ideal for VPSes, old servers, and Raspberry Pis where simplicity matters more than orchestration
-- **Editable by design** — the generated hooks and deployment scripts are yours; BonesDeploy gives you structure, not lock-in
-- **Git optional** — git push can trigger deploys through a thin post-receive adapter, but `bonesdeploy deploy` is the primary deployment command
+BonesDeploy builds two binaries:
 
-If you want a Heroku-style abstraction layer, use a platform. If you want a disciplined, transparent deployment tool that drops into a normal Linux box, use BonesDeploy.
+- **`bonesdeploy`** — the local CLI
+- **`bonesremote`** — the remote release runner
 
-## How It Works
+And wraps a Python runtime:
+- **`bonesinfra`** - https://github.com/AlextheYounga/bonesinfra
 
-BonesDeploy uses a two-user permission contract:
+## The Point
 
-1. A **deploy user** (default: `git`) handles SSH access, owns the bare repo, and creates release artifacts. This user has restricted sudo ability (service restart only) but no password login.
-2. A **runtime user** (defaults to the project name) owns runtime state — shared files, sockets, and writable directories. This user has no home folder, no login, and no sudo ability — limiting attack scope.
+Deploying small apps should not require a platform team.
 
-Permissions are a **provisioning-time contract**, not a deployment-time repair:
+Most apps need a few boring things done correctly:
 
-- The deploy user owns immutable release archives (`releases/`) with setgid so the runtime group can read them.
-- The runtime user owns mutable shared state (`shared/`).
-- Root creates users, directories, systemd units, and sockets during provisioning.
-- No deploy step changes ownership or applies recursive chown.
+- put each release in its own directory
+- keep uploads and runtime files outside the release
+- restart the right service
+- keep a few old releases around
+- roll back without drama
+- stop one site from casually reading another site's files
 
-The sudoers configuration is strictly limited to `bonesremote service restart`, the only command that needs elevated privileges during normal operation.
+That is what BonesDeploy is for.
 
-This gives you a clean privilege boundary:
+## Site Isolation
 
-- the **deploy user** can connect, stage, and activate
-- the **runtime user** runs the app
-- `root` provisions the machine and restarts services
+This is the part I care about.
 
-## Installation
+BonesDeploy treats each site as its own thing on the server. Each site gets its own isolated services via systemd.
 
-### Local (bonesdeploy)
+Each site can get its own:
+
+- Linux user
+- Linux group
+- writable shared paths
+- systemd runtime services
+- nginx config
+- AppArmor policy
+- Seccomps configs
+
+The deploy user deploys.  
+The runtime user runs the app.  
+Root provisions the machine.
+
+That is the whole model.
+
+## Why Not Just Docker?
+
+Docker is useful. It gives you packaging, repeatability, and another layer of isolation.
+
+But Docker is heavy, and slow, and you see this when you try running multiple Docker sites on a machine with less than 8GB of RAM. 
+
+Docker is also where a lot of people hide from Linux.
+
+Instead of setting up users, groups, permissions, services, sockets, nginx, PHP-FPM, AppArmor, and runtime directories correctly, we stuff the app in a container and call it done.
+
+Sometimes that is the right trade.
+
+BonesDeploy takes the other trade.
+
+It assumes the server is the deployment target, and then does the annoying work of centralizing the Linux setup per site.
+
+You can still use Docker with BonesDeploy. Put `docker compose` in your deploy scripts.
+
+Docker just is not the foundation.
+
+## Runtime Templates
+
+Runtime templates set up the Linux pieces for a framework.
+
+| Template | Status | Notes |
+| --- | --- | --- |
+| Laravel | Working | PHP / PHP-FPM setup |
+| Vue | Working | Static frontend setup |
+| Nuxt | Working | Nuxt runtime setup |
+| Svelte | Planned | Not working yet |
+| Django | Planned | Not working yet |
+| Rails | Planned | Not working yet |
+| Next.js | Planned | Not working yet |
+
+Templates are not magic. They are shared server setup so every project does not become a custom snowflake.
+
+## Install
+
+Install the local CLI:
 
 ```sh
 cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
 ```
 
-### Server (bonesremote)
+Install the remote runner on the server:
 
 ```sh
 sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
-Then run the remote setup:
+Initialize the remote side:
 
 ```sh
 sudo bonesremote init
 ```
 
-This installs a sudoers drop-in at `/etc/sudoers.d/bonesdeploy` so the deploy user can run only the privileged `bonesremote` commands without a password.
+## Start a Project
 
-## Usage
-
-### Initial Setup
-
-In your project repository:
+From your project repo:
 
 ```sh
 bonesdeploy init
 ```
 
-This will:
-1. Create a `.bones/` folder with deployment scripts and hooks
-2. Prompt for project name, branch, remote name, host, and port
-3. Add `.bones` to `.gitignore`
-4. Symlink the `pre-push` hook into `.git/hooks/`
-5. Create a local deployment git remote if needed
+This creates:
 
-BonesDeploy assumes opinionated server defaults unless you change them in `.bones/bones.toml`:
+```text
+.bones/
+├── bones.toml
+├── runtime.toml
+├── hooks/
+│   ├── hooks.sh
+│   ├── pre-push
+│   └── post-receive
+└── deployment/
+    └── 01_*.sh
+```
 
-- `port = "22"`
-- `project_root = "/srv/sites/<project_name>"`
-- `deploy_user = "git"`
-- `runtime_user = "<project_name>"`
-- `runtime_group = "<project_name>"`
-- `release_group = "<project_name>-release"`
+The files are yours.
 
-`web_root` lives in `.bones/runtime.toml` (default `"public"`), not `bones.toml`.
+Edit them.
 
-The `init` command creates the local `.bones/` scaffold and records project settings.
-Infra operations (remote setup, runtime, SSL) are delegated to the `bonesinfra` Python package, which `bonesdeploy` clones into `~/.config/bonesdeploy/bonesinfra/` on first use. `pyinfra` is a dependency of that package and is installed into its venv automatically.
-Template-based projects then use `bonesdeploy remote runtime` to prompt for a framework and scaffold runtime assets (for example: Laravel installs PHP + PHP-FPM, Django installs Python runtime packages, Node templates install Node.js).
-`bonesdeploy remote setup` handles machine bootstrap as root, while `bonesdeploy remote runtime` applies per-site runtime assets such as AppArmor and nginx after a quick confirmation prompt.
+Commit them.
 
-To customize nginx behavior, edit the Jinja2 templates shipped with the `bonesinfra` checkout and re-run `bonesdeploy remote runtime`.
+Read them when something breaks.
 
-When DNS is ready, enable SSL with certbot (separate from runtime):
+Deployment scripts run in filename order:
+
+```text
+01_install_deps.sh
+02_build.sh
+03_migrate.sh
+```
+
+## Set Up the Server
+
+Provision the base server:
+
+```sh
+bonesdeploy remote setup
+```
+
+Provision the site runtime:
+
+```sh
+bonesdeploy remote runtime
+```
+
+Add SSL after DNS points at the server:
 
 ```sh
 bonesdeploy remote ssl --domain app.example.com --email ops@example.com
 ```
 
-This runs the dedicated SSL deploy to obtain a Let's Encrypt certificate and configure the runtime nginx router for HTTPS. SSL is fully decoupled from runtime configuration.
+SSL is separate on purpose. Get the site working first. Add certificates after DNS is real.
 
-### Syncing Configuration
+## Deploy
 
-After editing hooks or deployment scripts in `.bones/`:
-
-```sh
-bonesdeploy push
-```
-
-This rsyncs `.bones/` to the remote bare repo and symlinks the hooks.
-
-### Deploying
-
-Deploy the configured project release:
+Deploy:
 
 ```sh
 bonesdeploy deploy
 ```
 
-This SSHs into the host and runs `bonesremote deploy --config <remote bones.toml>`, which orchestrates the full server-side pipeline: doctor check → stage release → checkout → wire shared paths → run deployment scripts → activate → restart services → prune old releases.
-
-To roll back to the previous release without rebuilding:
+Rollback:
 
 ```sh
 bonesdeploy rollback
 ```
 
-### Git-triggered deploy (optional)
-
-If `deploy_on_push = true`:
+Check the setup:
 
 ```sh
-git push production master
-# post-receive resolves the pushed revision
-# post-receive calls bonesremote deploy --config <path> --revision <sha>
+bonesdeploy doctor
 ```
 
-Git post-receive is a thin adapter — it does not orchestrate the deployment lifecycle. `bonesremote deploy` owns the lifecycle regardless of the trigger.
-
-If `deploy_on_push = false` (the default), pushes only update refs. Run `bonesdeploy deploy` when ready.
-
-### Health Checks
+Check only the local side:
 
 ```sh
-bonesdeploy doctor          # check local + remote
-bonesdeploy doctor --local  # check local only
+bonesdeploy doctor --local
 ```
 
-### Updating
+Sync `.bones/` changes to the server:
 
-Update BonesDeploy binaries to the latest release:
+```sh
+bonesdeploy push
+```
+
+Update the local and remote binaries:
 
 ```sh
 bonesdeploy update
 ```
 
-This rebuilds both local (`bonesdeploy`) and remote (`bonesremote`) from the git source via `cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git`. The remote update runs over SSH as root and also ensures `/srv/sites` exists with the correct ownership and permissions.
+## Config
 
-## Configuration
-
-`bonesdeploy init` generates `.bones/bones.toml`:
+`bonesdeploy init` creates `.bones/bones.toml`:
 
 ```toml
 remote_name = "production"
 project_name = "myproject"
 repo_path = "/home/git/myproject.git"
 project_root = "/srv/sites/myproject"
-port = '22'
-branch = 'master'
-domain = ''
+port = "22"
+branch = "master"
+domain = ""
 preview_domain = ""
-email = ''
+email = ""
 deploy_on_push = false
 ssl_enabled = false
 releases = 5
 ```
 
-`host` and `repo_path` are inferred from the deployment remote URL when possible; if parsing fails, init asks only for those missing values.
+Common defaults:
 
-## Project Structure
-
-```
-.bones/
-├── bones.toml           # project configuration
-├── runtime.toml         # framework runtime configuration
-├── hooks/
-│   ├── hooks.sh         # shared hook functions imported by hook entrypoints
-│   ├── pre-push         # symlinked to .git/hooks/pre-push
-│   └── post-receive     # thin adapter → calls bonesremote deploy
-└── deployment/
-    └── 01_*.sh          # deployment scripts (run sequentially)
+```toml
+deploy_user = "git"
+runtime_user = "<project_name>"
+runtime_group = "<project_name>"
+release_group = "<project_name>-release"
+project_root = "/srv/sites/<project_name>"
 ```
 
-Hooks are written to `.bones/hooks/` once during init and import shared functions from `.bones/hooks/hooks.sh`. After that they belong to you — edit freely. Deployment scripts in `.bones/deployment/` must be numbered (e.g. `01_install_deps.sh`, `02_build.sh`) and are always run in order.
+The web root lives in `.bones/runtime.toml`:
 
-Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote deploy`.
+```toml
+web_root = "public"
+```
+
+## Release Layout
+
+A deploy creates a new release directory.
+
+Shared state lives outside the release.
+
+The active release is switched after the deployment scripts pass.
+
+Old releases are pruned.
+
+Rollback points the site back to the previous release without rebuilding.
+
+That is enough for a lot of apps.
 
 ## Good Fit
 
-BonesDeploy is a strong fit when you want:
+BonesDeploy is for:
 
-- direct Linux deploys over SSH
-- simple app hosting on one machine at a time
-- explicit provisioning-time permission contracts with setgid group inheritance
-- a lightweight alternative to container-first deployment stacks
-- something you can run comfortably on low-cost hosts and Raspberry Pis
+- one-server apps
+- VPS deployments
+- small production apps
+- side projects that grew up
+- Raspberry Pis and old servers
+- developers who want to understand their deploys
+- developers who want Linux isolation without making Docker mandatory
 
-BonesDeploy can still deploy Docker-based apps if your deployment scripts call `docker compose`, but Docker is optional rather than the foundation.
+## Bad Fit
 
-## License
+BonesDeploy is not trying to be:
 
-MIT
+- Kubernetes
+- Heroku
+- Nomad
+- a PaaS
+- a dashboard
+- a managed database service
+- a multi-node orchestration layer
+
+Use those when you need those.
 
 ## Coverage
 
-Coverage is driven with `cargo-llvm-cov` using cargo aliases in `.cargo/config.toml`.
-
-Install once:
+Install:
 
 ```sh
 cargo install cargo-llvm-cov
 ```
 
-Generate a terminal summary:
+Run:
 
 ```sh
 cargo cov
 ```
 
-Generate lcov output for CI tooling:
+LCOV:
 
 ```sh
 cargo cov-lcov
 ```
 
-Generate an HTML report:
+HTML:
 
 ```sh
 cargo cov-html
 ```
 
-Reports are written under `target/coverage/`.
+Reports go here:
+
+```text
+target/coverage/
+```
+
+## License
+
+MIT
