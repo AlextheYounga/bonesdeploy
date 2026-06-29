@@ -11,9 +11,14 @@ use crate::infra::bonesinfra_cli;
 use crate::infra::embedded;
 use crate::infra::git;
 use crate::ui::prompts;
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use shared::config::{bonesinfra_input, default_deploy_user, release_group_for, runtime_group_for, runtime_user_for};
 use shared::paths;
+
+struct RuntimeSelection {
+    template: Option<String>,
+    config: serde_json::Map<String, serde_json::Value>,
+}
 
 pub fn run(args: &InitArgs) -> Result<bool> {
     run_with_prefetch(args, bonesinfra::prefetch)
@@ -30,49 +35,21 @@ fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Resu
     let has_live_bones_dir = bones_dir.exists();
     let is_fresh = !has_live_bones_dir;
 
-    let mut initial_project_name: Option<String> = None;
-
-    if is_fresh {
-        let project_name = resolve_project_name(args)?;
-        let config_dir = config::bones_config_dir(&project_name);
-
-        if config_dir.exists() && !config_dir.is_dir() {
-            fs::remove_file(&config_dir)
-                .with_context(|| format!("Stale file at {}, cannot create directory", config_dir.display()))?;
-        }
-        fs::create_dir_all(&config_dir)?;
-        embedded::scaffold(&config_dir)?;
-
-        if had_bones_entry {
-            fs::remove_file(bones_dir)
-                .with_context(|| format!("Failed to remove stale {} symlink", bones_dir.display()))?;
-        }
-        unix_fs::symlink(&config_dir, bones_dir)?;
-
-        let existing = config::Bones { project_name: project_name.clone(), ..Default::default() };
-        config::save(&existing, Path::new(paths::LOCAL_BONES_TOML))?;
-
-        initial_project_name = Some(project_name);
-    } else {
+    if !is_fresh {
         println!("Using existing .bones config.");
     }
 
-    update_gitignore()?;
-
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    let cfg = load_or_collect_config(bones_toml, args)?;
-    ensure_config_gitignore(&cfg.project_name)?;
+    let cfg = if is_fresh { collect_fresh_config(args)? } else { load_or_collect_config(bones_toml, args)? };
+    let runtime_selection = if is_fresh { Some(collect_runtime_config(args, &cfg.project_name)?) } else { None };
+    let remote_setup_ran = args.setup_remote || (!args.non_interactive && prompts::confirm_remote_setup()?);
 
-    if let Some(ref initial) = initial_project_name
-        && cfg.project_name != *initial
-    {
-        let old_dir = config::bones_config_dir(initial);
-        let new_dir = config::bones_config_dir(&cfg.project_name);
-        fs::rename(&old_dir, &new_dir)?;
-        fs::remove_file(bones_dir)?;
-        unix_fs::symlink(&new_dir, bones_dir)?;
+    if let Some(runtime) = runtime_selection {
+        materialize_fresh_bones(bones_dir, had_bones_entry, &cfg, runtime)?;
     }
 
+    update_gitignore()?;
+    ensure_config_gitignore(&cfg.project_name)?;
     config::save(&cfg, bones_toml)?;
 
     if is_fresh {
@@ -81,15 +58,10 @@ fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Resu
         println!("bonesdeploy config updated.");
     }
 
-    if is_fresh {
-        let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
-        existing_runtime_config(args, &cfg.project_name, bones_dir, runtime_toml)?;
-    }
     ensure_local_remote(&cfg)?;
 
     symlink_pre_push()?;
 
-    let remote_setup_ran = args.setup_remote || (!args.non_interactive && prompts::confirm_remote_setup()?);
     if remote_setup_ran {
         remote_setup::run()?;
     } else {
@@ -104,7 +76,17 @@ fn print_follow_up_hint() {
     println!("Next: run bonesdeploy setup.");
 }
 
-fn existing_runtime_config(args: &InitArgs, project_name: &str, bones_dir: &Path, runtime_toml: &Path) -> Result<()> {
+fn collect_fresh_config(args: &InitArgs) -> Result<config::Bones> {
+    let project_name = config::repo_directory_name()?;
+
+    if args.non_interactive {
+        return init_config::collect_non_interactive(&project_name, None, args);
+    }
+
+    collect_from_existing(&project_name, None, args)
+}
+
+fn collect_runtime_config(args: &InitArgs, project_name: &str) -> Result<RuntimeSelection> {
     let template = if args.non_interactive {
         None
     } else {
@@ -122,14 +104,43 @@ fn existing_runtime_config(args: &InitArgs, project_name: &str, bones_dir: &Path
         };
         let mut map = answers.as_object().cloned().unwrap_or(defaults);
         inject_runtime_identity(&mut map, project_name);
-        config::save_runtime(&map, runtime_toml)?;
-        embedded::scaffold_runtime_deployment(template_name, bones_dir)?;
-        embedded::scaffold_runtime_secrets(template_name, bones_dir)?;
-        println!("Runtime template: {template_name}");
+        Ok(RuntimeSelection { template: Some(template_name.clone()), config: map })
     } else {
         let mut vars = embedded::base_runtime_defaults()?;
         inject_runtime_identity(&mut vars, project_name);
-        config::save_runtime(&vars, runtime_toml)?;
+        Ok(RuntimeSelection { template: None, config: vars })
+    }
+}
+
+fn materialize_fresh_bones(
+    bones_dir: &Path,
+    had_bones_entry: bool,
+    cfg: &config::Bones,
+    runtime: RuntimeSelection,
+) -> Result<()> {
+    let config_dir = config::bones_config_dir(&cfg.project_name);
+
+    if config_dir.exists() && !config_dir.is_dir() {
+        fs::remove_file(&config_dir)
+            .with_context(|| format!("Stale file at {}, cannot create directory", config_dir.display()))?;
+    }
+    fs::create_dir_all(&config_dir)?;
+    embedded::scaffold(&config_dir)?;
+
+    if had_bones_entry {
+        fs::remove_file(bones_dir)
+            .with_context(|| format!("Failed to remove stale {} symlink", bones_dir.display()))?;
+    }
+    unix_fs::symlink(&config_dir, bones_dir)?;
+
+    let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
+    config::save_runtime(&runtime.config, runtime_toml)?;
+
+    if let Some(template_name) = runtime.template {
+        embedded::scaffold_runtime_deployment(&template_name, bones_dir)?;
+        embedded::scaffold_runtime_secrets(&template_name, bones_dir)?;
+        println!("Runtime template: {template_name}");
+    } else {
         println!("Runtime template: custom");
     }
 
@@ -198,19 +209,6 @@ fn collect_non_interactive(
     args: &InitArgs,
 ) -> Result<config::Bones> {
     init_config::collect_non_interactive(project_name_hint, existing_config, args)
-}
-
-fn resolve_project_name(args: &InitArgs) -> Result<String> {
-    if let Some(name) = args.project_name.as_ref().filter(|v| !v.is_empty()) {
-        return Ok(name.trim().to_string());
-    }
-    if args.non_interactive {
-        bail!(
-            "--project-name is required in non-interactive mode.\nUsage: bonesdeploy init --non-interactive --project-name <name> --host <host>"
-        );
-    }
-    let hint = config::repo_directory_name()?;
-    prompts::prompt_project_name(&hint, None)
 }
 
 fn cli_or_prompt(
