@@ -178,7 +178,7 @@ fn collect_from_existing(
         &project_name,
         config::default_project_root_for,
     );
-    let deploy_on_push = existing_config.is_none_or(|cfg| cfg.deploy_on_push);
+    let deploy_on_push = existing_config.map_or(false, |cfg| cfg.deploy_on_push);
     let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
 
     let ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
