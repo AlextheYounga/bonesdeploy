@@ -79,6 +79,7 @@ pub const HOOKS_DIR: &str = "hooks";
 pub const KIT_HOOKS_DIR: &str = "hooks/";
 pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";
 pub const KIT_SECRETS_DIR: &str = "secrets/";
+pub const BONES_CONFIG_LIB_DIR: &str = "_lib";
 
 const RUNTIME_SOCKET_PARENT: &str = "/run";
 
@@ -313,6 +314,11 @@ pub fn bones_config_root() -> PathBuf {
 }
 
 #[must_use]
+pub fn bones_config_lib_root() -> PathBuf {
+    bones_config_root().join(BONES_CONFIG_LIB_DIR)
+}
+
+#[must_use]
 pub fn bones_state_root() -> PathBuf {
     if let Some(dir) = env::var("XDG_STATE_HOME").ok().filter(|v| !v.is_empty()) {
         Path::new(&dir).join("bonesdeploy")
@@ -330,6 +336,11 @@ mod tests {
         let home = home_dir();
         let expected = home.join(".config/bonesdeploy");
         assert_eq!(bones_config_root(), expected);
+    }
+
+    #[test]
+    fn bones_config_lib_root_lives_under_bones_config_root() {
+        assert_eq!(bones_config_lib_root(), bones_config_root().join("_lib"));
     }
 
     #[test]

@@ -206,7 +206,7 @@ fn init_materializes_base_bones_assets() -> Result<()> {
         let config_gitignore = paths::bones_config_root().join(".gitignore");
         assert!(config_gitignore.is_file());
         let gitignore_content = fs::read_to_string(config_gitignore)?;
-        assert!(gitignore_content.contains("gnupg"));
+        assert!(gitignore_content.contains("_lib"));
         assert!(gitignore_content.contains("atlas.bones"));
 
         Ok(())
