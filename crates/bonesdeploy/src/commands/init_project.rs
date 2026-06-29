@@ -253,7 +253,7 @@ fn ensure_config_gitignore(project_name: &str) -> Result<()> {
     if gitignore.exists() {
         let content = fs::read_to_string(&gitignore)?;
         let mut missing = Vec::new();
-        for entry in ["gnupg", &project_entry] {
+        for entry in [paths::BONES_CONFIG_LIB_DIR, &project_entry] {
             if !content.lines().any(|line| line.trim() == entry) {
                 missing.push(entry);
             }
@@ -270,7 +270,7 @@ fn ensure_config_gitignore(project_name: &str) -> Result<()> {
         fs::write(&gitignore, format!("{content}{separator}{append}"))?;
     } else {
         let mut content = String::new();
-        for entry in ["gnupg", &project_entry] {
+        for entry in [paths::BONES_CONFIG_LIB_DIR, &project_entry] {
             content.push_str(entry);
             content.push('\n');
         }
