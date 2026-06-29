@@ -1,4 +1,4 @@
-	bones_init_remote_context() {
+bones_init_remote_context() {
 	local git_dir_input="${1:-${GIT_DIR:-.}}"
 	GIT_DIR=$(cd "$git_dir_input" && pwd)
 	BONES_YAML="$GIT_DIR/bones/bones.yaml"
@@ -75,13 +75,13 @@ bones_resolve_deploy_push_target() {
 	return 0
 }
 
-	bones_run_doctor_remote() {
-		echo "[bonesdeploy] Running remote doctor..."
+bones_run_doctor_remote() {
+	echo "[bonesdeploy] Running remote doctor..."
 
-		if ! bonesremote doctor; then
-			echo "[bonesdeploy] Remote doctor reported issues. Push rejected."
-			exit 1
-		fi
+	if ! bonesremote doctor; then
+		echo "[bonesdeploy] Remote doctor reported issues. Push rejected."
+		exit 1
+	fi
 
 	echo "[bonesdeploy] Doctor passed. Staging release..."
 }
@@ -117,13 +117,13 @@ bones_wire_release() {
 	echo "[bonesdeploy] Release wired."
 }
 
-	bones_run_deployment() {
-		echo "[bonesdeploy] Running deploy hook command..."
+bones_run_deployment() {
+	echo "[bonesdeploy] Running deploy hook command..."
 
-		if ! bonesremote hooks deploy --config "$BONES_YAML"; then
-			echo "[bonesdeploy] deploy hook command failed."
-			exit 1
-		fi
+	if ! bonesremote hooks deploy --config "$BONES_YAML"; then
+		echo "[bonesdeploy] deploy hook command failed."
+		exit 1
+	fi
 
 	echo "[bonesdeploy] Deploy hook command complete. Running post-deploy..."
 }
