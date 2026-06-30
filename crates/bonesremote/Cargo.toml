@@ -15,7 +15,6 @@ toml = "0.8"
 time = { version = "0.3.51", features = ["formatting", "macros"] }
 walkdir = "2.5.0"
 shared = { path = "../shared" }
-colored = "3.1.1"
 
 [lints.clippy]
 # broad groups (lower priority so individual lint overrides take effect)
