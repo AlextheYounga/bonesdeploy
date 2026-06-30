@@ -1,4 +1,5 @@
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -41,7 +42,31 @@ pub fn import(site: &str) -> Result<()> {
     extract_stdin_archive(&staging_dir)?;
     validate_site_dataset(site, &staging_dir)?;
     replace_site_dir(site, &staging_dir)?;
+    install_repo_post_receive_hook(site)?;
     println!("Imported site state for {site}.");
+    Ok(())
+}
+
+fn install_repo_post_receive_hook(site: &str) -> Result<()> {
+    let site_root = paths::bonesremote_site_root(site);
+    install_repo_post_receive_hook_from_site_root(&site_root)
+}
+
+fn install_repo_post_receive_hook_from_site_root(site_root: &Path) -> Result<()> {
+    let cfg = config::load(&site_root.join(paths::BONES_TOML))?;
+    let source = site_root.join(paths::HOOKS_DIR).join("post-receive");
+    let target = Path::new(&cfg.repo_path).join(paths::HOOKS_DIR).join("post-receive");
+    let target_parent = target.parent().context("post-receive hook target has no parent")?;
+
+    let hook = fs::read(&source).with_context(|| format!("Failed to read {}", source.display()))?;
+    fs::create_dir_all(target_parent).with_context(|| format!("Failed to create {}", target_parent.display()))?;
+    fs::write(&target, hook).with_context(|| format!("Failed to write {}", target.display()))?;
+
+    let mut perms =
+        fs::metadata(&target).with_context(|| format!("Failed to stat {}", target.display()))?.permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&target, perms).with_context(|| format!("Failed to chmod {}", target.display()))?;
+
     Ok(())
 }
 
@@ -138,11 +163,13 @@ fn unique_site_path(parent: &Path, site: &str, suffix: &str) -> PathBuf {
 mod tests {
     use std::env;
     use std::fs;
+    use std::os::unix::fs::PermissionsExt;
     use std::process;
 
     use anyhow::Result;
 
-    use super::{validate_site_dataset, validate_top_level_entries};
+    use super::{install_repo_post_receive_hook_from_site_root, validate_site_dataset, validate_top_level_entries};
+    use shared::paths;
 
     #[test]
     fn validate_top_level_entries_rejects_unexpected_file() -> Result<()> {
@@ -192,6 +219,54 @@ email = ""
 
         fs::remove_dir_all(&root)?;
         assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn install_repo_post_receive_hook_copies_executable_trigger() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-hook-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+
+        let site_root = root.join("sites/unitapp");
+        let repo_root = root.join("repos/unitapp.git");
+        fs::create_dir_all(site_root.join(paths::HOOKS_DIR))?;
+        fs::create_dir_all(repo_root.join(paths::HOOKS_DIR))?;
+        fs::write(
+            site_root.join(paths::BONES_TOML),
+            format!(
+                r#"
+remote_name = "production"
+project_name = "unitapp"
+ssh_user = "root"
+host = "example.com"
+port = "22"
+repo_path = "{}"
+project_root = "/srv/sites/unitapp"
+branch = "main"
+preview_domain = ""
+deploy_on_push = false
+releases = 5
+ssl_enabled = false
+domain = ""
+email = ""
+"#,
+                repo_root.display()
+            ),
+        )?;
+        fs::write(site_root.join(paths::HOOKS_DIR).join("post-receive"), "#!/bin/sh\nexec true\n")?;
+
+        let result = install_repo_post_receive_hook_from_site_root(&site_root);
+
+        let target = repo_root.join(paths::HOOKS_DIR).join("post-receive");
+        let contents = fs::read_to_string(&target)?;
+        let mode = fs::metadata(&target)?.permissions().mode() & 0o777;
+
+        result?;
+        assert_eq!(contents, "#!/bin/sh\nexec true\n");
+        assert_eq!(mode, 0o755);
+        fs::remove_dir_all(&root)?;
         Ok(())
     }
 }
