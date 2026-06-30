@@ -18,11 +18,11 @@ struct RuntimeSelection {
     config: serde_json::Map<String, serde_json::Value>,
 }
 
-pub fn run(args: &InitArgs) -> Result<bool> {
+pub fn run(args: &InitArgs) -> Result<()> {
     run_with_prefetch(args, bonesinfra::prefetch)
 }
 
-fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Result<()>) -> Result<bool> {
+fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Result<()>) -> Result<()> {
     git::ensure_git_repository()?;
 
     println!("Initializing bonesdeploy...");
@@ -30,8 +30,7 @@ fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Resu
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     let had_bones_entry = fs::symlink_metadata(bones_dir).is_ok();
-    let mut has_live_bones_dir = bones_dir.exists();
-    let is_fresh = !has_live_bones_dir;
+    let is_fresh = !bones_dir.exists();
     if !is_fresh {
         println!("Using existing .bones config.");
     }
@@ -42,7 +41,6 @@ fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Resu
 
     if let Some(runtime) = runtime_selection {
         materialize_fresh_bones(bones_dir, had_bones_entry, &cfg, runtime)?;
-        has_live_bones_dir = true;
     }
 
     update_gitignore()?;
@@ -61,7 +59,7 @@ fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Resu
 
     print_follow_up_hint();
 
-    Ok(has_live_bones_dir)
+    Ok(())
 }
 
 fn print_follow_up_hint() {

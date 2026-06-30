@@ -121,7 +121,11 @@ pub enum RemoteCommand {
         email: Option<String>,
     },
     /// Install helper tools on the remote host (starship, neovim, aptui, etc.)
-    Helpers,
+    Helpers {
+        /// Skip helper installation confirmation prompts
+        #[arg(long)]
+        yes: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

@@ -10,8 +10,14 @@ use super::remote_data;
 use crate::config;
 use crate::infra::bonesinfra;
 use crate::infra::bootstrap_ssh;
+use crate::ui::prompts;
 
-pub fn run() -> Result<()> {
+pub fn run(yes: bool) -> Result<()> {
+    if !yes && !prompts::confirm_remote_helpers()? {
+        println!("Skipped.");
+        return Ok(());
+    }
+
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
     let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
