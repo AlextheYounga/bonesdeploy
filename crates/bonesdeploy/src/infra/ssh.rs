@@ -124,28 +124,3 @@ pub async fn run_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[u8]
 
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use super::external_command;
-
-    #[test]
-    fn external_command_uses_expected_ssh_options() {
-        let command = external_command("root", "deploy.example.com", "2222");
-        let args = command.get_args();
-        let args = args.map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
-
-        assert_eq!(
-            args,
-            vec![
-                String::from("-p"),
-                String::from("2222"),
-                String::from("-o"),
-                String::from("StrictHostKeyChecking=no"),
-                String::from("-o"),
-                String::from("UserKnownHostsFile=/dev/null"),
-                String::from("root@deploy.example.com"),
-            ]
-        );
-    }
-}

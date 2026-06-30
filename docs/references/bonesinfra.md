@@ -1295,8 +1295,8 @@ def install():
     )
 
     server.shell(
-        name="Run bonesremote init",
-        commands=["/usr/local/bin/bonesremote init"],
+        name="Install bonesdeploy sudoers policy",
+        commands=["install sudoers drop-in directly from bonesinfra"],
         _sudo=True,
     )
 

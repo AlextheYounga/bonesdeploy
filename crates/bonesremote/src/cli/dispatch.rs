@@ -1,11 +1,10 @@
 use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, HookCommand, ReleaseCommand, ServiceCommand, SiteCommand};
-use crate::commands::{deploy, doctor, drop_failed_release, hook, init, post_deploy, service, site, status, version};
+use crate::commands::{deploy, doctor, drop_failed_release, hook, post_deploy, service, site, status, version};
 
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init => init::run(),
         Command::Doctor { site } => doctor::run(site.as_deref()),
         Command::Deploy { site, revision } => deploy::run_full(site, revision.as_deref()),
         Command::Status { site } => status::run(site),
@@ -14,7 +13,6 @@ pub fn run(cli: &Cli) -> Result<()> {
         },
         Command::Site { command } => match command {
             SiteCommand::Import { site: site_name } => site::import(site_name),
-            SiteCommand::Export { site: site_name } => site::export(site_name),
         },
         Command::Release { command } => match command {
             ReleaseCommand::Rollback { site: site_name } => deploy::rollback(site_name),

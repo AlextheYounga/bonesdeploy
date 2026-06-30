@@ -8,10 +8,9 @@ use std::{cell::RefCell, thread_local};
 use anyhow::{Context, Result, bail};
 
 use shared::paths;
-use shared::registry::Registry;
 
 thread_local! {
-    static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+    static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) }; // Explain: what is this?
 }
 
 #[cfg(test)]
@@ -77,20 +76,20 @@ pub fn clear_staged_release(site: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn release_dir(cfg: &Registry, release: &str) -> PathBuf {
-    releases_dir(cfg).join(release)
+pub fn release_dir(project_root: &str, release: &str) -> PathBuf {
+    PathBuf::from(project_root).join(paths::RELEASES_DIR).join(release)
 }
 
-pub fn releases_dir(cfg: &Registry) -> PathBuf {
-    PathBuf::from(&cfg.releases_root)
+pub fn releases_dir(project_root: &str) -> PathBuf {
+    PathBuf::from(project_root).join(paths::RELEASES_DIR)
 }
 
-pub fn shared_dir(cfg: &Registry) -> PathBuf {
-    PathBuf::from(&cfg.shared_root)
+pub fn shared_dir(project_root: &str) -> PathBuf {
+    PathBuf::from(project_root).join(paths::SHARED_DIR)
 }
 
-pub fn current_release_dir(cfg: &Registry) -> Result<PathBuf> {
-    let current_link = PathBuf::from(&cfg.current_path);
+pub fn current_release_dir(project_root: &str) -> Result<PathBuf> {
+    let current_link = PathBuf::from(project_root).join(paths::CURRENT_LINK);
     let active_target =
         fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
 
@@ -101,16 +100,16 @@ pub fn current_release_dir(cfg: &Registry) -> Result<PathBuf> {
     })
 }
 
-pub fn current_release_name(cfg: &Registry) -> Result<String> {
-    let current_release = current_release_dir(cfg)?;
+pub fn current_release_name(project_root: &str) -> Result<String> {
+    let current_release = current_release_dir(project_root)?;
     current_release
         .file_name()
         .map(|value| value.to_string_lossy().to_string())
         .ok_or_else(|| anyhow::anyhow!("Failed to resolve current release name from {}", current_release.display()))
 }
 
-pub fn list_releases_sorted(cfg: &Registry) -> Result<Vec<String>> {
-    let releases_dir = releases_dir(cfg);
+pub fn list_releases_sorted(project_root: &str) -> Result<Vec<String>> {
+    let releases_dir = releases_dir(project_root);
     if !releases_dir.exists() {
         return Ok(Vec::new());
     }
@@ -167,7 +166,6 @@ mod tests {
 
     use anyhow::Result;
     use shared::paths;
-    use shared::registry::Registry;
 
     use super::{
         ScopedRoot, clear_staged_release, current_release_name, list_releases_sorted, point_symlink_atomically,
@@ -185,21 +183,8 @@ mod tests {
         Ok((set_sites_root_for_tests(path.clone()), path))
     }
 
-    fn sample_config(root: &Path, site: &str) -> Registry {
-        let site_root = root.join("deploy");
-        Registry {
-            site: String::from(site),
-            repo_path: root.join("repo.git").to_string_lossy().to_string(),
-            site_root: site_root.to_string_lossy().to_string(),
-            shared_root: site_root.join(paths::SHARED_DIR).to_string_lossy().to_string(),
-            releases_root: site_root.join(paths::RELEASES_DIR).to_string_lossy().to_string(),
-            current_path: site_root.join(paths::CURRENT_LINK).to_string_lossy().to_string(),
-            runtime_user: String::from(site),
-            runtime_group: String::from(site),
-            branch: String::from("master"),
-            deploy_on_push: true,
-            releases_keep: 5,
-        }
+    fn project_root_for(root: &Path) -> String {
+        root.join("deploy").to_string_lossy().to_string()
     }
 
     #[test]
@@ -282,17 +267,17 @@ mod tests {
     #[test]
     fn list_releases_sorted_returns_only_directories_in_order() -> Result<()> {
         let root = temp_dir_path("list_releases");
-        let cfg = sample_config(&root, "listapp");
+        let project_root = project_root_for(&root);
         fs::create_dir_all(&root)?;
 
-        let releases = releases_dir(&cfg);
+        let releases = releases_dir(&project_root);
         fs::create_dir_all(&releases)?;
         fs::create_dir_all(releases.join("20260507_120000"))?;
         fs::create_dir_all(releases.join("20260507_110000"))?;
         fs::create_dir_all(releases.join(paths::PLACEHOLDER_RELEASE_NAME))?;
         fs::write(releases.join("notes.txt"), "not a release")?;
 
-        let items = list_releases_sorted(&cfg)?;
+        let items = list_releases_sorted(&project_root)?;
         assert_eq!(items, vec![String::from("20260507_110000"), String::from("20260507_120000")]);
 
         fs::remove_dir_all(root)?;
@@ -303,16 +288,16 @@ mod tests {
     fn current_release_name_resolves_from_current_symlink() -> Result<()> {
         let root = temp_dir_path("current_release_name");
         fs::create_dir_all(&root)?;
-        let cfg = sample_config(&root, "currentapp");
+        let project_root = project_root_for(&root);
 
-        let releases_dir = releases_dir(&cfg);
+        let releases_dir = releases_dir(&project_root);
         let release = releases_dir.join("20260507_170000");
         fs::create_dir_all(&release)?;
 
-        let current = PathBuf::from(cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).current);
+        let current = PathBuf::from(&project_root).join(paths::CURRENT_LINK);
         point_symlink_atomically(&current, &release)?;
 
-        let name = current_release_name(&cfg)?;
+        let name = current_release_name(&project_root)?;
         assert_eq!(name, "20260507_170000");
 
         fs::remove_dir_all(root)?;

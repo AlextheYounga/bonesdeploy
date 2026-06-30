@@ -6,13 +6,13 @@ use shared::paths;
 use crate::commands::{doctor, push_state, remote_runtime, remote_setup};
 use crate::config;
 
-pub async fn run(_yes: bool) -> Result<()> {
+pub async fn run(skip_confirm: bool) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
     println!("Setting up deployment...");
 
-    remote_setup::run().with_context(|| setup_error("bootstrapping remote server"))?;
+    remote_setup::run(skip_confirm).with_context(|| setup_error("bootstrapping remote server"))?;
     remote_runtime::run(true).with_context(|| setup_error("applying runtime"))?;
     push_state::run(false).with_context(|| setup_error("syncing .bones"))?;
     doctor::run(false).await.with_context(|| setup_error("checking deployment"))?;

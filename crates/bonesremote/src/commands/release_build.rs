@@ -4,10 +4,9 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{Runtime, load_runtime};
+use shared::config::{self, Runtime, load_runtime, runtime_group_for};
 use shared::paths;
 use shared::paths::default_web_root;
-use shared::registry;
 
 use crate::privileges;
 use crate::release::scripts as deploy_output;
@@ -16,9 +15,13 @@ use crate::release_state;
 pub fn run(site: &str, context: &Path) -> Result<()> {
     privileges::ensure_root("bonesremote release build")?;
 
-    let registry_path = paths::bonesremote_registry_path(site);
-    let cfg = registry::load(&registry_path)
-        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path)
+        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
+
+    if cfg.project_name != site {
+        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
+    }
 
     if !context.is_dir() {
         bail!("Build context does not exist: {}", context.display());
@@ -59,7 +62,7 @@ pub fn run(site: &str, context: &Path) -> Result<()> {
             context,
             &context.join(format!("{script_name}.log")),
             &deploy_output::BuildScriptEnv {
-                project_name: &cfg.site,
+                project_name: &cfg.project_name,
                 web_root: &runtime.web_root,
                 build_image: &runtime.build_image,
             },
@@ -77,20 +80,33 @@ pub fn run(site: &str, context: &Path) -> Result<()> {
 pub fn promote(site: &str, context: &Path) -> Result<PathBuf> {
     privileges::ensure_root("bonesremote release promote")?;
 
-    let registry_path = paths::bonesremote_registry_path(site);
-    let cfg = registry::load(&registry_path)
-        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path)
+        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
+
+    if cfg.project_name != site {
+        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
+    }
+
+    let Runtime { release_group, .. } = load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
+        web_root: default_web_root(),
+        build_image: String::new(),
+        runtime_user: String::new(),
+        runtime_group: String::new(),
+        release_group: String::new(),
+    });
 
     let release_name = release_state::read_staged_release(site)?;
-    let release_dir = release_state::release_dir(&cfg, &release_name);
-    harden_release_tree(context, &release_dir, &cfg)
+    let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
+    let release_group = if release_group.is_empty() { runtime_group_for(&cfg.project_name) } else { release_group };
+    harden_release_tree(context, &release_dir, &cfg.project_name, &release_group)
         .with_context(|| format!("Failed to promote release {release_name}"))?;
 
     println!("Promoted release {release_name} into {}", release_dir.display());
     Ok(release_dir)
 }
 
-fn harden_release_tree(source: &Path, destination: &Path, cfg: &registry::Registry) -> Result<()> {
+fn harden_release_tree(source: &Path, destination: &Path, _project_name: &str, release_group: &str) -> Result<()> {
     if !source.is_dir() {
         bail!("Source tree is not a directory: {}", source.display());
     }
@@ -100,7 +116,7 @@ fn harden_release_tree(source: &Path, destination: &Path, cfg: &registry::Regist
     clear_directory_children(destination)?;
 
     copy_hardened(source, destination, source)?;
-    seal_release(destination, cfg)?;
+    seal_release(destination, release_group)?;
     Ok(())
 }
 
@@ -173,10 +189,10 @@ fn normalize_relative_path(path: &Path, root: &Path) -> Result<PathBuf> {
     Ok(normalized)
 }
 
-fn seal_release(destination: &Path, cfg: &registry::Registry) -> Result<()> {
+fn seal_release(destination: &Path, release_group: &str) -> Result<()> {
     use std::os::unix::fs::MetadataExt;
 
-    let gid = site_group_gid(&cfg.runtime_group)?;
+    let gid = site_group_gid(release_group)?;
     let uid = root_uid()?;
 
     let metadata = fs::symlink_metadata(destination)
@@ -186,7 +202,7 @@ fn seal_release(destination: &Path, cfg: &registry::Registry) -> Result<()> {
     }
 
     chown(destination, Some(uid), Some(gid))
-        .with_context(|| format!("Failed to chown {} to root:{}", destination.display(), cfg.runtime_group))?;
+        .with_context(|| format!("Failed to chown {} to root:{}", destination.display(), release_group))?;
 
     let mode = if metadata.file_type().is_dir() {
         0o750
@@ -203,7 +219,7 @@ fn seal_release(destination: &Path, cfg: &registry::Registry) -> Result<()> {
             .with_context(|| format!("Failed to read {} for sealing", destination.display()))?
         {
             let entry = entry?;
-            seal_release(&entry.path(), cfg)?;
+            seal_release(&entry.path(), release_group)?;
         }
     }
 

@@ -9,7 +9,7 @@ use shared::paths;
 use super::push_state;
 use super::remote_data;
 use crate::config;
-use crate::infra::bonesinfra_cli;
+use crate::infra::bonesinfra;
 use crate::infra::bootstrap_ssh;
 use crate::ui::prompts;
 
@@ -50,7 +50,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     println!("Configuring HTTPS for {}...", cfg.domain);
 
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
-    let mut deploy_data = remote_data::ssl(&cfg, &runtime.web_root, &cfg.domain, &cfg.email)?;
+    let mut deploy_data = remote_data::ssl(&cfg, &runtime.web_root, &cfg.domain, &cfg.email);
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from(shared_config::bonesinfra_input::SSH_USER), Value::String(ssh_user));
         map.insert(String::from("host"), Value::String(cfg.host.clone()));
@@ -58,7 +58,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    bonesinfra_cli::run_with_stdin(&["ssl", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
+    bonesinfra::run_with_stdin(&["ssl", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
 
     cfg.ssl_enabled = true;
     config::save(&cfg, bones_toml)?;

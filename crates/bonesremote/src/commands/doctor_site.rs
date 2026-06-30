@@ -2,10 +2,11 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use shared::{config, paths, registry};
+use anyhow::{Result, bail};
+use shared::{config, paths};
 
 pub(crate) fn check(site: &str, issues: &mut Vec<String>) {
-    if let Err(error) = registry::validate_site_name(site) {
+    if let Err(error) = validate_site_name(site) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
     }
@@ -14,32 +15,41 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>) {
         return;
     };
 
-    check_repo_exists(&cfg, issues);
-    check_thin_hook(&cfg, issues);
-    check_runtime_identity(&cfg, issues);
-    check_site_layout(&cfg, issues);
-    check_service_exists(&cfg.site, issues);
+    let project_root = &cfg.project_root;
+    let shared_root = Path::new(project_root).join(paths::SHARED_DIR);
+    let releases_root = Path::new(project_root).join(paths::RELEASES_DIR);
+    let current_path = Path::new(project_root).join(paths::CURRENT_LINK);
+    let runtime_user = config::runtime_user_for(&cfg.project_name);
+    let runtime_group = config::runtime_group_for(&cfg.project_name);
+
+    check_repo_exists(&cfg.repo_path, issues);
+    check_thin_hook(&cfg.repo_path, issues);
+    check_runtime_identity(&runtime_user, &runtime_group, issues);
+    check_site_layout(&shared_root, &releases_root, &current_path, issues);
+    check_service_exists(&cfg.project_name, issues);
 }
 
-fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<registry::Registry> {
+fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bones> {
     let site_root = paths::bonesremote_site_root(site);
     if !site_root.is_dir() {
         issues.push(format!("control-plane site state is missing: {}", site_root.display()));
         return None;
     }
 
-    let registry_path = paths::bonesremote_registry_path(site);
-    let cfg = match registry::load(&registry_path) {
+    let bones_path = site_root.join(paths::BONES_TOML);
+    let cfg = match config::load(&bones_path) {
         Ok(cfg) => cfg,
         Err(error) => {
-            issues.push(format!("control-plane registry is invalid: {error}"));
+            issues.push(format!("control-plane bones.toml is invalid: {error}"));
             return None;
         }
     };
 
-    if let Err(error) = config::load(&site_root.join(paths::BONES_TOML)) {
-        issues.push(format!("control-plane bones.toml is invalid: {error}"));
+    if cfg.project_name != site {
+        issues.push(format!("control-plane bones.toml belongs to '{}', expected '{}'", cfg.project_name, site));
+        return None;
     }
+
     if let Err(error) = config::load_runtime(&site_root) {
         issues.push(format!("control-plane runtime.toml is invalid: {error}"));
     }
@@ -47,15 +57,15 @@ fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<registry::Re
     Some(cfg)
 }
 
-fn check_repo_exists(cfg: &registry::Registry, issues: &mut Vec<String>) {
-    let repo_path = Path::new(&cfg.repo_path);
+fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {
+    let repo_path = Path::new(repo_path);
     if !repo_path.is_dir() {
         issues.push(format!("bare repo is missing: {}", repo_path.display()));
     }
 }
 
-fn check_thin_hook(cfg: &registry::Registry, issues: &mut Vec<String>) {
-    let hook_path = Path::new(&cfg.repo_path).join("hooks").join("post-receive");
+fn check_thin_hook(repo_path: &str, issues: &mut Vec<String>) {
+    let hook_path = Path::new(repo_path).join("hooks").join("post-receive");
     let hook = fs::read_to_string(&hook_path);
 
     match hook {
@@ -65,8 +75,8 @@ fn check_thin_hook(cfg: &registry::Registry, issues: &mut Vec<String>) {
     }
 }
 
-fn check_runtime_identity(cfg: &registry::Registry, issues: &mut Vec<String>) {
-    if cfg.runtime_user == paths::DEPLOY_USER {
+fn check_runtime_identity(runtime_user: &str, runtime_group: &str, issues: &mut Vec<String>) {
+    if runtime_user == paths::DEPLOY_USER {
         issues.push(format!("runtime user must not be {}", paths::DEPLOY_USER));
     }
 
@@ -77,8 +87,8 @@ fn check_runtime_identity(cfg: &registry::Registry, issues: &mut Vec<String>) {
             return;
         }
     };
-    if !account_exists(&passwd, &cfg.runtime_user) {
-        issues.push(format!("runtime user does not exist: {}", cfg.runtime_user));
+    if !account_exists(&passwd, runtime_user) {
+        issues.push(format!("runtime user does not exist: {runtime_user}"));
     }
 
     let groupfile = match fs::read_to_string(paths::ETC_GROUP) {
@@ -88,31 +98,41 @@ fn check_runtime_identity(cfg: &registry::Registry, issues: &mut Vec<String>) {
             return;
         }
     };
-    let Some(members) = group_members(&groupfile, &cfg.runtime_group) else {
-        issues.push(format!("runtime group does not exist: {}", cfg.runtime_group));
+    let Some(members) = group_members(&groupfile, runtime_group) else {
+        issues.push(format!("runtime group does not exist: {runtime_group}"));
         return;
     };
     if members.iter().any(|member| member == paths::DEPLOY_USER) {
-        issues.push(format!("{} must not be a member of runtime group {}", paths::DEPLOY_USER, cfg.runtime_group));
+        issues.push(format!("{} must not be a member of runtime group {}", paths::DEPLOY_USER, runtime_group));
     }
 }
 
-fn check_site_layout(cfg: &registry::Registry, issues: &mut Vec<String>) {
-    let shared_root = Path::new(&cfg.shared_root);
+fn check_site_layout(shared_root: &Path, releases_root: &Path, current_path: &Path, issues: &mut Vec<String>) {
     if !shared_root.is_dir() {
         issues.push(format!("shared root is missing: {}", shared_root.display()));
     }
 
-    let releases_root = Path::new(&cfg.releases_root);
     if !releases_root.is_dir() {
         issues.push(format!("releases root is missing: {}", releases_root.display()));
     }
 
-    match Path::new(&cfg.current_path).parent() {
+    match current_path.parent() {
         Some(parent) if parent.is_dir() => {}
         Some(parent) => issues.push(format!("current parent is missing: {}", parent.display())),
-        None => issues.push(format!("current path has no parent: {}", cfg.current_path)),
+        None => issues.push(format!("current path has no parent: {}", current_path.display())),
     }
+}
+
+fn validate_site_name(site: &str) -> Result<()> {
+    if site.is_empty() {
+        bail!("Site name cannot be empty");
+    }
+
+    if site.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') {
+        return Ok(());
+    }
+
+    bail!("Invalid site name: {site}")
 }
 
 fn check_service_exists(site: &str, issues: &mut Vec<String>) {

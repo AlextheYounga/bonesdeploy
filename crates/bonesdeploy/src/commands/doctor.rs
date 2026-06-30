@@ -156,15 +156,11 @@ async fn check_remote_doctor(cfg: &config::Bones) -> Option<String> {
         Ok(session) => session,
         Err(error) => return Some(format!("Cannot connect as privileged remote user\n  {error}")),
     };
-    let command = format!("bonesremote doctor --site {}", shell_quote(&cfg.project_name));
+    let command = format!("bonesremote doctor --site {}", &cfg.project_name);
     let result = ssh::run_cmd(&session, &command).await;
     let _ = session.close().await;
 
     result.err().map(|error| format!("remote doctor failed\n  {error}"))
-}
-
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
 }
 
 #[cfg(test)]
@@ -175,17 +171,12 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{check_deployment_scripts, shell_quote};
+    use super::check_deployment_scripts;
     use crate::commands::push_state;
 
     #[test]
-    fn doctor_points_at_new_remote_import_flow() {
+    fn doctor_points_at_correct_remote_import_flow() {
         assert_eq!(push_state::remote_import_command("acme"), "bonesremote site import --site 'acme'");
-    }
-
-    #[test]
-    fn shell_quote_escapes_single_quotes() {
-        assert_eq!(shell_quote("a'b"), "'a'\\''b'");
     }
 
     #[test]

@@ -1,10 +1,10 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
-use shared::{config, paths, registry};
+use shared::{config, paths};
 use walkdir::WalkDir;
 
 use crate::privileges;
@@ -12,13 +12,25 @@ use crate::privileges;
 const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] =
     &[paths::BONES_TOML, paths::RUNTIME_TOML, paths::DEPLOYMENT_DIR, paths::HOOKS_DIR];
 
+fn validate_site_name(site: &str) -> Result<()> {
+    if site.is_empty() {
+        bail!("Site name cannot be empty");
+    }
+
+    if site.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') {
+        return Ok(());
+    }
+
+    bail!("Invalid site name: {site}")
+}
+
 /// # Errors
 ///
 /// Returns an error if the dataset is invalid or the control-plane state cannot
 /// be updated safely.
 pub fn import(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote site import")?;
-    registry::validate_site_name(site)?;
+    validate_site_name(site)?;
 
     let sites_root = paths::bonesremote_sites_root();
     fs::create_dir_all(&sites_root).with_context(|| format!("Failed to create {}", sites_root.display()))?;
@@ -28,26 +40,33 @@ pub fn import(site: &str) -> Result<()> {
 
     extract_stdin_archive(&staging_dir)?;
     validate_site_dataset(site, &staging_dir)?;
-    write_registry(&staging_dir)?;
     replace_site_dir(site, &staging_dir)?;
     println!("Imported site state for {site}.");
     Ok(())
 }
 
-/// # Errors
-///
-/// Returns an error if the site state does not exist or cannot be archived.
-pub fn export(site: &str) -> Result<()> {
-    privileges::ensure_root("bonesremote site export")?;
-    registry::validate_site_name(site)?;
-
+fn replace_site_dir(site: &str, staging_dir: &Path) -> Result<()> {
     let site_root = paths::bonesremote_site_root(site);
-    if !site_root.is_dir() {
-        bail!("Remote site state does not exist: {}", site_root.display());
+    let backup_dir = unique_site_path(&paths::bonesremote_sites_root(), site, "backup");
+    let had_existing = site_root.exists();
+
+    if had_existing {
+        fs::rename(&site_root, &backup_dir)
+            .with_context(|| format!("Failed to move existing site state {} out of the way", site_root.display()))?;
     }
 
-    validate_site_dataset(site, &site_root)?;
-    stream_site_archive(&site_root)
+    if let Err(error) = fs::rename(staging_dir, &site_root) {
+        if had_existing {
+            fs::rename(&backup_dir, &site_root).ok();
+        }
+        return Err(error).with_context(|| format!("Failed to activate {}", site_root.display()));
+    }
+
+    if had_existing {
+        fs::remove_dir_all(&backup_dir).with_context(|| format!("Failed to remove {}", backup_dir.display()))?;
+    }
+
+    Ok(())
 }
 
 fn extract_stdin_archive(destination: &Path) -> Result<()> {
@@ -108,57 +127,6 @@ fn reject_symlinks(root: &Path) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn write_registry(root: &Path) -> Result<()> {
-    let bones = config::load(&root.join(paths::BONES_TOML))?;
-    let registry = registry::Registry::derive(&bones);
-    let registry_toml = toml::to_string_pretty(&registry).context("Failed to serialize site registry")?;
-    fs::write(root.join(paths::REGISTRY_TOML), registry_toml).context("Failed to write site registry")?;
-    Ok(())
-}
-
-fn replace_site_dir(site: &str, staging_dir: &Path) -> Result<()> {
-    let site_root = paths::bonesremote_site_root(site);
-    let backup_dir = unique_site_path(&paths::bonesremote_sites_root(), site, "backup");
-    let had_existing = site_root.exists();
-
-    if had_existing {
-        fs::rename(&site_root, &backup_dir)
-            .with_context(|| format!("Failed to move existing site state {} out of the way", site_root.display()))?;
-    }
-
-    if let Err(error) = fs::rename(staging_dir, &site_root) {
-        if had_existing {
-            fs::rename(&backup_dir, &site_root).ok();
-        }
-        return Err(error).with_context(|| format!("Failed to activate {}", site_root.display()));
-    }
-
-    if had_existing {
-        fs::remove_dir_all(&backup_dir).with_context(|| format!("Failed to remove {}", backup_dir.display()))?;
-    }
-
-    Ok(())
-}
-
-fn stream_site_archive(site_root: &Path) -> Result<()> {
-    let mut command = Command::new("tar");
-    command.arg("-czf").arg("-").arg("-C").arg(site_root);
-
-    for entry in ALLOWED_TOP_LEVEL_ENTRIES {
-        let path = site_root.join(entry);
-        if path.exists() {
-            command.arg(entry);
-        }
-    }
-
-    let status = command.stdout(Stdio::inherit()).status().context("Failed to run tar for site export")?;
-    if status.success() {
-        return Ok(());
-    }
-
-    bail!("Failed to export remote site dataset")
 }
 
 fn unique_site_path(parent: &Path, site: &str, suffix: &str) -> PathBuf {

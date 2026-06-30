@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
+use shared::config;
 use shared::paths;
-use shared::registry;
 
 use crate::commands::{
     activate_release, drop_failed_release, post_deploy, release_build, release_checkout, release_prepare, service,
@@ -13,9 +13,13 @@ use crate::release_state;
 
 pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     privileges::ensure_root("bonesremote deploy")?;
-    let registry_path = paths::bonesremote_registry_path(site);
-    let cfg = registry::load(&registry_path)
-        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path)
+        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
+
+    if cfg.project_name != site {
+        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
+    }
 
     let target_revision = revision.map_or_else(|| cfg.branch.clone(), ToOwned::to_owned);
 
@@ -82,14 +86,19 @@ fn cleanup(site: &str, context: Option<&Path>) {
 
 pub fn rollback(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release rollback")?;
-    let cfg = registry::load(&paths::bonesremote_registry_path(site)).context(registry_load_error())?;
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path).context("Failed to load remote site state")?;
 
-    let releases = release_state::list_releases_sorted(&cfg)?;
+    if cfg.project_name != site {
+        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
+    }
+
+    let releases = release_state::list_releases_sorted(&cfg.project_root)?;
     if releases.len() < 2 {
         bail!("Need at least two releases to perform rollback");
     }
 
-    let current_name = release_state::current_release_name(&cfg)?;
+    let current_name = release_state::current_release_name(&cfg.project_root)?;
     let current_idx = releases
         .iter()
         .position(|name| name == &current_name)
@@ -100,15 +109,11 @@ pub fn rollback(site: &str) -> Result<()> {
     }
 
     let previous_name = releases[current_idx - 1].clone();
-    let previous_dir = release_state::release_dir(&cfg, &previous_name);
-    let current_link = PathBuf::from(&cfg.current_path);
+    let previous_dir = release_state::release_dir(&cfg.project_root, &previous_name);
+    let current_link = PathBuf::from(&cfg.project_root).join(paths::CURRENT_LINK);
     release_state::point_symlink_atomically(&current_link, &previous_dir)?;
     service::run(site)?;
 
     println!("Rollback complete: {current_name} -> {previous_name}");
     Ok(())
-}
-
-pub fn registry_load_error() -> String {
-    String::from("Failed to load remote site state from registry")
 }

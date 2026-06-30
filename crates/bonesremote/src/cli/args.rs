@@ -9,8 +9,6 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Install sudoers drop-in for passwordless bonesremote
-    Init,
     /// Check server environment health
     Doctor {
         /// Also validate the imported site state and runtime boundary for one site
@@ -68,11 +66,6 @@ pub enum HookCommand {
 pub enum SiteCommand {
     /// Import a deployment dataset from stdin
     Import {
-        #[arg(long)]
-        site: String,
-    },
-    /// Export the current deployment dataset to stdout
-    Export {
         #[arg(long)]
         site: String,
     },

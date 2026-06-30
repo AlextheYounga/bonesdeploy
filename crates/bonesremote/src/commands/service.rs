@@ -1,13 +1,12 @@
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use shared::{paths, registry};
+use shared::paths;
 
 use crate::privileges;
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote service restart")?;
-    registry::validate_site_name(site)?;
 
     let service_name = paths::nginx_service_name(site);
 
