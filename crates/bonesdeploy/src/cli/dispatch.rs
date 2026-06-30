@@ -9,7 +9,7 @@ use crate::commands::{
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init { non_interactive, project_name, branch, remote, host, port } => {
-            let remote_setup_ran = init_project::run(&init_config::InitArgs {
+            init_project::run(&init_config::InitArgs {
                 non_interactive: *non_interactive,
                 project_name: project_name.clone(),
                 branch: branch.clone(),
@@ -17,9 +17,6 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 host: host.clone(),
                 port: port.clone(),
             })?;
-            if remote_setup_ran {
-                push_state::run(false)?;
-            }
             Ok(())
         }
         Command::Setup { yes } => setup::run(*yes).await,
@@ -40,7 +37,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             RemoteCommand::Bootstrap => remote_setup::run(false),
             RemoteCommand::Runtime { yes } => remote_runtime::run(*yes),
             RemoteCommand::Ssl { yes, domain, email } => remote_ssl::run(*yes, domain.clone(), email.clone()),
-            RemoteCommand::Helpers => remote_helpers::run(),
+            RemoteCommand::Helpers { yes } => remote_helpers::run(*yes),
         },
         Command::Rollback => rollback::run().await,
         Command::Config { file, key } => config::run(file, key),

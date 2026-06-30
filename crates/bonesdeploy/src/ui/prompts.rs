@@ -220,6 +220,10 @@ pub fn confirm_remote_ssl() -> Result<bool> {
     confirm_prompt("Configure HTTPS?", "HTTPS requires DNS to point at this server.")
 }
 
+pub fn confirm_remote_helpers() -> Result<bool> {
+    confirm_prompt("Install remote helper tools?", "Helper tools install shell and editor utilities on the server.")
+}
+
 fn confirm_prompt(prompt: &str, message: &str) -> Result<bool> {
     println!();
     println!("{message}");

@@ -92,7 +92,7 @@ fn init_args() -> InitArgs {
     }
 }
 
-fn run_init() -> Result<bool> {
+fn run_init() -> Result<()> {
     run_with_prefetch(&init_args(), || Ok(()))
 }
 
