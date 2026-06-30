@@ -11,6 +11,7 @@ use anyhow::{Context, Result, bail};
 
 use crate::config;
 use crate::infra::{bootstrap_ssh, ssh};
+use crate::ui::output;
 use shared::config as shared_config;
 use shared::config::parse_port;
 use shared::paths;
@@ -33,12 +34,12 @@ pub fn init() -> Result<()> {
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     if !bones_dir.is_dir() {
-        bail!("Missing .bones config\n\nNext: run bonesdeploy init.");
+        bail!("Missing .bones config\n\n{}", output::next_step("bonesdeploy init"));
     }
 
     let secrets_toml = Path::new(".bones/secrets.toml");
     if secrets_toml.exists() {
-        bail!("Missing encrypted secrets\n\nNext: run bonesdeploy secrets edit.");
+        bail!("Missing encrypted secrets\n\n{}", output::next_step("bonesdeploy secrets edit"));
     }
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
@@ -49,7 +50,7 @@ pub fn init() -> Result<()> {
 
     println!("Secrets initialized.");
     println!();
-    println!("Next: run bonesdeploy secrets edit.");
+    println!("{}", output::next_step("bonesdeploy secrets edit"));
     Ok(())
 }
 
@@ -106,7 +107,7 @@ pub fn edit() -> Result<()> {
 
     println!("Secrets updated.");
     println!();
-    println!("Next: run bonesdeploy secrets push.");
+    println!("{}", output::next_step("bonesdeploy secrets push"));
     Ok(())
 }
 
@@ -127,7 +128,7 @@ pub async fn push() -> Result<()> {
 
     let encrypted_path = Path::new(LOCAL_ENV_SECRET);
     if !encrypted_path.is_file() {
-        bail!("Missing encrypted secrets\n\nNext: run bonesdeploy secrets edit.");
+        bail!("Missing encrypted secrets\n\n{}", output::next_step("bonesdeploy secrets edit"));
     }
 
     let plaintext = decrypt_secret(encrypted_path)?;

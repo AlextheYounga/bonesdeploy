@@ -5,6 +5,7 @@ use shared::paths;
 
 use crate::commands::{doctor, push_state, remote_runtime, remote_setup};
 use crate::config;
+use crate::ui::output;
 
 pub async fn run(skip_confirm: bool) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
@@ -21,14 +22,17 @@ pub async fn run(skip_confirm: bool) -> Result<()> {
     println!("Setup complete.");
     println!();
     if cfg.ssl_enabled {
-        println!("Next: run bonesdeploy deploy.");
+        println!("{}", output::next_step("bonesdeploy deploy"));
     } else {
-        println!("Next: run bonesdeploy remote ssl to configure HTTPS.");
+        println!("{}", output::next_step_with_detail("bonesdeploy remote ssl", "to configure HTTPS"));
     }
 
     Ok(())
 }
 
 fn setup_error(step: &str) -> String {
-    format!("Setup failed while {step}.\n\nNext: fix the error above, then run bonesdeploy setup again.")
+    format!(
+        "Setup failed while {step}.\n\nNext: fix the error above, then {} again.",
+        output::run_command("bonesdeploy setup")
+    )
 }

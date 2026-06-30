@@ -4,6 +4,7 @@ use anyhow::{Result, bail};
 
 use crate::infra::bonesinfra;
 use crate::infra::git;
+use crate::ui::output;
 use crate::ui::prompts;
 use shared::paths;
 
@@ -18,7 +19,7 @@ pub fn run(yes: bool) -> Result<()> {
     if !yes && !prompts::confirm_remote_runtime()? {
         println!("Skipped runtime setup.");
         println!();
-        println!("Next: run bonesdeploy remote runtime when ready.");
+        println!("{}", output::next_step_with_detail("bonesdeploy remote runtime", "when ready"));
         return Ok(());
     }
 
@@ -35,6 +36,6 @@ pub fn run(yes: bool) -> Result<()> {
 
     println!("Runtime applied.");
     println!();
-    println!("Next: run bonesdeploy push.");
+    println!("{}", output::next_step("bonesdeploy push"));
     Ok(())
 }

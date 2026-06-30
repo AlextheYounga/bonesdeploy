@@ -5,6 +5,7 @@ use anyhow::Result;
 
 use crate::config;
 use crate::infra::ssh;
+use crate::ui::output;
 use shared::paths;
 
 pub async fn run(local_only: bool) -> Result<()> {
@@ -15,33 +16,41 @@ pub async fn run(local_only: bool) -> Result<()> {
 
     let mut issues = 0usize;
 
-    issues += print_check(".bones config", check_bones_config(), Some("run bonesdeploy init"));
+    issues += print_check(".bones config", check_bones_config(), Some(output::run_command("bonesdeploy init")));
     issues += print_check(
         "deployment scripts",
         check_deployment_scripts(),
-        Some("rename it with a numeric prefix, like 01_build.sh"),
+        Some(String::from("rename it with a numeric prefix, like 01_build.sh")),
     );
 
     if deploy_on_push {
-        issues += print_check("pre-push hook", check_pre_push_hook(), Some("run bonesdeploy init"));
+        issues += print_check("pre-push hook", check_pre_push_hook(), Some(output::run_command("bonesdeploy init")));
     }
 
     if !local_only {
         match &cfg {
             Some(cfg) => {
                 let remote_ssh_issue = check_remote_ssh(cfg).await;
-                issues +=
-                    print_check("remote SSH", remote_ssh_issue.clone(), Some("check host, port, and SSH access."));
+                issues += print_check(
+                    "remote SSH",
+                    remote_ssh_issue.clone(),
+                    Some(String::from("check host, port, and SSH access.")),
+                );
                 if remote_ssh_issue.is_none() {
                     issues += print_check(
                         "remote doctor",
                         check_remote_doctor(cfg).await,
-                        Some("run bonesdeploy push or remote setup"),
+                        Some(format!(
+                            "{} or {}",
+                            output::run_command("bonesdeploy push"),
+                            output::run_command("bonesdeploy remote setup")
+                        )),
                     );
                 }
             }
             None => {
-                issues += print_failure("remote SSH", "Missing .bones config", Some("run bonesdeploy init"));
+                issues +=
+                    print_failure("remote SSH", "Missing .bones config", Some(output::run_command("bonesdeploy init")));
             }
         }
     }
@@ -57,7 +66,7 @@ pub async fn run(local_only: bool) -> Result<()> {
     }
 }
 
-fn print_check(label: &str, issue: Option<String>, next: Option<&str>) -> usize {
+fn print_check(label: &str, issue: Option<String>, next: Option<String>) -> usize {
     match issue {
         None => {
             println!("✓ {label}");
@@ -67,7 +76,7 @@ fn print_check(label: &str, issue: Option<String>, next: Option<&str>) -> usize 
     }
 }
 
-fn print_failure(label: &str, issue: &str, next: Option<&str>) -> usize {
+fn print_failure(label: &str, issue: &str, next: Option<String>) -> usize {
     println!("✗ {label}");
     let issue = issue.replace('\n', "\n  ");
     println!("  {issue}");

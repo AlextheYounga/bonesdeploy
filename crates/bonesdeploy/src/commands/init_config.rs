@@ -1,5 +1,6 @@
 use crate::config;
 use crate::infra::git;
+use crate::ui::output;
 
 use anyhow::{Result, anyhow};
 use shared::config::validate_host;
@@ -74,8 +75,9 @@ fn resolve_project_name(
         .ok_or_else(|| {
             anyhow!(
                 "{} --project-name is required in non-interactive mode.\n\
-                 Usage: bonesdeploy init --non-interactive --project-name <name> --host <host>",
+                 Usage: {}",
                 console::style("Error:").red().bold(),
+                output::green_command("bonesdeploy init --non-interactive --project-name <name> --host <host>"),
             )
         })
 }
@@ -105,8 +107,9 @@ fn resolve_host(
         .ok_or_else(|| {
             anyhow!(
                 "{} --host is required in non-interactive mode.\n\
-                 Usage: bonesdeploy init --non-interactive --project-name <name> --host <host>",
+                 Usage: {}",
                 console::style("Error:").red().bold(),
+                output::green_command("bonesdeploy init --non-interactive --project-name <name> --host <host>"),
             )
         })
 }

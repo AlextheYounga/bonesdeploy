@@ -8,6 +8,7 @@ use crate::config;
 use crate::infra::bonesinfra;
 use crate::infra::embedded;
 use crate::infra::git;
+use crate::ui::output;
 use crate::ui::prompts;
 use anyhow::{Context, Result};
 use shared::config::{bonesinfra_input, default_deploy_user, release_group_for, runtime_group_for, runtime_user_for};
@@ -64,7 +65,7 @@ fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Resu
 
 fn print_follow_up_hint() {
     println!();
-    println!("Next: run `bonesdeploy setup` to setup the remote server.");
+    println!("{}", output::next_step_with_detail("bonesdeploy setup", "to setup the remote server"));
 }
 
 fn collect_fresh_config(args: &InitArgs) -> Result<config::Bones> {
