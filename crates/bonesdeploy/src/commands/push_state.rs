@@ -6,6 +6,7 @@ use std::io::Write as _;
 
 use crate::config;
 use crate::infra::ssh;
+use crate::ui::output;
 use shared::paths;
 
 pub fn run(show_next: bool) -> Result<()> {
@@ -18,7 +19,7 @@ pub fn run(show_next: bool) -> Result<()> {
     println!(".bones published.");
     if show_next {
         println!();
-        println!("Next: run bonesdeploy doctor.");
+        println!("{}", output::next_step("bonesdeploy doctor"));
     }
 
     Ok(())

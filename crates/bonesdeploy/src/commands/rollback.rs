@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 
 use crate::config;
 use crate::infra::ssh;
+use crate::ui::output;
 use shared::paths;
 
 pub async fn run() -> Result<()> {
@@ -19,7 +20,7 @@ pub async fn run() -> Result<()> {
 
     println!("Rollback complete.");
     println!();
-    println!("Next: run bonesdeploy status.");
+    println!("{}", output::next_step("bonesdeploy status"));
 
     Ok(())
 }

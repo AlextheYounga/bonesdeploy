@@ -11,6 +11,7 @@ use super::remote_data;
 use crate::config;
 use crate::infra::bonesinfra;
 use crate::infra::bootstrap_ssh;
+use crate::ui::output;
 use crate::ui::prompts;
 
 pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<()> {
@@ -43,7 +44,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     if !yes && !prompts::confirm_remote_ssl()? {
         println!("Skipped HTTPS setup.");
         println!();
-        println!("Next: run bonesdeploy remote ssl when DNS is ready.");
+        println!("{}", output::next_step_with_detail("bonesdeploy remote ssl", "when DNS is ready"));
         return Ok(());
     }
 
@@ -66,7 +67,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
 
     println!("HTTPS configured.");
     println!();
-    println!("Next: run bonesdeploy deploy.");
+    println!("{}", output::next_step("bonesdeploy deploy"));
 
     Ok(())
 }

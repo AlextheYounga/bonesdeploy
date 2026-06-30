@@ -10,6 +10,7 @@ use super::remote_data;
 use crate::config;
 use crate::infra::bonesinfra;
 use crate::infra::bootstrap_ssh;
+use crate::ui::output;
 use crate::ui::prompts;
 
 pub fn run(skip_confirm: bool) -> Result<()> {
@@ -37,7 +38,7 @@ pub fn run(skip_confirm: bool) -> Result<()> {
 
     println!("Remote bootstrap complete.");
     println!();
-    println!("Next: run bonesdeploy remote runtime.");
+    println!("{}", output::next_step("bonesdeploy remote runtime"));
 
     Ok(())
 }
