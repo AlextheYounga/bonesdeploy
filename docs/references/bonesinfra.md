@@ -14,26 +14,43 @@ bonesinfra
 ├── src
 │   └── bonesinfra
 │       ├── __main__.py
-│       ├── app
-│       │   ├── apply.py
-│       │   ├── runtime_apply.py
-│       │   ├── runtime_catalog.py
-│       │   ├── setup_apply.py
-│       │   └── ssl_apply.py
 │       ├── assets
 │       │   ├── apparmor
 │       │   │   └── project-nginx-profile.j2
-│       │   └── nginx
-│       │       ├── index.html.j2
-│       │       ├── router.conf.j2
-│       │       ├── site-nginx.conf.j2
-│       │       └── site-nginx.service.j2
+│       │   ├── fail2ban
+│       │   │   └── jail.local.j2
+│       │   ├── nginx
+│       │   │   ├── default-deny.conf.j2
+│       │   │   ├── index.html.j2
+│       │   │   ├── router.conf.j2
+│       │   │   ├── site-nginx.conf.j2
+│       │   │   └── site-nginx.service.j2
+│       │   ├── nvim
+│       │   ├── profile.d
+│       │   │   └── bonesinfra-shell.sh
+│       │   ├── scripts
+│       │   │   └── install-neovim.sh
+│       │   ├── starship.toml
+│       │   ├── sudoers
+│       │   │   └── bonesdeploy.j2
+│       │   └── unattended-upgrades
+│       │       ├── 20auto-upgrades.j2
+│       │       └── 50unattended-upgrades.j2
 │       ├── cli
 │       │   └── app.py
 │       ├── deploys
+│       │   ├── _shared
+│       │   │   ├── __init__.py
+│       │   │   └── nginx_safety.py
+│       │   ├── helpers
+│       │   │   ├── aptui.py
+│       │   │   ├── crates.py
+│       │   │   ├── neovim.py
+│       │   │   ├── packages.py
+│       │   │   ├── plan.py
+│       │   │   └── starship.py
 │       │   ├── runtime
 │       │   │   ├── apparmor.py
-│       │   │   ├── doctor.py
 │       │   │   ├── nginx.py
 │       │   │   ├── packages.py
 │       │   │   ├── plan.py
@@ -41,10 +58,13 @@ bonesinfra
 │       │   ├── setup
 │       │   │   ├── bonesremote.py
 │       │   │   ├── directories.py
+│       │   │   ├── fail2ban.py
 │       │   │   ├── firewall.py
 │       │   │   ├── packages.py
 │       │   │   ├── placeholder.py
 │       │   │   ├── plan.py
+│       │   │   ├── sudoers.py
+│       │   │   ├── unattended_upgrades.py
 │       │   │   └── users.py
 │       │   └── ssl
 │       │       └── plan.py
@@ -54,9 +74,7 @@ bonesinfra
 │       ├── infra
 │       │   ├── deploy_helpers.py
 │       │   ├── output.py
-│       │   ├── pyinfra_runner.py
-│       │   ├── toml_store.py
-│       │   └── utils.py
+│       │   └── pyinfra_runner.py
 │       └── runtimes
 │           ├── __init__.py
 │           ├── common
@@ -110,6 +128,7 @@ bonesinfra
     ├── test_cli.py
     ├── test_context.py
     ├── test_deploy_structure.py
+    ├── test_nginx_safety.py
     ├── test_paths.py
     ├── test_pyinfra_runner.py
     ├── test_runtime_nginx.py
@@ -130,17 +149,19 @@ Before writing any code, stop at the first rung that holds:
 
 1. Does this need to be built at all? (YAGNI)
 2. Does the standard library already do this? Use it.
-3. Does a native platform feature cover it? Use it.
-4. Does an already-installed dependency solve it? Use it.
-5. Can this be one line? Make it one line.
-6. Only then: write the minimum code that works.
+3. Have we already written this before? Import it.
+4. Does a native platform feature cover it? Use it.
+5. Does an already-installed dependency solve it? Use it.
+6. Can this be one line? Make it one line.
+7. Only then: write the minimum code that works.
+8. Can we delete anything after this change? We love deleting unnecessary functionality. Delete it.
 
 When you are done, please run `ruff check .`. Do not ignore errors or warnings.
 
 Rules:
-
 - No abstractions that weren't explicitly requested.
 - No new dependency if it can be avoided.
+- Every piece of state must have a single source of truth. No DRY violations.
 - No boilerplate nobody asked for.
 - Deletion over addition. Boring over clever. Fewest files possible.
 - Question complex requests: "Do you actually need X, or does Y cover it?"
@@ -157,8 +178,6 @@ When you are done working, please run and address all warnings/errors:
 
 And finally, please update any related documentation **if necessary, use your best judgement**:
 - `docs/PROJECT.md`
-- `docs/commands/*`
-- `docs/security/*`
 
 ```
 
@@ -430,7 +449,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bonesinfra"
-version = "0.1.8"
+version = "0.2.1"
 description = "Deployment automation for BonesDeploy"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -448,7 +467,7 @@ bonesinfra = "bonesinfra.__main__:main"
 
 [tool.setuptools.package-data]
 bonesinfra = [
-    "assets/**/*.j2",
+    "assets/**/*",
     "runtimes/**/assets/**/*.j2",
 ]
 
@@ -603,88 +622,6 @@ if __name__ == "__main__":
 
 ```
 
-`src/bonesinfra/app/apply.py`:
-
-```py
-import sys
-
-from bonesinfra.infra.pyinfra_runner import run as run_deploy
-
-
-def run_plan(deploy, ctx):
-    if not ctx.host:
-        print("Error: missing host in bones.toml", file=sys.stderr)
-        sys.exit(3)
-    run_deploy(ctx=ctx, deploy=deploy)
-
-```
-
-`src/bonesinfra/app/runtime_apply.py`:
-
-```py
-from bonesinfra.app.apply import run_plan
-from bonesinfra.deploys.runtime.plan import deploy_runtime
-from bonesinfra.domain.context import DeployContext
-
-
-def apply(config_path: str, runtime_config_path: str) -> None:
-    ctx = DeployContext.from_files(config_path, runtime_config_path)
-    run_plan(deploy_runtime, ctx)
-
-```
-
-`src/bonesinfra/app/runtime_catalog.py`:
-
-```py
-from bonesinfra.runtimes import get_runtime, list_runtimes
-
-
-def list_all() -> list[str]:
-    return list_runtimes()
-
-
-def get_questions(runtime_name: str) -> list[dict]:
-    module = get_runtime(runtime_name)
-    return module.questions()
-
-```
-
-`src/bonesinfra/app/setup_apply.py`:
-
-```py
-from bonesinfra.app.apply import run_plan
-from bonesinfra.deploys.setup.plan import deploy_setup
-from bonesinfra.domain.context import DeployContext
-
-
-def apply(config_path: str) -> None:
-    ctx = DeployContext.from_files(config_path)
-    run_plan(deploy_setup, ctx)
-
-```
-
-`src/bonesinfra/app/ssl_apply.py`:
-
-```py
-import sys
-
-from bonesinfra.app.apply import run_plan
-from bonesinfra.deploys.ssl.plan import deploy_ssl
-from bonesinfra.domain.context import DeployContext
-
-
-def apply(config_path: str) -> None:
-    ctx = DeployContext.from_files(config_path)
-    if not ctx.host:
-        print("Error: missing host in bones.toml", file=sys.stderr)
-        sys.exit(3)
-    if not ctx.config.domain or not ctx.config.email:
-        print("Error: ssl.domain and ssl.email are required in bones.toml", file=sys.stderr)
-        sys.exit(3)
-    run_plan(deploy_ssl, ctx)
-
-```
-
 `src/bonesinfra/assets/apparmor/project-nginx-profile.j2`:
 
 ```j2
@@ -719,7 +656,6 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-ngi
   {{ paths.current_web_root }}/** r,
   # current is a symlink, so allow the resolved release path too.
   {{ paths.releases }}/*/{{ web_root }}/** r,
-  {{ paths.repo_bones_toml }} r,
   {{ paths.site_nginx_config }} r,
 
   {{ paths.runtime_nginx_dir }}/ rw,
@@ -733,10 +669,50 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-ngi
   {{ paths.runtime_socket_dir }}/*/ r,
   {{ paths.runtime_socket_dir }}/*/*.sock rw,
 
-  # repo_path defaults to /home/{{ deploy_user }}/<project>.git, so global /home denies
-  # would block bonesremote reading config and nginx config from repo-local bones files.
+  # Repos default to /srv/git/<project>.git; runtime policy should not depend on
+  # repo-owned config.
   deny /root/** r,
   deny /etc/ssh/** r,
+}
+
+```
+
+`src/bonesinfra/assets/fail2ban/jail.local.j2`:
+
+```j2
+[DEFAULT]
+bantime = 1h
+findtime = 10m
+maxretry = 5
+backend = systemd
+
+[sshd]
+enabled = true
+port = {{ ssh_port }}
+logpath = %(sshd_log)s
+
+```
+
+`src/bonesinfra/assets/nginx/default-deny.conf.j2`:
+
+```j2
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    return 444;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name _;
+
+    ssl_certificate {{ paths.nginx_default_deny_ssl_certificate }};
+    ssl_certificate_key {{ paths.nginx_default_deny_ssl_certificate_key }};
+
+    return 444;
 }
 
 ```
@@ -912,7 +888,6 @@ Requires=apparmor.service
 Type=simple
 User={{ runtime_user }}
 Group={{ runtime_group }}
-SupplementaryGroups={{ release_group }}
 WorkingDirectory={{ paths.current }}
 # 0711: system nginx (www-data) must traverse this dir to reach the socket.
 # 0750 causes 502 — www-data is not in the runtime group.
@@ -953,34 +928,202 @@ WantedBy=multi-user.target
 
 ```
 
+`src/bonesinfra/assets/profile.d/bonesinfra-shell.sh`:
+
+```sh
+export STARSHIP_CONFIG=/etc/starship.toml
+
+if [ -n "${BASH_VERSION:-}" ] && command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+fi
+
+```
+
+`src/bonesinfra/assets/scripts/install-neovim.sh`:
+
+```sh
+#!/usr/bin/env bash
+set -euo pipefail
+
+NVIM_VERSION_MINIMUM="0.11.1"
+NVIM_INSTALL_DIR="/opt/nvim"
+NVIM_BIN="/usr/local/bin/nvim"
+
+current_version() {
+  if ! command -v nvim >/dev/null 2>&1; then
+    return 1
+  fi
+
+  nvim --version | sed -n '1s/^NVIM v\([0-9][^[:space:]]*\).*/\1/p'
+}
+
+if current="$(current_version || true)"; [[ -n "$current" ]] && dpkg --compare-versions "$current" ge "$NVIM_VERSION_MINIMUM"; then
+  exit 0
+fi
+
+case "$(uname -m)" in
+amd64 | x86_64)
+  asset="nvim-linux-x86_64.tar.gz"
+  ;;
+arm64 | aarch64)
+  asset="nvim-linux-arm64.tar.gz"
+  ;;
+*)
+  echo "Unsupported architecture for Neovim: $(uname -m)" >&2
+  exit 1
+  ;;
+esac
+
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+curl -fsSL "https://github.com/neovim/neovim/releases/latest/download/$asset" -o "$tmp_dir/nvim.tar.gz"
+rm -rf "$NVIM_INSTALL_DIR"
+install -d -m 0755 "$NVIM_INSTALL_DIR" /usr/local/bin
+tar -xzf "$tmp_dir/nvim.tar.gz" -C "$tmp_dir"
+cp -R "$tmp_dir"/nvim-linux-*/* "$NVIM_INSTALL_DIR/"
+ln -sf "$NVIM_INSTALL_DIR/bin/nvim" "$NVIM_BIN"
+
+installed="$(current_version)"
+dpkg --compare-versions "$installed" ge "$NVIM_VERSION_MINIMUM"
+
+```
+
+`src/bonesinfra/assets/starship.toml`:
+
+```toml
+add_newline = true
+command_timeout = 200
+format = "[$username$hostname$directory$git_branch$git_status$git_metrics]($style)$character"
+
+[username]
+format = "[$user]($style)@"
+show_always = true
+style_root = "bold red"
+style_user = "bold yellow"
+
+[hostname]
+format = "[$hostname]($style) "
+ssh_only = false
+style = "bold yellow"
+
+[character]
+error_symbol = "[✗](bold cyan)"
+success_symbol = "[❯](bold cyan)"
+
+[directory]
+truncation_length = 2
+truncation_symbol = "…/"
+repo_root_style = "bold cyan"
+repo_root_format = "[$repo_root]($repo_root_style)[$path]($style)[$read_only]($read_only_style) "
+
+[git_branch]
+format = "[$branch]($style) "
+style = "italic cyan"
+
+[git_status]
+format     = '[$all_status]($style)'
+style      = "cyan"
+ahead      = "⇡${count} "
+diverged   = "⇕⇡${ahead_count}⇣${behind_count} "
+behind     = "⇣${count} "
+conflicted = " "
+up_to_date = " "
+untracked  = "? "
+modified   = " "
+stashed    = ""
+staged     = ""
+renamed    = ""
+deleted    = ""
+
+[git_metrics]
+disabled = false
+format = "([+$added]($added_style))([-$deleted]($deleted_style)) "
+added_style = "green"
+deleted_style = "red"
+
+```
+
+`src/bonesinfra/assets/sudoers/bonesdeploy.j2`:
+
+```j2
+# Installed by bonesinfra
+{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} hook post-receive --site *, {{ bonesremote_path }} service restart --site *, {{ bonesremote_path }} release rollback --site *, {{ bonesremote_path }} release drop-failed --site *, {{ bonesremote_path }} release prune --site *
+
+```
+
+`src/bonesinfra/assets/unattended-upgrades/20auto-upgrades.j2`:
+
+```j2
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+
+```
+
+`src/bonesinfra/assets/unattended-upgrades/50unattended-upgrades.j2`:
+
+```j2
+Unattended-Upgrade::Allowed-Origins {
+        "${distro_id}:${distro_codename}";
+        "${distro_id}:${distro_codename}-security";
+        "${distro_id}ESMApps:${distro_codename}-apps-security";
+        "${distro_id}ESM:${distro_codename}-infra-security";
+};
+
+Unattended-Upgrade::Package-Blacklist {
+};
+
+Unattended-Upgrade::DevRelease "false";
+Unattended-Upgrade::Remove-Unused-Kernel-Packages "true";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
+
+```
+
 `src/bonesinfra/cli/app.py`:
 
 ```py
 import json
+import sys
 
 import typer
 
-from bonesinfra.app import runtime_apply, runtime_catalog, setup_apply, ssl_apply
+from bonesinfra.deploys.helpers.plan import deploy_helpers
+from bonesinfra.deploys.runtime.plan import deploy_runtime
+from bonesinfra.deploys.setup.plan import deploy_setup
+from bonesinfra.deploys.ssl.plan import deploy_ssl
+from bonesinfra.domain.context import DeployContext
+from bonesinfra.infra.pyinfra_runner import run
+from bonesinfra.runtimes import get_runtime, list_runtimes
 
 app = typer.Typer()
 runtime_app = typer.Typer()
 setup_app = typer.Typer()
 ssl_app = typer.Typer()
+helpers_app = typer.Typer()
 app.add_typer(runtime_app, name="runtime", help="Runtime operations")
 app.add_typer(setup_app, name="setup", help="Setup operations")
 app.add_typer(ssl_app, name="ssl", help="SSL operations")
+app.add_typer(helpers_app, name="helpers", help="Helper tool operations")
+
+
+def _validate_host(ctx: DeployContext) -> None:
+    if not ctx.host:
+        print("Error: missing host in bones.toml", file=sys.stderr)
+        sys.exit(3)
 
 
 @runtime_app.command("list")
 def runtime_list():
-    print(json.dumps(runtime_catalog.list_all()))
+    print(json.dumps(list_runtimes()))
 
 
 @runtime_app.command("questions")
 def runtime_questions(
     runtime: str = typer.Argument(help="Runtime name"),
 ):
-    print(json.dumps(runtime_catalog.get_questions(runtime)))
+    print(json.dumps(get_runtime(runtime).questions()))
 
 
 @runtime_app.command("apply")
@@ -988,21 +1131,332 @@ def runtime_apply_cmd(
     config: str = typer.Option(..., "--config", help="Path to bones.toml"),
     runtime_config: str = typer.Option(..., "--runtime-config", help="Path to runtime.toml"),
 ):
-    runtime_apply.apply(config, runtime_config)
+    ctx = DeployContext.from_files(config, runtime_config)
+    _validate_host(ctx)
+    run(ctx=ctx, deploy=deploy_runtime)
 
 
 @setup_app.command("apply")
 def setup_apply_cmd(
     config: str = typer.Option(..., "--config", help="Path to bones.toml"),
 ):
-    setup_apply.apply(config)
+    ctx = DeployContext.from_files(config)
+    _validate_host(ctx)
+    run(ctx=ctx, deploy=deploy_setup)
 
 
 @ssl_app.command("apply")
 def ssl_apply_cmd(
     config: str = typer.Option(..., "--config", help="Path to bones.toml"),
 ):
-    ssl_apply.apply(config)
+    ctx = DeployContext.from_files(config)
+    if not ctx.config.domain or not ctx.config.email:
+        print("Error: ssl.domain and ssl.email are required in bones.toml", file=sys.stderr)
+        sys.exit(3)
+    _validate_host(ctx)
+    run(ctx=ctx, deploy=deploy_ssl)
+
+
+@helpers_app.command("apply")
+def helpers_apply_cmd(
+    config: str = typer.Option(..., "--config", help="Path to bones.toml"),
+):
+    ctx = DeployContext.from_files(config)
+    _validate_host(ctx)
+    run(ctx=ctx, deploy=deploy_helpers)
+
+```
+
+`src/bonesinfra/deploys/_shared/nginx_safety.py`:
+
+```py
+from pyinfra.operations import files, server
+
+from bonesinfra.domain.paths import ASSETS_DIR
+from bonesinfra.infra.deploy_helpers import render
+
+
+def install_default_deny_server(paths):
+    # ponytail: self-signed is enough here because this server never serves
+    # content; it only gives nginx a TLS default that can return 444.
+    server.shell(
+        name="Ensure nginx default-deny SSL certificate exists",
+        commands=[
+            "if [ ! -s {cert} ] || [ ! -s {key} ]; then "
+            "install -d -m 0755 /etc/ssl/certs && "
+            "install -d -m 0700 /etc/ssl/private && "
+            "openssl req -x509 -nodes -newkey rsa:2048 -days 3650 "
+            "-subj /CN=bonesdeploy-default-deny.invalid "
+            "-keyout {key} -out {cert} && "
+            "chmod 0600 {key} && chmod 0644 {cert}; "
+            "fi".format(
+                cert=paths["nginx_default_deny_ssl_certificate"],
+                key=paths["nginx_default_deny_ssl_certificate_key"],
+            )
+        ],
+        _sudo=True,
+    )
+
+    render(
+        "Deploy nginx default-deny server",
+        ASSETS_DIR / "nginx/default-deny.conf.j2",
+        paths["nginx_default_deny_site_available"],
+        mode="0644",
+        paths=paths,
+    )
+
+    files.link(
+        name="Enable nginx default-deny server",
+        path=paths["nginx_default_deny_site_enabled"],
+        target=paths["nginx_default_deny_site_available"],
+        force=True,
+        _sudo=True,
+    )
+
+    files.link(
+        name="Disable Debian default nginx site",
+        path=paths["nginx_default_site_enabled"],
+        present=False,
+        _sudo=True,
+    )
+
+
+def validate_config(name):
+    server.shell(
+        name=name,
+        commands=[
+            'output=$(nginx -t 2>&1); status=$?; printf "%s\\n" "$output"; '
+            '[ "$status" -eq 0 ] || exit "$status"; '
+            'case "$output" in *"conflicting server name"*) exit 1;; esac'
+        ],
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/deploys/helpers/aptui.py`:
+
+```py
+from pyinfra.operations import apt, server
+
+
+# Install https://github.com/mexirica/aptui
+def _add_aptui_repository():
+    server.shell(
+        name="Add aptui repository",
+        commands=[
+            "curl -fsSL https://mexirica.github.io/aptui/public-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/aptui-archive-keyring.gpg",  # noqa: E501
+            "echo 'deb [signed-by=/usr/share/keyrings/aptui-archive-keyring.gpg] https://mexirica.github.io/aptui/ stable main' | sudo tee /etc/apt/sources.list.d/aptui.list",  # noqa: E501
+        ],
+        _sudo=True,
+    )
+
+
+def install_aptui():
+    _add_aptui_repository()
+    apt.packages(
+        name="Install aptui",
+        packages=["aptui"],
+        update=True,
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/deploys/helpers/crates.py`:
+
+```py
+from pyinfra.operations import server
+
+CARGO_BIN = "/root/.cargo/bin/cargo"
+HELPER_CARGO_CRATES: list[str] = [
+    "rainfrog",
+    "tuimux",
+]
+
+
+def install_helper_crates():
+    for crate in HELPER_CARGO_CRATES:
+        server.shell(
+            name=f"Install {crate} binary",
+            commands=[f"{CARGO_BIN} install {crate}"],
+            _sudo=True,
+        )
+
+```
+
+`src/bonesinfra/deploys/helpers/neovim.py`:
+
+```py
+from pyinfra.operations import files, server
+
+from bonesinfra.domain.paths import ASSETS_DIR
+
+NVIM_CONFIG_DIR = "/etc/xdg/nvim"
+INSTALL_SCRIPT = "/usr/local/lib/bonesinfra/install-neovim.sh"
+
+
+def install():
+    files.put(
+        name="Install Neovim helper script",
+        src=str(ASSETS_DIR / "scripts/install-neovim.sh"),
+        dest=INSTALL_SCRIPT,
+        user="root",
+        group="root",
+        mode="0755",
+        _sudo=True,
+    )
+
+    server.shell(
+        name="Install Neovim > 0.11 from official release",
+        commands=[INSTALL_SCRIPT],
+        _sudo=True,
+    )
+
+    files.sync(
+        name="Install shared Neovim config",
+        src=str(ASSETS_DIR / "nvim"),
+        dest=NVIM_CONFIG_DIR,
+        user="root",
+        group="root",
+        mode="0644",
+        dir_mode="0755",
+        delete=False,
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/deploys/helpers/packages.py`:
+
+```py
+from pyinfra.operations import apt, server
+
+HELPER_APT_PACKAGES: list[str] = [
+    "age",
+    "apt-listchanges",
+    "apt-transport-https",
+    "automysqlbackup",
+    "autossh",
+    "bash-completion",
+    "bat",
+    "btop",
+    "borgbackup",
+    "fastfetch",
+    "fd-find",
+    "fzf",
+    "gnupg",
+    "iftop",
+    "inotify-tools",
+    "iotop",
+    "jdupes",
+    "jq",
+    "lsb-release",
+    "lsof",
+    "moreutils",
+    "mutt",
+    "ncdu",
+    "powerstat",
+    "powertop",
+    "rename",
+    "ripgrep",
+    "smartmontools",
+    "sysbench",
+    "sysstat",
+    "telnet",
+    "tmux",
+    "tree",
+]
+
+
+def install_helper_apt_packages(packages):
+    apt.packages(
+        name="Install supplementary helper apt packages",
+        packages=packages,
+        present=True,
+        update=True,
+        cache_time=3600,
+        _sudo=True,
+    )
+
+
+def install_debian_command_aliases():
+    server.shell(
+        name="Install Debian helper command aliases",
+        commands=[
+            "install -d -m 0755 /usr/local/bin",
+            (
+                "if command -v batcat >/dev/null 2>&1 && [ ! -x /usr/local/bin/bat ]; "
+                'then ln -sf "$(command -v batcat)" /usr/local/bin/bat; fi'
+            ),
+            (
+                "if command -v fdfind >/dev/null 2>&1 && [ ! -x /usr/local/bin/fd ]; "
+                'then ln -sf "$(command -v fdfind)" /usr/local/bin/fd; fi'
+            ),
+        ],
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/deploys/helpers/plan.py`:
+
+```py
+from bonesinfra.deploys.helpers import aptui, crates, neovim, packages, starship
+from bonesinfra.deploys.helpers.packages import HELPER_APT_PACKAGES
+
+
+def deploy_helpers(ctx):
+    del ctx
+    packages.install_helper_apt_packages(HELPER_APT_PACKAGES)
+    packages.install_debian_command_aliases()
+    starship.install()
+    neovim.install()
+    aptui.install_aptui()
+    crates.install_helper_crates()
+
+```
+
+`src/bonesinfra/deploys/helpers/starship.py`:
+
+```py
+from pyinfra.operations import files, server
+
+from bonesinfra.domain.paths import ASSETS_DIR
+
+STARSHIP_BIN = "/usr/local/bin/starship"
+STARSHIP_CONFIG = "/etc/starship.toml"
+PROFILE_SCRIPT = "/etc/profile.d/bonesinfra-shell.sh"
+
+
+def install():
+    server.shell(
+        name="Install starship prompt",
+        commands=[
+            (f"test -x {STARSHIP_BIN} || curl -fsSL https://starship.rs/install.sh | sh -s -- -y -b /usr/local/bin")
+        ],
+        _sudo=True,
+    )
+
+    files.put(
+        name="Install starship config",
+        src=str(ASSETS_DIR / "starship.toml"),
+        dest=STARSHIP_CONFIG,
+        user="root",
+        group="root",
+        mode="0644",
+        _sudo=True,
+    )
+
+    files.put(
+        name="Install shell profile for starship",
+        src=str(ASSETS_DIR / "profile.d/bonesinfra-shell.sh"),
+        dest=PROFILE_SCRIPT,
+        user="root",
+        group="root",
+        mode="0644",
+        _sudo=True,
+    )
 
 ```
 
@@ -1012,10 +1466,11 @@ def ssl_apply_cmd(
 from pyinfra.operations import server, systemd
 
 from bonesinfra.domain.context import template_data
+from bonesinfra.domain.paths import ASSETS_DIR
 from bonesinfra.infra.deploy_helpers import render
 
 
-def setup(ctx, paths, here):
+def setup(ctx, paths):
     systemd.service(
         name="Ensure apparmor service is enabled and started",
         service="apparmor",
@@ -1035,7 +1490,7 @@ def setup(ctx, paths, here):
 
     render(
         "Deploy per-project apparmor profile",
-        here / "assets/apparmor/project-nginx-profile.j2",
+        ASSETS_DIR / "apparmor/project-nginx-profile.j2",
         apparmor_profile_path,
         mode="0644",
         apparmor_profile_name=apparmor_profile_name,
@@ -1056,30 +1511,6 @@ def setup(ctx, paths, here):
 
 ```
 
-`src/bonesinfra/deploys/runtime/doctor.py`:
-
-```py
-from shlex import quote
-
-from pyinfra.operations import server
-
-
-def _user_env_command(user, command):
-    q_user = quote(user)
-    home = f"$(getent passwd {q_user} | cut -d: -f6)"
-    return f"HOME={home} XDG_CONFIG_HOME={home}/.config {command}"
-
-
-def run(ctx):
-    server.shell(
-        name="Run bonesremote doctor as deploy user",
-        commands=[_user_env_command(ctx.config.deploy_user, "/usr/local/bin/bonesremote doctor")],
-        _sudo=True,
-        _sudo_user=ctx.config.deploy_user,
-    )
-
-```
-
 `src/bonesinfra/deploys/runtime/nginx.py`:
 
 ```py
@@ -1087,11 +1518,13 @@ from pathlib import Path
 
 from pyinfra.operations import files, server, systemd
 
+from bonesinfra.deploys._shared import nginx_safety
 from bonesinfra.domain.context import template_data
+from bonesinfra.domain.paths import ASSETS_DIR
 from bonesinfra.infra.deploy_helpers import letsencrypt_cert_paths, mkdir, render
 
 
-def setup(ctx, paths, here):
+def setup(ctx, paths):
     # 0711: system nginx (www-data) needs traversal to reach the per-site
     # nginx socket at /run/<project>/nginx/nginx.sock. 0750 would block it.
     mkdir(
@@ -1119,7 +1552,7 @@ def setup(ctx, paths, here):
 
     render(
         "Deploy per-site nginx config",
-        here / "assets/nginx/site-nginx.conf.j2",
+        ASSETS_DIR / "nginx/site-nginx.conf.j2",
         paths["site_nginx_config"],
         group=ctx.runtime.runtime_group,
         mode="0640",
@@ -1128,7 +1561,7 @@ def setup(ctx, paths, here):
 
     render(
         "Deploy per-site nginx systemd service",
-        here / "assets/nginx/site-nginx.service.j2",
+        ASSETS_DIR / "nginx/site-nginx.service.j2",
         paths["systemd_site_nginx_service"],
         mode="0644",
         **template_data(ctx, paths=paths),
@@ -1146,12 +1579,12 @@ def setup(ctx, paths, here):
     # SSL state comes from bones.toml (ssl_enabled), not runtime.toml — SSL is
     # owned by `ssl apply`, not `runtime apply`. This keeps runtime apply from
     # clobbering the SSL router config that ssl apply wrote.
-    nginx_ssl_enabled = ctx.config.ssl_enabled and bool(ctx.config.domain)
+    nginx_ssl_enabled = ctx.config.ssl_enabled and ctx.config.domain
     cert_path, key_path = letsencrypt_cert_paths(ctx.config.domain or nginx_server_name)
 
     render(
         "Deploy router nginx config",
-        here / "assets/nginx/router.conf.j2",
+        ASSETS_DIR / "nginx/router.conf.j2",
         paths["nginx_site_available"],
         mode="0644",
         nginx_server_name=nginx_server_name,
@@ -1161,6 +1594,8 @@ def setup(ctx, paths, here):
         **template_data(ctx, paths=paths),
     )
 
+    nginx_safety.install_default_deny_server(paths)
+
     files.link(
         name="Enable router nginx site",
         path=paths["nginx_site_enabled"],
@@ -1169,18 +1604,7 @@ def setup(ctx, paths, here):
         _sudo=True,
     )
 
-    files.link(
-        name="Disable default nginx site",
-        path=paths["nginx_default_site_enabled"],
-        present=False,
-        _sudo=True,
-    )
-
-    server.shell(
-        name="Validate nginx configuration",
-        commands=["nginx -t"],
-        _sudo=True,
-    )
+    nginx_safety.validate_config("Validate nginx configuration")
 
 
 def start_services(paths):
@@ -1236,27 +1660,16 @@ def install_apt(ctx):
 `src/bonesinfra/deploys/runtime/plan.py`:
 
 ```py
-from pathlib import Path
-
-from bonesinfra.deploys.runtime import apparmor, doctor, nginx, packages, template_runtime
-from bonesinfra.domain.paths import DeploymentPaths
+from bonesinfra.deploys.runtime import apparmor, nginx, packages, template_runtime
 
 
 def deploy_runtime(ctx):
-    paths = DeploymentPaths.new(
-        ctx.config.project_name,
-        ctx.config.repo_path,
-        ctx.config.project_root,
-        ctx.runtime.web_root,
-    ).__dict__
-    here = Path(__file__).parent.parent.parent
-
+    paths = ctx.paths_dict
     packages.install_apt(ctx)
-    apparmor.setup(ctx, paths, here)
-    nginx.setup(ctx, paths, here)
+    apparmor.setup(ctx, paths)
+    nginx.setup(ctx, paths)
     template_runtime.load(ctx)
     nginx.start_services(paths)
-    doctor.run(ctx)
 
 ```
 
@@ -1271,9 +1684,6 @@ def load(ctx):
     from bonesinfra.runtimes import get_runtime
 
     runtime = get_runtime(template)
-    if not hasattr(runtime, "deploy"):
-        raise RuntimeError(f"Runtime {template} does not expose deploy(ctx)")
-
     runtime.deploy(ctx)
 
 ```
@@ -1294,18 +1704,20 @@ def install():
         _sudo=True,
     )
 
+<<<<<<< Updated upstream
     server.shell(
         name="Install bonesdeploy sudoers policy",
         commands=["install sudoers drop-in directly from bonesinfra"],
         _sudo=True,
     )
 
+=======
+>>>>>>> Stashed changes
 ```
 
 `src/bonesinfra/deploys/setup/directories.py`:
 
 ```py
-from pathlib import Path
 from shlex import quote
 
 from pyinfra.operations import server
@@ -1335,40 +1747,25 @@ def setup_repo_and_project(ctx, paths):
     )
 
     mkdir(
-        name="Ensure bare repo bones directory exists",
-        path=paths["repo_bones"],
-        user=ctx.config.deploy_user,
-        group=ctx.config.deploy_user,
-    )
-
-    mkdir(
         name="Ensure project root parent directory is traversable",
         path=paths["project_root_parent"],
         mode="0711",
     )
 
     mkdir(
-        name="Ensure project root with setgid for release group",
+        name="Ensure project root boundary exists",
         path=ctx.config.project_root,
-        user=ctx.config.deploy_user,
-        group=ctx.runtime.release_group,
-        mode="2751",
+        user="root",
+        group="root",
+        mode="0751",
     )
 
     mkdir(
         name="Ensure releases directory with setgid",
         path=paths["releases"],
-        user=ctx.config.deploy_user,
-        group=ctx.runtime.release_group,
+        user="root",
+        group=ctx.runtime.runtime_group,
         mode="2750",
-    )
-
-    mkdir(
-        name="Ensure build directory (private to deploy user)",
-        path=str(Path(ctx.config.project_root) / "build"),
-        user=ctx.config.deploy_user,
-        group=ctx.config.deploy_user,
-        mode="0700",
     )
 
     mkdir(
@@ -1376,15 +1773,47 @@ def setup_repo_and_project(ctx, paths):
         path=paths["shared"],
         user=ctx.runtime.runtime_user,
         group=ctx.runtime.runtime_group,
-        mode="2775",
+        mode="0750",
     )
 
     mkdir(
         name="Ensure placeholder release directory exists",
         path=paths["placeholder_web_root"],
-        user=ctx.config.deploy_user,
-        group=ctx.runtime.release_group,
+        user="root",
+        group=ctx.runtime.runtime_group,
         mode="0750",
+    )
+
+```
+
+`src/bonesinfra/deploys/setup/fail2ban.py`:
+
+```py
+from pyinfra.operations import systemd
+
+from bonesinfra.domain.paths import ASSETS_DIR
+from bonesinfra.infra.deploy_helpers import render
+
+FAIL2BAN_JAIL_LOCAL = "/etc/fail2ban/jail.local"
+
+
+def configure(ctx):
+    render(
+        "Install fail2ban jail.local",
+        ASSETS_DIR / "fail2ban/jail.local.j2",
+        FAIL2BAN_JAIL_LOCAL,
+        user="root",
+        group="root",
+        mode="0644",
+        ssh_port=int(ctx.config.port),
+    )
+
+    systemd.service(
+        name="Ensure fail2ban service is enabled and started",
+        service="fail2ban",
+        enabled=True,
+        running=True,
+        _sudo=True,
     )
 
 ```
@@ -1450,53 +1879,26 @@ from pyinfra.operations import apt
 BASE_SYSTEM_PACKAGES: list[str] = [
     "build-essential",
     "ca-certificates",
+    "fail2ban",
     "curl",
     "git",
     "rsync",
     "sudo",
     "nginx",
+    "openssl",
+    "podman",
     "apparmor",
     "apparmor-utils",
+    "unattended-upgrades",
     "certbot",
     "ufw",
 ]
 
 SUPPLEMENTARY_PACKAGES: list[str] = [
     "acl",
-    "age",
-    "apt-listchanges",
-    "apt-transport-https",
-    "automysqlbackup",
-    "autossh",
-    "btop",
-    "borgbackup",
-    "fail2ban",
-    "fastfetch",
-    "gnupg",
     "htop",
-    "iftop",
-    "inotify-tools",
-    "iotop",
-    "jdupes",
-    "jq",
-    "lsb-release",
-    "lsof",
-    "moreutils",
-    "mutt",
     "nano",
-    "neovim",
-    "ncdu",
-    "powerstat",
-    "powertop",
-    "rename",
     "sqlite3",
-    "smartmontools",
-    "sysbench",
-    "sysstat",
-    "telnet",
-    "tmux",
-    "tree",
-    "unattended-upgrades",
     "unzip",
     "zip",
     "zsh",
@@ -1521,16 +1923,17 @@ def install_system(packages):
 from pyinfra.operations import files
 
 from bonesinfra.domain.context import template_data
+from bonesinfra.domain.paths import ASSETS_DIR
 from bonesinfra.infra.deploy_helpers import render
 
 
-def existing(ctx, paths, here):
+def seed(ctx, paths):
     render(
         "Seed placeholder index page",
-        here / "assets/nginx/index.html.j2",
+        ASSETS_DIR / "nginx/index.html.j2",
         paths["placeholder_index"],
-        user=ctx.config.deploy_user,
-        group=ctx.runtime.release_group,
+        user="root",
+        group=ctx.runtime.runtime_group,
         mode="0640",
         **template_data(ctx, paths=paths),
     )
@@ -1548,31 +1951,98 @@ def existing(ctx, paths, here):
 `src/bonesinfra/deploys/setup/plan.py`:
 
 ```py
-from pathlib import Path
-
-from bonesinfra.deploys.setup import bonesremote, directories, firewall, packages, placeholder, users
+from bonesinfra.deploys.setup import (
+    bonesremote,
+    directories,
+    fail2ban,
+    firewall,
+    packages,
+    placeholder,
+    sudoers,
+    unattended_upgrades,
+    users,
+)
 from bonesinfra.deploys.setup.packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
-from bonesinfra.domain.paths import DeploymentPaths
 
 
 def deploy_setup(ctx):
-    paths = DeploymentPaths.new(
-        ctx.config.project_name,
-        ctx.config.repo_path,
-        ctx.config.project_root,
-        ctx.runtime.web_root,
-    ).__dict__
-    here = Path(__file__).parent.parent.parent
+    paths = ctx.paths_dict
     all_pkgs = BASE_SYSTEM_PACKAGES + SUPPLEMENTARY_PACKAGES
 
     packages.install_system(all_pkgs)
     users.install_rust()
     users.ensure_users_and_groups(ctx)
     directories.setup_repo_and_project(ctx, paths)
-    placeholder.existing(ctx, paths, here)
+    placeholder.seed(ctx, paths)
     firewall.configure(ctx)
+    fail2ban.configure(ctx)
+    unattended_upgrades.configure()
     users.install_authorized_key(ctx)
     bonesremote.install()
+    sudoers.install(ctx, paths)
+
+```
+
+`src/bonesinfra/deploys/setup/sudoers.py`:
+
+```py
+from shlex import quote
+
+from pyinfra.operations import server
+
+from bonesinfra.domain.paths import ASSETS_DIR
+from bonesinfra.infra.deploy_helpers import render
+
+
+def install(ctx, paths):
+    render(
+        "Install BonesDeploy sudoers drop-in",
+        ASSETS_DIR / "sudoers/bonesdeploy.j2",
+        paths["sudoers_path"],
+        user="root",
+        group="root",
+        mode="0440",
+        deploy_user=ctx.config.deploy_user,
+        bonesremote_path=paths["bonesremote_global_link"],
+    )
+
+    sudoers_path = quote(paths["sudoers_path"])
+    server.shell(
+        name="Validate BonesDeploy sudoers drop-in",
+        commands=[f"visudo -c -f {sudoers_path} >/dev/null || {{ rm -f {sudoers_path}; exit 1; }}"],
+        _sudo=True,
+    )
+
+```
+
+`src/bonesinfra/deploys/setup/unattended_upgrades.py`:
+
+```py
+from bonesinfra.domain.paths import ASSETS_DIR
+from bonesinfra.infra.deploy_helpers import render
+
+AUTO_UPGRADES_PATH = "/etc/apt/apt.conf.d/20auto-upgrades"
+UNATTENDED_UPGRADES_PATH = "/etc/apt/apt.conf.d/50unattended-upgrades"
+
+
+def configure():
+    render(
+        "Install apt auto-upgrades config",
+        ASSETS_DIR / "unattended-upgrades/20auto-upgrades.j2",
+        AUTO_UPGRADES_PATH,
+        user="root",
+        group="root",
+        mode="0644",
+    )
+
+    render(
+        "Install unattended-upgrades config",
+        ASSETS_DIR / "unattended-upgrades/50unattended-upgrades.j2",
+        UNATTENDED_UPGRADES_PATH,
+        user="root",
+        group="root",
+        mode="0644",
+    )
 
 ```
 
@@ -1619,14 +2089,6 @@ def ensure_users_and_groups(ctx):
         _sudo=True,
     )
 
-    server.group(
-        name="Ensure release-read group exists",
-        group=ctx.runtime.release_group,
-        _sudo=True,
-    )
-
-    _ensure_group_membership(ctx.config.deploy_user, ctx.runtime.runtime_group)
-
     existing_user = host.get_fact(Users).get(ctx.runtime.runtime_user)
 
     if existing_user is None:
@@ -1637,19 +2099,13 @@ def ensure_users_and_groups(ctx):
             home="/nonexistent",
             shell="/usr/sbin/nologin",
             create_home=False,
-            groups=[ctx.runtime.runtime_group, ctx.runtime.release_group],
+            groups=[ctx.runtime.runtime_group],
             _sudo=True,
         )
         return
 
-    required_groups = []
-    for group in (ctx.runtime.runtime_group, ctx.runtime.release_group):
-        if group not in required_groups:
-            required_groups.append(group)
-
-    for group in required_groups:
-        if group != existing_user["group"] and group not in existing_user["groups"]:
-            _ensure_group_membership(ctx.runtime.runtime_user, group)
+    if ctx.runtime.runtime_group != existing_user["group"] and ctx.runtime.runtime_group not in existing_user["groups"]:
+        _ensure_group_membership(ctx.runtime.runtime_user, ctx.runtime.runtime_group)
 
 
 def install_authorized_key(ctx):
@@ -1675,46 +2131,31 @@ def install_authorized_key(ctx):
 `src/bonesinfra/deploys/ssl/plan.py`:
 
 ```py
-import sys
-from pathlib import Path
-
 from pyinfra.operations import server, systemd
 
+from bonesinfra.deploys._shared import nginx_safety
 from bonesinfra.domain.context import template_data
-from bonesinfra.domain.paths import DeploymentPaths
+from bonesinfra.domain.paths import ASSETS_DIR
 from bonesinfra.infra.deploy_helpers import letsencrypt_cert_paths, mkdir, render
 
 
 def deploy_ssl(ctx):
-    paths = DeploymentPaths.new(
-        ctx.config.project_name,
-        ctx.config.repo_path,
-        ctx.config.project_root,
-        ctx.runtime.web_root,
-    ).__dict__
-    here = Path(__file__).parent.parent.parent
+    paths = ctx.paths_dict
 
-    if not ctx.config.domain or not ctx.config.email:
-        print("Error: ssl_domain and ssl_email are required", file=sys.stderr)
-        sys.exit(1)
-
-    # Dedicated, www-data-traversable webroot so the ACME challenge never
-    # depends on the release tree's permissions (SSL is separate from runtime).
     mkdir(
         name="Ensure ACME webroot exists",
         path=paths["acme_webroot"],
         mode="0755",
     )
 
-    _render_router_config(ctx, paths, here, ssl_enabled=False, stage="certbot challenge")
+    nginx_safety.install_default_deny_server(paths)
+    _render_router_config(ctx, paths, ssl_enabled=False, stage="certbot challenge")
     obtain_certificate(ctx, paths)
-    _render_router_config(ctx, paths, here, ssl_enabled=True, stage="SSL enable")
+    _render_router_config(ctx, paths, ssl_enabled=True, stage="SSL enable")
 
 
-def _render_router_config(ctx, paths, here, ssl_enabled, stage):
+def _render_router_config(ctx, paths, ssl_enabled, stage):
     nginx_server_name = ctx.config.domain
-    if not nginx_server_name:
-        raise ValueError("domain is required for ssl nginx config")
 
     extra = {
         "nginx_server_name": nginx_server_name,
@@ -1727,18 +2168,14 @@ def _render_router_config(ctx, paths, here, ssl_enabled, stage):
 
     render(
         f"Render nginx config ({stage})",
-        here / "assets/nginx/router.conf.j2",
+        ASSETS_DIR / "nginx/router.conf.j2",
         paths["nginx_site_available"],
         mode="0644",
         **extra,
         **template_data(ctx, paths=paths),
     )
 
-    server.shell(
-        name=f"Validate nginx configuration ({stage})",
-        commands=["nginx -t"],
-        _sudo=True,
-    )
+    nginx_safety.validate_config(f"Validate nginx configuration ({stage})")
 
     systemd.service(
         name=f"Reload nginx ({stage})",
@@ -1769,12 +2206,12 @@ def obtain_certificate(ctx, paths):
 ```py
 from __future__ import annotations
 
+import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from bonesinfra.domain.paths import DeploymentPaths
-from bonesinfra.infra.toml_store import load_toml
 
 DEPLOY_USER = "git"
 
@@ -1794,7 +2231,8 @@ class DeployContext:
         config_path: str,
         runtime_config_path: str | None = None,
     ) -> DeployContext:
-        bones_cfg = load_toml(config_path)
+        with Path(config_path).open("rb") as f:
+            bones_cfg = tomllib.load(f)
         project_name = bones_cfg.get("project_name", "")
         repo_path = bones_cfg.get("repo_path", "")
         project_root = bones_cfg.get("project_root", "")
@@ -1805,7 +2243,8 @@ class DeployContext:
         if runtime_config_path:
             rpath = Path(runtime_config_path)
             if rpath.exists():
-                runtime_cfg = load_toml(str(rpath))
+                with rpath.open("rb") as f:
+                    runtime_cfg = tomllib.load(f)
 
         config = BonesConfig(
             remote_name=bones_cfg.get("remote_name", ""),
@@ -1828,7 +2267,6 @@ class DeployContext:
             web_root=runtime_cfg.get("web_root", DEFAULT_WEB_ROOT),
             runtime_user=runtime_cfg.get("runtime_user", project_name),
             runtime_group=runtime_cfg.get("runtime_group", project_name),
-            release_group=runtime_cfg.get("release_group", f"{project_name}-release"),
             runtime_data=runtime_cfg,
         )
 
@@ -1842,30 +2280,45 @@ class DeployContext:
     def ssh_port(self) -> int:
         return int(self.config.port)
 
+    @property
+    def paths(self) -> DeploymentPaths:
+        try:
+            return self._paths
+        except AttributeError:
+            pass
+        self._paths = DeploymentPaths.new(
+            self.config.project_name,
+            self.config.repo_path,
+            self.config.project_root,
+            self.runtime.web_root,
+        )
+        return self._paths
+
+    @property
+    def paths_dict(self) -> dict[str, Any]:
+        return self.paths.__dict__
+
 
 def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **extra: Any) -> dict[str, Any]:
     """Build flat template context from DeployContext for Jinja2 template rendering."""
     if paths is None:
-        p = DeploymentPaths.new(
-            ctx.config.project_name, ctx.config.repo_path, ctx.config.project_root, ctx.runtime.web_root
-        )
-        paths = p.__dict__
+        paths = ctx.paths_dict
 
-    data: dict[str, Any] = {}
-    data["project_name"] = ctx.config.project_name
-    data["project_root"] = ctx.config.project_root
-    data["web_root"] = ctx.runtime.web_root
-    data["repo_path"] = ctx.config.repo_path
-    data["deploy_user"] = ctx.config.deploy_user
-    data["runtime_user"] = ctx.runtime.runtime_user
-    data["runtime_group"] = ctx.runtime.runtime_group
-    data["release_group"] = ctx.runtime.release_group
-    data["project_root_parent"] = paths.get("project_root_parent", "")
-    data["ssh_port"] = int(ctx.config.port)
-    data["paths"] = paths
-    data["ssl_domain"] = ctx.config.domain
-    data["ssl_email"] = ctx.config.email
-    data["preview_domain"] = ctx.config.preview_domain
+    data: dict[str, Any] = {
+        "project_name": ctx.config.project_name,
+        "project_root": ctx.config.project_root,
+        "web_root": ctx.runtime.web_root,
+        "repo_path": ctx.config.repo_path,
+        "deploy_user": ctx.config.deploy_user,
+        "runtime_user": ctx.runtime.runtime_user,
+        "runtime_group": ctx.runtime.runtime_group,
+        "project_root_parent": paths["project_root_parent"],
+        "ssh_port": int(ctx.config.port),
+        "paths": paths,
+        "ssl_domain": ctx.config.domain,
+        "ssl_email": ctx.config.email,
+        "preview_domain": ctx.config.preview_domain,
+    }
 
     for key, value in ctx.runtime.runtime_data.items():
         if key not in data:
@@ -1898,7 +2351,6 @@ class RuntimeConfig:
     web_root: str
     runtime_user: str
     runtime_group: str
-    release_group: str
     runtime_data: dict[str, Any] = field(default_factory=dict)
 
 ```
@@ -1909,7 +2361,9 @@ class RuntimeConfig:
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_REPO_PARENT = "/home/git"
+ASSETS_DIR = Path(__file__).parent.parent / "assets"
+
+DEFAULT_REPO_PARENT = "/srv/git"
 DEFAULT_PROJECT_ROOT_PARENT = "/srv/sites"
 DEFAULT_CONF_ROOT_PARENT = "/srv/conf"
 DEFAULT_WEB_ROOT = "public"
@@ -1918,19 +2372,16 @@ ETC_NGINX_SITES_AVAILABLE = "/etc/nginx/sites-available"
 ETC_NGINX_SITES_ENABLED = "/etc/nginx/sites-enabled"
 ETC_SYSTEMD_SYSTEM = "/etc/systemd/system"
 ETC_APPARMOR_D = "/etc/apparmor.d"
+ETC_SSL_CERTS = "/etc/ssl/certs"
+ETC_SSL_PRIVATE = "/etc/ssl/private"
 ETC_SUDOERS_D = "/etc/sudoers.d"
 
 RUNTIME_SOCKET_PARENT = "/run"
-BONES_DIR = "bones"
-BONES_TOML = "bones.toml"
 NGINX_CONF = "nginx.conf"
 INDEX_HTML = "index.html"
 GIT_HEAD = "HEAD"
 RELEASES_DIR = "releases"
 SHARED_DIR = "shared"
-BUILD_DIR = "build"
-WORKSPACE_DIR = "workspace"
-LOGS_DIR = "logs"
 CURRENT_LINK = "current"
 PLACEHOLDER_RELEASE_NAME = "19700101_000000"
 
@@ -1938,8 +2389,10 @@ NGINX_SOCKET = "nginx.sock"
 NGINX_PID = "nginx.pid"
 PHP_FPM_SOCKET = "php-fpm.sock"
 DEFAULT_NGINX_SITE = "default"
+BONESDEPLOY_NGINX_DEFAULT_DENY_SITE = "00-bonesdeploy-default-deny.conf"
+BONESDEPLOY_NGINX_DEFAULT_DENY_CERT = "bonesdeploy-default-deny.crt"
+BONESDEPLOY_NGINX_DEFAULT_DENY_KEY = "bonesdeploy-default-deny.key"
 
-BONESDEPLOY_BINARY = "bonesdeploy"
 BONESREMOTE_BINARY = "bonesremote"
 
 USR_LOCAL_BIN = "/usr/local/bin"
@@ -1950,10 +2403,8 @@ BONESDEPLOY_REPO = "https://github.com/AlextheYounga/bonesdeploy.git"
 
 
 def _parent_or_default(path: str, fallback: str) -> str:
-    parent = Path(path).parent
-    if parent and str(parent) != ".":
-        return str(parent)
-    return fallback
+    parent = str(Path(path).parent)
+    return fallback if parent == "." else parent
 
 
 @dataclass
@@ -1961,16 +2412,12 @@ class DeploymentPaths:
     repo: str
     repo_parent: str
     repo_head: str
-    repo_bones: str
-    repo_bones_toml: str
     site_nginx_config: str
     conf_root: str
     project_root: str
     project_root_parent: str
     releases: str
     shared: str
-    build_root: str
-    build_logs: str
     current: str
     current_web_root: str
     placeholder_release: str
@@ -1978,9 +2425,12 @@ class DeploymentPaths:
     placeholder_index: str
     nginx_site_available: str
     nginx_site_enabled: str
+    nginx_default_deny_site_available: str
+    nginx_default_deny_site_enabled: str
+    nginx_default_deny_ssl_certificate: str
+    nginx_default_deny_ssl_certificate_key: str
     nginx_default_site_enabled: str
     systemd_site_nginx_service: str
-    apparmor_profile_path: str
     runtime_socket_dir: str
     runtime_nginx_dir: str
     runtime_nginx_socket: str
@@ -2008,23 +2458,18 @@ class DeploymentPaths:
         current = Path(project_root) / CURRENT_LINK
         runtime_socket_dir = Path(RUNTIME_SOCKET_PARENT) / project_name
         runtime_nginx_dir = runtime_socket_dir / "nginx"
-        repo_bones = Path(repo_path) / BONES_DIR
         conf_root = Path(DEFAULT_CONF_ROOT_PARENT) / project_name
 
         return cls(
             repo=repo_path,
             repo_parent=_parent_or_default(repo_path, DEFAULT_REPO_PARENT),
             repo_head=str(Path(repo_path) / GIT_HEAD),
-            repo_bones=str(repo_bones),
-            repo_bones_toml=str(repo_bones / BONES_TOML),
             site_nginx_config=str(conf_root / NGINX_CONF),
             conf_root=str(conf_root),
             project_root=project_root,
             project_root_parent=_parent_or_default(project_root, DEFAULT_PROJECT_ROOT_PARENT),
             releases=str(Path(project_root) / RELEASES_DIR),
             shared=str(Path(project_root) / SHARED_DIR),
-            build_root=str(Path(project_root) / BUILD_DIR / WORKSPACE_DIR),
-            build_logs=str(Path(project_root) / BUILD_DIR / LOGS_DIR),
             current=str(current),
             current_web_root=str(current / web_root),
             placeholder_release=str(placeholder_release),
@@ -2032,9 +2477,14 @@ class DeploymentPaths:
             placeholder_index=str(placeholder_release / web_root / INDEX_HTML),
             nginx_site_available=str(Path(ETC_NGINX_SITES_AVAILABLE) / f"{project_name}.conf"),
             nginx_site_enabled=str(Path(ETC_NGINX_SITES_ENABLED) / f"{project_name}.conf"),
+            nginx_default_deny_site_available=str(
+                Path(ETC_NGINX_SITES_AVAILABLE) / BONESDEPLOY_NGINX_DEFAULT_DENY_SITE
+            ),
+            nginx_default_deny_site_enabled=str(Path(ETC_NGINX_SITES_ENABLED) / BONESDEPLOY_NGINX_DEFAULT_DENY_SITE),
+            nginx_default_deny_ssl_certificate=str(Path(ETC_SSL_CERTS) / BONESDEPLOY_NGINX_DEFAULT_DENY_CERT),
+            nginx_default_deny_ssl_certificate_key=str(Path(ETC_SSL_PRIVATE) / BONESDEPLOY_NGINX_DEFAULT_DENY_KEY),
             nginx_default_site_enabled=str(Path(ETC_NGINX_SITES_ENABLED) / DEFAULT_NGINX_SITE),
             systemd_site_nginx_service=str(Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}-nginx.service"),
-            apparmor_profile_path=str(Path(ETC_APPARMOR_D) / f"bonesdeploy-{project_name}-nginx"),
             runtime_socket_dir=str(runtime_socket_dir),
             runtime_nginx_dir=str(runtime_nginx_dir),
             runtime_nginx_socket=str(runtime_nginx_dir / NGINX_SOCKET),
@@ -2332,45 +2782,6 @@ def run(
 
 ```
 
-`src/bonesinfra/infra/toml_store.py`:
-
-```py
-import tomllib
-from pathlib import Path
-from typing import Any
-
-
-def load_toml(path: str) -> dict[str, Any]:
-    with Path(path).open("rb") as file:
-        return tomllib.load(file)
-
-
-def load_runtime_config(deploy_file: str) -> dict[str, Any]:
-    return load_toml(str(Path(deploy_file).parent / "runtime.toml"))
-
-```
-
-`src/bonesinfra/infra/utils.py`:
-
-```py
-from collections.abc import Mapping
-from typing import Any
-
-
-def unflatten(data_dict: Mapping[str, Any]) -> dict[str, Any]:
-    result: dict[str, Any] = {}
-    for key, value in data_dict.items():
-        parts = key.split(".")
-        node = result
-        for part in parts[:-1]:
-            if part not in node:
-                node[part] = {}
-            node = node[part]
-        node[parts[-1]] = value
-    return result
-
-```
-
 `src/bonesinfra/runtimes/__init__.py`:
 
 ```py
@@ -2566,7 +2977,6 @@ Requires=apparmor.service
 Type=simple
 User={{ runtime_user }}
 Group={{ runtime_group }}
-SupplementaryGroups={{ release_group }}
 WorkingDirectory={{ paths.current }}
 RuntimeDirectory={{ project_name }}/{{ runtime_name }}
 RuntimeDirectoryMode=0750
@@ -3026,9 +3436,7 @@ def deploy(ctx):
     paths = service.runtime_paths(ctx)
     socket_path = f"{paths['runtime_socket_dir']}/gunicorn/gunicorn.sock"
     wsgi_module = ctx.runtime.runtime_data.get("wsgi_module", "config.wsgi:application")
-    static_root = f"{paths['current']}/{ctx.runtime.runtime_data.get('static_root', 'staticfiles')}"
-    media_root = f"{paths['current']}/{ctx.runtime.runtime_data.get('media_root', 'media')}"
-    writable = [static_root, media_root]
+    writable = [f"{paths['shared']}/staticfiles", f"{paths['shared']}/media"]
     gunicorn_bin = f"{paths['current']}/.venv/bin/gunicorn"
     python_packages.install_packages()
     common_paths.ensure_runtime_dirs(ctx)
@@ -3489,16 +3897,16 @@ def deploy(ctx):
         mkdir(
             name="Ensure Nuxt static placeholder output directory exists",
             path=static_web_root,
-            user=ctx.config.deploy_user,
-            group=ctx.runtime.release_group,
+            user="root",
+            group=ctx.runtime.runtime_group,
             mode="0750",
         )
         render(
             "Seed Nuxt static placeholder index page",
             Path(__file__).parents[2] / "assets/nginx/index.html.j2",
             f"{static_web_root}/index.html",
-            user=ctx.config.deploy_user,
-            group=ctx.runtime.release_group,
+            user="root",
+            group=ctx.runtime.runtime_group,
             mode="0640",
             **template_data(ctx, paths=paths),
         )
@@ -3573,9 +3981,9 @@ def deploy(ctx):
     paths = service.runtime_paths(ctx)
     socket_path = f"{paths['runtime_socket_dir']}/puma/puma.sock"
     runtime_write_paths = [
-        f"{paths['current']}/tmp",  # noqa: S108
-        f"{paths['current']}/log",
-        f"{paths['current']}/storage",
+        f"{paths['shared']}/tmp",  # noqa: S108
+        f"{paths['shared']}/log",
+        f"{paths['shared']}/storage",
     ]
     rails_env = ctx.runtime.runtime_data.get("rails_env", "production")
     ruby_packages.install_packages()
@@ -4004,8 +4412,14 @@ def test_runtime_apply_rejects_missing_host():
     assert "missing host" in result.stderr.lower()
 
 
-def test_ssl_apply_rejects_missing_host():
+def test_ssl_apply_rejects_missing_domain_email():
     result = _run_no_input("ssl", "apply", "--config", "/dev/null")
+    assert result.returncode == 3, f"Expected exit 3 for missing domain/email, got {result.returncode}"
+    assert "ssl.domain" in result.stderr.lower()
+
+
+def test_helpers_apply_rejects_missing_host():
+    result = _run_no_input("helpers", "apply", "--config", "/dev/null")
     assert result.returncode == 3, f"Expected exit 3 for missing host, got {result.returncode}"
     assert "missing host" in result.stderr.lower()
 
@@ -4028,7 +4442,7 @@ def test_runtime_identity_defaults_to_project_name():
         config_path.write_text(
             """
 project_name = "lawsnipe"
-repo_path = "/home/git/lawsnipe.git"
+repo_path = "/srv/git/lawsnipe.git"
 project_root = "/srv/sites/lawsnipe"
 host = "example.com"
 """.lstrip()
@@ -4042,12 +4456,12 @@ host = "example.com"
     assert ctx.runtime.web_root == "public"
     assert ctx.runtime.runtime_user == "lawsnipe"
     assert ctx.runtime.runtime_group == "lawsnipe"
-    assert ctx.runtime.release_group == "lawsnipe-release"
     assert ctx.ssh_port == 22
 
     td = template_data(ctx)
     assert td["runtime_user"] == "lawsnipe"
     assert td["runtime_group"] == "lawsnipe"
+    assert "release_group" not in td
 
 
 def test_runtime_identity_respects_explicit_override():
@@ -4056,7 +4470,7 @@ def test_runtime_identity_respects_explicit_override():
         config_path.write_text(
             """
 project_name = "lawsnipe"
-repo_path = "/home/git/lawsnipe.git"
+repo_path = "/srv/git/lawsnipe.git"
 project_root = "/srv/sites/lawsnipe"
 host = "example.com"
 """.lstrip()
@@ -4091,7 +4505,10 @@ SETUP_USERS = helpers.SRC_DIR / "bonesinfra/deploys/setup/users.py"
 SETUP_DIRECTORIES = helpers.SRC_DIR / "bonesinfra/deploys/setup/directories.py"
 SETUP_PLACEHOLDER = helpers.SRC_DIR / "bonesinfra/deploys/setup/placeholder.py"
 SETUP_FIREWALL = helpers.SRC_DIR / "bonesinfra/deploys/setup/firewall.py"
+SETUP_FAIL2BAN = helpers.SRC_DIR / "bonesinfra/deploys/setup/fail2ban.py"
+SETUP_UNATTENDED_UPGRADES = helpers.SRC_DIR / "bonesinfra/deploys/setup/unattended_upgrades.py"
 SETUP_BONESREMOTE = helpers.SRC_DIR / "bonesinfra/deploys/setup/bonesremote.py"
+SETUP_SUDOERS = helpers.SRC_DIR / "bonesinfra/deploys/setup/sudoers.py"
 RUNTIME_PLAN = helpers.SRC_DIR / "bonesinfra/deploys/runtime/plan.py"
 RUNTIME_PACKAGES = helpers.SRC_DIR / "bonesinfra/deploys/runtime/packages.py"
 RUNTIME_APPARMOR = helpers.SRC_DIR / "bonesinfra/deploys/runtime/apparmor.py"
@@ -4111,10 +4528,13 @@ def test_setup_plan_calls_all_steps():
     helpers.assert_contains(c, "users.install_rust")
     helpers.assert_contains(c, "users.ensure_users_and_groups")
     helpers.assert_contains(c, "directories.setup_repo_and_project")
-    helpers.assert_contains(c, "placeholder.existing")
+    helpers.assert_contains(c, "placeholder.seed")
     helpers.assert_contains(c, "firewall.configure")
+    helpers.assert_contains(c, "fail2ban.configure")
+    helpers.assert_contains(c, "unattended_upgrades.configure")
     helpers.assert_contains(c, "users.install_authorized_key")
     helpers.assert_contains(c, "bonesremote.install")
+    helpers.assert_contains(c, "sudoers.install")
 
 
 def test_setup_plan_uses_base_packages():
@@ -4132,30 +4552,15 @@ def test_setup_plan_ordering():
     )
 
 
-def test_setup_excludes_apparmor():
-    for f in [
-        SETUP_PLAN,
-        SETUP_PACKAGES,
-        SETUP_USERS,
-        SETUP_DIRECTORIES,
-        SETUP_PLACEHOLDER,
-        SETUP_FIREWALL,
-        SETUP_BONESREMOTE,
-    ]:
-        c = helpers.read(f)
-        helpers.assert_not_contains(c, "apparmor_parser")
-        helpers.assert_not_contains(c, "apparmor_profile_name")
-
-
-def test_setup_excludes_runtime_doctor():
+def test_setup_installs_sudoers_in_bonesinfra():
     c = helpers.read(SETUP_PLAN)
-    helpers.assert_not_contains(c, "bonesremote doctor")
-
-
-def test_setup_excludes_per_site_roles():
-    c = helpers.read(SETUP_PLAN)
-    helpers.assert_not_contains(c, "bonesdeploy-nginx")
-    helpers.assert_not_contains(c, "per-site nginx")
+    helpers.assert_contains(c, "sudoers.install")
+    c = helpers.read(SETUP_BONESREMOTE)
+    helpers.assert_not_contains(c, "bonesremote init")
+    c = helpers.read(SETUP_SUDOERS)
+    helpers.assert_contains(c, "visudo")
+    helpers.assert_contains(c, 'mode="0440"')
+    helpers.assert_contains(c, "bonesremote_global_link")
 
 
 def test_setup_uses_resolved_placeholder_paths():
@@ -4171,15 +4576,26 @@ def test_setup_avoids_usermod_for_existing_runtime_user():
     helpers.assert_contains(c, "gpasswd -a")
 
 
-def test_setup_adds_deploy_user_to_runtime_group():
+def test_git_not_in_runtime_group():
     c = helpers.read(SETUP_USERS)
-    helpers.assert_contains(c, "_ensure_group_membership(ctx.config.deploy_user, ctx.runtime.runtime_group)")
+    helpers.assert_not_contains(c, "_ensure_group_membership(ctx.config.deploy_user, ctx.runtime.runtime_group)")
+    helpers.assert_not_contains(c, "ctx.runtime.release_group")
 
 
-def test_setup_shared_dir_is_setgid_and_traversable():
+def test_shared_is_runtime_owned_private_state():
     c = helpers.read(SETUP_DIRECTORIES)
     shared_block = c.split('path=paths["shared"]')[1].split(")")[0]
-    helpers.assert_contains(shared_block, 'mode="2775"')
+    helpers.assert_contains(shared_block, "user=ctx.runtime.runtime_user")
+    helpers.assert_contains(shared_block, "group=ctx.runtime.runtime_group")
+    helpers.assert_contains(shared_block, 'mode="0750"')
+
+
+def test_releases_are_root_owned_group_readable():
+    c = helpers.read(SETUP_DIRECTORIES)
+    releases_block = c.split('path=paths["releases"]')[1].split(")")[0]
+    helpers.assert_contains(releases_block, 'user="root"')
+    helpers.assert_contains(releases_block, "group=ctx.runtime.runtime_group")
+    helpers.assert_contains(releases_block, 'mode="2750"')
 
 
 def test_setup_deploy_user_commands_set_user_home():
@@ -4225,6 +4641,19 @@ def test_setup_firewall_status_gated_by_show_status():
     helpers.assert_contains(c, "firewall_show_status")
 
 
+def test_setup_fail2ban_configures_sshd_jail_and_service():
+    c = helpers.read(SETUP_FAIL2BAN)
+    helpers.assert_contains(c, '"/etc/fail2ban/jail.local"')
+    helpers.assert_contains(c, '"fail2ban"')
+    helpers.assert_contains(c, "ssh_port=int(ctx.config.port)")
+
+
+def test_setup_unattended_upgrades_installs_apt_configs():
+    c = helpers.read(SETUP_UNATTENDED_UPGRADES)
+    helpers.assert_contains(c, '"/etc/apt/apt.conf.d/20auto-upgrades"')
+    helpers.assert_contains(c, '"/etc/apt/apt.conf.d/50unattended-upgrades"')
+
+
 # ---- runtime plan ----
 
 
@@ -4235,7 +4664,7 @@ def test_runtime_plan_calls_all_steps():
     helpers.assert_contains(c, "nginx.setup")
     helpers.assert_contains(c, "template_runtime.load")
     helpers.assert_contains(c, "nginx.start_services")
-    helpers.assert_contains(c, "doctor.run")
+    helpers.assert_not_contains(c, "doctor.run")
 
 
 def test_runtime_applies_apparmor_and_nginx():
@@ -4299,11 +4728,6 @@ def test_runtime_plan_ordering():
     )
 
 
-def test_runtime_excludes_ssl_logic():
-    c = helpers.read(RUNTIME_PLAN)
-    helpers.assert_not_contains(c, "certbot")
-
-
 def test_runtime_socket_dir_runtime_user_owned():
     c = helpers.read(RUNTIME_NGINX)
     helpers.assert_contains(c, 'path=paths["runtime_socket_dir"]')
@@ -4320,10 +4744,9 @@ def test_runtime_uses_template_runtime():
     helpers.assert_contains(c, "get_runtime(template)")
 
 
-def test_runtime_doctor_deploy_user_commands_set_user_home():
-    c = helpers.read(RUNTIME_DOCTOR)
-    helpers.assert_contains(c, "XDG_CONFIG_HOME={home}/.config")
-    helpers.assert_contains(c, "getent passwd")
+def test_setup_installs_podman():
+    c = helpers.read(SETUP_PACKAGES)
+    helpers.assert_contains(c, '"podman"')
 
 
 # ---- ssl plan ----
@@ -4332,29 +4755,12 @@ def test_runtime_doctor_deploy_user_commands_set_user_home():
 def test_ssl_uses_certbot():
     c = helpers.read(SSL_PLAN)
     helpers.assert_contains(c, "certbot certonly")
-    helpers.assert_contains(c, "ssl_domain")
+    helpers.assert_contains(c, "ssl_enabled")
 
 
-def test_ssl_excludes_apparmor():
-    c = helpers.read(SSL_PLAN)
-    helpers.assert_not_contains(c, "apparmor_parser")
-
-
-def test_ssl_excludes_per_site_nginx():
-    c = helpers.read(SSL_PLAN)
-    helpers.assert_not_contains(c, '"per-site nginx"')
-
-
-def test_ssl_excludes_runtimes():
-    c = helpers.read(SSL_PLAN)
-    helpers.assert_not_contains(c, "runtimes")
-
-
-def test_ssl_defines_nginx_inline():
-    c = helpers.read(SSL_PLAN)
-    helpers.assert_contains(c, "nginx_server_name")
-    helpers.assert_contains(c, "router.conf.j2")
-    helpers.assert_contains(c, "nginx -t")
+def test_setup_installs_openssl_for_nginx_default_deny_cert():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/setup/packages.py")
+    helpers.assert_contains(c, '"openssl"')
 
 
 def test_runtime_nginx_falls_back_when_domain_empty():
@@ -4368,7 +4774,8 @@ def test_runtime_nginx_falls_back_when_domain_empty():
 
 def test_ssl_requires_real_domain_for_router_render():
     c = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/ssl/plan.py")
-    helpers.assert_contains(c, 'raise ValueError("domain is required for ssl nginx config")')
+    helpers.assert_not_contains(c, 'raise ValueError("domain is required for ssl nginx config")')
+    helpers.assert_contains(c, "nginx_server_name = ctx.config.domain")
 
 
 def test_ssl_uses_acme_webroot():
@@ -4399,16 +4806,6 @@ def test_laravel_validates_php_fpm_before_reload():
     )
 
 
-def test_laravel_deploy_does_not_setup_php_fpm_apparmor():
-    c = helpers.read(LARAVEL_DEPLOY)
-    helpers.assert_not_contains(c, "apparmor")
-    helpers.assert_ordering(
-        c,
-        "php_fpm.setup_pool",
-        "nginx.setup",
-    )
-
-
 def test_laravel_nginx_validates_without_creating_runtime_dir():
     c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/nginx.py")
     helpers.assert_ordering(
@@ -4417,11 +4814,6 @@ def test_laravel_nginx_validates_without_creating_runtime_dir():
         "nginx -t",
     )
     helpers.assert_not_contains(c, "runtime_socket_dir")
-
-
-def test_laravel_nginx_does_not_restart_site_service_early():
-    c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/nginx.py")
-    helpers.assert_not_contains(c, "Restart per-site nginx with Laravel config")
 
 
 # ---- Runtime directory traversal for system nginx (www-data) ----
@@ -4470,34 +4862,114 @@ def test_runtime_nginx_reloads_after_config_change():
     helpers.assert_ordering(
         c,
         "Enable router nginx site",
-        "nginx -t",
+        "validate_config",
         "Ensure nginx service is enabled and started",
         "Ensure per-site nginx service is enabled and started",
         "systemctl reload nginx",
     )
+
+
+def test_runtime_nginx_installs_default_deny_before_validation():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/runtime/nginx.py")
+    helpers.assert_ordering(c, "install_default_deny_server", "validate_config")
+
+
+def test_ssl_installs_default_deny_before_validation():
+    c = helpers.read(SSL_PLAN)
+    helpers.assert_ordering(c, "install_default_deny_server", "router.conf.j2", "validate_config")
+
+
+def test_ssl_installs_default_deny_once():
+    c = helpers.read(SSL_PLAN)
+    assert c.count("install_default_deny_server") == 1
+
+```
+
+`tests/test_nginx_safety.py`:
+
+```py
+from bonesinfra.deploys._shared import nginx_safety
+
+
+def test_validate_config_rejects_conflicting_server_name_warning(monkeypatch):
+    calls = []
+
+    def fake_shell(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(nginx_safety.server, "shell", fake_shell)
+
+    nginx_safety.validate_config("Validate nginx configuration")
+
+    command = calls[0][1]["commands"][0]
+    assert "nginx -t" in command
+    assert "conflicting server name" in command
+    assert "exit 1" in command
+
+
+def test_install_default_deny_server_uses_dedicated_paths_and_disables_debian_default(monkeypatch, tmp_path):
+    shell_calls = []
+    render_calls = []
+    link_calls = []
+    paths = {
+        "nginx_default_deny_site_available": "/etc/nginx/sites-available/00-bonesdeploy-default-deny.conf",
+        "nginx_default_deny_site_enabled": "/etc/nginx/sites-enabled/00-bonesdeploy-default-deny.conf",
+        "nginx_default_deny_ssl_certificate": "/etc/ssl/certs/bonesdeploy-default-deny.crt",
+        "nginx_default_deny_ssl_certificate_key": "/etc/ssl/private/bonesdeploy-default-deny.key",
+        "nginx_default_site_enabled": "/etc/nginx/sites-enabled/default",
+    }
+
+    monkeypatch.setattr(nginx_safety, "ASSETS_DIR", tmp_path)
+
+    def fake_shell(*args, **kwargs):
+        shell_calls.append((args, kwargs))
+
+    def fake_render(*args, **kwargs):
+        render_calls.append((args, kwargs))
+
+    def fake_link(*args, **kwargs):
+        link_calls.append((args, kwargs))
+
+    monkeypatch.setattr(nginx_safety.server, "shell", fake_shell)
+    monkeypatch.setattr(nginx_safety, "render", fake_render)
+    monkeypatch.setattr(nginx_safety.files, "link", fake_link)
+
+    nginx_safety.install_default_deny_server(paths)
+
+    command = shell_calls[0][1]["commands"][0]
+    assert "install -d -m 0700 /etc/ssl/private" in command
+    assert "openssl req -x509" in command
+    assert paths["nginx_default_deny_ssl_certificate"] in command
+    assert paths["nginx_default_deny_ssl_certificate_key"] in command
+    assert render_calls[0][0][1] == tmp_path / "nginx/default-deny.conf.j2"
+    assert render_calls[0][0][2] == paths["nginx_default_deny_site_available"]
+    assert link_calls[0][1]["path"] == paths["nginx_default_deny_site_enabled"]
+    assert link_calls[1][1]["path"] == paths["nginx_default_site_enabled"]
+    assert link_calls[1][1]["present"] is False
 
 ```
 
 `tests/test_paths.py`:
 
 ```py
-"""Paths manifest must define `build_logs` and `LOGS_DIR` for centralized log handling."""
+"""Deployment paths should match the v1 host layout."""
 
-from . import helpers
-
-CRATES_PATHS = helpers.REPO_ROOT / "crates/shared/src/paths.rs"
+from bonesinfra.domain.paths import DeploymentPaths
 
 
-def test_paths_has_build_logs_constant():
-    if not CRATES_PATHS.exists():
-        return
-    c = helpers.read(CRATES_PATHS)
-    helpers.assert_contains(c, 'pub const LOGS_DIR: &str = "logs";')
-    helpers.assert_contains(c, "pub build_logs: String,")
-    helpers.assert_contains(
-        c,
-        "build_logs: Path::new(&project_root).join(BUILD_DIR).join(LOGS_DIR).display().to_string()",
-    )
+def test_paths_default_repo_parent_is_srv_git():
+    paths = DeploymentPaths.new("lawsnipe", "/srv/git/lawsnipe.git", "/srv/sites/lawsnipe")
+
+    assert paths.repo_parent == "/srv/git"
+
+
+def test_paths_include_global_nginx_default_deny_site():
+    paths = DeploymentPaths.new("lawsnipe", "/srv/git/lawsnipe.git", "/srv/sites/lawsnipe")
+
+    assert paths.nginx_default_deny_site_available == "/etc/nginx/sites-available/00-bonesdeploy-default-deny.conf"
+    assert paths.nginx_default_deny_site_enabled == "/etc/nginx/sites-enabled/00-bonesdeploy-default-deny.conf"
+    assert paths.nginx_default_deny_ssl_certificate == "/etc/ssl/certs/bonesdeploy-default-deny.crt"
+    assert paths.nginx_default_deny_ssl_certificate_key == "/etc/ssl/private/bonesdeploy-default-deny.key"
 
 ```
 
@@ -4544,7 +5016,7 @@ def test_run_passes_ssh_auth_through_inventory(monkeypatch):
         config_path.write_text(
             """
 project_name = "lawsnipe"
-repo_path = "/home/git/lawsnipe.git"
+repo_path = "/srv/git/lawsnipe.git"
 project_root = "/srv/sites/lawsnipe"
 host = "example.com"
 ssh_user = "root"
@@ -4589,7 +5061,6 @@ port = 2222
 import pytest
 
 from bonesinfra.deploys.runtime import nginx as runtime_nginx
-from bonesinfra.deploys.ssl import plan as ssl_plan
 from bonesinfra.domain.context import DeployContext
 from bonesinfra.domain.paths import DeploymentPaths
 
@@ -4599,7 +5070,7 @@ def _make_ctx(tmp_path, *, domain: str = "", preview_domain: str = "preview.exam
     config_path.write_text(
         f"""
 project_name = "lawsnipe"
-repo_path = "/home/git/lawsnipe.git"
+repo_path = "/srv/git/lawsnipe.git"
 project_root = "/srv/sites/lawsnipe"
 host = "example.com"
 domain = "{domain}"
@@ -4628,13 +5099,15 @@ def test_runtime_nginx_uses_preview_domain_when_domain_is_empty(tmp_path, monkey
     monkeypatch.setattr(runtime_nginx.files, "link", _noop)
     monkeypatch.setattr(runtime_nginx.server, "shell", _noop)
     monkeypatch.setattr(runtime_nginx.systemd, "daemon_reload", _noop)
+    monkeypatch.setattr(runtime_nginx.nginx_safety, "install_default_deny_server", _noop)
+    monkeypatch.setattr(runtime_nginx.nginx_safety, "validate_config", _noop)
 
     def fake_render(*args, **kwargs):
         calls.append((args, kwargs))
 
     monkeypatch.setattr(runtime_nginx, "render", fake_render)
 
-    runtime_nginx.setup(ctx, paths, tmp_path)
+    runtime_nginx.setup(ctx, paths)
 
     router_call = next(call for _, call in calls if "nginx_server_name" in call)
     assert router_call["nginx_server_name"] == "preview.example.com"
@@ -4654,17 +5127,12 @@ def test_runtime_nginx_requires_a_real_name(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime_nginx.files, "link", _noop)
     monkeypatch.setattr(runtime_nginx.server, "shell", _noop)
     monkeypatch.setattr(runtime_nginx.systemd, "daemon_reload", _noop)
+    monkeypatch.setattr(runtime_nginx.nginx_safety, "install_default_deny_server", _noop)
+    monkeypatch.setattr(runtime_nginx.nginx_safety, "validate_config", _noop)
     monkeypatch.setattr(runtime_nginx, "render", _noop)
 
     with pytest.raises(ValueError, match="domain or preview_domain"):
-        runtime_nginx.setup(ctx, paths, tmp_path)
-
-
-def test_ssl_setup_requires_a_real_domain(tmp_path):
-    ctx = _make_ctx(tmp_path, domain="", preview_domain="preview.example.com")
-
-    with pytest.raises(SystemExit, match="1"):
-        ssl_plan.deploy_ssl(ctx)
+        runtime_nginx.setup(ctx, paths)
 
 ```
 
@@ -4674,8 +5142,7 @@ def test_ssl_setup_requires_a_real_domain(tmp_path):
 import importlib
 from types import SimpleNamespace
 
-from bonesinfra.app import runtime_catalog
-from bonesinfra.runtimes import list_runtimes
+from bonesinfra.runtimes import get_runtime, list_runtimes
 from bonesinfra.runtimes.laravel import php_fpm
 
 from . import helpers
@@ -4703,36 +5170,7 @@ def test_runtime_registry_is_explicit():
 
 
 def test_laravel_questions_are_exposed():
-    assert runtime_catalog.get_questions("laravel")
-
-
-def test_laravel_deploy_accepts_ctx():
-    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/deploy.py")
-    helpers.assert_contains(content, "def deploy(ctx):", "laravel deploy must accept ctx")
-
-
-def test_laravel_php_fpm_uses_distro_pool_model():
-    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py")
-    helpers.assert_contains(content, "cleanup_orphaned_pools(ctx, php_version)")
-    helpers.assert_contains(content, "php_fpm_pool.render_pool")
-    helpers.assert_contains(content, "php_fpm_pool.validate_php_fpm")
-    helpers.assert_contains(content, "php_fpm_pool.reload_php_fpm")
-
-
-def test_laravel_php_fpm_does_not_use_custom_service():
-    """Regression guard: Laravel must not render or start a per-project
-    php-fpm systemd service, nor validate via a custom --fpm-config."""
-    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py")
-    helpers.assert_not_contains(content, "site-php-fpm.service.j2")
-    helpers.assert_not_contains(content, "-php-fpm.service")
-    helpers.assert_not_contains(content, "--fpm-config")
-    helpers.assert_not_contains(content, "apparmor")
-
-
-def test_laravel_deploy_does_not_setup_php_fpm_apparmor():
-    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/laravel/deploy.py")
-    helpers.assert_not_contains(content, "apparmor.setup_php_fpm")
-    helpers.assert_not_contains(content, "apparmor")
+    assert get_runtime("laravel").questions()
 
 
 def test_common_php_fpm_pool_socket_path_is_distro_standard():
@@ -4791,28 +5229,6 @@ def test_template_runtime_load_fails_loudly_without_silent_swallow():
     content = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/runtime/template_runtime.py")
     helpers.assert_not_contains(content, "except (ImportError, KeyError)")
     helpers.assert_not_contains(content, "    pass")
-    helpers.assert_contains(content, 'raise RuntimeError(f"Runtime {template} does not expose deploy(ctx)")')
-
-
-def test_template_runtime_load_requires_deploy_attribute():
-    content = helpers.read(helpers.SRC_DIR / "bonesinfra/deploys/runtime/template_runtime.py")
-    helpers.assert_contains(content, 'if not hasattr(runtime, "deploy")')
-
-
-def test_all_runtimes_use_common_service_layer():
-    """Non-Laravel dynamic runtimes must wire through common.service, not pass."""
-    runtime_to_module_file = {
-        "django": "bonesinfra/runtimes/django/django.py",
-        "next": "bonesinfra/runtimes/next/next.py",
-        "nuxt": "bonesinfra/runtimes/nuxt/nuxt.py",
-        "rails": "bonesinfra/runtimes/rails/rails.py",
-        "sveltekit": "bonesinfra/runtimes/sveltekit/svelte.py",
-        "vue": "bonesinfra/runtimes/vue/vue.py",
-    }
-    for name, rel in runtime_to_module_file.items():
-        content = helpers.read(helpers.SRC_DIR / rel)
-        helpers.assert_not_contains(content, "    pass", msg=name)
-        helpers.assert_contains(content, "service.runtime_paths(ctx)", msg=name)
 
 
 def test_vue_is_static_only():
@@ -4843,30 +5259,18 @@ def test_nuxt_questions_include_is_static_default_true():
     assert keys["is_static"]["type"] == "bool"
 
 
-def test_nuxt_does_not_validate_build_artifact():
-    content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/nuxt/nuxt.py")
-    helpers.assert_not_contains(content, "test -f .output/server/index.mjs")
-    helpers.assert_not_contains(content, "validation.run_as_runtime_user")
-
-
 def test_nuxt_static_path_uses_render_static():
     content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/nuxt/nuxt.py")
     helpers.assert_contains(content, "nginx.render_static")
     helpers.assert_contains(content, "STATIC_ROOT")
 
 
-def test_nuxt_static_runtime_existings_placeholder_output():
+def test_nuxt_static_runtime_seeds_placeholder_output():
     content = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/nuxt/nuxt.py")
     helpers.assert_contains(content, 'STATIC_ROOT = ".output/public"')
     helpers.assert_contains(content, "paths['placeholder_release']")
     helpers.assert_contains(content, '"Seed Nuxt static placeholder index page"')
     helpers.assert_contains(content, 'f"{static_web_root}/index.html"')
-
-
-def test_static_nginx_template_uses_static_root_variable():
-    c = helpers.read(helpers.SRC_DIR / "bonesinfra/runtimes/common/assets/static-site-nginx.conf.j2")
-    helpers.assert_contains(c, "{{ static_root }}")
-    helpers.assert_not_contains(c, "{{ paths.current }}/dist;")
 
 
 def test_vue_static_uses_default_dist_root():
@@ -4919,7 +5323,7 @@ def test_rails_uses_puma_unix_socket():
 """Tests for shared-path provisioning removal.
 
 BonesInfra no longer creates framework shared paths.
-It creates only project_root/shared with mode 2775.
+It creates only project_root/shared with mode 0750.
 """
 
 from . import helpers
@@ -4930,27 +5334,23 @@ RUNTIME_PLAN = helpers.SRC_DIR / "bonesinfra/deploys/runtime/plan.py"
 LARAVEL_PHP_FPM = helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py"
 LARAVEL_DEPLOY = helpers.SRC_DIR / "bonesinfra/runtimes/laravel/deploy.py"
 SHARED_PATHS_PY = helpers.SRC_DIR / "bonesinfra/deploys/runtime/shared_paths.py"
+RAILS_DEPLOY = helpers.SRC_DIR / "bonesinfra/runtimes/rails/rails.py"
+DJANGO_DEPLOY = helpers.SRC_DIR / "bonesinfra/runtimes/django/django.py"
 
 
 def test_shared_paths_module_is_deleted():
     assert not SHARED_PATHS_PY.exists(), "shared_paths.py must be deleted"
 
 
-def test_runtime_plan_does_not_call_shared_paths():
-    c = helpers.read(RUNTIME_PLAN)
-    helpers.assert_not_contains(c, "shared_paths")
-    helpers.assert_not_contains(c, "shared.paths")
-
-
-def test_shared_root_is_created_with_mode_2775():
+def test_shared_root_is_created_with_mode_0750():
     c = helpers.read(SETUP_DIRECTORIES)
     helpers.assert_contains(c, 'path=paths["shared"]')
-    helpers.assert_contains(c, 'mode="2775"')
+    helpers.assert_contains(c, 'mode="0750"')
 
 
-def test_deploy_user_is_added_to_runtime_group():
+def test_deploy_user_is_not_added_to_runtime_group():
     c = helpers.read(SETUP_USERS)
-    helpers.assert_contains(c, "_ensure_group_membership(ctx.config.deploy_user, ctx.runtime.runtime_group)")
+    helpers.assert_not_contains(c, "_ensure_group_membership(ctx.config.deploy_user, ctx.runtime.runtime_group)")
 
 
 def test_laravel_does_not_create_storage_subdirectories():
@@ -4962,24 +5362,15 @@ def test_laravel_does_not_create_storage_subdirectories():
     helpers.assert_not_contains(c, "framework/views")
 
 
-def test_laravel_deploy_does_not_call_storage_setup():
-    c = helpers.read(LARAVEL_DEPLOY)
-    helpers.assert_not_contains(c, "setup_storage_directories")
+def test_runtime_write_paths_are_shared_paths():
+    rails = helpers.read(RAILS_DEPLOY)
+    helpers.assert_contains(rails, "f\"{paths['shared']}/tmp\"")
+    helpers.assert_contains(rails, "f\"{paths['shared']}/log\"")
+    helpers.assert_contains(rails, "f\"{paths['shared']}/storage\"")
 
-
-def test_bonesinfra_does_not_create_env_file():
-    # BonesInfra must not create shared/.env anywhere
-    for f in [SETUP_DIRECTORIES, RUNTIME_PLAN, LARAVEL_PHP_FPM, LARAVEL_DEPLOY]:
-        c = helpers.read(f)
-        helpers.assert_not_contains(c, "touch")
-        # Only "exists" is from non-file-creation contexts like "project not exists"
-        if ".env" in c:
-            assert "Ensure shared file" not in c, f"{f} must not create .env"
-
-
-def test_runtime_plan_does_not_inspect_shared_in_runtime_data():
-    c = helpers.read(RUNTIME_PLAN)
-    helpers.assert_not_contains(c, '["shared"]')
+    django = helpers.read(DJANGO_DEPLOY)
+    helpers.assert_contains(django, "f\"{paths['shared']}/staticfiles\"")
+    helpers.assert_contains(django, "f\"{paths['shared']}/media\"")
 
 ```
 
@@ -5015,142 +5406,35 @@ def _read(name):
 # ---- Base AppArmor profile ----
 
 
-def test_apparmor_profile_allows_resolved_web_root():
-    c = _read("assets/apparmor/project-nginx-profile.j2")
-    helpers.assert_contains(c, "{{ paths.current_web_root }}/** r,")
-    helpers.assert_contains(c, "{{ paths.releases }}/*/{{ web_root }}/** r,")
-
-
-def test_apparmor_profile_allows_site_nginx_conf():
-    c = _read("assets/apparmor/project-nginx-profile.j2")
-    helpers.assert_contains(c, "{{ paths.site_nginx_config }} r,")
-
-
-def test_apparmor_profile_allows_repo_bones_toml():
-    c = _read("assets/apparmor/project-nginx-profile.j2")
-    helpers.assert_contains(c, "{{ paths.repo_bones_toml }} r,")
-
-
-def test_apparmor_profile_does_not_deny_home_globally():
-    c = _read("assets/apparmor/project-nginx-profile.j2")
-    helpers.assert_not_contains(c, "deny /home/** r,")
-    helpers.assert_not_contains(c, "deny /home/{{ deploy_user }}/** r,")
-
-
-def test_apparmor_profile_limits_network_to_unix_stream():
-    c = _read("assets/apparmor/project-nginx-profile.j2")
-    helpers.assert_contains(c, "network unix stream,")
-    helpers.assert_not_contains(c, "network inet stream,")
-    helpers.assert_not_contains(c, "network inet6 stream,")
-
-
 # ---- Base nginx service template ----
-
-
-def test_nginx_service_sets_apparmor_profile():
-    c = _read("assets/nginx/site-nginx.service.j2")
-    helpers.assert_contains(c, "AppArmorProfile=")
-
-
-def test_nginx_service_waits_for_apparmor():
-    c = _read("assets/nginx/site-nginx.service.j2")
-    helpers.assert_contains(c, "After=network.target apparmor.service")
-    helpers.assert_contains(c, "Requires=apparmor.service")
 
 
 # ---- Base nginx config ----
 
 
-def test_site_nginx_config_logs_under_runtime_nginx_dir():
-    c = _read("assets/nginx/site-nginx.conf.j2")
-    helpers.assert_contains(c, "error_log {{ paths.runtime_nginx_dir }}/error.log")
-    helpers.assert_contains(c, "access_log {{ paths.runtime_nginx_dir }}/access.log")
-    helpers.assert_not_contains(c, "access_log stderr")
-
-
 # ---- Router nginx config ----
 
 
-def test_router_config_uses_resolved_socket_path():
-    c = _read("assets/nginx/router.conf.j2")
-    helpers.assert_contains(c, "{{ paths.runtime_nginx_socket }}")
-    helpers.assert_not_contains(c, "default_server")
+def test_default_deny_config_is_default_deny_only():
+    c = _read("assets/nginx/default-deny.conf.j2")
+    helpers.assert_contains(c, "listen 80 default_server;")
+    helpers.assert_contains(c, "listen 443 ssl default_server;")
+    helpers.assert_contains(c, "server_name _;")
+    helpers.assert_contains(c, "return 444;")
+    helpers.assert_contains(c, "{{ paths.nginx_default_deny_ssl_certificate }}")
+    helpers.assert_contains(c, "{{ paths.nginx_default_deny_ssl_certificate_key }}")
+    # Mandatory dead-end: never proxy, serve files, or reach project state.
+    helpers.assert_not_contains(c, "proxy_pass")
+    helpers.assert_not_contains(c, "root ")
+    helpers.assert_not_contains(c, "runtime_nginx_socket")
+    helpers.assert_not_contains(c, "runtime_socket_dir")
+    helpers.assert_not_contains(c, "current_web_root")
 
 
 # ---- Laravel PHP-FPM pool config ----
 
 
-def test_laravel_php_fpm_pool_has_no_global_section():
-    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
-    helpers.assert_not_contains(c, "[global]")
-    helpers.assert_not_contains(c, "daemonize")
-    helpers.assert_not_contains(c, "/var/log/php-fpm.log")
-
-
-def test_laravel_php_fpm_pool_uses_distro_run_php_socket():
-    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
-    helpers.assert_contains(c, "listen = {{ laravel_php_fpm_socket_path }}")
-    helpers.assert_not_contains(c, "{{ paths.runtime_socket_dir }}")
-    helpers.assert_not_contains(c, "/run/{{ project_name }}")
-
-
-def test_laravel_php_fpm_pool_listens_as_runtime_user():
-    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
-    helpers.assert_contains(c, "listen.owner = {{ runtime_user }}")
-    helpers.assert_contains(c, "listen.group = {{ runtime_group }}")
-    helpers.assert_contains(c, "listen.mode = 0660")
-
-
-def test_laravel_php_fpm_pool_runs_as_runtime_user():
-    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
-    helpers.assert_contains(c, "user = {{ runtime_user }}")
-    helpers.assert_contains(c, "group = {{ runtime_group }}")
-
-
-def test_laravel_php_fpm_pool_logs_under_bonesdeploy():
-    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
-    helpers.assert_contains(c, "/var/log/bonesdeploy/{{ project_name }}/php-worker-error.log")
-    helpers.assert_contains(c, "access.log = /var/log/bonesdeploy/{{ project_name }}/php-fpm-access.log")
-    helpers.assert_contains(c, "slowlog = /var/log/bonesdeploy/{{ project_name }}/php-fpm-slow.log")
-    helpers.assert_not_contains(c, "{{ paths.runtime_socket_dir }}")
-
-
-def test_laravel_php_fpm_pool_uses_resolved_current_path():
-    c = _read("runtimes/laravel/assets/php/php-fpm-pool.conf.j2")
-    helpers.assert_contains(c, "chdir = {{ paths.current }}")
-    helpers.assert_contains(c, "catch_workers_output = yes")
-    helpers.assert_contains(c, "php_admin_flag[log_errors] = on")
-
-
 # ---- Laravel nginx config ----
-
-
-def test_laravel_nginx_prefers_php_over_html():
-    c = _read("runtimes/laravel/assets/nginx/laravel-site-nginx.conf.j2")
-    helpers.assert_contains(c, "index index.php index.html;")
-
-
-def test_laravel_nginx_uses_absolute_fastcgi_params():
-    c = _read("runtimes/laravel/assets/nginx/laravel-site-nginx.conf.j2")
-    helpers.assert_contains(c, "include /etc/nginx/fastcgi_params;")
-    helpers.assert_not_contains(c, "include fastcgi_params;")
-
-
-def test_laravel_nginx_uses_resolved_path_manifest():
-    c = _read("runtimes/laravel/assets/nginx/laravel-site-nginx.conf.j2")
-    helpers.assert_contains(c, "pid {{ paths.runtime_nginx_pid }}")
-    helpers.assert_contains(c, "listen unix:{{ paths.runtime_nginx_socket }}")
-    helpers.assert_contains(c, "root {{ paths.current_web_root }}")
-    helpers.assert_contains(c, "{{ paths.runtime_nginx_dir }}/")
-    helpers.assert_not_contains(c, "/run/{{ project_name }}")
-    helpers.assert_not_contains(c, "{{ project_root }}/current/{{ web_root }}")
-
-
-def test_laravel_nginx_logs_under_runtime_nginx_dir():
-    c = _read("runtimes/laravel/assets/nginx/laravel-site-nginx.conf.j2")
-    helpers.assert_contains(c, "error_log {{ paths.runtime_nginx_dir }}/error.log")
-    helpers.assert_contains(c, "access_log {{ paths.runtime_nginx_dir }}/access.log")
-    helpers.assert_not_contains(c, "access_log stderr")
 
 
 # ---- Common app service template ----
@@ -5160,32 +5444,13 @@ def test_common_app_service_runs_as_runtime_user():
     c = _read("runtimes/common/assets/app.service.j2")
     helpers.assert_contains(c, "User={{ runtime_user }}")
     helpers.assert_contains(c, "Group={{ runtime_group }}")
-    helpers.assert_contains(c, "SupplementaryGroups={{ release_group }}")
+    helpers.assert_not_contains(c, "SupplementaryGroups={{ release_group }}")
     helpers.assert_contains(c, "WorkingDirectory={{ paths.current }}")
     helpers.assert_contains(c, "RuntimeDirectory={{ project_name }}/{{ runtime_name }}")
     helpers.assert_contains(c, "RuntimeDirectoryMode=0750")
     helpers.assert_contains(c, "EnvironmentFile=-{{ paths.conf_root }}/runtime.env")
     helpers.assert_contains(c, "ExecStart={{ runtime_exec }}")
     helpers.assert_contains(c, "AppArmorProfile={{ apparmor_profile_name }}")
-
-
-def test_common_app_service_is_tight_sandbox():
-    c = _read("runtimes/common/assets/app.service.j2")
-    helpers.assert_contains(c, "NoNewPrivileges=yes")
-    helpers.assert_contains(c, "PrivateTmp=yes")
-    helpers.assert_contains(c, "ProtectHome=yes")
-    helpers.assert_contains(c, "ProtectSystem=strict")
-    helpers.assert_contains(c, "RestrictNamespaces=yes")
-    helpers.assert_contains(c, "LockPersonality=yes")
-    helpers.assert_contains(c, "RestrictRealtime=yes")
-    helpers.assert_contains(c, "SystemCallArchitectures=native")
-    helpers.assert_contains(c, "CapabilityBoundingSet=")
-    helpers.assert_contains(c, "AmbientCapabilities=")
-    helpers.assert_contains(c, "PrivateDevices=yes")
-    helpers.assert_contains(c, "ProtectKernelTunables=yes")
-    helpers.assert_contains(c, "ProtectKernelModules=yes")
-    helpers.assert_contains(c, "ProtectControlGroups=yes")
-    helpers.assert_contains(c, 'RestrictAddressFamilies={{ runtime_address_families | default("AF_UNIX") }}')
 
 
 def test_common_app_service_writes_to_runtime_and_logs_dirs():
@@ -5217,13 +5482,6 @@ def test_common_app_nginx_proxies_to_socket():
     helpers.assert_contains(c, 'proxy_set_header Connection ""')
 
 
-def test_common_app_nginx_logs_under_runtime_nginx_dir():
-    c = _read("runtimes/common/assets/app-site-nginx.conf.j2")
-    helpers.assert_contains(c, "error_log {{ paths.runtime_nginx_dir }}/error.log")
-    helpers.assert_contains(c, "access_log {{ paths.runtime_nginx_dir }}/access.log")
-    helpers.assert_not_contains(c, "access_log stderr")
-
-
 # ---- Common static nginx template ----
 
 
@@ -5234,27 +5492,7 @@ def test_common_static_nginx_serves_dist():
     helpers.assert_contains(c, "try_files $uri $uri/ /index.html")
 
 
-def test_common_static_nginx_has_no_proxy_pass():
-    c = _read("runtimes/common/assets/static-site-nginx.conf.j2")
-    helpers.assert_not_contains(c, "proxy_pass")
-
-
 # ---- Common app AppArmor profile ----
-
-
-def test_common_apparmor_profile_includes_exec_paths():
-    c = _read("runtimes/common/assets/app-profile.j2")
-    helpers.assert_contains(c, "{{ apparmor_profile_name }}")
-    helpers.assert_contains(c, "{% for exec_path in apparmor_exec_paths %}")
-    helpers.assert_contains(c, "mrix")
-
-
-def test_common_apparmor_profile_allows_runtime_and_log_dirs():
-    c = _read("runtimes/common/assets/app-profile.j2")
-    helpers.assert_contains(c, "{{ paths.runtime_socket_dir }}/{{ apparmor_runtime }}/ rw,")
-    helpers.assert_contains(c, "{{ paths.runtime_socket_dir }}/{{ apparmor_runtime }}/** rwk,")
-    helpers.assert_contains(c, "/var/log/bonesdeploy/{{ project_name }}/ rw,")
-    helpers.assert_contains(c, "/var/log/bonesdeploy/{{ project_name }}/** rwk,")
 
 
 def test_common_apparmor_profile_uses_configurable_network():
@@ -5262,10 +5500,23 @@ def test_common_apparmor_profile_uses_configurable_network():
     helpers.assert_contains(c, '{{ apparmor_network | default("network unix stream,") }}')
 
 
-def test_common_apparmor_profile_denies_root_and_ssh():
-    c = _read("runtimes/common/assets/app-profile.j2")
-    helpers.assert_contains(c, "deny /root/** r,")
-    helpers.assert_contains(c, "deny /etc/ssh/** r,")
+def test_fail2ban_template_enables_sshd_on_configured_port():
+    c = _read("assets/fail2ban/jail.local.j2")
+    helpers.assert_contains(c, "[sshd]")
+    helpers.assert_contains(c, "enabled = true")
+    helpers.assert_contains(c, "port = {{ ssh_port }}")
+
+
+def test_unattended_upgrades_template_enables_periodic_security_updates():
+    c = _read("assets/unattended-upgrades/20auto-upgrades.j2")
+    helpers.assert_contains(c, 'APT::Periodic::Update-Package-Lists "1";')
+    helpers.assert_contains(c, 'APT::Periodic::Unattended-Upgrade "1";')
+
+
+def test_unattended_upgrades_template_uses_distro_variables():
+    c = _read("assets/unattended-upgrades/50unattended-upgrades.j2")
+    helpers.assert_contains(c, '"${distro_id}:${distro_codename}-security";')
+    helpers.assert_contains(c, 'Unattended-Upgrade::Automatic-Reboot "false";')
 
 ```
 
@@ -5298,49 +5549,11 @@ def test_pyinfra_rs_is_deleted():
     helpers.assert_file_not_exists(SRC / "pyinfra.rs")
 
 
-def test_main_rs_has_no_pyinfra_mod():
-    if not CRATES_EXIST:
-        return
-    c = helpers.read(SRC / "main.rs")
-    helpers.assert_not_contains(c, "mod pyinfra;")
-
-
-def test_no_managed_pyinfra_in_shared_paths():
-    if not CRATES_EXIST:
-        return
-    c = helpers.read(R / "crates/shared/src/paths.rs")
-    helpers.assert_not_contains(c, "managed_pyinfra_venv_dir")
-    helpers.assert_not_contains(c, "managed_pyinfra_binary")
-
-
-def test_config_rs_no_deploy_constants():
-    if not CRATES_EXIST:
-        return
-    c = helpers.read(R / "crates/bonesdeploy/src/config.rs")
-    helpers.assert_not_contains(c, "BONES_REMOTE_SSL_DEPLOY")
-    helpers.assert_not_contains(c, "BONES_REMOTE_SETUP_DEPLOY")
-
-
-def test_embedded_rs_no_removed_functions():
-    if not CRATES_EXIST:
-        return
-    c = helpers.read(R / "crates/bonesdeploy/src/embedded.rs")
-    helpers.assert_not_contains(c, "struct Runtimes")
-    helpers.assert_not_contains(c, "fn scaffold_runtime_template")
-    helpers.assert_not_contains(c, "fn read_template_runtime_config")
-    helpers.assert_not_contains(c, "fn available_templates")
-
-
 def test_cli_has_apply_handlers():
     c = helpers.read(helpers.SRC_DIR / "bonesinfra/cli/app.py")
     helpers.assert_contains(c, "setup_apply_cmd")
     helpers.assert_contains(c, "runtime_apply_cmd")
     helpers.assert_contains(c, "ssl_apply_cmd")
-
-
-def test_cli_has_no_unimplemented():
-    c = helpers.read(helpers.SRC_DIR / "bonesinfra/cli/app.py")
-    helpers.assert_not_contains(c, "UnimplementedError")
 
 
 def test_infra_has_pyinfra_runner():

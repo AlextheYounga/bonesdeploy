@@ -160,14 +160,8 @@ fn collect_non_interactive_uses_existing_and_cli_values_without_prompting() -> R
 #[test]
 fn collect_non_interactive_requires_host_when_existing_and_cli_are_missing_it() -> Result<()> {
     let existing = incomplete_existing("atlas");
-    let args = InitArgs {
-        non_interactive: true,
-        project_name: None,
-        branch: None,
-        remote: None,
-        host: None,
-        port: None,
-    };
+    let args =
+        InitArgs { non_interactive: true, project_name: None, branch: None, remote: None, host: None, port: None };
 
     let result = collect_non_interactive("workspace", Some(&existing), &args);
     let Err(err) = result else {

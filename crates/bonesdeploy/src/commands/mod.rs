@@ -7,6 +7,7 @@ pub mod guide;
 pub mod init_project;
 pub mod push_state;
 pub mod remote_data;
+pub mod remote_helpers;
 pub mod remote_runtime;
 pub mod remote_setup;
 pub mod remote_ssl;

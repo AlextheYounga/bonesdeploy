@@ -120,6 +120,8 @@ pub enum RemoteCommand {
         #[arg(long)]
         email: Option<String>,
     },
+    /// Install helper tools on the remote host (starship, neovim, aptui, etc.)
+    Helpers,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
