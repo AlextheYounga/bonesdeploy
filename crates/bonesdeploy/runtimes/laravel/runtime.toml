@@ -1,6 +1,7 @@
 template = "laravel"
 web_root = "public"
 php_version = "8.5"
+build_image = "docker.io/library/composer:2"
 
 [permissions]
 paths = [

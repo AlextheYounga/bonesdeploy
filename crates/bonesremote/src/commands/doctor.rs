@@ -7,15 +7,20 @@ use anyhow::Result;
 use console::style;
 use shared::paths;
 
-pub fn run() -> Result<()> {
+pub fn run(site: Option<&str>) -> Result<()> {
     println!("{}", style(format!("{} doctor", paths::BONESREMOTE_BINARY)).bold());
 
     let mut issues: Vec<String> = Vec::new();
 
     check_supported_distribution(&mut issues);
     check_globally_available(&mut issues);
+    check_podman_available(&mut issues);
     check_passwordless_sudo(&mut issues);
     check_apparmor_support(&mut issues);
+
+    if let Some(site) = site {
+        super::doctor_site::check(site, &mut issues);
+    }
 
     if issues.is_empty() {
         println!("\n{} All checks passed.", style("OK").green().bold());
@@ -53,22 +58,42 @@ fn check_globally_available(issues: &mut Vec<String>) {
     }
 }
 
+fn check_podman_available(issues: &mut Vec<String>) {
+    let result = Command::new("podman").arg("--version").output();
+
+    match result {
+        Ok(output) if output.status.success() => {}
+        _ => issues.push("podman is not available; install Podman for disposable builds".to_string()),
+    }
+}
+
 fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let privileged_commands = [[paths::BONESREMOTE_BINARY, "service", "restart", "--config", "/nonexistent"]];
+    let privileged_commands = [
+        [paths::BONESREMOTE_BINARY, "hook", "post-receive", "--site", "nonexistent"],
+        [paths::BONESREMOTE_BINARY, "service", "restart", "--site", "nonexistent"],
+        [paths::BONESREMOTE_BINARY, "release", "rollback", "--site", "nonexistent"],
+        [paths::BONESREMOTE_BINARY, "release", "drop-failed", "--site", "nonexistent"],
+        [paths::BONESREMOTE_BINARY, "release", "prune", "--site", "nonexistent"],
+    ];
 
     for command in privileged_commands {
-        let result = Command::new("sudo").arg("-n").arg("-l").args(command).output();
+        let result = deploy_user_sudo_check_command(command).output();
 
         match result {
             Ok(output) if output.status.success() => {}
             _ => issues.push(format!(
-                "{} is not allowed via passwordless sudo: {} (run 'sudo {} init')",
+                "{} is not allowed via passwordless sudo: {} (ensure bonesinfra has provisioned the sudoers policy on this host)",
                 paths::BONESREMOTE_BINARY,
                 command.join(" "),
-                paths::BONESREMOTE_BINARY
             )),
         }
     }
+}
+
+fn deploy_user_sudo_check_command(command: [&str; 5]) -> Command {
+    let mut sudo = Command::new("sudo");
+    sudo.args(["-n", "-u", paths::DEPLOY_USER, "sudo", "-n", "-l"]).args(command);
+    sudo
 }
 
 fn check_apparmor_support(issues: &mut Vec<String>) {
@@ -169,25 +194,11 @@ fn check_apparmor_unit_wiring(profile_names: &[String], issues: &mut Vec<String>
         let contents = fs::read_to_string(path);
 
         match contents {
-            Ok(contents) => match apparmor_unit_wiring_status(&contents, &installed_profiles) {
-                AppArmorUnitWiringStatus::Ok => {}
-                AppArmorUnitWiringStatus::MissingOrdering => {
-                    issues.push(format!(
-                        "AppArmor check failed: {} is missing apparmor.service ordering or dependency",
-                        path.display()
-                    ));
+            Ok(contents) => {
+                if let Some(msg) = apparmor_unit_wiring_issue(&contents, &installed_profiles) {
+                    issues.push(format!("AppArmor check failed: {path_display} {msg}", path_display = path.display()));
                 }
-                AppArmorUnitWiringStatus::MissingProfile => {
-                    issues.push(format!("AppArmor check failed: {} is missing AppArmorProfile=", path.display()));
-                }
-                AppArmorUnitWiringStatus::UnknownProfile(profile_name) => {
-                    issues.push(format!(
-                        "AppArmor check failed: {} references unknown AppArmor profile {}",
-                        path.display(),
-                        profile_name
-                    ));
-                }
-            },
+            }
             Err(error) => {
                 issues.push(format!("AppArmor check failed: could not read {} ({error})", path.display()));
             }
@@ -207,7 +218,7 @@ fn apparmor_unit_name_for_profile(profile_name: &str) -> Option<String> {
     profile_name
         .strip_prefix("bonesdeploy-")
         .and_then(|name| name.strip_suffix("-nginx"))
-        .map(|project_name| paths::nginx_service_name(&project_name))
+        .map(paths::nginx_service_name)
 }
 
 fn systemd_directive_values<'a>(contents: &'a str, directive: &str) -> Vec<&'a str> {
@@ -231,29 +242,21 @@ fn apparmor_profile_binding(contents: &str) -> Option<&str> {
     systemd_directive_values(contents, "AppArmorProfile").into_iter().next()
 }
 
-enum AppArmorUnitWiringStatus {
-    Ok,
-    MissingOrdering,
-    MissingProfile,
-    UnknownProfile(String),
-}
-
-fn apparmor_unit_wiring_status(contents: &str, installed_profiles: &HashSet<&str>) -> AppArmorUnitWiringStatus {
-    let has_apparmor_after = systemd_directive_contains_token(contents, "After", "apparmor.service");
-    let has_apparmor_requires = systemd_directive_contains_token(contents, "Requires", "apparmor.service");
-
-    if !has_apparmor_after || !has_apparmor_requires {
-        return AppArmorUnitWiringStatus::MissingOrdering;
+fn apparmor_unit_wiring_issue(contents: &str, installed_profiles: &HashSet<&str>) -> Option<String> {
+    if !systemd_directive_contains_token(contents, "After", "apparmor.service")
+        || !systemd_directive_contains_token(contents, "Requires", "apparmor.service")
+    {
+        return Some(String::from("is missing apparmor.service ordering or dependency"));
     }
 
     let Some(profile_name) = apparmor_profile_binding(contents) else {
-        return AppArmorUnitWiringStatus::MissingProfile;
+        return Some(String::from("is missing AppArmorProfile="));
     };
 
     if installed_profiles.contains(profile_name) {
-        AppArmorUnitWiringStatus::Ok
+        None
     } else {
-        AppArmorUnitWiringStatus::UnknownProfile(profile_name.to_string())
+        Some(format!("references unknown AppArmor profile {profile_name}"))
     }
 }
 

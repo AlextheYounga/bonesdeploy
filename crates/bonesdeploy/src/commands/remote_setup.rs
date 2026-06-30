@@ -8,10 +8,15 @@ use shared::paths;
 
 use super::remote_data;
 use crate::config;
-use crate::infra::bonesinfra_cli;
+use crate::infra::bonesinfra;
 use crate::infra::bootstrap_ssh;
+use crate::ui::prompts;
 
-pub fn run() -> Result<()> {
+pub fn run(skip_confirm: bool) -> Result<()> {
+    if !skip_confirm && !prompts::confirm_remote_setup()? {
+        println!("Skipped.");
+        return Ok(());
+    }
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
     let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
@@ -20,7 +25,7 @@ pub fn run() -> Result<()> {
 
     println!("Bootstrapping remote server...");
 
-    let mut deploy_data = Value::Object(remote_data::base(&cfg, &runtime.web_root)?);
+    let mut deploy_data = Value::Object(remote_data::base(&cfg, &runtime.web_root));
     let host = cfg.host;
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from(shared_config::bonesinfra_input::SSH_USER), Value::String(ssh_user));
@@ -28,7 +33,7 @@ pub fn run() -> Result<()> {
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    bonesinfra_cli::run_with_stdin(&["setup", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
+    bonesinfra::run_with_stdin(&["setup", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
 
     println!("Remote bootstrap complete.");
     println!();

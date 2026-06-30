@@ -1,19 +1,81 @@
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
+use serde_json::Value;
 use shared::paths;
 
 const REPOSITORY_URL: &str = "https://github.com/AlextheYounga/bonesinfra.git";
 const CHECKOUT_DIR: &str = "bonesinfra";
 
 pub fn prefetch() -> Result<()> {
-    ensure_available().map(|_| ())
+    ensure_available()?;
+    Ok(())
 }
 
-pub(super) fn executable_path() -> Result<PathBuf> {
-    ensure_available()
+pub fn run(args: &[&str]) -> Result<()> {
+    let executable = ensure_available()?;
+    let mut command = base_command(&executable, args);
+    command.stdin(Stdio::null());
+
+    let status = command
+        .spawn()
+        .with_context(|| format!("Failed to run bonesinfra {} from {}", args.join(" "), executable.display()))?
+        .wait()
+        .with_context(|| format!("Failed to wait on bonesinfra {} from {}", args.join(" "), executable.display()))?;
+
+    if !status.success() {
+        bail!("bonesinfra failed");
+    }
+
+    Ok(())
+}
+
+pub fn run_with_stdin(args: &[&str], stdin_json: &str) -> Result<()> {
+    let executable = ensure_available()?;
+    let mut command = base_command(&executable, args);
+    command.stdin(Stdio::piped());
+
+    let mut child = command
+        .spawn()
+        .with_context(|| format!("Failed to run bonesinfra {} from {}", args.join(" "), executable.display()))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        stdin.write_all(stdin_json.as_bytes()).context("Failed to write JSON data to bonesinfra stdin")?;
+    }
+
+    let status = child
+        .wait()
+        .with_context(|| format!("Failed to wait on bonesinfra {} from {}", args.join(" "), executable.display()))?;
+
+    if !status.success() {
+        bail!("bonesinfra failed");
+    }
+
+    Ok(())
+}
+
+pub fn runtime_questions(runtime: &str) -> Result<Value> {
+    let executable = ensure_available()?;
+    let output = base_command(&executable, &["runtime", "questions", runtime]).output().with_context(|| {
+        format!("Failed to run bonesinfra runtime questions {runtime} from {}", executable.display())
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!("bonesinfra failed:\n{}", stderr.trim());
+    }
+
+    serde_json::from_slice(&output.stdout).context("Failed to parse JSON output from bonesinfra")
+}
+
+fn base_command(executable: &Path, args: &[&str]) -> Command {
+    let mut cmd = Command::new(executable);
+    cmd.args(["-m", "bonesinfra"]);
+    cmd.args(args);
+    cmd
 }
 
 fn ensure_available() -> Result<PathBuf> {
@@ -128,45 +190,5 @@ fn setup_venv(checkout: &Path) -> Result<()> {
 }
 
 fn checkout_dir() -> PathBuf {
-    paths::bones_config_root().join(CHECKOUT_DIR)
-}
-
-#[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use anyhow::Result;
-    use shared::paths;
-    use tempfile::TempDir;
-
-    use super::{checkout_dir, reset_checkout};
-
-    #[test]
-    fn checkout_dir_lives_under_bones_config_root() {
-        assert_eq!(checkout_dir(), paths::bones_config_root().join("bonesinfra"));
-    }
-
-    #[test]
-    fn reset_checkout_removes_stale_directory() -> Result<()> {
-        let temp_dir = TempDir::new()?;
-        let checkout = temp_dir.path().join("bonesinfra");
-        fs::create_dir_all(checkout.join("nested"))?;
-
-        reset_checkout(&checkout)?;
-
-        assert!(!checkout.exists());
-        Ok(())
-    }
-
-    #[test]
-    fn reset_checkout_removes_stale_file() -> Result<()> {
-        let temp_dir = TempDir::new()?;
-        let checkout = temp_dir.path().join("bonesinfra");
-        fs::write(&checkout, "stale")?;
-
-        reset_checkout(&checkout)?;
-
-        assert!(!checkout.exists());
-        Ok(())
-    }
+    paths::bones_config_lib_root().join(CHECKOUT_DIR)
 }

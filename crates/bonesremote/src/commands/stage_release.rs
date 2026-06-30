@@ -2,37 +2,37 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
+use shared::config;
 use shared::paths;
 use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 
-use crate::config;
+use crate::privileges;
 use crate::release_state;
 
-pub fn run(config_path: &str) -> Result<()> {
-    let cfg = config::load(Path::new(config_path))?;
+pub fn run(site: &str) -> Result<()> {
+    privileges::ensure_root("bonesremote release stage")?;
+
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path)
+        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
+
+    if cfg.project_name != site {
+        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
+    }
 
     let project_root = Path::new(&cfg.project_root);
-    let build_dir = project_root.join(paths::BUILD_DIR);
-    let build_root = Path::new(&cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).build_root).to_path_buf();
-    let releases_dir = release_state::releases_dir(&cfg);
-    let shared_dir = Path::new(&cfg.deployment_paths(paths::DEFAULT_WEB_ROOT).shared).to_path_buf();
-
     require_dir(project_root, "project_root directory")?;
-    require_dir(&releases_dir, "releases")?;
-    require_dir(&build_dir, "build")?;
-    require_dir(&shared_dir, "shared")?;
-
-    fs::create_dir_all(&build_root)
-        .with_context(|| format!("Failed to create build workspace: {}", build_root.display()))?;
+    require_dir(&Path::new(&cfg.project_root).join(paths::RELEASES_DIR), "releases")?;
+    require_dir(&Path::new(&cfg.project_root).join(paths::SHARED_DIR), "shared")?;
 
     let release_name = create_release_name()?;
-    let staged_release_dir = release_state::release_dir(&cfg, &release_name);
-    fs::create_dir_all(&staged_release_dir)
-        .with_context(|| format!("Failed to create release dir: {}", staged_release_dir.display()))?;
+    let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
+    fs::create_dir_all(&release_dir)
+        .with_context(|| format!("Failed to create release dir: {}", release_dir.display()))?;
 
-    release_state::write_staged_release(&cfg, &release_name)?;
+    release_state::write_staged_release(site, &release_name)?;
 
     println!("Staged release: {release_name}");
     Ok(())
@@ -53,3 +53,6 @@ fn create_release_name() -> Result<String> {
     let now = OffsetDateTime::now_utc();
     now.format(TIMESTAMP_FORMAT).context("Failed to format release timestamp")
 }
+
+#[cfg(test)]
+mod tests {}

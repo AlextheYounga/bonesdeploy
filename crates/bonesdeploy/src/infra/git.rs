@@ -5,7 +5,6 @@ use anyhow::{Context, Result, bail};
 
 #[derive(Debug, Clone)]
 pub struct RemoteConnectionDetails {
-    pub user: String,
     pub host: String,
     pub port: String,
     pub repo_path: String,
@@ -44,23 +43,6 @@ pub fn add_remote(remote_name: &str, remote_url: &str) -> Result<()> {
     }
 
     Ok(())
-}
-
-pub fn list_remotes() -> Result<Vec<String>> {
-    let output = Command::new("git").args(["remote"]).output().context("Failed to run git")?;
-
-    if !output.status.success() {
-        bail!("Failed to list git remotes");
-    }
-
-    let remotes = String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-        .map(ToOwned::to_owned)
-        .collect::<Vec<_>>();
-
-    Ok(remotes)
 }
 
 pub fn list_remotes_with_urls() -> Result<Vec<RemoteInfo>> {
@@ -123,24 +105,20 @@ fn parse_ssh_style_url(url: &str) -> Option<RemoteConnectionDetails> {
         return None;
     }
 
-    let without_scheme = &url[6..];
-    let slash_index = without_scheme.find('/')?;
-    let authority = without_scheme[..slash_index].trim();
-    let path = without_scheme[slash_index..].trim();
+    let rest = &url[6..];
+    let slash_idx = rest.find('/')?;
+    let authority = &rest[..slash_idx];
+    let path = rest[slash_idx..].trim();
 
-    let host_port = authority.rsplit_once('@').map_or(authority, |(_, host)| host);
-    let (host, port) = match host_port.split_once(':') {
-        Some((host, port)) if !host.trim().is_empty() && !port.trim().is_empty() => {
-            (host.trim().to_string(), port.trim().to_string())
-        }
-        _ => (host_port.trim().to_string(), String::from("22")),
-    };
+    let (user, host_port) = authority.rsplit_once('@').unwrap_or(("", authority));
+    let _user = if user.is_empty() { "git" } else { user };
+    let (host, port) = host_port.split_once(':').unwrap_or((host_port, "22"));
 
-    if host.is_empty() || !has_git_extension(path) {
+    if host.is_empty() || Path::new(path).extension().is_none_or(|ext| !ext.eq_ignore_ascii_case("git")) {
         return None;
     }
 
-    Some(RemoteConnectionDetails { user: parse_user(authority), host, port, repo_path: path.to_string() })
+    Some(RemoteConnectionDetails { host: host.to_string(), port: port.to_string(), repo_path: path.to_string() })
 }
 
 fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
@@ -149,76 +127,55 @@ fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
     }
 
     let (left, right) = url.split_once(':')?;
-    let host = left.rsplit_once('@').map_or(left, |(_, host)| host).trim();
-    let repo_path = right.trim();
-    if !repo_path.starts_with('/') {
-        return None;
-    }
-    let repo_path = repo_path.to_string();
-
-    if host.is_empty() || !has_git_extension(&repo_path) {
+    let right = right.trim();
+    if !right.starts_with('/') {
         return None;
     }
 
-    Some(RemoteConnectionDetails {
-        user: parse_user(left),
-        host: host.to_string(),
-        port: String::from("22"),
-        repo_path,
-    })
-}
+    let (user, host) = left.trim().rsplit_once('@').unwrap_or(("", left.trim()));
+    let _user = if user.is_empty() { "git" } else { user };
 
-fn parse_user(authority: &str) -> String {
-    authority.rsplit_once('@').map_or_else(|| String::from("git"), |(user, _)| user.to_string())
-}
+    if host.is_empty() || Path::new(right).extension().is_none_or(|ext| !ext.eq_ignore_ascii_case("git")) {
+        return None;
+    }
 
-fn has_git_extension(path: &str) -> bool {
-    Path::new(path).extension().is_some_and(|ext| ext.eq_ignore_ascii_case("git"))
+    Some(RemoteConnectionDetails { host: host.to_string(), port: "22".to_string(), repo_path: right.to_string() })
 }
 
 #[cfg(test)]
 mod tests {
-    use shared::paths;
-
     use super::{parse_remote_url, parse_scp_style_url, parse_ssh_style_url};
-
-    fn repo_path(name: &str) -> String {
-        paths::default_repo_path_for(name)
-    }
 
     #[test]
     fn parse_ssh_style_url_parses_host_port_and_repo_path() {
-        let details = parse_ssh_style_url(&format!("ssh://git@example.com:2222{}", repo_path("myapp")));
+        let details = parse_ssh_style_url("ssh://git@example.com:2222/home/git/myapp.git");
         assert!(details.is_some());
         if let Some(details) = details {
-            assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "2222");
-            assert_eq!(details.repo_path, repo_path("myapp"));
+            assert_eq!(details.repo_path, "/home/git/myapp.git");
         }
     }
 
     #[test]
     fn parse_ssh_style_url_defaults_port_to_22() {
-        let details = parse_ssh_style_url(&format!("ssh://git@example.com{}", repo_path("myapp")));
+        let details = parse_ssh_style_url("ssh://git@example.com/home/git/myapp.git");
         assert!(details.is_some());
         if let Some(details) = details {
-            assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
-            assert_eq!(details.repo_path, repo_path("myapp"));
+            assert_eq!(details.repo_path, "/home/git/myapp.git");
         }
     }
 
     #[test]
     fn parse_scp_style_url_parses_absolute_repo_path() {
-        let details = parse_scp_style_url(&format!("git@example.com:{}", repo_path("myapp")));
+        let details = parse_scp_style_url("git@example.com:/home/git/myapp.git");
         assert!(details.is_some());
         if let Some(details) = details {
-            assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
-            assert_eq!(details.repo_path, repo_path("myapp"));
+            assert_eq!(details.repo_path, "/home/git/myapp.git");
         }
     }
 
@@ -227,7 +184,6 @@ mod tests {
         let details = parse_scp_style_url("git@example.com : /home/git/myapp.git");
         assert!(details.is_some());
         if let Some(details) = details {
-            assert_eq!(details.user, "git");
             assert_eq!(details.host, "example.com");
             assert_eq!(details.port, "22");
             assert_eq!(details.repo_path, "/home/git/myapp.git");
@@ -236,9 +192,8 @@ mod tests {
 
     #[test]
     fn parse_remote_url_rejects_non_git_paths() {
-        let non_git_path = repo_path("myapp").trim_end_matches(".git").to_string();
-        assert!(parse_remote_url(&format!("ssh://git@example.com:22{non_git_path}")).is_none());
-        assert!(parse_remote_url(&format!("git@example.com:{non_git_path}")).is_none());
+        assert!(parse_remote_url("ssh://git@example.com:22/home/git/myapp").is_none());
+        assert!(parse_remote_url("git@example.com:/home/git/myapp").is_none());
     }
 
     #[test]

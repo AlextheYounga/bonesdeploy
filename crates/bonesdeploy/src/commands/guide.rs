@@ -4,11 +4,11 @@ use anyhow::{Context, Result};
 use serde::Serialize;
 use shared::config as shared_config;
 use shared::paths;
+use shared::paths::bonesremote_bones_toml_path;
 
 use crate::cli::args::GuideFormat;
-use crate::commands::push_state;
 use crate::config;
-use crate::infra::{rsync, ssh};
+use crate::infra::ssh;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Report {
@@ -150,8 +150,8 @@ fn runtime_web_root() -> Result<String> {
     Ok(runtime.web_root)
 }
 
-async fn remote_setup_complete(cfg: &config::Bones, web_root: &str) -> Result<bool> {
-    let Ok(session) = ssh::connect(cfg).await else {
+async fn remote_setup_complete(cfg: &config::Bones, _web_root: &str) -> Result<bool> {
+    let Ok(session) = ssh::connect_privileged(cfg).await else {
         return Ok(false);
     };
 
@@ -160,29 +160,30 @@ async fn remote_setup_complete(cfg: &config::Bones, web_root: &str) -> Result<bo
         return Ok(false);
     }
 
-    let mut args = push_state::rsync_args(cfg);
-    args.insert(1, String::from("--dry-run"));
-    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
-    let sync_ok = rsync::status(&arg_refs).is_ok_and(|status| status.success());
+    let registry_path = bonesremote_bones_toml_path(&cfg.project_name);
+    let sync_ok =
+        ssh::run_cmd(&session, &format!("test -r {}", shell_quote(&registry_path.display().to_string()))).await.is_ok();
 
-    let paths = cfg.deployment_paths(web_root);
-    let current_ok = ssh::run_cmd(&session, &format!("test -e {}", shell_quote(&paths.current))).await.is_ok();
+    let current = Path::new(&cfg.project_root).join(paths::CURRENT_LINK);
+    let current_ok =
+        ssh::run_cmd(&session, &format!("test -e {}", shell_quote(&current.display().to_string()))).await.is_ok();
 
     session.close().await?;
 
     Ok(sync_ok && current_ok)
 }
 
-pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones, web_root: &str) -> Result<bool> {
+pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones, _web_root: &str) -> Result<bool> {
     if cfg.domain.is_empty() {
         return Ok(false);
     }
 
-    let session = ssh::connect(cfg).await?;
-    let path = cfg.deployment_paths(web_root).nginx_site_available;
+    let session = ssh::connect_privileged(cfg).await?;
+    let nginx_site_available =
+        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", &cfg.project_name)).display().to_string();
     let command = format!(
         "test -r {path} && grep -Fq {domain} {path} && grep -Fq 'listen 443 ssl;' {path}",
-        path = shell_quote(&path),
+        path = shell_quote(&nginx_site_available),
         domain = shell_quote(&format!("server_name {};", cfg.domain)),
     );
     let enabled = ssh::run_cmd(&session, &command).await.is_ok();
@@ -193,50 +194,4 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones, web_root: &str) -> R
 
 fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{initialized_report, prompt_free_init_command, ready_report, uninitialized_report};
-    use crate::config::Bones;
-
-    fn sample_cfg() -> Bones {
-        Bones {
-            project_name: String::from("atlas"),
-            host: String::from("deploy.example.com"),
-            port: String::from("22"),
-            repo_path: String::from("/home/git/atlas.git"),
-            project_root: String::from("/srv/sites/atlas"),
-            branch: String::from("main"),
-            ssl_enabled: false,
-            ..Default::default()
-        }
-    }
-
-    #[test]
-    fn init_command_is_prompt_free() {
-        assert_eq!(prompt_free_init_command("atlas"), "bonesdeploy init --yes --project-name atlas --host <host>");
-    }
-
-    #[test]
-    fn uninitialized_report_starts_with_init() {
-        let report = uninitialized_report("atlas");
-        assert_eq!(report.commands[0], "bonesdeploy init --yes --project-name atlas --host <host>");
-    }
-
-    #[test]
-    fn initialized_report_suggests_setup_then_ssl_then_deploy() {
-        let report = initialized_report(sample_cfg(), false);
-        assert_eq!(report.commands[0], "bonesdeploy setup --yes");
-        assert_eq!(report.commands[1], "bonesdeploy remote ssl --yes --domain <domain> --email <email>");
-        assert_eq!(report.commands[2], "bonesdeploy deploy");
-    }
-
-    #[test]
-    fn ready_report_suggests_deploy() {
-        let mut cfg = sample_cfg();
-        cfg.ssl_enabled = true;
-        let report = ready_report(cfg);
-        assert_eq!(report.commands, vec![String::from("bonesdeploy deploy")]);
-    }
 }

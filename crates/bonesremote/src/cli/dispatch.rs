@@ -1,28 +1,27 @@
 use anyhow::Result;
 
-use crate::cli::args::{Cli, Command, ReleaseCommand, ServiceCommand};
-use crate::commands::{
-    activate_release, config, deploy, doctor, drop_failed_release, init, rollback, service, stage_release, status,
-    version, wire_release,
-};
+use crate::cli::args::{Cli, Command, HookCommand, ReleaseCommand, ServiceCommand, SiteCommand};
+use crate::commands::{deploy, doctor, drop_failed_release, hook, post_deploy, service, site, status, version};
 
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init => init::run(),
-        Command::Doctor => doctor::run(),
-        Command::Status { config } => status::run(config),
-        Command::Deploy { config, revision } => deploy::run_full(config, revision.as_deref()),
+        Command::Doctor { site } => doctor::run(site.as_deref()),
+        Command::Deploy { site, revision } => deploy::run_full(site, revision.as_deref()),
+        Command::Status { site } => status::run(site),
+        Command::Hook { command } => match command {
+            HookCommand::PostReceive { site: site_name } => hook::post_receive(site_name),
+        },
+        Command::Site { command } => match command {
+            SiteCommand::Import { site: site_name } => site::import(site_name),
+        },
         Command::Release { command } => match command {
-            ReleaseCommand::Stage { config } => stage_release::run(config),
-            ReleaseCommand::Wire { config } => wire_release::run(config),
-            ReleaseCommand::Activate { config } => activate_release::run(config),
-            ReleaseCommand::DropFailed { config } => drop_failed_release::run(config),
-            ReleaseCommand::Rollback { config } => rollback::run(config),
+            ReleaseCommand::Rollback { site: site_name } => deploy::rollback(site_name),
+            ReleaseCommand::DropFailed { site: site_name } => drop_failed_release::run(site_name),
+            ReleaseCommand::Prune { site: site_name } => post_deploy::run(site_name),
         },
         Command::Service { command } => match command {
-            ServiceCommand::Restart { config } => service::run(config),
+            ServiceCommand::Restart { site: site_name } => service::run(site_name),
         },
-        Command::Config { file, key } => config::run(file, key),
         Command::Version => {
             version::run();
             Ok(())

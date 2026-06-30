@@ -9,24 +9,35 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Install sudoers drop-in for passwordless bonesremote
-    Init,
     /// Check server environment health
-    Doctor,
-    /// Print site status as JSON
-    Status {
-        /// Path to bones.toml config file
+    Doctor {
+        /// Also validate the imported site state and runtime boundary for one site
         #[arg(long)]
-        config: String,
+        site: Option<String>,
     },
     /// Run the full remote deployment lifecycle
     Deploy {
-        /// Path to bones.toml config file
+        /// Site identifier (must match an imported site directory)
         #[arg(long)]
-        config: String,
-        /// Exact revision to check out into the build workspace
+        site: String,
+        /// Exact revision to deploy (defaults to the configured branch)
         #[arg(long)]
         revision: Option<String>,
+    },
+    /// Print remote deployment status as JSON
+    Status {
+        #[arg(long)]
+        site: String,
+    },
+    /// Thin git-hook entrypoints
+    Hook {
+        #[command(subcommand)]
+        command: HookCommand,
+    },
+    /// Import or export root-owned remote site state
+    Site {
+        #[command(subcommand)]
+        command: SiteCommand,
     },
     /// Release lifecycle operations
     Release {
@@ -38,44 +49,44 @@ pub enum Command {
         #[command(subcommand)]
         command: ServiceCommand,
     },
-    /// Get a config value from a TOML file
-    Config {
-        /// Path to TOML config file
-        #[arg(long)]
-        file: String,
-        /// Key to read
-        key: String,
-    },
     /// Print the version
     Version,
 }
 
 #[derive(Subcommand)]
+pub enum HookCommand {
+    /// Resolve a post-receive push and delegate deployment
+    PostReceive {
+        #[arg(long)]
+        site: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SiteCommand {
+    /// Import a deployment dataset from stdin
+    Import {
+        #[arg(long)]
+        site: String,
+    },
+}
+
+#[derive(Subcommand)]
 pub enum ReleaseCommand {
-    /// Stage a new release before checkout
-    Stage {
-        #[arg(long)]
-        config: String,
-    },
-    /// Wire .env into the build workspace
-    Wire {
-        #[arg(long)]
-        config: String,
-    },
-    /// Atomically activate staged release
-    Activate {
-        #[arg(long)]
-        config: String,
-    },
-    /// Drop a failed staged release and clear state
-    DropFailed {
-        #[arg(long)]
-        config: String,
-    },
     /// Repoint current to the previous release
     Rollback {
         #[arg(long)]
-        config: String,
+        site: String,
+    },
+    /// Drop the staged release and clean state
+    DropFailed {
+        #[arg(long)]
+        site: String,
+    },
+    /// Prune old releases according to the registry keep count
+    Prune {
+        #[arg(long)]
+        site: String,
     },
 }
 
@@ -84,6 +95,6 @@ pub enum ServiceCommand {
     /// Restart the per-site nginx service
     Restart {
         #[arg(long)]
-        config: String,
+        site: String,
     },
 }

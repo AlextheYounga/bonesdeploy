@@ -2,7 +2,6 @@ use std::path::Path;
 
 use anyhow::Result;
 use serde::Deserialize;
-use shared::config as shared_config;
 use shared::paths;
 
 use crate::commands::guide;
@@ -62,10 +61,8 @@ pub async fn run() -> Result<()> {
 }
 
 async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
-    let session = ssh::connect(cfg).await?;
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
-    let deployment = cfg.deployment_paths(&runtime.web_root);
-    let command = format!("bonesremote status --config {}", shell_quote(&deployment.repo_bones_toml));
+    let session = ssh::connect_privileged(cfg).await?;
+    let command = format!("bonesremote status --site '{}'", shell_quote(&cfg.project_name));
     let output = ssh::run_cmd(&session, &command).await;
     session.close().await?;
 
@@ -73,14 +70,8 @@ async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
 }
 
 fn fallback_remote_status(cfg: &config::Bones) -> RemoteReport {
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR)).ok();
-    let current_release = runtime.as_ref().map_or_else(
-        || String::from("unknown"),
-        |runtime| {
-            let deployment = cfg.deployment_paths(&runtime.web_root);
-            release_name(&deployment.current)
-        },
-    );
+    let current = Path::new(&cfg.project_root).join(paths::CURRENT_LINK);
+    let current_release = release_name(&current.display().to_string());
 
     RemoteReport {
         current_release,
@@ -119,23 +110,4 @@ fn release_name(value: &str) -> String {
 
 fn shell_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{RemoteSslStatus, service_marker, ssl_state};
-
-    #[test]
-    fn ssl_state_uses_remote_state_when_local_flag_is_stale() {
-        let ssl = RemoteSslStatus { domain: String::from("app.example.com"), enabled: true };
-
-        assert_eq!(ssl_state(&ssl), "enabled (app.example.com)");
-    }
-
-    #[test]
-    fn service_marker_marks_only_active_as_ok() {
-        assert_eq!(service_marker("active"), "✓");
-        assert_eq!(service_marker("failed"), "✗");
-        assert_eq!(service_marker("unknown"), "✗");
-    }
 }

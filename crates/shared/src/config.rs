@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::paths::{self, Deployment};
+use crate::paths;
 
 /// Keys in the JSON object that bonesdeploy sends to bonesinfra.
 pub mod bonesinfra_input {
@@ -62,12 +62,7 @@ impl Default for Bones {
     }
 }
 
-impl Bones {
-    #[must_use]
-    pub fn deployment_paths(&self, web_root: &str) -> Deployment {
-        Deployment::new(&self.project_name, &self.repo_path, &self.project_root, web_root)
-    }
-}
+impl Bones {}
 
 #[must_use]
 pub fn default_deploy_user() -> String {
@@ -145,6 +140,8 @@ pub struct Runtime {
     #[serde(default = "paths::default_web_root")]
     pub web_root: String,
     #[serde(default)]
+    pub build_image: String,
+    #[serde(default)]
     pub runtime_user: String,
     #[serde(default)]
     pub runtime_group: String,
@@ -161,15 +158,34 @@ pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
     let path = config_dir.join(paths::RUNTIME_TOML);
     if path.exists() {
         let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
-        Ok(toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?)
+        let runtime: Runtime =
+            toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+        validate_build_image(&runtime.build_image)?;
+        Ok(runtime)
     } else {
         Ok(Runtime {
             web_root: paths::default_web_root(),
+            build_image: String::new(),
             runtime_user: String::new(),
             runtime_group: String::new(),
             release_group: String::new(),
         })
     }
+}
+
+/// # Errors
+///
+/// Returns an error when the image reference contains shell/control characters.
+pub fn validate_build_image(image: &str) -> Result<()> {
+    if image.is_empty() {
+        return Ok(());
+    }
+
+    if image.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '/' | ':' | '@')) {
+        return Ok(());
+    }
+
+    bail!("Invalid build image: {image}")
 }
 
 pub fn apply_derived_defaults(config: &mut Bones) {
@@ -216,5 +232,17 @@ mod tests {
     #[test]
     fn validate_host_rejects_shell_metacharacters() {
         assert!(validate_host("deploy.example.com;rm -rf /").is_err());
+    }
+
+    #[test]
+    fn validate_build_image_allows_common_references() {
+        assert!(validate_build_image("docker.io/library/node:22-bookworm").is_ok());
+        assert!(validate_build_image("ghcr.io/acme/app@sha256:abc123").is_ok());
+    }
+
+    #[test]
+    fn validate_build_image_rejects_shell_metacharacters() {
+        assert!(validate_build_image("node:22;rm -rf /").is_err());
+        assert!(validate_build_image("node:22 $(whoami)").is_err());
     }
 }

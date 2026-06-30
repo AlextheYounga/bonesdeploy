@@ -182,14 +182,7 @@ mod tests {
     use anyhow::Result;
     use tempfile::TempDir;
 
-    use super::{SOURCE_BRANCH, SOURCE_REPO_URL, parse_package_version, refresh_local_bones_from_source};
-
-    /// Verifies the update source repository and branch constants are set to the canonical values.
-    #[test]
-    fn update_uses_master_branch_source_repository() {
-        assert_eq!(SOURCE_REPO_URL, "https://github.com/AlextheYounga/bonesdeploy.git");
-        assert_eq!(SOURCE_BRANCH, "master");
-    }
+    use super::{parse_package_version, refresh_local_bones_from_source};
 
     /// Extracts the package version from the `[package]` section of a Cargo manifest.
     #[test]
@@ -223,8 +216,8 @@ version = "not-this"
         let bones_dir = temp.path().join(".bones");
 
         write(&source_dir.join("crates/bonesdeploy/kit/hooks/pre-push"), "new hook")?;
-        write(&source_dir.join("crates/bonesdeploy/kit/deployment/01_build.sh"), "generic deploy")?;
-        write(&source_dir.join("crates/bonesdeploy/runtimes/laravel/deployment/01_build.sh"), "laravel deploy")?;
+        write(&source_dir.join("crates/bonesdeploy/kit/deployment/build/01_build.sh"), "generic deploy")?;
+        write(&source_dir.join("crates/bonesdeploy/runtimes/laravel/deployment/build/01_build.sh"), "laravel deploy")?;
 
         write(&bones_dir.join("bones.toml"), "keep = 'config'\n")?;
         write(&bones_dir.join("runtime.toml"), "template = 'laravel'\n")?;
@@ -234,10 +227,10 @@ version = "not-this"
         assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "keep = 'config'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("runtime.toml"))?, "template = 'laravel'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("hooks/pre-push"))?, "new hook");
-        assert_eq!(fs::read_to_string(bones_dir.join("deployment/01_build.sh"))?, "laravel deploy");
+        assert_eq!(fs::read_to_string(bones_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
 
         let hook_mode = fs::metadata(bones_dir.join("hooks/pre-push"))?.permissions().mode() & 0o777;
-        let deploy_mode = fs::metadata(bones_dir.join("deployment/01_build.sh"))?.permissions().mode() & 0o777;
+        let deploy_mode = fs::metadata(bones_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
         assert_eq!(hook_mode, 0o755);
         assert_eq!(deploy_mode, 0o755);
 

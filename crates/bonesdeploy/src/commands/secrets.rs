@@ -19,7 +19,7 @@ const LOCAL_ENV_SECRET: &str = ".bones/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
 
 fn gpg_home() -> PathBuf {
-    paths::bones_config_root().join("gnupg")
+    paths::bones_config_lib_root().join("gnupg")
 }
 
 fn gpg_command() -> Command {
@@ -78,7 +78,6 @@ pub fn edit() -> Result<()> {
         ])?;
     }
 
-    // ponytail: plaintext briefly exists on local disk during edit; upgrade path is stricter temp-file handling or an in-memory editor flow.
     let edit_result = open_editor(&temp_path);
     let encrypt_result = if edit_result.is_ok() {
         run_gpg(&[
@@ -122,7 +121,6 @@ pub async fn push() -> Result<()> {
         runtime.runtime_group
     };
 
-    let deployment = cfg.deployment_paths(paths::DEFAULT_WEB_ROOT);
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     let port = parse_port(&cfg.port)?;
     let session = ssh::connect_as(&ssh_user, &cfg.host, port).await?;
@@ -133,7 +131,8 @@ pub async fn push() -> Result<()> {
     }
 
     let plaintext = decrypt_secret(encrypted_path)?;
-    let target = Path::new(&deployment.shared).join(paths::DOT_ENV);
+    let shared = Path::new(&cfg.project_root).join(paths::SHARED_DIR);
+    let target = shared.join(paths::DOT_ENV);
     let parent = target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
     let parent_s = shell_quote_single(&parent.display().to_string());
     let target_s = shell_quote_single(&target.display().to_string());
@@ -200,9 +199,6 @@ fn extract_fingerprint(output: &str) -> Option<String> {
     None
 }
 
-// ponytail: MVP uses an unprotected local project key inside the private
-// BonesDeploy GPG home; upgrade path is optional passphrase / OS keychain
-// integration.
 fn generate_project_key(project_name: &str, uid: &str) -> Result<String> {
     let email = format!("{project_name}@bonesdeploy.local");
     let params = format!(
@@ -305,13 +301,7 @@ fn shell_quote_single(value: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{extract_fingerprint, gpg_home};
-    use shared::paths;
-
-    #[test]
-    fn gpg_home_resolves_under_bones_config_root() {
-        assert_eq!(gpg_home(), paths::bones_config_root().join("gnupg"));
-    }
+    use super::extract_fingerprint;
 
     #[test]
     fn extract_fingerprint_parses_fpr_line() {

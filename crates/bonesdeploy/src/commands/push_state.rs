@@ -1,39 +1,21 @@
 use std::path::Path;
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
+use std::io::Write as _;
 
 use crate::config;
-use crate::infra::rsync;
 use crate::infra::ssh;
-use shared::config::default_deploy_user;
 use shared::paths;
 
-pub async fn run(show_next: bool) -> Result<()> {
+pub fn run(show_next: bool) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
-    let repo_path = &cfg.repo_path;
 
-    println!("Syncing .bones...");
-    sync_bones_directory(&cfg).context("Failed to sync .bones.")?;
+    println!("Publishing .bones...");
+    sync_bones_directory(&cfg).context("Failed to publish .bones.")?;
 
-    let session = ssh::connect(&cfg).await?;
-    let cmd = format!("find {repo_path}/{}/ -maxdepth 1 -name '*.sample' -delete 2>/dev/null; true", paths::HOOKS_DIR);
-    ssh::run_cmd(&session, &cmd).await?;
-    let cmd = format!(
-        "for hook in {repo_path}/{}/{}/{}; do \
-            name=$(basename \"$hook\"); \
-            ln -sf \"$hook\" \"{repo_path}/{}/$name\"; \
-          done",
-        paths::BONES_DIR,
-        paths::HOOKS_DIR,
-        "*",
-        paths::HOOKS_DIR
-    );
-    ssh::run_cmd(&session, &cmd).await?;
-
-    session.close().await?;
-
-    println!(".bones synced.");
+    println!(".bones published.");
     if show_next {
         println!();
         println!("Next: run bonesdeploy doctor.");
@@ -43,58 +25,60 @@ pub async fn run(show_next: bool) -> Result<()> {
 }
 
 pub(crate) fn sync_bones_directory(cfg: &config::Bones) -> Result<()> {
-    let args = rsync_args(cfg);
-    let arg_refs = args.iter().map(String::as_str).collect::<Vec<_>>();
+    let archive = archive_bones_directory()?;
+    let mut child = ssh::external_command(&cfg.ssh_user, &cfg.host, &cfg.port)
+        .arg(remote_import_command(&cfg.project_name))
+        .stdin(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("Failed to start remote site import")?;
 
-    let status = rsync::status(&arg_refs)?;
+    let mut stdin = child.stdin.take().context("ssh stdin was not piped")?;
+    stdin.write_all(&archive).context("Failed to stream .bones archive to remote host")?;
+    drop(stdin);
 
-    if !status.success() {
-        bail!("rsync failed");
+    let output = child.wait_with_output().context("Failed to finish remote site import")?;
+    if output.status.success() {
+        return Ok(());
     }
 
-    Ok(())
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    bail!("Failed to import remote site state\n{stderr}")
 }
 
-pub(crate) fn rsync_args(cfg: &config::Bones) -> Vec<String> {
-    let user = default_deploy_user();
-    let host = &cfg.host;
-    let port = &cfg.port;
-    let repo_path = &cfg.repo_path;
-    let dest = format!("{user}@{host}:{repo_path}/{}/", paths::BONES_DIR);
+pub(crate) fn remote_import_command(site: &str) -> String {
+    format!("bonesremote site import --site '{site}'")
+}
 
-    let ssh_arg = format!("ssh -p {port} -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null");
-    let source = format!("{}/", paths::LOCAL_BONES_DIR);
-    vec![
-        String::from("-av"),
-        String::from("--delete"),
-        String::from("--exclude"),
-        String::from(paths::KIT_SECRETS_DIR),
-        String::from("-e"),
-        ssh_arg,
-        source,
-        dest,
-    ]
+fn archive_bones_directory() -> Result<Vec<u8>> {
+    let output = Command::new("tar")
+        .args(["-czf", "-", "--exclude", "./secrets", "-C", paths::LOCAL_BONES_DIR, "."])
+        .output()
+        .context("Failed to run tar for .bones")?;
+
+    if output.status.success() {
+        return Ok(output.stdout);
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    bail!("Failed to archive .bones\n{stderr}")
 }
 
 #[cfg(test)]
 mod tests {
-    use super::rsync_args;
-    use crate::config::Bones;
+    use std::path::Path;
+
+    use super::remote_import_command;
+    use shared::paths;
 
     #[test]
-    fn rsync_args_exclude_local_secrets_directory_only() {
-        let cfg = Bones {
-            host: String::from("deploy.example.com"),
-            port: String::from("22"),
-            repo_path: String::from("/home/git/acme.git"),
-            ..Default::default()
-        };
+    fn local_secrets_path_stays_under_bones_dir() {
+        let path = Path::new(paths::LOCAL_BONES_SECRETS_DIR);
+        assert_eq!(path.parent(), Some(Path::new(paths::LOCAL_BONES_DIR)));
+    }
 
-        let args = rsync_args(&cfg);
-        let excludes =
-            args.windows(2).filter(|pair| pair[0] == "--exclude").map(|pair| pair[1].as_str()).collect::<Vec<_>>();
-
-        assert!(excludes.contains(&"secrets/"));
-        assert!(!excludes.contains(&"secrets.toml"));
+    #[test]
+    fn remote_import_command_targets_control_plane_import() {
+        assert_eq!(remote_import_command("acme"), "bonesremote site import --site 'acme'");
     }
 }

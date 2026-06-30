@@ -3,7 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::Serialize;
 use shared::config;
 use shared::paths;
@@ -29,26 +29,27 @@ struct ServiceStatus {
     enabled: String,
 }
 
-pub fn run(config_path: &str) -> Result<()> {
-    let report = build_report(config_path)?;
+pub fn run(site: &str) -> Result<()> {
+    let report = build_report(site)?;
     println!("{}", serde_json::to_string(&report)?);
     Ok(())
 }
 
-fn build_report(config_path: &str) -> Result<Report> {
-    let config_path = Path::new(config_path);
-    let cfg = config::load(config_path)?;
-    let runtime = config::load_runtime(config_path.parent().unwrap_or_else(|| Path::new(".")))?;
-    let deployment = cfg.deployment_paths(&runtime.web_root);
+fn build_report(site: &str) -> Result<Report> {
+    let config_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&config_path).context("Failed to load remote bones.toml")?;
+    let current = Path::new(&cfg.project_root).join(paths::CURRENT_LINK);
+    let nginx_site_available =
+        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", &cfg.project_name)).display().to_string();
 
     Ok(Report {
-        current_release: current_release(&deployment.current),
-        ssl: ssl_status(&cfg, &deployment.nginx_site_available),
+        current_release: current_release(&current),
+        ssl: ssl_status(&cfg, &nginx_site_available),
         services: services(&cfg.project_name),
     })
 }
 
-fn current_release(current_path: &str) -> String {
+fn current_release(current_path: &Path) -> String {
     fs::read_link(current_path).map_or_else(
         |_| String::from("unknown"),
         |path| path.file_name().map_or_else(|| String::from("unknown"), |name| name.to_string_lossy().to_string()),

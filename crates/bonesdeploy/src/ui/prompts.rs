@@ -209,47 +209,22 @@ pub fn prompt_port(
 }
 
 pub fn confirm_remote_setup() -> Result<bool> {
-    println!();
-    for line in remote_setup_prompt_lines() {
-        println!("{line}");
-    }
-    println!();
-    Confirm::new("Bootstrap remote server?").with_default(false).prompt().map_err(|err| anyhow!(err))
+    confirm_prompt("Bootstrap remote server?", "Remote bootstrap prepares the VPS for this project.")
 }
 
 pub fn confirm_remote_runtime() -> Result<bool> {
-    println!();
-    for line in remote_runtime_prompt_lines() {
-        println!("{line}");
-    }
-    println!();
-    Confirm::new("Apply runtime setup?").with_default(false).prompt().map_err(|err| anyhow!(err))
-}
-
-#[cfg(test)]
-fn is_affirmative(answer: &str) -> bool {
-    matches!(answer.trim().to_ascii_lowercase().as_str(), "y" | "yes")
-}
-
-fn remote_setup_prompt_lines() -> [&'static str; 1] {
-    ["Remote bootstrap prepares the VPS for this project."]
-}
-
-fn remote_runtime_prompt_lines() -> [&'static str; 1] {
-    ["Runtime setup installs app services for this project."]
+    confirm_prompt("Apply runtime setup?", "Runtime setup installs app services for this project.")
 }
 
 pub fn confirm_remote_ssl() -> Result<bool> {
-    println!();
-    for line in remote_ssl_prompt_lines() {
-        println!("{line}");
-    }
-    println!();
-    Confirm::new("Configure HTTPS?").with_default(false).prompt().map_err(|err| anyhow!(err))
+    confirm_prompt("Configure HTTPS?", "HTTPS requires DNS to point at this server.")
 }
 
-fn remote_ssl_prompt_lines() -> [&'static str; 1] {
-    ["HTTPS requires DNS to point at this server."]
+fn confirm_prompt(prompt: &str, message: &str) -> Result<bool> {
+    println!();
+    println!("{message}");
+    println!();
+    Confirm::new(prompt).with_default(false).prompt().map_err(|err| anyhow!(err))
 }
 
 fn prompt_remote_name_text(existing_config: Option<&Bones>) -> Result<String> {
@@ -281,41 +256,4 @@ pub fn prompt_ssl_email(existing_config: Option<&Bones>) -> Result<String> {
         .prompt()
         .map(|value| value.trim().to_string())
         .map_err(|err| anyhow!(err))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{is_affirmative, remote_runtime_prompt_lines, remote_setup_prompt_lines};
-
-    /// Accepts common yes values like y, yes, and YES.
-    #[test]
-    fn confirmation_parser_accepts_common_yes_values() {
-        assert!(is_affirmative("y"));
-        assert!(is_affirmative(" yes "));
-        assert!(is_affirmative("YES"));
-    }
-
-    /// Rejects non-affirmative values like empty string, n, and no.
-    #[test]
-    fn confirmation_parser_rejects_non_affirmative_values() {
-        assert!(!is_affirmative(""));
-        assert!(!is_affirmative("n"));
-        assert!(!is_affirmative("no"));
-    }
-
-    /// Mentions VPS in the remote bootstrap prompt.
-    #[test]
-    fn remote_setup_prompt_lines_mention_vps() {
-        let joined = remote_setup_prompt_lines().join("\n");
-
-        assert!(joined.contains("VPS"), "remote bootstrap prompt should mention VPS\n{joined}");
-    }
-
-    /// Mentions app services in the remote runtime prompt.
-    #[test]
-    fn remote_runtime_prompt_lines_mention_app_services() {
-        let joined = remote_runtime_prompt_lines().join("\n");
-
-        assert!(joined.contains("app services"), "remote runtime prompt should mention app services\n{joined}");
-    }
 }
