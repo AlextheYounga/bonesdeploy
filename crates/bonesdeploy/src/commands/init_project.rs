@@ -4,10 +4,8 @@ use std::path::Path;
 
 use crate::commands::init_config;
 pub use crate::commands::init_config::InitArgs;
-use crate::commands::remote_setup;
 use crate::config;
 use crate::infra::bonesinfra;
-use crate::infra::bonesinfra_cli;
 use crate::infra::embedded;
 use crate::infra::git;
 use crate::ui::prompts;
@@ -28,13 +26,12 @@ fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Resu
     git::ensure_git_repository()?;
 
     println!("Initializing bonesdeploy...");
-    prefetch_bonesinfra()?;
+    prefetch_bonesinfra()?; // Allows us to skip this step in tests. 
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     let had_bones_entry = fs::symlink_metadata(bones_dir).is_ok();
-    let has_live_bones_dir = bones_dir.exists();
+    let mut has_live_bones_dir = bones_dir.exists();
     let is_fresh = !has_live_bones_dir;
-
     if !is_fresh {
         println!("Using existing .bones config.");
     }
@@ -42,10 +39,10 @@ fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Resu
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = if is_fresh { collect_fresh_config(args)? } else { load_or_collect_config(bones_toml, args)? };
     let runtime_selection = if is_fresh { Some(collect_runtime_config(args, &cfg.project_name)?) } else { None };
-    let remote_setup_ran = args.setup_remote || (!args.non_interactive && prompts::confirm_remote_setup()?);
 
     if let Some(runtime) = runtime_selection {
         materialize_fresh_bones(bones_dir, had_bones_entry, &cfg, runtime)?;
+        has_live_bones_dir = true;
     }
 
     update_gitignore()?;
@@ -62,18 +59,14 @@ fn run_with_prefetch(args: &InitArgs, prefetch_bonesinfra: impl FnOnce() -> Resu
 
     symlink_pre_push()?;
 
-    if remote_setup_ran {
-        remote_setup::run()?;
-    } else {
-        print_follow_up_hint();
-    }
+    print_follow_up_hint();
 
-    Ok(remote_setup_ran)
+    Ok(has_live_bones_dir)
 }
 
 fn print_follow_up_hint() {
     println!();
-    println!("Next: run bonesdeploy setup.");
+    println!("Next: run `bonesdeploy setup` to setup the remote server.");
 }
 
 fn collect_fresh_config(args: &InitArgs) -> Result<config::Bones> {
@@ -99,7 +92,7 @@ fn collect_runtime_config(args: &InitArgs, project_name: &str) -> Result<Runtime
         let answers = if args.non_interactive {
             serde_json::Value::Object(defaults.clone())
         } else {
-            let questions = bonesinfra_cli::runtime_questions(template_name)?;
+            let questions = bonesinfra::runtime_questions(template_name)?;
             prompts::prompt_runtime_questions(&questions, &serde_json::Value::Object(defaults.clone()))?
         };
         let mut map = answers.as_object().cloned().unwrap_or(defaults);

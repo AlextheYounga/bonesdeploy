@@ -1,21 +1,25 @@
 use std::fs;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
+use shared::config;
 use shared::paths;
-use shared::registry;
 
 use crate::privileges;
 use crate::release_state;
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release prune")?;
-    registry::validate_site_name(site)?;
 
-    let registry_path = paths::bonesremote_registry_path(site);
-    let cfg = registry::load(&registry_path)
-        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path)
+        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
 
-    let pruned = prune_old_releases(&cfg)?;
+    if cfg.project_name != site {
+        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
+    }
+
+    let project_root = &cfg.project_root;
+    let pruned = prune_old_releases(project_root, cfg.releases_keep)?;
     if !pruned.is_empty() {
         println!("Pruned releases: {}", pruned.join(", "));
     }
@@ -23,10 +27,10 @@ pub fn run(site: &str) -> Result<()> {
     Ok(())
 }
 
-fn prune_old_releases(cfg: &registry::Registry) -> Result<Vec<String>> {
-    let active_release = release_state::current_release_name(cfg)?;
-    let mut releases = release_state::list_releases_sorted(cfg)?;
-    let keep = cfg.releases_keep.max(1);
+fn prune_old_releases(project_root: &str, keep: usize) -> Result<Vec<String>> {
+    let active_release = release_state::current_release_name(project_root)?;
+    let mut releases = release_state::list_releases_sorted(project_root)?;
+    let keep = keep.max(1);
 
     let mut pruned = Vec::new();
     while releases.len() > keep {
@@ -37,7 +41,7 @@ fn prune_old_releases(cfg: &registry::Registry) -> Result<Vec<String>> {
             continue;
         }
 
-        let path = release_state::release_dir(cfg, &oldest);
+        let path = release_state::release_dir(project_root, &oldest);
         if path.exists() {
             fs::remove_dir_all(&path).with_context(|| format!("Failed to prune old release {}", path.display()))?;
             pruned.push(oldest);
@@ -58,7 +62,6 @@ mod tests {
 
     use anyhow::Result;
     use shared::paths;
-    use shared::registry::Registry;
 
     use super::prune_old_releases;
 
@@ -69,21 +72,8 @@ mod tests {
         Ok(path)
     }
 
-    fn config_for(temp_root: &Path, keep: usize) -> Registry {
-        let site_root = temp_root.join("project_root");
-        Registry {
-            site: String::from("acme"),
-            repo_path: temp_root.join("repo.git").to_string_lossy().to_string(),
-            site_root: site_root.to_string_lossy().to_string(),
-            shared_root: site_root.join(paths::SHARED_DIR).to_string_lossy().to_string(),
-            releases_root: site_root.join(paths::RELEASES_DIR).to_string_lossy().to_string(),
-            current_path: site_root.join(paths::CURRENT_LINK).to_string_lossy().to_string(),
-            runtime_user: String::from("acme"),
-            runtime_group: String::from("acme"),
-            branch: String::from("main"),
-            deploy_on_push: true,
-            releases_keep: keep,
-        }
+    fn project_root_for(temp_root: &Path) -> String {
+        temp_root.join("project_root").to_string_lossy().to_string()
     }
 
     fn make_release(root: &Path, name: &str) -> Result<()> {
@@ -103,14 +93,14 @@ mod tests {
     #[test]
     fn prune_old_releases_removes_oldest_inactive_releases_up_to_keep_limit() -> Result<()> {
         let root = temp_dir("bonesremote_post_deploy_prune")?;
-        let cfg = config_for(&root, 2);
+        let project_root = project_root_for(&root);
 
         make_release(&root, "20260101_000000")?;
         make_release(&root, "20260102_000000")?;
         make_release(&root, "20260103_000000")?;
         set_current_release(&root, "20260103_000000")?;
 
-        let pruned = prune_old_releases(&cfg)?;
+        let pruned = prune_old_releases(&project_root, 2)?;
 
         assert_eq!(pruned, vec!["20260101_000000"]);
         assert!(!root.join("project_root").join(paths::RELEASES_DIR).join("20260101_000000").exists());
@@ -124,13 +114,13 @@ mod tests {
     #[test]
     fn prune_old_releases_keeps_active_release_when_within_keep_limit() -> Result<()> {
         let root = temp_dir("bonesremote_post_deploy_prune_active")?;
-        let cfg = config_for(&root, 2);
+        let project_root = project_root_for(&root);
 
         make_release(&root, "20260101_000000")?;
         make_release(&root, "20260102_000000")?;
         set_current_release(&root, "20260101_000000")?;
 
-        let pruned = prune_old_releases(&cfg)?;
+        let pruned = prune_old_releases(&project_root, 2)?;
 
         assert!(pruned.is_empty());
         assert!(root.join("project_root").join(paths::RELEASES_DIR).join("20260101_000000").exists());

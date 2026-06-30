@@ -114,11 +114,7 @@ Install the remote runner on the server:
 sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
-Initialize the remote side:
-
-```sh
-sudo bonesremote init
-```
+Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy init` remote setup.
 
 ## Start a Project
 

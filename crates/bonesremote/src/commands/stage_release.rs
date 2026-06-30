@@ -2,8 +2,8 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
+use shared::config;
 use shared::paths;
-use shared::registry;
 use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -14,17 +14,21 @@ use crate::release_state;
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release stage")?;
 
-    let registry_path = paths::bonesremote_registry_path(site);
-    let cfg = registry::load(&registry_path)
-        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path)
+        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
 
-    let project_root = Path::new(&cfg.site_root);
+    if cfg.project_name != site {
+        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
+    }
+
+    let project_root = Path::new(&cfg.project_root);
     require_dir(project_root, "project_root directory")?;
-    require_dir(&release_state::releases_dir(&cfg), "releases")?;
-    require_dir(&release_state::shared_dir(&cfg), "shared")?;
+    require_dir(&Path::new(&cfg.project_root).join(paths::RELEASES_DIR), "releases")?;
+    require_dir(&Path::new(&cfg.project_root).join(paths::SHARED_DIR), "shared")?;
 
     let release_name = create_release_name()?;
-    let release_dir = release_state::release_dir(&cfg, &release_name);
+    let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
     fs::create_dir_all(&release_dir)
         .with_context(|| format!("Failed to create release dir: {}", release_dir.display()))?;
 

@@ -2,10 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{Runtime, load_runtime};
+use shared::config::{self, Runtime, load_runtime, runtime_user_for};
 use shared::paths;
 use shared::paths::default_web_root;
-use shared::registry;
 
 use crate::privileges;
 use crate::release::scripts as deploy_output;
@@ -13,11 +12,14 @@ use crate::release_state;
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release prepare")?;
-    registry::validate_site_name(site)?;
 
-    let registry_path = paths::bonesremote_registry_path(site);
-    let cfg = registry::load(&registry_path)
-        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path)
+        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
+
+    if cfg.project_name != site {
+        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
+    }
 
     let scripts_dir =
         paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR).join(paths::DEPLOYMENT_PREPARE_DIR);
@@ -33,18 +35,21 @@ pub fn run(site: &str) -> Result<()> {
     }
 
     let release_name = release_state::read_staged_release(site)?;
-    let release_dir = release_state::release_dir(&cfg, &release_name);
+    let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
     if !release_dir.is_dir() {
         bail!("Promoted release is missing: {}", release_dir.display());
     }
 
-    let runtime = load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
-        web_root: default_web_root(),
-        build_image: String::new(),
-        runtime_user: String::new(),
-        runtime_group: String::new(),
-        release_group: String::new(),
-    });
+    let Runtime { web_root, runtime_user, .. } =
+        load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
+            web_root: default_web_root(),
+            build_image: String::new(),
+            runtime_user: String::new(),
+            runtime_group: String::new(),
+            release_group: String::new(),
+        });
+
+    let runtime_user = if runtime_user.is_empty() { runtime_user_for(&cfg.project_name) } else { runtime_user };
 
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
@@ -55,10 +60,10 @@ pub fn run(site: &str) -> Result<()> {
             &release_dir,
             &release_dir.join(format!("{script_name}.log")),
             &deploy_output::PrepareScriptEnv {
-                project_name: &cfg.site,
-                project_root: &cfg.site_root,
-                runtime_user: &cfg.runtime_user,
-                web_root: &runtime.web_root,
+                project_name: &cfg.project_name,
+                project_root: &cfg.project_root,
+                runtime_user: &runtime_user,
+                web_root: &web_root,
             },
         )
         .with_context(|| format!("Failed to execute prepare script {}", script.display()))?;

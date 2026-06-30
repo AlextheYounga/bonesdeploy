@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
-use crate::infra::bonesinfra_cli;
+use crate::infra::bonesinfra;
 use crate::infra::git;
 use crate::ui::prompts;
 use shared::paths;
@@ -24,7 +24,7 @@ pub fn run(yes: bool) -> Result<()> {
 
     println!("Applying runtime...");
 
-    bonesinfra_cli::run(&[
+    bonesinfra::run(&[
         "runtime",
         "apply",
         "--config",

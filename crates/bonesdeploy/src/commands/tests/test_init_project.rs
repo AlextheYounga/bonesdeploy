@@ -84,7 +84,6 @@ impl Drop for TestEnvironment {
 fn init_args() -> InitArgs {
     InitArgs {
         non_interactive: true,
-        setup_remote: false,
         project_name: Some(String::from("atlas")),
         branch: None,
         remote: None,
@@ -139,7 +138,6 @@ fn collect_non_interactive_uses_existing_and_cli_values_without_prompting() -> R
     let existing = incomplete_existing("atlas");
     let args = InitArgs {
         non_interactive: true,
-        setup_remote: false,
         project_name: None,
         branch: None,
         remote: None,
@@ -164,7 +162,6 @@ fn collect_non_interactive_requires_host_when_existing_and_cli_are_missing_it() 
     let existing = incomplete_existing("atlas");
     let args = InitArgs {
         non_interactive: true,
-        setup_remote: false,
         project_name: None,
         branch: None,
         remote: None,

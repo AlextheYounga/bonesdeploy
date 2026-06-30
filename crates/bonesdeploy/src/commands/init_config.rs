@@ -7,7 +7,6 @@ use shared::paths;
 
 pub struct InitArgs {
     pub non_interactive: bool,
-    pub setup_remote: bool,
     pub project_name: Option<String>,
     pub branch: Option<String>,
     pub remote: Option<String>,

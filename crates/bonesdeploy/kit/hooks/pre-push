@@ -13,20 +13,20 @@ set -euo pipefail
 REMOTE_NAME="$1"
 REPO_ROOT=$(git rev-parse --show-toplevel)
 cd "$REPO_ROOT"
-HOOKS_LIB="$REPO_ROOT/.bones/hooks/hooks.sh"
 
-if [ ! -f "$HOOKS_LIB" ]; then
-	echo "[bonesdeploy] Missing hook library: $HOOKS_LIB"
-	exit 1
+if [ ! -f ".bones/bones.toml" ]; then
+	exit 0
 fi
 
-# shellcheck source=/dev/null
-. "$HOOKS_LIB"
+DEPLOY_REMOTE=$(grep -oP '^\s*remote_name\s*=\s*"\K[^"]+' .bones/bones.toml 2>/dev/null || true)
+if [ "$REMOTE_NAME" != "$DEPLOY_REMOTE" ]; then
+	exit 0
+fi
 
-main() {
-	if bones_should_run_for_remote "$REMOTE_NAME"; then
-		bones_run_doctor_local
-	fi
-}
+if ! command -v bonesdeploy &>/dev/null; then
+	echo "[bonesdeploy] bonesdeploy not found in PATH, skipping pre-push checks"
+	exit 0
+fi
 
-main
+echo "[bonesdeploy] Running pre-push checks..."
+bonesdeploy doctor --local

@@ -3,25 +3,42 @@ use std::os::unix::fs::symlink;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
-use shared::{paths, registry};
+use shared::config;
+use shared::paths;
 
 use crate::privileges;
 use crate::release_state;
 
+fn validate_site_name(site: &str) -> Result<()> {
+    if site.is_empty() {
+        bail!("Site name cannot be empty");
+    }
+
+    if site.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') {
+        return Ok(());
+    }
+
+    bail!("Invalid site name: {site}")
+}
+
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release wire")?;
-    registry::validate_site_name(site)?;
+    validate_site_name(site)?;
 
-    let registry_path = paths::bonesremote_registry_path(site);
-    let cfg = registry::load(&registry_path).context(super::deploy::registry_load_error())?;
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path).context("Failed to load remote site state")?;
+
+    if cfg.project_name != site {
+        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
+    }
 
     let release_name = release_state::read_staged_release(site)?;
-    let release_dir = release_state::release_dir(&cfg, &release_name);
+    let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
     if !release_dir.is_dir() {
         bail!("Promoted release is missing: {}", release_dir.display());
     }
 
-    let shared_dir = release_state::shared_dir(&cfg);
+    let shared_dir = release_state::shared_dir(&cfg.project_root);
     if !shared_dir.is_dir() {
         bail!(
             "Shared root is missing: {}. Run 'bonesdeploy remote setup' or runtime provisioning first.",

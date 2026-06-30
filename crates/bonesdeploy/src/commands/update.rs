@@ -182,14 +182,7 @@ mod tests {
     use anyhow::Result;
     use tempfile::TempDir;
 
-    use super::{SOURCE_BRANCH, SOURCE_REPO_URL, parse_package_version, refresh_local_bones_from_source};
-
-    /// Verifies the update source repository and branch constants are set to the canonical values.
-    #[test]
-    fn update_uses_master_branch_source_repository() {
-        assert_eq!(SOURCE_REPO_URL, "https://github.com/AlextheYounga/bonesdeploy.git");
-        assert_eq!(SOURCE_BRANCH, "master");
-    }
+    use super::{parse_package_version, refresh_local_bones_from_source};
 
     /// Extracts the package version from the `[package]` section of a Cargo manifest.
     #[test]

@@ -14,9 +14,6 @@ pub enum Command {
         /// Skip all interactive prompts; required fields must be provided via flags
         #[arg(long)]
         non_interactive: bool,
-        /// Run remote setup after init (instead of prompting)
-        #[arg(long)]
-        setup_remote: bool,
         /// Project name (default: current directory name)
         #[arg(long)]
         project_name: Option<String>,
@@ -55,8 +52,6 @@ pub enum Command {
     },
     /// Publish .bones/ into bonesremote's remote control-plane state
     Push,
-    /// Recover .bones/ from bonesremote's remote control-plane state
-    Pull,
     /// Manage encrypted local secrets and push them to remote shared/
     Secrets {
         #[command(subcommand)]
@@ -78,8 +73,6 @@ pub enum Command {
         #[command(subcommand)]
         command: RemoteCommand,
     },
-    /// Open remote server management TUI
-    Manage,
     /// Roll back current release to the previous one
     Rollback,
     /// Get a config value from a TOML file

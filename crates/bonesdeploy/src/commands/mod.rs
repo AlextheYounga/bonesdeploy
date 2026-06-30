@@ -5,8 +5,6 @@ pub mod deploy_project;
 pub mod doctor;
 pub mod guide;
 pub mod init_project;
-pub mod manage;
-pub mod pull_state;
 pub mod push_state;
 pub mod remote_data;
 pub mod remote_runtime;

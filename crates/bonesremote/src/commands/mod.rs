@@ -4,7 +4,6 @@ pub(crate) mod doctor;
 pub(crate) mod doctor_site;
 pub(crate) mod drop_failed_release;
 pub(crate) mod hook;
-pub(crate) mod init;
 pub(crate) mod post_deploy;
 pub(crate) mod release_build;
 pub(crate) mod release_checkout;

@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
-use crate::paths::{self, Deployment};
+use crate::paths;
 
 /// Keys in the JSON object that bonesdeploy sends to bonesinfra.
 pub mod bonesinfra_input {
@@ -62,12 +62,7 @@ impl Default for Bones {
     }
 }
 
-impl Bones {
-    #[must_use]
-    pub fn deployment_paths(&self, web_root: &str) -> Deployment {
-        Deployment::new(&self.project_name, &self.repo_path, &self.project_root, web_root)
-    }
-}
+impl Bones {}
 
 #[must_use]
 pub fn default_deploy_user() -> String {

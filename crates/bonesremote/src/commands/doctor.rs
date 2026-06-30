@@ -82,10 +82,9 @@ fn check_passwordless_sudo(issues: &mut Vec<String>) {
         match result {
             Ok(output) if output.status.success() => {}
             _ => issues.push(format!(
-                "{} is not allowed via passwordless sudo: {} (run 'sudo {} init')",
+                "{} is not allowed via passwordless sudo: {} (ensure bonesinfra has provisioned the sudoers policy on this host)",
                 paths::BONESREMOTE_BINARY,
                 command.join(" "),
-                paths::BONESREMOTE_BINARY
             )),
         }
     }
@@ -195,25 +194,11 @@ fn check_apparmor_unit_wiring(profile_names: &[String], issues: &mut Vec<String>
         let contents = fs::read_to_string(path);
 
         match contents {
-            Ok(contents) => match apparmor_unit_wiring_status(&contents, &installed_profiles) {
-                AppArmorUnitWiringStatus::Ok => {}
-                AppArmorUnitWiringStatus::MissingOrdering => {
-                    issues.push(format!(
-                        "AppArmor check failed: {} is missing apparmor.service ordering or dependency",
-                        path.display()
-                    ));
+            Ok(contents) => {
+                if let Some(msg) = apparmor_unit_wiring_issue(&contents, &installed_profiles) {
+                    issues.push(format!("AppArmor check failed: {path_display} {msg}", path_display = path.display()));
                 }
-                AppArmorUnitWiringStatus::MissingProfile => {
-                    issues.push(format!("AppArmor check failed: {} is missing AppArmorProfile=", path.display()));
-                }
-                AppArmorUnitWiringStatus::UnknownProfile(profile_name) => {
-                    issues.push(format!(
-                        "AppArmor check failed: {} references unknown AppArmor profile {}",
-                        path.display(),
-                        profile_name
-                    ));
-                }
-            },
+            }
             Err(error) => {
                 issues.push(format!("AppArmor check failed: could not read {} ({error})", path.display()));
             }
@@ -257,29 +242,21 @@ fn apparmor_profile_binding(contents: &str) -> Option<&str> {
     systemd_directive_values(contents, "AppArmorProfile").into_iter().next()
 }
 
-enum AppArmorUnitWiringStatus {
-    Ok,
-    MissingOrdering,
-    MissingProfile,
-    UnknownProfile(String),
-}
-
-fn apparmor_unit_wiring_status(contents: &str, installed_profiles: &HashSet<&str>) -> AppArmorUnitWiringStatus {
-    let has_apparmor_after = systemd_directive_contains_token(contents, "After", "apparmor.service");
-    let has_apparmor_requires = systemd_directive_contains_token(contents, "Requires", "apparmor.service");
-
-    if !has_apparmor_after || !has_apparmor_requires {
-        return AppArmorUnitWiringStatus::MissingOrdering;
+fn apparmor_unit_wiring_issue(contents: &str, installed_profiles: &HashSet<&str>) -> Option<String> {
+    if !systemd_directive_contains_token(contents, "After", "apparmor.service")
+        || !systemd_directive_contains_token(contents, "Requires", "apparmor.service")
+    {
+        return Some(String::from("is missing apparmor.service ordering or dependency"));
     }
 
     let Some(profile_name) = apparmor_profile_binding(contents) else {
-        return AppArmorUnitWiringStatus::MissingProfile;
+        return Some(String::from("is missing AppArmorProfile="));
     };
 
     if installed_profiles.contains(profile_name) {
-        AppArmorUnitWiringStatus::Ok
+        None
     } else {
-        AppArmorUnitWiringStatus::UnknownProfile(profile_name.to_string())
+        Some(format!("references unknown AppArmor profile {profile_name}"))
     }
 }
 

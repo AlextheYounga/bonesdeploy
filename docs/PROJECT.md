@@ -149,7 +149,7 @@ bonesdeploy/
 │   │       ├── cli/            # clap args + dispatch
 │   │       ├── commands/       # remote release lifecycle steps
 │   │       ├── config.rs
-│   │       ├── privileges.rs   # sudoers drop-in install + privilege checks
+│   │       ├── privileges.rs   # privilege checks for root-only commands
 │   │       ├── release/
 │   │       ├── release_state.rs
 │   │       └── main.rs
@@ -193,7 +193,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 - **push**
   - Archives the local `.bones/` dataset, excluding local secrets, and streams it to `bonesremote site import --site <project>` over SSH.
-  - `bonesremote` validates the dataset, derives a root-owned `registry.toml`, and atomically replaces the current remote site state under `/root/.config/bonesremote/sites/<project>/`.
+  - `bonesremote` validates the dataset and atomically replaces the current remote site state under `/root/.config/bonesremote/sites/<project>/`.
   - The bare repo is no longer the control-plane storage target for `push`.
 
 - **pull**
@@ -209,7 +209,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Passes `bones.toml` deployment values plus computed paths and variables as JSON on stdin.
   - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
-  - Installs `bonesremote` from source and runs `bonesremote init`.
+  - Installs `bonesremote` from source.
+  - Installs the deploy-user sudoers policy through `bonesinfra` host provisioning.
   - Provisions machine-level dependencies (users, groups, firewall, system packages).
 
 - **remote runtime**:
@@ -256,9 +257,6 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - On failure, automatically drops the staged release.
   - `--site <name>`: imported site identifier used to load root-owned registry state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
-- **init**:
-  - Must be run as sudo.
-  - Installs a drop-in file at `/etc/sudoers.d/bonesdeploy` to allow only the thin hook, service restart, rollback, failed-release cleanup, and prune commands without requiring a password.
 - **doctor**:
   - Host mode checks `bonesremote` in `PATH`, Podman, AppArmor support, and the deploy-user sudoers drop-in.
   - `--site <name>` also checks the imported site boundary: validated control-plane state, bare repo and thin hook, runtime identity constraints, `shared/` and `releases/` layout, and `<site>-nginx.service`.
@@ -278,7 +276,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Echoes the installed `bonesremote` version.
 
 ## Security Notes
-- Sudo access for the deployment user is strictly limited to passwordless execution of `bonesremote service restart --config *` via the `/etc/sudoers.d/bonesdeploy` drop-in installed by `bonesremote init`.
+- Sudo access for the deployment user is strictly limited by the `/etc/sudoers.d/bonesdeploy` drop-in provisioned by `bonesinfra` on the host.
 - No broader sudo privileges are granted — the deploy user cannot run arbitrary commands as root, read root-owned files, or write outside their owned directories.
 - All release artifacts are created with the setgid bit on `releases/` so the runtime group inherits read access without needing a post-deploy chown.
 - The build workspace (`build/`) is private to the deploy user (`0700`), invisible to other processes.

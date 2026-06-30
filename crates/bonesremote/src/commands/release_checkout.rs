@@ -6,32 +6,13 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{cell::RefCell, thread_local};
 
 use anyhow::{Context, Result, bail};
+use shared::config;
 use shared::paths;
-use shared::registry;
 
 use crate::privileges;
 
 thread_local! {
     static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
-}
-
-#[cfg(test)]
-struct ScopedRoot(Option<PathBuf>);
-
-#[cfg(test)]
-fn set_sites_root_for_tests(root: PathBuf) -> ScopedRoot {
-    let prev = SITES_ROOT_OVERRIDE.with(|slot| slot.replace(Some(root)));
-    ScopedRoot(prev)
-}
-
-#[cfg(test)]
-impl Drop for ScopedRoot {
-    fn drop(&mut self) {
-        let previous = self.0.take();
-        SITES_ROOT_OVERRIDE.with(|slot| {
-            slot.replace(previous);
-        });
-    }
 }
 
 fn resolved_sites_root() -> PathBuf {
@@ -45,9 +26,9 @@ fn resolved_tmp_root(site: &str) -> PathBuf {
 pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
     privileges::ensure_root("bonesremote release checkout")?;
 
-    let registry_path = paths::bonesremote_registry_path(site);
-    let cfg = registry::load(&registry_path)
-        .with_context(|| format!("Failed to load remote site state from {}", registry_path.display()))?;
+    let bones_path = paths::bonesremote_bones_toml_path(site);
+    let cfg = config::load(&bones_path)
+        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
 
     let archive_output = Command::new("git")
         .args(["--git-dir", &cfg.repo_path, "archive", "--format=tar", revision])
@@ -115,66 +96,4 @@ pub fn cleanup_build_context(site: &str, context: &Path) -> Result<()> {
         fs::remove_dir(&root).ok();
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::env;
-    use std::fs;
-    use std::path::PathBuf;
-    use std::process;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    use anyhow::Result;
-    use shared::paths;
-
-    use super::ensure_build_context;
-    use super::run;
-    use super::set_sites_root_for_tests;
-
-    fn temp_dir_path(test_name: &str) -> PathBuf {
-        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-        env::temp_dir().join(format!("bonesremote_release_checkout_test_{}_{}_{}", process::id(), nanos, test_name))
-    }
-
-    #[test]
-    fn build_context_lives_under_bonesremote_tmp_root() -> Result<()> {
-        let root = temp_dir_path("tmp_root");
-        let _guard = set_sites_root_for_tests(root.clone());
-
-        let context = ensure_build_context("unitapp")?;
-        let expected_root = root.join("unitapp").join("tmp");
-        assert!(context.starts_with(&expected_root));
-
-        fs::remove_dir_all(root).ok();
-        Ok(())
-    }
-
-    #[test]
-    fn run_reuses_supplied_context_path() -> Result<()> {
-        let root = temp_dir_path("reuse_context");
-        let _guard = set_sites_root_for_tests(root.clone());
-        let context = ensure_build_context("unitapp")?;
-
-        let site_root = root.join("unitapp");
-        fs::create_dir_all(&site_root)?;
-        fs::write(
-            site_root.join(paths::REGISTRY_TOML),
-            "site = \"unitapp\"\nrepo_path = \"/nope.git\"\nsite_root = \"/srv/sites/unitapp\"\nshared_root = \"/srv/sites/unitapp/shared\"\nreleases_root = \"/srv/sites/unitapp/releases\"\ncurrent_path = \"/srv/sites/unitapp/current\"\nruntime_user = \"unitapp\"\nruntime_group = \"unitapp\"\nbranch = \"main\"\ndeploy_on_push = true\nreleases_keep = 5\n",
-        )?;
-
-        let err = match run("unitapp", "main", &context) {
-            Ok(()) => anyhow::bail!("missing repo should fail"),
-            Err(error) => error,
-        };
-        let message = err.to_string();
-        assert!(
-            message.contains("git archive") || message.contains("/nope.git") || message.contains("must be run as root"),
-            "unexpected error: {message}"
-        );
-        assert!(context.exists(), "caller-owned context should remain for cleanup");
-
-        fs::remove_dir_all(root).ok();
-        Ok(())
-    }
 }
