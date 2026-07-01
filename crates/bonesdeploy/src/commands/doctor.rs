@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 use anyhow::Result;
 
@@ -21,6 +22,13 @@ pub async fn run(local_only: bool) -> Result<()> {
         "deployment scripts",
         check_deployment_scripts(),
         Some(String::from("rename it with a numeric prefix, like 01_build.sh")),
+    );
+
+    let local_branch_issue = cfg.as_ref().and_then(check_local_branch);
+    issues += print_check(
+        "deploy branch",
+        local_branch_issue,
+        cfg.as_ref().map(|c| format!("git checkout -b {} && git push {} {}", c.branch, c.remote_name, c.branch)),
     );
 
     if deploy_on_push {
@@ -132,6 +140,23 @@ fn check_deployment_scripts() -> Option<String> {
     }
 
     None
+}
+
+fn check_local_branch(cfg: &config::Bones) -> Option<String> {
+    if cfg.branch.is_empty() {
+        return None;
+    }
+    let ref_name = format!("refs/heads/{}", cfg.branch);
+    let output = Command::new("git").args(["rev-parse", "--verify", &ref_name]).output().ok()?;
+    if output.status.success() {
+        return None;
+    }
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if stderr.is_empty() {
+        Some(format!("Local branch '{}' does not exist", cfg.branch))
+    } else {
+        Some(format!("Local branch '{}' does not exist: {}", cfg.branch, stderr))
+    }
 }
 
 fn check_pre_push_hook() -> Option<String> {

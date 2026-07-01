@@ -11,7 +11,7 @@ use crate::infra::git;
 use crate::ui::output;
 use crate::ui::prompts;
 use anyhow::{Context, Result};
-use shared::config::{bonesinfra_input, default_deploy_user, release_group_for, runtime_group_for, runtime_user_for};
+use shared::config::{bonesinfra_input, default_deploy_user, runtime_group_for, runtime_user_for};
 use shared::paths;
 
 struct RuntimeSelection {
@@ -142,7 +142,6 @@ fn materialize_fresh_bones(
 fn inject_runtime_identity(vars: &mut serde_json::Map<String, serde_json::Value>, project_name: &str) {
     vars.insert(bonesinfra_input::RUNTIME_USER.into(), serde_json::Value::String(runtime_user_for(project_name)));
     vars.insert(bonesinfra_input::RUNTIME_GROUP.into(), serde_json::Value::String(runtime_group_for(project_name)));
-    vars.insert(bonesinfra_input::RELEASE_GROUP.into(), serde_json::Value::String(release_group_for(project_name)));
 }
 
 fn collect_from_existing(
