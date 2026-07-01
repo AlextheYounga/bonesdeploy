@@ -47,6 +47,7 @@ pub fn run(site: &str) -> Result<()> {
             runtime_user: String::new(),
             runtime_group: String::new(),
             release_group: String::new(),
+            shared: config::Shared::default(),
         });
 
     let runtime_user = if runtime_user.is_empty() { runtime_user_for(&cfg.project_name) } else { runtime_user };

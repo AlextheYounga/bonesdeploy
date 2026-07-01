@@ -87,7 +87,7 @@ Everything else is defaulted or derived for Debian/Ubuntu-first usability:
 - `deploy_on_push`: defaults to `false`
 - `releases`: defaults to `5`
 
-`web_root`, `runtime_user`, `runtime_group`, and `release_group` live in `.bones/runtime.toml`. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively.
+`web_root`, `runtime_user`, `runtime_group`, `release_group`, and runtime-declared shared paths live in `.bones/runtime.toml`. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively. Shared paths are declared under `[shared].paths`; deploys only wire the paths listed there, so framework-specific writable paths must not be hardcoded globally.
 
 Users can override any default by editing `.bones/bones.toml` after init.
 
@@ -116,7 +116,7 @@ Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are wr
 - `post-receive` => Thin trigger that derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/` instead of the bare repo.
 
 ### Deployment Folder
-This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`, and run inside the `build_image` from `.bones/runtime.toml` with `cwd=/workspace/source`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, run in lexical order as the site runtime user with `cwd` set to the sealed release, and are the right place for migrations, cache warmups, and other runtime-state work.
+This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`, and run inside the `build_image` from `.bones/runtime.toml` with `cwd=/workspace/source`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, run in lexical order as the site runtime user with `cwd` set to the sealed release, and are the right place for migrations, cache warmups, and other runtime-state work. Before prepare scripts run, `bonesremote` wires each `[shared].paths` entry from the site runtime config into the promoted release.
 
 ## Crate Structure
 This Cargo workspace has three crates under `crates/`:

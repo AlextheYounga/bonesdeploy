@@ -129,9 +129,6 @@ pub fn bonesremote_tmp_builds_root(site: &str) -> PathBuf {
     bonesremote_site_root(site).join(TMP_BUILDS_DIR)
 }
 
-/// Canonical list of release-tree paths that should be linked from `shared/`.
-pub const SHARED_LEAVES: &[&str] = &[DOT_ENV, "storage", "bootstrap/cache", "database/database.sqlite"];
-
 #[must_use]
 pub fn bonesremote_sites_root_resolved() -> PathBuf {
     if let Some(root) = env::var_os("BONESREMOTE_SITES_ROOT") {

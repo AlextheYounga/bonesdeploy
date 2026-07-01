@@ -52,6 +52,7 @@ pub fn run(site: &str, context: &Path) -> Result<()> {
             runtime_user: String::new(),
             runtime_group: String::new(),
             release_group: String::new(),
+            shared: config::Shared::default(),
         });
         if runtime.build_image.is_empty() {
             bail!("Build scripts require build_image in runtime.toml");
