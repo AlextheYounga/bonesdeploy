@@ -26,10 +26,6 @@ pub(super) fn base(cfg: &config::Bones, web_root: &str) -> Map<String, Value> {
         Value::String(shared_config::runtime_group_for(&cfg.project_name)),
     );
     vars.insert(
-        String::from(shared_config::bonesinfra_input::RELEASE_GROUP),
-        Value::String(shared_config::release_group_for(&cfg.project_name)),
-    );
-    vars.insert(
         String::from("project_root_parent"),
         Value::String(
             Path::new(project_root)

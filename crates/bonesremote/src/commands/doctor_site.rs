@@ -23,6 +23,7 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>) {
     let runtime_group = config::runtime_group_for(&cfg.project_name);
 
     check_repo_exists(&cfg.repo_path, issues);
+    check_branch_ref(&cfg.repo_path, &cfg.branch, issues);
     check_thin_hook(&cfg.repo_path, issues);
     check_runtime_identity(&runtime_user, &runtime_group, issues);
     check_site_layout(&shared_root, &releases_root, &current_path, issues);
@@ -61,6 +62,24 @@ fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {
     let repo_path = Path::new(repo_path);
     if !repo_path.is_dir() {
         issues.push(format!("bare repo is missing: {}", repo_path.display()));
+    }
+}
+
+fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>) {
+    if branch.is_empty() {
+        return;
+    }
+    let ref_name = format!("refs/heads/{branch}");
+    let ok = Command::new("git")
+        .args(["--git-dir", repo_path, "rev-parse", "--verify", &ref_name])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+    if !ok {
+        issues.push(format!(
+            "deploy branch '{branch}' has not been pushed to {}\n  {}",
+            repo_path, "Run 'git push <remote> {branch}' first.",
+        ));
     }
 }
 

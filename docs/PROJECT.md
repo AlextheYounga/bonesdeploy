@@ -287,6 +287,11 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - User runs `bonesdeploy init`, and the procedures outlined above are executed.
 - User can make any changes to their deployment scripts or hooks in `.bones/` (e.g., customizing `deployment/build/` files or adding project-specific logic).
 - User runs `bonesdeploy push` to publish the `.bones/` dataset to bonesremote site state under `/root/.config/bonesremote/sites/<site>/`.
+- Before the first deploy (and after initial setup), the source code must be pushed to the remote bare repo so bonesremote can access it:
+  ```
+  git push <remote_name> <branch>
+  ```
+- `bonesdeploy doctor` checks the local and remote environment, including whether the configured deploy branch exists locally and in the remote bare repo.
 - User runs `bonesdeploy deploy` to perform the actual remote release deployment.
 
 ### Primary Deploy Flow
@@ -295,7 +300,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 2. It runs `bonesremote deploy --site <site>`.
 3. `bonesremote deploy` orchestrates the full pipeline:
    - **stage_release** — Create timestamped release state
-   - **release_checkout** — Export the approved revision with `git archive` into a temporary source tree
+   - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
    - **release_build** — Run `deployment/build/*.sh` in disposable Podman containers at `/workspace/source`
    - **release_promote** — Copy safe artifacts into a sealed `root:<site>` release
    - **wire_shared** — Symlink declared shared paths into the sealed release

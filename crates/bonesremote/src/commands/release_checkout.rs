@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, Read};
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -32,13 +32,19 @@ pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
 
     let archive_output = Command::new("git")
         .args(["--git-dir", &cfg.repo_path, "archive", "--format=tar", revision])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+        .output()
         .with_context(|| format!("Failed to run git archive for revision {revision} in {}", cfg.repo_path))?;
+    let git_stderr = String::from_utf8_lossy(&archive_output.stderr).into_owned();
 
-    let mut archive = archive_output.stdout.context("git archive stdout was not piped")?;
-    let stderr = archive_output.stderr.context("git archive stderr was not piped")?;
+    if !archive_output.status.success() {
+        bail!("Failed to export source revision '{revision}' from {}\n{git_stderr}", cfg.repo_path);
+    }
+
+    if !git_stderr.is_empty() {
+        println!("[bonesdeploy] git archive reported: {git_stderr}");
+    }
+
+    let mut archive = archive_output.stdout.as_slice();
 
     let mut tar = Command::new("tar")
         .args(["-xf", "-", "-C"])
@@ -53,7 +59,6 @@ pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
     drop(tar_stdin);
 
     let tar_output = tar.wait_with_output().context("Failed to finish tar extraction")?;
-    let git_stderr = String::from_utf8_lossy(&archive_stderr_handle(stderr)?).into_owned();
 
     if !tar_output.status.success() {
         bail!(
@@ -63,18 +68,8 @@ pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
         );
     }
 
-    if !git_stderr.is_empty() {
-        println!("[bonesdeploy] git archive reported: {git_stderr}");
-    }
-
     println!("Exported source for {revision} into {}", context_dir.display());
     Ok(())
-}
-
-fn archive_stderr_handle<R: Read>(mut reader: R) -> Result<Vec<u8>> {
-    let mut buf = Vec::new();
-    reader.read_to_end(&mut buf)?;
-    Ok(buf)
 }
 
 pub(crate) fn ensure_build_context(site: &str) -> Result<PathBuf> {

@@ -88,17 +88,9 @@ pub fn promote(site: &str, context: &Path) -> Result<PathBuf> {
         bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
     }
 
-    let Runtime { release_group, .. } = load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
-        web_root: default_web_root(),
-        build_image: String::new(),
-        runtime_user: String::new(),
-        runtime_group: String::new(),
-        release_group: String::new(),
-    });
-
     let release_name = release_state::read_staged_release(site)?;
     let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
-    let release_group = if release_group.is_empty() { runtime_group_for(&cfg.project_name) } else { release_group };
+    let release_group = runtime_group_for(&cfg.project_name);
     harden_release_tree(context, &release_dir, &cfg.project_name, &release_group)
         .with_context(|| format!("Failed to promote release {release_name}"))?;
 
