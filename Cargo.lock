@@ -84,11 +84,11 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "anyhow",
  "clap",
- "console 0.15.11",
+ "console",
  "inquire",
  "openssh",
  "oxc-toml",
@@ -104,18 +104,14 @@ dependencies = [
 
 [[package]]
 name = "bonesremote"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "anyhow",
  "clap",
- "console 0.16.3",
- "nix",
  "serde",
  "serde_json",
  "shared",
  "time",
- "toml",
- "walkdir",
 ]
 
 [[package]]
@@ -139,12 +135,6 @@ name = "cfg-if"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
-
-[[package]]
-name = "cfg_aliases"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "clap"
@@ -210,18 +200,6 @@ dependencies = [
  "once_cell",
  "unicode-width",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "console"
-version = "0.16.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d64e8af5551369d19cf50138de61f1c42074ab970f74e99be916646777f8fc87"
-dependencies = [
- "encode_unicode",
- "libc",
- "unicode-width",
- "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -500,18 +478,6 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "nix"
-version = "0.31.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf20d2fde8ff38632c426f1165ed7436270b44f199fc55284c38276f9db47c3d"
-dependencies = [
- "bitflags",
- "cfg-if",
- "cfg_aliases",
- "libc",
 ]
 
 [[package]]

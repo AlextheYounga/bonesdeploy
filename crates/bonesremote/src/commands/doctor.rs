@@ -4,11 +4,14 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::Result;
-use console::style;
+const BOLD: &str = "\x1b[1m";
+const GREEN_BOLD: &str = "\x1b[1;32m";
+const RED_BOLD: &str = "\x1b[1;31m";
+const RESET: &str = "\x1b[0m";
 use shared::paths;
 
 pub fn run(site: Option<&str>) -> Result<()> {
-    println!("{}", style(format!("{} doctor", paths::BONESREMOTE_BINARY)).bold());
+    println!("{BOLD}{} doctor{RESET}", paths::BONESREMOTE_BINARY);
 
     let mut issues: Vec<String> = Vec::new();
 
@@ -23,12 +26,12 @@ pub fn run(site: Option<&str>) -> Result<()> {
     }
 
     if issues.is_empty() {
-        println!("\n{} All checks passed.", style("OK").green().bold());
+        println!("\n{GREEN_BOLD}OK{RESET} All checks passed.");
         Ok(())
     } else {
         println!();
         for issue in &issues {
-            println!("  {} {issue}", style("!").red().bold());
+            println!("  {RED_BOLD}!{RESET} {issue}");
         }
         anyhow::bail!("Doctor found {} issue{}", issues.len(), if issues.len() == 1 { "" } else { "s" });
     }
