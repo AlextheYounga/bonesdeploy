@@ -6,7 +6,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use shared::{config, paths};
-use walkdir::WalkDir;
 
 use crate::privileges;
 
@@ -144,13 +143,21 @@ fn validate_top_level_entries(root: &Path) -> Result<()> {
 }
 
 fn reject_symlinks(root: &Path) -> Result<()> {
-    for entry in WalkDir::new(root).min_depth(1) {
+    reject_symlinks_recurse(root)?;
+    Ok(())
+}
+
+fn reject_symlinks_recurse(dir: &Path) -> Result<()> {
+    for entry in fs::read_dir(dir).with_context(|| format!("Failed to read {}", dir.display()))? {
         let entry = entry?;
-        if entry.file_type().is_symlink() {
-            bail!("Imported dataset cannot contain symlinks: {}", entry.path().display());
+        let path = entry.path();
+        if path.is_symlink() {
+            bail!("Imported dataset cannot contain symlinks: {}", path.display());
+        }
+        if path.is_dir() {
+            reject_symlinks_recurse(&path)?;
         }
     }
-
     Ok(())
 }
 

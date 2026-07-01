@@ -1,8 +1,13 @@
 use anyhow::{Result, bail};
-use nix::unistd::geteuid;
+
+unsafe extern "C" {
+    fn geteuid() -> u32;
+}
 
 pub fn ensure_root(command_name: &str) -> Result<()> {
-    if geteuid().is_root() {
+    // SAFETY: geteuid is a POSIX syscall that always succeeds and returns the
+    // calling process's effective UID. UB is impossible.
+    if unsafe { geteuid() } == 0 {
         return Ok(());
     }
 
