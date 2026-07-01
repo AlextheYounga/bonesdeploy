@@ -105,6 +105,7 @@ fn configure_podman_build_command(command: &mut Command, source_root: &Path, env
         .args([
             "run",
             "--rm",
+            "-i",
             "--pull=missing",
             "--security-opt=no-new-privileges",
             "--cap-drop=all",
@@ -346,6 +347,7 @@ mod tests {
 
         let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
         assert!(args.contains(&String::from("--rm")));
+        assert!(args.contains(&String::from("-i")));
         assert!(args.contains(&String::from("--security-opt=no-new-privileges")));
         assert!(args.contains(&String::from("--cap-drop=all")));
         assert!(args.contains(&String::from("/tmp/source:/workspace/source")));
