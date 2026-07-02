@@ -18,7 +18,7 @@ mod build;
 mod output;
 mod prepare;
 
-pub(crate) use build::{BuildScriptEnv, run_podman_build_script};
+pub(crate) use build::{BuildContainer, BuildScriptEnv};
 pub(crate) use prepare::{PrepareScriptEnv, run_prepare_script};
 
 // ── test-only deployment runner ──────────────────────────────────────

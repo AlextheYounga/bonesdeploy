@@ -7,7 +7,7 @@ use shared::paths;
 use shared::paths::default_web_root;
 
 use crate::privileges;
-use crate::release::scripts as deploy_output;
+use crate::release::script_runner as deploy_output;
 use crate::release::state as release_state;
 
 pub fn run(site: &str) -> Result<()> {
@@ -43,7 +43,6 @@ pub fn run(site: &str) -> Result<()> {
     let Runtime { web_root, runtime_user, .. } =
         load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
             web_root: default_web_root(),
-            build_image: String::new(),
             runtime_user: String::new(),
             runtime_group: String::new(),
             release_group: String::new(),

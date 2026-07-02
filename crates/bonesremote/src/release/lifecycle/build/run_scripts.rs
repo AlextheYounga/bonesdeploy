@@ -7,7 +7,7 @@ use shared::paths;
 use shared::paths::default_web_root;
 
 use super::ownership;
-use crate::release::scripts as deploy_output;
+use crate::release::script_runner as deploy_output;
 
 pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()> {
     if !context.is_dir() {
@@ -34,32 +34,29 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
     }
 
     let runtime = load_runtime_or_default(site);
-    if runtime.build_image.is_empty() {
-        bail!("Build scripts require build_image in runtime.toml");
-    }
+
+    let build_env = deploy_output::BuildScriptEnv {
+        project_name: &cfg.project_name,
+        build_user: &build_user,
+        build_uid: ownership::user_uid(&build_user)?,
+        web_root: &runtime.web_root,
+    };
+    let mut container = deploy_output::BuildContainer::start(context, &build_env)?;
 
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
         println!("Running build script {script_name}...");
 
-        let status = deploy_output::run_podman_build_script(
-            &script,
-            context,
-            &context.join(format!("{script_name}.log")),
-            &deploy_output::BuildScriptEnv {
-                project_name: &cfg.project_name,
-                build_user: &build_user,
-                build_uid: ownership::user_uid(&build_user)?,
-                web_root: &runtime.web_root,
-                build_image: &runtime.build_image,
-            },
-        )
-        .with_context(|| format!("Failed to execute build script {}", script.display()))?;
+        let status = container
+            .run_script(&script, &context.join(format!("{script_name}.log")))
+            .with_context(|| format!("Failed to execute build script {}", script.display()))?;
 
         if !status.success() {
             bail!("Build script {script_name} exited with status {status}");
         }
     }
+
+    container.remove()?;
 
     Ok(())
 }
@@ -67,7 +64,6 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
 fn load_runtime_or_default(site: &str) -> Runtime {
     load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
         web_root: default_web_root(),
-        build_image: String::new(),
         runtime_user: String::new(),
         runtime_group: String::new(),
         release_group: String::new(),

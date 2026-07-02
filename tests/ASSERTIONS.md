@@ -72,7 +72,6 @@
 - list scripts sorts prepare scripts. (list_scripts_sorts_prepare_scripts)
 
 ## `crates/bonesremote/src/commands/site.rs`
-- validate site dataset rejects bad build image. (validate_site_dataset_rejects_bad_build_image)
 - validate top level entries rejects unexpected file. (validate_top_level_entries_rejects_unexpected_file)
 
 ## `crates/bonesremote/src/commands/status.rs`
@@ -94,7 +93,7 @@
 - link relative creates symlink to shared target. (link_relative_creates_symlink_to_shared_target)
 - remove if present handles files dirs and missing. (remove_if_present_handles_files_dirs_and_missing)
 
-## `crates/bonesremote/src/release/scripts.rs`
+## `crates/bonesremote/src/release/script_runner/mod.rs`
 - podman build command mounts only source tree. (podman_build_command_mounts_only_source_tree)
 - prepare command runs as runtime user in release. (prepare_command_runs_as_runtime_user_in_release)
 - run deployment script applies group writable umask. (run_deployment_script_applies_group_writable_umask)
@@ -111,8 +110,6 @@
 - write then read staged release round trips. (write_then_read_staged_release_round_trips)
 
 ## `crates/shared/src/config.rs`
-- validate build image allows common references. (validate_build_image_allows_common_references)
-- validate build image rejects shell metacharacters. (validate_build_image_rejects_shell_metacharacters)
 - validate host accepts hostnames and ips. (validate_host_accepts_hostnames_and_ips)
 - validate host rejects shell metacharacters. (validate_host_rejects_shell_metacharacters)
 

@@ -5,7 +5,7 @@ use shared::config;
 
 mod ownership;
 mod promote;
-mod scripts;
+mod run_scripts;
 mod tree;
 
 use crate::privileges;
@@ -15,7 +15,7 @@ use shared::paths;
 pub fn run(site: &str, context: &Path) -> Result<()> {
     privileges::ensure_root("bonesremote release build")?;
     let cfg = load_site_config(site)?;
-    scripts::run(site, context, &cfg)
+    run_scripts::run(site, context, &cfg)
 }
 
 pub fn promote(site: &str, context: &Path) -> Result<PathBuf> {

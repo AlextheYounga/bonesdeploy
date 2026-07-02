@@ -1,6 +1,5 @@
 template = "vue"
 web_root = "dist"
-build_image = "docker.io/library/node:24-bookworm"
 
 [permissions]
 paths = [
