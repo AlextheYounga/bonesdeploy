@@ -4,14 +4,23 @@
 
 ## `crates/bonesdeploy/src/commands/doctor.rs`
 - deployment script check accepts nested build and prepare layout. (deployment_script_check_accepts_nested_build_and_prepare_layout)
-- doctor points at new remote import flow. (doctor_points_at_new_remote_import_flow)
-- shell quote escapes single quotes. (shell_quote_escapes_single_quotes)
+- doctor points at correct remote import flow. (doctor_points_at_correct_remote_import_flow)
+
+## `crates/bonesdeploy/src/commands/init/config.rs`
+- requires host when existing and cli are missing it. (requires_host_when_existing_and_cli_are_missing_it)
+- uses existing and cli values without prompting. (uses_existing_and_cli_values_without_prompting)
+
+## `crates/bonesdeploy/src/commands/init/mod.rs`
+- failure before completed prompts leaves no bones assets. (failure_before_completed_prompts_leaves_no_bones_assets)
+- materializes base bones assets. (materializes_base_bones_assets)
+- repairs dangling bones symlink. (repairs_dangling_bones_symlink)
+- rerun preserves existing bones assets. (rerun_preserves_existing_bones_assets)
 
 ## `crates/bonesdeploy/src/commands/push_state.rs`
 - local secrets path stays under bones dir. (local_secrets_path_stays_under_bones_dir)
 - remote import command targets control plane import. (remote_import_command_targets_control_plane_import)
 
-## `crates/bonesdeploy/src/commands/remote_data.rs`
+## `crates/bonesdeploy/src/commands/remote_bootstrap/data.rs`
 - base data includes preview domain. (base_data_includes_preview_domain)
 - Passes the SSL domain and email into the deploy data sent to bonesinfra (ssl_data_includes_domain_and_email)
 
@@ -19,18 +28,12 @@
 - extract fingerprint parses fpr line. (extract_fingerprint_parses_fpr_line)
 - extract fingerprint returns none without fpr line. (extract_fingerprint_returns_none_without_fpr_line)
 
-## `crates/bonesdeploy/src/commands/tests/test_init_project.rs`
-- Requires a host when neither existing config nor CLI provide one. (collect_non_interactive_requires_host_when_existing_and_cli_are_missing_it)
-- Uses existing config and CLI values without prompting when non-interactive mode is active. (collect_non_interactive_uses_existing_and_cli_values_without_prompting)
-- Does not leave managed config directories behind when required prompt data is missing. (init_failure_before_completed_prompts_leaves_no_bones_assets)
-- Materializes the base bonesdeploy kit and runtime config during init. (init_materializes_base_bones_assets)
-- Repairs a dangling .bones symlink instead of failing with EEXIST. (init_repairs_dangling_bones_symlink)
-- Keeps an already materialized local bones scaffold intact when init is run again. (init_rerun_preserves_existing_bones_assets)
+## `crates/bonesdeploy/src/commands/update/sync.rs`
+- refresh local bones updates scaffold without touching configs. (refresh_local_bones_updates_scaffold_without_touching_configs)
 
-## `crates/bonesdeploy/src/commands/update.rs`
-- Extracts the package version from the `[package]` section of a Cargo manifest. (parses_package_version_from_manifest_package_section)
-- Refreshes .bones scaffold assets from the cloned source tree without overwriting local config files. (refresh_local_bones_updates_scaffold_without_touching_configs)
-- Returns an error when the manifest has no `[package]` section with a version field. (rejects_manifest_without_package_version)
+## `crates/bonesdeploy/src/commands/update/version.rs`
+- parses package version from manifest package section. (parses_package_version_from_manifest_package_section)
+- rejects manifest without package version. (rejects_manifest_without_package_version)
 
 ## `crates/bonesdeploy/src/config.rs`
 - load applies default project root from project name. (load_applies_default_project_root_from_project_name)
@@ -53,70 +56,85 @@
 - parse ssh style url defaults port to 22. (parse_ssh_style_url_defaults_port_to_22)
 - parse ssh style url parses host port and repo path. (parse_ssh_style_url_parses_host_port_and_repo_path)
 
-## `crates/bonesremote/src/commands/doctor_site.rs`
+## `crates/bonesdeploy/src/infra/ssh.rs`
+- remote command failure includes stdout and stderr. (remote_command_failure_includes_stdout_and_stderr)
+
+## `crates/bonesremote/src/commands/doctor/apparmor.rs`
+- apparmor kernel enabled accepts yes. (apparmor_kernel_enabled_accepts_yes)
+- apparmor kernel enabled rejects no. (apparmor_kernel_enabled_rejects_no)
+- apparmor profile filename accepts bonesdeploy profile. (apparmor_profile_filename_accepts_bonesdeploy_profile)
+- apparmor profile filename rejects unrelated file. (apparmor_profile_filename_rejects_unrelated_file)
+- apparmor unit name for profile maps project unit. (apparmor_unit_name_for_profile_maps_project_unit)
+- apparmor unit wiring accepts expected unit with reordered after tokens. (apparmor_unit_wiring_accepts_expected_unit_with_reordered_after_tokens)
+- apparmor unit wiring rejects missing profile binding. (apparmor_unit_wiring_rejects_missing_profile_binding)
+- apparmor unit wiring rejects unknown profile binding. (apparmor_unit_wiring_rejects_unknown_profile_binding)
+
+## `crates/bonesremote/src/commands/doctor/site.rs`
 - account exists matches passwd entries. (account_exists_matches_passwd_entries)
 - group members reads group member list. (group_members_reads_group_member_list)
 - hook uses thin trigger accepts bonesremote post receive delegate. (hook_uses_thin_trigger_accepts_bonesremote_post_receive_delegate)
 - service exists accepts loaded unit. (service_exists_accepts_loaded_unit)
 
-## `crates/bonesremote/src/commands/post_deploy.rs`
+## `crates/bonesremote/src/commands/hook.rs`
+- ignores non matching branch. (ignores_non_matching_branch)
+- ignores tags. (ignores_tags)
+- resolves newrev for configured branch. (resolves_newrev_for_configured_branch)
+
+## `crates/bonesremote/src/commands/release_prune.rs`
 - prune old releases keeps active release when within keep limit. (prune_old_releases_keeps_active_release_when_within_keep_limit)
 - prune old releases removes oldest inactive releases up to keep limit. (prune_old_releases_removes_oldest_inactive_releases_up_to_keep_limit)
 
-## `crates/bonesremote/src/commands/release_build.rs`
-- clear directory children only removes entries. (clear_directory_children_only_removes_entries)
-- normalize relative path rejects escape. (normalize_relative_path_rejects_escape)
-- validate symlink target rejects absolute and escaping targets. (validate_symlink_target_rejects_absolute_and_escaping_targets)
-
-## `crates/bonesremote/src/commands/release_prepare.rs`
-- list scripts sorts prepare scripts. (list_scripts_sorts_prepare_scripts)
-
 ## `crates/bonesremote/src/commands/site.rs`
+- install repo post receive hook copies executable trigger. (install_repo_post_receive_hook_copies_executable_trigger)
 - validate top level entries rejects unexpected file. (validate_top_level_entries_rejects_unexpected_file)
 
 ## `crates/bonesremote/src/commands/status.rs`
 - parses unit names from systemctl output. (parses_unit_names_from_systemctl_output)
 
-## `crates/bonesremote/src/commands/tests/test_doctor.rs`
-- Accepts a yes value as indicating `AppArmor` is enabled in the kernel. (apparmor_kernel_enabled_accepts_yes)
-- Rejects a no value as indicating `AppArmor` is not enabled in the kernel. (apparmor_kernel_enabled_rejects_no)
-- Accepts a valid bonesdeploy `AppArmor` profile filename. (apparmor_profile_filename_accepts_bonesdeploy_profile)
-- Rejects a filename that does not match the bonesdeploy profile naming convention. (apparmor_profile_filename_rejects_unrelated_file)
-- Maps a bonesdeploy `AppArmor` profile name to its corresponding systemd unit name. (apparmor_unit_name_for_profile_maps_project_unit)
-- Accepts a systemd unit with correctly wired `AppArmor` dependency and profile. (apparmor_unit_wiring_accepts_expected_unit_with_reordered_after_tokens)
-- Rejects a systemd unit that is missing the `AppArmor` profile binding. (apparmor_unit_wiring_rejects_missing_profile_binding)
-- Rejects a systemd unit that binds an unknown `AppArmor` profile. (apparmor_unit_wiring_rejects_unknown_profile_binding)
+## `crates/bonesremote/src/release/lifecycle/build/ownership.rs`
+- parse user uid reads uid field. (parse_user_uid_reads_uid_field)
 
-## `crates/bonesremote/src/commands/wire_shared.rs`
+## `crates/bonesremote/src/release/lifecycle/build/tree.rs`
+- clear directory children only removes entries. (clear_directory_children_only_removes_entries)
+- normalize relative path rejects escape. (normalize_relative_path_rejects_escape)
+- validate symlink target rejects absolute and escaping targets. (validate_symlink_target_rejects_absolute_and_escaping_targets)
+
+## `crates/bonesremote/src/release/lifecycle/prepare.rs`
+- list scripts sorts prepare scripts. (list_scripts_sorts_prepare_scripts)
+
+## `crates/bonesremote/src/release/lifecycle/wire_shared.rs`
 - ensure shared leaf requires existing path. (ensure_shared_leaf_requires_existing_path)
-- link public storage links into release storage tree. (link_public_storage_links_into_release_storage_tree)
 - link relative creates symlink to shared target. (link_relative_creates_symlink_to_shared_target)
 - remove if present handles files dirs and missing. (remove_if_present_handles_files_dirs_and_missing)
+- validate shared path rejects absolute and parent paths. (validate_shared_path_rejects_absolute_and_parent_paths)
+
+## `crates/bonesremote/src/release/script_runner/build.rs`
+- build container name is deterministic per project. (build_container_name_is_deterministic_per_project)
+- podman build command mounts only source tree. (podman_build_command_mounts_only_source_tree)
+- podman exec command runs inside existing container. (podman_exec_command_runs_inside_existing_container)
 
 ## `crates/bonesremote/src/release/script_runner/mod.rs`
-- podman build command mounts only source tree. (podman_build_command_mounts_only_source_tree)
-- prepare command runs as runtime user in release. (prepare_command_runs_as_runtime_user_in_release)
 - run deployment script applies group writable umask. (run_deployment_script_applies_group_writable_umask)
 - run deployment script preserves failing exit status. (run_deployment_script_preserves_failing_exit_status)
 - run deployment script streams output to console and log. (run_deployment_script_streams_output_to_console_and_log)
 
-## `crates/bonesremote/src/release_state.rs`
+## `crates/bonesremote/src/release/script_runner/prepare.rs`
+- prepare command runs as runtime user in release. (prepare_command_runs_as_runtime_user_in_release)
+
+## `crates/bonesremote/src/release/state.rs`
 - clear staged release removes state file. (clear_staged_release_removes_state_file)
-- current release name resolves from current symlink. (current_release_name_resolves_from_current_symlink)
-- list releases sorted returns only directories in order. (list_releases_sorted_returns_only_directories_in_order)
+- current release name resolves symlink target name. (current_release_name_resolves_symlink_target_name)
+- list releases sorted skips placeholder. (list_releases_sorted_skips_placeholder)
 - point symlink atomically creates parent dirs and points to target. (point_symlink_atomically_creates_parent_dirs_and_points_to_target)
 - point symlink atomically repoints existing link. (point_symlink_atomically_repoints_existing_link)
 - read staged release rejects empty file. (read_staged_release_rejects_empty_file)
 - write then read staged release round trips. (write_then_read_staged_release_round_trips)
 
 ## `crates/shared/src/config.rs`
+- build identity helpers are derived from project name. (build_identity_helpers_are_derived_from_project_name)
+- runtime parses shared paths. (runtime_parses_shared_paths)
 - validate host accepts hostnames and ips. (validate_host_accepts_hostnames_and_ips)
 - validate host rejects shell metacharacters. (validate_host_rejects_shell_metacharacters)
-
-## `crates/shared/src/registry.rs`
-- derive uses conventional remote paths. (derive_uses_conventional_remote_paths)
-- load site derives registry from bones toml. (load_site_derives_registry_from_bones_toml)
-- validate site name rejects path escapes. (validate_site_name_rejects_path_escapes)
 
 ## `tests/cleancode/src/cleancode_file_too_long.rs`
 - Verifies all Rust source files stay at or below 400 lines. (source_files_stay_under_400_lines)
