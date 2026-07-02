@@ -9,7 +9,7 @@ use time::format_description::FormatItem;
 use time::macros::format_description;
 
 use crate::privileges;
-use crate::release_state;
+use crate::release::state as release_state;
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release stage")?;

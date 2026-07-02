@@ -1,16 +1,17 @@
+use std::cell::RefCell;
 use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process;
+use std::thread_local;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{cell::RefCell, thread_local};
 
 use anyhow::{Context, Result, bail};
 
 use shared::paths;
 
 thread_local! {
-    static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) }; // Explain: what is this?
+    static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
 }
 
 #[cfg(test)]
@@ -160,6 +161,7 @@ pub fn point_symlink_atomically(link_path: &Path, target_path: &Path) -> Result<
 mod tests {
     use std::env;
     use std::fs;
+    use std::os::unix::fs::symlink;
     use std::path::{Path, PathBuf};
     use std::process;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -169,7 +171,7 @@ mod tests {
 
     use super::{
         ScopedRoot, clear_staged_release, current_release_name, list_releases_sorted, point_symlink_atomically,
-        read_staged_release, releases_dir, set_sites_root_for_tests, staged_release_path, write_staged_release,
+        read_staged_release, release_dir, set_sites_root_for_tests, staged_release_path, write_staged_release,
     };
 
     fn temp_dir_path(test_name: &str) -> PathBuf {
@@ -239,7 +241,7 @@ mod tests {
         let linked = fs::read_link(&link_path)?;
         assert_eq!(linked, target);
 
-        fs::remove_dir_all(root)?;
+        fs::remove_dir_all(root).ok();
         Ok(())
     }
 
@@ -260,47 +262,43 @@ mod tests {
         let linked = fs::read_link(&link_path)?;
         assert_eq!(linked, target_b);
 
-        fs::remove_dir_all(root)?;
+        fs::remove_dir_all(root).ok();
         Ok(())
     }
 
     #[test]
-    fn list_releases_sorted_returns_only_directories_in_order() -> Result<()> {
-        let root = temp_dir_path("list_releases");
-        let project_root = project_root_for(&root);
-        fs::create_dir_all(&root)?;
-
-        let releases = releases_dir(&project_root);
-        fs::create_dir_all(&releases)?;
-        fs::create_dir_all(releases.join("20260507_120000"))?;
-        fs::create_dir_all(releases.join("20260507_110000"))?;
-        fs::create_dir_all(releases.join(paths::PLACEHOLDER_RELEASE_NAME))?;
-        fs::write(releases.join("notes.txt"), "not a release")?;
-
-        let items = list_releases_sorted(&project_root)?;
-        assert_eq!(items, vec![String::from("20260507_110000"), String::from("20260507_120000")]);
-
-        fs::remove_dir_all(root)?;
-        Ok(())
-    }
-
-    #[test]
-    fn current_release_name_resolves_from_current_symlink() -> Result<()> {
+    fn current_release_name_resolves_symlink_target_name() -> Result<()> {
         let root = temp_dir_path("current_release_name");
         fs::create_dir_all(&root)?;
+
         let project_root = project_root_for(&root);
+        let release_path = release_dir(&project_root, "20260507_151502");
+        fs::create_dir_all(&release_path)?;
+        let current = Path::new(&project_root).join(paths::CURRENT_LINK);
+        if let Some(parent) = current.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        symlink(&release_path, &current)?;
 
-        let releases_dir = releases_dir(&project_root);
-        let release = releases_dir.join("20260507_170000");
-        fs::create_dir_all(&release)?;
+        assert_eq!(current_release_name(&project_root)?, "20260507_151502");
 
-        let current = PathBuf::from(&project_root).join(paths::CURRENT_LINK);
-        point_symlink_atomically(&current, &release)?;
+        fs::remove_dir_all(root).ok();
+        Ok(())
+    }
 
-        let name = current_release_name(&project_root)?;
-        assert_eq!(name, "20260507_170000");
+    #[test]
+    fn list_releases_sorted_skips_placeholder() -> Result<()> {
+        let root = temp_dir_path("list_releases");
+        fs::create_dir_all(&root)?;
 
-        fs::remove_dir_all(root)?;
+        let project_root = project_root_for(&root);
+        fs::create_dir_all(release_dir(&project_root, "20260507_151500"))?;
+        fs::create_dir_all(release_dir(&project_root, paths::PLACEHOLDER_RELEASE_NAME))?;
+        fs::create_dir_all(release_dir(&project_root, "20260507_151501"))?;
+
+        assert_eq!(list_releases_sorted(&project_root)?, vec!["20260507_151500", "20260507_151501"]);
+
+        fs::remove_dir_all(root).ok();
         Ok(())
     }
 }

@@ -6,7 +6,7 @@ use shared::paths::{self, ssl_certificate_key_path, ssl_certificate_path};
 
 use crate::config;
 
-pub(super) fn base(cfg: &config::Bones, web_root: &str) -> Map<String, Value> {
+pub fn base(cfg: &config::Bones, web_root: &str) -> Map<String, Value> {
     let project_root = &cfg.project_root;
 
     let mut vars = Map::new();

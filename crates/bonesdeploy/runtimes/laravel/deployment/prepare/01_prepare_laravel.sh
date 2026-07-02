@@ -21,12 +21,6 @@ die() {
 	exit 1
 }
 
-require_command() {
-	local name="$1"
-
-	command -v "$name" >/dev/null 2>&1 || die "$name not found"
-}
-
 artisan_command_exists() {
 	local command_name="$1"
 
@@ -63,8 +57,10 @@ restart_queue_workers() {
 	fi
 }
 
-finish_laravel_build() {
+finish_laravel_prepare() {
 	php artisan optimize:clear
+	php artisan optimize
+	php artisan package:discover --ansi || true
 	restart_queue_workers
 	php artisan up
 }
@@ -73,11 +69,11 @@ main() {
 	ensure_app_key
 	ensure_storage_link
 	run_migrations
-	finish_laravel_build
+	finish_laravel_prepare
 
 	trap - ERR
 
-	log "Laravel build complete."
+	log "Laravel prepare complete."
 }
 
 main "$@"
