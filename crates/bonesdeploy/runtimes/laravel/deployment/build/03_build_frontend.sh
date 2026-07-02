@@ -27,6 +27,14 @@ require_command() {
 	command -v "$name" >/dev/null 2>&1 || die "$name not found"
 }
 
+artisan_command_exists() {
+	local command_name="$1"
+
+	php artisan list --raw 2>/dev/null |
+		awk '{ print $1 }' |
+		grep -qx -- "$command_name"
+}
+
 package_json_package_manager() {
 	[ -f package.json ] || return 0
 
@@ -89,6 +97,7 @@ detect_package_manager() {
 ensure_node_toolchain() {
 	export PATH="$PROJECT_ROOT/build/node/bin:$PATH"
 
+	require_command php
 	require_command node
 	require_command npm
 
@@ -184,6 +193,11 @@ run_frontend_build() {
 }
 
 generate_wayfinder_files() {
+	if ! artisan_command_exists "wayfinder:generate"; then
+		log "wayfinder:generate not available; skipping Wayfinder generation."
+		return
+	fi
+
 	log "Generating Wayfinder files..."
 	php artisan wayfinder:generate
 }

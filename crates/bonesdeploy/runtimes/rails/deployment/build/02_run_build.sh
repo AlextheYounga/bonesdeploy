@@ -2,45 +2,66 @@
 
 set -Eeuo pipefail
 
-command -v ruby >/dev/null 2>&1 || {
-	echo "ruby not found"
-	exit 1
+readonly LOG_PREFIX="[bonesdeploy]"
+
+on_error() {
+	local status=$?
+	echo "$LOG_PREFIX Failed at line $LINENO: $BASH_COMMAND (status $status)" >&2
+	exit "$status"
 }
-command -v bundle >/dev/null 2>&1 || {
-	echo "bundler not found"
-	exit 1
+
+trap on_error ERR
+
+log() {
+	echo "$LOG_PREFIX $*"
 }
 
-# Load rbenv if available
-if [ -d "$HOME/.rbenv" ]; then
-	export PATH="$HOME/.rbenv/bin:$PATH"
-	eval "$(rbenv init -)"
-fi
+skip_unless_rails_project() {
+	if [ ! -f Gemfile ]; then
+		log "Gemfile not found; skipping Rails build."
+		exit 0
+	fi
+}
 
-# Install Ruby version from .ruby-version if rbenv is available
-if [ -f "./.ruby-version" ] && command -v rbenv >/dev/null 2>&1; then
-	rbenv install --skip-existing
-fi
+install_system_packages() {
+	log "Installing Ruby and native build packages..."
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update
+	apt-get install -y --no-install-recommends \
+		build-essential \
+		default-libmysqlclient-dev \
+		git \
+		libffi-dev \
+		libpq-dev \
+		libsqlite3-dev \
+		libssl-dev \
+		libyaml-dev \
+		pkg-config \
+		ruby-bundler \
+		ruby-full \
+		zlib1g-dev
+}
 
-# Install dependencies
-bundle install --deployment --without development test
+install_bundle_dependencies() {
+	export BUNDLE_WITHOUT="development:test"
+	log "Installing bundle dependencies..."
+	bundle install --deployment --without development test
+}
 
-# Precompile assets
-if bundle exec rails assets:precompile 2>/dev/null; then
-	echo "Assets precompiled."
-fi
+precompile_assets() {
+	log "Precompiling Rails assets..."
+	SECRET_KEY_BASE_DUMMY=1 RAILS_ENV=production bundle exec rails assets:precompile
+}
 
-# Run database migrations
-RAILS_ENV=production bundle exec rails db:migrate
+main() {
+	skip_unless_rails_project
+	install_system_packages
+	install_bundle_dependencies
+	precompile_assets
 
-# Restart puma via systemd
-SERVICE_NAME="$PROJECT_NAME"
-if ! command -v systemctl >/dev/null 2>&1; then
-	echo "systemctl not found. Restart your app server manually."
-elif systemctl is-active --quiet "$SERVICE_NAME" 2>/dev/null; then
-	systemctl restart "$SERVICE_NAME"
-elif systemctl list-unit-files | grep -q "$SERVICE_NAME"; then
-	systemctl start "$SERVICE_NAME"
-else
-	echo "No systemd service found for $SERVICE_NAME. Restart your app server manually."
-fi
+	trap - ERR
+
+	log "Rails build complete."
+}
+
+main "$@"

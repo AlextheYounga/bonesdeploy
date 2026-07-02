@@ -175,7 +175,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{install_repo_post_receive_hook_from_site_root, validate_site_dataset, validate_top_level_entries};
+    use super::{install_repo_post_receive_hook_from_site_root, validate_top_level_entries};
     use shared::paths;
 
     #[test]

@@ -21,12 +21,6 @@ die() {
 	exit 1
 }
 
-require_command() {
-	local name="$1"
-
-	command -v "$name" >/dev/null 2>&1 || die "$name not found"
-}
-
 require_file() {
 	local file="$1"
 	local message="$2"
@@ -34,26 +28,39 @@ require_file() {
 	[ -f "$file" ] || die "$message"
 }
 
+skip_unless_laravel_project() {
+	if [ ! -f artisan ]; then
+		log "artisan not found; skipping Laravel PHP dependency install."
+		exit 0
+	fi
+}
+
 require_environment() {
 	require_file artisan "artisan not found"
-	require_command php
-	require_command composer
 
 	: "${PROJECT_ROOT:?PROJECT_ROOT must be set by bonesremote}"
+}
+
+install_system_packages() {
+	log "Installing PHP and Composer build packages..."
+	export DEBIAN_FRONTEND=noninteractive
+	apt-get update
+	apt-get install -y --no-install-recommends \
+		composer \
+		git \
+		php-cli \
+		php-curl \
+		php-mbstring \
+		php-sqlite3 \
+		php-xml \
+		php-zip \
+		unzip
 }
 
 configure_environment() {
 	export COMPOSER_ALLOW_SUPERUSER="${COMPOSER_ALLOW_SUPERUSER:-1}"
 	export CI=1
 	export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-}
-
-artisan_command_exists() {
-	local command_name="$1"
-
-	php artisan list --raw 2>/dev/null |
-		awk '{ print $1 }' |
-		grep -qx -- "$command_name"
 }
 
 install_composer_dependencies() {
@@ -67,7 +74,9 @@ install_composer_dependencies() {
 }
 
 main() {
+	skip_unless_laravel_project
 	require_environment
+	install_system_packages
 	configure_environment
 
 	install_composer_dependencies
