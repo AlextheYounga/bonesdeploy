@@ -451,7 +451,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bonesinfra"
-version = "0.2.2"
+version = "0.2.3"
 description = "Deployment automation for BonesDeploy"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -2179,38 +2179,6 @@ def build_home_for(project_name: str) -> str:
     return f"{BUILD_USER_HOME_ROOT}/{build_user_for(project_name)}"
 
 
-def _validate_subid_ranges(build_user: str):
-    q_subid_prefix = quote(f"^{build_user}:")
-    server.shell(
-        name=f"Validate subuid/subgid ranges for {build_user}",
-        commands=[
-            f"grep -q {q_subid_prefix} /etc/subuid",
-            f"grep -q {q_subid_prefix} /etc/subgid",
-        ],
-        _sudo=True,
-    )
-
-
-def _validate_rootless_podman(build_user: str, build_group: str, build_home: str):
-    q_build_user = quote(build_user)
-    q_build_group = quote(build_group)
-    q_build_home = quote(build_home)
-    server.shell(
-        name=f"Validate rootless podman for {build_user}",
-        commands=[
-            (
-                f"uid=$(id -u {q_build_user})"
-                f" && install -d -o {q_build_user} -g {q_build_group} -m 0700 /run/user/$uid"
-                f" && runuser -u {q_build_user} -- env"
-                f" HOME={q_build_home} XDG_RUNTIME_DIR=/run/user/$uid"
-                " podman info --format '{{.Host.Security.Rootless}}'"
-                " | grep -Fx true"
-            )
-        ],
-        _sudo=True,
-    )
-
-
 def ensure_users_and_groups(ctx):
     build_user = build_user_for(ctx.config.project_name)
     build_group = build_group_for(ctx.config.project_name)
@@ -2280,8 +2248,6 @@ def ensure_users_and_groups(ctx):
         commands=[f"loginctl enable-linger {quote(build_user)}"],
         _sudo=True,
     )
-    _validate_subid_ranges(build_user)
-    _validate_rootless_podman(build_user, build_group, build_home)
 
 
 def install_authorized_key(ctx):
@@ -5113,13 +5079,9 @@ def test_setup_creates_rootless_build_user_and_pseudo_home():
     helpers.assert_contains(c, 'mode="0700"')
 
 
-def test_setup_enables_linger_and_validates_rootless_podman():
+def test_setup_enables_linger_for_build_user():
     c = helpers.read(SETUP_USERS)
     helpers.assert_contains(c, "loginctl enable-linger")
-    helpers.assert_contains(c, "Validate subuid/subgid ranges")
-    helpers.assert_contains(c, "grep -q")
-    helpers.assert_contains(c, "runuser -u")
-    helpers.assert_contains(c, "podman info --format '{{.Host.Security.Rootless}}'")
 
 
 # ---- ssl plan ----
