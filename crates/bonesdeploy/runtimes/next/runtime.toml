@@ -1,6 +1,5 @@
 template = "next"
 web_root = "public"
-build_image = "docker.io/library/node:24-bookworm"
 
 [permissions]
 paths = [

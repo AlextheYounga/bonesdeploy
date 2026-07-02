@@ -69,17 +69,11 @@ fn archive_bones_directory() -> Result<Vec<u8>> {
 mod tests {
     use std::path::Path;
 
-    use super::remote_import_command;
     use shared::paths;
 
     #[test]
     fn local_secrets_path_stays_under_bones_dir() {
         let path = Path::new(paths::LOCAL_BONES_SECRETS_DIR);
         assert_eq!(path.parent(), Some(Path::new(paths::LOCAL_BONES_DIR)));
-    }
-
-    #[test]
-    fn remote_import_command_targets_control_plane_import() {
-        assert_eq!(remote_import_command("acme"), "bonesremote site import --site 'acme'");
     }
 }

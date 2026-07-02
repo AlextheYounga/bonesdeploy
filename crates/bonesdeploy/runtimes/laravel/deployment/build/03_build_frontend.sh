@@ -27,27 +27,51 @@ require_command() {
 	command -v "$name" >/dev/null 2>&1 || die "$name not found"
 }
 
+artisan_command_exists() {
+	local command_name="$1"
+
+	php artisan list --raw 2>/dev/null |
+		awk '{ print $1 }' |
+		grep -qx -- "$command_name"
+}
+
 package_json_package_manager() {
 	[ -f package.json ] || return 0
 
-	php -r '
-		$package = json_decode(file_get_contents("package.json"), true) ?: [];
-		$packageManager = $package["packageManager"] ?? "";
-
-		if ($packageManager !== "") {
-			echo explode("@", $packageManager)[0], PHP_EOL;
+	awk '
+		$0 ~ /"packageManager"[[:space:]]*:[[:space:]]*"/ {
+			line = $0
+			if (sub(/.*"packageManager"[[:space:]]*:[[:space:]]*"/, "", line)) {
+				sub(/".*/, "", line)
+				split(line, parts, "@")
+				print parts[1]
+				exit
+			}
 		}
-	' 2>/dev/null || true
+	' package.json 2>/dev/null || true
 }
 
 package_json_has_build_script() {
 	[ -f package.json ] || return 1
 
 	[ "$(
-		php -r '
-			$package = json_decode(file_get_contents("package.json"), true) ?: [];
-			echo isset($package["scripts"]["build"]) ? "1" : "0";
-		' 2>/dev/null || true
+		awk '
+			$0 ~ /"scripts"[[:space:]]*:[[:space:]]*{/ {
+				in_scripts = 1
+			}
+
+			in_scripts {
+				line = $0
+				if (sub(/.*"build"[[:space:]]*:[[:space:]]*"/, "", line)) {
+					print "1"
+					exit
+				}
+			}
+
+			in_scripts && $0 ~ /}/ {
+				in_scripts = 0
+			}
+		' package.json 2>/dev/null || true
 	)" = "1" ]
 }
 
@@ -73,6 +97,7 @@ detect_package_manager() {
 ensure_node_toolchain() {
 	export PATH="$PROJECT_ROOT/build/node/bin:$PATH"
 
+	require_command php
 	require_command node
 	require_command npm
 
@@ -168,6 +193,11 @@ run_frontend_build() {
 }
 
 generate_wayfinder_files() {
+	if ! artisan_command_exists "wayfinder:generate"; then
+		log "wayfinder:generate not available; skipping Wayfinder generation."
+		return
+	fi
+
 	log "Generating Wayfinder files..."
 	php artisan wayfinder:generate
 }

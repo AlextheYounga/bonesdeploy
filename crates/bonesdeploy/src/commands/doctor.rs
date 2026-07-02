@@ -132,6 +132,9 @@ fn check_deployment_scripts() -> Option<String> {
             }
             let name = entry.file_name();
             let name = name.to_string_lossy();
+            if !name.ends_with(".sh") {
+                continue;
+            }
             let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
             if !has_numeric_prefix {
                 return Some(format!("Deployment script is not ordered: {subdir}/{name}"));
@@ -223,7 +226,9 @@ mod tests {
         fs::create_dir_all(root.join(".bones/deployment/build"))?;
         fs::create_dir_all(root.join(".bones/deployment/prepare"))?;
         fs::write(root.join(".bones/deployment/build/01_build.sh"), "")?;
+        fs::write(root.join(".bones/deployment/build/README.md"), "# Build Scripts")?;
         fs::write(root.join(".bones/deployment/prepare/02_prepare.sh"), "")?;
+        fs::write(root.join(".bones/deployment/prepare/README.md"), "# Prepare Scripts")?;
 
         env::set_current_dir(&root)?;
         let result = check_deployment_scripts();

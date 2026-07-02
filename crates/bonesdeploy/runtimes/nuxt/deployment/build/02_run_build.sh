@@ -22,3 +22,7 @@ else
 	echo "No lockfile found. Run your package manager locally first."
 	exit 1
 fi
+
+if [ -L dist ]; then
+	rm dist
+fi

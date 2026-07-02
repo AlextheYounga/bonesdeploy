@@ -54,7 +54,7 @@ Important security property:
 - Runtime user still cannot access build scripts.
 
 ### 4. Run Podman As Build User
-In `crates/bonesremote/src/release/scripts.rs`, replace direct `podman` execution with:
+In `crates/bonesremote/src/release/script_runner/mod.rs`, replace direct `podman` execution with:
 
 ```text
 runuser -u <project>-build -- env \

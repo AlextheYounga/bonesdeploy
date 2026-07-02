@@ -60,21 +60,50 @@ configure_paths() {
 }
 
 read_node_version_from_package_json() {
-	command -v php >/dev/null 2>&1 || return 0
+	local version
 
-	php -r '
-		$package = json_decode(file_get_contents("package.json"), true) ?: [];
-
-		if (isset($package["volta"]["node"])) {
-			echo $package["volta"]["node"];
-			exit;
+	version="$(awk '
+		$0 ~ /"volta"[[:space:]]*:[[:space:]]*{/ {
+			in_section = 1
 		}
 
-		if (isset($package["engines"]["node"])) {
-			echo $package["engines"]["node"];
-			exit;
+		in_section {
+			line = $0
+			if (sub(/.*"node"[[:space:]]*:[[:space:]]*"/, "", line)) {
+				sub(/".*/, "", line)
+				print line
+				exit
+			}
 		}
-	'
+
+		in_section && $0 ~ /}/ {
+			in_section = 0
+		}
+	' package.json)"
+
+	if [ -n "$version" ]; then
+		echo "$version"
+		return
+	fi
+
+	awk '
+		$0 ~ /"engines"[[:space:]]*:[[:space:]]*{/ {
+			in_section = 1
+		}
+
+		in_section {
+			line = $0
+			if (sub(/.*"node"[[:space:]]*:[[:space:]]*"/, "", line)) {
+				sub(/".*/, "", line)
+				print line
+				exit
+			}
+		}
+
+		in_section && $0 ~ /}/ {
+			in_section = 0
+		}
+	' package.json
 }
 
 read_node_version() {

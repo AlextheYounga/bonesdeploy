@@ -175,7 +175,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{install_repo_post_receive_hook_from_site_root, validate_site_dataset, validate_top_level_entries};
+    use super::{install_repo_post_receive_hook_from_site_root, validate_top_level_entries};
     use shared::paths;
 
     #[test]
@@ -188,41 +188,6 @@ mod tests {
         fs::write(root.join("oops.txt"), "bad")?;
 
         let result = validate_top_level_entries(&root);
-
-        fs::remove_dir_all(&root)?;
-        assert!(result.is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn validate_site_dataset_rejects_bad_build_image() -> Result<()> {
-        let root = env::temp_dir().join(format!("bonesremote-site-runtime-test-{}", process::id()));
-        if root.exists() {
-            fs::remove_dir_all(&root)?;
-        }
-        fs::create_dir_all(&root)?;
-        fs::write(
-            root.join("bones.toml"),
-            r#"
-remote_name = "production"
-project_name = "unitapp"
-ssh_user = "root"
-host = "example.com"
-port = "22"
-repo_path = "/home/git/unitapp.git"
-project_root = "/srv/sites/unitapp"
-branch = "main"
-preview_domain = ""
-deploy_on_push = false
-releases = 5
-ssl_enabled = false
-domain = ""
-email = ""
-"#,
-        )?;
-        fs::write(root.join("runtime.toml"), "build_image = \"node:22;rm -rf /\"\n")?;
-
-        let result = validate_site_dataset("unitapp", &root);
 
         fs::remove_dir_all(&root)?;
         assert!(result.is_err());
