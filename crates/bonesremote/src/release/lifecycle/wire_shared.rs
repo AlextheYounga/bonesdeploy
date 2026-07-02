@@ -7,7 +7,7 @@ use shared::config::{self, SharedPath, SharedPathType};
 use shared::paths;
 
 use crate::privileges;
-use crate::release_state;
+use crate::release::state as release_state;
 
 fn validate_site_name(site: &str) -> Result<()> {
     if site.is_empty() {

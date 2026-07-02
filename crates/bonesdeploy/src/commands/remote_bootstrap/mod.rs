@@ -6,12 +6,13 @@ use serde_json::Value;
 use shared::config as shared_config;
 use shared::paths;
 
-use super::remote_data;
 use crate::config;
 use crate::infra::bonesinfra;
 use crate::infra::bootstrap_ssh;
 use crate::ui::output;
 use crate::ui::prompts;
+
+pub mod data;
 
 pub fn run(skip_confirm: bool) -> Result<()> {
     if !skip_confirm && !prompts::confirm_remote_setup()? {
@@ -26,7 +27,7 @@ pub fn run(skip_confirm: bool) -> Result<()> {
 
     println!("Bootstrapping remote server...");
 
-    let mut deploy_data = Value::Object(remote_data::base(&cfg, &runtime.web_root));
+    let mut deploy_data = Value::Object(data::base(&cfg, &runtime.web_root));
     let host = cfg.host;
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from(shared_config::bonesinfra_input::SSH_USER), Value::String(ssh_user));

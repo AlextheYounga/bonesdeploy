@@ -1,112 +1,11 @@
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
-use anyhow::{Context, Result, bail};
-use tempfile::TempDir;
-
-use super::update_release;
+use anyhow::{Context, Result};
 use shared::paths;
 
-const SOURCE_REPO_URL: &str = "https://github.com/AlextheYounga/bonesdeploy.git";
-const SOURCE_BRANCH: &str = "master";
-
-#[derive(Clone, Copy)]
-pub struct Options {
-    pub skip_local: bool,
-    pub skip_remote: bool,
-}
-
-pub async fn run(options: Options) -> Result<()> {
-    println!("Checking for updates...");
-    let current_local = update_release::current_local_version();
-    let current_remote = update_release::current_remote_version();
-
-    if options.skip_local && options.skip_remote {
-        println!("Already up to date.");
-        return Ok(());
-    }
-
-    let temp_dir = TempDir::new().context("Failed to create temp directory")?;
-    let temp_path = temp_dir.path();
-
-    let source_dir = clone_master_source(temp_path)?;
-    let master_versions = read_master_versions(&source_dir)?;
-
-    let mut updated = false;
-
-    if !options.skip_local {
-        if current_local != master_versions.bonesdeploy {
-            println!("Updating bonesdeploy...");
-            update_release::update_local_from_source(SOURCE_REPO_URL)?;
-            updated = true;
-        }
-
-        refresh_local_bones_from_source(&source_dir, Path::new(paths::LOCAL_BONES_DIR))?;
-    }
-
-    if !options.skip_remote && current_remote != master_versions.bonesremote {
-        println!("Updating bonesremote...");
-        update_release::update_remote_from_source(SOURCE_REPO_URL, &master_versions.bonesremote).await?;
-        updated = true;
-    }
-
-    if updated {
-        println!("Update complete.");
-    } else {
-        println!("Already up to date.");
-    }
-
-    Ok(())
-}
-
-fn clone_master_source(temp_path: &Path) -> Result<PathBuf> {
-    let source_dir = temp_path.join("source");
-
-    let clone_status = Command::new("git")
-        .args(["clone", "--depth", "1", "--branch", SOURCE_BRANCH, SOURCE_REPO_URL])
-        .arg(&source_dir)
-        .status()
-        .context("Failed to clone bonesdeploy repository")?;
-
-    if !clone_status.success() {
-        bail!("Failed to clone {SOURCE_REPO_URL} branch {SOURCE_BRANCH}");
-    }
-
-    Ok(source_dir)
-}
-
-struct MasterVersions {
-    bonesdeploy: String,
-    bonesremote: String,
-}
-
-fn read_master_versions(source_dir: &Path) -> Result<MasterVersions> {
-    let bonesdeploy = read_package_version(&source_dir.join("crates/bonesdeploy/Cargo.toml"))?;
-    let bonesremote = read_package_version(&source_dir.join("crates/bonesremote/Cargo.toml"))?;
-
-    Ok(MasterVersions { bonesdeploy, bonesremote })
-}
-
-fn read_package_version(manifest: &Path) -> Result<String> {
-    let content = fs::read_to_string(manifest).with_context(|| format!("Failed to read {}", manifest.display()))?;
-    parse_package_version(&content)
-        .with_context(|| format!("Failed to parse package version from {}", manifest.display()))
-}
-
-fn parse_package_version(manifest: &str) -> Result<String> {
-    let value: toml::Value = toml::from_str(manifest)?;
-    value
-        .get("package")
-        .and_then(|package| package.get("version"))
-        .and_then(toml::Value::as_str)
-        .filter(|version| !version.is_empty())
-        .map(String::from)
-        .ok_or_else(|| anyhow::anyhow!("missing [package] version"))
-}
-
-fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Result<()> {
+pub(super) fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Result<()> {
     if !bones_dir.exists() {
         return Ok(());
     }
@@ -182,33 +81,8 @@ mod tests {
     use anyhow::Result;
     use tempfile::TempDir;
 
-    use super::{parse_package_version, refresh_local_bones_from_source};
+    use super::refresh_local_bones_from_source;
 
-    /// Extracts the package version from the `[package]` section of a Cargo manifest.
-    #[test]
-    fn parses_package_version_from_manifest_package_section() -> anyhow::Result<()> {
-        let manifest = r#"
-[package]
-name = "bonesdeploy"
-version = "0.2.8"
-edition = "2024"
-
-[dependencies]
-version = "not-this"
-"#;
-
-        assert_eq!(parse_package_version(manifest)?, "0.2.8");
-        Ok(())
-    }
-
-    /// Returns an error when the manifest has no `[package]` section with a version field.
-    #[test]
-    fn rejects_manifest_without_package_version() {
-        let result = parse_package_version("[dependencies]\nversion = \"0.2.8\"\n");
-        assert!(result.is_err());
-    }
-
-    /// Refreshes .bones scaffold assets from the cloned source tree without overwriting local config files.
     #[test]
     fn refresh_local_bones_updates_scaffold_without_touching_configs() -> Result<()> {
         let temp = TempDir::new()?;

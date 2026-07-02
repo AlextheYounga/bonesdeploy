@@ -8,11 +8,11 @@ use crate::config;
 use crate::infra::ssh;
 use shared::config::{default_deploy_user, parse_port};
 
-pub fn current_local_version() -> String {
+pub(super) fn current_local_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
-pub fn current_remote_version() -> String {
+pub(super) fn current_remote_version() -> String {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     if !bones_toml.exists() {
         return String::from("unknown");
@@ -33,7 +33,7 @@ pub fn current_remote_version() -> String {
     }
 }
 
-pub fn update_local_from_source(repo_url: &str) -> Result<()> {
+pub(super) fn update_local_from_source(repo_url: &str) -> Result<()> {
     let status = Command::new("cargo")
         .args(["install", "--locked", "--git", repo_url, paths::BONESDEPLOY_BINARY, "--force"])
         .status()
@@ -46,7 +46,7 @@ pub fn update_local_from_source(repo_url: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result<()> {
+pub(super) async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     if !bones_toml.exists() {
         bail!("No {} found. Run from a bonesdeploy project directory.", paths::LOCAL_BONES_TOML);

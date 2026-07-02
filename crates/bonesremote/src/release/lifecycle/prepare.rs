@@ -8,7 +8,7 @@ use shared::paths::default_web_root;
 
 use crate::privileges;
 use crate::release::scripts as deploy_output;
-use crate::release_state;
+use crate::release::state as release_state;
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release prepare")?;

@@ -4,102 +4,9 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::Result;
-const BOLD: &str = "\x1b[1m";
-const GREEN_BOLD: &str = "\x1b[1;32m";
-const RED_BOLD: &str = "\x1b[1;31m";
-const RESET: &str = "\x1b[0m";
 use shared::paths;
 
-pub fn run(site: Option<&str>) -> Result<()> {
-    println!("{BOLD}{} doctor{RESET}", paths::BONESREMOTE_BINARY);
-
-    let mut issues: Vec<String> = Vec::new();
-
-    check_supported_distribution(&mut issues);
-    check_globally_available(&mut issues);
-    check_podman_available(&mut issues);
-    check_passwordless_sudo(&mut issues);
-    check_apparmor_support(&mut issues);
-
-    if let Some(site) = site {
-        super::doctor_site::check(site, &mut issues);
-    }
-
-    if issues.is_empty() {
-        println!("\n{GREEN_BOLD}OK{RESET} All checks passed.");
-        Ok(())
-    } else {
-        println!();
-        for issue in &issues {
-            println!("  {RED_BOLD}!{RESET} {issue}");
-        }
-        anyhow::bail!("Doctor found {} issue{}", issues.len(), if issues.len() == 1 { "" } else { "s" });
-    }
-}
-
-fn check_supported_distribution(issues: &mut Vec<String>) {
-    let os_release = fs::read_to_string(paths::ETC_OS_RELEASE);
-    let Ok(os_release) = os_release else {
-        issues.push(format!("Failed to read {}; expected Debian or Ubuntu host", paths::ETC_OS_RELEASE));
-        return;
-    };
-
-    let normalized = os_release.to_lowercase();
-    if normalized.contains("id=debian") || normalized.contains("id=ubuntu") {
-        return;
-    }
-
-    issues.push("Unsupported host OS; bonesremote currently supports Debian/Ubuntu only".to_string());
-}
-
-fn check_globally_available(issues: &mut Vec<String>) {
-    let result = Command::new(paths::BONESREMOTE_BINARY).arg("version").output();
-
-    match result {
-        Ok(output) if output.status.success() => {}
-        _ => issues.push(format!("{} is not globally available (not in PATH)", paths::BONESREMOTE_BINARY)),
-    }
-}
-
-fn check_podman_available(issues: &mut Vec<String>) {
-    let result = Command::new("podman").arg("--version").output();
-
-    match result {
-        Ok(output) if output.status.success() => {}
-        _ => issues.push("podman is not available; install Podman for disposable builds".to_string()),
-    }
-}
-
-fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let privileged_commands = [
-        [paths::BONESREMOTE_BINARY, "hook", "post-receive", "--site", "nonexistent"],
-        [paths::BONESREMOTE_BINARY, "service", "restart", "--site", "nonexistent"],
-        [paths::BONESREMOTE_BINARY, "release", "rollback", "--site", "nonexistent"],
-        [paths::BONESREMOTE_BINARY, "release", "drop-failed", "--site", "nonexistent"],
-        [paths::BONESREMOTE_BINARY, "release", "prune", "--site", "nonexistent"],
-    ];
-
-    for command in privileged_commands {
-        let result = deploy_user_sudo_check_command(command).output();
-
-        match result {
-            Ok(output) if output.status.success() => {}
-            _ => issues.push(format!(
-                "{} is not allowed via passwordless sudo: {} (ensure bonesinfra has provisioned the sudoers policy on this host)",
-                paths::BONESREMOTE_BINARY,
-                command.join(" "),
-            )),
-        }
-    }
-}
-
-fn deploy_user_sudo_check_command(command: [&str; 5]) -> Command {
-    let mut sudo = Command::new("sudo");
-    sudo.args(["-n", "-u", paths::DEPLOY_USER, "sudo", "-n", "-l"]).args(command);
-    sudo
-}
-
-fn check_apparmor_support(issues: &mut Vec<String>) {
+pub(super) fn check_support(issues: &mut Vec<String>) {
     check_apparmor_kernel_enabled(issues);
     check_apparmor_service(issues);
 
@@ -264,5 +171,69 @@ fn apparmor_unit_wiring_issue(contents: &str, installed_profiles: &HashSet<&str>
 }
 
 #[cfg(test)]
-#[path = "tests/test_doctor.rs"]
-mod test_doctor;
+#[test]
+fn apparmor_kernel_enabled_accepts_yes() {
+    assert!(apparmor_kernel_enabled("Y\n"));
+}
+
+#[cfg(test)]
+#[test]
+fn apparmor_kernel_enabled_rejects_no() {
+    assert!(!apparmor_kernel_enabled("N\n"));
+}
+
+#[cfg(test)]
+#[test]
+fn apparmor_profile_filename_accepts_bonesdeploy_profile() {
+    assert!(apparmor_profile_filename("bonesdeploy-demo-nginx"));
+}
+
+#[cfg(test)]
+#[test]
+fn apparmor_profile_filename_rejects_unrelated_file() {
+    assert!(!apparmor_profile_filename("default"));
+}
+
+#[cfg(test)]
+#[test]
+fn apparmor_unit_name_for_profile_maps_project_unit() {
+    assert_eq!(apparmor_unit_name_for_profile("bonesdeploy-demo-nginx"), Some("demo-nginx.service".to_string()));
+}
+
+#[cfg(test)]
+#[test]
+fn apparmor_unit_wiring_accepts_expected_unit_with_reordered_after_tokens() {
+    let installed_profiles = HashSet::from(["bonesdeploy-demo-nginx"]);
+
+    assert!(apparmor_unit_wiring_issue(
+        "[Unit]\nAfter=apparmor.service network.target\nRequires=apparmor.service\n[Service]\nAppArmorProfile=bonesdeploy-demo-nginx\n",
+        &installed_profiles,
+    )
+    .is_none());
+}
+
+#[cfg(test)]
+#[test]
+fn apparmor_unit_wiring_rejects_missing_profile_binding() {
+    let installed_profiles = HashSet::from(["bonesdeploy-demo-nginx"]);
+
+    assert!(
+        apparmor_unit_wiring_issue(
+            "[Unit]\nAfter=network.target apparmor.service\nRequires=apparmor.service\n[Service]\nType=simple\n",
+            &installed_profiles,
+        )
+        .is_some()
+    );
+}
+
+#[cfg(test)]
+#[test]
+fn apparmor_unit_wiring_rejects_unknown_profile_binding() {
+    let installed_profiles = HashSet::from(["bonesdeploy-demo-nginx"]);
+
+    let issue = apparmor_unit_wiring_issue(
+        "[Unit]\nAfter=network.target apparmor.service\nRequires=apparmor.service\n[Service]\nAppArmorProfile=bonesdeploy-demo-ngnix\n",
+        &installed_profiles,
+    );
+    assert!(issue.is_some_and(|msg| msg.contains("bonesdeploy-demo-ngnix")));
+}

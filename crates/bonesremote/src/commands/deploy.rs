@@ -4,12 +4,10 @@ use anyhow::{Context, Result, bail};
 use shared::config;
 use shared::paths;
 
-use crate::commands::{
-    activate_release, drop_failed_release, post_deploy, release_build, release_checkout, release_prepare, service,
-    stage_release, wire_shared,
-};
+use crate::commands::{drop_failed_release, release_prune, service};
 use crate::privileges;
-use crate::release_state;
+use crate::release::lifecycle;
+use crate::release::state as release_state;
 
 pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     privileges::ensure_root("bonesremote deploy")?;
@@ -23,41 +21,41 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
 
     let target_revision = revision.map_or_else(|| cfg.branch.clone(), ToOwned::to_owned);
 
-    stage_release::run(site)?;
+    lifecycle::stage::run(site)?;
 
-    let context_dir = release_checkout::ensure_build_context(site)?;
+    let context_dir = lifecycle::checkout::ensure_build_context(site)?;
 
-    if let Err(error) = release_checkout::run(site, &target_revision, &context_dir) {
+    if let Err(error) = lifecycle::checkout::run(site, &target_revision, &context_dir) {
         cleanup(site, Some(&context_dir));
         drop_failed_release::run(site).ok();
         return Err(error);
     }
 
-    if let Err(error) = release_build::run(site, &context_dir) {
+    if let Err(error) = lifecycle::build::run(site, &context_dir) {
         cleanup(site, Some(&context_dir));
         drop_failed_release::run(site).ok();
         return Err(error);
     }
 
-    if let Err(error) = release_build::promote(site, &context_dir) {
+    if let Err(error) = lifecycle::build::promote(site, &context_dir) {
         cleanup(site, Some(&context_dir));
         drop_failed_release::run(site).ok();
         return Err(error);
     }
 
-    if let Err(error) = wire_shared::run(site) {
+    if let Err(error) = lifecycle::wire_shared::run(site) {
         cleanup(site, Some(&context_dir));
         drop_failed_release::run(site).ok();
         return Err(error);
     }
 
-    if let Err(error) = release_prepare::run(site) {
+    if let Err(error) = lifecycle::prepare::run(site) {
         cleanup(site, Some(&context_dir));
         drop_failed_release::run(site).ok();
         return Err(error);
     }
 
-    if let Err(error) = activate_release::run(site) {
+    if let Err(error) = lifecycle::activate::run(site) {
         cleanup(site, Some(&context_dir));
         drop_failed_release::run(site).ok();
         return Err(error);
@@ -69,7 +67,7 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
         return Err(error);
     }
 
-    if let Err(error) = post_deploy::run(site) {
+    if let Err(error) = release_prune::run(site) {
         cleanup(site, Some(&context_dir));
         return Err(error);
     }
@@ -80,7 +78,7 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
 
 fn cleanup(site: &str, context: Option<&Path>) {
     if let Some(context) = context {
-        release_checkout::cleanup_build_context(site, context).ok();
+        lifecycle::checkout::cleanup_build_context(site, context).ok();
     }
 }
 

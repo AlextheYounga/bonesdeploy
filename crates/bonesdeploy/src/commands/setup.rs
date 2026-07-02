@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use shared::paths;
 
-use crate::commands::{doctor, push_state, remote_runtime, remote_setup};
+use crate::commands::{doctor, push_state, remote_bootstrap, remote_runtime};
 use crate::config;
 use crate::ui::output;
 
@@ -13,7 +13,7 @@ pub async fn run(skip_confirm: bool) -> Result<()> {
 
     println!("Setting up deployment...");
 
-    remote_setup::run(skip_confirm).with_context(|| setup_error("bootstrapping remote server"))?;
+    remote_bootstrap::run(skip_confirm).with_context(|| setup_error("bootstrapping remote server"))?;
     remote_runtime::run(true).with_context(|| setup_error("applying runtime"))?;
     push_state::run(false).with_context(|| setup_error("syncing .bones"))?;
     doctor::run(false).await.with_context(|| setup_error("checking deployment"))?;

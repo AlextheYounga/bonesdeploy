@@ -207,7 +207,7 @@ install_node() {
 	mkdir -p "$(dirname "$NODE_DIR")"
 
 	curl -fsSL --retry 3 --retry-delay 2 "$url" |
-		tar -xJ -C "$TMP_DIR"
+		tar --no-same-owner -xJ -C "$TMP_DIR"
 
 	rm -rf "$NODE_DIR"
 	mv "$TMP_DIR/node-v${version}-linux-${node_arch}" "$NODE_DIR"
