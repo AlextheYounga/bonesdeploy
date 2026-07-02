@@ -109,6 +109,16 @@ pub fn release_group_for(project_name: &str) -> String {
 }
 
 #[must_use]
+pub fn build_user_for(project_name: &str) -> String {
+    format!("{project_name}-build")
+}
+
+#[must_use]
+pub fn build_group_for(project_name: &str) -> String {
+    format!("{project_name}-build")
+}
+
+#[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
     paths::default_repo_path_for(project_name)
 }
@@ -289,5 +299,11 @@ paths = [
         assert_eq!(runtime.shared.paths[0].path_type, SharedPathType::File);
         assert_eq!(runtime.shared.paths[1].path, "storage");
         assert_eq!(runtime.shared.paths[1].path_type, SharedPathType::Dir);
+    }
+
+    #[test]
+    fn build_identity_helpers_are_derived_from_project_name() {
+        assert_eq!(build_user_for("demo"), "demo-build");
+        assert_eq!(build_group_for("demo"), "demo-build");
     }
 }

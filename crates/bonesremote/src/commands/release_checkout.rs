@@ -19,8 +19,11 @@ fn resolved_sites_root() -> PathBuf {
     SITES_ROOT_OVERRIDE.with(|slot| slot.borrow().clone()).unwrap_or_else(paths::bonesremote_sites_root)
 }
 
-fn resolved_tmp_root(site: &str) -> PathBuf {
-    resolved_sites_root().join(site).join(paths::TMP_BUILDS_DIR)
+fn resolved_tmp_root(site: &str) -> Result<PathBuf> {
+    let bones_path = resolved_sites_root().join(site).join(paths::BONES_TOML);
+    let cfg = config::load(&bones_path)
+        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
+    Ok(Path::new(&cfg.project_root).join(paths::TMP_BUILDS_DIR))
 }
 
 pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
@@ -73,7 +76,7 @@ pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
 }
 
 pub(crate) fn ensure_build_context(site: &str) -> Result<PathBuf> {
-    let root = resolved_tmp_root(site);
+    let root = resolved_tmp_root(site)?;
     fs::create_dir_all(&root).with_context(|| format!("Failed to create tmp builds root: {}", root.display()))?;
 
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
@@ -86,7 +89,7 @@ pub fn cleanup_build_context(site: &str, context: &Path) -> Result<()> {
     if context.exists() {
         fs::remove_dir_all(context).with_context(|| format!("Failed to remove build context {}", context.display()))?;
     }
-    let root = resolved_tmp_root(site);
+    let root = if let Some(parent) = context.parent() { parent.to_path_buf() } else { resolved_tmp_root(site)? };
     if root.exists() && fs::read_dir(&root)?.next().is_none() {
         fs::remove_dir(&root).ok();
     }

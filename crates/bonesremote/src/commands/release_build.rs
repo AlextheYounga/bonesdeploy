@@ -4,7 +4,7 @@ use std::os::unix::fs::{PermissionsExt, symlink};
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, Runtime, load_runtime, runtime_group_for};
+use shared::config::{self, Runtime, build_group_for, build_user_for, load_runtime, runtime_group_for};
 use shared::paths;
 use shared::paths::default_web_root;
 
@@ -26,6 +26,10 @@ pub fn run(site: &str, context: &Path) -> Result<()> {
     if !context.is_dir() {
         bail!("Build context does not exist: {}", context.display());
     }
+
+    let build_user = build_user_for(&cfg.project_name);
+    let build_group = build_group_for(&cfg.project_name);
+    chown_tree_to_user(context, &build_user, &build_group)?;
 
     let scripts_dir = paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR).join(paths::DEPLOYMENT_BUILD_DIR);
     if !scripts_dir.is_dir() {
@@ -64,6 +68,8 @@ pub fn run(site: &str, context: &Path) -> Result<()> {
             &context.join(format!("{script_name}.log")),
             &deploy_output::BuildScriptEnv {
                 project_name: &cfg.project_name,
+                build_user: &build_user,
+                build_uid: user_uid(&build_user)?,
                 web_root: &runtime.web_root,
                 build_image: &runtime.build_image,
             },
@@ -220,16 +226,13 @@ fn seal_release(destination: &Path, release_group: &str) -> Result<()> {
 }
 
 fn root_uid() -> Result<u32> {
+    user_uid("root")
+}
+
+fn user_uid(user: &str) -> Result<u32> {
     let passwd = fs::read_to_string(paths::ETC_PASSWD)
-        .with_context(|| format!("Failed to read {} while sealing release", paths::ETC_PASSWD))?;
-    let line = passwd.lines().find(|line| line.starts_with("root:")).context("root entry missing from /etc/passwd")?;
-    let fields: Vec<&str> = line.split(':').collect();
-    let uid = fields
-        .get(2)
-        .context("root passwd line missing uid field")?
-        .parse::<u32>()
-        .context("root uid is not a valid integer")?;
-    Ok(uid)
+        .with_context(|| format!("Failed to read {} while resolving uid for {user}", paths::ETC_PASSWD))?;
+    parse_user_uid(&passwd, user)
 }
 
 fn site_group_gid(group: &str) -> Result<u32> {
@@ -246,6 +249,42 @@ fn site_group_gid(group: &str) -> Result<u32> {
         .parse::<u32>()
         .with_context(|| format!("Group '{group}' gid is not a valid integer"))?;
     Ok(gid)
+}
+
+fn parse_user_uid(passwd: &str, user: &str) -> Result<u32> {
+    let line = passwd
+        .lines()
+        .find(|line| line.starts_with(&format!("{user}:")))
+        .with_context(|| format!("User '{user}' missing from {}", paths::ETC_PASSWD))?;
+    let fields: Vec<&str> = line.split(':').collect();
+    fields
+        .get(2)
+        .with_context(|| format!("User '{user}' missing uid field"))?
+        .parse::<u32>()
+        .with_context(|| format!("User '{user}' uid is not a valid integer"))
+}
+
+fn chown_tree_to_user(path: &Path, user: &str, group: &str) -> Result<()> {
+    let uid = user_uid(user)?;
+    let gid = site_group_gid(group)?;
+    chown_tree(path, uid, gid)
+}
+
+fn chown_tree(path: &Path, uid: u32, gid: u32) -> Result<()> {
+    chown(path, Some(uid), Some(gid)).with_context(|| format!("Failed to chown {}", path.display()))?;
+
+    if fs::symlink_metadata(path)
+        .with_context(|| format!("Failed to inspect {} for chown", path.display()))?
+        .file_type()
+        .is_dir()
+    {
+        for entry in fs::read_dir(path).with_context(|| format!("Failed to read {} for chown", path.display()))? {
+            let entry = entry?;
+            chown_tree(&entry.path(), uid, gid)?;
+        }
+    }
+
+    Ok(())
 }
 
 fn clear_directory_children(path: &Path) -> Result<()> {
@@ -278,7 +317,7 @@ fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{clear_directory_children, normalize_relative_path, validate_symlink_target};
+    use super::{clear_directory_children, normalize_relative_path, parse_user_uid, validate_symlink_target};
     use std::env;
     use std::fs;
     use std::path::Path;
@@ -319,5 +358,11 @@ mod tests {
         assert!(
             validate_symlink_target(Path::new("/tmp/release-root/public/x"), Path::new("../../evil"), root).is_err()
         );
+    }
+
+    #[test]
+    fn parse_user_uid_reads_uid_field() {
+        let passwd = "root:x:0:0:root:/root:/bin/bash\ndemo-build:x:1234:1234::/nonexistent:/usr/sbin/nologin\n";
+        assert_eq!(parse_user_uid(passwd, "demo-build").expect("uid should parse"), 1234);
     }
 }
