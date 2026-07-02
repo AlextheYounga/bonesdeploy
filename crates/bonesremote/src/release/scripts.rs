@@ -107,6 +107,7 @@ fn configure_podman_build_command(command: &mut Command, source_root: &Path, env
         .args(["-u", env.build_user, "--", "env"])
         .arg(format!("HOME={}", build_home.display()))
         .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", env.build_uid))
+        .current_dir(source_root)
         .args([
             "podman",
             "run",
@@ -368,6 +369,7 @@ mod tests {
         assert!(args.contains(&String::from("/tmp/source:/workspace/source")));
         assert!(!args.iter().any(|arg| arg.contains("/srv/sites/demo/shared")));
         assert!(!args.iter().any(|arg| arg.contains("/root/.config/bonesremote")));
+        assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/source")));
     }
 
     #[test]
