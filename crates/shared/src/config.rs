@@ -109,6 +109,16 @@ pub fn release_group_for(project_name: &str) -> String {
 }
 
 #[must_use]
+pub fn build_user_for(project_name: &str) -> String {
+    format!("{project_name}-build")
+}
+
+#[must_use]
+pub fn build_group_for(project_name: &str) -> String {
+    format!("{project_name}-build")
+}
+
+#[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
     paths::default_repo_path_for(project_name)
 }
@@ -147,6 +157,28 @@ pub struct Runtime {
     pub runtime_group: String,
     #[serde(default)]
     pub release_group: String,
+    #[serde(default)]
+    pub shared: Shared,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Shared {
+    pub paths: Vec<SharedPath>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SharedPath {
+    pub path: String,
+    #[serde(rename = "type")]
+    pub path_type: SharedPathType,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SharedPathType {
+    File,
+    Dir,
 }
 
 /// Loads the runtime configuration from a TOML file, falling back to defaults.
@@ -169,6 +201,7 @@ pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
             runtime_user: String::new(),
             runtime_group: String::new(),
             release_group: String::new(),
+            shared: Shared::default(),
         })
     }
 }
@@ -244,5 +277,33 @@ mod tests {
     fn validate_build_image_rejects_shell_metacharacters() {
         assert!(validate_build_image("node:22;rm -rf /").is_err());
         assert!(validate_build_image("node:22 $(whoami)").is_err());
+    }
+
+    #[test]
+    fn runtime_parses_shared_paths() {
+        let runtime: Runtime = toml::from_str(
+            r#"
+web_root = "public"
+
+[shared]
+paths = [
+    { path = ".env", type = "file" },
+    { path = "storage", type = "dir" },
+]
+"#,
+        )
+        .expect("runtime config should parse shared paths");
+
+        assert_eq!(runtime.shared.paths.len(), 2);
+        assert_eq!(runtime.shared.paths[0].path, ".env");
+        assert_eq!(runtime.shared.paths[0].path_type, SharedPathType::File);
+        assert_eq!(runtime.shared.paths[1].path, "storage");
+        assert_eq!(runtime.shared.paths[1].path_type, SharedPathType::Dir);
+    }
+
+    #[test]
+    fn build_identity_helpers_are_derived_from_project_name() {
+        assert_eq!(build_user_for("demo"), "demo-build");
+        assert_eq!(build_group_for("demo"), "demo-build");
     }
 }

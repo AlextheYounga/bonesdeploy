@@ -5,6 +5,7 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
+use shared::paths;
 
 #[cfg(test)]
 pub(super) struct HostScriptEnv<'a> {
@@ -13,13 +14,13 @@ pub(super) struct HostScriptEnv<'a> {
     pub(super) repo_path: &'a str,
     pub(super) web_root: &'a str,
 }
-
 pub(crate) struct BuildScriptEnv<'a> {
     pub(crate) project_name: &'a str,
+    pub(crate) build_user: &'a str,
+    pub(crate) build_uid: u32,
     pub(crate) web_root: &'a str,
     pub(crate) build_image: &'a str,
 }
-
 pub(crate) struct PrepareScriptEnv<'a> {
     pub(crate) project_name: &'a str,
     pub(crate) project_root: &'a str,
@@ -66,7 +67,7 @@ pub(crate) fn run_podman_build_script(
     let script_file =
         fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
 
-    let mut command = Command::new("podman");
+    let mut command = Command::new("runuser");
     configure_podman_build_command(&mut command, source_root, env);
 
     let mut child = command
@@ -101,10 +102,16 @@ pub(crate) fn run_prepare_script(
 
 fn configure_podman_build_command(command: &mut Command, source_root: &Path, env: &BuildScriptEnv<'_>) {
     let mount = format!("{}:/workspace/source", source_root.display());
+    let build_home = paths::bonesdeploy_user_home(env.build_user);
     command
+        .args(["-u", env.build_user, "--", "env"])
+        .arg(format!("HOME={}", build_home.display()))
+        .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", env.build_uid))
         .args([
+            "podman",
             "run",
             "--rm",
+            "-i",
             "--pull=missing",
             "--security-opt=no-new-privileges",
             "--cap-drop=all",
@@ -333,19 +340,29 @@ mod tests {
 
     #[test]
     fn podman_build_command_mounts_only_source_tree() {
-        let mut command = Command::new("podman");
+        let mut command = Command::new("runuser");
         configure_podman_build_command(
             &mut command,
             Path::new("/tmp/source"),
             &BuildScriptEnv {
                 project_name: "demo",
+                build_user: "demo-build",
+                build_uid: 1234,
                 web_root: "public",
                 build_image: "docker.io/library/node:22-bookworm",
             },
         );
 
         let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+        assert_eq!(args[0], "-u");
+        assert_eq!(args[1], "demo-build");
+        assert_eq!(args[2], "--");
+        assert_eq!(args[3], "env");
+        assert!(args.contains(&String::from("HOME=/var/lib/bonesdeploy/users/demo-build")));
+        assert!(args.contains(&String::from("XDG_RUNTIME_DIR=/run/user/1234")));
+        assert!(args.contains(&String::from("podman")));
         assert!(args.contains(&String::from("--rm")));
+        assert!(args.contains(&String::from("-i")));
         assert!(args.contains(&String::from("--security-opt=no-new-privileges")));
         assert!(args.contains(&String::from("--cap-drop=all")));
         assert!(args.contains(&String::from("/tmp/source:/workspace/source")));

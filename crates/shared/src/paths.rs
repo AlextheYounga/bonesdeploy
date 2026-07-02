@@ -54,6 +54,7 @@ pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
 pub const BONESREMOTE_BINARY: &str = "bonesremote";
 pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
 pub const BONESREMOTE_SITES_DIR: &str = "sites";
+pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
 pub const NGINX_SOCKET: &str = "nginx.sock";
 pub const NGINX_PID: &str = "nginx.pid";
 pub const PHP_FPM_SOCKET: &str = "php-fpm.sock";
@@ -129,8 +130,10 @@ pub fn bonesremote_tmp_builds_root(site: &str) -> PathBuf {
     bonesremote_site_root(site).join(TMP_BUILDS_DIR)
 }
 
-/// Canonical list of release-tree paths that should be linked from `shared/`.
-pub const SHARED_LEAVES: &[&str] = &[DOT_ENV, "storage", "bootstrap/cache", "database/database.sqlite"];
+#[must_use]
+pub fn bonesdeploy_user_home(user: &str) -> PathBuf {
+    Path::new(BONESDEPLOY_USERS_ROOT).join(user)
+}
 
 #[must_use]
 pub fn bonesremote_sites_root_resolved() -> PathBuf {

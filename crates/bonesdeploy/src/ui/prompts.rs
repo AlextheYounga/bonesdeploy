@@ -101,7 +101,7 @@ pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bon
 }
 
 pub fn prompt_branch(existing_config: Option<&Bones>) -> Result<String> {
-    let default_branch = config_default(existing_config, |cfg| cfg.branch.as_str(), "main");
+    let default_branch = config_default(existing_config, |cfg| cfg.branch.as_str(), "master");
     Text::new("Branch:")
         .with_default(default_branch)
         .prompt()

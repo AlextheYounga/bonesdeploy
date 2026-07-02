@@ -8,3 +8,8 @@ paths = [
   { path = "*", type = "file", mode = "640" },
   { path = "build", type = "dir", mode = "770", recursive = true },
 ]
+
+[shared]
+paths = [
+  { path = ".env", type = "file" },
+]

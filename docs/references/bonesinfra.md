@@ -19,13 +19,14 @@ bonesinfra
 │       │   │   └── project-nginx-profile.j2
 │       │   ├── fail2ban
 │       │   │   └── jail.local.j2
+│       │   ├── hooks
+│       │   │   └── post-receive
 │       │   ├── nginx
 │       │   │   ├── default-deny.conf.j2
 │       │   │   ├── index.html.j2
 │       │   │   ├── router.conf.j2
 │       │   │   ├── site-nginx.conf.j2
 │       │   │   └── site-nginx.service.j2
-│       │   ├── nvim
 │       │   ├── profile.d
 │       │   │   └── bonesinfra-shell.sh
 │       │   ├── scripts
@@ -43,17 +44,17 @@ bonesinfra
 │       │   │   ├── __init__.py
 │       │   │   └── nginx_safety.py
 │       │   ├── helpers
-│       │   │   ├── aptui.py
-│       │   │   ├── crates.py
 │       │   │   ├── neovim.py
 │       │   │   ├── packages.py
 │       │   │   ├── plan.py
+│       │   │   ├── rainfrog.py
 │       │   │   └── starship.py
 │       │   ├── runtime
 │       │   │   ├── apparmor.py
 │       │   │   ├── nginx.py
 │       │   │   ├── packages.py
 │       │   │   ├── plan.py
+│       │   │   ├── shared_paths.py
 │       │   │   └── template_runtime.py
 │       │   ├── setup
 │       │   │   ├── bonesremote.py
@@ -125,6 +126,7 @@ bonesinfra
     │   ├── test_no_provably_unnecessary_fallback.py
     │   └── test_no_suspicious_fallback.py
     ├── helpers.py
+    ├── test_build_user.py
     ├── test_cli.py
     ├── test_context.py
     ├── test_deploy_structure.py
@@ -178,7 +180,7 @@ When you are done working, please run and address all warnings/errors:
 
 And finally, please update any related documentation **if necessary, use your best judgement**:
 - `docs/PROJECT.md`
-
+- `README.md`
 ```
 
 `LICENSE`:
@@ -449,7 +451,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bonesinfra"
-version = "0.2.1"
+version = "0.2.2"
 description = "Deployment automation for BonesDeploy"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -690,6 +692,26 @@ backend = systemd
 enabled = true
 port = {{ ssh_port }}
 logpath = %(sshd_log)s
+
+```
+
+`src/bonesinfra/assets/hooks/post-receive`:
+
+```
+#!/usr/bin/env bash
+set -euo pipefail
+
+GIT_DIR="${GIT_DIR:-.}"
+GIT_DIR=$(cd "$GIT_DIR" && pwd)
+SITE=$(basename "$GIT_DIR")
+SITE=${SITE%.git}
+
+if [ -z "$SITE" ] || [ "$SITE" = "." ] || [ "$SITE" = "/" ]; then
+    echo "[bonesdeploy] Could not derive site name from GIT_DIR=$GIT_DIR"
+    exit 1
+fi
+
+exec sudo bonesremote hook post-receive --site "$SITE"
 
 ```
 
@@ -1234,57 +1256,6 @@ def validate_config(name):
 
 ```
 
-`src/bonesinfra/deploys/helpers/aptui.py`:
-
-```py
-from pyinfra.operations import apt, server
-
-
-# Install https://github.com/mexirica/aptui
-def _add_aptui_repository():
-    server.shell(
-        name="Add aptui repository",
-        commands=[
-            "curl -fsSL https://mexirica.github.io/aptui/public-key.gpg | sudo gpg --dearmor -o /usr/share/keyrings/aptui-archive-keyring.gpg",  # noqa: E501
-            "echo 'deb [signed-by=/usr/share/keyrings/aptui-archive-keyring.gpg] https://mexirica.github.io/aptui/ stable main' | sudo tee /etc/apt/sources.list.d/aptui.list",  # noqa: E501
-        ],
-        _sudo=True,
-    )
-
-
-def install_aptui():
-    _add_aptui_repository()
-    apt.packages(
-        name="Install aptui",
-        packages=["aptui"],
-        update=True,
-        _sudo=True,
-    )
-
-```
-
-`src/bonesinfra/deploys/helpers/crates.py`:
-
-```py
-from pyinfra.operations import server
-
-CARGO_BIN = "/root/.cargo/bin/cargo"
-HELPER_CARGO_CRATES: list[str] = [
-    "rainfrog",
-    "tuimux",
-]
-
-
-def install_helper_crates():
-    for crate in HELPER_CARGO_CRATES:
-        server.shell(
-            name=f"Install {crate} binary",
-            commands=[f"{CARGO_BIN} install {crate}"],
-            _sudo=True,
-        )
-
-```
-
 `src/bonesinfra/deploys/helpers/neovim.py`:
 
 ```py
@@ -1294,6 +1265,7 @@ from bonesinfra.domain.paths import ASSETS_DIR
 
 NVIM_CONFIG_DIR = "/etc/xdg/nvim"
 INSTALL_SCRIPT = "/usr/local/lib/bonesinfra/install-neovim.sh"
+NVIM_CONFIG_REPO = "https://github.com/AlextheYounga/myneovim.git"
 
 
 def install():
@@ -1313,15 +1285,28 @@ def install():
         _sudo=True,
     )
 
-    files.sync(
-        name="Install shared Neovim config",
-        src=str(ASSETS_DIR / "nvim"),
-        dest=NVIM_CONFIG_DIR,
+    server.shell(
+        name="Install shared Neovim config repo",
+        commands=[
+            (
+                f"if [ -d {NVIM_CONFIG_DIR}/.git ]; then "
+                f"git -C {NVIM_CONFIG_DIR} fetch --depth=1 origin && "
+                f"git -C {NVIM_CONFIG_DIR} reset --hard FETCH_HEAD; "
+                "else "
+                f"rm -rf {NVIM_CONFIG_DIR} && git clone --depth=1 {NVIM_CONFIG_REPO} {NVIM_CONFIG_DIR}; "
+                "fi"
+            ),
+            f"chown -R root:root {NVIM_CONFIG_DIR}",
+        ],
+        _sudo=True,
+    )
+
+    files.directory(
+        name="Ensure shared Neovim config permissions",
+        path=NVIM_CONFIG_DIR,
         user="root",
         group="root",
-        mode="0644",
-        dir_mode="0755",
-        delete=False,
+        mode="0755",
         _sudo=True,
     )
 
@@ -1353,6 +1338,7 @@ HELPER_APT_PACKAGES: list[str] = [
     "jq",
     "lsb-release",
     "lsof",
+    "lynis",
     "moreutils",
     "mutt",
     "ncdu",
@@ -1402,7 +1388,7 @@ def install_debian_command_aliases():
 `src/bonesinfra/deploys/helpers/plan.py`:
 
 ```py
-from bonesinfra.deploys.helpers import aptui, crates, neovim, packages, starship
+from bonesinfra.deploys.helpers import neovim, packages, rainfrog, starship
 from bonesinfra.deploys.helpers.packages import HELPER_APT_PACKAGES
 
 
@@ -1412,8 +1398,24 @@ def deploy_helpers(ctx):
     packages.install_debian_command_aliases()
     starship.install()
     neovim.install()
-    aptui.install_aptui()
-    crates.install_helper_crates()
+    rainfrog.install()
+
+```
+
+`src/bonesinfra/deploys/helpers/rainfrog.py`:
+
+```py
+from pyinfra.operations import server
+
+
+# Install https://github.com/achristmascarl/rainfrog
+# This is too big to be installed as a cargo crate, so we install it via the install script.
+def install():
+    server.shell(
+        name="Install rainfrog binary",
+        commands=[("curl -LSsf https://raw.githubusercontent.com/achristmascarl/rainfrog/main/install.sh | bash")],
+        _sudo=True,
+    )
 
 ```
 
@@ -1660,7 +1662,7 @@ def install_apt(ctx):
 `src/bonesinfra/deploys/runtime/plan.py`:
 
 ```py
-from bonesinfra.deploys.runtime import apparmor, nginx, packages, template_runtime
+from bonesinfra.deploys.runtime import apparmor, nginx, packages, shared_paths, template_runtime
 
 
 def deploy_runtime(ctx):
@@ -1668,8 +1670,59 @@ def deploy_runtime(ctx):
     packages.install_apt(ctx)
     apparmor.setup(ctx, paths)
     nginx.setup(ctx, paths)
+    shared_paths.ensure(ctx, paths)
     template_runtime.load(ctx)
     nginx.start_services(paths)
+
+```
+
+`src/bonesinfra/deploys/runtime/shared_paths.py`:
+
+```py
+from shlex import quote
+
+from pyinfra.operations import server
+
+
+def ensure(ctx, paths):
+    for shared_path in ctx.runtime.shared_paths:
+        if shared_path.type == "dir":
+            _ensure_dir(paths["shared"], shared_path.path, ctx.runtime.runtime_user, ctx.runtime.runtime_group)
+            continue
+
+        _ensure_file(paths["shared"], shared_path.path, ctx.runtime.runtime_user, ctx.runtime.runtime_group)
+
+
+def _ensure_dir(shared_root: str, relative_path: str, runtime_user: str, runtime_group: str):
+    target = f"{shared_root}/{relative_path}"
+    server.shell(
+        name=f"Ensure shared directory {relative_path}",
+        commands=[(f"install -d -o {quote(runtime_user)} -g {quote(runtime_group)} -m 0750 {quote(target)}")],
+        _sudo=True,
+    )
+
+
+def _ensure_file(shared_root: str, relative_path: str, runtime_user: str, runtime_group: str):
+    target = f"{shared_root}/{relative_path}"
+    parent = target.rsplit("/", 1)[0]
+    user = "root" if _is_dotenv(relative_path) else runtime_user
+    server.shell(
+        name=f"Ensure shared file {relative_path}",
+        commands=[
+            (
+                f"install -d -o {quote(runtime_user)} -g {quote(runtime_group)} -m 0750"
+                f" {quote(parent)}"
+                f" && touch {quote(target)}"
+                f" && chown {quote(user)}:{quote(runtime_group)} {quote(target)}"
+                f" && chmod 0640 {quote(target)}"
+            )
+        ],
+        _sudo=True,
+    )
+
+
+def _is_dotenv(relative_path: str) -> bool:
+    return relative_path.rsplit("/", 1)[-1] == ".env"
 
 ```
 
@@ -1704,15 +1757,6 @@ def install():
         _sudo=True,
     )
 
-<<<<<<< Updated upstream
-    server.shell(
-        name="Install bonesdeploy sudoers policy",
-        commands=["install sudoers drop-in directly from bonesinfra"],
-        _sudo=True,
-    )
-
-=======
->>>>>>> Stashed changes
 ```
 
 `src/bonesinfra/deploys/setup/directories.py`:
@@ -1720,8 +1764,9 @@ def install():
 ```py
 from shlex import quote
 
-from pyinfra.operations import server
+from pyinfra.operations import files, server
 
+from bonesinfra.domain.paths import ASSETS_DIR
 from bonesinfra.infra.deploy_helpers import mkdir
 
 
@@ -1744,6 +1789,24 @@ def setup_repo_and_project(ctx, paths):
         commands=[_user_env_command(ctx.config.deploy_user, f"git init --bare {quote(paths['repo'])}")],
         _sudo=True,
         _sudo_user=ctx.config.deploy_user,
+    )
+
+    repo = quote(paths["repo"])
+    server.shell(
+        name="Set bare repo default branch",
+        commands=[f"git --git-dir {repo} symbolic-ref HEAD refs/heads/{ctx.config.branch}"],
+        _sudo=True,
+        _sudo_user=ctx.config.deploy_user,
+    )
+
+    files.put(
+        name="Install bare repo post-receive hook",
+        src=str(ASSETS_DIR / "hooks/post-receive"),
+        dest=f"{paths['repo']}/hooks/post-receive",
+        user=ctx.config.deploy_user,
+        group=ctx.config.deploy_user,
+        mode="0755",
+        _sudo=True,
     )
 
     mkdir(
@@ -1774,6 +1837,17 @@ def setup_repo_and_project(ctx, paths):
         user=ctx.runtime.runtime_user,
         group=ctx.runtime.runtime_group,
         mode="0750",
+    )
+
+    env_path = f"{paths['shared']}/.env"
+    server.shell(
+        name="Seed blank .env in shared directory",
+        commands=[
+            f"touch {quote(env_path)}"
+            f" && chown {quote(ctx.runtime.runtime_user)}:{quote(ctx.runtime.runtime_group)} {quote(env_path)}"
+            f" && chmod 640 {quote(env_path)}",
+        ],
+        _sudo=True,
     )
 
     mkdir(
@@ -1874,19 +1948,26 @@ def configure(ctx):
 `src/bonesinfra/deploys/setup/packages.py`:
 
 ```py
-from pyinfra.operations import apt
+from pyinfra.operations import apt, server
 
 BASE_SYSTEM_PACKAGES: list[str] = [
     "build-essential",
     "ca-certificates",
     "fail2ban",
     "curl",
+    "dbus-user-session",
+    "fuse-overlayfs",
     "git",
     "rsync",
     "sudo",
     "nginx",
     "openssl",
+    "aardvark-dns",
+    "netavark",
+    "passt",
     "podman",
+    "slirp4netns",
+    "uidmap",
     "apparmor",
     "apparmor-utils",
     "unattended-upgrades",
@@ -1912,6 +1993,14 @@ def install_system(packages):
         present=True,
         update=True,
         cache_time=3600,
+        _sudo=True,
+    )
+
+
+def install_rust():
+    server.shell(
+        name="Install rustup and cargo",
+        commands=["curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal"],
         _sudo=True,
     )
 
@@ -2055,6 +2144,10 @@ from pyinfra import host
 from pyinfra.facts.server import Users
 from pyinfra.operations import server
 
+from bonesinfra.infra.deploy_helpers import mkdir
+
+BUILD_USER_HOME_ROOT = "/var/lib/bonesdeploy/users"
+
 
 def install_rust():
     server.shell(
@@ -2074,7 +2167,55 @@ def _ensure_group_membership(user, group):
     )
 
 
+def build_user_for(project_name: str) -> str:
+    return f"{project_name}-build"
+
+
+def build_group_for(project_name: str) -> str:
+    return build_user_for(project_name)
+
+
+def build_home_for(project_name: str) -> str:
+    return f"{BUILD_USER_HOME_ROOT}/{build_user_for(project_name)}"
+
+
+def _validate_subid_ranges(build_user: str):
+    q_subid_prefix = quote(f"^{build_user}:")
+    server.shell(
+        name=f"Validate subuid/subgid ranges for {build_user}",
+        commands=[
+            f"grep -q {q_subid_prefix} /etc/subuid",
+            f"grep -q {q_subid_prefix} /etc/subgid",
+        ],
+        _sudo=True,
+    )
+
+
+def _validate_rootless_podman(build_user: str, build_group: str, build_home: str):
+    q_build_user = quote(build_user)
+    q_build_group = quote(build_group)
+    q_build_home = quote(build_home)
+    server.shell(
+        name=f"Validate rootless podman for {build_user}",
+        commands=[
+            (
+                f"uid=$(id -u {q_build_user})"
+                f" && install -d -o {q_build_user} -g {q_build_group} -m 0700 /run/user/$uid"
+                f" && runuser -u {q_build_user} -- env"
+                f" HOME={q_build_home} XDG_RUNTIME_DIR=/run/user/$uid"
+                " podman info --format '{{.Host.Security.Rootless}}'"
+                " | grep -Fx true"
+            )
+        ],
+        _sudo=True,
+    )
+
+
 def ensure_users_and_groups(ctx):
+    build_user = build_user_for(ctx.config.project_name)
+    build_group = build_group_for(ctx.config.project_name)
+    build_home = build_home_for(ctx.config.project_name)
+
     server.user(
         name="Ensure deploy user exists",
         user=ctx.config.deploy_user,
@@ -2086,6 +2227,12 @@ def ensure_users_and_groups(ctx):
     server.group(
         name="Ensure runtime group exists",
         group=ctx.runtime.runtime_group,
+        _sudo=True,
+    )
+
+    server.group(
+        name="Ensure build group exists",
+        group=build_group,
         _sudo=True,
     )
 
@@ -2102,10 +2249,39 @@ def ensure_users_and_groups(ctx):
             groups=[ctx.runtime.runtime_group],
             _sudo=True,
         )
-        return
-
-    if ctx.runtime.runtime_group != existing_user["group"] and ctx.runtime.runtime_group not in existing_user["groups"]:
+    elif (
+        ctx.runtime.runtime_group != existing_user["group"] and ctx.runtime.runtime_group not in existing_user["groups"]
+    ):
         _ensure_group_membership(ctx.runtime.runtime_user, ctx.runtime.runtime_group)
+
+    server.user(
+        name="Ensure build user exists",
+        user=build_user,
+        group=build_group,
+        home="/nonexistent",
+        shell="/usr/sbin/nologin",
+        create_home=False,
+        _sudo=True,
+    )
+
+    mkdir(
+        name="Ensure bonesdeploy user home root exists",
+        path=BUILD_USER_HOME_ROOT,
+    )
+    mkdir(
+        name=f"Ensure podman pseudo-home for {build_user}",
+        path=build_home,
+        user=build_user,
+        group=build_group,
+        mode="0700",
+    )
+    server.shell(
+        name=f"Enable linger for {build_user}",
+        commands=[f"loginctl enable-linger {quote(build_user)}"],
+        _sudo=True,
+    )
+    _validate_subid_ranges(build_user)
+    _validate_rootless_podman(build_user, build_group, build_home)
 
 
 def install_authorized_key(ctx):
@@ -2208,7 +2384,7 @@ from __future__ import annotations
 
 import tomllib
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from bonesinfra.domain.paths import DeploymentPaths
@@ -2267,6 +2443,7 @@ class DeployContext:
             web_root=runtime_cfg.get("web_root", DEFAULT_WEB_ROOT),
             runtime_user=runtime_cfg.get("runtime_user", project_name),
             runtime_group=runtime_cfg.get("runtime_group", project_name),
+            shared_paths=_parse_shared_paths(runtime_cfg),
             runtime_data=runtime_cfg,
         )
 
@@ -2309,6 +2486,7 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
         "project_root": ctx.config.project_root,
         "web_root": ctx.runtime.web_root,
         "repo_path": ctx.config.repo_path,
+        "branch": ctx.config.branch,
         "deploy_user": ctx.config.deploy_user,
         "runtime_user": ctx.runtime.runtime_user,
         "runtime_group": ctx.runtime.runtime_group,
@@ -2351,7 +2529,67 @@ class RuntimeConfig:
     web_root: str
     runtime_user: str
     runtime_group: str
+    shared_paths: list[SharedPath] = field(default_factory=list)
     runtime_data: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SharedPath:
+    path: str
+    type: str
+
+
+def _parse_shared_paths(runtime_cfg: dict[str, Any]) -> list[SharedPath]:
+    shared = runtime_cfg.get("shared")
+    if shared is None:
+        return []
+    if not isinstance(shared, dict):
+        raise TypeError("runtime.toml [shared] must be a table")
+
+    paths = shared.get("paths", [])
+    if not isinstance(paths, list):
+        raise TypeError("runtime.toml [shared].paths must be a list")
+
+    return [_parse_shared_path(entry) for entry in paths]
+
+
+def _parse_shared_path(entry: Any) -> SharedPath:
+    if not isinstance(entry, dict):
+        raise TypeError("runtime.toml [shared].paths entries must be tables")
+
+    raw_path = entry.get("path")
+    if not isinstance(raw_path, str) or not raw_path:
+        raise ValueError("runtime.toml [shared].paths entries need a non-empty string path")
+
+    path = _validate_shared_path(raw_path)
+    path_type = entry.get("type")
+    if path_type not in {"file", "dir"}:
+        raise ValueError(f"invalid shared path type for {path}: {path_type!r}")
+
+    return SharedPath(path=path, type=path_type)
+
+
+def _validate_shared_path(raw_path: str) -> str:
+    if "\\" in raw_path:
+        raise ValueError(f"invalid shared path {raw_path!r}: use forward slashes")
+    if raw_path.startswith("/"):
+        raise ValueError(f"invalid shared path {raw_path!r}: path must be relative")
+
+    for part in raw_path.split("/"):
+        if part in {"", ".", ".."}:
+            raise ValueError(f"invalid shared path {raw_path!r}: path must use normal components only")
+
+    path = PurePosixPath(raw_path)
+
+    parts = path.parts
+    if not parts:
+        raise ValueError("invalid shared path '': path must not be empty")
+
+    for part in parts:
+        if part in {"", ".", ".."}:
+            raise ValueError(f"invalid shared path {raw_path!r}: path must use normal components only")
+
+    return path.as_posix()
 
 ```
 
@@ -4365,6 +4603,19 @@ def run(*args):
 
 ```
 
+`tests/test_build_user.py`:
+
+```py
+from bonesinfra.deploys.setup.users import build_group_for, build_home_for, build_user_for
+
+
+def test_build_identity_is_derived_from_project_name():
+    assert build_user_for("demo") == "demo-build"
+    assert build_group_for("demo") == "demo-build"
+    assert build_home_for("demo") == "/var/lib/bonesdeploy/users/demo-build"
+
+```
+
 `tests/test_cli.py`:
 
 ```py
@@ -4433,6 +4684,8 @@ def test_helpers_apply_rejects_missing_host():
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+import pytest
+
 from bonesinfra.domain.context import DeployContext, template_data
 
 
@@ -4490,6 +4743,69 @@ runtime_group = "lawsnipe-web"
     assert ctx.runtime.runtime_user == "lawsnipe-web"
     assert ctx.runtime.runtime_group == "lawsnipe-web"
 
+
+def test_branch_in_template_data():
+    with TemporaryDirectory() as tmp:
+        config_path = Path(tmp) / "bones.toml"
+        config_path.write_text(
+            """
+project_name = "lawsnipe"
+repo_path = "/srv/git/lawsnipe.git"
+project_root = "/srv/sites/lawsnipe"
+host = "example.com"
+branch = "main"
+""".lstrip()
+        )
+
+        ctx = DeployContext.from_files(str(config_path))
+
+    td = template_data(ctx)
+    assert td["branch"] == "main"
+
+
+@pytest.mark.parametrize(
+    ("runtime_toml", "message"),
+    [
+        ('[shared]\npaths = ".env"\n', "must be a list"),
+        (
+            '[shared]\npaths = [{ path = "/etc/passwd", type = "file" }]\n',
+            "path must be relative",
+        ),
+        (
+            '[shared]\npaths = [{ path = "../secrets", type = "dir" }]\n',
+            "normal components only",
+        ),
+        (
+            '[shared]\npaths = [{ path = "foo/./bar", type = "dir" }]\n',
+            "normal components only",
+        ),
+        (
+            '[shared]\npaths = [{ path = "foo/../bar", type = "dir" }]\n',
+            "normal components only",
+        ),
+        (
+            '[shared]\npaths = [{ path = "database.sqlite", type = "socket" }]\n',
+            "invalid shared path type",
+        ),
+    ],
+)
+def test_invalid_shared_paths_are_rejected(runtime_toml, message):
+    with TemporaryDirectory() as tmp:
+        config_path = Path(tmp) / "bones.toml"
+        config_path.write_text(
+            """
+project_name = "lawsnipe"
+repo_path = "/srv/git/lawsnipe.git"
+project_root = "/srv/sites/lawsnipe"
+host = "example.com"
+""".lstrip()
+        )
+        runtime_config_path = Path(tmp) / "runtime.toml"
+        runtime_config_path.write_text(runtime_toml)
+
+        with pytest.raises((TypeError, ValueError), match=message):
+            DeployContext.from_files(str(config_path), str(runtime_config_path))
+
 ```
 
 `tests/test_deploy_structure.py`:
@@ -4509,6 +4825,7 @@ SETUP_FAIL2BAN = helpers.SRC_DIR / "bonesinfra/deploys/setup/fail2ban.py"
 SETUP_UNATTENDED_UPGRADES = helpers.SRC_DIR / "bonesinfra/deploys/setup/unattended_upgrades.py"
 SETUP_BONESREMOTE = helpers.SRC_DIR / "bonesinfra/deploys/setup/bonesremote.py"
 SETUP_SUDOERS = helpers.SRC_DIR / "bonesinfra/deploys/setup/sudoers.py"
+HELPERS_NEOVIM = helpers.SRC_DIR / "bonesinfra/deploys/helpers/neovim.py"
 RUNTIME_PLAN = helpers.SRC_DIR / "bonesinfra/deploys/runtime/plan.py"
 RUNTIME_PACKAGES = helpers.SRC_DIR / "bonesinfra/deploys/runtime/packages.py"
 RUNTIME_APPARMOR = helpers.SRC_DIR / "bonesinfra/deploys/runtime/apparmor.py"
@@ -4568,6 +4885,28 @@ def test_setup_uses_resolved_placeholder_paths():
     helpers.assert_contains(c1, "placeholder_web_root")
     c2 = helpers.read(SETUP_PLACEHOLDER)
     helpers.assert_contains(c2, "placeholder_index")
+
+
+def test_setup_seeds_bare_repo_post_receive_hook():
+    c = helpers.read(SETUP_DIRECTORIES)
+    helpers.assert_contains(c, '"Install bare repo post-receive hook"')
+    helpers.assert_contains(c, "dest=f\"{paths['repo']}/hooks/post-receive\"")
+    helpers.assert_contains(c, "user=ctx.config.deploy_user")
+    helpers.assert_contains(c, 'mode="0755"')
+
+
+def test_bare_repo_init_sets_default_branch():
+    c = helpers.read(SETUP_DIRECTORIES)
+    helpers.assert_contains(c, '"Set bare repo default branch"')
+    helpers.assert_contains(c, "git --git-dir")
+    helpers.assert_contains(c, "symbolic-ref HEAD refs/heads/{ctx.config.branch}")
+
+
+def test_post_receive_hook_execs_bonesremote():
+    c = helpers.read(helpers.SRC_DIR / "bonesinfra/assets/hooks/post-receive")
+    helpers.assert_contains(c, "set -euo pipefail")
+    helpers.assert_contains(c, "SITE=${SITE%.git}")
+    helpers.assert_contains(c, 'exec sudo bonesremote hook post-receive --site "$SITE"')
 
 
 def test_setup_avoids_usermod_for_existing_runtime_user():
@@ -4652,6 +4991,13 @@ def test_setup_unattended_upgrades_installs_apt_configs():
     c = helpers.read(SETUP_UNATTENDED_UPGRADES)
     helpers.assert_contains(c, '"/etc/apt/apt.conf.d/20auto-upgrades"')
     helpers.assert_contains(c, '"/etc/apt/apt.conf.d/50unattended-upgrades"')
+
+
+def test_helpers_neovim_installs_config_from_repo():
+    c = helpers.read(HELPERS_NEOVIM)
+    helpers.assert_contains(c, '"https://github.com/AlextheYounga/myneovim.git"')
+    helpers.assert_contains(c, "git clone --depth=1")
+    helpers.assert_contains(c, "reset --hard FETCH_HEAD")
 
 
 # ---- runtime plan ----
@@ -4744,9 +5090,36 @@ def test_runtime_uses_template_runtime():
     helpers.assert_contains(c, "get_runtime(template)")
 
 
-def test_setup_installs_podman():
+def test_setup_installs_podman_networking():
     c = helpers.read(SETUP_PACKAGES)
     helpers.assert_contains(c, '"podman"')
+    helpers.assert_contains(c, '"netavark"')
+    helpers.assert_contains(c, '"aardvark-dns"')
+    helpers.assert_contains(c, '"passt"')
+    helpers.assert_contains(c, '"slirp4netns"')
+    helpers.assert_contains(c, '"uidmap"')
+    helpers.assert_contains(c, '"fuse-overlayfs"')
+    helpers.assert_contains(c, '"dbus-user-session"')
+
+
+def test_setup_creates_rootless_build_user_and_pseudo_home():
+    c = helpers.read(SETUP_USERS)
+    helpers.assert_contains(c, "build_user_for(ctx.config.project_name)")
+    helpers.assert_contains(c, "group=build_group")
+    helpers.assert_contains(c, 'home="/nonexistent"')
+    helpers.assert_contains(c, 'shell="/usr/sbin/nologin"')
+    helpers.assert_contains(c, "path=BUILD_USER_HOME_ROOT")
+    helpers.assert_contains(c, "path=build_home")
+    helpers.assert_contains(c, 'mode="0700"')
+
+
+def test_setup_enables_linger_and_validates_rootless_podman():
+    c = helpers.read(SETUP_USERS)
+    helpers.assert_contains(c, "loginctl enable-linger")
+    helpers.assert_contains(c, "Validate subuid/subgid ranges")
+    helpers.assert_contains(c, "grep -q")
+    helpers.assert_contains(c, "runuser -u")
+    helpers.assert_contains(c, "podman info --format '{{.Host.Security.Rootless}}'")
 
 
 # ---- ssl plan ----
@@ -5320,26 +5693,19 @@ def test_rails_uses_puma_unix_socket():
 `tests/test_shared_paths.py`:
 
 ```py
-"""Tests for shared-path provisioning removal.
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
-BonesInfra no longer creates framework shared paths.
-It creates only project_root/shared with mode 0750.
-"""
+import pytest
+
+from bonesinfra.deploys.runtime import shared_paths
+from bonesinfra.domain.context import DeployContext
 
 from . import helpers
 
 SETUP_DIRECTORIES = helpers.SRC_DIR / "bonesinfra/deploys/setup/directories.py"
 SETUP_USERS = helpers.SRC_DIR / "bonesinfra/deploys/setup/users.py"
 RUNTIME_PLAN = helpers.SRC_DIR / "bonesinfra/deploys/runtime/plan.py"
-LARAVEL_PHP_FPM = helpers.SRC_DIR / "bonesinfra/runtimes/laravel/php_fpm.py"
-LARAVEL_DEPLOY = helpers.SRC_DIR / "bonesinfra/runtimes/laravel/deploy.py"
-SHARED_PATHS_PY = helpers.SRC_DIR / "bonesinfra/deploys/runtime/shared_paths.py"
-RAILS_DEPLOY = helpers.SRC_DIR / "bonesinfra/runtimes/rails/rails.py"
-DJANGO_DEPLOY = helpers.SRC_DIR / "bonesinfra/runtimes/django/django.py"
-
-
-def test_shared_paths_module_is_deleted():
-    assert not SHARED_PATHS_PY.exists(), "shared_paths.py must be deleted"
 
 
 def test_shared_root_is_created_with_mode_0750():
@@ -5353,24 +5719,124 @@ def test_deploy_user_is_not_added_to_runtime_group():
     helpers.assert_not_contains(c, "_ensure_group_membership(ctx.config.deploy_user, ctx.runtime.runtime_group)")
 
 
-def test_laravel_does_not_create_storage_subdirectories():
-    c = helpers.read(LARAVEL_PHP_FPM)
-    helpers.assert_not_contains(c, "setup_storage_directories")
-    helpers.assert_not_contains(c, "storage/logs")
-    helpers.assert_not_contains(c, "framework/cache")
-    helpers.assert_not_contains(c, "framework/sessions")
-    helpers.assert_not_contains(c, "framework/views")
+def test_runtime_plan_provisions_shared_paths_before_runtime_template():
+    c = helpers.read(RUNTIME_PLAN)
+    helpers.assert_ordering(c, "nginx.setup", "shared_paths.ensure", "template_runtime.load")
 
 
-def test_runtime_write_paths_are_shared_paths():
-    rails = helpers.read(RAILS_DEPLOY)
-    helpers.assert_contains(rails, "f\"{paths['shared']}/tmp\"")
-    helpers.assert_contains(rails, "f\"{paths['shared']}/log\"")
-    helpers.assert_contains(rails, "f\"{paths['shared']}/storage\"")
+@pytest.mark.parametrize("template", ["vue", "next", "nuxt"])
+def test_runtime_without_shared_paths_provisions_no_shared_leaves(template, monkeypatch):
+    ctx = _make_context(f'template = "{template}"\n')
+    commands = _capture_commands(ctx, monkeypatch)
 
-    django = helpers.read(DJANGO_DEPLOY)
-    helpers.assert_contains(django, "f\"{paths['shared']}/staticfiles\"")
-    helpers.assert_contains(django, "f\"{paths['shared']}/media\"")
+    assert ctx.runtime.shared_paths == []
+    assert commands == []
+
+
+def test_sveltekit_provisions_blank_dotenv(monkeypatch):
+    ctx = _make_context(
+        """
+template = "sveltekit"
+
+[shared]
+paths = [{ path = ".env", type = "file" }]
+""".lstrip()
+    )
+
+    commands = _capture_commands(ctx, monkeypatch)
+
+    assert [(path.path, path.type) for path in ctx.runtime.shared_paths] == [(".env", "file")]
+    assert len(commands) == 1
+    assert commands[0]["name"] == "Ensure shared file .env"
+    assert "touch /srv/sites/lawsnipe/shared/.env" in commands[0]["commands"][0]
+    assert "chown root:lawsnipe /srv/sites/lawsnipe/shared/.env" in commands[0]["commands"][0]
+    assert "chmod 0640 /srv/sites/lawsnipe/shared/.env" in commands[0]["commands"][0]
+
+
+def test_rails_provisions_declared_shared_leaves(monkeypatch):
+    ctx = _make_context(
+        """
+template = "rails"
+
+[shared]
+paths = [
+  { path = ".env", type = "file" },
+  { path = "tmp", type = "dir" },
+  { path = "log", type = "dir" },
+  { path = "storage", type = "dir" },
+]
+""".lstrip()
+    )
+
+    commands = _capture_commands(ctx, monkeypatch)
+
+    assert [(path.path, path.type) for path in ctx.runtime.shared_paths] == [
+        (".env", "file"),
+        ("tmp", "dir"),
+        ("log", "dir"),
+        ("storage", "dir"),
+    ]
+    assert [command["name"] for command in commands] == [
+        "Ensure shared file .env",
+        "Ensure shared directory tmp",
+        "Ensure shared directory log",
+        "Ensure shared directory storage",
+    ]
+
+
+def test_django_provisions_declared_shared_leaves(monkeypatch):
+    ctx = _make_context(
+        """
+template = "django"
+
+[shared]
+paths = [
+  { path = ".env", type = "file" },
+  { path = "staticfiles", type = "dir" },
+  { path = "media", type = "dir" },
+]
+""".lstrip()
+    )
+
+    commands = _capture_commands(ctx, monkeypatch)
+
+    assert [(path.path, path.type) for path in ctx.runtime.shared_paths] == [
+        (".env", "file"),
+        ("staticfiles", "dir"),
+        ("media", "dir"),
+    ]
+    assert [command["name"] for command in commands] == [
+        "Ensure shared file .env",
+        "Ensure shared directory staticfiles",
+        "Ensure shared directory media",
+    ]
+
+
+def _make_context(runtime_toml: str) -> DeployContext:
+    with TemporaryDirectory() as tmp:
+        config_path = Path(tmp) / "bones.toml"
+        config_path.write_text(
+            """
+project_name = "lawsnipe"
+repo_path = "/srv/git/lawsnipe.git"
+project_root = "/srv/sites/lawsnipe"
+host = "example.com"
+""".lstrip()
+        )
+        runtime_config_path = Path(tmp) / "runtime.toml"
+        runtime_config_path.write_text(runtime_toml)
+        return DeployContext.from_files(str(config_path), str(runtime_config_path))
+
+
+def _capture_commands(ctx: DeployContext, monkeypatch):
+    captured = []
+
+    def fake_shell(*, name, commands: list[str], _sudo):
+        captured.append({"name": name, "commands": commands, "sudo": _sudo})
+
+    monkeypatch.setattr(shared_paths.server, "shell", fake_shell)
+    shared_paths.ensure(ctx, ctx.paths_dict)
+    return captured
 
 ```
 

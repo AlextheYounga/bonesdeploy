@@ -1,9 +1,9 @@
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::Path;
+use std::path::{Component, Path};
 
 use anyhow::{Context, Result, bail};
-use shared::config;
+use shared::config::{self, SharedPath, SharedPathType};
 use shared::paths;
 
 use crate::privileges;
@@ -27,6 +27,8 @@ pub fn run(site: &str) -> Result<()> {
 
     let bones_path = paths::bonesremote_bones_toml_path(site);
     let cfg = config::load(&bones_path).context("Failed to load remote site state")?;
+    let runtime =
+        config::load_runtime(&paths::bonesremote_site_root(site)).context("Failed to load remote runtime state")?;
 
     if cfg.project_name != site {
         bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
@@ -46,23 +48,40 @@ pub fn run(site: &str) -> Result<()> {
         );
     }
 
-    for leaf in paths::SHARED_LEAVES {
-        let target = shared_dir.join(leaf);
-        ensure_shared_leaf(&target)?;
-        link_relative(&release_dir, leaf, &target)?;
+    for shared_path in &runtime.shared.paths {
+        validate_shared_path(shared_path)?;
+        let target = shared_dir.join(&shared_path.path);
+        ensure_shared_leaf(&target, &shared_path.path_type)?;
+        link_relative(&release_dir, &shared_path.path, &target)?;
     }
-
-    link_public_storage(&release_dir)?;
 
     Ok(())
 }
 
-fn ensure_shared_leaf(path: &Path) -> Result<()> {
-    if path.exists() {
-        return Ok(());
+fn validate_shared_path(shared_path: &SharedPath) -> Result<()> {
+    let path = Path::new(&shared_path.path);
+    if shared_path.path.is_empty() || path.is_absolute() {
+        bail!("Invalid shared path in runtime.toml: {}", shared_path.path);
     }
 
-    bail!("Required shared path is missing: {}. Provision the runtime shared paths before deploying.", path.display())
+    if !path.components().all(|component| matches!(component, Component::Normal(_))) {
+        bail!("Invalid shared path in runtime.toml: {}", shared_path.path);
+    }
+
+    Ok(())
+}
+
+fn ensure_shared_leaf(path: &Path, path_type: &SharedPathType) -> Result<()> {
+    match path_type {
+        SharedPathType::File if path.is_file() => return Ok(()),
+        SharedPathType::Dir if path.is_dir() => return Ok(()),
+        _ => {}
+    }
+
+    bail!(
+        "Required shared path is missing or has the wrong type: {}. Provision the runtime shared paths before deploying.",
+        path.display()
+    )
 }
 
 fn link_relative(release_dir: &Path, relative: &str, target: &Path) -> Result<()> {
@@ -86,19 +105,6 @@ fn remove_if_present(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn link_public_storage(release_dir: &Path) -> Result<()> {
-    let public_dir = release_dir.join("public");
-    if !public_dir.is_dir() {
-        return Ok(());
-    }
-
-    let link_path = public_dir.join("storage");
-    remove_if_present(&link_path)?;
-    symlink(Path::new("../storage/app/public"), &link_path)
-        .with_context(|| format!("Failed to link {} -> ../storage/app/public", link_path.display()))?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::env;
@@ -109,7 +115,9 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{ensure_shared_leaf, link_public_storage, link_relative, remove_if_present};
+    use shared::config::SharedPathType;
+
+    use super::{ensure_shared_leaf, link_relative, remove_if_present, validate_shared_path};
 
     fn temp_dir(label: &str) -> Result<PathBuf> {
         let dir = env::temp_dir().join(format!("bonesremote-wire-{label}-{}", process::id()));
@@ -124,13 +132,23 @@ mod tests {
     fn ensure_shared_leaf_requires_existing_path() -> Result<()> {
         let root = temp_dir("ensure_leaves")?;
         let missing = root.join("storage");
-        assert!(ensure_shared_leaf(&missing).is_err());
+        assert!(ensure_shared_leaf(&missing, &SharedPathType::Dir).is_err());
 
         fs::create_dir_all(&missing)?;
-        ensure_shared_leaf(&missing)?;
+        ensure_shared_leaf(&missing, &SharedPathType::Dir)?;
+        assert!(ensure_shared_leaf(&missing, &SharedPathType::File).is_err());
 
         fs::remove_dir_all(&root).ok();
         Ok(())
+    }
+
+    #[test]
+    fn validate_shared_path_rejects_absolute_and_parent_paths() {
+        assert!(validate_shared_path(&shared_path("storage", SharedPathType::Dir)).is_ok());
+        assert!(validate_shared_path(&shared_path("/srv/storage", SharedPathType::Dir)).is_err());
+        assert!(validate_shared_path(&shared_path("../storage", SharedPathType::Dir)).is_err());
+        assert!(validate_shared_path(&shared_path(".", SharedPathType::Dir)).is_err());
+        assert!(validate_shared_path(&shared_path("", SharedPathType::Dir)).is_err());
     }
 
     #[test]
@@ -176,19 +194,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn link_public_storage_links_into_release_storage_tree() -> Result<()> {
-        let root = temp_dir("public_storage")?;
-        let release = root.join("releases/now");
-        fs::create_dir_all(release.join("public"))?;
-
-        link_public_storage(&release)?;
-
-        let link = release.join("public/storage");
-        assert!(link.is_symlink());
-        assert_eq!(fs::read_link(&link)?, PathBuf::from("../storage/app/public"));
-
-        fs::remove_dir_all(&root).ok();
-        Ok(())
+    fn shared_path(path: &str, path_type: SharedPathType) -> shared::config::SharedPath {
+        shared::config::SharedPath { path: path.to_string(), path_type }
     }
 }

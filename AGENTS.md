@@ -31,5 +31,4 @@ When you are done working, please run and address all warnings/errors:
 
 And finally, please update any related documentation **if necessary, use your best judgement**:
 - `docs/PROJECT.md`
-- `docs/commands/*`
-- `docs/security/*`
+- `README.md`
