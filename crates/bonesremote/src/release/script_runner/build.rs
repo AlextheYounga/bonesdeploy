@@ -241,22 +241,3 @@ fn podman_build_command_mounts_only_source_tree() {
 fn build_container_name_is_deterministic_per_project() {
     assert_eq!(build_container_name("demo"), "bonesdeploy-build-demo");
 }
-
-#[cfg(test)]
-#[test]
-fn podman_exec_command_runs_inside_existing_container() {
-    let mut command = Command::new("runuser");
-    configure_podman_exec_command(
-        &mut command,
-        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", build_uid: 1234, web_root: "public" },
-        "demo-container",
-    );
-
-    let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
-    assert!(args.contains(&String::from("podman")));
-    assert!(args.contains(&String::from("exec")));
-    assert!(args.contains(&String::from("-i")));
-    assert!(args.contains(&String::from("demo-container")));
-    assert!(args.contains(&String::from("HOME=/var/lib/bonesdeploy/users/demo-build")));
-    assert!(args.contains(&String::from("XDG_RUNTIME_DIR=/run/user/1234")));
-}

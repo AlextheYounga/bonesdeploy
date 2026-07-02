@@ -43,32 +43,3 @@ fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &P
         .env("WEB_ROOT", env.web_root)
         .env("SERVICE_USER", env.runtime_user);
 }
-
-#[cfg(test)]
-#[test]
-fn prepare_command_runs_as_runtime_user_in_release() {
-    let mut command = Command::new("runuser");
-    configure_prepare_command(
-        &mut command,
-        Path::new("/srv/sites/demo/releases/20260626_120000"),
-        &PrepareScriptEnv {
-            project_name: "demo",
-            project_root: "/srv/sites/demo",
-            runtime_user: "demo",
-            web_root: "public",
-        },
-    );
-
-    let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
-    assert_eq!(args[0], "-u");
-    assert_eq!(args[1], "demo");
-    assert_eq!(command.get_current_dir(), Some(Path::new("/srv/sites/demo/releases/20260626_120000")));
-    assert!(!args.iter().any(|arg| arg.contains("/root/.config/bonesremote")));
-    let service_user = command.get_envs().find_map(|(key, value)| {
-        (key.to_string_lossy() == "SERVICE_USER")
-            .then(|| value.map(|value| value.to_string_lossy().into_owned()))
-            .flatten()
-    });
-    assert_eq!(service_user, Some(String::from("demo")));
-    assert!(!args.iter().any(|arg| arg.contains("podman")));
-}

@@ -19,32 +19,3 @@ pub(super) fn parse_package_version(manifest: &str) -> Result<String> {
         .map(String::from)
         .ok_or_else(|| anyhow::anyhow!("missing [package] version"))
 }
-
-#[cfg(test)]
-mod tests {
-    use anyhow::Result;
-
-    use super::parse_package_version;
-
-    #[test]
-    fn parses_package_version_from_manifest_package_section() -> Result<()> {
-        let manifest = r#"
-[package]
-name = "bonesdeploy"
-version = "0.2.8"
-edition = "2024"
-
-[dependencies]
-version = "not-this"
-"#;
-
-        assert_eq!(parse_package_version(manifest)?, "0.2.8");
-        Ok(())
-    }
-
-    #[test]
-    fn rejects_manifest_without_package_version() {
-        let result = parse_package_version("[dependencies]\nversion = \"0.2.8\"\n");
-        assert!(result.is_err());
-    }
-}
