@@ -247,12 +247,12 @@ Common defaults:
 │   └── post-receive     # thin adapter → calls bonesremote deploy
 └── deployment/
     ├── build/
-    │   └── 01_*.sh      # build scripts (run sequentially in the Debian build container)
+    │   └── 01_*.sh      # build scripts (run sequentially in the buildpack-deps container)
     └── prepare/
         └── 01_*.sh      # prepare scripts (run as the site user before activation)
 ```
 
-Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you and can be edited freely. Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's Debian build container. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation.
+Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you and can be edited freely. Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation.
 
 Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote hook post-receive`, which resolves policy from bonesremote-managed site state.
 
