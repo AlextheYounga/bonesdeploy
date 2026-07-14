@@ -68,7 +68,7 @@ Preserve existing Podman arguments:
 - `-i`
 - `--pull=missing`
 - `--security-opt=no-new-privileges`
-- `--cap-drop=all`
+- Podman's default rootless capability set (do not add `--cap-drop=all`; build scripts may run `apt-get`)
 - `--workdir=/workspace/source`
 - `--volume <context>:/workspace/source`
 - build env vars

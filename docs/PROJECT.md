@@ -116,7 +116,7 @@ Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are wr
 - `post-receive` => Thin trigger that derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/` instead of the bare repo.
 
 ### Deployment Folder
-This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`, and run inside bonesremote's Debian build container with `cwd=/workspace/source`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, run in lexical order as the site runtime user with `cwd` set to the sealed release, and are the right place for migrations, cache warmups, and other runtime-state work. Before prepare scripts run, `bonesremote` wires each `[shared].paths` entry from the site runtime config into the promoted release.
+This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`, and run inside bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, run in lexical order as the site runtime user with `cwd` set to the sealed release, and are the right place for migrations, cache warmups, and other runtime-state work. Before prepare scripts run, `bonesremote` wires each `[shared].paths` entry from the site runtime config into the promoted release.
 
 ## Crate Structure
 This Cargo workspace has three crates under `crates/`:
@@ -301,7 +301,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 3. `bonesremote deploy` orchestrates the full pipeline:
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
-   - **release_build** — Run `deployment/build/*.sh` inside bonesremote's Debian build container at `/workspace/source`
+   - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`
    - **release_promote** — Copy safe artifacts into a sealed `root:<site>` release
    - **wire_shared** — Symlink declared shared paths into the sealed release
    - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user in the sealed release
@@ -326,7 +326,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
    - This command orchestrates the full pipeline:
       - **stage_release** — Create timestamped release state
       - **release_checkout** — Export source from the bare repo into temporary context
-      - **release_build** — Run `deployment/build/*.sh` inside bonesremote's Debian build container at `/workspace/source`
+      - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`
       - **release_promote** — Seal safe artifacts into `releases/<release>`
       - **wire_shared** — Link shared runtime paths
       - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user

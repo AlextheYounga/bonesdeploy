@@ -35,10 +35,10 @@ This preserves tool installs across scripts in a single deploy without persistin
 `runtime.toml` should not choose the build image. For now, `bonesremote` uses one hardcoded base:
 
 ```text
-docker.io/library/debian:bookworm
+docker.io/library/buildpack-deps:bookworm
 ```
 
-Framework templates stay dynamic through shell scripts. If a framework needs Node, PHP extensions, Ruby packages, Python packages, or system libraries, its build scripts install them inside the per-deploy container.
+The image provides common build and download prerequisites. Framework templates stay dynamic through shell scripts; if a framework needs PHP extensions, Ruby packages, Python packages, or additional system libraries, its build scripts install them inside the per-deploy container.
 
 ## Security Model
 
@@ -68,8 +68,7 @@ Avoid a mutable per-site toolchain volume unless there is a clear need. It speed
 ## Template Notes
 
 - Nuxt still needs to remove its compatibility `dist` symlink after `generate`, because Nuxt creates `dist -> /workspace/source/.output/public` and absolute symlinks are rejected during promotion.
-- Node installer scripts should not rely on PHP for `package.json` parsing. A generic Debian base does not include PHP unless the template installs it.
-- Build scripts that need OS tools must install them explicitly, for example `ca-certificates`, `curl`, or `xz-utils`.
+- Node installer scripts should not rely on PHP for `package.json` parsing. The common build image does not include PHP unless the template installs it.
 
 ## Implementation Checklist
 
