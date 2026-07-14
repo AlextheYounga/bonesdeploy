@@ -78,10 +78,54 @@ fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
     {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() {
+        if path.is_file() && is_script(&path) {
             scripts.push(path);
         }
     }
     scripts.sort();
     Ok(scripts)
+}
+
+fn is_script(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    let bytes = name.as_bytes();
+    bytes.len() > 6
+        && bytes[0].is_ascii_digit()
+        && bytes[1].is_ascii_digit()
+        && bytes[2] == b'_'
+        && path.extension().is_some_and(|extension| extension == "sh")
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+    use std::fs;
+    use std::process;
+
+    use anyhow::Result;
+
+    use super::list_scripts;
+
+    #[test]
+    fn list_scripts_only_includes_numbered_shell_scripts() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-build-list-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(&root)?;
+        fs::write(root.join("02_second.sh"), "")?;
+        fs::write(root.join("01_first.sh"), "")?;
+        fs::write(root.join("README.md"), "# Build Scripts")?;
+        fs::write(root.join("1_not_ordered.sh"), "")?;
+        fs::write(root.join("01-not-a-script.sh"), "")?;
+
+        let scripts = list_scripts(&root)?;
+
+        assert_eq!(scripts, vec![root.join("01_first.sh"), root.join("02_second.sh")]);
+
+        fs::remove_dir_all(&root).ok();
+        Ok(())
+    }
 }

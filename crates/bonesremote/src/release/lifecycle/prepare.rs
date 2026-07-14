@@ -83,12 +83,24 @@ fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
     {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() {
+        if path.is_file() && is_script(&path) {
             scripts.push(path);
         }
     }
     scripts.sort();
     Ok(scripts)
+}
+
+fn is_script(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    let bytes = name.as_bytes();
+    bytes.len() > 6
+        && bytes[0].is_ascii_digit()
+        && bytes[1].is_ascii_digit()
+        && bytes[2] == b'_'
+        && path.extension().is_some_and(|extension| extension == "sh")
 }
 
 #[cfg(test)]
@@ -110,6 +122,7 @@ mod tests {
         fs::create_dir_all(&root)?;
         fs::write(root.join("02_second.sh"), "")?;
         fs::write(root.join("01_first.sh"), "")?;
+        fs::write(root.join("README.md"), "# Prepare Scripts")?;
         fs::create_dir_all(root.join("nested"))?;
 
         let scripts = list_scripts(&root)?;
