@@ -132,17 +132,25 @@ fn check_deployment_scripts() -> Option<String> {
             }
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if !name.ends_with(".sh") {
+            if path.extension().is_none_or(|extension| extension != "sh") {
                 continue;
             }
-            let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
-            if !has_numeric_prefix {
-                return Some(format!("Deployment script is not ordered: {subdir}/{name}"));
+            if !is_deployment_script(&name) {
+                return Some(format!("Deployment script must use the NN_name.sh convention: {subdir}/{name}"));
             }
         }
     }
 
     None
+}
+
+fn is_deployment_script(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    bytes.len() > 6
+        && bytes[0].is_ascii_digit()
+        && bytes[1].is_ascii_digit()
+        && bytes[2] == b'_'
+        && Path::new(name).extension().is_some_and(|extension| extension == "sh")
 }
 
 fn check_local_branch(cfg: &config::Bones) -> Option<String> {
