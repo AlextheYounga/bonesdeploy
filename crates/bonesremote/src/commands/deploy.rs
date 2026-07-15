@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Error, Result, bail};
 use shared::config;
 use shared::paths;
 
@@ -26,60 +26,66 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     let context_dir = lifecycle::checkout::ensure_build_context(site)?;
 
     if let Err(error) = lifecycle::checkout::run(site, &target_revision, &context_dir) {
-        cleanup(site, Some(&context_dir));
-        drop_failed_release::run(site).ok();
-        return Err(error);
+        return abort(site, Some(&context_dir), error);
     }
 
     if let Err(error) = lifecycle::build::run(site, &context_dir) {
-        cleanup(site, Some(&context_dir));
-        drop_failed_release::run(site).ok();
-        return Err(error);
+        return abort(site, Some(&context_dir), error);
     }
 
     if let Err(error) = lifecycle::build::promote(site, &context_dir) {
-        cleanup(site, Some(&context_dir));
-        drop_failed_release::run(site).ok();
-        return Err(error);
+        return abort(site, Some(&context_dir), error);
     }
 
     if let Err(error) = lifecycle::wire_shared::run(site) {
-        cleanup(site, Some(&context_dir));
-        drop_failed_release::run(site).ok();
-        return Err(error);
+        return abort(site, Some(&context_dir), error);
     }
 
     if let Err(error) = lifecycle::prepare::run(site) {
-        cleanup(site, Some(&context_dir));
-        drop_failed_release::run(site).ok();
-        return Err(error);
+        return abort(site, Some(&context_dir), error);
     }
 
     if let Err(error) = lifecycle::activate::run(site) {
-        cleanup(site, Some(&context_dir));
-        drop_failed_release::run(site).ok();
-        return Err(error);
+        return abort(site, Some(&context_dir), error);
     }
 
     if let Err(error) = service::run(site) {
-        cleanup(site, Some(&context_dir));
-        drop_failed_release::run(site).ok();
-        return Err(error);
+        return abort(site, Some(&context_dir), error);
     }
 
     if let Err(error) = release_prune::run(site) {
-        cleanup(site, Some(&context_dir));
-        return Err(error);
+        return abort_without_release_drop(site, Some(&context_dir), error);
     }
 
-    cleanup(site, Some(&context_dir));
+    cleanup(site, Some(&context_dir))?;
     Ok(())
 }
 
-fn cleanup(site: &str, context: Option<&Path>) {
+fn cleanup(site: &str, context: Option<&Path>) -> Result<()> {
     if let Some(context) = context {
-        lifecycle::checkout::cleanup_build_context(site, context).ok();
+        lifecycle::checkout::cleanup_build_context(site, context)?;
     }
+    Ok(())
+}
+
+fn abort(site: &str, context: Option<&Path>, error: Error) -> Result<()> {
+    let error = match abort_without_release_drop(site, context, error) {
+        Ok(()) => unreachable!("abort_without_release_drop always returns an error"),
+        Err(error) => error,
+    };
+    let mut error = error;
+    if let Err(drop_error) = drop_failed_release::run(site) {
+        error = error.context(format!("Failed to remove failed release: {drop_error:#}"));
+    }
+    Err(error)
+}
+
+fn abort_without_release_drop(site: &str, context: Option<&Path>, error: Error) -> Result<()> {
+    let mut error = error;
+    if let Err(cleanup_error) = cleanup(site, context) {
+        error = error.context(format!("Cleanup failed: {cleanup_error:#}"));
+    }
+    Err(error)
 }
 
 pub fn rollback(site: &str) -> Result<()> {

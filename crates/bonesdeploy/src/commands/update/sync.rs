@@ -12,25 +12,31 @@ pub(super) fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Pat
 
     let kit_root = source_dir.join("crates/bonesdeploy/kit");
     sync_tree(&kit_root.join("hooks"), &bones_dir.join("hooks"), true)?;
-    sync_tree(&deployment_source_root(source_dir, bones_dir), &bones_dir.join("deployment"), true)?;
+    sync_tree(&deployment_source_root(source_dir, bones_dir)?, &bones_dir.join("deployment"), true)?;
 
     Ok(())
 }
 
-fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> PathBuf {
+fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> Result<PathBuf> {
     let runtime_toml = bones_dir.join(paths::RUNTIME_TOML);
-    let Some(template) = selected_runtime_template(&runtime_toml) else {
-        return source_dir.join("crates/bonesdeploy/kit/deployment");
+    let Some(template) = selected_runtime_template(&runtime_toml)? else {
+        return Ok(source_dir.join("crates/bonesdeploy/kit/deployment"));
     };
 
     let runtime_deployment = source_dir.join("crates/bonesdeploy/runtimes").join(template).join("deployment");
-    if runtime_deployment.is_dir() { runtime_deployment } else { source_dir.join("crates/bonesdeploy/kit/deployment") }
+    Ok(if runtime_deployment.is_dir() {
+        runtime_deployment
+    } else {
+        source_dir.join("crates/bonesdeploy/kit/deployment")
+    })
 }
 
-fn selected_runtime_template(runtime_toml: &Path) -> Option<String> {
-    let content = fs::read_to_string(runtime_toml).ok()?;
-    let value: toml::Value = toml::from_str(&content).ok()?;
-    value.get("template")?.as_str().map(String::from)
+fn selected_runtime_template(runtime_toml: &Path) -> Result<Option<String>> {
+    let content =
+        fs::read_to_string(runtime_toml).with_context(|| format!("Failed to read {}", runtime_toml.display()))?;
+    let value: toml::Value =
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_toml.display()))?;
+    Ok(value.get("template").and_then(toml::Value::as_str).map(String::from))
 }
 
 fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {

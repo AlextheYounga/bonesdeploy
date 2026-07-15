@@ -122,6 +122,10 @@ fn check_bones_config() -> Option<String> {
         return Some(format!("Missing {}", paths::LOCAL_BONES_TOML));
     }
 
+    if let Err(error) = config::load(Path::new(paths::LOCAL_BONES_TOML)) {
+        return Some(format!("Invalid {}: {error:#}", paths::LOCAL_BONES_TOML));
+    }
+
     None
 }
 
@@ -137,8 +141,15 @@ fn check_deployment_scripts() -> Option<String> {
             continue;
         }
 
-        let entries = fs::read_dir(&scripts_dir).ok()?;
-        for entry in entries.flatten() {
+        let entries = match fs::read_dir(&scripts_dir) {
+            Ok(entries) => entries,
+            Err(error) => return Some(format!("Cannot read {}: {error}", scripts_dir.display())),
+        };
+        for entry in entries {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) => return Some(format!("Cannot read an entry in {}: {error}", scripts_dir.display())),
+            };
             let path = entry.path();
             if !path.is_file() {
                 continue;
@@ -171,7 +182,10 @@ fn check_local_branch(cfg: &config::Bones) -> Option<String> {
         return None;
     }
     let ref_name = format!("refs/heads/{}", cfg.branch);
-    let output = Command::new("git").args(["rev-parse", "--verify", &ref_name]).output().ok()?;
+    let output = match Command::new("git").args(["rev-parse", "--verify", &ref_name]).output() {
+        Ok(output) => output,
+        Err(error) => return Some(format!("Unable to run git: {error}")),
+    };
     if output.status.success() {
         return None;
     }
@@ -190,7 +204,10 @@ fn check_pre_push_hook() -> Option<String> {
         return Some(String::from("pre-push hook is not installed"));
     }
 
-    let target = fs::read_link(link).ok()?;
+    let target = match fs::read_link(link) {
+        Ok(target) => target,
+        Err(error) => return Some(format!("Cannot read pre-push hook link: {error}")),
+    };
     let expected = Path::new(paths::PRE_PUSH_HOOK_TARGET);
     if target != expected {
         return Some(String::from("pre-push hook is not installed"));

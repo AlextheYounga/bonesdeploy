@@ -81,7 +81,8 @@ fn replace_site_dir(site: &str, staging_dir: &Path) -> Result<()> {
 
     if let Err(error) = fs::rename(staging_dir, &site_root) {
         if had_existing {
-            fs::rename(&backup_dir, &site_root).ok();
+            fs::rename(&backup_dir, &site_root)
+                .with_context(|| format!("Failed to restore previous site state from {}", backup_dir.display()))?;
         }
         return Err(error).with_context(|| format!("Failed to activate {}", site_root.display()));
     }

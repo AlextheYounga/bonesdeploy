@@ -131,7 +131,6 @@ This creates:
 ├── bones.toml
 ├── runtime.toml
 ├── hooks/
-│   ├── hooks.sh
 │   ├── pre-push
 │   └── post-receive
 └── deployment/
@@ -252,7 +251,6 @@ Common defaults:
 ├── bones.toml           # project configuration
 ├── runtime.toml         # framework runtime configuration
 ├── hooks/
-│   ├── hooks.sh         # (legacy) shared hook functions imported by hook entrypoints
 │   ├── pre-push         # symlinked to .git/hooks/pre-push
 │   └── post-receive     # thin adapter → calls bonesremote deploy
 └── deployment/

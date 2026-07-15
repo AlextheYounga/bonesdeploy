@@ -166,7 +166,7 @@ ensure_corepack() {
 
 	if ! command -v corepack >/dev/null 2>&1; then
 		log "corepack not found in Node install; installing corepack..."
-		npm install -g corepack@latest
+		npm install -g corepack@0.31.0
 	fi
 
 	corepack enable --install-directory "$NODE_DIR/bin" 2>/dev/null || true

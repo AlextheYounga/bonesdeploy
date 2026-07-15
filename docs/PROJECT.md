@@ -61,7 +61,6 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 ├── bones.toml
 ├── runtime.toml
 ├── hooks
-│   ├── hooks.sh                      # (legacy; pre-push only used to source from here)
 │   ├── post-receive
 │   └── pre-push
 ├── deployment

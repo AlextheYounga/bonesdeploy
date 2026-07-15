@@ -51,13 +51,15 @@ pub async fn build_report() -> Result<Report> {
 
     let cfg = config::load(bones_toml).with_context(|| format!("Failed to read {}", bones_toml.display()))?;
     let web_root = runtime_web_root()?;
-    let setup_complete = remote_setup_complete(&cfg, &web_root).await.unwrap_or(false);
+    let setup_complete =
+        remote_setup_complete(&cfg, &web_root).await.context("Unable to determine remote setup status")?;
 
     if !setup_complete {
         return Ok(initialized_report(cfg, false));
     }
 
-    let ssl_enabled = cfg.ssl_enabled || remote_ssl_enabled(&cfg, &web_root).await.unwrap_or(false);
+    let ssl_enabled = cfg.ssl_enabled
+        || remote_ssl_enabled(&cfg, &web_root).await.context("Unable to determine remote SSL status")?;
 
     if ssl_enabled { Ok(ready_report(cfg)) } else { Ok(initialized_report(cfg, true)) }
 }
@@ -151,9 +153,7 @@ fn runtime_web_root() -> Result<String> {
 }
 
 async fn remote_setup_complete(cfg: &config::Bones, _web_root: &str) -> Result<bool> {
-    let Ok(session) = ssh::connect_privileged(cfg).await else {
-        return Ok(false);
-    };
+    let session = ssh::connect_privileged(cfg).await?;
 
     if ssh::run_cmd(&session, "command -v bonesremote >/dev/null 2>&1").await.is_err() {
         session.close().await?;

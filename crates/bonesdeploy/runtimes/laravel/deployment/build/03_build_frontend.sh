@@ -103,7 +103,7 @@ ensure_node_toolchain() {
 
 	if ! command -v corepack >/dev/null 2>&1; then
 		log "corepack not found; installing corepack..."
-		npm install -g corepack@latest
+		npm install -g corepack@0.31.0
 	fi
 
 	corepack enable --install-directory "$(dirname "$(command -v node)")" 2>/dev/null || true
@@ -114,8 +114,7 @@ install_and_build_with_npm() {
 		log "Installing frontend dependencies with npm ci..."
 		npm ci --include=dev
 	else
-		log "package-lock.json not found; falling back to npm install..."
-		npm install
+		die "package-lock.json or npm-shrinkwrap.json is required for production builds"
 	fi
 
 	log "Building frontend assets with npm..."
@@ -127,8 +126,7 @@ install_and_build_with_pnpm() {
 		log "Installing frontend dependencies with pnpm frozen lockfile..."
 		corepack pnpm install --frozen-lockfile --prod=false
 	else
-		log "pnpm-lock.yaml not found; falling back to non-frozen pnpm install..."
-		corepack pnpm install --prod=false
+		die "pnpm-lock.yaml is required for production builds"
 	fi
 
 	log "Building frontend assets with pnpm..."
