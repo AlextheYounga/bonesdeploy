@@ -8,7 +8,7 @@ use anyhow::{Context, Result, bail};
 use shared::config::{self, build_user_for};
 use shared::paths;
 
-use crate::commands::{drop_failed_release, release_list};
+use crate::commands::{drop_failed_release, release::list};
 use crate::privileges;
 use crate::release::lifecycle::checkout;
 use crate::release::script_runner::{ensure_build_user_ready, remove_build_container};
@@ -28,12 +28,12 @@ pub fn run(site: &str, release: &str) -> Result<()> {
         if active.release != release {
             bail!("Release {release} is not the active deployment. Run 'bonesdeploy releases' to inspect releases.");
         }
-        if active.phase == DeploymentPhase::Preparing && release_list::process_matches(active) {
+        if active.phase == DeploymentPhase::Preparing && list::process_matches(active) {
             bail!(
                 "Release {release} is preparing and cannot be cancelled because prepare scripts may change runtime state."
             );
         }
-        if release_list::process_matches(active) {
+        if list::process_matches(active) {
             terminate_deployment(active)?;
         }
     } else if release_state::read_staged_release(site).ok().as_deref() != Some(release) {
@@ -117,12 +117,12 @@ fn signal(pid: u32, signal: &str) -> Result<()> {
 fn wait_for_process_exit(active: &release_state::ActiveDeployment, timeout: Duration) -> bool {
     let attempts = timeout.as_millis() / 100;
     for _ in 0..attempts {
-        if !release_list::process_matches(active) {
+        if !list::process_matches(active) {
             return true;
         }
         thread::sleep(Duration::from_millis(100));
     }
-    !release_list::process_matches(active)
+    !list::process_matches(active)
 }
 
 #[cfg(test)]

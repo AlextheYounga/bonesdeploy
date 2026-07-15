@@ -10,7 +10,7 @@ use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 
-use crate::commands::{drop_failed_release, release_list, release_prune, service};
+use crate::commands::{drop_failed_release, release, service};
 use crate::privileges;
 use crate::release::lifecycle;
 use crate::release::script_runner::ensure_build_user_ready;
@@ -108,7 +108,7 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
         return finish_abort(site, Some(&context_dir), error);
     }
 
-    if let Err(error) = release_prune::run(site) {
+    if let Err(error) = release::prune::run(site) {
         return finish_abort_without_release_drop(site, Some(&context_dir), error);
     }
 
@@ -122,7 +122,7 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
 fn process_start_ticks() -> Result<u64> {
     let path = format!("/proc/{}/stat", process::id());
     let stat = fs::read_to_string(&path).with_context(|| format!("Failed to read {path}"))?;
-    release_list::process_start_ticks(&stat).context("Failed to read deployment process start time")
+    release::list::process_start_ticks(&stat).context("Failed to read deployment process start time")
 }
 
 fn deployment_started_at() -> Result<String> {
