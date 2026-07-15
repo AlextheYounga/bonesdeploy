@@ -60,6 +60,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 .bones
 ├── bones.toml
 ├── runtime.toml
+├── buildtime.toml
 ├── deployment
 │   ├── build/
 │   │   ├── 01_install_build_deps.sh
@@ -107,6 +108,22 @@ deploy_on_push = false
 ssl_enabled = true
 releases = 5
 ```
+
+### Buildtime TOML
+`.bones/buildtime.toml` declares which environment variable names from `shared/.env` should be injected into the build container at build time. This is required for frameworks that inline public env vars into client bundles at build time (e.g. `NEXT_PUBLIC_*`, `VITE_*`, `NUXT_PUBLIC_*`, `PUBLIC_*`).
+
+```toml
+# .bones/buildtime.toml
+# Values come from `bonesdeploy secrets push` (shared/.env), not this file.
+vars = [
+  "NEXT_PUBLIC_API_URL",
+  "NEXT_PUBLIC_GA_ID",
+]
+```
+
+The file is pushed with `bonesdeploy push` and read by `bonesremote` during the build phase. It reads the requested vars from the host's `shared/.env`, then passes them into the podman build container as `--env KEY=VALUE`. If `buildtime.toml` is missing or its `vars` array is empty, no env vars are injected (the default for most runtimes).
+
+This is NOT a replacement for `bonesdeploy secrets` — it only contains **var names** (not values). The actual values come from the existing `.env` persisted by `bonesdeploy secrets push`. Putting secret values in `buildtime.toml` would expose them to the build container and potentially inlined client bundles.
 
 ### Hooks
 The optional git push transport uses two thin internal adapters (local `pre-push` guard and remote `post-receive` trigger) that are embedded in the binaries. They are not visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
@@ -302,7 +319,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 3. `bonesremote deploy` orchestrates the full pipeline:
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
-   - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`
+    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `.bones/buildtime.toml` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
    - **release_promote** — Copy safe artifacts into a sealed `root:<site>` release
    - **wire_shared** — Symlink declared shared paths into the sealed release
    - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user in the sealed release
@@ -326,8 +343,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
       ```
    - This command orchestrates the full pipeline:
       - **stage_release** — Create timestamped release state
-      - **release_checkout** — Export source from the bare repo into temporary context
-      - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`
+       - **release_checkout** — Export source from the bare repo into temporary context
+       - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `.bones/buildtime.toml` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
       - **release_promote** — Seal safe artifacts into `releases/<release>`
       - **wire_shared** — Link shared runtime paths
       - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user

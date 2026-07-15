@@ -179,6 +179,58 @@ pub enum SharedPathType {
     Dir,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct Buildtime {
+    #[serde(default)]
+    pub vars: Vec<String>,
+}
+
+/// # Errors
+///
+/// Returns an error if the file exists but cannot be read or parsed.
+pub fn load_buildtime(config_dir: &Path) -> Result<Option<Buildtime>> {
+    let path = config_dir.join(paths::BUILDTIME_TOML);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let buildtime: Buildtime =
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    Ok(Some(buildtime))
+}
+
+#[must_use]
+pub fn extract_env_vars(env_content: &str, var_names: &[String]) -> Vec<(String, String)> {
+    env_content
+        .lines()
+        .filter_map(|line| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() || trimmed.starts_with('#') {
+                return None;
+            }
+            let (key, value) = trimmed.split_once('=')?;
+            let key = key.trim();
+            if !var_names.iter().any(|name| name == key) {
+                return None;
+            }
+            let value = strip_quotes(value.trim());
+            Some((key.to_string(), value.to_string()))
+        })
+        .collect()
+}
+
+fn strip_quotes(s: &str) -> &str {
+    let bytes = s.as_bytes();
+    if bytes.len() >= 2
+        && ((bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"')
+            || (bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\''))
+    {
+        &s[1..s.len() - 1]
+    } else {
+        s
+    }
+}
+
 /// Loads the runtime configuration from a TOML file, falling back to defaults.
 ///
 /// # Errors
@@ -234,6 +286,8 @@ pub fn load(path: &Path) -> Result<Bones> {
 
 #[cfg(test)]
 mod tests {
+    use std::{env, fs};
+
     use toml::de::Error;
 
     use super::*;
@@ -276,5 +330,67 @@ paths = [
     fn build_identity_helpers_are_derived_from_project_name() {
         assert_eq!(build_user_for("demo"), "demo-build");
         assert_eq!(build_group_for("demo"), "demo-build");
+    }
+
+    #[test]
+    fn extract_env_vars_parses_unquoted_values() {
+        let vars = extract_env_vars("KEY=hello\nOTHER=world", &["KEY".into()]);
+        assert_eq!(vars, vec![("KEY".to_string(), "hello".to_string())]);
+    }
+
+    #[test]
+    fn extract_env_vars_parses_double_quoted_values() {
+        let vars = extract_env_vars(r#"KEY="hello world""#, &["KEY".into()]);
+        assert_eq!(vars, vec![("KEY".to_string(), "hello world".to_string())]);
+    }
+
+    #[test]
+    fn extract_env_vars_parses_single_quoted_values() {
+        let vars = extract_env_vars("KEY='hello world'", &["KEY".into()]);
+        assert_eq!(vars, vec![("KEY".to_string(), "hello world".to_string())]);
+    }
+
+    #[test]
+    fn extract_env_vars_skips_comments_and_blank_lines() {
+        let content = "# comment\n\nKEY=val\n  \nOTHER=other";
+        let vars = extract_env_vars(content, &["KEY".into()]);
+        assert_eq!(vars, vec![("KEY".to_string(), "val".to_string())]);
+    }
+
+    #[test]
+    fn extract_env_vars_returns_only_requested_keys() {
+        let content = "A=1\nB=2\nC=3";
+        let vars = extract_env_vars(content, &["A".into(), "C".into()]);
+        assert_eq!(vars, vec![("A".to_string(), "1".to_string()), ("C".to_string(), "3".to_string())]);
+    }
+
+    #[test]
+    fn load_buildtime_returns_none_for_missing_file() {
+        let result = load_buildtime(Path::new("/tmp/nonexistent_dir_for_test")).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn load_buildtime_parses_vars_array() {
+        let dir = env::temp_dir().join("bones-buildtime-test");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("buildtime.toml"), "vars = [\"A\", \"B\"]").unwrap();
+
+        let result = load_buildtime(&dir).unwrap().unwrap();
+        assert_eq!(result.vars, vec!["A", "B"]);
+
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn load_buildtime_empty_vars_is_fine() {
+        let dir = env::temp_dir().join("bones-buildtime-empty-test");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("buildtime.toml"), "vars = []").unwrap();
+
+        let result = load_buildtime(&dir).unwrap().unwrap();
+        assert!(result.vars.is_empty());
+
+        fs::remove_dir_all(&dir).ok();
     }
 }

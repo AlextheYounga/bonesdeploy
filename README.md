@@ -130,6 +130,7 @@ This creates:
 .bones/
 ├── bones.toml
 ├── runtime.toml
+├── buildtime.toml
 └── deployment/
     └── 01_*.sh
 ```
@@ -247,6 +248,7 @@ Common defaults:
 .bones/
 ├── bones.toml           # project configuration
 ├── runtime.toml         # framework runtime configuration
+├── buildtime.toml       # build-time env vars from shared/.env
 └── deployment/
     ├── build/
     │   └── 01_*.sh      # build scripts (run sequentially in the buildpack-deps container)

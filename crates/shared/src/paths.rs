@@ -26,9 +26,11 @@ pub const LOCAL_BONES_DIR: &str = ".bones";
 pub const LOCAL_BONES_TOML: &str = ".bones/bones.toml";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
 pub const LOCAL_BONES_RUNTIME_TOML: &str = ".bones/runtime.toml";
+pub const LOCAL_BONES_BUILDTIME_TOML: &str = ".bones/buildtime.toml";
 pub const LOCAL_BONES_SECRETS_DIR: &str = ".bones/secrets";
 pub const DOT_ENV: &str = ".env";
 pub const RUNTIME_TOML: &str = "runtime.toml";
+pub const BUILDTIME_TOML: &str = "buildtime.toml";
 
 pub const BONES_DIR: &str = "bones";
 pub const BONES_TOML: &str = "bones.toml";

@@ -12,6 +12,7 @@ pub(crate) struct BuildScriptEnv<'a> {
     pub(crate) project_name: &'a str,
     pub(crate) build_user: &'a str,
     pub(crate) web_root: &'a str,
+    pub(crate) build_env_vars: &'a [(String, String)],
 }
 
 fn build_user_command(build_user: &str) -> Command {
@@ -130,6 +131,10 @@ fn configure_podman_create_command(
         .arg(mount)
         .arg(BUILD_IMAGE)
         .args(["sleep", "infinity"]);
+
+    for (key, value) in env.build_env_vars {
+        command.arg("--env").arg(format!("{key}={value}"));
+    }
 }
 
 fn configure_podman_exec_command(command: &mut Command, source_root: &Path, container_name: &str) {
@@ -192,7 +197,7 @@ fn podman_build_command_mounts_only_source_tree() {
     configure_podman_create_command(
         &mut command,
         Path::new("/tmp/source"),
-        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", web_root: "public" },
+        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", web_root: "public", build_env_vars: &[] },
         "demo-container",
     );
 

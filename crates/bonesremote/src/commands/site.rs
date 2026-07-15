@@ -11,7 +11,8 @@ use crate::privileges;
 
 const POST_RECEIVE_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/post-receive"));
 
-const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] = &[paths::BONES_TOML, paths::RUNTIME_TOML, paths::DEPLOYMENT_DIR];
+const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] =
+    &[paths::BONES_TOML, paths::RUNTIME_TOML, paths::BUILDTIME_TOML, paths::DEPLOYMENT_DIR];
 
 fn validate_site_name(site: &str) -> Result<()> {
     if site.is_empty() {
@@ -177,6 +178,24 @@ mod tests {
 
     use super::{validate_top_level_entries, write_post_receive_hook};
     use shared::paths;
+
+    #[test]
+    fn validate_top_level_entries_allows_buildtime_toml() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-buildtime-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(&root)?;
+        fs::write(root.join(paths::BONES_TOML), "")?;
+        fs::write(root.join(paths::RUNTIME_TOML), "")?;
+        fs::write(root.join(paths::BUILDTIME_TOML), "")?;
+        fs::create_dir_all(root.join(paths::DEPLOYMENT_DIR))?;
+
+        let result = validate_top_level_entries(&root);
+        fs::remove_dir_all(&root)?;
+        assert!(result.is_ok());
+        Ok(())
+    }
 
     #[test]
     fn validate_top_level_entries_rejects_unexpected_file() -> Result<()> {
