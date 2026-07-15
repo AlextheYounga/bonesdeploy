@@ -1,8 +1,12 @@
-# Declare which env var names from shared/.env should be injected into
-# the build container. Vite inlines VITE_* vars into the client bundle
-# at build time, so they must be available during `vite build`.
+# ── Build-time environment variables ──────────────────────
+# Declare which env var names from shared/.env should be
+# injected into the build container.
 #
-# Values come from `bonesdeploy secrets push` — do not put values here.
+# Vite inlines VITE_* vars into the client bundle at build
+# time, so any VITE_* var your app uses must be listed here.
+#
+# Values come from `bonesdeploy secrets push` —
+# do not put values here.
 #
 vars = [
   # "VITE_API_URL",

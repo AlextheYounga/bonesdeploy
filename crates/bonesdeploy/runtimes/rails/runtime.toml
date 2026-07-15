@@ -1,6 +1,16 @@
+# ── Runtime identity ──────────────────────────────────────
+# Do not edit `template` — it links this config to the
+# Rails build and deploy scripts.
 template = "rails"
+
+# ── Web root ──────────────────────────────────────────────
+# Rails serves static assets from public/.
 web_root = "public"
 
+# ── File permissions ──────────────────────────────────────
+# tmp/, log/, and storage/ need group-write for the
+# runtime user (Puma workers, Active Job, caching).
+# public/assets/ is precompiled and read-only at runtime.
 [permissions]
 paths = [
   { path = "*", type = "dir", mode = "750" },
@@ -11,6 +21,9 @@ paths = [
   { path = "public/assets", type = "dir", mode = "750", recursive = true },
 ]
 
+# ── Shared paths ──────────────────────────────────────────
+# Persist across deploys via symlinks into shared/.
+# .env is managed by `bonesdeploy secrets push`.
 [shared]
 paths = [
   { path = ".env", type = "file" },

@@ -1,6 +1,14 @@
+# ── Runtime identity ──────────────────────────────────────
+# Do not edit `template` — it links this config to the
+# Vue / Vite build and deploy scripts.
 template = "vue"
+
+# ── Web root ──────────────────────────────────────────────
+# Vite outputs the production bundle to dist/.
 web_root = "dist"
 
+# ── File permissions ──────────────────────────────────────
+# dist/ is read-only at runtime — no group-write needed.
 [permissions]
 paths = [
   { path = "*", type = "dir", mode = "750" },

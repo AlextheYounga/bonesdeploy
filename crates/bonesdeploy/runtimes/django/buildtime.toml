@@ -1,2 +1,12 @@
+# ── Build-time environment variables ──────────────────────
+# Declare which env var names from shared/.env should be
+# injected into the build container.
+#
+# Django does not inline environment variables at build time.
+# Add var names here only if your build scripts need them.
+#
+# Values come from `bonesdeploy secrets push` —
+# do not put values here.
+#
 vars = [
 ]
