@@ -262,7 +262,7 @@ Common defaults:
 
 Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you and can be edited freely. Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation.
 
-Build containers are capped at half of the host's available CPU capacity. This applies to `npm`, Nuxt/Vite, pnpm, and other commands run by the build scripts; it is a container CPU quota rather than a Node memory setting.
+Build scripts can set framework-specific runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool.
 
 Rootless Podman commands run through the dedicated build user's systemd user manager. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 

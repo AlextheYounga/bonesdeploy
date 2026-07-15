@@ -1,19 +1,12 @@
 use std::fs;
-use std::num::NonZeroUsize;
 use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
-use std::thread;
 
 use anyhow::{Context, Result, bail};
 
 use super::output;
 
 const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
-
-fn build_cpu_limit() -> String {
-    let cpus = thread::available_parallelism().map_or(1, NonZeroUsize::get);
-    if cpus.is_multiple_of(2) { (cpus / 2).to_string() } else { format!("{}.50", cpus / 2) }
-}
 
 pub(crate) struct BuildScriptEnv<'a> {
     pub(crate) project_name: &'a str,
@@ -104,8 +97,7 @@ fn configure_podman_create_command(
     let mount = format!("{}:/workspace/source", source_root.display());
     command
         .current_dir(source_root)
-        .args(["podman", "run", "-d", "--pull=missing", "--cpus"])
-        .arg(build_cpu_limit())
+        .args(["podman", "run", "-d", "--pull=missing"])
         .args(["--security-opt=no-new-privileges", "--workdir=/workspace/source", "--name"])
         .arg(container_name)
         .args(["--env"])
@@ -185,7 +177,7 @@ fn assert_build_command_mounts(args: &[String], command: &Command) {
     assert!(args.contains(&String::from("podman")));
     assert!(args.contains(&String::from("run")));
     assert!(args.contains(&String::from("-d")));
-    assert!(args.windows(2).any(|window| window[0] == "--cpus" && window[1] == build_cpu_limit()));
+    assert!(!args.iter().any(|arg| arg == "--cpus"));
     assert!(args.contains(&String::from("--security-opt=no-new-privileges")));
     assert!(!args.iter().any(|arg| arg == "--cap-drop=all"));
     assert!(args.contains(&String::from("docker.io/library/buildpack-deps:bookworm")));

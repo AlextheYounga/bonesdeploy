@@ -242,7 +242,8 @@ async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
             let pending = output.contains("has not been pushed yet");
             if pending {
                 for line in output.lines().filter(|line| line.contains("has not been pushed yet")) {
-                    println!("{} {}", output::pending_marker(), line.trim());
+                    let line = line.trim().strip_prefix('•').map_or(line.trim(), str::trim_start);
+                    println!("{} {}", output::pending_marker(), line);
                 }
             }
             (None, pending)
