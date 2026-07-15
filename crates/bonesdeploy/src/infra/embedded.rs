@@ -59,6 +59,14 @@ pub fn scaffold_runtime_secrets(runtime: &str, bones_dir: &Path) -> Result<()> {
     scaffold_runtime_assets(runtime, bones_dir, paths::KIT_SECRETS_DIR)
 }
 
+pub fn scaffold_runtime_buildtime(runtime: &str, bones_dir: &Path) -> Result<()> {
+    let asset_path = format!("{runtime}/{}", paths::BUILDTIME_TOML);
+    if let Some(asset) = RuntimeAssets::get(&asset_path) {
+        write_asset(bones_dir, paths::BUILDTIME_TOML, asset.data.as_ref())?;
+    }
+    Ok(())
+}
+
 fn scaffold_runtime_assets(runtime: &str, bones_dir: &Path, asset_prefix: &str) -> Result<()> {
     let runtime_prefix = format!("{runtime}/");
 

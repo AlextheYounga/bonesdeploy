@@ -1,2 +1,13 @@
+# Declare which env var names from shared/.env should be injected into
+# the build container. Nuxt inlines NUXT_PUBLIC_* vars into the client
+# bundle at build time, so they must be available during `nuxt build`.
+#
+# Variables without the NUXT_PUBLIC_ prefix are server-side only and
+# do NOT need to be listed here.
+#
+# Values come from `bonesdeploy secrets push` — do not put values here.
+#
 vars = [
+  # "NUXT_PUBLIC_API_URL",
+  # "NUXT_PUBLIC_SITE_NAME",
 ]

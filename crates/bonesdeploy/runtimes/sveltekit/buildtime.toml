@@ -1,2 +1,11 @@
+# Declare which env var names from shared/.env should be injected into
+# the build container. SvelteKit inlines PUBLIC_* vars (via
+# $env/static/public) into the client bundle at build time, so they must
+# be available during `vite build`.
+#
+# Values come from `bonesdeploy secrets push` — do not put values here.
+#
 vars = [
+  # "PUBLIC_API_URL",
+  # "PUBLIC_SITE_NAME",
 ]
