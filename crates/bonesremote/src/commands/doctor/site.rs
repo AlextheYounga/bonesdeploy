@@ -108,22 +108,34 @@ fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pen
         return;
     }
     let ref_name = format!("refs/heads/{branch}");
-    let refs = Command::new("git").args(["--git-dir", repo_path, "for-each-ref", "--format=%(refname)"]).output();
-    if refs.as_ref().is_ok_and(|output| output.status.success() && output.stdout.is_empty()) {
+    let refs = match Command::new("git").args(["--git-dir", repo_path, "for-each-ref", "--format=%(refname)"]).output()
+    {
+        Ok(output) if output.status.success() => output,
+        Ok(output) => {
+            issues.push(format!(
+                "could not inspect branches in {repo_path}: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+            return;
+        }
+        Err(error) => {
+            issues.push(format!("could not run git while inspecting {repo_path}: {error}"));
+            return;
+        }
+    };
+    if refs.stdout.is_empty() {
         pending.push(format!(
             "deploy branch '{branch}' has not been pushed yet. Run 'git push <remote> {branch}' before the first deploy."
         ));
         return;
     }
-    let ok = Command::new("git")
-        .args(["--git-dir", repo_path, "rev-parse", "--verify", &ref_name])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
-    if !ok {
-        issues.push(format!(
-            "deploy branch '{branch}' has not been pushed to {repo_path}. Run 'git push <remote> {branch}' first.",
-        ));
+    let branch_output = Command::new("git").args(["--git-dir", repo_path, "rev-parse", "--verify", &ref_name]).output();
+    match branch_output {
+        Ok(output) if output.status.success() => {}
+        Ok(_) => issues.push(format!(
+            "deploy branch '{branch}' has not been pushed to {repo_path}. Run 'git push <remote> {branch}' first."
+        )),
+        Err(error) => issues.push(format!("could not run git while checking branch '{branch}': {error}")),
     }
 }
 

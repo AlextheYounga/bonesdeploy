@@ -219,6 +219,7 @@ fn check_pre_push_hook() -> Option<String> {
 async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
     match ssh::connect(cfg).await {
         Ok(session) => {
+            // This check only asks whether SSH can connect; ignore failure while closing the test session.
             let _ = session.close().await;
             None
         }
@@ -233,6 +234,7 @@ async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
     };
     let command = format!("bonesremote doctor --site {}", &cfg.project_name);
     let result = ssh::run_cmd(&session, &command).await;
+    // The remote command has finished; ignore failure while closing this short-lived SSH session.
     let _ = session.close().await;
 
     match result {

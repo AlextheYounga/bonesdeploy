@@ -59,14 +59,14 @@ pub async fn run() -> Result<()> {
         }
     }
     println!();
-    println!("Next: {}", report.commands[0]);
+    println!("Next: {}", report.next.command);
 
     Ok(())
 }
 
 async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
     let session = ssh::connect_privileged(cfg).await?;
-    let command = format!("bonesremote status --site '{}'", shell_quote(&cfg.project_name));
+    let command = format!("bonesremote status --site {}", ssh::shell_quote(&cfg.project_name));
     let output = ssh::run_cmd(&session, &command).await;
     session.close().await?;
 
@@ -95,8 +95,4 @@ fn service_marker(state: &str) -> &'static str {
         "unknown" => "?",
         _ => "✗",
     }
-}
-
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
 }
