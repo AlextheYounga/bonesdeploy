@@ -18,7 +18,6 @@
 
 ## `crates/bonesdeploy/src/commands/push_state.rs`
 - local secrets path stays under bones dir. (local_secrets_path_stays_under_bones_dir)
-- remote import command targets control plane import. (remote_import_command_targets_control_plane_import)
 
 ## `crates/bonesdeploy/src/commands/remote_bootstrap/data.rs`
 - base data includes preview domain. (base_data_includes_preview_domain)
@@ -30,10 +29,6 @@
 
 ## `crates/bonesdeploy/src/commands/update/sync.rs`
 - refresh local bones updates scaffold without touching configs. (refresh_local_bones_updates_scaffold_without_touching_configs)
-
-## `crates/bonesdeploy/src/commands/update/version.rs`
-- parses package version from manifest package section. (parses_package_version_from_manifest_package_section)
-- rejects manifest without package version. (rejects_manifest_without_package_version)
 
 ## `crates/bonesdeploy/src/config.rs`
 - load applies default project root from project name. (load_applies_default_project_root_from_project_name)
@@ -58,19 +53,12 @@
 
 ## `crates/bonesdeploy/src/infra/ssh.rs`
 - remote command failure includes stdout and stderr. (remote_command_failure_includes_stdout_and_stderr)
-
-## `crates/bonesremote/src/commands/doctor/apparmor.rs`
-- apparmor kernel enabled accepts yes. (apparmor_kernel_enabled_accepts_yes)
-- apparmor kernel enabled rejects no. (apparmor_kernel_enabled_rejects_no)
-- apparmor profile filename accepts bonesdeploy profile. (apparmor_profile_filename_accepts_bonesdeploy_profile)
-- apparmor profile filename rejects unrelated file. (apparmor_profile_filename_rejects_unrelated_file)
-- apparmor unit name for profile maps project unit. (apparmor_unit_name_for_profile_maps_project_unit)
-- apparmor unit wiring accepts expected unit with reordered after tokens. (apparmor_unit_wiring_accepts_expected_unit_with_reordered_after_tokens)
-- apparmor unit wiring rejects missing profile binding. (apparmor_unit_wiring_rejects_missing_profile_binding)
-- apparmor unit wiring rejects unknown profile binding. (apparmor_unit_wiring_rejects_unknown_profile_binding)
+- shell quote preserves single quotes. (shell_quote_preserves_single_quotes)
 
 ## `crates/bonesremote/src/commands/doctor/site.rs`
 - account exists matches passwd entries. (account_exists_matches_passwd_entries)
+- build user home is parsed. (build_user_home_is_parsed)
+- empty bare repo is pending before first push. (empty_bare_repo_is_pending_before_first_push)
 - group members reads group member list. (group_members_reads_group_member_list)
 - hook uses thin trigger accepts bonesremote post receive delegate. (hook_uses_thin_trigger_accepts_bonesremote_post_receive_delegate)
 - service exists accepts loaded unit. (service_exists_accepts_loaded_unit)
@@ -85,7 +73,8 @@
 - prune old releases removes oldest inactive releases up to keep limit. (prune_old_releases_removes_oldest_inactive_releases_up_to_keep_limit)
 
 ## `crates/bonesremote/src/commands/site.rs`
-- install repo post receive hook copies executable trigger. (install_repo_post_receive_hook_copies_executable_trigger)
+- install repo post receive hook writes baked trigger. (install_repo_post_receive_hook_writes_baked_trigger)
+- validate top level entries allows buildtime toml. (validate_top_level_entries_allows_buildtime_toml)
 - validate top level entries rejects unexpected file. (validate_top_level_entries_rejects_unexpected_file)
 
 ## `crates/bonesremote/src/commands/status.rs`
@@ -93,6 +82,9 @@
 
 ## `crates/bonesremote/src/release/lifecycle/build/ownership.rs`
 - parse user uid reads uid field. (parse_user_uid_reads_uid_field)
+
+## `crates/bonesremote/src/release/lifecycle/build/run_scripts.rs`
+- list scripts only includes numbered shell scripts. (list_scripts_only_includes_numbered_shell_scripts)
 
 ## `crates/bonesremote/src/release/lifecycle/build/tree.rs`
 - clear directory children only removes entries. (clear_directory_children_only_removes_entries)
@@ -109,17 +101,17 @@
 - validate shared path rejects absolute and parent paths. (validate_shared_path_rejects_absolute_and_parent_paths)
 
 ## `crates/bonesremote/src/release/script_runner/build.rs`
+- assert build command identity. (assert_build_command_identity)
+- assert build command mounts. (assert_build_command_mounts)
 - build container name is deterministic per project. (build_container_name_is_deterministic_per_project)
+- build image commands use the foreground user session. (build_image_commands_use_the_foreground_user_session)
 - podman build command mounts only source tree. (podman_build_command_mounts_only_source_tree)
-- podman exec command runs inside existing container. (podman_exec_command_runs_inside_existing_container)
+- podman exec and remove commands use source working directory. (podman_exec_and_remove_commands_use_source_working_directory)
 
 ## `crates/bonesremote/src/release/script_runner/mod.rs`
 - run deployment script applies group writable umask. (run_deployment_script_applies_group_writable_umask)
 - run deployment script preserves failing exit status. (run_deployment_script_preserves_failing_exit_status)
 - run deployment script streams output to console and log. (run_deployment_script_streams_output_to_console_and_log)
-
-## `crates/bonesremote/src/release/script_runner/prepare.rs`
-- prepare command runs as runtime user in release. (prepare_command_runs_as_runtime_user_in_release)
 
 ## `crates/bonesremote/src/release/state.rs`
 - clear staged release removes state file. (clear_staged_release_removes_state_file)
@@ -132,6 +124,14 @@
 
 ## `crates/shared/src/config.rs`
 - build identity helpers are derived from project name. (build_identity_helpers_are_derived_from_project_name)
+- extract env vars parses double quoted values. (extract_env_vars_parses_double_quoted_values)
+- extract env vars parses single quoted values. (extract_env_vars_parses_single_quoted_values)
+- extract env vars parses unquoted values. (extract_env_vars_parses_unquoted_values)
+- extract env vars returns only requested keys. (extract_env_vars_returns_only_requested_keys)
+- extract env vars skips comments and blank lines. (extract_env_vars_skips_comments_and_blank_lines)
+- load buildtime empty vars is fine. (load_buildtime_empty_vars_is_fine)
+- load buildtime parses vars array. (load_buildtime_parses_vars_array)
+- load buildtime returns none for missing file. (load_buildtime_returns_none_for_missing_file)
 - runtime parses shared paths. (runtime_parses_shared_paths)
 - validate host accepts hostnames and ips. (validate_host_accepts_hostnames_and_ips)
 - validate host rejects shell metacharacters. (validate_host_rejects_shell_metacharacters)
