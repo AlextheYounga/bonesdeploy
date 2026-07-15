@@ -17,7 +17,6 @@ pub fn run(site: Option<&str>) -> Result<()> {
     let mut pending: Vec<String> = Vec::new();
 
     system::check_supported_distribution(&mut issues);
-    system::check_globally_available(&mut issues);
     system::check_podman_available(&mut issues);
     system::check_passwordless_sudo(&mut issues);
     apparmor::check_support(&mut issues);

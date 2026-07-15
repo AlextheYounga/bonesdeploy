@@ -18,7 +18,6 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
     let project_root = &cfg.project_root;
     let shared_root = Path::new(project_root).join(paths::SHARED_DIR);
     let releases_root = Path::new(project_root).join(paths::RELEASES_DIR);
-    let current_path = Path::new(project_root).join(paths::CURRENT_LINK);
     let runtime_user = config::runtime_user_for(&cfg.project_name);
     let runtime_group = config::runtime_group_for(&cfg.project_name);
     let build_user = config::build_user_for(&cfg.project_name);
@@ -28,7 +27,7 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
     check_thin_hook(&cfg.repo_path, issues);
     check_runtime_identity(&runtime_user, &runtime_group, issues);
     check_build_user(&build_user, issues);
-    check_site_layout(&shared_root, &releases_root, &current_path, issues);
+    check_site_layout(&shared_root, &releases_root, issues);
     check_service_exists(&cfg.project_name, issues);
 }
 
@@ -64,15 +63,9 @@ fn check_delegated_controllers(uid: u32, issues: &mut Vec<String>) {
             return;
         }
     };
-    let missing = missing_controllers(&controllers);
-    if !missing.is_empty() {
-        issues.push(format!("build user is missing delegated cgroup controllers: {}", missing.join(", ")));
+    if !controllers.split_whitespace().any(|controller| controller == "cpu") {
+        issues.push("build user is missing delegated cgroup controller: cpu".to_string());
     }
-}
-
-fn missing_controllers(controllers: &str) -> Vec<&'static str> {
-    const REQUIRED: [&str; 4] = ["cpu", "cpuset", "memory", "pids"];
-    REQUIRED.into_iter().filter(|required| !controllers.split_whitespace().any(|item| item == *required)).collect()
 }
 
 fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bones> {
@@ -146,10 +139,6 @@ fn check_thin_hook(repo_path: &str, issues: &mut Vec<String>) {
 }
 
 fn check_runtime_identity(runtime_user: &str, runtime_group: &str, issues: &mut Vec<String>) {
-    if runtime_user == paths::DEPLOY_USER {
-        issues.push(format!("runtime user must not be {}", paths::DEPLOY_USER));
-    }
-
     let passwd = match fs::read_to_string(paths::ETC_PASSWD) {
         Ok(passwd) => passwd,
         Err(error) => {
@@ -177,19 +166,13 @@ fn check_runtime_identity(runtime_user: &str, runtime_group: &str, issues: &mut 
     }
 }
 
-fn check_site_layout(shared_root: &Path, releases_root: &Path, current_path: &Path, issues: &mut Vec<String>) {
+fn check_site_layout(shared_root: &Path, releases_root: &Path, issues: &mut Vec<String>) {
     if !shared_root.is_dir() {
         issues.push(format!("shared root is missing: {}", shared_root.display()));
     }
 
     if !releases_root.is_dir() {
         issues.push(format!("releases root is missing: {}", releases_root.display()));
-    }
-
-    match current_path.parent() {
-        Some(parent) if parent.is_dir() => {}
-        Some(parent) => issues.push(format!("current parent is missing: {}", parent.display())),
-        None => issues.push(format!("current path has no parent: {}", current_path.display())),
     }
 }
 
@@ -254,10 +237,7 @@ fn service_exists(load_state: &str) -> bool {
 mod tests {
     use std::{env, fs, process, process::Command};
 
-    use super::{
-        account_exists, account_home, account_uid, group_members, hook_uses_thin_trigger, missing_controllers,
-        service_exists,
-    };
+    use super::{account_exists, account_home, account_uid, group_members, hook_uses_thin_trigger, service_exists};
 
     #[test]
     fn empty_bare_repo_is_pending_before_first_push() {
@@ -297,8 +277,6 @@ mod tests {
         let passwd = "demo-build:x:1002:1002::/var/lib/bonesdeploy/users/demo-build:/usr/sbin/nologin\n";
         assert_eq!(account_uid(passwd, "demo-build"), Some(1002));
         assert_eq!(account_home(passwd, "demo-build"), Some("/var/lib/bonesdeploy/users/demo-build"));
-        assert!(missing_controllers("cpu cpuset io memory pids").is_empty());
-        assert_eq!(missing_controllers("memory pids"), ["cpu", "cpuset"]);
     }
 
     #[test]

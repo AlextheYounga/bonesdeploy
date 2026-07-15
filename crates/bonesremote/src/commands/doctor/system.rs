@@ -18,15 +18,6 @@ pub(super) fn check_supported_distribution(issues: &mut Vec<String>) {
     issues.push("Unsupported host OS; bonesremote currently supports Debian/Ubuntu only".to_string());
 }
 
-pub(super) fn check_globally_available(issues: &mut Vec<String>) {
-    let result = Command::new(paths::BONESREMOTE_BINARY).arg("version").output();
-
-    match result {
-        Ok(output) if output.status.success() => {}
-        _ => issues.push(format!("{} is not globally available (not in PATH)", paths::BONESREMOTE_BINARY)),
-    }
-}
-
 pub(super) fn check_podman_available(issues: &mut Vec<String>) {
     let result = Command::new("podman").arg("--version").output();
 

@@ -16,6 +16,7 @@ Rules:
 - No abstractions that weren't explicitly requested.
 - No new dependency if it can be avoided.
 - Prefer readability to cleverness.
+- Add comments only on unintuitive code. 
 - No boilerplate nobody asked for.
 - Deletion over addition. Boring over clever. Fewest files possible.
 - Question complex requests: "Do you actually need X, or does Y cover it?"
