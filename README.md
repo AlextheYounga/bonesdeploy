@@ -202,6 +202,16 @@ Check only the local side:
 bonesdeploy doctor --local
 ```
 
+`doctor` reports three states: green checks are healthy, yellow pending items
+are expected next steps (such as the first Git push after setup), and red
+failures need attention. Pending first-push state exits successfully so setup
+can finish without looking broken. For agents and scripts, use the stable
+machine-readable guide:
+
+```sh
+bonesdeploy guide --format json
+```
+
 Sync `.bones/` changes to the server:
 
 ```sh

@@ -178,12 +178,22 @@ fn podman_build_command_mounts_only_source_tree() {
     );
 
     let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+    assert_build_command_identity(&args);
+    assert_build_command_mounts(&args, &command);
+}
+
+#[cfg(test)]
+fn assert_build_command_identity(args: &[String]) {
     assert_eq!(args[0], "-u");
     assert_eq!(args[1], "demo-build");
     assert_eq!(args[2], "--");
     assert_eq!(args[3], "env");
     assert!(args.contains(&String::from("HOME=/var/lib/bonesdeploy/users/demo-build")));
     assert!(args.contains(&String::from("XDG_RUNTIME_DIR=/run/user/1234")));
+}
+
+#[cfg(test)]
+fn assert_build_command_mounts(args: &[String], command: &Command) {
     assert!(args.contains(&String::from("podman")));
     assert!(args.contains(&String::from("run")));
     assert!(args.contains(&String::from("-d")));

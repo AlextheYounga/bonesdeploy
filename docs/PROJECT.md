@@ -2,7 +2,7 @@
 
 A remote release deployment tool for simple Linux servers. It produces two executables: `bonesdeploy` (local CLI for setup, provisioning, deployment, and management) and `bonesremote` (server-side release lifecycle executor, installed on the deployment host). Git remains supported as an optional trigger, but it does not own the deployment model. **We only handle Debian/Ubuntu machines.**
 
-We keep detailed documentation of each command at: `docs/commands/*.md:`
+The command behavior is documented in this file and in the command examples in `README.md`.
 
 ## Deployment Methodology
 We have an SSH deployment user (normally `git`) that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user named after the project. This is not a shared `applications` user; it must be a dedicated user per project so isolation works on a shared server. This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
@@ -181,6 +181,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 - **doctor**
   - This command checks all concerns in your local environment.
+  - Checks are reported as pass, pending, or failure. A pending first Git push is expected after remote setup and exits successfully; broken prerequisites still exit non-zero.
   - Loads config from `.bones/bones.toml`
   - Runs local checks:
     - `.bones` folder exists and is a symlink (warns if it is not a symlink to `~/.config/bonesdeploy/<project>.bones/`).
@@ -188,7 +189,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
     - Local `pre-push` hook is symlinked properly when `deploy_on_push = true`.
   - Runs remote checks (skipped with `--local`):
     - Opens a privileged SSH session and runs `bonesremote doctor --site <project>`.
-    - `bonesremote doctor --site <project>` checks `bonesremote` itself, Podman availability, deploy-user sudo wiring, AppArmor, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`.
+    - `bonesremote doctor --site <project>` checks `bonesremote` itself, Podman availability, deploy-user sudo wiring, AppArmor, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until the configured branch is pushed.
   - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys.
 
 - **push**
@@ -292,6 +293,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   git push <remote_name> <branch>
   ```
 - `bonesdeploy doctor` checks the local and remote environment, including whether the configured deploy branch exists locally and in the remote bare repo.
+- Doctor uses exit status for actionable failures; an empty remote repository before the first branch push is a successful pending state so setup can finish cleanly.
 - User runs `bonesdeploy deploy` to perform the actual remote release deployment.
 
 ### Primary Deploy Flow

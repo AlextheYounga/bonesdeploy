@@ -5,7 +5,7 @@ use std::process::Command;
 use anyhow::{Result, bail};
 use shared::{config, paths};
 
-pub(crate) fn check(site: &str, issues: &mut Vec<String>) {
+pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if let Err(error) = validate_site_name(site) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
@@ -23,7 +23,7 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>) {
     let runtime_group = config::runtime_group_for(&cfg.project_name);
 
     check_repo_exists(&cfg.repo_path, issues);
-    check_branch_ref(&cfg.repo_path, &cfg.branch, issues);
+    check_branch_ref(&cfg.repo_path, &cfg.branch, issues, pending);
     check_thin_hook(&cfg.repo_path, issues);
     check_runtime_identity(&runtime_user, &runtime_group, issues);
     check_site_layout(&shared_root, &releases_root, &current_path, issues);
@@ -65,11 +65,18 @@ fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {
     }
 }
 
-fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>) {
+fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if branch.is_empty() {
         return;
     }
     let ref_name = format!("refs/heads/{branch}");
+    let refs = Command::new("git").args(["--git-dir", repo_path, "for-each-ref", "--format=%(refname)"]).output();
+    if refs.as_ref().is_ok_and(|output| output.status.success() && output.stdout.is_empty()) {
+        pending.push(format!(
+            "deploy branch '{branch}' has not been pushed yet. Run 'git push <remote> {branch}' before the first deploy."
+        ));
+        return;
+    }
     let ok = Command::new("git")
         .args(["--git-dir", repo_path, "rev-parse", "--verify", &ref_name])
         .output()
@@ -77,8 +84,7 @@ fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>) {
         .unwrap_or(false);
     if !ok {
         issues.push(format!(
-            "deploy branch '{branch}' has not been pushed to {}\n  {}",
-            repo_path, "Run 'git push <remote> {branch}' first.",
+            "deploy branch '{branch}' has not been pushed to {repo_path}. Run 'git push <remote> {branch}' first.",
         ));
     }
 }
@@ -189,7 +195,25 @@ fn service_exists(load_state: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::{env, fs, process, process::Command};
+
     use super::{account_exists, group_members, hook_uses_thin_trigger, service_exists};
+
+    #[test]
+    fn empty_bare_repo_is_pending_before_first_push() {
+        let root = env::temp_dir().join(format!("bonesremote-doctor-empty-repo-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let output = Command::new("git").args(["init", "--bare", root.to_str().unwrap_or_default()]).output();
+        assert!(output.is_ok_and(|output| output.status.success()));
+
+        let mut issues = Vec::new();
+        let mut pending = Vec::new();
+        super::check_branch_ref(root.to_str().unwrap_or_default(), "master", &mut issues, &mut pending);
+
+        let _ = fs::remove_dir_all(root);
+        assert!(issues.is_empty());
+        assert_eq!(pending.len(), 1);
+    }
 
     #[test]
     fn hook_uses_thin_trigger_accepts_bonesremote_post_receive_delegate() {

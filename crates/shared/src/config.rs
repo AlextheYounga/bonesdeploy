@@ -234,6 +234,8 @@ pub fn load(path: &Path) -> Result<Bones> {
 
 #[cfg(test)]
 mod tests {
+    use toml::de::Error;
+
     use super::*;
 
     #[test]
@@ -249,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn runtime_parses_shared_paths() {
+    fn runtime_parses_shared_paths() -> Result<(), Error> {
         let runtime: Runtime = toml::from_str(
             r#"
 web_root = "public"
@@ -260,14 +262,14 @@ paths = [
     { path = "storage", type = "dir" },
 ]
 "#,
-        )
-        .expect("runtime config should parse shared paths");
+        )?;
 
         assert_eq!(runtime.shared.paths.len(), 2);
         assert_eq!(runtime.shared.paths[0].path, ".env");
         assert_eq!(runtime.shared.paths[0].path_type, SharedPathType::File);
         assert_eq!(runtime.shared.paths[1].path, "storage");
         assert_eq!(runtime.shared.paths[1].path_type, SharedPathType::Dir);
+        Ok(())
     }
 
     #[test]

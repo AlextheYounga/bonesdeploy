@@ -1,19 +1,20 @@
 use anyhow::Result;
 use shared::paths;
+use std::io::{self, IsTerminal};
 
-const BOLD: &str = "\x1b[1m";
-const GREEN_BOLD: &str = "\x1b[1;32m";
-const RED_BOLD: &str = "\x1b[1;31m";
-const RESET: &str = "\x1b[0m";
+fn style(code: &str, value: &str) -> String {
+    if io::stdout().is_terminal() { format!("\x1b[{code}m{value}\x1b[0m") } else { value.to_string() }
+}
 
 mod apparmor;
 mod site;
 mod system;
 
 pub fn run(site: Option<&str>) -> Result<()> {
-    println!("{BOLD}{} doctor{RESET}", paths::BONESREMOTE_BINARY);
+    println!("{}", style("1", &format!("{} doctor", paths::BONESREMOTE_BINARY)));
 
     let mut issues: Vec<String> = Vec::new();
+    let mut pending: Vec<String> = Vec::new();
 
     system::check_supported_distribution(&mut issues);
     system::check_globally_available(&mut issues);
@@ -22,16 +23,27 @@ pub fn run(site: Option<&str>) -> Result<()> {
     apparmor::check_support(&mut issues);
 
     if let Some(site) = site {
-        site::check(site, &mut issues);
+        site::check(site, &mut issues, &mut pending);
+    }
+
+    if !pending.is_empty() {
+        println!();
+        for item in &pending {
+            println!("  {} {item}", style("1;33", "•"));
+        }
     }
 
     if issues.is_empty() {
-        println!("\n{GREEN_BOLD}OK{RESET} All checks passed.");
+        if pending.is_empty() {
+            println!("\n{} All checks passed.", style("1;32", "OK"));
+        } else {
+            println!("\n{} Deployment needs one more step.", style("1;33", "PENDING"));
+        }
         Ok(())
     } else {
         println!();
         for issue in &issues {
-            println!("  {RED_BOLD}!{RESET} {issue}");
+            println!("  {} {issue}", style("1;31", "!"));
         }
         anyhow::bail!("Doctor found {} issue{}", issues.len(), if issues.len() == 1 { "" } else { "s" });
     }
