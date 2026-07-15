@@ -1,9 +1,12 @@
 use std::fs;
+use std::os::unix::fs::FileTypeExt;
 use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Result, bail};
 use shared::{config, paths};
+
+use crate::release::script_runner::build_user_command;
 
 pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if let Err(error) = validate_site_name(site) {
@@ -21,13 +24,78 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
     let current_path = Path::new(project_root).join(paths::CURRENT_LINK);
     let runtime_user = config::runtime_user_for(&cfg.project_name);
     let runtime_group = config::runtime_group_for(&cfg.project_name);
+    let build_user = config::build_user_for(&cfg.project_name);
 
     check_repo_exists(&cfg.repo_path, issues);
     check_branch_ref(&cfg.repo_path, &cfg.branch, issues, pending);
     check_thin_hook(&cfg.repo_path, issues);
     check_runtime_identity(&runtime_user, &runtime_group, issues);
+    check_build_user(&build_user, issues);
     check_site_layout(&shared_root, &releases_root, &current_path, issues);
     check_service_exists(&cfg.project_name, issues);
+}
+
+fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
+    let passwd = match fs::read_to_string(paths::ETC_PASSWD) {
+        Ok(passwd) => passwd,
+        Err(error) => {
+            issues.push(format!("could not read {} to validate build user ({error})", paths::ETC_PASSWD));
+            return;
+        }
+    };
+    let Some(uid) = account_uid(&passwd, build_user) else {
+        issues.push(format!("build user does not exist: {build_user}"));
+        return;
+    };
+
+    let expected_home = paths::bonesdeploy_user_home(build_user);
+    if account_home(&passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
+        issues.push(format!("build user home must be {}: {build_user}", expected_home.display()));
+    }
+
+    check_delegated_controllers(uid, issues);
+
+    let bus = Path::new("/run/user").join(uid.to_string()).join("bus");
+    if !fs::metadata(&bus).is_ok_and(|metadata| metadata.file_type().is_socket()) {
+        issues.push(format!("build user systemd D-Bus socket is missing: {}", bus.display()));
+        return;
+    }
+
+    let output = build_user_command(build_user).args(["podman", "info", "--format={{.Host.CgroupManager}}"]).output();
+    match output {
+        Ok(output) if output.status.success() && String::from_utf8_lossy(&output.stdout).trim() == "systemd" => {}
+        Ok(output) if output.status.success() => issues.push(format!(
+            "rootless Podman for {build_user} is not using the systemd cgroup manager: {}",
+            String::from_utf8_lossy(&output.stdout).trim()
+        )),
+        Ok(output) => issues.push(format!(
+            "rootless Podman session failed for {build_user}: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )),
+        Err(error) => issues.push(format!("could not start rootless Podman session for {build_user} ({error})")),
+    }
+}
+
+fn check_delegated_controllers(uid: u32, issues: &mut Vec<String>) {
+    let path = Path::new("/sys/fs/cgroup/user.slice")
+        .join(format!("user-{uid}.slice"))
+        .join(format!("user@{uid}.service/cgroup.controllers"));
+    let controllers = match fs::read_to_string(&path) {
+        Ok(controllers) => controllers,
+        Err(error) => {
+            issues.push(format!("could not inspect build user cgroup controllers at {} ({error})", path.display()));
+            return;
+        }
+    };
+    let missing = missing_controllers(&controllers);
+    if !missing.is_empty() {
+        issues.push(format!("build user is missing delegated cgroup controllers: {}", missing.join(", ")));
+    }
+}
+
+fn missing_controllers(controllers: &str) -> Vec<&'static str> {
+    const REQUIRED: [&str; 4] = ["cpu", "cpuset", "memory", "pids"];
+    REQUIRED.into_iter().filter(|required| !controllers.split_whitespace().any(|item| item == *required)).collect()
 }
 
 fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bones> {
@@ -175,6 +243,18 @@ fn account_exists(passwd: &str, account: &str) -> bool {
     passwd.lines().any(|line| line.starts_with(&format!("{account}:")))
 }
 
+fn account_uid(passwd: &str, account: &str) -> Option<u32> {
+    account_field(passwd, account, 2)?.parse().ok()
+}
+
+fn account_home<'a>(passwd: &'a str, account: &str) -> Option<&'a str> {
+    account_field(passwd, account, 5)
+}
+
+fn account_field<'a>(passwd: &'a str, account: &str, index: usize) -> Option<&'a str> {
+    passwd.lines().find(|line| line.starts_with(&format!("{account}:")))?.split(':').nth(index)
+}
+
 fn group_members(groupfile: &str, group: &str) -> Option<Vec<String>> {
     let line = groupfile.lines().find(|line| line.starts_with(&format!("{group}:")))?;
     let fields: Vec<&str> = line.split(':').collect();
@@ -197,7 +277,10 @@ fn service_exists(load_state: &str) -> bool {
 mod tests {
     use std::{env, fs, process, process::Command};
 
-    use super::{account_exists, group_members, hook_uses_thin_trigger, service_exists};
+    use super::{
+        account_exists, account_home, account_uid, group_members, hook_uses_thin_trigger, missing_controllers,
+        service_exists,
+    };
 
     #[test]
     fn empty_bare_repo_is_pending_before_first_push() {
@@ -230,6 +313,15 @@ mod tests {
     fn account_exists_matches_passwd_entries() {
         assert!(account_exists("demo:x:1000:1000::/srv:/usr/sbin/nologin\n", "demo"));
         assert!(!account_exists("demo:x:1000:1000::/srv:/usr/sbin/nologin\n", "git"));
+    }
+
+    #[test]
+    fn build_user_fields_and_required_controllers_are_parsed() {
+        let passwd = "demo-build:x:1002:1002::/var/lib/bonesdeploy/users/demo-build:/usr/sbin/nologin\n";
+        assert_eq!(account_uid(passwd, "demo-build"), Some(1002));
+        assert_eq!(account_home(passwd, "demo-build"), Some("/var/lib/bonesdeploy/users/demo-build"));
+        assert!(missing_controllers("cpu cpuset io memory pids").is_empty());
+        assert_eq!(missing_controllers("memory pids"), ["cpu", "cpuset"]);
     }
 
     #[test]

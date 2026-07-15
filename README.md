@@ -266,6 +266,8 @@ Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-
 
 Build containers are capped at half of the host's available CPU capacity. This applies to `npm`, Nuxt/Vite, pnpm, and other commands run by the build scripts; it is a container CPU quota rather than a Node memory setting.
 
+Rootless Podman commands run through the dedicated build user's systemd user manager. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
+
 Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote hook post-receive`, which resolves policy from bonesremote-managed site state.
 
 ## Good Fit

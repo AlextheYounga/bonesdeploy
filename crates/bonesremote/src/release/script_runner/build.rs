@@ -5,7 +5,6 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use shared::paths;
 
 use super::output;
 
@@ -19,8 +18,13 @@ fn build_cpu_limit() -> String {
 pub(crate) struct BuildScriptEnv<'a> {
     pub(crate) project_name: &'a str,
     pub(crate) build_user: &'a str,
-    pub(crate) build_uid: u32,
     pub(crate) web_root: &'a str,
+}
+
+pub(crate) fn build_user_command(build_user: &str) -> Command {
+    let mut command = Command::new("systemd-run");
+    command.arg(format!("--machine={build_user}@")).args(["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    command
 }
 
 pub(crate) struct BuildContainer<'a> {
@@ -32,7 +36,7 @@ pub(crate) struct BuildContainer<'a> {
 
 impl<'a> BuildContainer<'a> {
     pub(crate) fn start(source_root: &'a Path, env: &'a BuildScriptEnv<'a>) -> Result<Self> {
-        let mut command = Command::new("runuser");
+        let mut command = build_user_command(env.build_user);
         let name = build_container_name(env.project_name);
         remove_existing_container(source_root, env, &name)?;
         configure_podman_create_command(&mut command, source_root, env, &name);
@@ -50,8 +54,8 @@ impl<'a> BuildContainer<'a> {
             fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
         let description = format!("podman build script {}", script.display());
 
-        let mut command = Command::new("runuser");
-        configure_podman_exec_command(&mut command, self.source_root, self.env, &self.name);
+        let mut command = build_user_command(self.env.build_user);
+        configure_podman_exec_command(&mut command, self.source_root, &self.name);
         let mut child = command
             .stdin(Stdio::from(script_file))
             .stdout(Stdio::piped())
@@ -66,8 +70,8 @@ impl<'a> BuildContainer<'a> {
             return Ok(());
         }
 
-        let mut command = Command::new("runuser");
-        configure_podman_remove_command(&mut command, self.source_root, self.env, &self.name);
+        let mut command = build_user_command(self.env.build_user);
+        configure_podman_remove_command(&mut command, self.source_root, &self.name);
         let status = command.status().with_context(|| format!("Failed to remove build container {}", self.name))?;
         if !status.success() {
             bail!("Failed to remove build container {}: {}", self.name, status);
@@ -84,8 +88,8 @@ impl Drop for BuildContainer<'_> {
             return;
         }
 
-        let mut command = Command::new("runuser");
-        configure_podman_remove_command(&mut command, self.source_root, self.env, &self.name);
+        let mut command = build_user_command(self.env.build_user);
+        configure_podman_remove_command(&mut command, self.source_root, &self.name);
         let _ = command.status();
         self.removed = true;
     }
@@ -99,9 +103,6 @@ fn configure_podman_create_command(
 ) {
     let mount = format!("{}:/workspace/source", source_root.display());
     command
-        .args(["-u", env.build_user, "--", "env"])
-        .arg(format!("HOME={}", paths::bonesdeploy_user_home(env.build_user).display()))
-        .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", env.build_uid))
         .current_dir(source_root)
         .args(["podman", "run", "-d", "--pull=missing", "--cpus"])
         .arg(build_cpu_limit())
@@ -123,32 +124,20 @@ fn configure_podman_create_command(
         .args(["sleep", "infinity"]);
 }
 
-fn configure_podman_exec_command(
-    command: &mut Command,
-    source_root: &Path,
-    env: &BuildScriptEnv<'_>,
-    container_name: &str,
-) {
-    command
-        .args(["-u", env.build_user, "--", "env"])
-        .arg(format!("HOME={}", paths::bonesdeploy_user_home(env.build_user).display()))
-        .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", env.build_uid))
-        .current_dir(source_root)
-        .args(["podman", "exec", "-i", container_name, "bash", "-c", "umask 0002; exec bash -s"]);
+fn configure_podman_exec_command(command: &mut Command, source_root: &Path, container_name: &str) {
+    command.current_dir(source_root).args([
+        "podman",
+        "exec",
+        "-i",
+        container_name,
+        "bash",
+        "-c",
+        "umask 0002; exec bash -s",
+    ]);
 }
 
-fn configure_podman_remove_command(
-    command: &mut Command,
-    source_root: &Path,
-    env: &BuildScriptEnv<'_>,
-    container_name: &str,
-) {
-    command
-        .args(["-u", env.build_user, "--", "env"])
-        .arg(format!("HOME={}", paths::bonesdeploy_user_home(env.build_user).display()))
-        .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", env.build_uid))
-        .current_dir(source_root)
-        .args(["podman", "rm", "--force", "--ignore", container_name]);
+fn configure_podman_remove_command(command: &mut Command, source_root: &Path, container_name: &str) {
+    command.current_dir(source_root).args(["podman", "rm", "--force", "--ignore", container_name]);
 }
 
 fn build_container_name(project_name: &str) -> String {
@@ -156,8 +145,8 @@ fn build_container_name(project_name: &str) -> String {
 }
 
 fn remove_existing_container(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
-    let mut remove = Command::new("runuser");
-    configure_podman_remove_command(&mut remove, source_root, env, container_name);
+    let mut remove = build_user_command(env.build_user);
+    configure_podman_remove_command(&mut remove, source_root, container_name);
     let remove_status =
         remove.status().with_context(|| format!("Failed to remove existing build container {container_name}"))?;
     if !remove_status.success() {
@@ -170,27 +159,25 @@ fn remove_existing_container(source_root: &Path, env: &BuildScriptEnv<'_>, conta
 #[cfg(test)]
 #[test]
 fn podman_build_command_mounts_only_source_tree() {
-    let mut command = Command::new("runuser");
+    let mut command = build_user_command("demo-build");
     configure_podman_create_command(
         &mut command,
         Path::new("/tmp/source"),
-        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", build_uid: 1234, web_root: "public" },
+        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", web_root: "public" },
         "demo-container",
     );
 
     let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+    assert_eq!(command.get_program(), "systemd-run");
     assert_build_command_identity(&args);
     assert_build_command_mounts(&args, &command);
 }
 
 #[cfg(test)]
 fn assert_build_command_identity(args: &[String]) {
-    assert_eq!(args[0], "-u");
-    assert_eq!(args[1], "demo-build");
-    assert_eq!(args[2], "--");
-    assert_eq!(args[3], "env");
-    assert!(args.contains(&String::from("HOME=/var/lib/bonesdeploy/users/demo-build")));
-    assert!(args.contains(&String::from("XDG_RUNTIME_DIR=/run/user/1234")));
+    assert_eq!(args[0], "--machine=demo-build@");
+    assert_eq!(&args[1..6], ["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    assert!(!args.iter().any(|arg| arg == "runuser" || arg.starts_with("XDG_RUNTIME_DIR=")));
 }
 
 #[cfg(test)]
@@ -211,14 +198,12 @@ fn assert_build_command_mounts(args: &[String], command: &Command) {
 #[cfg(test)]
 #[test]
 fn podman_exec_and_remove_commands_use_source_working_directory() {
-    let env = BuildScriptEnv { project_name: "demo", build_user: "demo-build", build_uid: 1234, web_root: "public" };
-
-    let mut exec = Command::new("runuser");
-    configure_podman_exec_command(&mut exec, Path::new("/tmp/source"), &env, "demo-container");
+    let mut exec = build_user_command("demo-build");
+    configure_podman_exec_command(&mut exec, Path::new("/tmp/source"), "demo-container");
     assert_eq!(exec.get_current_dir(), Some(Path::new("/tmp/source")));
 
-    let mut remove = Command::new("runuser");
-    configure_podman_remove_command(&mut remove, Path::new("/tmp/source"), &env, "demo-container");
+    let mut remove = build_user_command("demo-build");
+    configure_podman_remove_command(&mut remove, Path::new("/tmp/source"), "demo-container");
     let args = remove.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
     assert_eq!(remove.get_current_dir(), Some(Path::new("/tmp/source")));
     assert!(args.windows(3).any(|window| window == ["podman", "rm", "--force"]));
