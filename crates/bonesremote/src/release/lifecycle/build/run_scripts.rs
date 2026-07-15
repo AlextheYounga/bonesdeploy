@@ -2,9 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, Runtime, build_group_for, build_user_for, load_runtime};
+use shared::config::{self, build_group_for, build_user_for, load_runtime};
 use shared::paths;
-use shared::paths::default_web_root;
 
 use super::ownership;
 use crate::release::script_runner as deploy_output;
@@ -33,12 +32,12 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
         return Ok(());
     }
 
-    let runtime = load_runtime_or_default(site);
+    let runtime = load_runtime(&paths::bonesremote_site_root(site))
+        .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
 
     let build_env = deploy_output::BuildScriptEnv {
         project_name: &cfg.project_name,
         build_user: &build_user,
-        build_uid: ownership::user_uid(&build_user)?,
         web_root: &runtime.web_root,
     };
     let mut container = deploy_output::BuildContainer::start(context, &build_env)?;
@@ -59,16 +58,6 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
     container.remove()?;
 
     Ok(())
-}
-
-fn load_runtime_or_default(site: &str) -> Runtime {
-    load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
-        web_root: default_web_root(),
-        runtime_user: String::new(),
-        runtime_group: String::new(),
-        release_group: String::new(),
-        shared: config::Shared::default(),
-    })
 }
 
 fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {

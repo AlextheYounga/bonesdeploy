@@ -20,7 +20,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             Ok(())
         }
         Command::Setup { yes } => setup::run(*yes).await,
-        Command::Doctor { local } => doctor::run(*local).await,
+        Command::Doctor { local } => doctor::run(*local).await.map(|_| ()),
         Command::Status => status::run().await,
         Command::Guide { format } => guide::run(*format).await,
         Command::Push => push_state::run(true),

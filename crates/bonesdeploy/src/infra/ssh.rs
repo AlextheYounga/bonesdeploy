@@ -40,6 +40,10 @@ pub fn external_command(user: &str, host: &str, port: &str) -> Command {
     command
 }
 
+pub fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
 pub async fn run_cmd(session: &Session, cmd: &str) -> Result<String> {
     let output = session
         .command("bash")
@@ -143,7 +147,12 @@ fn format_remote_command_failure(cmd: &str, stdout: &[u8], stderr: &[u8]) -> Str
 
 #[cfg(test)]
 mod tests {
-    use super::format_remote_command_failure;
+    use super::{format_remote_command_failure, shell_quote};
+
+    #[test]
+    fn shell_quote_preserves_single_quotes() {
+        assert_eq!(shell_quote("site's"), "'site'\\''s'");
+    }
 
     #[test]
     fn remote_command_failure_includes_stdout_and_stderr() {

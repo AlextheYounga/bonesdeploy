@@ -2,9 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, Runtime, load_runtime, runtime_user_for};
+use shared::config::{self, load_runtime, runtime_user_for};
 use shared::paths;
-use shared::paths::default_web_root;
 
 use crate::privileges;
 use crate::release::script_runner as deploy_output;
@@ -40,14 +39,10 @@ pub fn run(site: &str) -> Result<()> {
         bail!("Promoted release is missing: {}", release_dir.display());
     }
 
-    let Runtime { web_root, runtime_user, .. } =
-        load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
-            web_root: default_web_root(),
-            runtime_user: String::new(),
-            runtime_group: String::new(),
-            release_group: String::new(),
-            shared: config::Shared::default(),
-        });
+    let runtime = load_runtime(&paths::bonesremote_site_root(site))
+        .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
+    let web_root = runtime.web_root;
+    let runtime_user = runtime.runtime_user;
 
     let runtime_user = if runtime_user.is_empty() { runtime_user_for(&cfg.project_name) } else { runtime_user };
 

@@ -38,7 +38,7 @@ ensure_app_key() {
 
 ensure_storage_link() {
 	log "Ensuring Laravel storage link exists..."
-	php artisan storage:link --force || true
+	php artisan storage:link --force
 }
 
 run_migrations() {

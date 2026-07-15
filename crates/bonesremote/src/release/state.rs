@@ -94,11 +94,14 @@ pub fn current_release_dir(project_root: &str) -> Result<PathBuf> {
     let active_target =
         fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
 
-    Ok(if active_target.is_absolute() {
-        active_target
-    } else {
-        current_link.parent().unwrap_or_else(|| Path::new("/")).join(active_target)
-    })
+    if active_target.is_absolute() {
+        return Ok(active_target);
+    }
+
+    let parent = current_link
+        .parent()
+        .with_context(|| format!("Current release link has no parent: {}", current_link.display()))?;
+    Ok(parent.join(active_target))
 }
 
 pub fn current_release_name(project_root: &str) -> Result<String> {
