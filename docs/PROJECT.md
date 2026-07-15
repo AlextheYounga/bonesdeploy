@@ -55,6 +55,12 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 - Git hooks only trigger `bonesremote`; they do not check out source, run builds, write releases, or restart services.
 - `bonesremote` is the privileged mediator for promotion, activation, and service restart.
 
+### Release Visibility and Cancellation
+
+`bonesdeploy releases` asks `bonesremote` for the site's release state and renders the returned JSON locally; it stores no release state on the workstation. Releases are `active`, `previous`, `building`, `preparing`, or `interrupted`. A `building` or `interrupted` release can be cancelled with `bonesdeploy releases kill <release>`; cancellation removes only that release's build container, temporary context, staged-release state, and transient deployment metadata.
+
+BonesRemote holds one OS-backed deployment lock per site. A second deploy must not stage or overwrite state while a release is building, preparing, or interrupted. Before staging, BonesRemote starts and verifies the build user's systemd manager and checks rootless Podman readiness. A damaged rootless Podman namespace is reported before any release state is created; deploy does not silently reset Podman because that operation stops the build user's containers.
+
 ## Bones Scaffolding
 ```
 .bones

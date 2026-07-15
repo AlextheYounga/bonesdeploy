@@ -187,6 +187,18 @@ Rollback:
 bonesdeploy rollback
 ```
 
+Inspect releases, including a release that is currently building:
+
+```sh
+bonesdeploy releases
+```
+
+Cancel a named building or interrupted release and clean its temporary build state:
+
+```sh
+bonesdeploy releases kill 20260715_225306
+```
+
 Check the setup:
 
 ```sh
@@ -262,7 +274,7 @@ Build scripts in `.bones/deployment/build/` must be numbered (for example `01_in
 
 Build scripts can set framework-specific runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool.
 
-Rootless Podman commands run through the dedicated build user's systemd user manager. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
+Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager and Podman before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 
 Git hooks are an optional transport — `bonesdeploy deploy` is the primary deployment command. The remote `post-receive` trigger is embedded in the `bonesremote` binary and installed into the bare repo automatically.
 
