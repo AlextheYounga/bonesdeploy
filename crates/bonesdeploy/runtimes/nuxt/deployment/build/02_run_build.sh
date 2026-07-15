@@ -2,6 +2,8 @@
 set -Eeuo pipefail
 
 export PATH="$PROJECT_ROOT/build/node/bin:$PATH"
+export NODE_OPTIONS="--max-old-space-size-percentage=70 --max-semi-space-size=64"
+export UV_THREADPOOL_SIZE=4
 
 if ! command -v corepack >/dev/null 2>&1; then
 	npm install -g corepack@0.31.0
