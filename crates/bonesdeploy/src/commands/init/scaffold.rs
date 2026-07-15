@@ -1,5 +1,5 @@
 use std::fs;
-use std::os::unix::fs as unix_fs;
+use std::os::unix::fs::{self as unix_fs, PermissionsExt};
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -10,6 +10,8 @@ use super::RuntimeSelection;
 use crate::config;
 use crate::infra::embedded;
 use crate::infra::git;
+
+const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/pre-push"));
 
 pub(super) fn materialize_fresh_bones(
     bones_dir: &Path,
@@ -33,11 +35,16 @@ pub(super) fn materialize_fresh_bones(
     unix_fs::symlink(&config_dir, bones_dir)?;
 
     let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
-    config::save_runtime(&runtime.config, runtime_toml)?;
+    let raw_template = match &runtime.template {
+        Some(name) => embedded::raw_runtime_template(name)?,
+        None => embedded::raw_base_runtime_template()?,
+    };
+    config::save_runtime(&raw_template, &runtime.config, runtime_toml)?;
 
     if let Some(template_name) = runtime.template {
         embedded::scaffold_runtime_deployment(&template_name, bones_dir)?;
         embedded::scaffold_runtime_secrets(&template_name, bones_dir)?;
+        embedded::scaffold_runtime_buildtime(&template_name, bones_dir)?;
         println!("Runtime template: {template_name}");
     } else {
         println!("Runtime template: custom");
@@ -98,18 +105,20 @@ pub(super) fn ensure_config_gitignore(project_name: &str) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn symlink_pre_push() -> Result<()> {
+pub(super) fn install_pre_push_guard() -> Result<()> {
     let hooks_dir = Path::new(paths::GIT_HOOKS_DIR);
     fs::create_dir_all(hooks_dir)?;
 
-    let link = hooks_dir.join(paths::PRE_PUSH_HOOK_NAME);
-    let target = Path::new(paths::PRE_PUSH_HOOK_TARGET);
+    let guard = hooks_dir.join(paths::PRE_PUSH_HOOK_NAME);
 
-    if fs::symlink_metadata(&link).is_ok() {
-        fs::remove_file(&link).with_context(|| format!("Failed to remove existing {}", link.display()))?;
+    if fs::symlink_metadata(&guard).is_ok() {
+        fs::remove_file(&guard).with_context(|| format!("Failed to remove existing {}", guard.display()))?;
     }
 
-    unix_fs::symlink(target, &link).with_context(|| format!("Failed to symlink {}", link.display()))?;
+    fs::write(&guard, PRE_PUSH_SCRIPT).with_context(|| format!("Failed to write {}", guard.display()))?;
+    let mut perms = fs::metadata(&guard).with_context(|| format!("Failed to stat {}", guard.display()))?.permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&guard, perms).with_context(|| format!("Failed to chmod {}", guard.display()))?;
 
     Ok(())
 }

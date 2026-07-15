@@ -48,7 +48,6 @@ fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
     if account_home(&passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
         issues.push(format!("build user home must be {}: {build_user}", expected_home.display()));
     }
-
 }
 
 fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bones> {

@@ -130,9 +130,7 @@ This creates:
 .bones/
 ├── bones.toml
 ├── runtime.toml
-├── hooks/
-│   ├── pre-push
-│   └── post-receive
+├── buildtime.toml
 └── deployment/
     └── 01_*.sh
 ```
@@ -250,9 +248,7 @@ Common defaults:
 .bones/
 ├── bones.toml           # project configuration
 ├── runtime.toml         # framework runtime configuration
-├── hooks/
-│   ├── pre-push         # symlinked to .git/hooks/pre-push
-│   └── post-receive     # thin adapter → calls bonesremote deploy
+├── buildtime.toml       # build-time env vars from shared/.env
 └── deployment/
     ├── build/
     │   └── 01_*.sh      # build scripts (run sequentially in the buildpack-deps container)
@@ -260,13 +256,15 @@ Common defaults:
         └── 01_*.sh      # prepare scripts (run as the site user before activation)
 ```
 
-Hooks are written to `.bones/hooks/` once during init. `pre-push` is now a self-contained guard; remote `post-receive` is a thin trigger that delegates to `sudo bonesremote hook post-receive --site <project>`. After that they belong to you and can be edited freely. Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation.
+The optional git push transport uses two thin internal adapters (local pre-push guard and remote post-receive trigger) that are embedded in the binaries. You do not see or manage them under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys; the default is `false`.
 
-Build containers are capped at half of the host's available CPU capacity. This applies to `npm`, Nuxt/Vite, pnpm, and other commands run by the build scripts; it is a container CPU quota rather than a Node memory setting.
+Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation.
+
+Build scripts can set framework-specific runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool.
 
 Rootless Podman commands run through the dedicated build user's systemd user manager. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 
-Git hooks exist as an optional transport — `bonesdeploy deploy` is the primary deployment command. `post-receive` is a thin adapter that delegates to `bonesremote hook post-receive`, which resolves policy from bonesremote-managed site state.
+Git hooks are an optional transport — `bonesdeploy deploy` is the primary deployment command. The remote `post-receive` trigger is embedded in the `bonesremote` binary and installed into the bare repo automatically.
 
 ## Good Fit
 

@@ -1,0 +1,9 @@
+# ── Build-time environment variables ──────────────────────
+# Declare which env var names from shared/.env should be
+# injected into the build container at build time.
+#
+# Values come from `bonesdeploy secrets push` —
+# do not put values here.
+#
+vars = [
+]

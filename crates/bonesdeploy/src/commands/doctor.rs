@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::Result;
+use toml::Table;
 
 use crate::config;
 use crate::infra::ssh;
@@ -30,6 +31,12 @@ pub async fn run(local_only: bool) -> Result<bool> {
         "deploy branch",
         local_branch_issue,
         cfg.as_ref().map(|c| format!("git checkout -b {} && git push {} {}", c.branch, c.remote_name, c.branch)),
+    );
+
+    issues += print_check(
+        "buildtime env vars",
+        check_buildtime_config(),
+        Some(String::from("add vars to .bones/buildtime.toml for build-time env vars")),
     );
 
     if deploy_on_push {
@@ -198,22 +205,16 @@ fn check_local_branch(cfg: &config::Bones) -> Option<String> {
 }
 
 fn check_pre_push_hook() -> Option<String> {
-    let link = Path::new(paths::GIT_PRE_PUSH_HOOK);
-
-    if !link.symlink_metadata().is_ok_and(|m| m.is_symlink()) {
+    let guard = Path::new(paths::GIT_PRE_PUSH_HOOK);
+    let Ok(contents) = fs::read_to_string(guard) else {
         return Some(String::from("pre-push hook is not installed"));
-    }
-
-    let target = match fs::read_link(link) {
-        Ok(target) => target,
-        Err(error) => return Some(format!("Cannot read pre-push hook link: {error}")),
     };
-    let expected = Path::new(paths::PRE_PUSH_HOOK_TARGET);
-    if target != expected {
-        return Some(String::from("pre-push hook is not installed"));
+
+    if contents.contains("bonesdeploy-pre-push-v1") {
+        return None;
     }
 
-    None
+    Some(String::from("pre-push hook is missing or stale"))
 }
 
 async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
@@ -242,13 +243,34 @@ async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
             let pending = output.contains("has not been pushed yet");
             if pending {
                 for line in output.lines().filter(|line| line.contains("has not been pushed yet")) {
-                    println!("{} {}", output::pending_marker(), line.trim());
+                    let line = line.trim().strip_prefix('•').map_or(line.trim(), str::trim_start);
+                    println!("{} {}", output::pending_marker(), line);
                 }
             }
             (None, pending)
         }
         Err(error) => (Some(format!("remote doctor failed\n  {error}")), false),
     }
+}
+
+fn check_buildtime_config() -> Option<String> {
+    let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
+    let Ok(content) = fs::read_to_string(runtime_toml) else {
+        return None;
+    };
+    let Ok(toml_value) = content.parse::<Table>() else {
+        return None;
+    };
+    let is_next = toml_value.get("template").and_then(|v| v.as_str()) == Some("next");
+    if !is_next {
+        return None;
+    }
+
+    if !Path::new(paths::LOCAL_BONES_BUILDTIME_TOML).exists() {
+        return Some(String::from("Next.js requires .bones/buildtime.toml for build-time env vars"));
+    }
+
+    None
 }
 
 #[cfg(test)]

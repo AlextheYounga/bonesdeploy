@@ -1,12 +1,21 @@
-# project_name = "mysite"
-# remote_name = "production"
-# host = ''
+# ── Project identity ──────────────────────────────────────
+project_name = "mysite"
+remote_name = "production"
+
+# ── Server connection ─────────────────────────────────────
+host = ''
 ssh_user = "root"
 port = '22'
+
+# ── Git & filesystem paths ────────────────────────────────
 branch = 'master'
+
+# ── Domain & TLS ──────────────────────────────────────────
 domain = ''
 preview_domain = ""
 email = ''
-deploy_on_push = false
 ssl_enabled = false
+
+# ── Deploy behaviour ──────────────────────────────────────
+deploy_on_push = false
 releases = 5

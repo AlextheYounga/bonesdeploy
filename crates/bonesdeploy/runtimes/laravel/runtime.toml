@@ -1,19 +1,36 @@
+# ── Runtime identity ──────────────────────────────────────
+# Do not edit `template` — it links this config to the
+# Laravel build and deploy scripts.
 template = "laravel"
+
+# ── Web root ──────────────────────────────────────────────
+# Laravel's entry point (index.php) lives in public/.
 web_root = "public"
+
+# ── PHP version ───────────────────────────────────────────
+# The PHP-FPM version to install on the server.
 php_version = "8.5"
 
+# ── File permissions ──────────────────────────────────────
+# storage/ and bootstrap/cache/ need group-write for
+# logs, cache, compiled views, and file uploads.
+# database/ is read-write so SQLite can work.
 [permissions]
 paths = [
-    { path = "*", type = "dir", mode = "750" },
-    { path = "*", type = "file", mode = "640" },
-    { path = "storage", type = "dir", mode = "770", recursive = true },
-    { path = "bootstrap/cache", type = "dir", mode = "770", recursive = true },
-    { path = "database", type = "dir", mode = "770", recursive = false },
-    { path = "database/database.sqlite", type = "file", mode = "660", recursive = false },
+  { path = "*", type = "dir", mode = "750" },
+  { path = "*", type = "file", mode = "640" },
+  { path = "storage", type = "dir", mode = "770", recursive = true },
+  { path = "bootstrap/cache", type = "dir", mode = "770", recursive = true },
+  { path = "database", type = "dir", mode = "770", recursive = false },
+  { path = "database/database.sqlite", type = "file", mode = "660", recursive = false },
 ]
 
+# ── Shared paths ──────────────────────────────────────────
+# Persist across deploys via symlinks into shared/.
+# storage/ holds logs, cache, and file uploads.
+# .env is managed by `bonesdeploy secrets push`.
 [shared]
 paths = [
-    { path = "storage", type = "dir" },
-    { path = ".env", type = "file" },
+  { path = "storage", type = "dir" },
+  { path = ".env", type = "file" },
 ]

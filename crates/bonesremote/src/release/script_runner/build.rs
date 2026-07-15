@@ -1,8 +1,6 @@
 use std::fs;
-use std::num::NonZeroUsize;
 use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
-use std::thread;
 
 use anyhow::{Context, Result, bail};
 
@@ -10,20 +8,28 @@ use super::output;
 
 const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
 
-fn build_cpu_limit() -> String {
-    let cpus = thread::available_parallelism().map_or(1, NonZeroUsize::get);
-    if cpus.is_multiple_of(2) { (cpus / 2).to_string() } else { format!("{}.50", cpus / 2) }
-}
-
 pub(crate) struct BuildScriptEnv<'a> {
     pub(crate) project_name: &'a str,
     pub(crate) build_user: &'a str,
     pub(crate) web_root: &'a str,
+    pub(crate) build_env_vars: &'a [(String, String)],
 }
 
 fn build_user_command(build_user: &str) -> Command {
     let mut command = Command::new("systemd-run");
     command.arg(format!("--machine={build_user}@")).args(["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    command
+}
+
+fn build_container_service_command(build_user: &str, container_name: &str) -> Command {
+    let mut command = Command::new("systemd-run");
+    // Conmon reports when the container is ready and remains the service's
+    // tracked process. Podman remains responsible for stopping the container.
+    command
+        .arg(format!("--machine={build_user}@"))
+        .args(["--quiet", "--user", "--collect", "--unit"])
+        .arg(container_name)
+        .args(["--service-type=notify", "--property=NotifyAccess=all", "--property=KillMode=none"]);
     command
 }
 
@@ -36,9 +42,11 @@ pub(crate) struct BuildContainer<'a> {
 
 impl<'a> BuildContainer<'a> {
     pub(crate) fn start(source_root: &'a Path, env: &'a BuildScriptEnv<'a>) -> Result<Self> {
-        let mut command = build_user_command(env.build_user);
         let name = build_container_name(env.project_name);
         remove_existing_container(source_root, env, &name)?;
+        pull_build_image(source_root, env, &name)?;
+
+        let mut command = build_container_service_command(env.build_user, &name);
         configure_podman_create_command(&mut command, source_root, env, &name);
 
         let status = command.status().with_context(|| format!("Failed to start build container {name}"))?;
@@ -104,8 +112,9 @@ fn configure_podman_create_command(
     let mount = format!("{}:/workspace/source", source_root.display());
     command
         .current_dir(source_root)
-        .args(["podman", "run", "-d", "--pull=missing", "--cpus"])
-        .arg(build_cpu_limit())
+        .args(["podman", "run", "-d", "--pull=never"])
+        .arg("--sdnotify=conmon")
+        .arg("--cgroups=no-conmon")
         .args(["--security-opt=no-new-privileges", "--workdir=/workspace/source", "--name"])
         .arg(container_name)
         .args(["--env"])
@@ -122,6 +131,10 @@ fn configure_podman_create_command(
         .arg(mount)
         .arg(BUILD_IMAGE)
         .args(["sleep", "infinity"]);
+
+    for (key, value) in env.build_env_vars {
+        command.arg("--env").arg(format!("{key}={value}"));
+    }
 }
 
 fn configure_podman_exec_command(command: &mut Command, source_root: &Path, container_name: &str) {
@@ -137,7 +150,7 @@ fn configure_podman_exec_command(command: &mut Command, source_root: &Path, cont
 }
 
 fn configure_podman_remove_command(command: &mut Command, source_root: &Path, container_name: &str) {
-    command.current_dir(source_root).args(["podman", "rm", "--force", "--ignore", container_name]);
+    command.current_dir(source_root).args(["podman", "rm", "--force", "--time", "0", "--ignore", container_name]);
 }
 
 fn build_container_name(project_name: &str) -> String {
@@ -156,14 +169,35 @@ fn remove_existing_container(source_root: &Path, env: &BuildScriptEnv<'_>, conta
     Ok(())
 }
 
+fn pull_build_image(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
+    let mut exists = build_user_command(env.build_user);
+    exists.current_dir(source_root).args(["podman", "image", "exists", BUILD_IMAGE]);
+    let exists_status =
+        exists.status().with_context(|| format!("Failed to inspect build image for {container_name}"))?;
+    match exists_status.code() {
+        Some(0) => return Ok(()),
+        Some(1) => {}
+        _ => bail!("Failed to inspect build image for {container_name}: {exists_status}"),
+    }
+
+    let mut pull = build_user_command(env.build_user);
+    pull.current_dir(source_root).args(["podman", "pull", BUILD_IMAGE]);
+    let status = pull.status().with_context(|| format!("Failed to prepare build image for {container_name}"))?;
+    if !status.success() {
+        bail!("Failed to prepare build image for {container_name}: {status}");
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 #[test]
 fn podman_build_command_mounts_only_source_tree() {
-    let mut command = build_user_command("demo-build");
+    let mut command = build_container_service_command("demo-build", "demo-container");
     configure_podman_create_command(
         &mut command,
         Path::new("/tmp/source"),
-        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", web_root: "public" },
+        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", web_root: "public", build_env_vars: &[] },
         "demo-container",
     );
 
@@ -176,7 +210,10 @@ fn podman_build_command_mounts_only_source_tree() {
 #[cfg(test)]
 fn assert_build_command_identity(args: &[String]) {
     assert_eq!(args[0], "--machine=demo-build@");
-    assert_eq!(&args[1..6], ["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    assert_eq!(&args[1..7], ["--quiet", "--user", "--collect", "--unit", "demo-container", "--service-type=notify"]);
+    assert!(args.contains(&String::from("--property=NotifyAccess=all")));
+    assert!(args.contains(&String::from("--property=KillMode=none")));
+    assert!(!args.iter().any(|arg| arg == "--pipe" || arg == "--wait"));
     assert!(!args.iter().any(|arg| arg == "runuser" || arg.starts_with("XDG_RUNTIME_DIR=")));
 }
 
@@ -185,7 +222,9 @@ fn assert_build_command_mounts(args: &[String], command: &Command) {
     assert!(args.contains(&String::from("podman")));
     assert!(args.contains(&String::from("run")));
     assert!(args.contains(&String::from("-d")));
-    assert!(args.windows(2).any(|window| window[0] == "--cpus" && window[1] == build_cpu_limit()));
+    assert!(args.contains(&String::from("--pull=never")));
+    assert!(args.contains(&String::from("--sdnotify=conmon")));
+    assert!(args.contains(&String::from("--cgroups=no-conmon")));
     assert!(args.contains(&String::from("--security-opt=no-new-privileges")));
     assert!(!args.iter().any(|arg| arg == "--cap-drop=all"));
     assert!(args.contains(&String::from("docker.io/library/buildpack-deps:bookworm")));
@@ -207,7 +246,26 @@ fn podman_exec_and_remove_commands_use_source_working_directory() {
     let args = remove.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
     assert_eq!(remove.get_current_dir(), Some(Path::new("/tmp/source")));
     assert!(args.windows(3).any(|window| window == ["podman", "rm", "--force"]));
+    assert!(args.windows(3).any(|window| window == ["--time", "0", "--ignore"]));
     assert!(args.contains(&String::from("--ignore")));
+}
+
+#[cfg(test)]
+#[test]
+fn build_image_commands_use_the_foreground_user_session() {
+    let mut exists = build_user_command("demo-build");
+    exists.current_dir("/tmp/source").args(["podman", "image", "exists", BUILD_IMAGE]);
+
+    let args = exists.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+    assert_eq!(&args[1..6], ["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    assert!(args.windows(4).any(|window| window == ["podman", "image", "exists", BUILD_IMAGE]));
+
+    let mut pull = build_user_command("demo-build");
+    pull.current_dir("/tmp/source").args(["podman", "pull", BUILD_IMAGE]);
+
+    let args = pull.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+    assert_eq!(&args[1..6], ["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    assert!(args.windows(3).any(|window| window == ["podman", "pull", BUILD_IMAGE]));
 }
 
 #[cfg(test)]

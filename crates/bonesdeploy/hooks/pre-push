@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
-# pre-push — Local hook, symlinked to .git/hooks/pre-push
+# bonesdeploy-pre-push-v1
+#
+# pre-push — Local guard installed by bonesdeploy
 #
 # Checks if we are pushing to the bonesdeploy-managed remote.
 # If so, runs `bonesdeploy doctor` and aborts on any failure.

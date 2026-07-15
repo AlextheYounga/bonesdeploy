@@ -37,9 +37,12 @@ pub fn base(cfg: &config::Bones, web_root: &str) -> Map<String, Value> {
     );
     vars.insert(String::from(shared_config::bonesinfra_input::PROJECT_ROOT), Value::String(cfg.project_root.clone()));
     vars.insert(String::from("web_root"), Value::String(web_root.to_string()));
-    vars.insert(String::from("project_name"), Value::String(cfg.project_name.clone()));
-    vars.insert(String::from("preview_domain"), Value::String(cfg.preview_domain.clone()));
-    vars.insert(String::from("repo_path"), Value::String(cfg.repo_path.clone()));
+    vars.insert(String::from(shared_config::bonesinfra_input::PROJECT_NAME), Value::String(cfg.project_name.clone()));
+    vars.insert(
+        String::from(shared_config::bonesinfra_input::PREVIEW_DOMAIN),
+        Value::String(cfg.preview_domain.clone()),
+    );
+    vars.insert(String::from(shared_config::bonesinfra_input::REPO_PATH), Value::String(cfg.repo_path.clone()));
 
     vars
 }
