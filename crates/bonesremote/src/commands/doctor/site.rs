@@ -39,33 +39,16 @@ fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
             return;
         }
     };
-    let Some(uid) = account_uid(&passwd, build_user) else {
+    if !account_exists(&passwd, build_user) {
         issues.push(format!("build user does not exist: {build_user}"));
         return;
-    };
+    }
 
     let expected_home = paths::bonesdeploy_user_home(build_user);
     if account_home(&passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
         issues.push(format!("build user home must be {}: {build_user}", expected_home.display()));
     }
 
-    check_delegated_controllers(uid, issues);
-}
-
-fn check_delegated_controllers(uid: u32, issues: &mut Vec<String>) {
-    let path = Path::new("/sys/fs/cgroup/user.slice")
-        .join(format!("user-{uid}.slice"))
-        .join(format!("user@{uid}.service/cgroup.controllers"));
-    let controllers = match fs::read_to_string(&path) {
-        Ok(controllers) => controllers,
-        Err(error) => {
-            issues.push(format!("could not inspect build user cgroup controllers at {} ({error})", path.display()));
-            return;
-        }
-    };
-    if !controllers.split_whitespace().any(|controller| controller == "cpu") {
-        issues.push("build user is missing delegated cgroup controller: cpu".to_string());
-    }
 }
 
 fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bones> {
@@ -215,10 +198,6 @@ fn account_exists(passwd: &str, account: &str) -> bool {
     passwd.lines().any(|line| line.starts_with(&format!("{account}:")))
 }
 
-fn account_uid(passwd: &str, account: &str) -> Option<u32> {
-    account_field(passwd, account, 2)?.parse().ok()
-}
-
 fn account_home<'a>(passwd: &'a str, account: &str) -> Option<&'a str> {
     account_field(passwd, account, 5)
 }
@@ -249,7 +228,7 @@ fn service_exists(load_state: &str) -> bool {
 mod tests {
     use std::{env, fs, process, process::Command};
 
-    use super::{account_exists, account_home, account_uid, group_members, hook_uses_thin_trigger, service_exists};
+    use super::{account_exists, account_home, group_members, hook_uses_thin_trigger, service_exists};
 
     #[test]
     fn empty_bare_repo_is_pending_before_first_push() {
@@ -285,9 +264,8 @@ mod tests {
     }
 
     #[test]
-    fn build_user_fields_and_required_controllers_are_parsed() {
+    fn build_user_home_is_parsed() {
         let passwd = "demo-build:x:1002:1002::/var/lib/bonesdeploy/users/demo-build:/usr/sbin/nologin\n";
-        assert_eq!(account_uid(passwd, "demo-build"), Some(1002));
         assert_eq!(account_home(passwd, "demo-build"), Some("/var/lib/bonesdeploy/users/demo-build"));
     }
 

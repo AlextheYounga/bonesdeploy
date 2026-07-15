@@ -188,7 +188,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
     - Local `pre-push` hook is symlinked properly when `deploy_on_push = true`.
   - Runs remote checks (skipped with `--local`):
     - Opens a privileged SSH session and runs `bonesremote doctor --site <project>`.
-    - `bonesremote doctor --site <project>` checks Podman availability, deploy-user sudo wiring, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's home and CPU cgroup delegation, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until the configured branch is pushed.
+    - `bonesremote doctor --site <project>` checks Podman availability, deploy-user sudo wiring, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until the configured branch is pushed.
   - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys.
 
 - **push**
