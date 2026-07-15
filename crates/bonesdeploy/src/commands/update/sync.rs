@@ -10,8 +10,6 @@ pub(super) fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Pat
         return Ok(());
     }
 
-    let kit_root = source_dir.join("crates/bonesdeploy/kit");
-    sync_tree(&kit_root.join("hooks"), &bones_dir.join("hooks"), true)?;
     sync_tree(&deployment_source_root(source_dir, bones_dir)?, &bones_dir.join("deployment"), true)?;
 
     Ok(())
@@ -84,10 +82,9 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
 
+    use super::refresh_local_bones_from_source;
     use anyhow::Result;
     use tempfile::TempDir;
-
-    use super::refresh_local_bones_from_source;
 
     #[test]
     fn refresh_local_bones_updates_scaffold_without_touching_configs() -> Result<()> {
@@ -95,7 +92,6 @@ mod tests {
         let source_dir = temp.path().join("source");
         let bones_dir = temp.path().join(".bones");
 
-        write(&source_dir.join("crates/bonesdeploy/kit/hooks/pre-push"), "new hook")?;
         write(&source_dir.join("crates/bonesdeploy/kit/deployment/build/01_build.sh"), "generic deploy")?;
         write(&source_dir.join("crates/bonesdeploy/runtimes/laravel/deployment/build/01_build.sh"), "laravel deploy")?;
 
@@ -106,12 +102,9 @@ mod tests {
 
         assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "keep = 'config'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("runtime.toml"))?, "template = 'laravel'\n");
-        assert_eq!(fs::read_to_string(bones_dir.join("hooks/pre-push"))?, "new hook");
         assert_eq!(fs::read_to_string(bones_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
 
-        let hook_mode = fs::metadata(bones_dir.join("hooks/pre-push"))?.permissions().mode() & 0o777;
         let deploy_mode = fs::metadata(bones_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
-        assert_eq!(hook_mode, 0o755);
         assert_eq!(deploy_mode, 0o755);
 
         Ok(())

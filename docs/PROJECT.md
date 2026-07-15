@@ -60,12 +60,12 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 .bones
 ├── bones.toml
 ├── runtime.toml
-├── hooks
-│   ├── post-receive
-│   └── pre-push
 ├── deployment
-│   ├── 01_install_build_deps.sh
-│   └── 02_run_build.sh
+│   ├── build/
+│   │   ├── 01_install_build_deps.sh
+│   │   └── 02_run_build.sh
+│   └── prepare/
+│       └── 01_prepare.sh
 ```
 
 Python infra scripts and templates are managed separately by the hidden `bonesinfra` checkout under `~/.config/bonesdeploy/_lib/bonesinfra`; see `crates/bonesdeploy/src/infra/bonesinfra.rs`.
@@ -109,10 +109,10 @@ releases = 5
 ```
 
 ### Hooks
-Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`: a local `pre-push` guard and a remote `post-receive` thin trigger. The previous shared `hooks.sh` library is gone; `pre-push` is now self-contained and `post-receive` delegates directly to `sudo bonesremote hook post-receive --site <project>`. After that, they belong to the user and can be edited freely. They are published into `bonesremote`'s root-owned remote site state via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
+The optional git push transport uses two thin internal adapters (local `pre-push` guard and remote `post-receive` trigger) that are embedded in the binaries. They are not visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
 
-- `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor --local` and we fail if the doctor command expresses any warning or errors.
-- `post-receive` => Thin trigger that derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/` instead of the bare repo.
+- `pre-push` => Installed by `bonesdeploy init` into `.git/hooks/pre-push`. This checks if we are pushing to the bonesdeploy designated remote. If so, it runs `bonesdeploy doctor --local` and fails if doctor reports warnings or errors.
+- `post-receive` => Installed automatically into the bare repo. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/`. The canonical script is embedded in the `bonesremote` binary and installed as a side-effect of `bonesdeploy push`.
 
 ### Deployment Folder
 This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order inside bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; other files, including `README.md`, are ignored. Bonesremote prepares the image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to the sealed release, and are the right place for migrations, cache warmups, and other runtime-state work. Before prepare scripts run, `bonesremote` wires each `[shared].paths` entry from the site runtime config into the promoted release.
@@ -135,7 +135,7 @@ bonesdeploy/
 ├── Cargo.toml                  # workspace root
 ├── crates/
 │   ├── bonesdeploy/
-│   │   ├── kit/                # embedded scaffolding templates and hooks
+│   │   ├── kit/                # embedded scaffolding templates
 │   │   └── src/
 │   │       ├── cli/            # clap args + dispatch
 │   │       ├── commands/       # CLI command implementations
@@ -185,7 +185,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Runs local checks:
     - `.bones` folder exists and is a symlink (warns if it is not a symlink to `~/.config/bonesdeploy/<project>.bones/`).
     - Deployment scripts under `.bones/deployment/build/` and `.bones/deployment/prepare/` are ordered with numeric prefixes.
-    - Local `pre-push` hook is symlinked properly when `deploy_on_push = true`.
+    - Local `pre-push` guard is installed properly when `deploy_on_push = true`. Checks for the presence and version marker in the baked script.
   - Runs remote checks (skipped with `--local`):
     - Opens a privileged SSH session and runs `bonesremote doctor --site <project>`.
     - `bonesremote doctor --site <project>` checks Podman availability, deploy-user sudo wiring, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until the configured branch is pushed.
@@ -198,7 +198,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 - **pull**
   - Streams the current remote site dataset back from `bonesremote site export --site <project>` and extracts it into local `.bones/`.
-  - Recreates the local `.git/hooks/pre-push` symlink so the repository regains its pre-push check after recovery.
+  - Re-installs the local pre-push guard so the repository regains its pre-push check after recovery.
 
 - **deploy**
   - Publishes the local `.bones/` dataset into remote bonesremote site state first, then SSHes into the configured host and runs `bonesremote deploy --site <project>` directly.
@@ -285,7 +285,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 ## Flow
 - User runs `bonesdeploy init`, and the procedures outlined above are executed.
-- User can make any changes to their deployment scripts or hooks in `.bones/` (e.g., customizing `deployment/build/` files or adding project-specific logic).
+- User can make any changes to their deployment scripts in `.bones/` (e.g., customizing `deployment/build/` files or adding project-specific logic).
 - User runs `bonesdeploy push` to publish the `.bones/` dataset to bonesremote site state under `/root/.config/bonesremote/sites/<site>/`.
 - Before the first deploy (and after initial setup), the source code must be pushed to the remote bare repo so bonesremote can access it:
   ```

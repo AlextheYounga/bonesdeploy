@@ -198,22 +198,16 @@ fn check_local_branch(cfg: &config::Bones) -> Option<String> {
 }
 
 fn check_pre_push_hook() -> Option<String> {
-    let link = Path::new(paths::GIT_PRE_PUSH_HOOK);
-
-    if !link.symlink_metadata().is_ok_and(|m| m.is_symlink()) {
+    let guard = Path::new(paths::GIT_PRE_PUSH_HOOK);
+    let Ok(contents) = fs::read_to_string(guard) else {
         return Some(String::from("pre-push hook is not installed"));
-    }
-
-    let target = match fs::read_link(link) {
-        Ok(target) => target,
-        Err(error) => return Some(format!("Cannot read pre-push hook link: {error}")),
     };
-    let expected = Path::new(paths::PRE_PUSH_HOOK_TARGET);
-    if target != expected {
-        return Some(String::from("pre-push hook is not installed"));
+
+    if contents.contains("bonesdeploy-pre-push-v1") {
+        return None;
     }
 
-    None
+    Some(String::from("pre-push hook is missing or stale"))
 }
 
 async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
