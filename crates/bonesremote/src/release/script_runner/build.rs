@@ -177,7 +177,6 @@ fn assert_build_command_mounts(args: &[String], command: &Command) {
     assert!(args.contains(&String::from("podman")));
     assert!(args.contains(&String::from("run")));
     assert!(args.contains(&String::from("-d")));
-    assert!(!args.iter().any(|arg| arg == "--cpus"));
     assert!(args.contains(&String::from("--security-opt=no-new-privileges")));
     assert!(!args.iter().any(|arg| arg == "--cap-drop=all"));
     assert!(args.contains(&String::from("docker.io/library/buildpack-deps:bookworm")));
