@@ -20,8 +20,8 @@ systemd-run --machine=<site>-build@ --quiet --user --collect --pipe --wait podma
 
 This is required for rootless Podman with cgroup v2; `runuser` plus a synthetic
 `HOME`/`XDG_RUNTIME_DIR` is not a valid substitute. The build user needs a real,
-writable home, lingering, subordinate UID/GID ranges, a user D-Bus session, and
-delegated `cpu`, `cpuset`, `memory`, and `pids` controllers.
+writable home, lingering, subordinate UID/GID ranges, and delegated `cpu`,
+`cpuset`, `memory`, and `pids` controllers.
 
 Build scripts remain root-owned and are piped to the container over stdin. The
 build user therefore receives only the selected script and cannot read the
@@ -33,8 +33,8 @@ Root promotes the finished build context into a sealed release, wires shared
 paths, runs prepare scripts as the runtime user, and removes the disposable
 context. The runtime user never needs Podman or a writable home.
 
-`bonesremote doctor` checks the build user's home, user D-Bus socket, delegated
-controllers, and systemd-managed Podman session before deployment.
+`bonesremote doctor` checks the build user's home and delegated controllers
+before deployment.
 
 ## Provisioning
 

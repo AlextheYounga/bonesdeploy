@@ -1,12 +1,9 @@
 use std::fs;
-use std::os::unix::fs::FileTypeExt;
 use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Result, bail};
 use shared::{config, paths};
-
-use crate::release::script_runner::build_user_command;
 
 pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if let Err(error) = validate_site_name(site) {
@@ -54,26 +51,6 @@ fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
     }
 
     check_delegated_controllers(uid, issues);
-
-    let bus = Path::new("/run/user").join(uid.to_string()).join("bus");
-    if !fs::metadata(&bus).is_ok_and(|metadata| metadata.file_type().is_socket()) {
-        issues.push(format!("build user systemd D-Bus socket is missing: {}", bus.display()));
-        return;
-    }
-
-    let output = build_user_command(build_user).args(["podman", "info", "--format={{.Host.CgroupManager}}"]).output();
-    match output {
-        Ok(output) if output.status.success() && String::from_utf8_lossy(&output.stdout).trim() == "systemd" => {}
-        Ok(output) if output.status.success() => issues.push(format!(
-            "rootless Podman for {build_user} is not using the systemd cgroup manager: {}",
-            String::from_utf8_lossy(&output.stdout).trim()
-        )),
-        Ok(output) => issues.push(format!(
-            "rootless Podman session failed for {build_user}: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )),
-        Err(error) => issues.push(format!("could not start rootless Podman session for {build_user} ({error})")),
-    }
 }
 
 fn check_delegated_controllers(uid: u32, issues: &mut Vec<String>) {

@@ -21,7 +21,7 @@ pub(crate) struct BuildScriptEnv<'a> {
     pub(crate) web_root: &'a str,
 }
 
-pub(crate) fn build_user_command(build_user: &str) -> Command {
+fn build_user_command(build_user: &str) -> Command {
     let mut command = Command::new("systemd-run");
     command.arg(format!("--machine={build_user}@")).args(["--quiet", "--user", "--collect", "--pipe", "--wait"]);
     command
