@@ -35,7 +35,11 @@ pub(super) fn materialize_fresh_bones(
     unix_fs::symlink(&config_dir, bones_dir)?;
 
     let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
-    config::save_runtime(&runtime.config, runtime_toml)?;
+    let raw_template = match &runtime.template {
+        Some(name) => embedded::raw_runtime_template(name)?,
+        None => embedded::raw_base_runtime_template()?,
+    };
+    config::save_runtime(&raw_template, &runtime.config, runtime_toml)?;
 
     if let Some(template_name) = runtime.template {
         embedded::scaffold_runtime_deployment(&template_name, bones_dir)?;

@@ -1,12 +1,13 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::str;
 
 use anyhow::{Context, Result};
 use serde_json::{Map, Value};
 use shared::config as shared_config;
+use shared::config::bonesinfra_input;
 use shared::paths;
-use toml_edit::ser::to_string as toml_to_string;
 
 pub use shared::config::{Bones, load};
 
@@ -34,17 +35,55 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
     shared_config::apply_derived_defaults(&mut to_serialize);
 
-    let raw = toml_to_string(&to_serialize).context("Failed to serialize bones config")?;
-    let toml_str = oxc_toml::format(&raw, oxc_toml::Options::default());
-    fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
+    let mut doc = if path.exists() {
+        let existing = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
+        existing.parse::<toml_edit::DocumentMut>().with_context(|| format!("Failed to parse {}", path.display()))?
+    } else {
+        toml_edit::DocumentMut::new()
+    };
+
+    doc["remote_name"] = toml_edit::value(to_serialize.remote_name.as_str());
+    doc[bonesinfra_input::PROJECT_NAME] = toml_edit::value(to_serialize.project_name.as_str());
+    doc["host"] = toml_edit::value(to_serialize.host.as_str());
+    doc["port"] = toml_edit::value(to_serialize.port.as_str());
+    doc[bonesinfra_input::SSH_USER] = toml_edit::value(to_serialize.ssh_user.as_str());
+    doc[bonesinfra_input::REPO_PATH] = toml_edit::value(to_serialize.repo_path.as_str());
+    doc[bonesinfra_input::PROJECT_ROOT] = toml_edit::value(to_serialize.project_root.as_str());
+    doc["branch"] = toml_edit::value(to_serialize.branch.as_str());
+    doc[bonesinfra_input::PREVIEW_DOMAIN] = toml_edit::value(to_serialize.preview_domain.as_str());
+    doc["deploy_on_push"] = toml_edit::value(to_serialize.deploy_on_push);
+    let releases = i64::try_from(to_serialize.releases_keep).unwrap_or(i64::MAX);
+    doc["releases"] = toml_edit::value(releases);
+    doc["ssl_enabled"] = toml_edit::value(to_serialize.ssl_enabled);
+    doc["domain"] = toml_edit::value(to_serialize.domain.as_str());
+    doc["email"] = toml_edit::value(to_serialize.email.as_str());
+
+    fs::write(path, doc.to_string()).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
 
-pub fn save_runtime(runtime: &Map<String, Value>, path: &Path) -> Result<()> {
-    let raw = toml_to_string(runtime).context("Failed to serialize runtime config")?;
-    let toml_str = oxc_toml::format(&raw, oxc_toml::Options::default());
-    fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
+pub fn save_runtime(template_bytes: &[u8], config: &Map<String, Value>, path: &Path) -> Result<()> {
+    let template = str::from_utf8(template_bytes).context("Runtime template is not valid UTF-8")?;
+    let mut doc: toml_edit::DocumentMut = template.parse().context("Failed to parse runtime template")?;
+
+    for (key, value) in config {
+        let Some(toml_val) = json_to_toml_item(value) else {
+            continue;
+        };
+        doc[key.as_str()] = toml_val;
+    }
+
+    fs::write(path, doc.to_string()).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
+}
+
+fn json_to_toml_item(v: &Value) -> Option<toml_edit::Item> {
+    match v {
+        Value::String(s) => Some(toml_edit::value(s.as_str())),
+        Value::Number(n) => n.as_i64().map(toml_edit::value),
+        Value::Bool(b) => Some(toml_edit::value(*b)),
+        _ => None,
+    }
 }
 
 #[cfg(test)]

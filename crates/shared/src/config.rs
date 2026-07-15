@@ -11,7 +11,10 @@ pub mod bonesinfra_input {
     pub const SSH_PORT: &str = "ssh_port";
     pub const SSH_USER: &str = "ssh_user";
     pub const DEPLOY_USER: &str = "deploy_user";
+    pub const PROJECT_NAME: &str = "project_name";
     pub const PROJECT_ROOT: &str = "project_root";
+    pub const PREVIEW_DOMAIN: &str = "preview_domain";
+    pub const REPO_PATH: &str = "repo_path";
     pub const RUNTIME_USER: &str = "runtime_user";
     pub const RUNTIME_GROUP: &str = "runtime_group";
     pub const RELEASE_GROUP: &str = "release_group";

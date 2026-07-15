@@ -67,6 +67,17 @@ pub fn scaffold_runtime_buildtime(runtime: &str, bones_dir: &Path) -> Result<()>
     Ok(())
 }
 
+pub fn raw_runtime_template(runtime: &str) -> Result<Vec<u8>> {
+    let asset_path = format!("{runtime}/{}", paths::RUNTIME_TOML);
+    RuntimeAssets::get(&asset_path)
+        .map(|a| a.data.to_vec())
+        .ok_or_else(|| anyhow!("Missing runtime template at {asset_path}"))
+}
+
+pub fn raw_base_runtime_template() -> Result<Vec<u8>> {
+    Kit::get(paths::RUNTIME_TOML).map(|a| a.data.to_vec()).ok_or_else(|| anyhow!("Missing kit runtime template"))
+}
+
 fn scaffold_runtime_assets(runtime: &str, bones_dir: &Path, asset_prefix: &str) -> Result<()> {
     let runtime_prefix = format!("{runtime}/");
 
