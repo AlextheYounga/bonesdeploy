@@ -240,14 +240,22 @@ remote_name = "production"
 project_name = "myproject"
 repo_path = "/home/git/myproject.git"
 project_root = "/srv/sites/myproject"
+
+[app.server]
+host = "deploy.example.com"
+ssh_user = "root"
 port = "22"
+
+[app.deploy]
 branch = "master"
+deploy_on_push = false
+releases = 5
+
+[app.dns]
 domain = ""
 preview_domain = ""
 email = ""
-deploy_on_push = false
 ssl_enabled = false
-releases = 5
 
 [build]
 vars = []

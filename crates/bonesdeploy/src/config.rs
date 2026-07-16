@@ -32,9 +32,33 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
     shared_config::apply_derived_defaults(&mut to_serialize);
 
-    let content = toml::to_string_pretty(&to_serialize).context("Failed to serialize bones.toml")?;
+    let content = annotate_sections(&toml::to_string_pretty(&to_serialize).context("Failed to serialize bones.toml")?);
     fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
+}
+
+fn annotate_sections(content: &str) -> String {
+    let comments = [
+        ("[app]", "# Project identity and deployment settings."),
+        ("[app.server]", "# Remote server connection."),
+        ("[app.dns]", "# Domains, email, and TLS."),
+        ("[app.deploy]", "# Branch and deployment behavior."),
+        ("[build]", "# Environment variables and constants injected during builds."),
+        ("[runtime]", "# Framework runtime settings."),
+        ("[runtime.permissions]", "# Release file permissions."),
+        ("[runtime.shared]", "# Paths persisted in the shared release directory."),
+    ];
+
+    let mut output = String::new();
+    for line in content.lines() {
+        if let Some((_, comment)) = comments.iter().find(|(section, _)| *section == line) {
+            output.push_str(comment);
+            output.push('\n');
+        }
+        output.push_str(line);
+        output.push('\n');
+    }
+    output
 }
 
 #[cfg(test)]
@@ -58,7 +82,7 @@ mod tests {
 
     fn minimal_toml(project_name: &str) -> String {
         format!(
-            "[app]\nremote_name = \"production\"\nproject_name = \"{project_name}\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nbranch = \"master\"\ndeploy_on_push = true\n",
+            "[app]\nremote_name = \"production\"\nproject_name = \"{project_name}\"\nrepo_path = \"{}\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.deploy]\nbranch = \"master\"\ndeploy_on_push = true\n",
             paths::default_repo_path_for(project_name)
         )
     }
@@ -135,10 +159,21 @@ mod tests {
     }
 
     #[test]
+    fn save_adds_comments_to_nested_sections() -> Result<()> {
+        let path = temp_path("section_comments.toml");
+        save(&sample_config("phoenix"), &path)?;
+        let content = fs::read_to_string(&path)?;
+        assert!(content.contains("# Remote server connection.\n[app.server]"));
+        assert!(content.contains("# Branch and deployment behavior.\n[app.deploy]"));
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[test]
     fn load_preserves_explicit_repo_and_project_root_overrides() -> Result<()> {
         let path = temp_path("overrides.toml");
         let toml = format!(
-            "[app]\nremote_name = \"production\"\nproject_name = \"app\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\nbranch = \"master\"\ndeploy_on_push = false\n",
+            "[app]\nremote_name = \"production\"\nproject_name = \"app\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.deploy]\nbranch = \"master\"\ndeploy_on_push = false\n",
             paths::default_repo_path_for("app")
         );
 

@@ -100,17 +100,23 @@ Example `bones.toml`:
 [app]
 remote_name = "production"
 project_name = "lawsnipe"
+repo_path = "/home/git/lawsnipe.git"
+project_root = "/srv/sites/lawsnipe"
+
+[app.server]
 ssh_user = "root"
 host = "deploy.example.com"
 port = "22"
-repo_path = "/home/git/lawsnipe.git"
-project_root = "/srv/sites/lawsnipe"
-branch = "master"
+
+[app.dns]
 preview_domain = "lawsnipe-deploy-example-com.nip.io"
 domain = "app.example.com"
 email = "ops@example.com"
-deploy_on_push = false
 ssl_enabled = true
+
+[app.deploy]
+branch = "master"
+deploy_on_push = false
 releases = 5
 
 [build]

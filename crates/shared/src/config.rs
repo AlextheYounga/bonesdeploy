@@ -8,6 +8,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::paths;
 
+#[path = "app.rs"]
+mod app;
+pub use app::App;
+
 /// Keys in the JSON object that bonesdeploy sends to bonesinfra.
 pub mod bonesinfra_input {
     pub const SSH_PORT: &str = "ssh_port";
@@ -20,30 +24,6 @@ pub mod bonesinfra_input {
     pub const RUNTIME_USER: &str = "runtime_user";
     pub const RUNTIME_GROUP: &str = "runtime_group";
     pub const RELEASE_GROUP: &str = "release_group";
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(default)]
-pub struct App {
-    pub remote_name: String,
-    pub project_name: String,
-    pub ssh_user: String,
-    pub host: String,
-    pub port: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub repo_path: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub project_root: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub branch: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub preview_domain: String,
-    pub deploy_on_push: bool,
-    #[serde(rename = "releases")]
-    pub releases_keep: usize,
-    pub ssl_enabled: bool,
-    pub domain: String,
-    pub email: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -66,27 +46,6 @@ impl Deref for Bones {
 impl DerefMut for Bones {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.app
-    }
-}
-
-impl Default for App {
-    fn default() -> Self {
-        Self {
-            remote_name: String::new(),
-            project_name: String::new(),
-            ssh_user: String::from("root"),
-            host: String::new(),
-            port: "22".into(),
-            repo_path: String::new(),
-            project_root: String::new(),
-            branch: "master".into(),
-            preview_domain: String::new(),
-            deploy_on_push: false,
-            releases_keep: 5,
-            ssl_enabled: false,
-            domain: String::new(),
-            email: String::new(),
-        }
     }
 }
 

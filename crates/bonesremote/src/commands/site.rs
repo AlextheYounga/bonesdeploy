@@ -225,18 +225,18 @@ mod tests {
 [app]
 remote_name = "production"
 project_name = "unitapp"
+repo_path = "{}"
+project_root = "/srv/sites/unitapp"
+[app.server]
 ssh_user = "root"
 host = "example.com"
 port = "22"
-repo_path = "{}"
-project_root = "/srv/sites/unitapp"
-branch = "main"
+[app.dns]
 preview_domain = ""
+[app.deploy]
+branch = "main"
 deploy_on_push = false
 releases = 5
-ssl_enabled = false
-domain = ""
-email = ""
 "#,
                 repo_root.display()
             ),
