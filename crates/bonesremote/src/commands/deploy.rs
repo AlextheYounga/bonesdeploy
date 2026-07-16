@@ -100,6 +100,10 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
         return finish_abort(site, Some(&context_dir), error);
     }
 
+    if let Err(error) = lifecycle::build::finalize(site) {
+        return finish_abort(site, Some(&context_dir), error);
+    }
+
     if let Err(error) = lifecycle::activate::run(site) {
         return finish_abort(site, Some(&context_dir), error);
     }
