@@ -25,3 +25,9 @@ Name them with a numbered prefix so the order is clear:
 ```
 
 No secrets, no runtime state, no .env. Build only.
+
+## Next.js requirement
+
+The app must set `output: "standalone"` in its Next config. The build script
+checks for `.next/standalone/server.js` and copies `public/` and `.next/static/`
+into that standalone output for the runtime service.

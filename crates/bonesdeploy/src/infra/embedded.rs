@@ -134,3 +134,13 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::RuntimeAssets;
+
+    #[test]
+    fn next_runtime_includes_the_build_script() {
+        assert!(RuntimeAssets::get("next/deployment/build/02_run_build.sh").is_some());
+    }
+}

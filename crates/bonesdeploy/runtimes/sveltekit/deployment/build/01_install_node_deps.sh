@@ -139,7 +139,7 @@ assert_exact_node_version() {
 	fi
 
 	cat >&2 <<'EOF'
-[bonesdeploy] Laravel frontend build requires an exact pinned Node version.
+[bonesdeploy] SvelteKit build requires an exact pinned Node version.
 
 Add one of these to the project:
   .node-version        example: 24.17.0

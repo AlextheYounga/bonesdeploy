@@ -59,6 +59,11 @@ pub enum Command {
     },
     /// Deploy the configured project release to the remote server
     Deploy,
+    /// List remote releases and their deployment state
+    Releases {
+        #[command(subcommand)]
+        command: Option<ReleasesCommand>,
+    },
     /// Update bonesdeploy and bonesremote to the latest version
     Update {
         /// Skip local update
@@ -95,6 +100,15 @@ pub enum SecretsCommand {
     Edit,
     /// Decrypt local secrets and write them into remote shared/
     Push,
+}
+
+#[derive(Subcommand)]
+pub enum ReleasesCommand {
+    /// Cancel a building or interrupted release and clean its temporary state
+    Kill {
+        /// Release identifier shown by `bonesdeploy releases`
+        release: String,
+    },
 }
 
 #[derive(Subcommand)]

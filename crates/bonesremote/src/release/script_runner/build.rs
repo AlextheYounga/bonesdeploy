@@ -21,6 +21,57 @@ fn build_user_command(build_user: &str) -> Command {
     command
 }
 
+fn build_user_control_command(build_user: &str) -> Command {
+    let mut command = build_user_command(build_user);
+    command.arg("--property=RuntimeMaxSec=20s");
+    command
+}
+
+pub(crate) fn ensure_build_user_ready(build_user: &str, working_dir: &Path) -> Result<()> {
+    let uid = Command::new("id")
+        .args(["-u", build_user])
+        .output()
+        .with_context(|| format!("Failed to resolve build user {build_user}"))?;
+    if !uid.status.success() {
+        bail!("Failed to resolve build user {build_user}");
+    }
+    let uid = String::from_utf8_lossy(&uid.stdout).trim().to_string();
+    if uid.is_empty() {
+        bail!("Build user {build_user} has no UID");
+    }
+
+    let status = Command::new("systemctl")
+        .args(["start", &format!("user@{uid}.service")])
+        .status()
+        .with_context(|| format!("Failed to start the systemd user manager for {build_user}"))?;
+    if !status.success() {
+        bail!("Failed to start the systemd user manager for {build_user}: {status}");
+    }
+
+    let status = Command::new("systemctl")
+        .args(["is-active", "--quiet", &format!("user@{uid}.service")])
+        .status()
+        .with_context(|| format!("Failed to inspect the systemd user manager for {build_user}"))?;
+    if !status.success() {
+        bail!("The systemd user manager for {build_user} is not active");
+    }
+
+    let mut command = build_user_control_command(build_user);
+    let status = command
+        .current_dir(working_dir)
+        .args(["podman", "info", "--format", "{{.Host.Security.Rootless}}"])
+        .stdout(Stdio::null())
+        .status()
+        .with_context(|| format!("Failed to check rootless Podman for {build_user}"))?;
+    if !status.success() {
+        bail!(
+            "Rootless Podman is not ready for {build_user}. Its user session or Podman namespace is unhealthy; repair it before deploying."
+        );
+    }
+
+    Ok(())
+}
+
 fn build_container_service_command(build_user: &str, container_name: &str) -> Command {
     let mut command = Command::new("systemd-run");
     // Conmon reports when the container is ready and remains the service's
@@ -78,7 +129,7 @@ impl<'a> BuildContainer<'a> {
             return Ok(());
         }
 
-        let mut command = build_user_command(self.env.build_user);
+        let mut command = build_user_control_command(self.env.build_user);
         configure_podman_remove_command(&mut command, self.source_root, &self.name);
         let status = command.status().with_context(|| format!("Failed to remove build container {}", self.name))?;
         if !status.success() {
@@ -96,7 +147,7 @@ impl Drop for BuildContainer<'_> {
             return;
         }
 
-        let mut command = build_user_command(self.env.build_user);
+        let mut command = build_user_control_command(self.env.build_user);
         configure_podman_remove_command(&mut command, self.source_root, &self.name);
         let _ = command.status();
         self.removed = true;
@@ -158,7 +209,7 @@ fn build_container_name(project_name: &str) -> String {
 }
 
 fn remove_existing_container(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
-    let mut remove = build_user_command(env.build_user);
+    let mut remove = build_user_control_command(env.build_user);
     configure_podman_remove_command(&mut remove, source_root, container_name);
     let remove_status =
         remove.status().with_context(|| format!("Failed to remove existing build container {container_name}"))?;
@@ -166,6 +217,17 @@ fn remove_existing_container(source_root: &Path, env: &BuildScriptEnv<'_>, conta
         bail!("Failed to remove existing build container {container_name}: {remove_status}");
     }
 
+    Ok(())
+}
+
+pub(crate) fn remove_build_container(build_user: &str, project_name: &str, working_dir: &Path) -> Result<()> {
+    let name = build_container_name(project_name);
+    let mut remove = build_user_control_command(build_user);
+    configure_podman_remove_command(&mut remove, working_dir, &name);
+    let status = remove.status().with_context(|| format!("Failed to remove build container {name}"))?;
+    if !status.success() {
+        bail!("Failed to remove build container {name}: {status}");
+    }
     Ok(())
 }
 

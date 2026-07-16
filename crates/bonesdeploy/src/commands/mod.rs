@@ -5,6 +5,7 @@ pub mod doctor;
 pub mod guide;
 pub mod init;
 pub mod push_state;
+pub mod releases;
 pub mod remote_bootstrap;
 pub mod remote_helpers;
 pub mod remote_runtime;
