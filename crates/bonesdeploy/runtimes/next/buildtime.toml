@@ -11,6 +11,6 @@
 # do not put values here.
 #
 vars = [
-  # "NEXT_PUBLIC_API_URL",
-  # "NEXT_PUBLIC_SITE_NAME",
+ "NEXT_PUBLIC_API_URL",
+ "NEXT_PUBLIC_SITE_NAME",
 ]

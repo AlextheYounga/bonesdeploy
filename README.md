@@ -91,12 +91,11 @@ Runtime templates set up the Linux pieces for a framework.
 | Template | Status | Notes |
 | --- | --- | --- |
 | Laravel | Working | PHP / PHP-FPM setup |
-| Vue | Working | Static frontend setup |
+| Next.js | Working | Node runtime setup |
 | Nuxt | Working | Nuxt runtime setup |
-| Svelte | Planned | Not working yet |
-| Django | Planned | Not working yet |
-| Rails | Planned | Not working yet |
-| Next.js | Planned | Not working yet |
+| Vue | Working | Static frontend setup |
+| Django | Not tested | Python / Gunicorn not tested yet |
+| Rails | Not tested | Ruby not tested yet |
 
 Templates are not magic. They are shared server setup so every project does not become a custom snowflake.
 

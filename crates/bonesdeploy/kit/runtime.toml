@@ -10,4 +10,7 @@ release_group = ""
 # Set recursive = true for directories whose contents also
 # need the same mode.
 [permissions]
-paths = [{ path = "*", type = "dir", mode = "750" }, { path = "*", type = "file", mode = "640" }]
+paths = [
+	{ path = "*", type = "dir", mode = "750" }, 
+	{ path = "*", type = "file", mode = "640" }
+]
