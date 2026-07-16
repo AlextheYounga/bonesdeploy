@@ -177,15 +177,13 @@ fn configure_podman_create_command(
         .arg("--env")
         .arg(format!("WEB_ROOT={}", env.web_root))
         .arg("--env")
-        .arg(format!("SERVICE_USER={}", env.project_name))
-        .args(["--volume"])
-        .arg(mount)
-        .arg(BUILD_IMAGE)
-        .args(["sleep", "infinity"]);
+        .arg(format!("SERVICE_USER={}", env.project_name));
 
     for (key, value) in env.build_env_vars {
         command.arg("--env").arg(format!("{key}={value}"));
     }
+
+    command.args(["--volume"]).arg(mount).arg(BUILD_IMAGE).args(["sleep", "infinity"]);
 }
 
 fn configure_podman_exec_command(command: &mut Command, source_root: &Path, container_name: &str) {
@@ -267,6 +265,31 @@ fn podman_build_command_mounts_only_source_tree() {
     assert_eq!(command.get_program(), "systemd-run");
     assert_build_command_identity(&args);
     assert_build_command_mounts(&args, &command);
+}
+
+#[cfg(test)]
+#[test]
+fn podman_build_command_places_environment_before_image() {
+    let build_env_vars = [(String::from("PHP_VERSION"), String::from("8.5"))];
+    let mut command = build_container_service_command("demo-build", "demo-container");
+    configure_podman_create_command(
+        &mut command,
+        Path::new("/tmp/source"),
+        &BuildScriptEnv {
+            project_name: "demo",
+            build_user: "demo-build",
+            web_root: "public",
+            build_env_vars: &build_env_vars,
+        },
+        "demo-container",
+    );
+
+    let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+    let image_index = args.iter().position(|arg| arg == BUILD_IMAGE).expect("image should be present");
+    let env_index = args.iter().position(|arg| arg == "PHP_VERSION=8.5").expect("build environment should be present");
+
+    assert!(env_index < image_index);
+    assert_eq!(&args[image_index + 1..], ["sleep", "infinity"]);
 }
 
 #[cfg(test)]
