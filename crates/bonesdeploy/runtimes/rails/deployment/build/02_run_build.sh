@@ -3,7 +3,6 @@
 set -Eeuo pipefail
 
 readonly LOG_PREFIX="[bonesdeploy]"
-export NODE_OPTIONS="--max-old-space-size-percentage=70"
 
 on_error() {
 	local status=$?

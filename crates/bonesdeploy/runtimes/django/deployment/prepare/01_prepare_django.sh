@@ -33,19 +33,13 @@ activate_virtualenv() {
 
 install_python_dependencies() {
 	log "Installing Django Python dependencies..."
-	python -m pip install --upgrade pip
 
 	if [ -f requirements.txt ]; then
 		python -m pip install -r requirements.txt --quiet
 		return
 	fi
 
-	if [ -f pyproject.toml ]; then
-		python -m pip install . --quiet
-		return
-	fi
-
-	log "No requirements.txt or pyproject.toml found; skipping Python dependency install."
+	log "No requirements.txt found; skipping Python dependency install."
 }
 
 run_migrations() {
