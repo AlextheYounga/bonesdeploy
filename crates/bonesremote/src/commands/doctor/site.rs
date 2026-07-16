@@ -71,10 +71,6 @@ fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bone
         return None;
     }
 
-    if let Err(error) = config::load_runtime(&site_root) {
-        issues.push(format!("control-plane runtime.toml is invalid: {error}"));
-    }
-
     Some(cfg)
 }
 

@@ -11,8 +11,7 @@ use crate::privileges;
 
 const POST_RECEIVE_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/post-receive"));
 
-const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] =
-    &[paths::BONES_TOML, paths::RUNTIME_TOML, paths::BUILDTIME_TOML, paths::DEPLOYMENT_DIR];
+const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] = &[paths::BONES_TOML, paths::DEPLOYMENT_DIR];
 
 fn validate_site_name(site: &str) -> Result<()> {
     if site.is_empty() {
@@ -122,8 +121,6 @@ fn validate_site_dataset(site: &str, root: &Path) -> Result<()> {
         bail!("Imported site dataset is for '{}', expected '{}'", bones.project_name, site);
     }
 
-    config::load_runtime(root)?;
-
     Ok(())
 }
 
@@ -180,15 +177,13 @@ mod tests {
     use shared::paths;
 
     #[test]
-    fn validate_top_level_entries_allows_buildtime_toml() -> Result<()> {
+    fn validate_top_level_entries_allows_single_config() -> Result<()> {
         let root = env::temp_dir().join(format!("bonesremote-site-buildtime-test-{}", process::id()));
         if root.exists() {
             fs::remove_dir_all(&root)?;
         }
         fs::create_dir_all(&root)?;
         fs::write(root.join(paths::BONES_TOML), "")?;
-        fs::write(root.join(paths::RUNTIME_TOML), "")?;
-        fs::write(root.join(paths::BUILDTIME_TOML), "")?;
         fs::create_dir_all(root.join(paths::DEPLOYMENT_DIR))?;
 
         let result = validate_top_level_entries(&root);
@@ -227,20 +222,21 @@ mod tests {
             site_root.join(paths::BONES_TOML),
             format!(
                 r#"
+[app]
 remote_name = "production"
 project_name = "unitapp"
+repo_path = "{}"
+project_root = "/srv/sites/unitapp"
+[app.server]
 ssh_user = "root"
 host = "example.com"
 port = "22"
-repo_path = "{}"
-project_root = "/srv/sites/unitapp"
-branch = "main"
+[app.dns]
 preview_domain = ""
+[app.deploy]
+branch = "main"
 deploy_on_push = false
 releases = 5
-ssl_enabled = false
-domain = ""
-email = ""
 "#,
                 repo_root.display()
             ),

@@ -73,21 +73,20 @@ fn collect_from_existing(
     let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
     let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 
-    Ok(config::Bones {
-        remote_name,
-        project_name,
-        host,
-        port,
-        repo_path,
-        project_root,
-        branch,
-        deploy_on_push,
-        releases_keep,
-        ssl_enabled,
-        domain,
-        email,
-        ..Default::default()
-    })
+    let mut config = config::Bones::default();
+    config.remote_name = remote_name;
+    config.project_name = project_name;
+    config.host = host;
+    config.port = port;
+    config.repo_path = repo_path;
+    config.project_root = project_root;
+    config.branch = branch;
+    config.deploy_on_push = deploy_on_push;
+    config.releases_keep = releases_keep;
+    config.ssl_enabled = ssl_enabled;
+    config.domain = domain;
+    config.email = email;
+    Ok(config)
 }
 
 fn cli_or_prompt(
@@ -128,21 +127,20 @@ pub(super) fn collect_non_interactive(
     let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
     let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 
-    Ok(config::Bones {
-        remote_name,
-        project_name,
-        host,
-        port,
-        repo_path,
-        project_root,
-        branch,
-        deploy_on_push,
-        releases_keep,
-        ssl_enabled,
-        domain,
-        email,
-        ..Default::default()
-    })
+    let mut config = config::Bones::default();
+    config.remote_name = remote_name;
+    config.project_name = project_name;
+    config.host = host;
+    config.port = port;
+    config.repo_path = repo_path;
+    config.project_root = project_root;
+    config.branch = branch;
+    config.deploy_on_push = deploy_on_push;
+    config.releases_keep = releases_keep;
+    config.ssl_enabled = ssl_enabled;
+    config.domain = domain;
+    config.email = email;
+    Ok(config)
 }
 
 fn resolve_project_name(
@@ -269,17 +267,13 @@ mod tests {
     use crate::config::Bones;
 
     fn incomplete_existing(project_name: &str) -> Bones {
-        Bones {
-            remote_name: String::from("production"),
-            project_name: String::from(project_name),
-            host: String::new(),
-            port: String::from("22"),
-            repo_path: String::new(),
-            project_root: String::new(),
-            branch: String::from("main"),
-            deploy_on_push: true,
-            ..Default::default()
-        }
+        let mut config = Bones::default();
+        config.remote_name = String::from("production");
+        config.project_name = String::from(project_name);
+        config.port = String::from("22");
+        config.branch = String::from("main");
+        config.deploy_on_push = true;
+        config
     }
 
     #[test]

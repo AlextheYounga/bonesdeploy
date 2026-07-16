@@ -124,17 +124,16 @@ mod tests {
     use super::{base, ssl};
 
     fn test_cfg() -> Bones {
-        Bones {
-            project_name: String::from("test"),
-            repo_path: String::from("/home/git/test.git"),
-            project_root: String::from("/srv/test"),
-            host: String::from("example.com"),
-            port: String::from("22"),
-            branch: String::from("master"),
-            remote_name: String::from("production"),
-            deploy_on_push: true,
-            ..Default::default()
-        }
+        let mut config = Bones::default();
+        config.project_name = String::from("test");
+        config.repo_path = String::from("/home/git/test.git");
+        config.project_root = String::from("/srv/test");
+        config.host = String::from("example.com");
+        config.port = String::from("22");
+        config.branch = String::from("master");
+        config.remote_name = String::from("production");
+        config.deploy_on_push = true;
+        config
     }
 
     /// Passes the SSL domain and email into the deploy data sent to bonesinfra

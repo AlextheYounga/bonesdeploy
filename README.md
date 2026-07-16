@@ -91,12 +91,11 @@ Runtime templates set up the Linux pieces for a framework.
 | Template | Status | Notes |
 | --- | --- | --- |
 | Laravel | Working | PHP / PHP-FPM setup |
-| Vue | Working | Static frontend setup |
+| Next.js | Working | Node runtime setup |
 | Nuxt | Working | Nuxt runtime setup |
-| Svelte | Planned | Not working yet |
-| Django | Planned | Not working yet |
-| Rails | Planned | Not working yet |
-| Next.js | Planned | Not working yet |
+| Vue | Working | Static frontend setup |
+| Django | Not tested | Python / Gunicorn not tested yet |
+| Rails | Not tested | Ruby not tested yet |
 
 Templates are not magic. They are shared server setup so every project does not become a custom snowflake.
 
@@ -129,8 +128,6 @@ This creates:
 ```text
 .bones/
 ├── bones.toml
-├── runtime.toml
-├── buildtime.toml
 └── deployment/
     └── 01_*.sh
 ```
@@ -238,18 +235,33 @@ bonesdeploy update
 `bonesdeploy init` creates `.bones/bones.toml`:
 
 ```toml
+[app]
 remote_name = "production"
 project_name = "myproject"
 repo_path = "/home/git/myproject.git"
 project_root = "/srv/sites/myproject"
+
+[app.server]
+host = "deploy.example.com"
+ssh_user = "root"
 port = "22"
+
+[app.deploy]
 branch = "master"
+deploy_on_push = false
+releases = 5
+
+[app.dns]
 domain = ""
 preview_domain = ""
 email = ""
-deploy_on_push = false
 ssl_enabled = false
-releases = 5
+
+[build]
+vars = []
+
+[runtime]
+template = "custom"
 ```
 
 Common defaults:
@@ -258,9 +270,7 @@ Common defaults:
 
 ```
 .bones/
-├── bones.toml           # project configuration
-├── runtime.toml         # framework runtime configuration
-├── buildtime.toml       # build-time env vars from shared/.env
+├── bones.toml           # project, build, and runtime configuration
 └── deployment/
     ├── build/
     │   └── 01_*.sh      # build scripts (run sequentially in the buildpack-deps container)

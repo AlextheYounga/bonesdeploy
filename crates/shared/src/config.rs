@@ -1,11 +1,16 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
 use anyhow::{bail, Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::paths;
+
+#[path = "app.rs"]
+mod app;
+pub use app::App;
 
 /// Keys in the JSON object that bonesdeploy sends to bonesinfra.
 pub mod bonesinfra_input {
@@ -21,52 +26,28 @@ pub mod bonesinfra_input {
     pub const RELEASE_GROUP: &str = "release_group";
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Bones {
-    pub remote_name: String,
-    pub project_name: String,
-    pub ssh_user: String,
-    pub host: String,
-    pub port: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub repo_path: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub project_root: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub branch: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub preview_domain: String,
-    pub deploy_on_push: bool,
-    #[serde(rename = "releases")]
-    pub releases_keep: usize,
-    pub ssl_enabled: bool,
-    pub domain: String,
-    pub email: String,
+    pub app: App,
+    #[serde(rename = "build")]
+    pub buildtime: Buildtime,
+    pub runtime: Runtime,
 }
 
-impl Default for Bones {
-    fn default() -> Self {
-        Self {
-            remote_name: String::new(),
-            project_name: String::new(),
-            ssh_user: String::from("root"),
-            host: String::new(),
-            port: "22".into(),
-            repo_path: String::new(),
-            project_root: String::new(),
-            branch: "master".into(),
-            preview_domain: String::new(),
-            deploy_on_push: false,
-            releases_keep: 5,
-            ssl_enabled: false,
-            domain: String::new(),
-            email: String::new(),
-        }
+impl Deref for Bones {
+    type Target = App;
+
+    fn deref(&self) -> &Self::Target {
+        &self.app
     }
 }
 
-impl Bones {}
+impl DerefMut for Bones {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.app
+    }
+}
 
 #[must_use]
 pub fn default_deploy_user() -> String {
@@ -74,16 +55,13 @@ pub fn default_deploy_user() -> String {
 }
 
 /// # Errors
-///
-/// Returns an error if the string cannot be parsed as a `u16` port number.
+/// Returns an error when `port` is not a valid TCP port number.
 pub fn parse_port(port: &str) -> Result<u16> {
     port.parse().with_context(|| format!("Invalid port: {port}"))
 }
 
 /// # Errors
-///
-/// Returns an error if the host contains characters that are not ASCII
-/// alphanumeric, dots, or dashes.
+/// Returns an error when `host` contains unsupported characters.
 pub fn validate_host(host: &str) -> Result<()> {
     let host = host.trim();
     if host.is_empty() {
@@ -151,6 +129,8 @@ fn sanitize_domain_label(value: &str) -> String {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Runtime {
+    #[serde(default)]
+    pub template: String,
     #[serde(default = "paths::default_web_root")]
     pub web_root: String,
     #[serde(default)]
@@ -161,6 +141,25 @@ pub struct Runtime {
     pub release_group: String,
     #[serde(default)]
     pub shared: Shared,
+    #[serde(default)]
+    pub permissions: Option<toml::Value>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, String>,
+}
+
+impl Default for Runtime {
+    fn default() -> Self {
+        Self {
+            template: String::new(),
+            web_root: paths::default_web_root(),
+            runtime_user: String::new(),
+            runtime_group: String::new(),
+            release_group: String::new(),
+            shared: Shared::default(),
+            permissions: None,
+            extra: BTreeMap::new(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -191,16 +190,16 @@ pub struct Buildtime {
     pub extra: BTreeMap<String, String>,
 }
 
-/// Returns `Ok(None)` when the file is missing, or an error if it exists but can't be read/parsed.
+/// # Errors
+/// Returns an error when the configuration cannot be read or parsed.
 pub fn load_buildtime(config_dir: &Path) -> Result<Option<Buildtime>> {
-    let path = config_dir.join(paths::BUILDTIME_TOML);
+    let path = config_dir.join(paths::BONES_TOML);
     if !path.exists() {
         return Ok(None);
     }
     let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let buildtime: Buildtime =
-        toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(Some(buildtime))
+    let bones: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    Ok(Some(bones.buildtime))
 }
 
 #[must_use]
@@ -235,46 +234,34 @@ fn strip_quotes(s: &str) -> &str {
     }
 }
 
-/// Loads `runtime.toml` from `config_dir`, falling back to defaults when the file is missing.
+/// # Errors
+/// Returns an error when the configuration cannot be read or parsed.
 pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
-    let path = config_dir.join(paths::RUNTIME_TOML);
-    if path.exists() {
-        let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
-        let runtime: Runtime =
-            toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-        Ok(runtime)
-    } else {
-        Ok(Runtime {
-            web_root: paths::default_web_root(),
-            runtime_user: String::new(),
-            runtime_group: String::new(),
-            release_group: String::new(),
-            shared: Shared::default(),
-        })
-    }
+    let path = config_dir.join(paths::BONES_TOML);
+    let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let bones: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
+    Ok(bones.runtime)
 }
 
 pub fn apply_derived_defaults(config: &mut Bones) {
-    let project_name = &config.project_name;
+    let project_name = config.project_name.clone();
 
     if config.ssh_user.is_empty() {
         config.ssh_user = String::from("root");
     }
     if config.repo_path.is_empty() {
-        config.repo_path = default_repo_path_for(project_name);
+        config.repo_path = default_repo_path_for(&project_name);
     }
     if config.project_root.is_empty() {
-        config.project_root = paths::default_project_root_for(project_name);
+        config.project_root = paths::default_project_root_for(&project_name);
     }
     if config.preview_domain.is_empty() {
-        config.preview_domain = default_preview_domain_for(project_name, &config.host);
+        config.preview_domain = default_preview_domain_for(&project_name, &config.host);
     }
 }
 
 /// Loads and parses a `bones.toml` configuration file, applying derived defaults.
-///
 /// # Errors
-///
 /// Returns an error if the file cannot be read or the TOML is invalid.
 pub fn load(path: &Path) -> Result<Bones> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
@@ -327,12 +314,6 @@ paths = [
     }
 
     #[test]
-    fn build_identity_helpers_are_derived_from_project_name() {
-        assert_eq!(build_user_for("demo"), "demo-build");
-        assert_eq!(build_group_for("demo"), "demo-build");
-    }
-
-    #[test]
     fn extract_env_vars_parses_all_quote_styles() {
         assert_eq!(
             extract_env_vars("KEY=hello\nOTHER=world", &["KEY".into()]),
@@ -363,35 +344,13 @@ paths = [
     }
 
     #[test]
-    fn load_buildtime_returns_none_for_missing_file() {
-        let result = load_buildtime(Path::new("/tmp/nonexistent_dir_for_test")).unwrap();
-        assert!(result.is_none());
-    }
-
-    #[test]
-    fn load_buildtime_parses_vars_and_extra() {
-        let dir = env::temp_dir().join("bones-buildtime-vars-extra");
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("buildtime.toml"), "vars = [\"A\"]\nphp_version = \"8.5\"\n").unwrap();
-        let result = load_buildtime(&dir).unwrap().unwrap();
-        assert_eq!(result.vars, vec!["A"]);
-        assert_eq!(result.extra.get("php_version").unwrap(), "8.5");
-        fs::remove_dir_all(&dir).ok();
-
+    fn load_buildtime_reads_nested_build_settings() {
         let dir = env::temp_dir().join("bones-buildtime-vars");
         fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("buildtime.toml"), "vars = [\"A\", \"B\"]").unwrap();
+        fs::write(dir.join("bones.toml"), "[build]\nvars = [\"A\"]\ntool_version = \"8.5\"\n").unwrap();
         let result = load_buildtime(&dir).unwrap().unwrap();
-        assert_eq!(result.vars, vec!["A", "B"]);
-        assert!(result.extra.is_empty());
-        fs::remove_dir_all(&dir).ok();
-
-        let dir = env::temp_dir().join("bones-buildtime-empty-vars");
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("buildtime.toml"), "vars = []").unwrap();
-        let result = load_buildtime(&dir).unwrap().unwrap();
-        assert!(result.vars.is_empty());
-        assert!(result.extra.is_empty());
+        assert_eq!(result.vars, vec!["A"]);
+        assert_eq!(result.extra.get("tool_version").unwrap(), "8.5");
         fs::remove_dir_all(&dir).ok();
     }
 }

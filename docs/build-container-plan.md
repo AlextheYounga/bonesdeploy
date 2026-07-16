@@ -32,7 +32,7 @@ This preserves tool installs across scripts in a single deploy without persistin
 
 ## Base Image
 
-`runtime.toml` should not choose the build image. For now, `bonesremote` uses one hardcoded base:
+The `[runtime]` section of `bones.toml` should not choose the build image. For now, `bonesremote` uses one hardcoded base:
 
 ```text
 docker.io/library/buildpack-deps:bookworm

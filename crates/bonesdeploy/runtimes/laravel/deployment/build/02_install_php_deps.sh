@@ -71,15 +71,15 @@ install_system_packages() {
 	log "Installing PHP and Composer build packages..."
 	export DEBIAN_FRONTEND=noninteractive
 
-	if [ -n "${php_version:-}" ]; then
+	if [ -n "${PHP_VERSION:-}" ]; then
 		_add_sury_repo
 		apt-get install -y --no-install-recommends \
-			"php${php_version}-cli" \
-			"php${php_version}-curl" \
-			"php${php_version}-mbstring" \
-			"php${php_version}-sqlite3" \
-			"php${php_version}-xml" \
-			"php${php_version}-zip" \
+			"php${PHP_VERSION}-cli" \
+			"php${PHP_VERSION}-curl" \
+			"php${PHP_VERSION}-mbstring" \
+			"php${PHP_VERSION}-sqlite3" \
+			"php${PHP_VERSION}-xml" \
+			"php${PHP_VERSION}-zip" \
 			composer \
 			git \
 			unzip
