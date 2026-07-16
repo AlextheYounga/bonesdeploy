@@ -10,3 +10,13 @@
 #
 vars = [
 ]
+
+# ── Build-time configuration constants ────────────────────
+# Top-level keys (except `vars`) are injected as same-named
+# environment variables into the build container.
+# Non-secret, safe to commit.
+#
+# php_version must match the value in runtime.toml — they
+# serve different lifecycle phases (build vs. runtime) but
+# must refer to the same PHP major.minor release.
+php_version = "8.5"

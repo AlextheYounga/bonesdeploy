@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -186,11 +187,11 @@ pub enum SharedPathType {
 pub struct Buildtime {
     #[serde(default)]
     pub vars: Vec<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, String>,
 }
 
-/// # Errors
-///
-/// Returns an error if the file exists but cannot be read or parsed.
+/// Returns `Ok(None)` when the file is missing, or an error if it exists but can't be read/parsed.
 pub fn load_buildtime(config_dir: &Path) -> Result<Option<Buildtime>> {
     let path = config_dir.join(paths::BUILDTIME_TOML);
     if !path.exists() {
@@ -234,11 +235,7 @@ fn strip_quotes(s: &str) -> &str {
     }
 }
 
-/// Loads the runtime configuration from a TOML file, falling back to defaults.
-///
-/// # Errors
-///
-/// Returns an error if the file exists but cannot be read or parsed.
+/// Loads `runtime.toml` from `config_dir`, falling back to defaults when the file is missing.
 pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
     let path = config_dir.join(paths::RUNTIME_TOML);
     if path.exists() {
@@ -336,21 +333,19 @@ paths = [
     }
 
     #[test]
-    fn extract_env_vars_parses_unquoted_values() {
-        let vars = extract_env_vars("KEY=hello\nOTHER=world", &["KEY".into()]);
-        assert_eq!(vars, vec![("KEY".to_string(), "hello".to_string())]);
-    }
-
-    #[test]
-    fn extract_env_vars_parses_double_quoted_values() {
-        let vars = extract_env_vars(r#"KEY="hello world""#, &["KEY".into()]);
-        assert_eq!(vars, vec![("KEY".to_string(), "hello world".to_string())]);
-    }
-
-    #[test]
-    fn extract_env_vars_parses_single_quoted_values() {
-        let vars = extract_env_vars("KEY='hello world'", &["KEY".into()]);
-        assert_eq!(vars, vec![("KEY".to_string(), "hello world".to_string())]);
+    fn extract_env_vars_parses_all_quote_styles() {
+        assert_eq!(
+            extract_env_vars("KEY=hello\nOTHER=world", &["KEY".into()]),
+            vec![("KEY".to_string(), "hello".to_string())]
+        );
+        assert_eq!(
+            extract_env_vars(r#"KEY="hello world""#, &["KEY".into()]),
+            vec![("KEY".to_string(), "hello world".to_string())]
+        );
+        assert_eq!(
+            extract_env_vars("KEY='hello world'", &["KEY".into()]),
+            vec![("KEY".to_string(), "hello world".to_string())]
+        );
     }
 
     #[test]
@@ -374,26 +369,29 @@ paths = [
     }
 
     #[test]
-    fn load_buildtime_parses_vars_array() {
-        let dir = env::temp_dir().join("bones-buildtime-test");
+    fn load_buildtime_parses_vars_and_extra() {
+        let dir = env::temp_dir().join("bones-buildtime-vars-extra");
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(dir.join("buildtime.toml"), "vars = [\"A\"]\nphp_version = \"8.5\"\n").unwrap();
+        let result = load_buildtime(&dir).unwrap().unwrap();
+        assert_eq!(result.vars, vec!["A"]);
+        assert_eq!(result.extra.get("php_version").unwrap(), "8.5");
+        fs::remove_dir_all(&dir).ok();
+
+        let dir = env::temp_dir().join("bones-buildtime-vars");
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("buildtime.toml"), "vars = [\"A\", \"B\"]").unwrap();
-
         let result = load_buildtime(&dir).unwrap().unwrap();
         assert_eq!(result.vars, vec!["A", "B"]);
-
+        assert!(result.extra.is_empty());
         fs::remove_dir_all(&dir).ok();
-    }
 
-    #[test]
-    fn load_buildtime_empty_vars_is_fine() {
-        let dir = env::temp_dir().join("bones-buildtime-empty-test");
+        let dir = env::temp_dir().join("bones-buildtime-empty-vars");
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join("buildtime.toml"), "vars = []").unwrap();
-
         let result = load_buildtime(&dir).unwrap().unwrap();
         assert!(result.vars.is_empty());
-
+        assert!(result.extra.is_empty());
         fs::remove_dir_all(&dir).ok();
     }
 }

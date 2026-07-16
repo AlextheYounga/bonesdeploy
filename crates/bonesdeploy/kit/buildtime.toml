@@ -7,3 +7,11 @@
 #
 vars = [
 ]
+
+# ── Build-time configuration constants ────────────────────
+# Top-level keys (except `vars`) are injected as same-named
+# environment variables into the build container.
+# Non-secret, safe to commit.
+#
+# Example:
+# php_version = "8.5"

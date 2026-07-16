@@ -41,20 +41,61 @@ require_environment() {
 	: "${PROJECT_ROOT:?PROJECT_ROOT must be set by bonesremote}"
 }
 
+_add_sury_repo() {
+	local codename="bookworm"
+	local keyring="/usr/share/keyrings/deb.sury.org-php.gpg"
+
+	if [ -f "$keyring" ]; then
+		apt-get update
+		return
+	fi
+
+	apt-get update
+	apt-get install -y --no-install-recommends apt-transport-https ca-certificates curl
+
+	local deb
+	deb="$(mktemp /tmp/debsuryorg-keyring.XXXXXX.deb)"
+
+	curl -fsSL -o "$deb" https://packages.sury.org/debsuryorg-archive-keyring.deb
+	dpkg -i "$deb"
+	rm -f "$deb"
+
+	# ponytail: codename tied to BUILD_IMAGE (buildpack-deps:bookworm).
+	# If the build container moves to a different Debian release, update this.
+	echo "deb [signed-by=${keyring}] https://packages.sury.org/php ${codename} main" \
+		>/etc/apt/sources.list.d/php.list
+	apt-get update
+}
+
 install_system_packages() {
 	log "Installing PHP and Composer build packages..."
 	export DEBIAN_FRONTEND=noninteractive
-	apt-get update
-	apt-get install -y --no-install-recommends \
-		composer \
-		git \
-		php-cli \
-		php-curl \
-		php-mbstring \
-		php-sqlite3 \
-		php-xml \
-		php-zip \
-		unzip
+
+	if [ -n "${php_version:-}" ]; then
+		_add_sury_repo
+		apt-get install -y --no-install-recommends \
+			"php${php_version}-cli" \
+			"php${php_version}-curl" \
+			"php${php_version}-mbstring" \
+			"php${php_version}-sqlite3" \
+			"php${php_version}-xml" \
+			"php${php_version}-zip" \
+			composer \
+			git \
+			unzip
+	else
+		apt-get update
+		apt-get install -y --no-install-recommends \
+			composer \
+			git \
+			php-cli \
+			php-curl \
+			php-mbstring \
+			php-sqlite3 \
+			php-xml \
+			php-zip \
+			unzip
+	fi
 }
 
 configure_environment() {
