@@ -1,34 +1,103 @@
 use std::fs;
-use std::io::Write;
 use std::path::Path;
 use std::process::{Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, bail};
-use shared::paths;
 
 use super::output;
 
-const BUILD_IMAGE: &str = "docker.io/library/debian:bookworm";
-const BUILD_BOOTSTRAP_SCRIPT: &str = include_str!("build_bootstrap.sh");
+const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
 
 pub(crate) struct BuildScriptEnv<'a> {
     pub(crate) project_name: &'a str,
     pub(crate) build_user: &'a str,
-    pub(crate) build_uid: u32,
     pub(crate) web_root: &'a str,
+    pub(crate) build_env_vars: &'a [(String, String)],
+}
+
+fn build_user_command(build_user: &str) -> Command {
+    let mut command = Command::new("systemd-run");
+    command.arg(format!("--machine={build_user}@")).args(["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    command
+}
+
+fn build_user_control_command(build_user: &str) -> Command {
+    let mut command = build_user_command(build_user);
+    command.arg("--property=RuntimeMaxSec=20s");
+    command
+}
+
+pub(crate) fn ensure_build_user_ready(build_user: &str, working_dir: &Path) -> Result<()> {
+    let uid = Command::new("id")
+        .args(["-u", build_user])
+        .output()
+        .with_context(|| format!("Failed to resolve build user {build_user}"))?;
+    if !uid.status.success() {
+        bail!("Failed to resolve build user {build_user}");
+    }
+    let uid = String::from_utf8_lossy(&uid.stdout).trim().to_string();
+    if uid.is_empty() {
+        bail!("Build user {build_user} has no UID");
+    }
+
+    let status = Command::new("systemctl")
+        .args(["start", &format!("user@{uid}.service")])
+        .status()
+        .with_context(|| format!("Failed to start the systemd user manager for {build_user}"))?;
+    if !status.success() {
+        bail!("Failed to start the systemd user manager for {build_user}: {status}");
+    }
+
+    let status = Command::new("systemctl")
+        .args(["is-active", "--quiet", &format!("user@{uid}.service")])
+        .status()
+        .with_context(|| format!("Failed to inspect the systemd user manager for {build_user}"))?;
+    if !status.success() {
+        bail!("The systemd user manager for {build_user} is not active");
+    }
+
+    let mut command = build_user_control_command(build_user);
+    let status = command
+        .current_dir(working_dir)
+        .args(["podman", "info", "--format", "{{.Host.Security.Rootless}}"])
+        .stdout(Stdio::null())
+        .status()
+        .with_context(|| format!("Failed to check rootless Podman for {build_user}"))?;
+    if !status.success() {
+        bail!(
+            "Rootless Podman is not ready for {build_user}. Its user session or Podman namespace is unhealthy; repair it before deploying."
+        );
+    }
+
+    Ok(())
+}
+
+fn build_container_service_command(build_user: &str, container_name: &str) -> Command {
+    let mut command = Command::new("systemd-run");
+    // Conmon reports when the container is ready and remains the service's
+    // tracked process. Podman remains responsible for stopping the container.
+    command
+        .arg(format!("--machine={build_user}@"))
+        .args(["--quiet", "--user", "--collect", "--unit"])
+        .arg(container_name)
+        .args(["--service-type=notify", "--property=NotifyAccess=all", "--property=KillMode=none"]);
+    command
 }
 
 pub(crate) struct BuildContainer<'a> {
     env: &'a BuildScriptEnv<'a>,
+    source_root: &'a Path,
     name: String,
     removed: bool,
 }
 
 impl<'a> BuildContainer<'a> {
     pub(crate) fn start(source_root: &'a Path, env: &'a BuildScriptEnv<'a>) -> Result<Self> {
-        let mut command = Command::new("runuser");
         let name = build_container_name(env.project_name);
-        remove_existing_container(env, &name)?;
+        remove_existing_container(source_root, env, &name)?;
+        pull_build_image(source_root, env, &name)?;
+
+        let mut command = build_container_service_command(env.build_user, &name);
         configure_podman_create_command(&mut command, source_root, env, &name);
 
         let status = command.status().with_context(|| format!("Failed to start build container {name}"))?;
@@ -36,20 +105,7 @@ impl<'a> BuildContainer<'a> {
             bail!("Failed to start build container {name}: {status}");
         }
 
-        let container = Self { env, name, removed: false };
-
-        let status = container
-            .run_inline_script(
-                "00_bonesdeploy_build_bootstrap.sh",
-                BUILD_BOOTSTRAP_SCRIPT,
-                &source_root.join(".bonesdeploy-build-bootstrap.log"),
-            )
-            .context("Failed to execute internal build bootstrap script")?;
-        if !status.success() {
-            bail!("Internal build bootstrap script exited with status {status}");
-        }
-
-        Ok(container)
+        Ok(Self { env, source_root, name, removed: false })
     }
 
     pub(crate) fn run_script(&self, script: &Path, log_path: &Path) -> Result<ExitStatus> {
@@ -57,8 +113,8 @@ impl<'a> BuildContainer<'a> {
             fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
         let description = format!("podman build script {}", script.display());
 
-        let mut command = Command::new("runuser");
-        configure_podman_exec_command(&mut command, self.env, &self.name);
+        let mut command = build_user_command(self.env.build_user);
+        configure_podman_exec_command(&mut command, self.source_root, &self.name);
         let mut child = command
             .stdin(Stdio::from(script_file))
             .stdout(Stdio::piped())
@@ -68,30 +124,13 @@ impl<'a> BuildContainer<'a> {
         output::stream_child_output(&mut child, log_path, &description)
     }
 
-    fn run_inline_script(&self, script_name: &str, script_contents: &str, log_path: &Path) -> Result<ExitStatus> {
-        let description = format!("podman build script {script_name}");
-
-        let mut command = Command::new("runuser");
-        configure_podman_exec_command(&mut command, self.env, &self.name);
-        let mut child = command
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .with_context(|| format!("Failed to execute {description} in podman"))?;
-        let mut child_stdin = child.stdin.take().context("Podman child stdin was not available")?;
-        child_stdin.write_all(script_contents.as_bytes()).context("Failed to write script into podman stdin")?;
-        drop(child_stdin);
-        output::stream_child_output(&mut child, log_path, &description)
-    }
-
     pub(crate) fn remove(&mut self) -> Result<()> {
         if self.removed {
             return Ok(());
         }
 
-        let mut command = Command::new("runuser");
-        configure_podman_remove_command(&mut command, self.env, &self.name);
+        let mut command = build_user_control_command(self.env.build_user);
+        configure_podman_remove_command(&mut command, self.source_root, &self.name);
         let status = command.status().with_context(|| format!("Failed to remove build container {}", self.name))?;
         if !status.success() {
             bail!("Failed to remove build container {}: {}", self.name, status);
@@ -108,8 +147,8 @@ impl Drop for BuildContainer<'_> {
             return;
         }
 
-        let mut command = Command::new("runuser");
-        configure_podman_remove_command(&mut command, self.env, &self.name);
+        let mut command = build_user_control_command(self.env.build_user);
+        configure_podman_remove_command(&mut command, self.source_root, &self.name);
         let _ = command.status();
         self.removed = true;
     }
@@ -123,20 +162,11 @@ fn configure_podman_create_command(
 ) {
     let mount = format!("{}:/workspace/source", source_root.display());
     command
-        .args(["-u", env.build_user, "--", "env"])
-        .arg(format!("HOME={}", paths::bonesdeploy_user_home(env.build_user).display()))
-        .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", env.build_uid))
         .current_dir(source_root)
-        .args([
-            "podman",
-            "run",
-            "-d",
-            "--pull=missing",
-            "--security-opt=no-new-privileges",
-            "--cap-drop=all",
-            "--workdir=/workspace/source",
-            "--name",
-        ])
+        .args(["podman", "run", "-d", "--pull=never"])
+        .arg("--sdnotify=conmon")
+        .arg("--cgroups=no-conmon")
+        .args(["--security-opt=no-new-privileges", "--workdir=/workspace/source", "--name"])
         .arg(container_name)
         .args(["--env"])
         .arg(format!("PROJECT_NAME={}", env.project_name))
@@ -152,52 +182,35 @@ fn configure_podman_create_command(
         .arg(mount)
         .arg(BUILD_IMAGE)
         .args(["sleep", "infinity"]);
+
+    for (key, value) in env.build_env_vars {
+        command.arg("--env").arg(format!("{key}={value}"));
+    }
 }
 
-fn configure_podman_exec_command(command: &mut Command, env: &BuildScriptEnv<'_>, container_name: &str) {
-    command
-        .args(["-u", env.build_user, "--", "env"])
-        .arg(format!("HOME={}", paths::bonesdeploy_user_home(env.build_user).display()))
-        .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", env.build_uid))
-        .args(["podman", "exec", "-i", container_name, "bash", "-c", "umask 0002; exec bash -s"]);
+fn configure_podman_exec_command(command: &mut Command, source_root: &Path, container_name: &str) {
+    command.current_dir(source_root).args([
+        "podman",
+        "exec",
+        "-i",
+        container_name,
+        "bash",
+        "-c",
+        "umask 0002; exec bash -s",
+    ]);
 }
 
-fn configure_podman_remove_command(command: &mut Command, env: &BuildScriptEnv<'_>, container_name: &str) {
-    command
-        .args(["-u", env.build_user, "--", "env"])
-        .arg(format!("HOME={}", paths::bonesdeploy_user_home(env.build_user).display()))
-        .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", env.build_uid))
-        .args(["podman", "rm", "-f", container_name]);
-}
-
-fn configure_podman_exists_command(command: &mut Command, env: &BuildScriptEnv<'_>, container_name: &str) {
-    command
-        .args(["-u", env.build_user, "--", "env"])
-        .arg(format!("HOME={}", paths::bonesdeploy_user_home(env.build_user).display()))
-        .arg(format!("XDG_RUNTIME_DIR=/run/user/{}", env.build_uid))
-        .args(["podman", "container", "exists", container_name]);
+fn configure_podman_remove_command(command: &mut Command, source_root: &Path, container_name: &str) {
+    command.current_dir(source_root).args(["podman", "rm", "--force", "--time", "0", "--ignore", container_name]);
 }
 
 fn build_container_name(project_name: &str) -> String {
     format!("bonesdeploy-build-{project_name}")
 }
 
-fn remove_existing_container(env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
-    let mut exists = Command::new("runuser");
-    configure_podman_exists_command(&mut exists, env, container_name);
-    let exists_status =
-        exists.status().with_context(|| format!("Failed to check for build container {container_name}"))?;
-
-    if !exists_status.success() {
-        return Ok(());
-    }
-
-    // ponytail: this assumes one deploy per site at a time; upgrade to an explicit per-site lock if
-    // concurrent deploys become a supported behavior.
-    println!("Removing existing build container {container_name} before starting a new build.");
-
-    let mut remove = Command::new("runuser");
-    configure_podman_remove_command(&mut remove, env, container_name);
+fn remove_existing_container(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
+    let mut remove = build_user_control_command(env.build_user);
+    configure_podman_remove_command(&mut remove, source_root, container_name);
     let remove_status =
         remove.status().with_context(|| format!("Failed to remove existing build container {container_name}"))?;
     if !remove_status.success() {
@@ -207,33 +220,114 @@ fn remove_existing_container(env: &BuildScriptEnv<'_>, container_name: &str) -> 
     Ok(())
 }
 
+pub(crate) fn remove_build_container(build_user: &str, project_name: &str, working_dir: &Path) -> Result<()> {
+    let name = build_container_name(project_name);
+    let mut remove = build_user_control_command(build_user);
+    configure_podman_remove_command(&mut remove, working_dir, &name);
+    let status = remove.status().with_context(|| format!("Failed to remove build container {name}"))?;
+    if !status.success() {
+        bail!("Failed to remove build container {name}: {status}");
+    }
+    Ok(())
+}
+
+fn pull_build_image(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
+    let mut exists = build_user_command(env.build_user);
+    exists.current_dir(source_root).args(["podman", "image", "exists", BUILD_IMAGE]);
+    let exists_status =
+        exists.status().with_context(|| format!("Failed to inspect build image for {container_name}"))?;
+    match exists_status.code() {
+        Some(0) => return Ok(()),
+        Some(1) => {}
+        _ => bail!("Failed to inspect build image for {container_name}: {exists_status}"),
+    }
+
+    let mut pull = build_user_command(env.build_user);
+    pull.current_dir(source_root).args(["podman", "pull", BUILD_IMAGE]);
+    let status = pull.status().with_context(|| format!("Failed to prepare build image for {container_name}"))?;
+    if !status.success() {
+        bail!("Failed to prepare build image for {container_name}: {status}");
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 #[test]
 fn podman_build_command_mounts_only_source_tree() {
-    let mut command = Command::new("runuser");
+    let mut command = build_container_service_command("demo-build", "demo-container");
     configure_podman_create_command(
         &mut command,
         Path::new("/tmp/source"),
-        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", build_uid: 1234, web_root: "public" },
+        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", web_root: "public", build_env_vars: &[] },
         "demo-container",
     );
 
     let args = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
-    assert_eq!(args[0], "-u");
-    assert_eq!(args[1], "demo-build");
-    assert_eq!(args[2], "--");
-    assert_eq!(args[3], "env");
-    assert!(args.contains(&String::from("HOME=/var/lib/bonesdeploy/users/demo-build")));
-    assert!(args.contains(&String::from("XDG_RUNTIME_DIR=/run/user/1234")));
+    assert_eq!(command.get_program(), "systemd-run");
+    assert_build_command_identity(&args);
+    assert_build_command_mounts(&args, &command);
+}
+
+#[cfg(test)]
+fn assert_build_command_identity(args: &[String]) {
+    assert_eq!(args[0], "--machine=demo-build@");
+    assert_eq!(&args[1..7], ["--quiet", "--user", "--collect", "--unit", "demo-container", "--service-type=notify"]);
+    assert!(args.contains(&String::from("--property=NotifyAccess=all")));
+    assert!(args.contains(&String::from("--property=KillMode=none")));
+    assert!(!args.iter().any(|arg| arg == "--pipe" || arg == "--wait"));
+    assert!(!args.iter().any(|arg| arg == "runuser" || arg.starts_with("XDG_RUNTIME_DIR=")));
+}
+
+#[cfg(test)]
+fn assert_build_command_mounts(args: &[String], command: &Command) {
     assert!(args.contains(&String::from("podman")));
     assert!(args.contains(&String::from("run")));
     assert!(args.contains(&String::from("-d")));
+    assert!(args.contains(&String::from("--pull=never")));
+    assert!(args.contains(&String::from("--sdnotify=conmon")));
+    assert!(args.contains(&String::from("--cgroups=no-conmon")));
     assert!(args.contains(&String::from("--security-opt=no-new-privileges")));
-    assert!(args.contains(&String::from("--cap-drop=all")));
+    assert!(!args.iter().any(|arg| arg == "--cap-drop=all"));
+    assert!(args.contains(&String::from("docker.io/library/buildpack-deps:bookworm")));
     assert!(args.contains(&String::from("/tmp/source:/workspace/source")));
     assert!(!args.iter().any(|arg| arg.contains("/srv/sites/demo/shared")));
     assert!(!args.iter().any(|arg| arg.contains("/root/.config/bonesremote")));
     assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/source")));
+}
+
+#[cfg(test)]
+#[test]
+fn podman_exec_and_remove_commands_use_source_working_directory() {
+    let mut exec = build_user_command("demo-build");
+    configure_podman_exec_command(&mut exec, Path::new("/tmp/source"), "demo-container");
+    assert_eq!(exec.get_current_dir(), Some(Path::new("/tmp/source")));
+
+    let mut remove = build_user_command("demo-build");
+    configure_podman_remove_command(&mut remove, Path::new("/tmp/source"), "demo-container");
+    let args = remove.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+    assert_eq!(remove.get_current_dir(), Some(Path::new("/tmp/source")));
+    assert!(args.windows(3).any(|window| window == ["podman", "rm", "--force"]));
+    assert!(args.windows(3).any(|window| window == ["--time", "0", "--ignore"]));
+    assert!(args.contains(&String::from("--ignore")));
+}
+
+#[cfg(test)]
+#[test]
+fn build_image_commands_use_the_foreground_user_session() {
+    let mut exists = build_user_command("demo-build");
+    exists.current_dir("/tmp/source").args(["podman", "image", "exists", BUILD_IMAGE]);
+
+    let args = exists.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+    assert_eq!(&args[1..6], ["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    assert!(args.windows(4).any(|window| window == ["podman", "image", "exists", BUILD_IMAGE]));
+
+    let mut pull = build_user_command("demo-build");
+    pull.current_dir("/tmp/source").args(["podman", "pull", BUILD_IMAGE]);
+
+    let args = pull.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect::<Vec<_>>();
+    assert_eq!(&args[1..6], ["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    assert!(args.windows(3).any(|window| window == ["podman", "pull", BUILD_IMAGE]));
 }
 
 #[cfg(test)]

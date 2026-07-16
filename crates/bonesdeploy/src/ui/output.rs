@@ -4,6 +4,18 @@ pub fn green_command(command: &str) -> String {
     style(command).green().to_string()
 }
 
+pub fn success_marker() -> String {
+    style("✓").green().bold().to_string()
+}
+
+pub fn pending_marker() -> String {
+    style("•").yellow().bold().to_string()
+}
+
+pub fn failure_marker() -> String {
+    style("✗").red().bold().to_string()
+}
+
 pub fn run_command(command: &str) -> String {
     format!("run {}", green_command(command))
 }

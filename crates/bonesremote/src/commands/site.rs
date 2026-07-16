@@ -9,8 +9,9 @@ use shared::{config, paths};
 
 use crate::privileges;
 
-const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] =
-    &[paths::BONES_TOML, paths::RUNTIME_TOML, paths::DEPLOYMENT_DIR, paths::HOOKS_DIR];
+const POST_RECEIVE_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/post-receive"));
+
+const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] = &[paths::BONES_TOML, paths::DEPLOYMENT_DIR];
 
 fn validate_site_name(site: &str) -> Result<()> {
     if site.is_empty() {
@@ -48,18 +49,16 @@ pub fn import(site: &str) -> Result<()> {
 
 fn install_repo_post_receive_hook(site: &str) -> Result<()> {
     let site_root = paths::bonesremote_site_root(site);
-    install_repo_post_receive_hook_from_site_root(&site_root)
+    write_post_receive_hook(&site_root)
 }
 
-fn install_repo_post_receive_hook_from_site_root(site_root: &Path) -> Result<()> {
+fn write_post_receive_hook(site_root: &Path) -> Result<()> {
     let cfg = config::load(&site_root.join(paths::BONES_TOML))?;
-    let source = site_root.join(paths::HOOKS_DIR).join("post-receive");
     let target = Path::new(&cfg.repo_path).join(paths::HOOKS_DIR).join("post-receive");
     let target_parent = target.parent().context("post-receive hook target has no parent")?;
 
-    let hook = fs::read(&source).with_context(|| format!("Failed to read {}", source.display()))?;
     fs::create_dir_all(target_parent).with_context(|| format!("Failed to create {}", target_parent.display()))?;
-    fs::write(&target, hook).with_context(|| format!("Failed to write {}", target.display()))?;
+    fs::write(&target, POST_RECEIVE_SCRIPT).with_context(|| format!("Failed to write {}", target.display()))?;
 
     let mut perms =
         fs::metadata(&target).with_context(|| format!("Failed to stat {}", target.display()))?.permissions();
@@ -81,7 +80,8 @@ fn replace_site_dir(site: &str, staging_dir: &Path) -> Result<()> {
 
     if let Err(error) = fs::rename(staging_dir, &site_root) {
         if had_existing {
-            fs::rename(&backup_dir, &site_root).ok();
+            fs::rename(&backup_dir, &site_root)
+                .with_context(|| format!("Failed to restore previous site state from {}", backup_dir.display()))?;
         }
         return Err(error).with_context(|| format!("Failed to activate {}", site_root.display()));
     }
@@ -120,8 +120,6 @@ fn validate_site_dataset(site: &str, root: &Path) -> Result<()> {
     if bones.project_name != site {
         bail!("Imported site dataset is for '{}', expected '{}'", bones.project_name, site);
     }
-
-    config::load_runtime(root)?;
 
     Ok(())
 }
@@ -175,8 +173,24 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{install_repo_post_receive_hook_from_site_root, validate_top_level_entries};
+    use super::{validate_top_level_entries, write_post_receive_hook};
     use shared::paths;
+
+    #[test]
+    fn validate_top_level_entries_allows_single_config() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-buildtime-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(&root)?;
+        fs::write(root.join(paths::BONES_TOML), "")?;
+        fs::create_dir_all(root.join(paths::DEPLOYMENT_DIR))?;
+
+        let result = validate_top_level_entries(&root);
+        fs::remove_dir_all(&root)?;
+        assert!(result.is_ok());
+        Ok(())
+    }
 
     #[test]
     fn validate_top_level_entries_rejects_unexpected_file() -> Result<()> {
@@ -195,48 +209,47 @@ mod tests {
     }
 
     #[test]
-    fn install_repo_post_receive_hook_copies_executable_trigger() -> Result<()> {
+    fn install_repo_post_receive_hook_writes_baked_trigger() -> Result<()> {
         let root = env::temp_dir().join(format!("bonesremote-site-hook-test-{}", process::id()));
         if root.exists() {
             fs::remove_dir_all(&root)?;
         }
 
-        let site_root = root.join("sites/unitapp");
         let repo_root = root.join("repos/unitapp.git");
-        fs::create_dir_all(site_root.join(paths::HOOKS_DIR))?;
-        fs::create_dir_all(repo_root.join(paths::HOOKS_DIR))?;
+        let site_root = root.join("sites/unitapp");
+        fs::create_dir_all(&site_root)?;
         fs::write(
             site_root.join(paths::BONES_TOML),
             format!(
                 r#"
+[app]
 remote_name = "production"
 project_name = "unitapp"
+repo_path = "{}"
+project_root = "/srv/sites/unitapp"
+[app.server]
 ssh_user = "root"
 host = "example.com"
 port = "22"
-repo_path = "{}"
-project_root = "/srv/sites/unitapp"
-branch = "main"
+[app.dns]
 preview_domain = ""
+[app.deploy]
+branch = "main"
 deploy_on_push = false
 releases = 5
-ssl_enabled = false
-domain = ""
-email = ""
 "#,
                 repo_root.display()
             ),
         )?;
-        fs::write(site_root.join(paths::HOOKS_DIR).join("post-receive"), "#!/bin/sh\nexec true\n")?;
 
-        let result = install_repo_post_receive_hook_from_site_root(&site_root);
+        let result = write_post_receive_hook(&site_root);
 
         let target = repo_root.join(paths::HOOKS_DIR).join("post-receive");
         let contents = fs::read_to_string(&target)?;
         let mode = fs::metadata(&target)?.permissions().mode() & 0o777;
 
         result?;
-        assert_eq!(contents, "#!/bin/sh\nexec true\n");
+        assert!(contents.contains("bonesdeploy-post-receive-v1"));
         assert_eq!(mode, 0o755);
         fs::remove_dir_all(&root)?;
         Ok(())

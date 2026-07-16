@@ -5,7 +5,7 @@ use std::process::Command;
 use anyhow::{Result, bail};
 use shared::{config, paths};
 
-pub(crate) fn check(site: &str, issues: &mut Vec<String>) {
+pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if let Err(error) = validate_site_name(site) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
@@ -18,16 +18,36 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>) {
     let project_root = &cfg.project_root;
     let shared_root = Path::new(project_root).join(paths::SHARED_DIR);
     let releases_root = Path::new(project_root).join(paths::RELEASES_DIR);
-    let current_path = Path::new(project_root).join(paths::CURRENT_LINK);
     let runtime_user = config::runtime_user_for(&cfg.project_name);
     let runtime_group = config::runtime_group_for(&cfg.project_name);
+    let build_user = config::build_user_for(&cfg.project_name);
 
     check_repo_exists(&cfg.repo_path, issues);
-    check_branch_ref(&cfg.repo_path, &cfg.branch, issues);
+    check_branch_ref(&cfg.repo_path, &cfg.branch, issues, pending);
     check_thin_hook(&cfg.repo_path, issues);
     check_runtime_identity(&runtime_user, &runtime_group, issues);
-    check_site_layout(&shared_root, &releases_root, &current_path, issues);
+    check_build_user(&build_user, issues);
+    check_site_layout(&shared_root, &releases_root, issues);
     check_service_exists(&cfg.project_name, issues);
+}
+
+fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
+    let passwd = match fs::read_to_string(paths::ETC_PASSWD) {
+        Ok(passwd) => passwd,
+        Err(error) => {
+            issues.push(format!("could not read {} to validate build user ({error})", paths::ETC_PASSWD));
+            return;
+        }
+    };
+    if !account_exists(&passwd, build_user) {
+        issues.push(format!("build user does not exist: {build_user}"));
+        return;
+    }
+
+    let expected_home = paths::bonesdeploy_user_home(build_user);
+    if account_home(&passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
+        issues.push(format!("build user home must be {}: {build_user}", expected_home.display()));
+    }
 }
 
 fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bones> {
@@ -51,10 +71,6 @@ fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bone
         return None;
     }
 
-    if let Err(error) = config::load_runtime(&site_root) {
-        issues.push(format!("control-plane runtime.toml is invalid: {error}"));
-    }
-
     Some(cfg)
 }
 
@@ -65,21 +81,39 @@ fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {
     }
 }
 
-fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>) {
+fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if branch.is_empty() {
         return;
     }
     let ref_name = format!("refs/heads/{branch}");
-    let ok = Command::new("git")
-        .args(["--git-dir", repo_path, "rev-parse", "--verify", &ref_name])
-        .output()
-        .map(|o| o.status.success())
-        .unwrap_or(false);
-    if !ok {
-        issues.push(format!(
-            "deploy branch '{branch}' has not been pushed to {}\n  {}",
-            repo_path, "Run 'git push <remote> {branch}' first.",
+    let refs = match Command::new("git").args(["--git-dir", repo_path, "for-each-ref", "--format=%(refname)"]).output()
+    {
+        Ok(output) if output.status.success() => output,
+        Ok(output) => {
+            issues.push(format!(
+                "could not inspect branches in {repo_path}: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+            return;
+        }
+        Err(error) => {
+            issues.push(format!("could not run git while inspecting {repo_path}: {error}"));
+            return;
+        }
+    };
+    if refs.stdout.is_empty() {
+        pending.push(format!(
+            "deploy branch '{branch}' has not been pushed yet. Run 'git push <remote> {branch}' before the first deploy."
         ));
+        return;
+    }
+    let branch_output = Command::new("git").args(["--git-dir", repo_path, "rev-parse", "--verify", &ref_name]).output();
+    match branch_output {
+        Ok(output) if output.status.success() => {}
+        Ok(_) => issues.push(format!(
+            "deploy branch '{branch}' has not been pushed to {repo_path}. Run 'git push <remote> {branch}' first."
+        )),
+        Err(error) => issues.push(format!("could not run git while checking branch '{branch}': {error}")),
     }
 }
 
@@ -95,10 +129,6 @@ fn check_thin_hook(repo_path: &str, issues: &mut Vec<String>) {
 }
 
 fn check_runtime_identity(runtime_user: &str, runtime_group: &str, issues: &mut Vec<String>) {
-    if runtime_user == paths::DEPLOY_USER {
-        issues.push(format!("runtime user must not be {}", paths::DEPLOY_USER));
-    }
-
     let passwd = match fs::read_to_string(paths::ETC_PASSWD) {
         Ok(passwd) => passwd,
         Err(error) => {
@@ -126,19 +156,13 @@ fn check_runtime_identity(runtime_user: &str, runtime_group: &str, issues: &mut 
     }
 }
 
-fn check_site_layout(shared_root: &Path, releases_root: &Path, current_path: &Path, issues: &mut Vec<String>) {
+fn check_site_layout(shared_root: &Path, releases_root: &Path, issues: &mut Vec<String>) {
     if !shared_root.is_dir() {
         issues.push(format!("shared root is missing: {}", shared_root.display()));
     }
 
     if !releases_root.is_dir() {
         issues.push(format!("releases root is missing: {}", releases_root.display()));
-    }
-
-    match current_path.parent() {
-        Some(parent) if parent.is_dir() => {}
-        Some(parent) => issues.push(format!("current parent is missing: {}", parent.display())),
-        None => issues.push(format!("current path has no parent: {}", current_path.display())),
     }
 }
 
@@ -169,6 +193,14 @@ fn account_exists(passwd: &str, account: &str) -> bool {
     passwd.lines().any(|line| line.starts_with(&format!("{account}:")))
 }
 
+fn account_home<'a>(passwd: &'a str, account: &str) -> Option<&'a str> {
+    account_field(passwd, account, 5)
+}
+
+fn account_field<'a>(passwd: &'a str, account: &str, index: usize) -> Option<&'a str> {
+    passwd.lines().find(|line| line.starts_with(&format!("{account}:")))?.split(':').nth(index)
+}
+
 fn group_members(groupfile: &str, group: &str) -> Option<Vec<String>> {
     let line = groupfile.lines().find(|line| line.starts_with(&format!("{group}:")))?;
     let fields: Vec<&str> = line.split(':').collect();
@@ -189,7 +221,25 @@ fn service_exists(load_state: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{account_exists, group_members, hook_uses_thin_trigger, service_exists};
+    use std::{env, fs, process, process::Command};
+
+    use super::{account_exists, account_home, group_members, hook_uses_thin_trigger, service_exists};
+
+    #[test]
+    fn empty_bare_repo_is_pending_before_first_push() {
+        let root = env::temp_dir().join(format!("bonesremote-doctor-empty-repo-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let output = Command::new("git").args(["init", "--bare", root.to_str().unwrap_or_default()]).output();
+        assert!(output.is_ok_and(|output| output.status.success()));
+
+        let mut issues = Vec::new();
+        let mut pending = Vec::new();
+        super::check_branch_ref(root.to_str().unwrap_or_default(), "master", &mut issues, &mut pending);
+
+        let _ = fs::remove_dir_all(root);
+        assert!(issues.is_empty());
+        assert_eq!(pending.len(), 1);
+    }
 
     #[test]
     fn hook_uses_thin_trigger_accepts_bonesremote_post_receive_delegate() {
@@ -206,6 +256,12 @@ mod tests {
     fn account_exists_matches_passwd_entries() {
         assert!(account_exists("demo:x:1000:1000::/srv:/usr/sbin/nologin\n", "demo"));
         assert!(!account_exists("demo:x:1000:1000::/srv:/usr/sbin/nologin\n", "git"));
+    }
+
+    #[test]
+    fn build_user_home_is_parsed() {
+        let passwd = "demo-build:x:1002:1002::/var/lib/bonesdeploy/users/demo-build:/usr/sbin/nologin\n";
+        assert_eq!(account_home(passwd, "demo-build"), Some("/var/lib/bonesdeploy/users/demo-build"));
     }
 
     #[test]

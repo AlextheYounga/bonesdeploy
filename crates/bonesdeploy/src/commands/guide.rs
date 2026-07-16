@@ -2,7 +2,6 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use serde::Serialize;
-use shared::config as shared_config;
 use shared::paths;
 use shared::paths::bonesremote_bones_toml_path;
 
@@ -50,14 +49,14 @@ pub async fn build_report() -> Result<Report> {
     }
 
     let cfg = config::load(bones_toml).with_context(|| format!("Failed to read {}", bones_toml.display()))?;
-    let web_root = runtime_web_root()?;
-    let setup_complete = remote_setup_complete(&cfg, &web_root).await.unwrap_or(false);
+    let setup_complete = remote_setup_complete(&cfg).await.context("Unable to determine remote setup status")?;
 
     if !setup_complete {
         return Ok(initialized_report(cfg, false));
     }
 
-    let ssl_enabled = cfg.ssl_enabled || remote_ssl_enabled(&cfg, &web_root).await.unwrap_or(false);
+    let ssl_enabled =
+        cfg.ssl_enabled || remote_ssl_enabled(&cfg).await.context("Unable to determine remote SSL status")?;
 
     if ssl_enabled { Ok(ready_report(cfg)) } else { Ok(initialized_report(cfg, true)) }
 }
@@ -80,31 +79,36 @@ fn uninitialized_report(project: &str) -> Report {
 }
 
 fn initialized_report(cfg: config::Bones, setup_complete: bool) -> Report {
-    let (state, state_label, missing, commands) = if setup_complete {
+    if setup_complete {
         let command = ssl_command(&cfg);
-        (
-            String::from("setup_complete_ssl_missing"),
-            String::from("setup complete, HTTPS missing."),
-            vec![String::from("ssl")],
-            vec![command, String::from("bonesdeploy deploy")],
-        )
-    } else {
-        (
-            String::from("initialized_setup_missing"),
-            String::from("initialized, setup not complete."),
-            vec![
-                String::from("remote_bootstrap"),
-                String::from("runtime"),
-                String::from("bones_sync"),
-                String::from("doctor_pass"),
-            ],
-            vec![String::from("bonesdeploy setup --yes"), ssl_command(&cfg), String::from("bonesdeploy deploy")],
-        )
-    };
+        let commands = vec![command.clone(), String::from("bonesdeploy deploy")];
+        return Report {
+            project: cfg.project_name.clone(),
+            state: String::from("setup_complete_ssl_missing"),
+            state_label: String::from("setup complete, HTTPS missing."),
+            missing: vec![String::from("ssl")],
+            commands,
+            next: next_command(&command, true, true),
+            cfg: Some(cfg),
+        };
+    }
 
-    let next = next_command(&commands[0], true, true);
-
-    Report { project: cfg.project_name.clone(), state, state_label, missing, commands, next, cfg: Some(cfg) }
+    let command = String::from("bonesdeploy setup --yes");
+    let commands = vec![command.clone(), ssl_command(&cfg), String::from("bonesdeploy deploy")];
+    Report {
+        project: cfg.project_name.clone(),
+        state: String::from("initialized_setup_missing"),
+        state_label: String::from("initialized, setup not complete."),
+        missing: vec![
+            String::from("remote_bootstrap"),
+            String::from("runtime"),
+            String::from("bones_sync"),
+            String::from("doctor_pass"),
+        ],
+        commands,
+        next: next_command(&command, true, true),
+        cfg: Some(cfg),
+    }
 }
 
 fn ready_report(cfg: config::Bones) -> Report {
@@ -145,15 +149,8 @@ fn print_text(report: &Report) {
     }
 }
 
-fn runtime_web_root() -> Result<String> {
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
-    Ok(runtime.web_root)
-}
-
-async fn remote_setup_complete(cfg: &config::Bones, _web_root: &str) -> Result<bool> {
-    let Ok(session) = ssh::connect_privileged(cfg).await else {
-        return Ok(false);
-    };
+async fn remote_setup_complete(cfg: &config::Bones) -> Result<bool> {
+    let session = ssh::connect_privileged(cfg).await?;
 
     if ssh::run_cmd(&session, "command -v bonesremote >/dev/null 2>&1").await.is_err() {
         session.close().await?;
@@ -162,18 +159,20 @@ async fn remote_setup_complete(cfg: &config::Bones, _web_root: &str) -> Result<b
 
     let registry_path = bonesremote_bones_toml_path(&cfg.project_name);
     let sync_ok =
-        ssh::run_cmd(&session, &format!("test -r {}", shell_quote(&registry_path.display().to_string()))).await.is_ok();
+        ssh::run_cmd(&session, &format!("test -r {}", ssh::shell_quote(&registry_path.display().to_string())))
+            .await
+            .is_ok();
 
     let current = Path::new(&cfg.project_root).join(paths::CURRENT_LINK);
     let current_ok =
-        ssh::run_cmd(&session, &format!("test -e {}", shell_quote(&current.display().to_string()))).await.is_ok();
+        ssh::run_cmd(&session, &format!("test -e {}", ssh::shell_quote(&current.display().to_string()))).await.is_ok();
 
     session.close().await?;
 
     Ok(sync_ok && current_ok)
 }
 
-pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones, _web_root: &str) -> Result<bool> {
+pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones) -> Result<bool> {
     if cfg.domain.is_empty() {
         return Ok(false);
     }
@@ -183,15 +182,11 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones, _web_root: &str) -> 
         Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", &cfg.project_name)).display().to_string();
     let command = format!(
         "test -r {path} && grep -Fq {domain} {path} && grep -Fq 'listen 443 ssl;' {path}",
-        path = shell_quote(&nginx_site_available),
-        domain = shell_quote(&format!("server_name {};", cfg.domain)),
+        path = ssh::shell_quote(&nginx_site_available),
+        domain = ssh::shell_quote(&format!("server_name {};", cfg.domain)),
     );
     let enabled = ssh::run_cmd(&session, &command).await.is_ok();
     session.close().await?;
 
     Ok(enabled)
-}
-
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
 }

@@ -37,9 +37,12 @@ pub fn base(cfg: &config::Bones, web_root: &str) -> Map<String, Value> {
     );
     vars.insert(String::from(shared_config::bonesinfra_input::PROJECT_ROOT), Value::String(cfg.project_root.clone()));
     vars.insert(String::from("web_root"), Value::String(web_root.to_string()));
-    vars.insert(String::from("project_name"), Value::String(cfg.project_name.clone()));
-    vars.insert(String::from("preview_domain"), Value::String(cfg.preview_domain.clone()));
-    vars.insert(String::from("repo_path"), Value::String(cfg.repo_path.clone()));
+    vars.insert(String::from(shared_config::bonesinfra_input::PROJECT_NAME), Value::String(cfg.project_name.clone()));
+    vars.insert(
+        String::from(shared_config::bonesinfra_input::PREVIEW_DOMAIN),
+        Value::String(cfg.preview_domain.clone()),
+    );
+    vars.insert(String::from(shared_config::bonesinfra_input::REPO_PATH), Value::String(cfg.repo_path.clone()));
 
     vars
 }
@@ -121,17 +124,16 @@ mod tests {
     use super::{base, ssl};
 
     fn test_cfg() -> Bones {
-        Bones {
-            project_name: String::from("test"),
-            repo_path: String::from("/home/git/test.git"),
-            project_root: String::from("/srv/test"),
-            host: String::from("example.com"),
-            port: String::from("22"),
-            branch: String::from("master"),
-            remote_name: String::from("production"),
-            deploy_on_push: true,
-            ..Default::default()
-        }
+        let mut config = Bones::default();
+        config.project_name = String::from("test");
+        config.repo_path = String::from("/home/git/test.git");
+        config.project_root = String::from("/srv/test");
+        config.host = String::from("example.com");
+        config.port = String::from("22");
+        config.branch = String::from("master");
+        config.remote_name = String::from("production");
+        config.deploy_on_push = true;
+        config
     }
 
     /// Passes the SSL domain and email into the deploy data sent to bonesinfra

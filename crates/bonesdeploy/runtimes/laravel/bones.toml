@@ -1,0 +1,22 @@
+[runtime]
+template = "laravel"
+web_root = "public"
+
+[runtime.permissions]
+paths = [
+  { path = "*", type = "dir", mode = "750" },
+  { path = "*", type = "file", mode = "640" },
+  { path = "storage", type = "dir", mode = "770", recursive = true },
+  { path = "bootstrap/cache", type = "dir", mode = "770", recursive = true },
+  { path = "database", type = "dir", mode = "770", recursive = false },
+  { path = "database/database.sqlite", type = "file", mode = "660", recursive = false },
+]
+
+[runtime.shared]
+paths = [
+  { path = "storage", type = "dir" },
+  { path = ".env", type = "file" },
+]
+
+[build]
+vars = ["PHP_VERSION"]

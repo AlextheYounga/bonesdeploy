@@ -1,9 +1,9 @@
 use anyhow::Result;
 
-use crate::cli::args::{Cli, Command, RemoteCommand, SecretsCommand};
+use crate::cli::args::{Cli, Command, ReleasesCommand, RemoteCommand, SecretsCommand};
 use crate::commands::{
-    config, deploy_project, doctor, guide, init, push_state, remote_bootstrap, remote_helpers, remote_runtime,
-    remote_ssl, rollback, secrets, setup, status, update, version,
+    config, deploy_project, doctor, guide, init, push_state, releases, remote_bootstrap, remote_helpers,
+    remote_runtime, remote_ssl, rollback, secrets, setup, status, update, version,
 };
 
 pub async fn run(cli: &Cli) -> Result<()> {
@@ -20,7 +20,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             Ok(())
         }
         Command::Setup { yes } => setup::run(*yes).await,
-        Command::Doctor { local } => doctor::run(*local).await,
+        Command::Doctor { local } => doctor::run(*local).await.map(|_| ()),
         Command::Status => status::run().await,
         Command::Guide { format } => guide::run(*format).await,
         Command::Push => push_state::run(true),
@@ -30,6 +30,10 @@ pub async fn run(cli: &Cli) -> Result<()> {
             SecretsCommand::Push => secrets::push().await,
         },
         Command::Deploy => deploy_project::run().await,
+        Command::Releases { command } => match command {
+            None => releases::list().await,
+            Some(ReleasesCommand::Kill { release }) => releases::kill(release).await,
+        },
         Command::Update { skip_local, skip_remote } => {
             update::run(update::Options { skip_local: *skip_local, skip_remote: *skip_remote }).await
         }

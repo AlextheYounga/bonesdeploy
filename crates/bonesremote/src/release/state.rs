@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::fs;
+use std::fs::{File, OpenOptions, TryLockError};
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 use std::process;
@@ -7,6 +8,7 @@ use std::thread_local;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
+use serde::{Deserialize, Serialize};
 
 use shared::paths;
 
@@ -43,6 +45,93 @@ fn resolved_site_root(site: &str) -> PathBuf {
 
 pub fn staged_release_path(site: &str) -> PathBuf {
     resolved_site_root(site).join(paths::STAGED_RELEASE_FILE)
+}
+
+fn active_deployment_path(site: &str) -> PathBuf {
+    resolved_site_root(site).join(paths::ACTIVE_DEPLOYMENT_FILE)
+}
+
+fn deployment_lock_path(site: &str) -> PathBuf {
+    resolved_site_root(site).join(paths::DEPLOYMENT_LOCK_FILE)
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ActiveDeployment {
+    pub release: String,
+    pub pid: u32,
+    pub process_start_ticks: u64,
+    pub phase: DeploymentPhase,
+    pub started_at: String,
+    pub context: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DeploymentPhase {
+    Building,
+    Preparing,
+}
+
+pub struct DeploymentLock(File);
+
+impl DeploymentLock {
+    pub fn acquire(site: &str) -> Result<Self> {
+        let path = deployment_lock_path(site);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("Failed to create deployment state directory {}", parent.display()))?;
+        }
+
+        let file = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(&path)
+            .with_context(|| format!("Failed to open deployment lock {}", path.display()))?;
+        match file.try_lock() {
+            Ok(()) => Ok(Self(file)),
+            Err(TryLockError::WouldBlock) => {
+                bail!("A deployment is already running for {site}. Run 'bonesdeploy releases' to inspect it.")
+            }
+            Err(TryLockError::Error(error)) => {
+                Err(error).with_context(|| format!("Failed to lock deployment state for {site}"))
+            }
+        }
+    }
+}
+
+impl Drop for DeploymentLock {
+    fn drop(&mut self) {
+        let _ = self.0.unlock();
+    }
+}
+
+pub fn read_active_deployment(site: &str) -> Result<Option<ActiveDeployment>> {
+    let path = active_deployment_path(site);
+    if !path.exists() {
+        return Ok(None);
+    }
+    let content = fs::read_to_string(&path)
+        .with_context(|| format!("Failed to read active deployment state at {}", path.display()))?;
+    serde_json::from_str(&content)
+        .map(Some)
+        .with_context(|| format!("Failed to parse active deployment state at {}", path.display()))
+}
+
+pub fn write_active_deployment(site: &str, deployment: &ActiveDeployment) -> Result<()> {
+    let path = active_deployment_path(site);
+    let content = serde_json::to_string(deployment).context("Failed to serialize active deployment state")?;
+    fs::write(&path, content).with_context(|| format!("Failed to write active deployment state at {}", path.display()))
+}
+
+pub fn clear_active_deployment(site: &str) -> Result<()> {
+    let path = active_deployment_path(site);
+    if path.exists() {
+        fs::remove_file(&path)
+            .with_context(|| format!("Failed to remove active deployment state at {}", path.display()))?;
+    }
+    Ok(())
 }
 
 pub fn read_staged_release(site: &str) -> Result<String> {
@@ -94,11 +183,14 @@ pub fn current_release_dir(project_root: &str) -> Result<PathBuf> {
     let active_target =
         fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
 
-    Ok(if active_target.is_absolute() {
-        active_target
-    } else {
-        current_link.parent().unwrap_or_else(|| Path::new("/")).join(active_target)
-    })
+    if active_target.is_absolute() {
+        return Ok(active_target);
+    }
+
+    let parent = current_link
+        .parent()
+        .with_context(|| format!("Current release link has no parent: {}", current_link.display()))?;
+    Ok(parent.join(active_target))
 }
 
 pub fn current_release_name(project_root: &str) -> Result<String> {

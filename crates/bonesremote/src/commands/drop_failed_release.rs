@@ -16,10 +16,13 @@ pub fn run(site: &str) -> Result<()> {
         return Ok(());
     }
 
-    let Ok(release_name) = release_state::read_staged_release(site) else {
-        release_state::clear_staged_release(site).ok();
-        println!("Cleared staged release state.");
-        return Ok(());
+    let release_name = match release_state::read_staged_release(site) {
+        Ok(name) => name,
+        Err(error) => {
+            release_state::clear_staged_release(site)
+                .with_context(|| format!("Failed to clear invalid staged release state for {site}"))?;
+            return Err(error).context("Staged release state was invalid and has been cleared");
+        }
     };
 
     let bones_path = paths::bonesremote_bones_toml_path(site);

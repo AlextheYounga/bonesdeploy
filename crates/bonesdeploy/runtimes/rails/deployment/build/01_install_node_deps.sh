@@ -28,6 +28,13 @@ log() {
 	echo "$LOG_PREFIX $*"
 }
 
+skip_unless_node_project() {
+	if [ ! -f package.json ]; then
+		log "package.json not found; skipping Node install."
+		exit 0
+	fi
+}
+
 die() {
 	echo "$LOG_PREFIX $*" >&2
 	exit 1
@@ -139,7 +146,7 @@ assert_exact_node_version() {
 	fi
 
 	cat >&2 <<'EOF'
-[bonesdeploy] Laravel frontend build requires an exact pinned Node version.
+[bonesdeploy] Rails frontend build requires an exact pinned Node version.
 
 Add one of these to the project:
   .node-version        example: 24.17.0
@@ -166,7 +173,7 @@ ensure_corepack() {
 
 	if ! command -v corepack >/dev/null 2>&1; then
 		log "corepack not found in Node install; installing corepack..."
-		npm install -g corepack@latest
+		npm install -g corepack@0.31.0
 	fi
 
 	corepack enable --install-directory "$NODE_DIR/bin" 2>/dev/null || true
@@ -236,6 +243,7 @@ print_installed_versions() {
 main() {
 	local version
 
+	skip_unless_node_project
 	require_environment
 	configure_paths
 

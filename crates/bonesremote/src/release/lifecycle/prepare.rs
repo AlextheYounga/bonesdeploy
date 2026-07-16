@@ -2,9 +2,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, Runtime, load_runtime, runtime_user_for};
+use shared::config::{self, load_runtime, runtime_user_for};
 use shared::paths;
-use shared::paths::default_web_root;
 
 use crate::privileges;
 use crate::release::script_runner as deploy_output;
@@ -40,14 +39,10 @@ pub fn run(site: &str) -> Result<()> {
         bail!("Promoted release is missing: {}", release_dir.display());
     }
 
-    let Runtime { web_root, runtime_user, .. } =
-        load_runtime(&paths::bonesremote_site_root(site)).unwrap_or_else(|_| Runtime {
-            web_root: default_web_root(),
-            runtime_user: String::new(),
-            runtime_group: String::new(),
-            release_group: String::new(),
-            shared: config::Shared::default(),
-        });
+    let runtime = load_runtime(&paths::bonesremote_site_root(site))
+        .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
+    let web_root = runtime.web_root;
+    let runtime_user = runtime.runtime_user;
 
     let runtime_user = if runtime_user.is_empty() { runtime_user_for(&cfg.project_name) } else { runtime_user };
 
@@ -83,12 +78,24 @@ fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
     {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() {
+        if path.is_file() && is_script(&path) {
             scripts.push(path);
         }
     }
     scripts.sort();
     Ok(scripts)
+}
+
+fn is_script(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    let bytes = name.as_bytes();
+    bytes.len() > 6
+        && bytes[0].is_ascii_digit()
+        && bytes[1].is_ascii_digit()
+        && bytes[2] == b'_'
+        && path.extension().is_some_and(|extension| extension == "sh")
 }
 
 #[cfg(test)]
@@ -110,6 +117,7 @@ mod tests {
         fs::create_dir_all(&root)?;
         fs::write(root.join("02_second.sh"), "")?;
         fs::write(root.join("01_first.sh"), "")?;
+        fs::write(root.join("README.md"), "# Prepare Scripts")?;
         fs::create_dir_all(root.join("nested"))?;
 
         let scripts = list_scripts(&root)?;

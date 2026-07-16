@@ -45,13 +45,13 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     }
 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    let cfg =
+    let mut cfg =
         if is_fresh { config::collect_fresh_config(args)? } else { config::load_or_collect_config(bones_toml, args)? };
     let runtime_selection =
         if is_fresh { Some(runtime::collect_runtime_config(args, &cfg.project_name)?) } else { None };
 
     if let Some(runtime) = runtime_selection {
-        scaffold::materialize_fresh_bones(bones_dir, had_bones_entry, &cfg, runtime)?;
+        scaffold::materialize_fresh_bones(bones_dir, had_bones_entry, &mut cfg, runtime)?;
     }
 
     scaffold::update_gitignore()?;
@@ -65,7 +65,7 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     }
 
     scaffold::ensure_local_remote(&cfg)?;
-    scaffold::symlink_pre_push()?;
+    scaffold::install_pre_push_guard()?;
     print_follow_up_hint();
 
     Ok(())
@@ -202,19 +202,22 @@ mod tests {
 
             let bones_dir = repo_dir.join(".bones");
             assert!(bones_dir.join("bones.toml").is_file());
-            assert!(bones_dir.join("runtime.toml").is_file());
-            assert!(bones_dir.join("hooks/pre-push").is_file());
-            assert!(bones_dir.join("hooks/post-receive").is_file());
+            assert!(bones_dir.join("bones.toml").is_file());
+            assert!(!bones_dir.join("hooks").exists(), ".bones should not contain a hooks/ directory");
             let deploy_dir = bones_dir.join("deployment");
             assert!(deploy_dir.is_dir());
             assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
-            let runtime_toml = fs::read_to_string(bones_dir.join("runtime.toml"))?;
-            assert!(runtime_toml.contains("runtime_user = \"atlas\""));
-            assert!(runtime_toml.contains("permissions"));
+            let bones_toml = fs::read_to_string(bones_dir.join("bones.toml"))?;
+            assert!(bones_toml.contains("runtime_user = \"atlas\""));
+            assert!(bones_toml.contains("[runtime]"));
+
+            let pre_push = repo_dir.join(".git/hooks/pre-push");
+            assert!(pre_push.is_file(), "guaranteed pre-push guard should be installed");
+            let guard_content = fs::read_to_string(&pre_push)?;
+            assert!(guard_content.contains("bonesdeploy-pre-push-v1"));
 
             let config_root = paths::bones_config_root().join("atlas.bones");
-            assert!(config_root.join("hooks/pre-push").is_file());
-            assert!(config_root.join("hooks/post-receive").is_file());
+            assert!(!config_root.join("hooks").exists(), "config hooks/ should not be created");
 
             let config_gitignore = paths::bones_config_root().join(".gitignore");
             assert!(config_gitignore.is_file());
@@ -231,7 +234,7 @@ mod tests {
         with_temp_repo(|repo_dir, _home_dir| {
             run_init()?;
 
-            let sentinel = repo_dir.join(".bones/hooks/pre-push");
+            let sentinel = repo_dir.join(".bones/bones.toml");
             let original = fs::read_to_string(&sentinel)?;
 
             run_init()?;

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 #
-# post-receive — Remote hook, runs after refs are updated.
+# bonesdeploy-post-receive-v1
+#
+# post-receive — Thin adapter installed by bonesremote
 #
 # Resolves the pushed deployment ref and delegates the full remote
 # deployment lifecycle to bonesremote.

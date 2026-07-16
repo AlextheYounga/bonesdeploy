@@ -1,3 +1,5 @@
+Historical review note. The subsequent implementation now uses `buildpack-deps:bookworm`, so the bootstrap concern described below is resolved; the remaining template concerns are tracked separately.
+
 Code review bot:
 
 The implementation is correct and matches the plan — one container per deploy via podman create/exec/rm with a Drop guard so failed deploys still clean up, build_image fully excised from config/validation/templates/tests, the Nuxt dist symlink fix and the php→awk swap are in, and all 85 workspace tests pass. The runner-side work is solid. But the templates haven't caught up with the image change, and that will fail your very next test deploy:
@@ -33,4 +35,4 @@ Further answers/questions:
 2. This will be future problems, but good to note. 
 3. Should we consider running a git clone command to get the site into the container? 
 4. We will handle this in a later correction, but good to note. 
-5. We will constrain this later, but we will keep this fully open for now. 
+5. We will constrain this later, but we will keep this fully open for now.

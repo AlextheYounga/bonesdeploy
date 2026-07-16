@@ -73,6 +73,18 @@ pub enum SiteCommand {
 
 #[derive(Subcommand)]
 pub enum ReleaseCommand {
+    /// Print releases and active deployment state as JSON
+    List {
+        #[arg(long)]
+        site: String,
+    },
+    /// Cancel a building or interrupted release and clean its temporary state
+    Kill {
+        #[arg(long)]
+        site: String,
+        #[arg(long)]
+        release: String,
+    },
     /// Repoint current to the previous release
     Rollback {
         #[arg(long)]

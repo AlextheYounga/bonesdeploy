@@ -27,7 +27,7 @@ pub fn run(yes: bool) -> Result<()> {
     println!("Installing remote helper tools...");
 
     let mut deploy_data = Value::Object(data::base(&cfg, &runtime.web_root));
-    let host = cfg.host;
+    let host = cfg.host.clone();
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from(shared_config::bonesinfra_input::SSH_USER), Value::String(ssh_user));
         map.insert(String::from("host"), Value::String(host));

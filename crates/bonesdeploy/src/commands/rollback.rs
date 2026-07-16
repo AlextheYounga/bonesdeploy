@@ -14,7 +14,7 @@ pub async fn run() -> Result<()> {
     println!("Rolling back {} on {}...", cfg.project_name, cfg.host);
 
     let session = ssh::connect_privileged(&cfg).await?;
-    let command = format!("bonesremote release rollback --site '{}'", single_quote(&cfg.project_name));
+    let command = format!("bonesremote release rollback --site {}", ssh::shell_quote(&cfg.project_name));
     ssh::stream_cmd(&session, &command).await?;
     session.close().await?;
 
@@ -23,8 +23,4 @@ pub async fn run() -> Result<()> {
     println!("{}", output::next_step("bonesdeploy status"));
 
     Ok(())
-}
-
-fn single_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
 }

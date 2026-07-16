@@ -61,11 +61,11 @@ pub fn run(site: &str) -> Result<()> {
 fn validate_shared_path(shared_path: &SharedPath) -> Result<()> {
     let path = Path::new(&shared_path.path);
     if shared_path.path.is_empty() || path.is_absolute() {
-        bail!("Invalid shared path in runtime.toml: {}", shared_path.path);
+        bail!("Invalid shared path in [runtime].shared: {}", shared_path.path);
     }
 
     if !path.components().all(|component| matches!(component, Component::Normal(_))) {
-        bail!("Invalid shared path in runtime.toml: {}", shared_path.path);
+        bail!("Invalid shared path in [runtime].shared: {}", shared_path.path);
     }
 
     Ok(())
@@ -115,7 +115,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use shared::config::SharedPathType;
+    use shared::config::{SharedPath, SharedPathType};
 
     use super::{ensure_shared_leaf, link_relative, remove_if_present, validate_shared_path};
 
@@ -194,7 +194,7 @@ mod tests {
         Ok(())
     }
 
-    fn shared_path(path: &str, path_type: SharedPathType) -> shared::config::SharedPath {
-        shared::config::SharedPath { path: path.to_string(), path_type }
+    fn shared_path(path: &str, path_type: SharedPathType) -> SharedPath {
+        SharedPath { path: path.to_string(), path_type }
     }
 }

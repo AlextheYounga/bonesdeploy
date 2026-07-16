@@ -135,9 +135,9 @@ pub async fn push() -> Result<()> {
     let shared = Path::new(&cfg.project_root).join(paths::SHARED_DIR);
     let target = shared.join(paths::DOT_ENV);
     let parent = target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
-    let parent_s = shell_quote_single(&parent.display().to_string());
-    let target_s = shell_quote_single(&target.display().to_string());
-    let group_s = shell_quote_single(&runtime_group);
+    let parent_s = ssh::shell_quote(&parent.display().to_string());
+    let target_s = ssh::shell_quote(&target.display().to_string());
+    let group_s = ssh::shell_quote(&runtime_group);
     let cmd = format!(
         "mkdir -p {parent_s} && tmp=$(mktemp {target_s}.XXXXXX) && cat > \"$tmp\" && chown root:{group_s} \"$tmp\" && chmod {DEFAULT_SECRET_MODE} \"$tmp\" && mv \"$tmp\" {target_s}",
     );
@@ -294,10 +294,6 @@ fn run_gpg(args: &[&str]) -> Result<()> {
         bail!("gpg failed with status {status}");
     }
     Ok(())
-}
-
-fn shell_quote_single(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
 #[cfg(test)]

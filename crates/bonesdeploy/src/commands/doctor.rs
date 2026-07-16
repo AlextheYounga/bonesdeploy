@@ -3,19 +3,21 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::Result;
+use toml::Table;
 
 use crate::config;
 use crate::infra::ssh;
 use crate::ui::output;
 use shared::paths;
 
-pub async fn run(local_only: bool) -> Result<()> {
-    println!("Checking deployment...");
+pub async fn run(local_only: bool) -> Result<bool> {
+    println!("{} Checking deployment...", console::style("bonesdeploy doctor").bold());
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML)).ok();
     let deploy_on_push = cfg.as_ref().is_some_and(|c| c.deploy_on_push);
 
     let mut issues = 0usize;
+    let mut pending = false;
 
     issues += print_check(".bones config", check_bones_config(), Some(output::run_command("bonesdeploy init")));
     issues += print_check(
@@ -31,42 +33,30 @@ pub async fn run(local_only: bool) -> Result<()> {
         cfg.as_ref().map(|c| format!("git checkout -b {} && git push {} {}", c.branch, c.remote_name, c.branch)),
     );
 
+    issues += print_check(
+        "buildtime env vars",
+        check_buildtime_config(),
+        Some(String::from("add names to [build].vars in .bones/bones.toml for build-time env vars")),
+    );
+
     if deploy_on_push {
         issues += print_check("pre-push hook", check_pre_push_hook(), Some(output::run_command("bonesdeploy init")));
     }
 
     if !local_only {
-        match &cfg {
-            Some(cfg) => {
-                let remote_ssh_issue = check_remote_ssh(cfg).await;
-                issues += print_check(
-                    "remote SSH",
-                    remote_ssh_issue.clone(),
-                    Some(String::from("check host, port, and SSH access.")),
-                );
-                if remote_ssh_issue.is_none() {
-                    issues += print_check(
-                        "remote doctor",
-                        check_remote_doctor(cfg).await,
-                        Some(format!(
-                            "{} or {}",
-                            output::run_command("bonesdeploy push"),
-                            output::run_command("bonesdeploy remote setup")
-                        )),
-                    );
-                }
-            }
-            None => {
-                issues +=
-                    print_failure("remote SSH", "Missing .bones config", Some(output::run_command("bonesdeploy init")));
-            }
-        }
+        let (remote_issues, remote_pending) = check_remote(cfg.as_ref()).await;
+        issues += remote_issues;
+        pending |= remote_pending;
     }
 
     if issues == 0 {
         println!();
-        println!("All checks passed.");
-        Ok(())
+        if pending {
+            println!("{} Deployment is provisioned and waiting for the first Git push.", output::pending_marker());
+        } else {
+            println!("{} All checks passed.", output::success_marker());
+        }
+        Ok(pending)
     } else {
         println!();
         let issue_word = if issues == 1 { "issue" } else { "issues" };
@@ -74,10 +64,40 @@ pub async fn run(local_only: bool) -> Result<()> {
     }
 }
 
+async fn check_remote(cfg: Option<&config::Bones>) -> (usize, bool) {
+    match cfg {
+        Some(cfg) => {
+            let remote_ssh_issue = check_remote_ssh(cfg).await;
+            let mut issues = print_check(
+                "remote SSH",
+                remote_ssh_issue.clone(),
+                Some(String::from("check host, port, and SSH access.")),
+            );
+            if remote_ssh_issue.is_none() {
+                let (remote_issue, pending) = check_remote_doctor(cfg).await;
+                issues += print_check(
+                    "remote doctor",
+                    remote_issue,
+                    Some(format!(
+                        "{} or {}",
+                        output::run_command("bonesdeploy push"),
+                        output::run_command("bonesdeploy remote setup")
+                    )),
+                );
+                return (issues, pending);
+            }
+            (issues, false)
+        }
+        None => {
+            (print_failure("remote SSH", "Missing .bones config", Some(output::run_command("bonesdeploy init"))), false)
+        }
+    }
+}
+
 fn print_check(label: &str, issue: Option<String>, next: Option<String>) -> usize {
     match issue {
         None => {
-            println!("✓ {label}");
+            println!("{} {label}", output::success_marker());
             0
         }
         Some(issue) => print_failure(label, &issue, next),
@@ -85,7 +105,7 @@ fn print_check(label: &str, issue: Option<String>, next: Option<String>) -> usiz
 }
 
 fn print_failure(label: &str, issue: &str, next: Option<String>) -> usize {
-    println!("✗ {label}");
+    println!("{} {label}", output::failure_marker());
     let issue = issue.replace('\n', "\n  ");
     println!("  {issue}");
     if let Some(next) = next {
@@ -109,6 +129,10 @@ fn check_bones_config() -> Option<String> {
         return Some(format!("Missing {}", paths::LOCAL_BONES_TOML));
     }
 
+    if let Err(error) = config::load(Path::new(paths::LOCAL_BONES_TOML)) {
+        return Some(format!("Invalid {}: {error:#}", paths::LOCAL_BONES_TOML));
+    }
+
     None
 }
 
@@ -124,20 +148,26 @@ fn check_deployment_scripts() -> Option<String> {
             continue;
         }
 
-        let entries = fs::read_dir(&scripts_dir).ok()?;
-        for entry in entries.flatten() {
+        let entries = match fs::read_dir(&scripts_dir) {
+            Ok(entries) => entries,
+            Err(error) => return Some(format!("Cannot read {}: {error}", scripts_dir.display())),
+        };
+        for entry in entries {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) => return Some(format!("Cannot read an entry in {}: {error}", scripts_dir.display())),
+            };
             let path = entry.path();
             if !path.is_file() {
                 continue;
             }
             let name = entry.file_name();
             let name = name.to_string_lossy();
-            if !name.ends_with(".sh") {
+            if path.extension().is_none_or(|extension| extension != "sh") {
                 continue;
             }
-            let has_numeric_prefix = name.chars().take_while(char::is_ascii_digit).count() > 0;
-            if !has_numeric_prefix {
-                return Some(format!("Deployment script is not ordered: {subdir}/{name}"));
+            if !is_deployment_script(&name) {
+                return Some(format!("Deployment script must use the NN_name.sh convention: {subdir}/{name}"));
             }
         }
     }
@@ -145,12 +175,24 @@ fn check_deployment_scripts() -> Option<String> {
     None
 }
 
+fn is_deployment_script(name: &str) -> bool {
+    let bytes = name.as_bytes();
+    bytes.len() > 6
+        && bytes[0].is_ascii_digit()
+        && bytes[1].is_ascii_digit()
+        && bytes[2] == b'_'
+        && Path::new(name).extension().is_some_and(|extension| extension == "sh")
+}
+
 fn check_local_branch(cfg: &config::Bones) -> Option<String> {
     if cfg.branch.is_empty() {
         return None;
     }
     let ref_name = format!("refs/heads/{}", cfg.branch);
-    let output = Command::new("git").args(["rev-parse", "--verify", &ref_name]).output().ok()?;
+    let output = match Command::new("git").args(["rev-parse", "--verify", &ref_name]).output() {
+        Ok(output) => output,
+        Err(error) => return Some(format!("Unable to run git: {error}")),
+    };
     if output.status.success() {
         return None;
     }
@@ -163,24 +205,22 @@ fn check_local_branch(cfg: &config::Bones) -> Option<String> {
 }
 
 fn check_pre_push_hook() -> Option<String> {
-    let link = Path::new(paths::GIT_PRE_PUSH_HOOK);
-
-    if !link.symlink_metadata().is_ok_and(|m| m.is_symlink()) {
+    let guard = Path::new(paths::GIT_PRE_PUSH_HOOK);
+    let Ok(contents) = fs::read_to_string(guard) else {
         return Some(String::from("pre-push hook is not installed"));
+    };
+
+    if contents.contains("bonesdeploy-pre-push-v1") {
+        return None;
     }
 
-    let target = fs::read_link(link).ok()?;
-    let expected = Path::new(paths::PRE_PUSH_HOOK_TARGET);
-    if target != expected {
-        return Some(String::from("pre-push hook is not installed"));
-    }
-
-    None
+    Some(String::from("pre-push hook is missing or stale"))
 }
 
 async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
     match ssh::connect(cfg).await {
         Ok(session) => {
+            // This check only asks whether SSH can connect; ignore failure while closing the test session.
             let _ = session.close().await;
             None
         }
@@ -188,16 +228,50 @@ async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
     }
 }
 
-async fn check_remote_doctor(cfg: &config::Bones) -> Option<String> {
+async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
     let session = match ssh::connect_privileged(cfg).await {
         Ok(session) => session,
-        Err(error) => return Some(format!("Cannot connect as privileged remote user\n  {error}")),
+        Err(error) => return (Some(format!("Cannot connect as privileged remote user\n  {error}")), false),
     };
     let command = format!("bonesremote doctor --site {}", &cfg.project_name);
     let result = ssh::run_cmd(&session, &command).await;
+    // The remote command has finished; ignore failure while closing this short-lived SSH session.
     let _ = session.close().await;
 
-    result.err().map(|error| format!("remote doctor failed\n  {error}"))
+    match result {
+        Ok(output) => {
+            let pending = output.contains("has not been pushed yet");
+            if pending {
+                for line in output.lines().filter(|line| line.contains("has not been pushed yet")) {
+                    let line = line.trim().strip_prefix('•').map_or(line.trim(), str::trim_start);
+                    println!("{} {}", output::pending_marker(), line);
+                }
+            }
+            (None, pending)
+        }
+        Err(error) => (Some(format!("remote doctor failed\n  {error}")), false),
+    }
+}
+
+fn check_buildtime_config() -> Option<String> {
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let Ok(content) = fs::read_to_string(bones_toml) else {
+        return None;
+    };
+    let Ok(toml_value) = content.parse::<Table>() else {
+        return None;
+    };
+    let is_next =
+        toml_value.get("runtime").and_then(|runtime| runtime.get("template")).and_then(|v| v.as_str()) == Some("next");
+    if !is_next {
+        return None;
+    }
+
+    if toml_value.get("build").is_none_or(|build| build.get("vars").is_none()) {
+        return Some(String::from("Next.js requires [build].vars in .bones/bones.toml for build-time env vars"));
+    }
+
+    None
 }
 
 #[cfg(test)]

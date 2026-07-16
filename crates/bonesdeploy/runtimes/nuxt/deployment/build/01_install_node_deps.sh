@@ -139,7 +139,7 @@ assert_exact_node_version() {
 	fi
 
 	cat >&2 <<'EOF'
-[bonesdeploy] Laravel frontend build requires an exact pinned Node version.
+[bonesdeploy] Nuxt build requires an exact pinned Node version.
 
 Add one of these to the project:
   .node-version        example: 24.17.0
@@ -166,7 +166,7 @@ ensure_corepack() {
 
 	if ! command -v corepack >/dev/null 2>&1; then
 		log "corepack not found in Node install; installing corepack..."
-		npm install -g corepack@latest
+		npm install -g corepack@0.31.0
 	fi
 
 	corepack enable --install-directory "$NODE_DIR/bin" 2>/dev/null || true

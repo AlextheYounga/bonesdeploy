@@ -53,7 +53,7 @@ pub(crate) fn remote_import_command(site: &str) -> String {
 
 fn archive_bones_directory() -> Result<Vec<u8>> {
     let output = Command::new("tar")
-        .args(["-czf", "-", "--exclude", "./secrets", "-C", paths::LOCAL_BONES_DIR, "."])
+        .args(["-czf", "-", "--exclude", "./secrets", "--exclude", "./hooks", "-C", paths::LOCAL_BONES_DIR, "."])
         .output()
         .context("Failed to run tar for .bones")?;
 

@@ -22,7 +22,7 @@ pub async fn run() -> Result<()> {
 
     let session = ssh::connect_privileged(&cfg).await?;
 
-    let command = format!("bonesremote deploy --site {}", single_quote(&cfg.project_name));
+    let command = format!("bonesremote deploy --site {}", ssh::shell_quote(&cfg.project_name));
     ssh::stream_cmd(&session, &command).await?;
 
     session.close().await?;
@@ -30,8 +30,4 @@ pub async fn run() -> Result<()> {
     println!("Deployment complete.");
 
     Ok(())
-}
-
-fn single_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
 }

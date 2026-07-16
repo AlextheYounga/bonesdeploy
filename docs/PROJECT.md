@@ -2,7 +2,7 @@
 
 A remote release deployment tool for simple Linux servers. It produces two executables: `bonesdeploy` (local CLI for setup, provisioning, deployment, and management) and `bonesremote` (server-side release lifecycle executor, installed on the deployment host). Git remains supported as an optional trigger, but it does not own the deployment model. **We only handle Debian/Ubuntu machines.**
 
-We keep detailed documentation of each command at: `docs/commands/*.md:`
+The command behavior is documented in this file and in the command examples in `README.md`.
 
 ## Deployment Methodology
 We have an SSH deployment user (normally `git`) that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user named after the project. This is not a shared `applications` user; it must be a dedicated user per project so isolation works on a shared server. This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
@@ -55,18 +55,22 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 - Git hooks only trigger `bonesremote`; they do not check out source, run builds, write releases, or restart services.
 - `bonesremote` is the privileged mediator for promotion, activation, and service restart.
 
+### Release Visibility and Cancellation
+
+`bonesdeploy releases` asks `bonesremote` for the site's release state and renders the returned JSON locally; it stores no release state on the workstation. Releases are `active`, `previous`, `building`, `preparing`, or `interrupted`. A `building` or `interrupted` release can be cancelled with `bonesdeploy releases kill <release>`; cancellation removes only that release's build container, temporary context, staged-release state, and transient deployment metadata.
+
+BonesRemote holds one OS-backed deployment lock per site. A second deploy must not stage or overwrite state while a release is building, preparing, or interrupted. Before staging, BonesRemote starts and verifies the build user's systemd manager and checks rootless Podman readiness. A damaged rootless Podman namespace is reported before any release state is created; deploy does not silently reset Podman because that operation stops the build user's containers.
+
 ## Bones Scaffolding
 ```
 .bones
 ├── bones.toml
-├── runtime.toml
-├── hooks
-│   ├── hooks.sh                      # (legacy; pre-push only used to source from here)
-│   ├── post-receive
-│   └── pre-push
 ├── deployment
-│   ├── 01_install_build_deps.sh
-│   └── 02_run_build.sh
+│   ├── build/
+│   │   ├── 01_install_build_deps.sh
+│   │   └── 02_run_build.sh
+│   └── prepare/
+│       └── 01_prepare.sh
 ```
 
 Python infra scripts and templates are managed separately by the hidden `bonesinfra` checkout under `~/.config/bonesdeploy/_lib/bonesinfra`; see `crates/bonesdeploy/src/infra/bonesinfra.rs`.
@@ -87,36 +91,74 @@ Everything else is defaulted or derived for Debian/Ubuntu-first usability:
 - `deploy_on_push`: defaults to `false`
 - `releases`: defaults to `5`
 
-`web_root`, `runtime_user`, `runtime_group`, `release_group`, and runtime-declared shared paths live in `.bones/runtime.toml`. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively. Shared paths are declared under `[shared].paths`; deploys only wire the paths listed there, so framework-specific writable paths must not be hardcoded globally.
+`[runtime]` in `.bones/bones.toml` contains the selected template, web root, runtime identity, permissions, and shared paths. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively. Shared paths are declared under `[runtime.shared].paths`; deploys only wire the paths listed there, so framework-specific writable paths must not be hardcoded globally.
 
 Users can override any default by editing `.bones/bones.toml` after init.
 
 Example `bones.toml`:
 ```toml
+[app]
 remote_name = "production"
 project_name = "lawsnipe"
+repo_path = "/home/git/lawsnipe.git"
+project_root = "/srv/sites/lawsnipe"
+
+[app.server]
 ssh_user = "root"
 host = "deploy.example.com"
 port = "22"
-repo_path = "/home/git/lawsnipe.git"
-project_root = "/srv/sites/lawsnipe"
-branch = "master"
+
+[app.dns]
 preview_domain = "lawsnipe-deploy-example-com.nip.io"
 domain = "app.example.com"
 email = "ops@example.com"
-deploy_on_push = false
 ssl_enabled = true
+
+[app.deploy]
+branch = "master"
+deploy_on_push = false
 releases = 5
+
+[build]
+vars = ["NEXT_PUBLIC_API_URL"]
+
+[runtime]
+template = "next"
+web_root = "public"
 ```
 
-### Hooks
-Hooks are static shell scripts embedded in the `bonesdeploy` binary. They are written to `.bones/hooks/` once during `bonesdeploy init`: a local `pre-push` guard and a remote `post-receive` thin trigger. The previous shared `hooks.sh` library is gone; `pre-push` is now self-contained and `post-receive` delegates directly to `sudo bonesremote hook post-receive --site <project>`. After that, they belong to the user and can be edited freely. They are published into `bonesremote`'s root-owned remote site state via `bonesdeploy push` and can be restored locally with `bonesdeploy pull`.
+### Build-time configuration
+`[build]` in `.bones/bones.toml` declares which environment variables should be injected into the build container at build time. It supports two sources:
 
-- `pre-push` => Local hook, symlinked to `.git/hooks/pre-push`. This checks to see if we are pushing to our bonesdeploy designated remote. If so, then we run `bonesdeploy doctor --local` and we fail if the doctor command expresses any warning or errors.
-- `post-receive` => Thin trigger that derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/` instead of the bare repo.
+1. **`vars`** — names of environment variables from `shared/.env` (secrets). Values come from `bonesdeploy secrets push`, not this file.
+2. **Any other key under `[build]`** — literal (non-secret) value injected as a same-named environment variable, e.g. `BUILD_TARGET = "production"` is exposed as `$BUILD_TARGET`. These are build-time configuration constants, not secrets.
+
+```toml
+# .bones/bones.toml
+[build]
+# `vars` pulls from shared/.env — never put secret values here.
+vars = [
+  "NEXT_PUBLIC_API_URL",
+  "NEXT_PUBLIC_GA_ID",
+]
+
+# Keys under [build] (except `vars`) are injected directly as env vars.
+# Non-secret, safe to commit, e.g. $BUILD_TARGET in build scripts.
+BUILD_TARGET = "production"
+```
+
+The file is pushed with `bonesdeploy push` and read by `bonesremote` during the build phase. It first injects literal keys into the build container, then overlays the `vars` values from `shared/.env` on top. If a name appears in both places, the value from `.env` wins.
+
+Top-level keys are for **non-secret build constants** (e.g. toolchain versions, feature flags). They are committed to version control and visible in plaintext. Putting secret values at the top level would expose them to the build container, the repository, and potentially inlined client bundles — use `vars` and `bonesdeploy secrets push` instead.
+
+### Hooks
+The optional git push transport uses two thin internal adapters (local `pre-push` guard and remote `post-receive` trigger) that are embedded in the binaries. They are not visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
+
+- `pre-push` => Installed by `bonesdeploy init` into `.git/hooks/pre-push`. This checks if we are pushing to the bonesdeploy designated remote. If so, it runs `bonesdeploy doctor --local` and fails if doctor reports warnings or errors.
+- `post-receive` => Installed automatically into the bare repo. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/`. The canonical script is embedded in the `bonesremote` binary and installed as a side-effect of `bonesdeploy push`.
 
 ### Deployment Folder
-This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must be ordered sequentially like `01_install_deps.sh`, `02_run_build.sh`, and run inside bonesremote's Debian build container with `cwd=/workspace/source`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, run in lexical order as the site runtime user with `cwd` set to the sealed release, and are the right place for migrations, cache warmups, and other runtime-state work. Before prepare scripts run, `bonesremote` wires each `[shared].paths` entry from the site runtime config into the promoted release.
+This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order inside bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; other files, including `README.md`, are ignored. Bonesremote prepares the image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to the sealed release, and are the right place for migrations, cache warmups, and other runtime-state work. Before prepare scripts run, `bonesremote` wires each `[shared].paths` entry from the site runtime config into the promoted release.
 
 ## Crate Structure
 This Cargo workspace has three crates under `crates/`:
@@ -136,7 +178,7 @@ bonesdeploy/
 ├── Cargo.toml                  # workspace root
 ├── crates/
 │   ├── bonesdeploy/
-│   │   ├── kit/                # embedded scaffolding templates and hooks
+│   │   ├── kit/                # embedded scaffolding templates
 │   │   └── src/
 │   │       ├── cli/            # clap args + dispatch
 │   │       ├── commands/       # CLI command implementations
@@ -181,14 +223,15 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 - **doctor**
   - This command checks all concerns in your local environment.
+  - Checks are reported as pass, pending, or failure. A pending first Git push is expected after remote setup and exits successfully; broken prerequisites still exit non-zero.
   - Loads config from `.bones/bones.toml`
   - Runs local checks:
     - `.bones` folder exists and is a symlink (warns if it is not a symlink to `~/.config/bonesdeploy/<project>.bones/`).
     - Deployment scripts under `.bones/deployment/build/` and `.bones/deployment/prepare/` are ordered with numeric prefixes.
-    - Local `pre-push` hook is symlinked properly when `deploy_on_push = true`.
+    - Local `pre-push` guard is installed properly when `deploy_on_push = true`. Checks for the presence and version marker in the baked script.
   - Runs remote checks (skipped with `--local`):
     - Opens a privileged SSH session and runs `bonesremote doctor --site <project>`.
-    - `bonesremote doctor --site <project>` checks `bonesremote` itself, Podman availability, deploy-user sudo wiring, AppArmor, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`.
+    - `bonesremote doctor --site <project>` checks Podman availability, deploy-user sudo wiring, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until the configured branch is pushed.
   - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys.
 
 - **push**
@@ -198,7 +241,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 - **pull**
   - Streams the current remote site dataset back from `bonesremote site export --site <project>` and extracts it into local `.bones/`.
-  - Recreates the local `.git/hooks/pre-push` symlink so the repository regains its pre-push check after recovery.
+  - Re-installs the local pre-push guard so the repository regains its pre-push check after recovery.
 
 - **deploy**
   - Publishes the local `.bones/` dataset into remote bonesremote site state first, then SSHes into the configured host and runs `bonesremote deploy --site <project>` directly.
@@ -214,7 +257,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Provisions machine-level dependencies (users, groups, firewall, system packages).
 
 - **remote runtime**:
-  - Prompts for a framework template, refreshes `.bones/runtime/`, and writes `.bones/runtime.toml`.
+  - Prompts for a framework template, refreshes `.bones/runtime/`, and writes the selected settings into `.bones/bones.toml`.
   - Reapplies template-specific defaults into `.bones/bones.toml` only when they still match generic or previous-template values.
   - After a `y/N` confirmation, delegates to the hidden `bonesinfra` checkout by running `python -m bonesinfra runtime apply --config <path> --runtime-config <path>` against the configured host as the configured `ssh_user`.
   - Loads the template's `operations.py` at runtime to install framework-specific packages and services.
@@ -285,13 +328,14 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 ## Flow
 - User runs `bonesdeploy init`, and the procedures outlined above are executed.
-- User can make any changes to their deployment scripts or hooks in `.bones/` (e.g., customizing `deployment/build/` files or adding project-specific logic).
+- User can make any changes to their deployment scripts in `.bones/` (e.g., customizing `deployment/build/` files or adding project-specific logic).
 - User runs `bonesdeploy push` to publish the `.bones/` dataset to bonesremote site state under `/root/.config/bonesremote/sites/<site>/`.
 - Before the first deploy (and after initial setup), the source code must be pushed to the remote bare repo so bonesremote can access it:
   ```
   git push <remote_name> <branch>
   ```
 - `bonesdeploy doctor` checks the local and remote environment, including whether the configured deploy branch exists locally and in the remote bare repo.
+- Doctor uses exit status for actionable failures; an empty remote repository before the first branch push is a successful pending state so setup can finish cleanly.
 - User runs `bonesdeploy deploy` to perform the actual remote release deployment.
 
 ### Primary Deploy Flow
@@ -301,7 +345,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 3. `bonesremote deploy` orchestrates the full pipeline:
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
-   - **release_build** — Run `deployment/build/*.sh` inside bonesremote's Debian build container at `/workspace/source`
+    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `[build].vars` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
    - **release_promote** — Copy safe artifacts into a sealed `root:<site>` release
    - **wire_shared** — Symlink declared shared paths into the sealed release
    - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user in the sealed release
@@ -325,8 +369,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
       ```
    - This command orchestrates the full pipeline:
       - **stage_release** — Create timestamped release state
-      - **release_checkout** — Export source from the bare repo into temporary context
-      - **release_build** — Run `deployment/build/*.sh` inside bonesremote's Debian build container at `/workspace/source`
+       - **release_checkout** — Export source from the bare repo into temporary context
+       - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `[build].vars` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
       - **release_promote** — Seal safe artifacts into `releases/<release>`
       - **wire_shared** — Link shared runtime paths
       - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user

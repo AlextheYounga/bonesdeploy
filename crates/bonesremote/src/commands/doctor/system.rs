@@ -18,15 +18,6 @@ pub(super) fn check_supported_distribution(issues: &mut Vec<String>) {
     issues.push("Unsupported host OS; bonesremote currently supports Debian/Ubuntu only".to_string());
 }
 
-pub(super) fn check_globally_available(issues: &mut Vec<String>) {
-    let result = Command::new(paths::BONESREMOTE_BINARY).arg("version").output();
-
-    match result {
-        Ok(output) if output.status.success() => {}
-        _ => issues.push(format!("{} is not globally available (not in PATH)", paths::BONESREMOTE_BINARY)),
-    }
-}
-
 pub(super) fn check_podman_available(issues: &mut Vec<String>) {
     let result = Command::new("podman").arg("--version").output();
 
@@ -45,17 +36,24 @@ pub(super) fn check_passwordless_sudo(issues: &mut Vec<String>) {
         [paths::BONESREMOTE_BINARY, "release", "prune", "--site", "nonexistent"],
     ];
 
-    for command in privileged_commands {
-        let result = deploy_user_sudo_check_command(command).output();
+    let missing: Vec<String> = privileged_commands
+        .into_iter()
+        .filter(|command| !deploy_user_can_run(*command))
+        .map(|command| command.join(" "))
+        .collect();
 
-        match result {
-            Ok(output) if output.status.success() => {}
-            _ => issues.push(format!(
-                "{} is not allowed via passwordless sudo: {} (ensure bonesinfra has provisioned the sudoers policy on this host)",
-                paths::BONESREMOTE_BINARY,
-                command.join(" "),
-            )),
-        }
+    if !missing.is_empty() {
+        issues.push(format!(
+            "deploy user is missing passwordless sudo permissions for: {} (ensure bonesinfra has provisioned the sudoers policy on this host)",
+            missing.join(", "),
+        ));
+    }
+}
+
+fn deploy_user_can_run(command: [&str; 5]) -> bool {
+    match deploy_user_sudo_check_command(command).output() {
+        Ok(output) => output.status.success(),
+        Err(_) => false,
     }
 }
 

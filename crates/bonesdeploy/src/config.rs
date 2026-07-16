@@ -3,10 +3,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use serde_json::{Map, Value};
 use shared::config as shared_config;
 use shared::paths;
-use toml_edit::ser::to_string as toml_to_string;
 
 pub use shared::config::{Bones, load};
 
@@ -34,17 +32,33 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
     shared_config::apply_derived_defaults(&mut to_serialize);
 
-    let raw = toml_to_string(&to_serialize).context("Failed to serialize bones config")?;
-    let toml_str = oxc_toml::format(&raw, oxc_toml::Options::default());
-    fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
+    let content = annotate_sections(&toml::to_string_pretty(&to_serialize).context("Failed to serialize bones.toml")?);
+    fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
 
-pub fn save_runtime(runtime: &Map<String, Value>, path: &Path) -> Result<()> {
-    let raw = toml_to_string(runtime).context("Failed to serialize runtime config")?;
-    let toml_str = oxc_toml::format(&raw, oxc_toml::Options::default());
-    fs::write(path, toml_str).with_context(|| format!("Failed to write {}", path.display()))?;
-    Ok(())
+fn annotate_sections(content: &str) -> String {
+    let comments = [
+        ("[app]", "# Project identity and deployment settings."),
+        ("[app.server]", "# Remote server connection."),
+        ("[app.dns]", "# Domains, email, and TLS."),
+        ("[app.deploy]", "# Branch and deployment behavior."),
+        ("[build]", "# Environment variables and constants injected during builds."),
+        ("[runtime]", "# Framework runtime settings."),
+        ("[runtime.permissions]", "# Release file permissions."),
+        ("[runtime.shared]", "# Paths persisted in the shared release directory."),
+    ];
+
+    let mut output = String::new();
+    for line in content.lines() {
+        if let Some((_, comment)) = comments.iter().find(|(section, _)| *section == line) {
+            output.push_str(comment);
+            output.push('\n');
+        }
+        output.push_str(line);
+        output.push('\n');
+    }
+    output
 }
 
 #[cfg(test)]
@@ -68,23 +82,22 @@ mod tests {
 
     fn minimal_toml(project_name: &str) -> String {
         format!(
-            "remote_name = \"production\"\nproject_name = \"{project_name}\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nbranch = \"master\"\ndeploy_on_push = true\n",
+            "[app]\nremote_name = \"production\"\nproject_name = \"{project_name}\"\nrepo_path = \"{}\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.deploy]\nbranch = \"master\"\ndeploy_on_push = true\n",
             paths::default_repo_path_for(project_name)
         )
     }
 
     fn sample_config(project_name: &str) -> Bones {
-        Bones {
-            remote_name: String::from("production"),
-            project_name: String::from(project_name),
-            host: String::from("deploy.example.com"),
-            port: String::from("22"),
-            repo_path: paths::default_repo_path_for(project_name),
-            project_root: default_project_root_for(project_name),
-            branch: String::from("master"),
-            deploy_on_push: true,
-            ..Default::default()
-        }
+        let mut config = Bones::default();
+        config.remote_name = String::from("production");
+        config.project_name = String::from(project_name);
+        config.host = String::from("deploy.example.com");
+        config.port = String::from("22");
+        config.repo_path = paths::default_repo_path_for(project_name);
+        config.project_root = default_project_root_for(project_name);
+        config.branch = String::from("master");
+        config.deploy_on_push = true;
+        config
     }
 
     #[test]
@@ -146,10 +159,21 @@ mod tests {
     }
 
     #[test]
+    fn save_adds_comments_to_nested_sections() -> Result<()> {
+        let path = temp_path("section_comments.toml");
+        save(&sample_config("phoenix"), &path)?;
+        let content = fs::read_to_string(&path)?;
+        assert!(content.contains("# Remote server connection.\n[app.server]"));
+        assert!(content.contains("# Branch and deployment behavior.\n[app.deploy]"));
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[test]
     fn load_preserves_explicit_repo_and_project_root_overrides() -> Result<()> {
         let path = temp_path("overrides.toml");
         let toml = format!(
-            "remote_name = \"production\"\nproject_name = \"app\"\nhost = \"deploy.example.com\"\nport = \"22\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\nbranch = \"master\"\ndeploy_on_push = false\n",
+            "[app]\nremote_name = \"production\"\nproject_name = \"app\"\nrepo_path = \"{}\"\nproject_root = \"/custom/deploy\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.deploy]\nbranch = \"master\"\ndeploy_on_push = false\n",
             paths::default_repo_path_for("app")
         );
 

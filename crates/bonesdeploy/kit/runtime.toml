@@ -1,6 +1,0 @@
-runtime_user = ""
-runtime_group = ""
-release_group = ""
-
-[permissions]
-paths = [{ path = "*", type = "dir", mode = "750" }, { path = "*", type = "file", mode = "640" }]

@@ -10,27 +10,31 @@ pub(super) fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Pat
         return Ok(());
     }
 
-    let kit_root = source_dir.join("crates/bonesdeploy/kit");
-    sync_tree(&kit_root.join("hooks"), &bones_dir.join("hooks"), true)?;
-    sync_tree(&deployment_source_root(source_dir, bones_dir), &bones_dir.join("deployment"), true)?;
+    sync_tree(&deployment_source_root(source_dir, bones_dir)?, &bones_dir.join("deployment"), true)?;
 
     Ok(())
 }
 
-fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> PathBuf {
-    let runtime_toml = bones_dir.join(paths::RUNTIME_TOML);
-    let Some(template) = selected_runtime_template(&runtime_toml) else {
-        return source_dir.join("crates/bonesdeploy/kit/deployment");
+fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> Result<PathBuf> {
+    let bones_toml = bones_dir.join(paths::BONES_TOML);
+    let Some(template) = selected_runtime_template(&bones_toml)? else {
+        return Ok(source_dir.join("crates/bonesdeploy/kit/deployment"));
     };
 
     let runtime_deployment = source_dir.join("crates/bonesdeploy/runtimes").join(template).join("deployment");
-    if runtime_deployment.is_dir() { runtime_deployment } else { source_dir.join("crates/bonesdeploy/kit/deployment") }
+    Ok(if runtime_deployment.is_dir() {
+        runtime_deployment
+    } else {
+        source_dir.join("crates/bonesdeploy/kit/deployment")
+    })
 }
 
-fn selected_runtime_template(runtime_toml: &Path) -> Option<String> {
-    let content = fs::read_to_string(runtime_toml).ok()?;
-    let value: toml::Value = toml::from_str(&content).ok()?;
-    value.get("template")?.as_str().map(String::from)
+fn selected_runtime_template(runtime_toml: &Path) -> Result<Option<String>> {
+    let content =
+        fs::read_to_string(runtime_toml).with_context(|| format!("Failed to read {}", runtime_toml.display()))?;
+    let value: toml::Value =
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_toml.display()))?;
+    Ok(value.get("runtime").and_then(|runtime| runtime.get("template")).and_then(toml::Value::as_str).map(String::from))
 }
 
 fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {
@@ -78,10 +82,9 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
 
+    use super::refresh_local_bones_from_source;
     use anyhow::Result;
     use tempfile::TempDir;
-
-    use super::refresh_local_bones_from_source;
 
     #[test]
     fn refresh_local_bones_updates_scaffold_without_touching_configs() -> Result<()> {
@@ -89,23 +92,17 @@ mod tests {
         let source_dir = temp.path().join("source");
         let bones_dir = temp.path().join(".bones");
 
-        write(&source_dir.join("crates/bonesdeploy/kit/hooks/pre-push"), "new hook")?;
         write(&source_dir.join("crates/bonesdeploy/kit/deployment/build/01_build.sh"), "generic deploy")?;
         write(&source_dir.join("crates/bonesdeploy/runtimes/laravel/deployment/build/01_build.sh"), "laravel deploy")?;
 
-        write(&bones_dir.join("bones.toml"), "keep = 'config'\n")?;
-        write(&bones_dir.join("runtime.toml"), "template = 'laravel'\n")?;
+        write(&bones_dir.join("bones.toml"), "[runtime]\ntemplate = 'laravel'\n")?;
 
         refresh_local_bones_from_source(&source_dir, &bones_dir)?;
 
-        assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "keep = 'config'\n");
-        assert_eq!(fs::read_to_string(bones_dir.join("runtime.toml"))?, "template = 'laravel'\n");
-        assert_eq!(fs::read_to_string(bones_dir.join("hooks/pre-push"))?, "new hook");
+        assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "[runtime]\ntemplate = 'laravel'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
 
-        let hook_mode = fs::metadata(bones_dir.join("hooks/pre-push"))?.permissions().mode() & 0o777;
         let deploy_mode = fs::metadata(bones_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
-        assert_eq!(hook_mode, 0o755);
         assert_eq!(deploy_mode, 0o755);
 
         Ok(())

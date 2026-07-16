@@ -1,7 +1,8 @@
+[runtime]
 template = "django"
 web_root = "public"
 
-[permissions]
+[runtime.permissions]
 paths = [
   { path = "*", type = "dir", mode = "750" },
   { path = "*", type = "file", mode = "640" },
@@ -9,9 +10,12 @@ paths = [
   { path = "media", type = "dir", mode = "770", recursive = true },
 ]
 
-[shared]
+[runtime.shared]
 paths = [
   { path = ".env", type = "file" },
   { path = "staticfiles", type = "dir" },
   { path = "media", type = "dir" },
 ]
+
+[build]
+vars = []
