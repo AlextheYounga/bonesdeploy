@@ -3,7 +3,7 @@ use std::os::unix::fs::symlink;
 use std::path::{Component, Path};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, SharedPath, SharedPathType};
+use shared::config::{self, SharedPath};
 use shared::paths;
 
 use crate::privileges;
