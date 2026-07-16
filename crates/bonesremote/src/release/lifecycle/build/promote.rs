@@ -13,6 +13,6 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<Pat
     tree::harden_release_tree(context, &release_dir, &release_group)
         .with_context(|| format!("Failed to promote release {release_name}"))?;
 
-    println!("Promoted release {release_name} into {}", release_dir.display());
+    println!("Copied release {release_name} into {}", release_dir.display());
     Ok(release_dir)
 }
