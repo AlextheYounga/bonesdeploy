@@ -128,8 +128,6 @@ This creates:
 ```text
 .bones/
 ├── bones.toml
-├── runtime.toml
-├── buildtime.toml
 └── deployment/
     └── 01_*.sh
 ```
@@ -237,6 +235,7 @@ bonesdeploy update
 `bonesdeploy init` creates `.bones/bones.toml`:
 
 ```toml
+[app]
 remote_name = "production"
 project_name = "myproject"
 repo_path = "/home/git/myproject.git"
@@ -249,6 +248,12 @@ email = ""
 deploy_on_push = false
 ssl_enabled = false
 releases = 5
+
+[build]
+vars = []
+
+[runtime]
+template = "custom"
 ```
 
 Common defaults:
@@ -257,9 +262,7 @@ Common defaults:
 
 ```
 .bones/
-├── bones.toml           # project configuration
-├── runtime.toml         # framework runtime configuration
-├── buildtime.toml       # build-time env vars from shared/.env
+├── bones.toml           # project, build, and runtime configuration
 └── deployment/
     ├── build/
     │   └── 01_*.sh      # build scripts (run sequentially in the buildpack-deps container)

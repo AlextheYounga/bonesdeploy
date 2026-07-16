@@ -11,9 +11,9 @@ use shared::paths;
 pub fn run(yes: bool) -> Result<()> {
     git::ensure_git_repository()?;
 
-    let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
-    if !runtime_toml.exists() {
-        bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_RUNTIME_TOML);
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    if !bones_toml.exists() {
+        bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_TOML);
     }
 
     if !yes && !prompts::confirm_remote_runtime()? {
@@ -25,14 +25,7 @@ pub fn run(yes: bool) -> Result<()> {
 
     println!("Applying runtime...");
 
-    bonesinfra::run(&[
-        "runtime",
-        "apply",
-        "--config",
-        paths::LOCAL_BONES_TOML,
-        "--runtime-config",
-        paths::LOCAL_BONES_RUNTIME_TOML,
-    ])?;
+    bonesinfra::run(&["runtime", "apply", "--config", paths::LOCAL_BONES_TOML])?;
 
     println!("Runtime applied.");
     println!();

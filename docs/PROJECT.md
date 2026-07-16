@@ -65,8 +65,6 @@ BonesRemote holds one OS-backed deployment lock per site. A second deploy must n
 ```
 .bones
 ├── bones.toml
-├── runtime.toml
-├── buildtime.toml
 ├── deployment
 │   ├── build/
 │   │   ├── 01_install_build_deps.sh
@@ -93,12 +91,13 @@ Everything else is defaulted or derived for Debian/Ubuntu-first usability:
 - `deploy_on_push`: defaults to `false`
 - `releases`: defaults to `5`
 
-`web_root`, `runtime_user`, `runtime_group`, `release_group`, and runtime-declared shared paths live in `.bones/runtime.toml`. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively. Shared paths are declared under `[shared].paths`; deploys only wire the paths listed there, so framework-specific writable paths must not be hardcoded globally.
+`[runtime]` in `.bones/bones.toml` contains the selected template, web root, runtime identity, permissions, and shared paths. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively. Shared paths are declared under `[runtime.shared].paths`; deploys only wire the paths listed there, so framework-specific writable paths must not be hardcoded globally.
 
 Users can override any default by editing `.bones/bones.toml` after init.
 
 Example `bones.toml`:
 ```toml
+[app]
 remote_name = "production"
 project_name = "lawsnipe"
 ssh_user = "root"
@@ -113,28 +112,36 @@ email = "ops@example.com"
 deploy_on_push = false
 ssl_enabled = true
 releases = 5
+
+[build]
+vars = ["NEXT_PUBLIC_API_URL"]
+
+[runtime]
+template = "next"
+web_root = "public"
 ```
 
-### Buildtime TOML
-`.bones/buildtime.toml` declares which environment variables should be injected into the build container at build time. It supports two sources:
+### Build-time configuration
+`[build]` in `.bones/bones.toml` declares which environment variables should be injected into the build container at build time. It supports two sources:
 
 1. **`vars`** — names of environment variables from `shared/.env` (secrets). Values come from `bonesdeploy secrets push`, not this file.
-2. **Any other top-level key** — literal (non-secret) value injected as a same-named environment variable, e.g. `php_version = "8.5"` is exposed as `$php_version`. These are build-time configuration constants, not secrets.
+2. **Any other key under `[build]`** — literal (non-secret) value injected as a same-named environment variable, e.g. `BUILD_TARGET = "production"` is exposed as `$BUILD_TARGET`. These are build-time configuration constants, not secrets.
 
 ```toml
-# .bones/buildtime.toml
+# .bones/bones.toml
+[build]
 # `vars` pulls from shared/.env — never put secret values here.
 vars = [
   "NEXT_PUBLIC_API_URL",
   "NEXT_PUBLIC_GA_ID",
 ]
 
-# Top-level keys (except `vars`) are injected directly as env vars.
-# Non-secret, safe to commit, e.g. $php_version in build scripts.
-php_version = "8.5"
+# Keys under [build] (except `vars`) are injected directly as env vars.
+# Non-secret, safe to commit, e.g. $BUILD_TARGET in build scripts.
+BUILD_TARGET = "production"
 ```
 
-The file is pushed with `bonesdeploy push` and read by `bonesremote` during the build phase. It first injects top-level keys into the podman build container as `--env KEY=VALUE`, then overlays the `vars` values from `shared/.env` on top. If a name appears both as a top-level key and as a `vars` entry resolved from `.env`, the secret from `.env` wins. If `buildtime.toml` is missing, or both `vars` is empty and no extra keys are present, no env vars are injected (the default for most runtimes).
+The file is pushed with `bonesdeploy push` and read by `bonesremote` during the build phase. It first injects literal keys into the build container, then overlays the `vars` values from `shared/.env` on top. If a name appears in both places, the value from `.env` wins.
 
 Top-level keys are for **non-secret build constants** (e.g. toolchain versions, feature flags). They are committed to version control and visible in plaintext. Putting secret values at the top level would expose them to the build container, the repository, and potentially inlined client bundles — use `vars` and `bonesdeploy secrets push` instead.
 
@@ -244,7 +251,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Provisions machine-level dependencies (users, groups, firewall, system packages).
 
 - **remote runtime**:
-  - Prompts for a framework template, refreshes `.bones/runtime/`, and writes `.bones/runtime.toml`.
+  - Prompts for a framework template, refreshes `.bones/runtime/`, and writes the selected settings into `.bones/bones.toml`.
   - Reapplies template-specific defaults into `.bones/bones.toml` only when they still match generic or previous-template values.
   - After a `y/N` confirmation, delegates to the hidden `bonesinfra` checkout by running `python -m bonesinfra runtime apply --config <path> --runtime-config <path>` against the configured host as the configured `ssh_user`.
   - Loads the template's `operations.py` at runtime to install framework-specific packages and services.
@@ -332,7 +339,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 3. `bonesremote deploy` orchestrates the full pipeline:
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
-    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `.bones/buildtime.toml` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
+    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `[build].vars` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
    - **release_promote** — Copy safe artifacts into a sealed `root:<site>` release
    - **wire_shared** — Symlink declared shared paths into the sealed release
    - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user in the sealed release
@@ -357,7 +364,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
    - This command orchestrates the full pipeline:
       - **stage_release** — Create timestamped release state
        - **release_checkout** — Export source from the bare repo into temporary context
-       - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `.bones/buildtime.toml` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
+       - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `[build].vars` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
       - **release_promote** — Seal safe artifacts into `releases/<release>`
       - **wire_shared** — Link shared runtime paths
       - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user

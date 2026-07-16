@@ -74,14 +74,17 @@ fn resolve_build_env(site: &str, cfg: &config::Bones) -> Result<Vec<(String, Str
 
     let env_path = Path::new(&cfg.project_root).join(paths::SHARED_DIR).join(paths::DOT_ENV);
     let env_content = fs::read_to_string(&env_path).with_context(|| {
-        format!("buildtime.toml requests vars but {}. Run `bonesdeploy secrets push` first.", env_path.display())
+        format!(
+            "[build].vars requests values but {} is missing. Run `bonesdeploy secrets push` first.",
+            env_path.display()
+        )
     })?;
 
     let vars = extract_env_vars(&env_content, &buildtime.vars);
 
     for name in &buildtime.vars {
         if !vars.iter().any(|(k, _)| k == name) {
-            bail!("buildtime.toml requests `{name}` but it was not found in {}.", env_path.display());
+            bail!("[build].vars requests `{name}` but it was not found in {}.", env_path.display());
         }
     }
 

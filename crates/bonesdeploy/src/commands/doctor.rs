@@ -36,7 +36,7 @@ pub async fn run(local_only: bool) -> Result<bool> {
     issues += print_check(
         "buildtime env vars",
         check_buildtime_config(),
-        Some(String::from("add vars to .bones/buildtime.toml for build-time env vars")),
+        Some(String::from("add names to [build].vars in .bones/bones.toml for build-time env vars")),
     );
 
     if deploy_on_push {
@@ -254,20 +254,21 @@ async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
 }
 
 fn check_buildtime_config() -> Option<String> {
-    let runtime_toml = Path::new(paths::LOCAL_BONES_RUNTIME_TOML);
-    let Ok(content) = fs::read_to_string(runtime_toml) else {
+    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let Ok(content) = fs::read_to_string(bones_toml) else {
         return None;
     };
     let Ok(toml_value) = content.parse::<Table>() else {
         return None;
     };
-    let is_next = toml_value.get("template").and_then(|v| v.as_str()) == Some("next");
+    let is_next =
+        toml_value.get("runtime").and_then(|runtime| runtime.get("template")).and_then(|v| v.as_str()) == Some("next");
     if !is_next {
         return None;
     }
 
-    if !Path::new(paths::LOCAL_BONES_BUILDTIME_TOML).exists() {
-        return Some(String::from("Next.js requires .bones/buildtime.toml for build-time env vars"));
+    if toml_value.get("build").is_none_or(|build| build.get("vars").is_none()) {
+        return Some(String::from("Next.js requires [build].vars in .bones/bones.toml for build-time env vars"));
     }
 
     None

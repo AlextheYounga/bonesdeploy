@@ -8,6 +8,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use rust_embed::Embed;
 use serde_json::{Map, Value};
 
+use shared::config::{Buildtime, Runtime};
 use shared::paths;
 
 #[derive(Embed)]
@@ -38,11 +39,14 @@ pub fn runtime_names() -> Vec<String> {
 }
 
 pub fn base_runtime_defaults() -> Result<Map<String, Value>> {
-    runtime_defaults_from_bytes("kit/runtime.toml", Kit::get(paths::RUNTIME_TOML).map(|asset| asset.data))
+    serde_json::to_value(Runtime::default())
+        .ok()
+        .and_then(|value| value.as_object().cloned())
+        .ok_or_else(|| anyhow!("Failed to serialize base runtime defaults"))
 }
 
 pub fn runtime_defaults(runtime: &str) -> Result<Map<String, Value>> {
-    let asset_path = format!("{runtime}/runtime.toml");
+    let asset_path = format!("{runtime}/bones.toml");
     runtime_defaults_from_bytes(&asset_path, RuntimeAssets::get(&asset_path).map(|asset| asset.data))
 }
 
@@ -59,23 +63,18 @@ pub fn scaffold_runtime_secrets(runtime: &str, bones_dir: &Path) -> Result<()> {
     scaffold_runtime_assets(runtime, bones_dir, paths::KIT_SECRETS_DIR)
 }
 
-pub fn scaffold_runtime_buildtime(runtime: &str, bones_dir: &Path) -> Result<()> {
-    let asset_path = format!("{runtime}/{}", paths::BUILDTIME_TOML);
-    if let Some(asset) = RuntimeAssets::get(&asset_path) {
-        write_asset(bones_dir, paths::BUILDTIME_TOML, asset.data.as_ref())?;
-    }
-    Ok(())
-}
-
-pub fn raw_runtime_template(runtime: &str) -> Result<Vec<u8>> {
-    let asset_path = format!("{runtime}/{}", paths::RUNTIME_TOML);
-    RuntimeAssets::get(&asset_path)
-        .map(|a| a.data.to_vec())
-        .ok_or_else(|| anyhow!("Missing runtime template at {asset_path}"))
-}
-
-pub fn raw_base_runtime_template() -> Result<Vec<u8>> {
-    Kit::get(paths::RUNTIME_TOML).map(|a| a.data.to_vec()).ok_or_else(|| anyhow!("Missing kit runtime template"))
+pub fn runtime_buildtime_defaults(runtime: &str) -> Result<Buildtime> {
+    let asset_path = format!("{runtime}/bones.toml");
+    let Some(asset) = RuntimeAssets::get(&asset_path) else { return Ok(Buildtime::default()) };
+    let value: toml::Value = toml::from_str(str::from_utf8(asset.data.as_ref())?)
+        .with_context(|| format!("Failed to parse embedded build-time defaults at {asset_path}"))?;
+    value
+        .get("build")
+        .cloned()
+        .map(toml::Value::try_into)
+        .transpose()
+        .with_context(|| format!("Failed to parse [build] defaults at {asset_path}"))
+        .map(Option::unwrap_or_default)
 }
 
 fn scaffold_runtime_assets(runtime: &str, bones_dir: &Path, asset_prefix: &str) -> Result<()> {
@@ -109,7 +108,11 @@ fn runtime_defaults_from_bytes(asset_path: &str, bytes: Option<impl AsRef<[u8]>>
         str::from_utf8(bytes.as_ref()).with_context(|| format!("Embedded asset {asset_path} is not valid UTF-8"))?;
     let toml_value: toml::Value = toml::from_str(content)
         .with_context(|| format!("Failed to parse embedded runtime defaults at {asset_path}"))?;
-    let json_value = serde_json::to_value(toml_value)
+    let runtime = toml_value
+        .get("runtime")
+        .cloned()
+        .ok_or_else(|| anyhow!("Embedded runtime defaults at {asset_path} are missing [runtime]"))?;
+    let json_value = serde_json::to_value(runtime)
         .with_context(|| format!("Failed to convert embedded runtime defaults at {asset_path} to JSON"))?;
 
     json_value
@@ -137,10 +140,20 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::RuntimeAssets;
+    use super::{RuntimeAssets, runtime_defaults, runtime_names};
 
     #[test]
     fn next_runtime_includes_the_build_script() {
         assert!(RuntimeAssets::get("next/deployment/build/02_run_build.sh").is_some());
+    }
+
+    #[test]
+    fn runtime_defaults_fit_the_single_file_schema() {
+        for runtime in runtime_names() {
+            let defaults = runtime_defaults(&runtime).expect("runtime defaults should parse");
+            let config: shared::config::Runtime = serde_json::from_value(serde_json::Value::Object(defaults))
+                .expect("runtime defaults should deserialize");
+            assert_eq!(config.template, runtime);
+        }
     }
 }

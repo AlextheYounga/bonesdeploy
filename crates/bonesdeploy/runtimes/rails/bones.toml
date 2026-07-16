@@ -1,0 +1,24 @@
+[runtime]
+template = "rails"
+web_root = "public"
+
+[runtime.permissions]
+paths = [
+  { path = "*", type = "dir", mode = "750" },
+  { path = "*", type = "file", mode = "640" },
+  { path = "tmp", type = "dir", mode = "770", recursive = true },
+  { path = "log", type = "dir", mode = "770", recursive = true },
+  { path = "storage", type = "dir", mode = "770", recursive = true },
+  { path = "public/assets", type = "dir", mode = "750", recursive = true },
+]
+
+[runtime.shared]
+paths = [
+  { path = ".env", type = "file" },
+  { path = "tmp", type = "dir" },
+  { path = "log", type = "dir" },
+  { path = "storage", type = "dir" },
+]
+
+[build]
+vars = []
