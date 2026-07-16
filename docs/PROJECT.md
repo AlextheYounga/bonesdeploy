@@ -116,20 +116,27 @@ releases = 5
 ```
 
 ### Buildtime TOML
-`.bones/buildtime.toml` declares which environment variable names from `shared/.env` should be injected into the build container at build time. This is required for frameworks that inline public env vars into client bundles at build time (e.g. `NEXT_PUBLIC_*`, `VITE_*`, `NUXT_PUBLIC_*`, `PUBLIC_*`).
+`.bones/buildtime.toml` declares which environment variables should be injected into the build container at build time. It supports two sources:
+
+1. **`vars`** — names of environment variables from `shared/.env` (secrets). Values come from `bonesdeploy secrets push`, not this file.
+2. **Any other top-level key** — literal (non-secret) value injected as a same-named environment variable, e.g. `php_version = "8.5"` is exposed as `$php_version`. These are build-time configuration constants, not secrets.
 
 ```toml
 # .bones/buildtime.toml
-# Values come from `bonesdeploy secrets push` (shared/.env), not this file.
+# `vars` pulls from shared/.env — never put secret values here.
 vars = [
   "NEXT_PUBLIC_API_URL",
   "NEXT_PUBLIC_GA_ID",
 ]
+
+# Top-level keys (except `vars`) are injected directly as env vars.
+# Non-secret, safe to commit, e.g. $php_version in build scripts.
+php_version = "8.5"
 ```
 
-The file is pushed with `bonesdeploy push` and read by `bonesremote` during the build phase. It reads the requested vars from the host's `shared/.env`, then passes them into the podman build container as `--env KEY=VALUE`. If `buildtime.toml` is missing or its `vars` array is empty, no env vars are injected (the default for most runtimes).
+The file is pushed with `bonesdeploy push` and read by `bonesremote` during the build phase. It first injects top-level keys into the podman build container as `--env KEY=VALUE`, then overlays the `vars` values from `shared/.env` on top. If a name appears both as a top-level key and as a `vars` entry resolved from `.env`, the secret from `.env` wins. If `buildtime.toml` is missing, or both `vars` is empty and no extra keys are present, no env vars are injected (the default for most runtimes).
 
-This is NOT a replacement for `bonesdeploy secrets` — it only contains **var names** (not values). The actual values come from the existing `.env` persisted by `bonesdeploy secrets push`. Putting secret values in `buildtime.toml` would expose them to the build container and potentially inlined client bundles.
+Top-level keys are for **non-secret build constants** (e.g. toolchain versions, feature flags). They are committed to version control and visible in plaintext. Putting secret values at the top level would expose them to the build container, the repository, and potentially inlined client bundles — use `vars` and `bonesdeploy secrets push` instead.
 
 ### Hooks
 The optional git push transport uses two thin internal adapters (local `pre-push` guard and remote `post-receive` trigger) that are embedded in the binaries. They are not visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.

@@ -64,13 +64,12 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
 }
 
 fn resolve_build_env(site: &str, cfg: &config::Bones) -> Result<Vec<(String, String)>> {
-    let buildtime = load_buildtime(&paths::bonesremote_site_root(site))?;
-    let Some(buildtime) = buildtime else {
-        return Ok(Vec::new());
-    };
+    let buildtime = load_buildtime(&paths::bonesremote_site_root(site))?.unwrap_or_default();
+
+    let mut env_vars: Vec<(String, String)> = buildtime.extra.into_iter().collect();
 
     if buildtime.vars.is_empty() {
-        return Ok(Vec::new());
+        return Ok(env_vars);
     }
 
     let env_path = Path::new(&cfg.project_root).join(paths::SHARED_DIR).join(paths::DOT_ENV);
@@ -86,7 +85,8 @@ fn resolve_build_env(site: &str, cfg: &config::Bones) -> Result<Vec<(String, Str
         }
     }
 
-    Ok(vars)
+    env_vars.extend(vars);
+    Ok(env_vars)
 }
 
 fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
