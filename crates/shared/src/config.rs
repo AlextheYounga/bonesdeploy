@@ -144,7 +144,7 @@ pub struct Runtime {
     #[serde(default)]
     pub permissions: Option<toml::Value>,
     #[serde(flatten)]
-    pub extra: BTreeMap<String, String>,
+    pub extra: BTreeMap<String, toml::Value>,
 }
 
 impl Default for Runtime {

@@ -156,4 +156,15 @@ mod tests {
             assert_eq!(config.template, runtime);
         }
     }
+
+    #[test]
+    fn runtime_answers_accept_boolean_template_settings() {
+        let mut answers = runtime_defaults("nuxt").expect("Nuxt defaults should parse");
+        answers.insert("static".into(), serde_json::Value::Bool(true));
+
+        let config: shared::config::Runtime = serde_json::from_value(serde_json::Value::Object(answers))
+            .expect("boolean template settings should deserialize");
+        assert_eq!(config.extra.get("static").and_then(|value| value.as_bool()), Some(true));
+        assert!(toml::to_string(&config).expect("runtime should serialize").contains("static = true"));
+    }
 }
