@@ -51,7 +51,6 @@ pub fn run(site: &str) -> Result<()> {
     for shared_path in &runtime.shared.paths {
         validate_shared_path(shared_path)?;
         let target = shared_dir.join(&shared_path.path);
-        ensure_shared_leaf(&target, &shared_path.path_type)?;
         link_relative(&release_dir, &shared_path.path, &target)?;
     }
 
@@ -69,19 +68,6 @@ fn validate_shared_path(shared_path: &SharedPath) -> Result<()> {
     }
 
     Ok(())
-}
-
-fn ensure_shared_leaf(path: &Path, path_type: &SharedPathType) -> Result<()> {
-    match path_type {
-        SharedPathType::File if path.is_file() => return Ok(()),
-        SharedPathType::Dir if path.is_dir() => return Ok(()),
-        _ => {}
-    }
-
-    bail!(
-        "Required shared path is missing or has the wrong type: {}. Provision the runtime shared paths before deploying.",
-        path.display()
-    )
 }
 
 fn link_relative(release_dir: &Path, relative: &str, target: &Path) -> Result<()> {
@@ -117,7 +103,7 @@ mod tests {
 
     use shared::config::{SharedPath, SharedPathType};
 
-    use super::{ensure_shared_leaf, link_relative, remove_if_present, validate_shared_path};
+    use super::{link_relative, remove_if_present, validate_shared_path};
 
     fn temp_dir(label: &str) -> Result<PathBuf> {
         let dir = env::temp_dir().join(format!("bonesremote-wire-{label}-{}", process::id()));
@@ -126,20 +112,6 @@ mod tests {
         }
         fs::create_dir_all(&dir)?;
         Ok(dir)
-    }
-
-    #[test]
-    fn ensure_shared_leaf_requires_existing_path() -> Result<()> {
-        let root = temp_dir("ensure_leaves")?;
-        let missing = root.join("storage");
-        assert!(ensure_shared_leaf(&missing, &SharedPathType::Dir).is_err());
-
-        fs::create_dir_all(&missing)?;
-        ensure_shared_leaf(&missing, &SharedPathType::Dir)?;
-        assert!(ensure_shared_leaf(&missing, &SharedPathType::File).is_err());
-
-        fs::remove_dir_all(&root).ok();
-        Ok(())
     }
 
     #[test]
