@@ -83,20 +83,7 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
         return finish_abort(site, Some(&context_dir), error);
     }
 
-    deployment.phase = release_state::DeploymentPhase::Preparing;
-    if let Err(error) = release_state::write_active_deployment(site, &deployment) {
-        return finish_abort(site, Some(&context_dir), error);
-    }
-
-    if let Err(error) = lifecycle::build::promote(site, &context_dir) {
-        return finish_abort(site, Some(&context_dir), error);
-    }
-
-    if let Err(error) = lifecycle::wire_shared::run(site) {
-        return finish_abort(site, Some(&context_dir), error);
-    }
-
-    if let Err(error) = lifecycle::prepare::run(site) {
+    if let Err(error) = prepare_release(site, &context_dir, &mut deployment) {
         return finish_abort(site, Some(&context_dir), error);
     }
 
@@ -116,6 +103,16 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
         return finish_abort_without_release_drop(site, Some(&context_dir), error);
     }
     release_state::clear_active_deployment(site)?;
+    Ok(())
+}
+
+fn prepare_release(site: &str, context: &Path, deployment: &mut release_state::ActiveDeployment) -> Result<()> {
+    deployment.phase = release_state::DeploymentPhase::Preparing;
+    release_state::write_active_deployment(site, deployment)?;
+    lifecycle::build::promote(site, context)?;
+    lifecycle::wire_shared::run(site)?;
+    lifecycle::prepare::run(site)?;
+    lifecycle::build::finalize(site)?;
     Ok(())
 }
 

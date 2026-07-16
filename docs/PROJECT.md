@@ -48,7 +48,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 **Key mechanics:**
 
-- `releases/` contains root-promoted artifacts sealed as `root:<site>`.
+- `releases/` contains candidates owned by the runtime user while prepare runs, then sealed as `root:<site>` before activation.
 - `shared/` is owned by the runtime user (`<site>:<site>`) — only the app writes here.
 - Build input is temporary and disposable; build scripts run in Podman with the source mounted at `/workspace/source`.
 - Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed.
@@ -158,7 +158,7 @@ The optional git push transport uses two thin internal adapters (local `pre-push
 - `post-receive` => Installed automatically into the bare repo. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/`. The canonical script is embedded in the `bonesremote` binary and installed as a side-effect of `bonesdeploy push`.
 
 ### Deployment Folder
-This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order inside bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; other files, including `README.md`, are ignored. Bonesremote prepares the image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to the sealed release, and are the right place for migrations, cache warmups, and other runtime-state work. Before prepare scripts run, `bonesremote` wires each `[shared].paths` entry from the site runtime config into the promoted release.
+This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order inside bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; other files, including `README.md`, are ignored. Bonesremote prepares the image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. The build container receives the exported source tree only; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or bonesremote control-plane files. Prepare scripts live in `.bones/deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to a runtime-owned candidate release, and are the right place for migrations, cache warmups, and other runtime-state work. Before prepare scripts run, `bonesremote` wires each `[runtime.shared].paths` entry into the candidate; after prepare succeeds, it seals the release before activation.
 
 ## Crate Structure
 This Cargo workspace has three crates under `crates/`:
@@ -296,7 +296,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **Service commands** live under `bonesremote service ...`
 - **deploy**:
   - Runs the full deployment lifecycle as a single command (the primary entrypoint used by both `post-receive` hook and `bonesdeploy deploy`).
-  - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → release promotion/hardening → shared wiring → prepare scripts as the site user → activate → restart `<site>-nginx.service` → post-deploy pruning.
+  - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → runtime-writable candidate release → shared wiring → prepare scripts as the site user → seal release → activate → restart `<site>-nginx.service` → post-deploy pruning.
   - On failure, automatically drops the staged release.
   - `--site <name>`: imported site identifier used to load root-owned registry state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
@@ -346,9 +346,10 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
     - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `[build].vars` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
-   - **release_promote** — Copy safe artifacts into a sealed `root:<site>` release
-   - **wire_shared** — Symlink declared shared paths into the sealed release
-   - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user in the sealed release
+   - **release_promote** — Copy safe artifacts into a runtime-owned candidate release
+   - **wire_shared** — Symlink declared shared paths into the candidate release
+   - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
+   - **release_finalize** — Seal the prepared release as `root:<site>`
    - **activate_release** — Atomically repoint `current`
    - **restart_services** — Restart `<site>-nginx.service`
    - **post_deploy** — Prune old releases beyond `releases`
@@ -371,9 +372,10 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
       - **stage_release** — Create timestamped release state
        - **release_checkout** — Export source from the bare repo into temporary context
        - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `[build].vars` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
-      - **release_promote** — Seal safe artifacts into `releases/<release>`
+      - **release_promote** — Copy safe artifacts into a runtime-owned candidate at `releases/<release>`
       - **wire_shared** — Link shared runtime paths
       - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
+      - **release_finalize** — Seal the prepared release as `root:<site>`
       - **activate_release** — Repoint `current`
       - **restart_services** — Restart `<site>-nginx.service`
       - **post_deploy** — Prune old releases beyond `releases`

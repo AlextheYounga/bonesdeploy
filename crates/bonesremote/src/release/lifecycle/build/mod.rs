@@ -24,6 +24,12 @@ pub fn promote(site: &str, context: &Path) -> Result<PathBuf> {
     promote::run(site, context, &cfg)
 }
 
+pub fn finalize(site: &str) -> Result<()> {
+    privileges::ensure_root("bonesremote release finalize")?;
+    let cfg = load_site_config(site)?;
+    promote::finalize(site, &cfg)
+}
+
 pub(super) fn load_site_config(site: &str) -> Result<config::Bones> {
     let bones_path = paths::bonesremote_bones_toml_path(site);
     let cfg = config::load(&bones_path)
