@@ -280,11 +280,11 @@ Common defaults:
 
 The optional git push transport uses two thin internal adapters (local pre-push guard and remote post-receive trigger) that are embedded in the binaries. You do not see or manage them under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys; the default is `false`.
 
-Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation.
+Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. BonesInfra provisions a private persistent cache for each build user; bonesremote mounts it at `/workspace/cache` and exposes `BUILD_CACHE_DIR`. The shared deployment functions use it for Node, Corepack, npm, pnpm, Yarn, Composer, and Bundler downloads. Installed dependency trees and build output remain disposable. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation.
 
 Build scripts can set framework-specific runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool.
 
-Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager and Podman before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
+Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager, Podman, and the Infra-provisioned build cache before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 
 Git hooks are an optional transport — `bonesdeploy deploy` is the primary deployment command. The remote `post-receive` trigger is embedded in the `bonesremote` binary and installed into the bare repo automatically.
 

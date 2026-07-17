@@ -6,7 +6,7 @@ source /workspace/deployment/functions.sh
 
 install_dependencies_and_build() {
 	if [ -f pnpm-lock.yaml ]; then
-		corepack pnpm install --frozen-lockfile
+		corepack pnpm install --store-dir "$PNPM_STORE_DIR" --frozen-lockfile
 		corepack pnpm run build
 	elif [ -f yarn.lock ]; then
 		corepack yarn install --frozen-lockfile
@@ -61,7 +61,6 @@ main() {
 		exit 1
 	fi
 
-	export PATH="$PROJECT_ROOT/build/node/bin:$PATH"
 	node_enable_toolchain
 
 	install_dependencies_and_build

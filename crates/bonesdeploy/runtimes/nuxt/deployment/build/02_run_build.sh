@@ -6,7 +6,7 @@ source /workspace/deployment/functions.sh
 node_enable_toolchain
 
 if [ -f "./pnpm-lock.yaml" ]; then
-	corepack pnpm install --frozen-lockfile
+	corepack pnpm install --store-dir "$PNPM_STORE_DIR" --frozen-lockfile
 	corepack pnpm generate
 elif [ -f "./yarn.lock" ]; then
 	corepack yarn install --frozen-lockfile

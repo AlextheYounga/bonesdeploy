@@ -52,9 +52,9 @@ fn build_paths_map(cfg: &config::Bones, project_root: &str) -> Map<String, Value
     let releases_root = Path::new(project_root).join(paths::RELEASES_DIR).display().to_string();
     let current = Path::new(project_root).join(paths::CURRENT_LINK).display().to_string();
     let nginx_site_available =
-        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", &cfg.project_name)).display().to_string();
+        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", cfg.project_name)).display().to_string();
     let nginx_site_enabled =
-        Path::new(paths::ETC_NGINX_SITES_ENABLED).join(format!("{}.conf", &cfg.project_name)).display().to_string();
+        Path::new(paths::ETC_NGINX_SITES_ENABLED).join(format!("{}.conf", cfg.project_name)).display().to_string();
 
     let mut m = Map::new();
     m.insert(String::from("repo"), Value::String(cfg.repo_path.clone()));

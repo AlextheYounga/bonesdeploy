@@ -233,7 +233,7 @@ async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
         Ok(session) => session,
         Err(error) => return (Some(format!("Cannot connect as privileged remote user\n  {error}")), false),
     };
-    let command = format!("bonesremote doctor --site {}", &cfg.project_name);
+    let command = format!("bonesremote doctor --site {}", cfg.project_name);
     let result = ssh::run_cmd(&session, &command).await;
     // The remote command has finished; ignore failure while closing this short-lived SSH session.
     let _ = session.close().await;

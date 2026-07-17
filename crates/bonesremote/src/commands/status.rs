@@ -40,7 +40,7 @@ fn build_report(site: &str) -> Result<Report> {
     let cfg = config::load(&config_path).context("Failed to load remote bones.toml")?;
     let current = Path::new(&cfg.project_root).join(paths::CURRENT_LINK);
     let nginx_site_available =
-        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", &cfg.project_name)).display().to_string();
+        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", cfg.project_name)).display().to_string();
 
     Ok(Report {
         current_release: current_release(&current),

@@ -5,6 +5,8 @@ use std::process::Command;
 use anyhow::{Result, bail};
 use shared::{config, paths};
 
+use crate::release::script_runner::validate_build_cache;
+
 pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if let Err(error) = validate_site_name(site) {
         issues.push(format!("Invalid site name for doctor: {error}"));
@@ -47,6 +49,14 @@ fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
     let expected_home = paths::bonesdeploy_user_home(build_user);
     if account_home(&passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
         issues.push(format!("build user home must be {}: {build_user}", expected_home.display()));
+    }
+
+    let Some((uid, gid)) = account_identity(&passwd, build_user) else {
+        issues.push(format!("build user has invalid passwd identity: {build_user}"));
+        return;
+    };
+    if let Err(error) = validate_build_cache(&paths::bonesdeploy_user_cache(build_user), uid, gid) {
+        issues.push(error.to_string());
     }
 }
 
@@ -197,6 +207,12 @@ fn account_home<'a>(passwd: &'a str, account: &str) -> Option<&'a str> {
     account_field(passwd, account, 5)
 }
 
+fn account_identity(passwd: &str, account: &str) -> Option<(u32, u32)> {
+    let uid = account_field(passwd, account, 2)?.parse().ok()?;
+    let gid = account_field(passwd, account, 3)?.parse().ok()?;
+    Some((uid, gid))
+}
+
 fn account_field<'a>(passwd: &'a str, account: &str, index: usize) -> Option<&'a str> {
     passwd.lines().find(|line| line.starts_with(&format!("{account}:")))?.split(':').nth(index)
 }
@@ -223,7 +239,9 @@ fn service_exists(load_state: &str) -> bool {
 mod tests {
     use std::{env, fs, process, process::Command};
 
-    use super::{account_exists, account_home, group_members, hook_uses_thin_trigger, service_exists};
+    use super::{
+        account_exists, account_home, account_identity, group_members, hook_uses_thin_trigger, service_exists,
+    };
 
     #[test]
     fn empty_bare_repo_is_pending_before_first_push() {
@@ -262,6 +280,7 @@ mod tests {
     fn build_user_home_is_parsed() {
         let passwd = "demo-build:x:1002:1002::/var/lib/bonesdeploy/users/demo-build:/usr/sbin/nologin\n";
         assert_eq!(account_home(passwd, "demo-build"), Some("/var/lib/bonesdeploy/users/demo-build"));
+        assert_eq!(account_identity(passwd, "demo-build"), Some((1002, 1002)));
     }
 
     #[test]

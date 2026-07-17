@@ -36,12 +36,15 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
         .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
 
     let build_env_vars = resolve_build_env(site, cfg)?;
+    let deployment_dir = scripts_dir.parent().context("Build scripts directory has no deployment parent")?;
+    let build_cache_dir = paths::bonesdeploy_user_cache(&build_user);
 
     let build_env = deploy_output::BuildScriptEnv {
         project_name: &cfg.project_name,
         build_user: &build_user,
         web_root: &runtime.web_root,
-        deployment_dir: &scripts_dir,
+        deployment_dir,
+        build_cache_dir: &build_cache_dir,
         build_env_vars: &build_env_vars,
     };
     let mut container = deploy_output::BuildContainer::start(context, &build_env)?;
