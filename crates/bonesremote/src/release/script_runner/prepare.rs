@@ -11,6 +11,7 @@ pub(crate) struct PrepareScriptEnv<'a> {
     pub(crate) project_root: &'a str,
     pub(crate) runtime_user: &'a str,
     pub(crate) web_root: &'a str,
+    pub(crate) deployment_dir: &'a Path,
 }
 
 pub(crate) fn run_prepare_script(
@@ -41,5 +42,6 @@ fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &P
         .env("PROJECT_ROOT", env.project_root)
         .env("REPO_PATH", "")
         .env("WEB_ROOT", env.web_root)
+        .env("DEPLOYMENT_DIR", env.deployment_dir)
         .env("SERVICE_USER", env.runtime_user);
 }

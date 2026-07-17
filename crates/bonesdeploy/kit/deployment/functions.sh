@@ -11,6 +11,14 @@ die() {
 	exit 1
 }
 
+on_error() {
+	local status=$?
+	echo "[bonesdeploy] Failed at line $LINENO: $BASH_COMMAND (status $status)" >&2
+	exit "$status"
+}
+
+trap on_error ERR
+
 node_cleanup() {
 	if [ -n "${BONES_NODE_TMP_DIR:-}" ]; then
 		rm -rf "$BONES_NODE_TMP_DIR"
@@ -176,5 +184,3 @@ node_enable_toolchain() {
 	command -v npm >/dev/null 2>&1 || die "npm not found"
 	node_ensure_corepack
 }
-
-

@@ -45,6 +45,7 @@ pub fn run(site: &str) -> Result<()> {
     let runtime_user = runtime.runtime_user;
 
     let runtime_user = if runtime_user.is_empty() { runtime_user_for(&cfg.project_name) } else { runtime_user };
+    let deployment_dir = scripts_dir.parent().context("Prepare scripts directory has no deployment parent")?;
 
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
@@ -59,6 +60,7 @@ pub fn run(site: &str) -> Result<()> {
                 project_root: &cfg.project_root,
                 runtime_user: &runtime_user,
                 web_root: &web_root,
+                deployment_dir,
             },
         )
         .with_context(|| format!("Failed to execute prepare script {}", script.display()))?;

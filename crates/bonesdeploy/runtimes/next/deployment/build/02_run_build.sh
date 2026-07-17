@@ -4,12 +4,6 @@ set -Eeuo pipefail
 
 source /workspace/deployment/functions.sh
 
-readonly LOG_PREFIX="[bonesdeploy]"
-
-log() {
-	echo "$LOG_PREFIX $*"
-}
-
 install_dependencies_and_build() {
 	if [ -f pnpm-lock.yaml ]; then
 		corepack pnpm install --frozen-lockfile

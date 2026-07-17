@@ -2,24 +2,7 @@
 
 set -Eeuo pipefail
 
-readonly LOG_PREFIX="[bonesdeploy]"
-
-on_error() {
-	local status=$?
-	echo "$LOG_PREFIX Failed at line $LINENO: $BASH_COMMAND (status $status)" >&2
-	exit "$status"
-}
-
-trap on_error ERR
-
-log() {
-	echo "$LOG_PREFIX $*"
-}
-
-die() {
-	echo "$LOG_PREFIX $*" >&2
-	exit 1
-}
+source "${DEPLOYMENT_DIR:?DEPLOYMENT_DIR must be set by bonesremote}/functions.sh"
 
 artisan_command_exists() {
 	local command_name="$1"

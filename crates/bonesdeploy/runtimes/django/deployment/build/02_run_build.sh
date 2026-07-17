@@ -2,11 +2,7 @@
 
 set -Eeuo pipefail
 
-readonly LOG_PREFIX="[bonesdeploy]"
-
-log() {
-	echo "$LOG_PREFIX $*"
-}
+source /workspace/deployment/functions.sh
 
 main() {
 	if [ ! -f manage.py ]; then
