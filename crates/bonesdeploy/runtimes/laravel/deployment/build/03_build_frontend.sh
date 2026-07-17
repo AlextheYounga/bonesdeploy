@@ -2,6 +2,8 @@
 
 set -Eeuo pipefail
 
+source /workspace/deployment/functions.sh
+
 readonly LOG_PREFIX="[bonesdeploy]"
 
 on_error() {
@@ -95,18 +97,8 @@ detect_package_manager() {
 }
 
 ensure_node_toolchain() {
-	export PATH="$PROJECT_ROOT/build/node/bin:$PATH"
-
 	require_command php
-	require_command node
-	require_command npm
-
-	if ! command -v corepack >/dev/null 2>&1; then
-		log "corepack not found; installing corepack..."
-		npm install -g corepack@0.31.0
-	fi
-
-	corepack enable --install-directory "$(dirname "$(command -v node)")" 2>/dev/null || true
+	node_enable_toolchain
 }
 
 install_and_build_with_npm() {

@@ -32,9 +32,28 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
     let mut to_serialize = config.clone();
     shared_config::apply_derived_defaults(&mut to_serialize);
 
-    let content = annotate_sections(&toml::to_string_pretty(&to_serialize).context("Failed to serialize bones.toml")?);
+    let serialized = toml::to_string_pretty(&to_serialize).context("Failed to serialize bones.toml")?;
+    let content = annotate_sections(&compact_inline_table_arrays(&serialized)?);
     fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
+}
+
+fn compact_inline_table_arrays(content: &str) -> Result<String> {
+    let mut document = content.parse::<toml_edit::DocumentMut>().context("Failed to parse serialized bones.toml")?;
+
+    let Some(runtime) = document.get_mut("runtime").and_then(toml_edit::Item::as_table_mut) else {
+        return Ok(document.to_string());
+    };
+    for key in ["permissions", "shared"] {
+        let Some(item) =
+            runtime.get_mut(key).and_then(toml_edit::Item::as_table_mut).and_then(|table| table.get_mut("paths"))
+        else {
+            continue;
+        };
+        item.make_value();
+    }
+
+    Ok(document.to_string())
 }
 
 fn annotate_sections(content: &str) -> String {
@@ -165,6 +184,37 @@ mod tests {
         let content = fs::read_to_string(&path)?;
         assert!(content.contains("# Remote server connection.\n[app.server]"));
         assert!(content.contains("# Branch and deployment behavior.\n[app.deploy]"));
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn save_formats_permission_entries_as_inline_tables() -> Result<()> {
+        let mut config = sample_config("phoenix");
+        config.runtime.permissions = Some(toml::from_str(
+            r#"paths = [
+                { path = "*", type = "dir", mode = "750" },
+                { path = "storage", type = "dir", mode = "770", recursive = true },
+            ]"#,
+        )?);
+
+        let path = temp_path("inline_permissions.toml");
+        save(&config, &path)?;
+        let content = fs::read_to_string(&path)?;
+
+        let document = content.parse::<toml_edit::DocumentMut>()?;
+        let paths = document
+            .get("runtime")
+            .and_then(toml_edit::Item::as_table)
+            .and_then(|runtime| runtime.get("permissions"))
+            .and_then(toml_edit::Item::as_table)
+            .and_then(|permissions| permissions.get("paths"))
+            .and_then(toml_edit::Item::as_array);
+
+        assert!(paths.is_some_and(|paths| paths.iter().all(toml_edit::Value::is_inline_table)), "{content}");
+        assert!(!content.contains("[[runtime.permissions.paths]]"), "{content}");
+        load(&path)?;
+
         fs::remove_file(path)?;
         Ok(())
     }

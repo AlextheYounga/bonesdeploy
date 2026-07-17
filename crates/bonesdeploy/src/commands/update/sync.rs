@@ -10,8 +10,17 @@ pub(super) fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Pat
         return Ok(());
     }
 
+    sync_kit_deployment_functions(source_dir, bones_dir)?;
     sync_tree(&deployment_source_root(source_dir, bones_dir)?, &bones_dir.join("deployment"), true)?;
 
+    Ok(())
+}
+
+fn sync_kit_deployment_functions(source_dir: &Path, bones_dir: &Path) -> Result<()> {
+    let source = source_dir.join("crates/bonesdeploy/kit/deployment/functions.sh");
+    if source.is_file() {
+        copy_file(&source, &bones_dir.join("deployment/functions.sh"), true)?;
+    }
     Ok(())
 }
 
@@ -93,6 +102,7 @@ mod tests {
         let bones_dir = temp.path().join(".bones");
 
         write(&source_dir.join("crates/bonesdeploy/kit/deployment/build/01_build.sh"), "generic deploy")?;
+        write(&source_dir.join("crates/bonesdeploy/kit/deployment/functions.sh"), "shared functions")?;
         write(&source_dir.join("crates/bonesdeploy/runtimes/laravel/deployment/build/01_build.sh"), "laravel deploy")?;
 
         write(&bones_dir.join("bones.toml"), "[runtime]\ntemplate = 'laravel'\n")?;
@@ -101,6 +111,7 @@ mod tests {
 
         assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "[runtime]\ntemplate = 'laravel'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
+        assert_eq!(fs::read_to_string(bones_dir.join("deployment/functions.sh"))?, "shared functions");
 
         let deploy_mode = fs::metadata(bones_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
         assert_eq!(deploy_mode, 0o755);

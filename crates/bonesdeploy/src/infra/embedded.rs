@@ -56,6 +56,7 @@ pub fn scaffold_runtime_deployment(runtime: &str, bones_dir: &Path) -> Result<()
         fs::remove_dir_all(&deploy_dir)
             .with_context(|| format!("Failed to clear deployment dir: {}", deploy_dir.display()))?;
     }
+    scaffold_kit_deployment_functions(bones_dir)?;
     scaffold_runtime_assets(runtime, bones_dir, paths::KIT_DEPLOYMENT_DIR)
 }
 
@@ -97,6 +98,14 @@ fn scaffold_runtime_assets(runtime: &str, bones_dir: &Path, asset_prefix: &str) 
     }
 
     Ok(())
+}
+
+fn scaffold_kit_deployment_functions(bones_dir: &Path) -> Result<()> {
+    let path = format!("{}functions.sh", paths::KIT_DEPLOYMENT_DIR);
+    let Some(asset) = Kit::get(&path) else {
+        return Ok(());
+    };
+    write_asset(bones_dir, &path, asset.data.as_ref())
 }
 
 fn runtime_defaults_from_bytes(asset_path: &str, bytes: Option<impl AsRef<[u8]>>) -> Result<Map<String, Value>> {

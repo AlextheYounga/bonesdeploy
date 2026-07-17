@@ -2,6 +2,8 @@
 
 set -Eeuo pipefail
 
+source /workspace/deployment/functions.sh
+
 readonly LOG_PREFIX="[bonesdeploy]"
 
 log() {
@@ -66,6 +68,7 @@ main() {
 	fi
 
 	export PATH="$PROJECT_ROOT/build/node/bin:$PATH"
+	node_enable_toolchain
 
 	install_dependencies_and_build
 
