@@ -2,20 +2,9 @@
 
 set -Eeuo pipefail
 
-readonly LOG_PREFIX="[bonesdeploy]"
 readonly VENV_DIR="${VENV_DIR:-.venv}"
 
-on_error() {
-	local status=$?
-	echo "$LOG_PREFIX Failed at line $LINENO: $BASH_COMMAND (status $status)" >&2
-	exit "$status"
-}
-
-trap on_error ERR
-
-log() {
-	echo "$LOG_PREFIX $*"
-}
+source "${DEPLOYMENT_DIR:?DEPLOYMENT_DIR must be set by bonesremote}/functions.sh"
 
 ensure_virtualenv() {
 	if [ -d "$VENV_DIR" ]; then

@@ -2,13 +2,9 @@
 
 set -Eeuo pipefail
 
-export PATH="$PROJECT_ROOT/build/node/bin:$PATH"
+source /workspace/deployment/functions.sh
 
-if ! command -v corepack >/dev/null 2>&1; then
-	npm install -g corepack@0.31.0
-fi
-
-corepack enable --install-directory "$(dirname "$(command -v node)")" 2>/dev/null || true
+node_enable_toolchain
 
 rm -rf node_modules
 

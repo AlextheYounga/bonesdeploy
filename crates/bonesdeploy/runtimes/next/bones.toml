@@ -10,4 +10,8 @@ paths = [
 ]
 
 [build]
-vars = ["NEXT_PUBLIC_API_URL", "NEXT_PUBLIC_SITE_NAME"]
+vars = [
+	# "NODE_VERSION",
+	# "NEXT_PUBLIC_API_URL", 
+	# "NEXT_PUBLIC_SITE_NAME"
+]

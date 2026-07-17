@@ -41,6 +41,7 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
         project_name: &cfg.project_name,
         build_user: &build_user,
         web_root: &runtime.web_root,
+        deployment_dir: &scripts_dir,
         build_env_vars: &build_env_vars,
     };
     let mut container = deploy_output::BuildContainer::start(context, &build_env)?;

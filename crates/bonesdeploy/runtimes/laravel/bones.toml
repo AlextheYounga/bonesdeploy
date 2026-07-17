@@ -19,4 +19,7 @@ paths = [
 ]
 
 [build]
-vars = ["PHP_VERSION"]
+vars = [
+	# "NODE_VERSION",
+	"PHP_VERSION"
+]

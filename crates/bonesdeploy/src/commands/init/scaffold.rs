@@ -10,6 +10,7 @@ use super::RuntimeSelection;
 use crate::config;
 use crate::infra::embedded;
 use crate::infra::git;
+use crate::runtimes;
 
 const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/pre-push"));
 
@@ -42,6 +43,7 @@ pub(super) fn materialize_fresh_bones(
     if let Some(template_name) = runtime.template {
         embedded::scaffold_runtime_deployment(&template_name, bones_dir)?;
         embedded::scaffold_runtime_secrets(&template_name, bones_dir)?;
+        runtimes::apply(&template_name, cfg, bones_dir)?;
         println!("Runtime template: {template_name}");
     } else {
         println!("Runtime template: custom");

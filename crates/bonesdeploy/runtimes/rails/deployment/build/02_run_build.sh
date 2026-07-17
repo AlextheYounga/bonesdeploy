@@ -2,19 +2,7 @@
 
 set -Eeuo pipefail
 
-readonly LOG_PREFIX="[bonesdeploy]"
-
-on_error() {
-	local status=$?
-	echo "$LOG_PREFIX Failed at line $LINENO: $BASH_COMMAND (status $status)" >&2
-	exit "$status"
-}
-
-trap on_error ERR
-
-log() {
-	echo "$LOG_PREFIX $*"
-}
+source /workspace/deployment/functions.sh
 
 skip_unless_rails_project() {
 	if [ ! -f Gemfile ]; then

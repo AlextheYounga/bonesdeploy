@@ -26,8 +26,12 @@ Name them with a numbered prefix so the order is clear:
 
 No secrets, no runtime state, no .env. Build only.
 
-## Next.js requirement
+## Next.js output
 
-The app must set `output: "standalone"` in its Next config. The build script
+For a server-rendered runtime, set `output: "standalone"`. The build script
 checks for `.next/standalone/server.js` and copies `public/` and `.next/static/`
 into that standalone output for the runtime service.
+
+For a static runtime (`is_static = true`, `web_root = "out"`), set
+`output: "export"`. The build script requires `out/index.html`, which the
+static nginx runtime serves.

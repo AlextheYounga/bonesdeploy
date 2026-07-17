@@ -12,6 +12,7 @@ pub(crate) struct BuildScriptEnv<'a> {
     pub(crate) project_name: &'a str,
     pub(crate) build_user: &'a str,
     pub(crate) web_root: &'a str,
+    pub(crate) deployment_dir: &'a Path,
     pub(crate) build_env_vars: &'a [(String, String)],
 }
 
@@ -161,6 +162,7 @@ fn configure_podman_create_command(
     container_name: &str,
 ) {
     let mount = format!("{}:/workspace/source", source_root.display());
+    let deployment_mount = format!("{}:/workspace/deployment:ro", env.deployment_dir.display());
     command
         .current_dir(source_root)
         .args(["podman", "run", "-d", "--pull=never"])
@@ -183,7 +185,13 @@ fn configure_podman_create_command(
         command.arg("--env").arg(format!("{key}={value}"));
     }
 
-    command.args(["--volume"]).arg(mount).arg(BUILD_IMAGE).args(["sleep", "infinity"]);
+    command
+        .args(["--volume"])
+        .arg(mount)
+        .args(["--volume"])
+        .arg(deployment_mount)
+        .arg(BUILD_IMAGE)
+        .args(["sleep", "infinity"]);
 }
 
 fn configure_podman_exec_command(command: &mut Command, source_root: &Path, container_name: &str) {
@@ -252,12 +260,18 @@ fn pull_build_image(source_root: &Path, env: &BuildScriptEnv<'_>, container_name
 
 #[cfg(test)]
 #[test]
-fn podman_build_command_mounts_only_source_tree() {
+fn podman_build_command_mounts_source_and_deployment_tree() {
     let mut command = build_container_service_command("demo-build", "demo-container");
     configure_podman_create_command(
         &mut command,
         Path::new("/tmp/source"),
-        &BuildScriptEnv { project_name: "demo", build_user: "demo-build", web_root: "public", build_env_vars: &[] },
+        &BuildScriptEnv {
+            project_name: "demo",
+            build_user: "demo-build",
+            web_root: "public",
+            deployment_dir: Path::new("/tmp/deployment"),
+            build_env_vars: &[],
+        },
         "demo-container",
     );
 
@@ -279,6 +293,7 @@ fn podman_build_command_places_environment_before_image() {
             project_name: "demo",
             build_user: "demo-build",
             web_root: "public",
+            deployment_dir: Path::new("/tmp/deployment"),
             build_env_vars: &build_env_vars,
         },
         "demo-container",
@@ -314,6 +329,7 @@ fn assert_build_command_mounts(args: &[String], command: &Command) {
     assert!(!args.iter().any(|arg| arg == "--cap-drop=all"));
     assert!(args.contains(&String::from("docker.io/library/buildpack-deps:bookworm")));
     assert!(args.contains(&String::from("/tmp/source:/workspace/source")));
+    assert!(args.contains(&String::from("/tmp/deployment:/workspace/deployment:ro")));
     assert!(!args.iter().any(|arg| arg.contains("/srv/sites/demo/shared")));
     assert!(!args.iter().any(|arg| arg.contains("/root/.config/bonesremote")));
     assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/source")));
