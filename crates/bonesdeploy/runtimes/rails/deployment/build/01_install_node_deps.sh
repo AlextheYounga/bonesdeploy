@@ -100,8 +100,8 @@ read_node_version_from_package_json() {
 }
 
 read_node_version() {
-	if [ -n "${BONES_NODE_VERSION:-}" ]; then
-		echo "$BONES_NODE_VERSION"
+	if [ -n "${NODE_VERSION:-}" ]; then
+		echo "$NODE_VERSION"
 		return
 	fi
 
@@ -155,7 +155,7 @@ Add one of these to the project:
   package.json volta  example: "volta": { "node": "24.17.0" }
 
 Or set:
-  BONES_NODE_VERSION=24.17.0
+  NODE_VERSION=24.17.0
 
 Aliases and ranges are intentionally rejected:
   node

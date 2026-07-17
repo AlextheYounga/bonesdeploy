@@ -38,6 +38,7 @@
 - load applies default repo path from project name. (load_applies_default_repo_path_from_project_name)
 - load preserves explicit repo and project root overrides. (load_preserves_explicit_repo_and_project_root_overrides)
 - save adds comments to nested sections. (save_adds_comments_to_nested_sections)
+- save formats permission entries as inline tables. (save_formats_permission_entries_as_inline_tables)
 - save includes derived repo and project root. (save_includes_derived_repo_and_project_root)
 - save persists ssl settings. (save_persists_ssl_settings)
 
@@ -65,6 +66,7 @@
 - shell quote preserves single quotes. (shell_quote_preserves_single_quotes)
 
 ## `crates/bonesdeploy/src/runtimes.rs`
+- laravel environment uses the assigned preview domain. (laravel_environment_uses_the_assigned_preview_domain)
 - server next keeps its server output. (server_next_keeps_its_server_output)
 - static next uses static output and project environment example. (static_next_uses_static_output_and_project_environment_example)
 
