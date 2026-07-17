@@ -149,11 +149,55 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::{RuntimeAssets, runtime_defaults, runtime_names};
+    use super::{Kit, RuntimeAssets, runtime_defaults, runtime_names};
 
     #[test]
     fn next_runtime_includes_the_build_script() {
         assert!(RuntimeAssets::get("next/deployment/build/02_run_build.sh").is_some());
+    }
+
+    #[test]
+    fn shared_deployment_functions_include_cache_and_node_entry_points() {
+        let Some(functions) = Kit::get("deployment/functions.sh") else {
+            assert!(false, "shared functions should be embedded");
+            return;
+        };
+        let functions = String::from_utf8_lossy(functions.data.as_ref());
+        assert!(functions.contains("configure_build_cache"));
+        assert!(functions.contains("install_node_dependencies"));
+        assert!(functions.contains("COMPOSER_CACHE_DIR"));
+        assert!(functions.contains("BUNDLE_USER_CACHE"));
+    }
+
+    #[test]
+    fn runtime_pnpm_installs_use_the_persistent_store() {
+        for runtime in runtime_names() {
+            let path = format!("{runtime}/deployment/build/02_run_build.sh");
+            let Some(asset) = RuntimeAssets::get(&path) else {
+                continue;
+            };
+            let script = String::from_utf8_lossy(asset.data.as_ref());
+            if script.contains("pnpm install") {
+                assert!(
+                    script.contains("--store-dir \"$PNPM_STORE_DIR\""),
+                    "{path} must use the persistent pnpm store"
+                );
+            }
+        }
+
+        let laravel = RuntimeAssets::get("laravel/deployment/build/03_build_frontend.sh")
+            .map(|asset| String::from_utf8_lossy(asset.data.as_ref()).into_owned())
+            .unwrap_or_default();
+        if laravel.contains("pnpm install") {
+            assert!(laravel.contains("--store-dir \"$PNPM_STORE_DIR\""));
+        }
+
+        let kit = Kit::get("deployment/build/02_run_build copy.sh")
+            .map(|asset| String::from_utf8_lossy(asset.data.as_ref()).into_owned())
+            .unwrap_or_default();
+        if kit.contains("pnpm install") {
+            assert!(kit.contains("--store-dir \"$PNPM_STORE_DIR\""));
+        }
     }
 
     #[test]

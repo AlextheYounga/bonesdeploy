@@ -9,7 +9,7 @@ node_enable_toolchain
 rm -rf node_modules
 
 if [ -f "./pnpm-lock.yaml" ]; then
-	corepack pnpm install --frozen-lockfile
+	corepack pnpm install --store-dir "$PNPM_STORE_DIR" --frozen-lockfile
 	corepack pnpm build
 elif [ -f "./yarn.lock" ]; then
 	corepack yarn install --frozen-lockfile

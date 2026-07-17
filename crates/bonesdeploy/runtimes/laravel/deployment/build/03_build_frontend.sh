@@ -97,7 +97,7 @@ install_and_build_with_npm() {
 install_and_build_with_pnpm() {
 	if [ -f pnpm-lock.yaml ]; then
 		log "Installing frontend dependencies with pnpm frozen lockfile..."
-		corepack pnpm install --frozen-lockfile --prod=false
+		corepack pnpm install --store-dir "$PNPM_STORE_DIR" --frozen-lockfile --prod=false
 	else
 		die "pnpm-lock.yaml is required for production builds"
 	fi

@@ -18,7 +18,9 @@ mod build;
 mod output;
 mod prepare;
 
-pub(crate) use build::{BuildContainer, BuildScriptEnv, ensure_build_user_ready, remove_build_container};
+pub(crate) use build::{
+    BuildContainer, BuildScriptEnv, ensure_build_user_ready, remove_build_container, validate_build_cache,
+};
 pub(crate) use prepare::{PrepareScriptEnv, run_prepare_script};
 
 // ── test-only deployment runner ──────────────────────────────────────
