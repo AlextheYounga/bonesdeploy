@@ -44,6 +44,21 @@ EOF
 	fi
 }
 
+require_static_output() {
+	if [ -f out/index.html ]; then
+		return
+	fi
+
+	cat >&2 <<'EOF'
+[bonesdeploy] Static Next.js deployments require out/index.html.
+
+Configure static export in next.config.js, next.config.mjs, or next.config.ts:
+
+  output: "export",
+EOF
+	exit 1
+}
+
 main() {
 	if [ ! -f package.json ]; then
 		echo "$LOG_PREFIX package.json not found; this is not a Next.js project." >&2
@@ -53,7 +68,12 @@ main() {
 	export PATH="$PROJECT_ROOT/build/node/bin:$PATH"
 
 	install_dependencies_and_build
-	prepare_standalone_output
+
+	if [ "$WEB_ROOT" = "out" ]; then
+		require_static_output
+	else
+		prepare_standalone_output
+	fi
 
 	log "Next.js build complete."
 }
