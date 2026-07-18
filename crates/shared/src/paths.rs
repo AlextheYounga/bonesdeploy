@@ -99,6 +99,17 @@ pub fn site_target_name(project_name: &str) -> String {
     format!("{project_name}.target")
 }
 
+#[cfg(test)]
+mod tests {
+    use super::site_target_name;
+
+    #[test]
+    fn site_target_name_is_exactly_project_derived() {
+        assert_eq!(site_target_name("nexttest"), "nexttest.target");
+        assert_ne!(site_target_name("shop"), "shop-admin.target");
+    }
+}
+
 #[must_use]
 pub fn bonesremote_config_root() -> PathBuf {
     PathBuf::from(BONESREMOTE_CONFIG_DIR)

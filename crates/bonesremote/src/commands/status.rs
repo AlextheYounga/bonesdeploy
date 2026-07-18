@@ -95,9 +95,8 @@ fn services(project_name: &str) -> Vec<ServiceStatus> {
 }
 
 fn target_service_names(target: &str) -> Vec<String> {
-    let output = Command::new("systemctl")
-        .args(["show", "--property=Wants", "--property=Requires", "--value", "--no-pager", "--", target])
-        .output();
+    let output =
+        Command::new("systemctl").args(["show", "--property=Requires", "--value", "--no-pager", "--", target]).output();
     match output {
         Ok(output) if output.status.success() => parse_target_units(&String::from_utf8_lossy(&output.stdout)),
         _ => Vec::new(),
