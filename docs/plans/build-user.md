@@ -23,9 +23,9 @@ This is required for rootless Podman with cgroup v2; `runuser` plus a synthetic
 writable home, lingering, and subordinate UID/GID ranges. The systemd user
 manager provides the cgroup boundary used by rootless Podman.
 
-Build scripts remain root-owned and are piped to the container over stdin. The
-build user therefore receives only the selected script and cannot read the
-deployment source tree directly.
+Build scripts remain root-owned. Bonesremote streams a disposable copy of the
+deployment bundle into the container before piping each selected script over
+stdin, so the build user never needs to read the host deployment source tree.
 
 ## Promotion
 

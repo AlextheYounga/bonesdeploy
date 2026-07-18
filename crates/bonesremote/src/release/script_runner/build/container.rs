@@ -40,7 +40,9 @@ impl<'a> BuildContainer<'a> {
             bail!("Failed to start build container {name}: {status}");
         }
 
-        Ok(Self { env, source_root, name, removed: false })
+        let container = Self { env, source_root, name, removed: false };
+        container.copy_deployment_tree()?;
+        Ok(container)
     }
 
     pub(crate) fn run_script(&self, script: &Path, log_path: &Path) -> Result<ExitStatus> {
@@ -71,6 +73,35 @@ impl<'a> BuildContainer<'a> {
         self.removed = true;
         Ok(())
     }
+
+    fn copy_deployment_tree(&self) -> Result<()> {
+        let mut archive = Command::new("tar")
+            .current_dir(self.env.deployment_dir)
+            .args(["--create", "--file=-", "."])
+            .stdout(Stdio::piped())
+            .spawn()
+            .with_context(|| {
+                format!("Failed to archive deployment files from {}", self.env.deployment_dir.display())
+            })?;
+        let archive_stdout = archive.stdout.take().context("Deployment archive stdout was not piped")?;
+
+        let mut extract = build_user_command(self.env.build_user);
+        configure_deployment_extract_command(&mut extract, self.source_root, &self.name);
+        let extract_result = extract
+            .stdin(Stdio::from(archive_stdout))
+            .status()
+            .with_context(|| format!("Failed to copy deployment files into build container {}", self.name));
+        let archive_status = archive.wait().context("Failed to finish deployment archive")?;
+        let extract_status = extract_result?;
+
+        if !extract_status.success() {
+            bail!("Failed to copy deployment files into build container {}: {extract_status}", self.name);
+        }
+        if !archive_status.success() {
+            bail!("Failed to archive deployment files from {}: {archive_status}", self.env.deployment_dir.display());
+        }
+        Ok(())
+    }
 }
 
 impl Drop for BuildContainer<'_> {
@@ -87,7 +118,6 @@ impl Drop for BuildContainer<'_> {
 
 fn configure_create(command: &mut Command, source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) {
     let source_mount = format!("{}:/workspace/source", source_root.display());
-    let deployment_mount = format!("{}:/workspace/deployment:ro", env.deployment_dir.display());
     let cache_mount = format!("{}:/workspace/cache:rw", env.build_cache_dir.display());
     command
         .current_dir(source_root)
@@ -120,8 +150,6 @@ fn configure_create(command: &mut Command, source_root: &Path, env: &BuildScript
         .args(["--env", "BUILD_CACHE_DIR=/workspace/cache", "--volume"])
         .arg(source_mount)
         .args(["--volume"])
-        .arg(deployment_mount)
-        .args(["--volume"])
         .arg(cache_mount)
         .arg(BUILD_IMAGE)
         .args(["sleep", "infinity"]);
@@ -136,6 +164,18 @@ fn configure_exec(command: &mut Command, source_root: &Path, container_name: &st
         "bash",
         "-c",
         "umask 0002; exec bash -s",
+    ]);
+}
+
+fn configure_deployment_extract_command(command: &mut Command, source_root: &Path, container_name: &str) {
+    command.current_dir(source_root).args([
+        "podman",
+        "exec",
+        "-i",
+        container_name,
+        "sh",
+        "-c",
+        "mkdir -p /workspace/deployment && tar --extract --file=- --no-same-owner --no-same-permissions --directory=/workspace/deployment",
     ]);
 }
 
@@ -185,7 +225,7 @@ fn ensure_image(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &s
 
 #[cfg(test)]
 #[test]
-fn podman_build_command_mounts_source_and_deployment_tree() {
+fn podman_build_command_mounts_only_source_and_cache() {
     let mut command = service_command("demo-build", "demo-container");
     configure_create(&mut command, Path::new("/tmp/source"), &test_env(&[]), "demo-container");
     let args = arguments(&command);
@@ -242,10 +282,23 @@ fn assert_build_command_mounts(args: &[String], command: &Command) {
     assert!(!args.iter().any(|arg| arg == "--cap-drop=all"));
     assert!(args.contains(&String::from(BUILD_IMAGE)));
     assert!(args.contains(&String::from("/tmp/source:/workspace/source")));
-    assert!(args.contains(&String::from("/tmp/deployment:/workspace/deployment:ro")));
+    assert!(!args.iter().any(|arg| arg.contains("/tmp/deployment")));
+    assert!(!args.iter().any(|arg| arg.contains("/workspace/deployment")));
     assert!(args.contains(&String::from("/tmp/cache:/workspace/cache:rw")));
     assert!(args.contains(&String::from("BUILD_CACHE_DIR=/workspace/cache")));
     assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/source")));
+}
+
+#[cfg(test)]
+#[test]
+fn deployment_files_are_streamed_into_the_container() {
+    let mut command = build_user_command("demo-build");
+    configure_deployment_extract_command(&mut command, Path::new("/tmp/source"), "demo-container");
+
+    let args = arguments(&command);
+    assert_eq!(command.get_current_dir(), Some(Path::new("/tmp/source")));
+    assert!(args.windows(4).any(|window| window == ["podman", "exec", "-i", "demo-container"]));
+    assert!(args.contains(&String::from("mkdir -p /workspace/deployment && tar --extract --file=- --no-same-owner --no-same-permissions --directory=/workspace/deployment")));
 }
 
 #[cfg(test)]
