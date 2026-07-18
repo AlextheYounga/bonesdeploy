@@ -271,7 +271,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Separate from `remote runtime` to keep certificate management decoupled from app runtime concerns.
 
 - **rollback**
-  - SSHes into the configured host and runs `bonesremote release rollback --site <project>`, which repoints `current` to the previous release without rebuilding and restarts `<project>-nginx.service`.
+  - SSHes into the configured host and runs `bonesremote release rollback --site <project>`, which repoints `current` to the previous release without rebuilding and restarts `<project>.target`.
 
 - **secrets**
   - Subcommands: `init`, `edit`, `push`.
@@ -315,6 +315,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 	- Repoints `current` to the previous release.
 - **service restart**
 	- Restarts the per-site systemd lifecycle target (`<project>.target`), which restarts all registered site services. This is the only `bonesremote` command that requires root privileges.
+
+BonesInfra owns site service membership. BonesRemote restarts exactly `<project>.target` for deploy and rollback.
 - **version**:
   - Echoes the installed `bonesremote` version.
 
