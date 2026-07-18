@@ -196,7 +196,7 @@ node_install() {
 
 	mkdir "$BUILD_NODE_TMP_DIR/extracted"
 	tar --no-same-owner -xJ -f "$BUILD_NODE_TMP_DIR/$archive" -C "$BUILD_NODE_TMP_DIR/extracted"
-	local extracted="$BUILD_NODE_TMP_DIR/node-v${version}-linux-${node_arch}"
+	local extracted="$BUILD_NODE_TMP_DIR/extracted/node-v${version}-linux-${node_arch}"
 	[ -x "$extracted/bin/node" ] || die "Node archive did not contain the expected executable"
 	"$extracted/bin/node" --version | grep -qx "v$version" || die "Node archive contained an unexpected version"
 
