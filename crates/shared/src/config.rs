@@ -12,6 +12,10 @@ use crate::paths;
 mod app;
 pub use app::App;
 
+#[path = "validation.rs"]
+mod validation;
+pub use validation::validate_project_name;
+
 /// Keys in the JSON object that bonesdeploy sends to bonesinfra.
 pub mod bonesinfra_input {
     pub const SSH_PORT: &str = "ssh_port";

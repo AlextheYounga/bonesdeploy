@@ -66,21 +66,21 @@ fn ssl_status(cfg: &config::Bones, nginx_config_path: &str) -> SslStatus {
 }
 
 fn services(project_name: &str) -> Vec<ServiceStatus> {
-    let expected = paths::nginx_service_name(project_name);
+    let target = paths::site_target_name(project_name);
     let mut services = BTreeMap::from([(
-        expected.clone(),
+        target.clone(),
         ServiceStatus {
-            name: expected,
-            kind: String::from("site_nginx"),
+            name: target.clone(),
+            kind: String::from("site_target"),
             state: String::from("unknown"),
             enabled: String::from("unknown"),
         },
     )]);
 
-    for name in discovered_service_names(project_name) {
+    for name in target_service_names(&target) {
         services.entry(name.clone()).or_insert_with(|| ServiceStatus {
             name,
-            kind: String::from("discovered"),
+            kind: String::from("registered"),
             state: String::from("unknown"),
             enabled: String::from("unknown"),
         });
@@ -94,22 +94,14 @@ fn services(project_name: &str) -> Vec<ServiceStatus> {
     services.into_values().collect()
 }
 
-fn discovered_service_names(project_name: &str) -> Vec<String> {
-    let pattern = format!("*{project_name}*.service");
-    let mut names = BTreeSet::new();
-
-    for args in [
-        vec!["list-units", "--all", "--type=service", "--no-legend", "--no-pager", pattern.as_str()],
-        vec!["list-unit-files", "--type=service", "--no-legend", "--no-pager", pattern.as_str()],
-    ] {
-        let output = Command::new("systemctl").args(args).output();
-        let Ok(output) = output else { continue };
-        if output.status.success() {
-            names.extend(parse_systemctl_units(&String::from_utf8_lossy(&output.stdout)));
-        }
+fn target_service_names(target: &str) -> Vec<String> {
+    let output = Command::new("systemctl")
+        .args(["show", "--property=Wants", "--property=Requires", "--value", "--no-pager", "--", target])
+        .output();
+    match output {
+        Ok(output) if output.status.success() => parse_target_units(&String::from_utf8_lossy(&output.stdout)),
+        _ => Vec::new(),
     }
-
-    names.into_iter().collect()
 }
 
 fn systemctl_output<const N: usize>(args: [&str; N]) -> String {
@@ -122,23 +114,24 @@ fn systemctl_output<const N: usize>(args: [&str; N]) -> String {
     )
 }
 
-fn parse_systemctl_units(output: &str) -> Vec<String> {
+fn parse_target_units(output: &str) -> Vec<String> {
     output
-        .lines()
-        .filter_map(|line| line.split_whitespace().next())
-        .filter(|name| name.ends_with(".service"))
-        .map(str::to_string)
+        .split_whitespace()
+        .filter(|name| name.ends_with(paths::SYSTEMD_SERVICE_SUFFIX))
+        .map(str::to_owned)
+        .collect::<BTreeSet<_>>()
+        .into_iter()
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::parse_systemctl_units;
+    use super::parse_target_units;
 
     #[test]
-    fn parses_unit_names_from_systemctl_output() {
-        let output = "atlas-nginx.service loaded active running Per-site nginx\natlas-worker.service loaded failed failed Worker\n";
+    fn parses_registered_units_from_target_properties() {
+        let output = "atlas-nginx.service atlas-worker.service\natlas-worker.service";
 
-        assert_eq!(parse_systemctl_units(output), vec!["atlas-nginx.service", "atlas-worker.service"]);
+        assert_eq!(parse_target_units(output), vec!["atlas-nginx.service", "atlas-worker.service"]);
     }
 }

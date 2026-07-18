@@ -99,7 +99,7 @@
 - validate top level entries rejects unexpected file. (validate_top_level_entries_rejects_unexpected_file)
 
 ## `crates/bonesremote/src/commands/status.rs`
-- parses unit names from systemctl output. (parses_unit_names_from_systemctl_output)
+- parses registered units from target properties. (parses_registered_units_from_target_properties)
 
 ## `crates/bonesremote/src/release/lifecycle/build/ownership.rs`
 - parse user uid reads uid field. (parse_user_uid_reads_uid_field)

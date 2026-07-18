@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{Result, bail};
+use anyhow::Result;
 use shared::{config, paths};
 
 use crate::release::script_runner::validate_build_cache;
@@ -30,7 +30,7 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
     check_runtime_identity(&runtime_user, &runtime_group, issues);
     check_build_user(&build_user, issues);
     check_site_layout(&shared_root, &releases_root, issues);
-    check_service_exists(&cfg.project_name, issues);
+    check_site_target_exists(&cfg.project_name, issues);
 }
 
 fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
@@ -177,25 +177,35 @@ fn check_site_layout(shared_root: &Path, releases_root: &Path, issues: &mut Vec<
 }
 
 fn validate_site_name(site: &str) -> Result<()> {
-    if site.is_empty() {
-        bail!("Site name cannot be empty");
-    }
-
-    if site.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') {
-        return Ok(());
-    }
-
-    bail!("Invalid site name: {site}")
+    config::validate_project_name(site).map_err(|error| anyhow::anyhow!("Invalid site name: {error}"))
 }
 
-fn check_service_exists(site: &str, issues: &mut Vec<String>) {
-    let service_name = paths::nginx_service_name(site);
-    let output = Command::new("systemctl").args(["show", "--property=LoadState", "--value", &service_name]).output();
+fn check_site_target_exists(site: &str, issues: &mut Vec<String>) {
+    let target_name = paths::site_target_name(site);
+    let output =
+        Command::new("systemctl").args(["show", "--property=LoadState", "--value", "--", &target_name]).output();
 
     match output {
-        Ok(output) if output.status.success() && service_exists(&String::from_utf8_lossy(&output.stdout)) => {}
-        Ok(_) => issues.push(format!("service is missing: {service_name}")),
-        Err(error) => issues.push(format!("could not inspect service {service_name} ({error})")),
+        Ok(output) if output.status.success() && service_exists(&String::from_utf8_lossy(&output.stdout)) => {
+            check_target_membership(&target_name, issues);
+        }
+        Ok(_) => issues.push(format!("site target is missing: {target_name}")),
+        Err(error) => issues.push(format!("could not inspect site target {target_name} ({error})")),
+    }
+}
+
+fn check_target_membership(target: &str, issues: &mut Vec<String>) {
+    let output = Command::new("systemctl")
+        .args(["show", "--property=Wants", "--property=Requires", "--value", "--no-pager", "--", target])
+        .output();
+    let has_services = output.is_ok_and(|output| {
+        output.status.success()
+            && String::from_utf8_lossy(&output.stdout)
+                .split_whitespace()
+                .any(|name| name.ends_with(paths::SYSTEMD_SERVICE_SUFFIX))
+    });
+    if !has_services {
+        issues.push(format!("site target has no registered services: {target}"));
     }
 }
 
