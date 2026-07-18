@@ -59,6 +59,7 @@ pub const NGINX_SOCKET: &str = "nginx.sock";
 pub const NGINX_PID: &str = "nginx.pid";
 pub const PHP_FPM_SOCKET: &str = "php-fpm.sock";
 pub const DEFAULT_NGINX_SITE: &str = "default";
+pub const SYSTEMD_SERVICE_SUFFIX: &str = ".service";
 
 pub const GIT_HOOKS_DIR: &str = ".git/hooks";
 pub const GIT_PRE_PUSH_HOOK: &str = ".git/hooks/pre-push";
@@ -94,8 +95,8 @@ pub fn ssl_certificate_key_path(domain: &str) -> String {
 }
 
 #[must_use]
-pub fn nginx_service_name(project_name: &str) -> String {
-    format!("{project_name}-nginx.service")
+pub fn site_target_name(project_name: &str) -> String {
+    format!("{project_name}.target")
 }
 
 #[must_use]

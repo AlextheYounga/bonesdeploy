@@ -10,15 +10,7 @@ use crate::privileges;
 use crate::release::state as release_state;
 
 fn validate_site_name(site: &str) -> Result<()> {
-    if site.is_empty() {
-        bail!("Site name cannot be empty");
-    }
-
-    if site.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') {
-        return Ok(());
-    }
-
-    bail!("Invalid site name: {site}")
+    config::validate_project_name(site).map_err(|error| anyhow::anyhow!("Invalid site name: {error}"))
 }
 
 pub fn run(site: &str) -> Result<()> {

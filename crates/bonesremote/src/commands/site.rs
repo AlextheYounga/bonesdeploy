@@ -14,15 +14,7 @@ const POST_RECEIVE_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"
 const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] = &[paths::BONES_TOML, paths::DEPLOYMENT_DIR];
 
 fn validate_site_name(site: &str) -> Result<()> {
-    if site.is_empty() {
-        bail!("Site name cannot be empty");
-    }
-
-    if site.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') {
-        return Ok(());
-    }
-
-    bail!("Invalid site name: {site}")
+    config::validate_project_name(site).map_err(|error| anyhow::anyhow!("Invalid site name: {error}"))
 }
 
 /// # Errors

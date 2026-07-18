@@ -104,7 +104,6 @@ fn build_paths_map(cfg: &config::Bones, project_root: &str) -> Map<String, Value
     m.insert(String::from("current"), Value::String(current));
     m.insert(String::from("nginx_site_available"), Value::String(nginx_site_available));
     m.insert(String::from("nginx_site_enabled"), Value::String(nginx_site_enabled));
-
     m
 }
 

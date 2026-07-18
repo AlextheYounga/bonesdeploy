@@ -296,13 +296,13 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **Service commands** live under `bonesremote service ...`
 - **deploy**:
   - Runs the full deployment lifecycle as a single command (the primary entrypoint used by both `post-receive` hook and `bonesdeploy deploy`).
-  - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → runtime-writable candidate release → shared wiring → prepare scripts as the site user → seal release → activate → restart `<site>-nginx.service` → post-deploy pruning.
+  - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → runtime-writable candidate release → shared wiring → prepare scripts as the site user → seal release → activate → restart `<site>.target` → post-deploy pruning.
   - On failure, automatically drops the staged release.
   - `--site <name>`: imported site identifier used to load root-owned registry state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
 - **doctor**:
   - Host mode checks `bonesremote` in `PATH`, Podman, AppArmor support, and the deploy-user sudoers drop-in.
-  - `--site <name>` also checks the imported site boundary: validated control-plane state, bare repo and thin hook, runtime identity constraints, `shared/` and `releases/` layout, and `<site>-nginx.service`.
+  - `--site <name>` also checks the imported site boundary: validated control-plane state, bare repo and thin hook, runtime identity constraints, `shared/` and `releases/` layout, and `<site>.target`.
 - **release stage**
 	- Creates a staged release tree under `releases/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout.
 - **release wire**
@@ -314,7 +314,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **release rollback**
 	- Repoints `current` to the previous release.
 - **service restart**
-	- Restarts the per-site nginx systemd service (`<project>-nginx.service`). This is the only `bonesremote` command that requires root privileges.
+	- Restarts the per-site systemd lifecycle target (`<project>.target`), which restarts all registered site services. This is the only `bonesremote` command that requires root privileges.
 - **version**:
   - Echoes the installed `bonesremote` version.
 
@@ -351,7 +351,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
    - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
    - **release_finalize** — Seal the prepared release as `root:<site>`
    - **activate_release** — Atomically repoint `current`
-   - **restart_services** — Restart `<site>-nginx.service`
+   - **restart_services** — Restart `<site>.target`, which restarts all registered site services
    - **post_deploy** — Prune old releases beyond `releases`
    - On failure: **drop_failed_release** — Clean up staged release
 
@@ -377,7 +377,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
       - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
       - **release_finalize** — Seal the prepared release as `root:<site>`
       - **activate_release** — Repoint `current`
-      - **restart_services** — Restart `<site>-nginx.service`
+      - **restart_services** — Restart `<site>.target`, which restarts all registered site services
       - **post_deploy** — Prune old releases beyond `releases`
       - On failure: **drop_failed_release** — Clean up staged release
 
