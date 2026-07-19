@@ -7,7 +7,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 use shared::{config, paths};
 
+use crate::commands::ensure_site_idle;
 use crate::privileges;
+use crate::release::state::DeploymentLock;
 
 const POST_RECEIVE_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/post-receive"));
 
@@ -31,17 +33,27 @@ pub fn import(site: &str) -> Result<()> {
     let staging_dir = unique_site_path(&sites_root, site, "incoming");
     fs::create_dir_all(&staging_dir).with_context(|| format!("Failed to create {}", staging_dir.display()))?;
 
-    extract_stdin_archive(&staging_dir)?;
-    validate_site_dataset(site, &staging_dir)?;
-    replace_site_dir(site, &staging_dir)?;
-    install_repo_post_receive_hook(site)?;
+    if let Err(error) = import_staged_site(site, &staging_dir) {
+        if let Err(cleanup_error) = fs::remove_dir_all(&staging_dir) {
+            return Err(error).context(format!(
+                "Failed to clean up import staging directory {}: {cleanup_error}",
+                staging_dir.display()
+            ));
+        }
+        return Err(error);
+    }
     println!("Imported site state for {site}.");
     Ok(())
 }
 
-fn install_repo_post_receive_hook(site: &str) -> Result<()> {
-    let site_root = paths::bonesremote_site_root(site);
-    write_post_receive_hook(&site_root)
+fn import_staged_site(site: &str, staging_dir: &Path) -> Result<()> {
+    extract_stdin_archive(staging_dir)?;
+    validate_site_dataset(site, staging_dir)?;
+
+    let _lock = DeploymentLock::acquire(site)?;
+    ensure_site_idle(site)?;
+    write_post_receive_hook(staging_dir)?;
+    replace_site_dir(site, staging_dir)
 }
 
 fn write_post_receive_hook(site_root: &Path) -> Result<()> {
@@ -165,8 +177,32 @@ mod tests {
 
     use anyhow::Result;
 
+    use crate::commands::ensure_site_idle;
+    use crate::release::state::{self as release_state, DeploymentLock};
+
     use super::{validate_top_level_entries, write_post_receive_hook};
     use shared::paths;
+
+    #[test]
+    fn imports_share_a_stable_lock_and_reject_staged_releases() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-lock-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(root.join("unitapp"))?;
+        let _guard = release_state::set_sites_root_for_tests(root.clone());
+
+        let lock = DeploymentLock::acquire("unitapp")?;
+        fs::rename(root.join("unitapp"), root.join("unitapp.backup"))?;
+        fs::create_dir_all(root.join("unitapp"))?;
+        assert!(DeploymentLock::acquire("unitapp").is_err());
+        drop(lock);
+
+        release_state::write_staged_release("unitapp", "20260507_151501")?;
+        assert!(ensure_site_idle("unitapp").is_err());
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
 
     #[test]
     fn validate_top_level_entries_allows_single_config() -> Result<()> {

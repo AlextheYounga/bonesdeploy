@@ -236,19 +236,24 @@ fn podman_build_command_mounts_only_source_and_cache() {
 
 #[cfg(test)]
 #[test]
-fn podman_build_command_places_environment_before_image() {
+fn podman_build_command_places_environment_before_image() -> Result<()> {
     let vars = [(String::from("PHP_VERSION"), String::from("8.5"))];
     let mut command = service_command("demo-build", "demo-container");
     configure_create(&mut command, Path::new("/tmp/source"), &test_env(&vars), "demo-container");
     let args = arguments(&command);
-    let image_index = args.iter().position(|arg| arg == BUILD_IMAGE).unwrap();
-    let env_index = args.iter().position(|arg| arg == "PHP_VERSION=8.5").unwrap();
+    let Some(image_index) = args.iter().position(|arg| arg == BUILD_IMAGE) else {
+        bail!("build image argument is missing");
+    };
+    let Some(env_index) = args.iter().position(|arg| arg == "PHP_VERSION=8.5") else {
+        bail!("build environment argument is missing");
+    };
     assert!(env_index < image_index);
     assert_eq!(&args[image_index + 1..], ["sleep", "infinity"]);
+    Ok(())
 }
 
 #[cfg(test)]
-fn test_env<'a>(build_env_vars: &'a [(String, String)]) -> BuildScriptEnv<'a> {
+fn test_env(build_env_vars: &[(String, String)]) -> BuildScriptEnv<'_> {
     BuildScriptEnv {
         project_name: "demo",
         build_user: "demo-build",

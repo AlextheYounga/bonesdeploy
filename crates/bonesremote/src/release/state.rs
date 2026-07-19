@@ -52,7 +52,7 @@ fn active_deployment_path(site: &str) -> PathBuf {
 }
 
 fn deployment_lock_path(site: &str) -> PathBuf {
-    resolved_site_root(site).join(paths::DEPLOYMENT_LOCK_FILE)
+    resolved_sites_root().join(format!(".{site}.{}", paths::DEPLOYMENT_LOCK_FILE))
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
