@@ -282,11 +282,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 - **config**
   - Reads or prints values from `.bones/bones.toml`.
-  - `--file <path>` overrides the config file location.
-  - `<key>` prints a single value when supplied; otherwise dumps the whole file.
-
-- **manage**
-  - Opens an interactive SSH session to the remote and runs `bonesremote manage --config <path>`. Requires `bonesremote manage` to be implemented on the server.
+  - `--file <path>` overrides the config file location (defaults to `.bones/bones.toml`).
+  - `<key>` prints a single value when supplied; when omitted, dumps the whole file.
 
 - **version**:
   - Echoes the installed `bonesdeploy` version.

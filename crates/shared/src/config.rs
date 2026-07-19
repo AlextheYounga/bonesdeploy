@@ -279,7 +279,7 @@ pub fn load(path: &Path) -> Result<Bones> {
 mod tests {
     use std::{env, fs};
 
-    use toml::de::Error;
+    use anyhow::{bail, Result};
 
     use super::*;
 
@@ -296,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    fn runtime_parses_shared_paths() -> Result<(), Error> {
+    fn runtime_parses_shared_paths() -> Result<()> {
         let runtime: Runtime = toml::from_str(
             r#"
 web_root = "public"
@@ -348,13 +348,19 @@ paths = [
     }
 
     #[test]
-    fn load_buildtime_reads_nested_build_settings() {
+    fn load_buildtime_reads_nested_build_settings() -> Result<()> {
         let dir = env::temp_dir().join("bones-buildtime-vars");
-        fs::create_dir_all(&dir).unwrap();
-        fs::write(dir.join("bones.toml"), "[build]\nvars = [\"A\"]\ntool_version = \"8.5\"\n").unwrap();
-        let result = load_buildtime(&dir).unwrap().unwrap();
+        fs::create_dir_all(&dir)?;
+        fs::write(dir.join("bones.toml"), "[build]\nvars = [\"A\"]\ntool_version = \"8.5\"\n")?;
+        let Some(result) = load_buildtime(&dir)? else {
+            bail!("expected Some(buildtime config), got None");
+        };
         assert_eq!(result.vars, vec!["A"]);
-        assert_eq!(result.extra.get("tool_version").unwrap(), "8.5");
+        let Some(tool_version) = result.extra.get("tool_version") else {
+            bail!("tool_version missing from buildtime config");
+        };
+        assert_eq!(tool_version, "8.5");
         fs::remove_dir_all(&dir).ok();
+        Ok(())
     }
 }

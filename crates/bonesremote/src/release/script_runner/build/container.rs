@@ -241,14 +241,18 @@ fn podman_build_command_places_environment_before_image() {
     let mut command = service_command("demo-build", "demo-container");
     configure_create(&mut command, Path::new("/tmp/source"), &test_env(&vars), "demo-container");
     let args = arguments(&command);
-    let image_index = args.iter().position(|arg| arg == BUILD_IMAGE).unwrap();
-    let env_index = args.iter().position(|arg| arg == "PHP_VERSION=8.5").unwrap();
-    assert!(env_index < image_index);
+    let image_index = args.iter().position(|arg| arg == BUILD_IMAGE);
+    let env_index = args.iter().position(|arg| arg == "PHP_VERSION=8.5");
+    assert!(
+        matches!((image_index, env_index), (Some(image_index), Some(env_index)) if env_index < image_index),
+        "expected PHP_VERSION=8.5 before {BUILD_IMAGE} in args: {args:?}",
+    );
+    let (Some(image_index), Some(_env_index)) = (image_index, env_index) else { return };
     assert_eq!(&args[image_index + 1..], ["sleep", "infinity"]);
 }
 
 #[cfg(test)]
-fn test_env<'a>(build_env_vars: &'a [(String, String)]) -> BuildScriptEnv<'a> {
+fn test_env(build_env_vars: &[(String, String)]) -> BuildScriptEnv<'_> {
     BuildScriptEnv {
         project_name: "demo",
         build_user: "demo-build",

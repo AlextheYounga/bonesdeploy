@@ -272,23 +272,28 @@ mod tests {
     }
 
     #[test]
-    fn runtime_defaults_fit_the_single_file_schema() {
+    fn runtime_defaults_fit_the_single_file_schema() -> anyhow::Result<()> {
         for runtime in runtime_names() {
-            let defaults = runtime_defaults(&runtime).expect("runtime defaults should parse");
+            let defaults =
+                runtime_defaults(&runtime).map_err(|err| anyhow::anyhow!("runtime defaults should parse: {err}"))?;
             let config: shared::config::Runtime = serde_json::from_value(serde_json::Value::Object(defaults))
-                .expect("runtime defaults should deserialize");
+                .map_err(|err| anyhow::anyhow!("runtime defaults should deserialize: {err}"))?;
             assert_eq!(config.template, runtime);
         }
+        Ok(())
     }
 
     #[test]
-    fn runtime_answers_accept_boolean_template_settings() {
-        let mut answers = runtime_defaults("nuxt").expect("Nuxt defaults should parse");
+    fn runtime_answers_accept_boolean_template_settings() -> anyhow::Result<()> {
+        let mut answers =
+            runtime_defaults("nuxt").map_err(|err| anyhow::anyhow!("Nuxt defaults should parse: {err}"))?;
         answers.insert("static".into(), serde_json::Value::Bool(true));
 
         let config: shared::config::Runtime = serde_json::from_value(serde_json::Value::Object(answers))
-            .expect("boolean template settings should deserialize");
+            .map_err(|err| anyhow::anyhow!("boolean template settings should deserialize: {err}"))?;
         assert_eq!(config.extra.get("static").and_then(|value| value.as_bool()), Some(true));
-        assert!(toml::to_string(&config).expect("runtime should serialize").contains("static = true"));
+        let serialized = toml::to_string(&config).map_err(|err| anyhow::anyhow!("runtime should serialize: {err}"))?;
+        assert!(serialized.contains("static = true"));
+        Ok(())
     }
 }
