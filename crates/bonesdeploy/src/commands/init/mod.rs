@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use console::style;
 
 mod config;
 mod runtime;
@@ -34,7 +35,7 @@ pub fn run(args: &Args) -> Result<()> {
 pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<()>) -> Result<()> {
     git::ensure_git_repository()?;
 
-    println!("Initializing bonesdeploy...");
+    println!("{} {}", style("Initializing").cyan().bold(), style("bonesdeploy").bold());
     prefetch_bonesinfra()?;
 
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
@@ -59,9 +60,9 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     bones_config::save(&cfg, bones_toml)?;
 
     if is_fresh {
-        println!("bonesdeploy initialized.");
+        println!("{} bonesdeploy initialized.", output::success_marker());
     } else {
-        println!("bonesdeploy config updated.");
+        println!("{} bonesdeploy config updated.", output::success_marker());
     }
 
     scaffold::ensure_local_remote(&cfg)?;
