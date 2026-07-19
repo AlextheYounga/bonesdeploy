@@ -8,7 +8,7 @@ use crate::ui::output;
 use crate::ui::prompts;
 use shared::paths;
 
-pub fn run(yes: bool) -> Result<()> {
+pub fn run(yes: bool, show_next: bool) -> Result<()> {
     git::ensure_git_repository()?;
 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
@@ -18,8 +18,10 @@ pub fn run(yes: bool) -> Result<()> {
 
     if !yes && !prompts::confirm_remote_runtime()? {
         println!("Skipped runtime setup.");
-        println!();
-        println!("{}", output::next_step_with_detail("bonesdeploy remote runtime", "when ready"));
+        if show_next {
+            println!();
+            println!("{}", output::next_step_with_detail("bonesdeploy remote runtime", "when ready"));
+        }
         return Ok(());
     }
 
@@ -28,7 +30,9 @@ pub fn run(yes: bool) -> Result<()> {
     bonesinfra::run(&["runtime", "apply", "--config", paths::LOCAL_BONES_TOML])?;
 
     println!("Runtime applied.");
-    println!();
-    println!("{}", output::next_step("bonesdeploy push"));
+    if show_next {
+        println!();
+        println!("{}", output::next_step("bonesdeploy push"));
+    }
     Ok(())
 }

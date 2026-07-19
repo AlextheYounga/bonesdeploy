@@ -14,7 +14,7 @@ use crate::ui::prompts;
 
 pub mod data;
 
-pub fn run(skip_confirm: bool) -> Result<()> {
+pub fn run(skip_confirm: bool, show_next: bool) -> Result<()> {
     if !skip_confirm && !prompts::confirm_remote_setup()? {
         println!("Skipped.");
         return Ok(());
@@ -38,8 +38,10 @@ pub fn run(skip_confirm: bool) -> Result<()> {
     bonesinfra::run_with_stdin(&["setup", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
 
     println!("Remote bootstrap complete.");
-    println!();
-    println!("{}", output::next_step("bonesdeploy remote runtime"));
+    if show_next {
+        println!();
+        println!("{}", output::next_step("bonesdeploy remote runtime"));
+    }
 
     Ok(())
 }

@@ -38,8 +38,8 @@ pub async fn run(cli: &Cli) -> Result<()> {
             update::run(update::Options { skip_local: *skip_local, skip_remote: *skip_remote }).await
         }
         Command::Remote { command } => match command {
-            RemoteCommand::Bootstrap => remote_bootstrap::run(false),
-            RemoteCommand::Runtime { yes } => remote_runtime::run(*yes),
+            RemoteCommand::Bootstrap => remote_bootstrap::run(false, true),
+            RemoteCommand::Runtime { yes } => remote_runtime::run(*yes, true),
             RemoteCommand::Ssl { yes, domain, email } => remote_ssl::run(*yes, domain.clone(), email.clone()),
             RemoteCommand::Helpers { yes } => remote_helpers::run(*yes),
         },

@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use console::style;
 use shared::paths;
 
 use crate::commands::{doctor, push_state, remote_bootstrap, remote_runtime};
@@ -11,15 +12,15 @@ pub async fn run(skip_confirm: bool) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
 
-    println!("Setting up deployment...");
+    println!("{} {}", style("Setting up").cyan().bold(), style(&cfg.host).bold(),);
 
-    remote_bootstrap::run(skip_confirm).with_context(|| setup_error("bootstrapping remote server"))?;
-    remote_runtime::run(true).with_context(|| setup_error("applying runtime"))?;
+    remote_bootstrap::run(skip_confirm, false).with_context(|| setup_error("bootstrapping remote server"))?;
+    remote_runtime::run(true, false).with_context(|| setup_error("applying runtime"))?;
     push_state::run(false).with_context(|| setup_error("syncing .bones"))?;
     let pending_first_push = doctor::run(false).await.with_context(|| setup_error("checking deployment"))?;
 
     println!();
-    println!("Setup complete.");
+    println!("{} Setup complete.", output::success_marker());
     println!();
     if pending_first_push {
         println!(
