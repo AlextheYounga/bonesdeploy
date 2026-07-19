@@ -34,6 +34,7 @@ pub const NGINX_CONF: &str = "nginx.conf";
 pub const INDEX_HTML: &str = "index.html";
 pub const GIT_HEAD: &str = "HEAD";
 pub const DEPLOYMENT_DIR: &str = "deployment";
+pub const DEPLOYMENT_FUNCTIONS_FILE: &str = "functions.sh";
 pub const DEPLOYMENT_BUILD_DIR: &str = "build";
 pub const DEPLOYMENT_PREPARE_DIR: &str = "prepare";
 pub const RELEASES_DIR: &str = "releases";

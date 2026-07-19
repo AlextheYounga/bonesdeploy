@@ -2,8 +2,6 @@
 
 set -Eeuo pipefail
 
-source "${DEPLOYMENT_DIR:?DEPLOYMENT_DIR must be set by bonesremote}/functions.sh"
-
 artisan_command_exists() {
 	local command_name="$1"
 

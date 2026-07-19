@@ -2,8 +2,6 @@
 
 set -Eeuo pipefail
 
-source "${DEPLOYMENT_DIR:?DEPLOYMENT_DIR must be set by bonesremote}/functions.sh"
-
 main() {
 	if [ ! -f Gemfile ]; then
 		log "Gemfile not found; skipping Rails prepare."

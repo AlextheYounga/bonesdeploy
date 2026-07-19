@@ -4,8 +4,6 @@ set -Eeuo pipefail
 
 readonly VENV_DIR="${VENV_DIR:-.venv}"
 
-source "${DEPLOYMENT_DIR:?DEPLOYMENT_DIR must be set by bonesremote}/functions.sh"
-
 ensure_virtualenv() {
 	if [ -d "$VENV_DIR" ]; then
 		return
