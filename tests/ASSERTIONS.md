@@ -141,6 +141,8 @@
 - list releases sorted skips placeholder. (list_releases_sorted_skips_placeholder)
 - point symlink atomically creates parent dirs and points to target. (point_symlink_atomically_creates_parent_dirs_and_points_to_target)
 - point symlink atomically repoints existing link. (point_symlink_atomically_repoints_existing_link)
+- failed release cleanup refuses to remove the active release. (active_release_cannot_be_dropped)
+- failed activation restores the previous release. (failed_activation_restores_previous_release)
 - read staged release rejects empty file. (read_staged_release_rejects_empty_file)
 - write then read staged release round trips. (write_then_read_staged_release_round_trips)
 

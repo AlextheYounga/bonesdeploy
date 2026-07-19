@@ -149,7 +149,9 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use super::{Kit, RuntimeAssets, runtime_defaults, runtime_names};
+    use anyhow::Result;
+
+    use super::{Kit, Runtime, RuntimeAssets, runtime_defaults, runtime_names};
 
     #[test]
     fn next_runtime_includes_the_build_script() {
@@ -174,6 +176,7 @@ mod tests {
 
     #[test]
     fn node_install_extracts_a_cold_cache_archive() -> anyhow::Result<()> {
+        use std::env;
         use std::fs;
         use std::os::unix::fs::PermissionsExt;
         use std::process::Command;
@@ -222,7 +225,7 @@ mod tests {
         let functions_file = temp.path().join("functions.sh");
         fs::write(&functions_file, functions.data.as_ref())?;
 
-        let current_path = std::env::var("PATH").unwrap_or_default();
+        let current_path = env::var("PATH").unwrap_or_default();
         let script = "source \"$FUNCTIONS_FILE\"\nnode_install 1.2.3 x64\n";
         let status = Command::new("bash")
             .current_dir(temp.path())
@@ -272,23 +275,23 @@ mod tests {
     }
 
     #[test]
-    fn runtime_defaults_fit_the_single_file_schema() {
+    fn runtime_defaults_fit_the_single_file_schema() -> Result<()> {
         for runtime in runtime_names() {
-            let defaults = runtime_defaults(&runtime).expect("runtime defaults should parse");
-            let config: shared::config::Runtime = serde_json::from_value(serde_json::Value::Object(defaults))
-                .expect("runtime defaults should deserialize");
+            let defaults = runtime_defaults(&runtime)?;
+            let config: Runtime = serde_json::from_value(serde_json::Value::Object(defaults))?;
             assert_eq!(config.template, runtime);
         }
+        Ok(())
     }
 
     #[test]
-    fn runtime_answers_accept_boolean_template_settings() {
-        let mut answers = runtime_defaults("nuxt").expect("Nuxt defaults should parse");
+    fn runtime_answers_accept_boolean_template_settings() -> Result<()> {
+        let mut answers = runtime_defaults("nuxt")?;
         answers.insert("static".into(), serde_json::Value::Bool(true));
 
-        let config: shared::config::Runtime = serde_json::from_value(serde_json::Value::Object(answers))
-            .expect("boolean template settings should deserialize");
-        assert_eq!(config.extra.get("static").and_then(|value| value.as_bool()), Some(true));
-        assert!(toml::to_string(&config).expect("runtime should serialize").contains("static = true"));
+        let config: Runtime = serde_json::from_value(serde_json::Value::Object(answers))?;
+        assert_eq!(config.extra.get("static").map(ToString::to_string).as_deref(), Some("true"));
+        assert!(toml::to_string(&config)?.contains("static = true"));
+        Ok(())
     }
 }

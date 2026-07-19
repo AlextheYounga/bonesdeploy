@@ -87,12 +87,20 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
         return finish_abort(site, Some(&context_dir), error);
     }
 
+    let previous_release = match current_release(site) {
+        Ok(release) => release,
+        Err(error) => return finish_abort(site, Some(&context_dir), error),
+    };
     if let Err(error) = lifecycle::activate::run(site) {
         return finish_abort(site, Some(&context_dir), error);
     }
 
     if let Err(error) = service::run(site) {
-        return finish_abort(site, Some(&context_dir), error);
+        return finish_failed_activation(site, &previous_release, Some(&context_dir), error);
+    }
+
+    if let Err(error) = release_state::clear_staged_release(site) {
+        return finish_abort_without_release_drop(site, Some(&context_dir), error);
     }
 
     if let Err(error) = release::prune::run(site) {
@@ -104,6 +112,33 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
     }
     release_state::clear_active_deployment(site)?;
     Ok(())
+}
+
+fn current_release(site: &str) -> Result<PathBuf> {
+    let cfg = config::load(&paths::bonesremote_bones_toml_path(site)).context("Failed to load remote site state")?;
+    release_state::current_release_dir(&cfg.project_root)
+}
+
+fn finish_failed_activation(site: &str, previous_release: &Path, context: Option<&Path>, error: Error) -> Result<()> {
+    let cfg = config::load(&paths::bonesremote_bones_toml_path(site)).context("Failed to load remote site state")?;
+    if let Err(restore_error) = restore_previous_release(Path::new(&cfg.project_root), previous_release) {
+        return finish_abort_without_release_drop(
+            site,
+            context,
+            error.context(format!("Failed to restore previous release: {restore_error:#}")),
+        );
+    }
+
+    let error = match service::run(site) {
+        Ok(()) => error,
+        Err(restart_error) => error.context(format!("Failed to restart the restored release: {restart_error:#}")),
+    };
+    finish_abort(site, context, error)
+}
+
+fn restore_previous_release(project_root: &Path, previous_release: &Path) -> Result<()> {
+    let current_link = project_root.join(paths::CURRENT_LINK);
+    release_state::point_symlink_atomically(&current_link, previous_release)
 }
 
 fn prepare_release(site: &str, context: &Path, deployment: &mut release_state::ActiveDeployment) -> Result<()> {
@@ -205,4 +240,36 @@ pub fn rollback(site: &str) -> Result<()> {
 
     println!("Rollback complete: {current_name} -> {previous_name}");
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+    use std::fs;
+    use std::os::unix::fs::symlink;
+    use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use anyhow::Result;
+    use shared::paths;
+
+    use super::restore_previous_release;
+
+    #[test]
+    fn failed_activation_restores_previous_release() -> Result<()> {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let root = env::temp_dir().join(format!("bonesremote_restore_{}_{}", process::id(), nonce));
+        let releases = root.join(paths::RELEASES_DIR);
+        let previous = releases.join("previous");
+        let failed = releases.join("failed");
+        fs::create_dir_all(&previous)?;
+        fs::create_dir(&failed)?;
+        symlink(&failed, root.join(paths::CURRENT_LINK))?;
+
+        restore_previous_release(&root, &previous)?;
+
+        assert_eq!(fs::read_link(root.join(paths::CURRENT_LINK))?, previous);
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
 }

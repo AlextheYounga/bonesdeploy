@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use shared::config;
@@ -34,6 +35,7 @@ pub fn run(site: &str) -> Result<()> {
     }
 
     let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
+    ensure_release_not_active(Path::new(&cfg.project_root), &release_name)?;
     if release_dir.exists() {
         fs::remove_dir_all(&release_dir)
             .with_context(|| format!("Failed to remove failed release {}", release_dir.display()))?;
@@ -43,4 +45,39 @@ pub fn run(site: &str) -> Result<()> {
     release_state::clear_staged_release(site)?;
     println!("Cleared staged release state.");
     Ok(())
+}
+
+fn ensure_release_not_active(project_root: &Path, release: &str) -> Result<()> {
+    if release_state::current_release_name(&project_root.to_string_lossy()).ok().as_deref() == Some(release) {
+        bail!("Refusing to remove active release {release}");
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env;
+    use std::fs;
+    use std::os::unix::fs::symlink;
+    use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use anyhow::Result;
+    use shared::paths;
+
+    use super::ensure_release_not_active;
+
+    #[test]
+    fn active_release_cannot_be_dropped() -> Result<()> {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let root = env::temp_dir().join(format!("bonesremote_drop_{}_{}", process::id(), nonce));
+        let release = root.join(paths::RELEASES_DIR).join("active-release");
+        fs::create_dir_all(&release)?;
+        symlink(&release, root.join(paths::CURRENT_LINK))?;
+
+        assert!(ensure_release_not_active(&root, "active-release").is_err());
+
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
 }

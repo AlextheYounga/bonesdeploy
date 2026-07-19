@@ -297,7 +297,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **deploy**:
   - Runs the full deployment lifecycle as a single command (the primary entrypoint used by both `post-receive` hook and `bonesdeploy deploy`).
   - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → runtime-writable candidate release → shared wiring → prepare scripts as the site user → seal release → activate → restart `<site>.target` → post-deploy pruning.
-  - On failure, automatically drops the staged release.
+  - On failure before activation, automatically drops the staged release. If the service restart fails after activation,
+    restores and restarts the previous release before dropping the failed release.
   - `--site <name>`: imported site identifier used to load root-owned registry state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
 - **doctor**:
@@ -381,6 +382,7 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
       - **activate_release** — Repoint `current`
       - **restart_services** — Restart `<site>.target`, which restarts all registered site services
       - **post_deploy** — Prune old releases beyond `releases`
-      - On failure: **drop_failed_release** — Clean up staged release
+      - On failure: **drop_failed_release** — Restore the previous release when activation occurred, then clean up the
+        failed staged release
 
 `bonesdeploy deploy` performs the same remote pipeline by SSHing into the host and running `bonesremote deploy --site <site>` directly (without `--revision`, so it uses the configured branch). Git-triggered deploy is optional plumbing, not the primary model.

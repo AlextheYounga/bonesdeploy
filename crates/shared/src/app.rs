@@ -182,12 +182,13 @@ mod tests {
     use super::App;
 
     #[test]
-    fn omitted_nested_sections_keep_app_defaults() {
-        let app: App = toml::from_str("").expect("empty app config should parse");
+    fn omitted_nested_sections_keep_app_defaults() -> Result<(), toml::de::Error> {
+        let app: App = toml::from_str("")?;
 
         assert_eq!(app.ssh_user, "root");
         assert_eq!(app.port, "22");
         assert_eq!(app.branch, "master");
         assert_eq!(app.releases_keep, 5);
+        Ok(())
     }
 }
