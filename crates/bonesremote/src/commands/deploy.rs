@@ -10,7 +10,7 @@ use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 
-use crate::commands::{drop_failed_release, release, service};
+use crate::commands::{drop_failed_release, ensure_site_idle, release, service};
 use crate::privileges;
 use crate::release::lifecycle;
 use crate::release::script_runner::ensure_build_user_ready;
@@ -27,17 +27,7 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     }
 
     let _lock = release_state::DeploymentLock::acquire(site)?;
-    if let Some(active) = release_state::read_active_deployment(site)? {
-        bail!(
-            "Release {} was interrupted. Run 'bonesdeploy releases' and cancel it before starting another deployment.",
-            active.release
-        );
-    }
-    if let Ok(staged) = release_state::read_staged_release(site) {
-        bail!(
-            "Release {staged} is staged without an active deployment. Run 'bonesdeploy releases' before starting another deployment."
-        );
-    }
+    ensure_site_idle(site)?;
     let build_user = build_user_for(&cfg.project_name);
     ensure_build_user_ready(&build_user, Path::new(&cfg.project_root))?;
 
