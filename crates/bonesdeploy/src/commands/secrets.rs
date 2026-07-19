@@ -48,7 +48,7 @@ pub fn init() -> Result<()> {
     fs::create_dir_all(paths::LOCAL_BONES_SECRETS_DIR)
         .with_context(|| format!("Failed to create {}", paths::LOCAL_BONES_SECRETS_DIR))?;
 
-    println!("Secrets initialized.");
+    println!("{} Secrets initialized.", output::success_marker());
     println!();
     println!("{}", output::next_step("bonesdeploy secrets edit"));
     Ok(())
@@ -105,7 +105,7 @@ pub fn edit() -> Result<()> {
         eprintln!("Warning: could not remove temporary secret file: {}", temp_path.display());
     }
 
-    println!("Secrets updated.");
+    println!("{} Secrets updated.", output::success_marker());
     println!();
     println!("{}", output::next_step("bonesdeploy secrets push"));
     Ok(())
@@ -144,7 +144,7 @@ pub async fn push() -> Result<()> {
 
     ssh::run_cmd_with_stdin(&session, &cmd, &plaintext).await?;
     session.close().await?;
-    println!("Secrets pushed.");
+    println!("{} Secrets pushed.", output::success_marker());
     Ok(())
 }
 

@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use console::style;
 use serde_json::Value;
 
 use shared::config as shared_config;
@@ -10,6 +11,7 @@ use super::remote_bootstrap::data;
 use crate::config;
 use crate::infra::bonesinfra;
 use crate::infra::bootstrap_ssh;
+use crate::ui::output;
 use crate::ui::prompts;
 
 pub fn run(yes: bool) -> Result<()> {
@@ -24,7 +26,7 @@ pub fn run(yes: bool) -> Result<()> {
 
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
 
-    println!("Installing remote helper tools...");
+    println!("{}", style("Installing remote helper tools").cyan().bold());
 
     let mut deploy_data = Value::Object(data::base(&cfg, &runtime.web_root));
     let host = cfg.host.clone();
@@ -36,6 +38,6 @@ pub fn run(yes: bool) -> Result<()> {
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
     bonesinfra::run_with_stdin(&["helpers", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
 
-    println!("Remote helper tools installed.");
+    println!("{} Helper tools installed.", output::success_marker());
     Ok(())
 }

@@ -31,7 +31,7 @@ pub async fn list() -> Result<()> {
         return Ok(());
     }
 
-    println!("{}  {}  {}", style("RELEASE").dim(), style("STATUS").dim(), style("STARTED").dim(),);
+    println!("{}  {}  {}", style("RELEASE").dim(), style("STATUS").dim(), style("STARTED").dim());
     for release in &report.releases {
         let (marker, status_str) = render_status(release);
         let name = if release.status == "active" {

@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
+use console::style;
 use serde_json::Value;
 
 use shared::config as shared_config;
@@ -48,7 +49,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
         return Ok(());
     }
 
-    println!("Configuring HTTPS for {}...", cfg.domain);
+    println!("{} {}", style("Configuring HTTPS for").cyan().bold(), style(&cfg.domain).bold());
 
     let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
     let mut deploy_data = data::ssl(&cfg, &runtime.web_root, &cfg.domain, &cfg.email);
@@ -65,7 +66,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     config::save(&cfg, bones_toml)?;
     push_state::sync_bones_directory(&cfg)?;
 
-    println!("HTTPS configured.");
+    println!("{} HTTPS configured.", output::success_marker());
     println!();
     println!("{}", output::next_step("bonesdeploy deploy"));
 
