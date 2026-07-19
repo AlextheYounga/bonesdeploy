@@ -1,11 +1,13 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use console::style;
 use serde::Deserialize;
 use shared::paths;
 
 use crate::config;
 use crate::infra::ssh;
+use crate::ui::output;
 
 #[derive(Debug, Deserialize)]
 struct Report {
@@ -29,12 +31,27 @@ pub async fn list() -> Result<()> {
         return Ok(());
     }
 
-    println!("RELEASE           STATUS       STARTED");
-    for release in report.releases {
-        let status = format_status(&release);
-        println!("{:<17} {:<12} {}", release.name, status, release.started_at.unwrap_or_else(|| String::from("-")));
+    println!("{}  {}  {}", style("RELEASE").dim(), style("STATUS").dim(), style("STARTED").dim(),);
+    for release in &report.releases {
+        let (marker, status_str) = render_status(release);
+        let name = if release.status == "active" {
+            style(&release.name).bold().to_string()
+        } else {
+            style(&release.name).dim().to_string()
+        };
+        println!("{marker} {name:<24} {status_str:<14} {}", release.started_at.as_deref().unwrap_or("-"));
     }
     Ok(())
+}
+
+fn render_status(release: &Release) -> (String, String) {
+    match release.status.as_str() {
+        "active" => (output::success_marker(), style("active").green().to_string()),
+        "building" | "preparing" => (output::pending_marker(), style(format_status(release)).yellow().to_string()),
+        "interrupted" => (output::failure_marker(), style("interrupted").red().to_string()),
+        "previous" => (style("·").dim().to_string(), style("previous").dim().to_string()),
+        other => (output::pending_marker(), style(other).to_string()),
+    }
 }
 
 fn format_status(release: &Release) -> String {
