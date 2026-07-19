@@ -139,7 +139,7 @@ pub async fn push() -> Result<()> {
     let target_s = ssh::shell_quote(&target.display().to_string());
     let group_s = ssh::shell_quote(&runtime_group);
     let cmd = format!(
-        "mkdir -p {parent_s} && tmp=$(mktemp {target_s}.XXXXXX) && cat > \"$tmp\" && chown root:{group_s} \"$tmp\" && chmod {DEFAULT_SECRET_MODE} \"$tmp\" && mv \"$tmp\" {target_s}",
+        "tmp=; trap 'rm -f \"$tmp\"' EXIT; mkdir -p {parent_s} && tmp=$(mktemp {target_s}.XXXXXX) && cat > \"$tmp\" && chown root:{group_s} \"$tmp\" && chmod {DEFAULT_SECRET_MODE} \"$tmp\" && mv \"$tmp\" {target_s} && tmp=",
     );
 
     ssh::run_cmd_with_stdin(&session, &cmd, &plaintext).await?;

@@ -58,18 +58,36 @@ fn import_staged_site(site: &str, staging_dir: &Path) -> Result<()> {
 
 fn write_post_receive_hook(site_root: &Path) -> Result<()> {
     let cfg = config::load(&site_root.join(paths::BONES_TOML))?;
+    validate_repo_path(&cfg.repo_path, &cfg.project_name)?;
     let target = Path::new(&cfg.repo_path).join(paths::HOOKS_DIR).join("post-receive");
+    write_hook_file(&target)
+}
+
+fn write_hook_file(target: &Path) -> Result<()> {
     let target_parent = target.parent().context("post-receive hook target has no parent")?;
 
     fs::create_dir_all(target_parent).with_context(|| format!("Failed to create {}", target_parent.display()))?;
-    fs::write(&target, POST_RECEIVE_SCRIPT).with_context(|| format!("Failed to write {}", target.display()))?;
+    fs::write(target, POST_RECEIVE_SCRIPT).with_context(|| format!("Failed to write {}", target.display()))?;
 
-    let mut perms =
-        fs::metadata(&target).with_context(|| format!("Failed to stat {}", target.display()))?.permissions();
+    let mut perms = fs::metadata(target).with_context(|| format!("Failed to stat {}", target.display()))?.permissions();
     perms.set_mode(0o755);
-    fs::set_permissions(&target, perms).with_context(|| format!("Failed to chmod {}", target.display()))?;
+    fs::set_permissions(target, perms).with_context(|| format!("Failed to chmod {}", target.display()))?;
 
     Ok(())
+}
+
+// Confused-deputy guard: the imported bones.toml supplies `repo_path`, and this
+// function writes `<repo_path>/hooks/post-receive` as root. Reject anything that
+// is not the canonical site repository under the configured parent so an
+// imported dataset cannot redirect the hook write at an unintended path.
+fn validate_repo_path(repo_path: &str, project_name: &str) -> Result<()> {
+    let expected = paths::default_repo_path_for(project_name);
+    if repo_path == expected {
+        return Ok(());
+    }
+    bail!(
+        "Imported repo_path '{repo_path}' does not match the expected site repository '{expected}'; refusing to write hook outside the configured repository parent"
+    );
 }
 
 fn replace_site_dir(site: &str, staging_dir: &Path) -> Result<()> {
@@ -180,7 +198,7 @@ mod tests {
     use crate::commands::ensure_site_idle;
     use crate::release::state::{self as release_state, DeploymentLock};
 
-    use super::{validate_top_level_entries, write_post_receive_hook};
+    use super::{validate_repo_path, validate_top_level_entries, write_hook_file};
     use shared::paths;
 
     #[test]
@@ -237,49 +255,40 @@ mod tests {
     }
 
     #[test]
-    fn install_repo_post_receive_hook_writes_baked_trigger() -> Result<()> {
+    fn write_hook_file_installs_baked_trigger_with_executable_mode() -> Result<()> {
         let root = env::temp_dir().join(format!("bonesremote-site-hook-test-{}", process::id()));
         if root.exists() {
             fs::remove_dir_all(&root)?;
         }
 
         let repo_root = root.join("repos/unitapp.git");
-        let site_root = root.join("sites/unitapp");
-        fs::create_dir_all(&site_root)?;
-        fs::write(
-            site_root.join(paths::BONES_TOML),
-            format!(
-                r#"
-[app]
-remote_name = "production"
-project_name = "unitapp"
-repo_path = "{}"
-project_root = "/srv/sites/unitapp"
-[app.server]
-ssh_user = "root"
-host = "example.com"
-port = "22"
-[app.dns]
-preview_domain = ""
-[app.deploy]
-branch = "main"
-deploy_on_push = false
-releases = 5
-"#,
-                repo_root.display()
-            ),
-        )?;
-
-        let result = write_post_receive_hook(&site_root);
-
         let target = repo_root.join(paths::HOOKS_DIR).join("post-receive");
+
+        write_hook_file(&target)?;
+
         let contents = fs::read_to_string(&target)?;
         let mode = fs::metadata(&target)?.permissions().mode() & 0o777;
 
-        result?;
         assert!(contents.contains("bonesdeploy-post-receive-v1"));
         assert_eq!(mode, 0o755);
         fs::remove_dir_all(&root)?;
         Ok(())
+    }
+
+    #[test]
+    fn validate_repo_path_rejects_paths_outside_configured_parent() {
+        // Lexical match against the canonical /home/git/<project>.git path.
+        assert!(validate_repo_path("/home/git/unitapp.git", "unitapp").is_ok());
+
+        // Traversal attempts, absolute mismatches, and relative paths are all rejected
+        // because they are not byte-equal to the expected canonical path.
+        assert!(validate_repo_path("/home/git/../etc/passwd", "unitapp").is_err());
+        assert!(validate_repo_path("/home/git/other.git", "unitapp").is_err());
+        assert!(validate_repo_path("/srv/repos/unitapp.git", "unitapp").is_err());
+        assert!(validate_repo_path("relative/unitapp.git", "unitapp").is_err());
+        assert!(validate_repo_path("/home/git/unitapp.git/", "unitapp").is_err());
+        assert!(validate_repo_path("", "unitapp").is_err());
+        // Project name mismatch must also fail.
+        assert!(validate_repo_path("/home/git/unitapp.git", "other").is_err());
     }
 }
