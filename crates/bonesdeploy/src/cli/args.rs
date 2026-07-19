@@ -44,11 +44,11 @@ pub enum Command {
     },
     /// Show the current deployment state and next steps
     Status,
-    /// Suggest the next prompt-free command to run
-    Guide {
-        /// Output format
-        #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
-        format: GuideFormat,
+    /// Embedded documentation and next-step guidance for AI agents
+    Skill {
+        /// Optional subcommand: `next`, `list`, or `doc <name>`
+        #[command(subcommand)]
+        command: Option<SkillCommand>,
     },
     /// Publish .bones/ into bonesremote's remote control-plane state
     Push,
@@ -139,6 +139,23 @@ pub enum RemoteCommand {
         /// Skip helper installation confirmation prompts
         #[arg(long)]
         yes: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SkillCommand {
+    /// Suggest the next prompt-free command to run, based on actual state
+    Next {
+        /// Output format
+        #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
+        format: GuideFormat,
+    },
+    /// List every embedded skill doc by name
+    List,
+    /// Print a specific embedded skill doc
+    Doc {
+        /// Doc name (see `bonesdeploy skill list`)
+        name: String,
     },
 }
 

@@ -5,8 +5,9 @@ use serde::Serialize;
 use shared::paths;
 use shared::paths::bonesremote_bones_toml_path;
 
-use crate::cli::args::GuideFormat;
+use crate::cli::args::{GuideFormat, SkillCommand};
 use crate::config;
+use crate::infra::embedded;
 use crate::infra::ssh;
 
 #[derive(Clone, Debug, Serialize)]
@@ -29,7 +30,35 @@ pub struct NextCommand {
     pub prompt_free_command: String,
 }
 
-pub async fn run(format: GuideFormat) -> Result<()> {
+pub async fn dispatch(command: Option<&SkillCommand>) -> Result<()> {
+    match command {
+        None => print_orientation(),
+        Some(SkillCommand::Next { format }) => run_next(*format).await,
+        Some(SkillCommand::List) => {
+            list_docs();
+            Ok(())
+        }
+        Some(SkillCommand::Doc { name }) => print_doc(name),
+    }
+}
+
+pub fn print_orientation() -> Result<()> {
+    print!("{}", embedded::skill_orientation()?);
+    Ok(())
+}
+
+pub fn list_docs() {
+    for name in embedded::skill_doc_names() {
+        println!("{name}");
+    }
+}
+
+pub fn print_doc(name: &str) -> Result<()> {
+    print!("{}", embedded::skill_doc(name)?);
+    Ok(())
+}
+
+pub async fn run_next(format: GuideFormat) -> Result<()> {
     let report = build_report().await?;
 
     match format {
@@ -197,7 +226,7 @@ mod tests {
     use clap::Parser;
 
     use crate::cli::args::Cli;
-    use crate::commands::guide::prompt_free_init_command;
+    use crate::commands::skill::prompt_free_init_command;
 
     /// The guide's prompt-free init command must stay valid against the real CLI.
     /// If the flag drifts again, copy-pasting the suggestion breaks for new users.

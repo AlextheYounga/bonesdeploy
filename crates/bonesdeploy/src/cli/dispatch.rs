@@ -2,10 +2,9 @@ use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, ReleasesCommand, RemoteCommand, SecretsCommand};
 use crate::commands::{
-    config, deploy_project, doctor, guide, init, push_state, releases, remote_bootstrap, remote_helpers,
-    remote_runtime, remote_ssl, rollback, secrets, setup, status, update, version,
+    config, deploy_project, doctor, init, push_state, releases, remote_bootstrap, remote_helpers, remote_runtime,
+    remote_ssl, rollback, secrets, setup, skill, status, update, version,
 };
-
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init { non_interactive, project_name, branch, remote, host, port } => {
@@ -22,7 +21,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Setup { yes } => setup::run(*yes).await,
         Command::Doctor { local } => doctor::run(*local).await.map(|_| ()),
         Command::Status => status::run().await,
-        Command::Guide { format } => guide::run(*format).await,
+        Command::Skill { command } => skill::dispatch(command.as_ref()).await,
         Command::Push => push_state::run(true),
         Command::Secrets { command } => match command {
             SecretsCommand::Init => secrets::init(),

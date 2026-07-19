@@ -212,10 +212,19 @@ bonesdeploy doctor --local
 are expected next steps (such as the first Git push after setup), and red
 failures need attention. Pending first-push state exits successfully so setup
 can finish without looking broken. For agents and scripts, use the stable
-machine-readable guide:
+machine-readable next-step guide:
 
 ```sh
-bonesdeploy guide --format json
+bonesdeploy skill next --format json
+```
+
+Embedded documentation for AI agents lives under the `skill` command:
+
+```sh
+bonesdeploy skill                    # orientation doc
+bonesdeploy skill list               # names of every embedded doc
+bonesdeploy skill doc workflows      # end-to-end flows
+bonesdeploy skill doc methodology    # permission model and doctrine
 ```
 
 Sync `.bones/` changes to the server:

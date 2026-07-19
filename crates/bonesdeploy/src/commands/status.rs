@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::Deserialize;
 
-use crate::commands::guide;
+use crate::commands::skill;
 use crate::config;
 use crate::infra::ssh;
 
@@ -26,7 +26,7 @@ struct RemoteServiceStatus {
 }
 
 pub async fn run() -> Result<()> {
-    let report = guide::build_report().await?;
+    let report = skill::build_report().await?;
     let cfg = report.cfg.as_ref();
 
     println!("Project: {}", report.project);
