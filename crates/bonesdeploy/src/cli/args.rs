@@ -80,13 +80,13 @@ pub enum Command {
     },
     /// Roll back current release to the previous one
     Rollback,
-    /// Get a config value from a TOML file
+    /// Read a value from .bones/bones.toml, or dump the whole file when no key is given
     Config {
-        /// Path to TOML config file
+        /// Path to TOML config file (default: .bones/bones.toml)
         #[arg(long)]
-        file: String,
-        /// Key to read
-        key: String,
+        file: Option<String>,
+        /// Key to read; omit to dump the whole file
+        key: Option<String>,
     },
     /// Print the version
     Version,

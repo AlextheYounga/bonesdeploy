@@ -44,7 +44,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             RemoteCommand::Helpers { yes } => remote_helpers::run(*yes),
         },
         Command::Rollback => rollback::run().await,
-        Command::Config { file, key } => config::run(file, key),
+        Command::Config { file, key } => config::run(file.as_deref(), key.as_deref()),
         Command::Version => {
             version::run();
             Ok(())

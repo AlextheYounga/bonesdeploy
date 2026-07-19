@@ -62,7 +62,7 @@ pub async fn build_report() -> Result<Report> {
 }
 
 pub(crate) fn prompt_free_init_command(project: &str) -> String {
-    format!("bonesdeploy init --yes --project-name {project} --host <host>")
+    format!("bonesdeploy init --non-interactive --project-name {project} --host <host>")
 }
 
 fn uninitialized_report(project: &str) -> Report {
@@ -189,4 +189,35 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones) -> Result<bool> {
     session.close().await?;
 
     Ok(enabled)
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use clap::Parser;
+
+    use crate::cli::args::Cli;
+    use crate::commands::guide::prompt_free_init_command;
+
+    /// The guide's prompt-free init command must stay valid against the real CLI.
+    /// If the flag drifts again, copy-pasting the suggestion breaks for new users.
+    #[test]
+    fn prompt_free_init_command_parses_with_cli() -> Result<()> {
+        let command = prompt_free_init_command("atlas");
+        let mut parts = command.split_whitespace();
+        assert_eq!(parts.next(), Some("bonesdeploy"));
+        let argv: Vec<&str> = parts.collect();
+        let parsed = Cli::try_parse_from(["bonesdeploy"].into_iter().chain(argv.iter().copied()))
+            .map_err(|err| anyhow::anyhow!("guide init command should parse, got: {err}"))?;
+        // Force-use parsed to confirm it is the expected variant.
+        assert!(matches!(parsed.command, crate::cli::args::Command::Init { .. }));
+        Ok(())
+    }
+
+    #[test]
+    fn prompt_free_init_command_uses_non_interactive_flag() {
+        let command = prompt_free_init_command("atlas");
+        assert!(command.contains("--non-interactive"), "expected --non-interactive, got: {command}");
+        assert!(!command.contains("--yes"), "stale --yes flag leaked into guide: {command}");
+    }
 }
