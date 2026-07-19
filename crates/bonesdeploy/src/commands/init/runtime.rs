@@ -107,7 +107,7 @@ mod tests {
             host: Some(String::from("deploy.example.com")),
             port: None,
             template: template.map(String::from),
-            runtime_vars: runtime_vars.iter().map(std::string::ToString::to_string).collect(),
+            runtime_vars: runtime_vars.iter().map(|value| String::from(*value)).collect(),
         }
     }
 
@@ -155,12 +155,11 @@ mod tests {
 
     #[test]
     fn validate_accepts_known_runtime_vars() -> Result<()> {
-        let args = args_non_interactive(Some("laravel"), &["php_version=8.5", "install_queue_worker=true"]);
+        let args = args_non_interactive(Some("laravel"), &["php_version=8.5"]);
         let project = "atlas";
         let selection = collect_runtime_config(&args, project)?;
         assert_eq!(selection.template.as_deref(), Some("laravel"));
         assert_eq!(selection.config.get("php_version"), Some(&Value::String("8.5".to_string())));
-        assert_eq!(selection.config.get("install_queue_worker"), Some(&Value::Bool(true)));
         Ok(())
     }
 

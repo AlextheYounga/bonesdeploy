@@ -121,11 +121,10 @@ the hidden `bonesinfra` checkout. Runs as root (or
 
 `bonesdeploy remote runtime [--yes]`
 
-Installs the framework runtime: AppArmor profile, nginx router + per-site
-config, systemd service. Prompts for a template (laravel, django, next, nuxt,
-sveltekit, vue, rails) when not set. Writes the selection into `bones.toml`.
-Does not do TLS — that's `remote ssl`. Already included in `bonesdeploy
-setup`. Run it on its own only when changing templates on a provisioned box.
+Installs the framework runtime configured in `bones.toml`: AppArmor profile,
+nginx router + per-site config, and systemd service. Does not do TLS — that's
+`remote ssl`. It is already included in `bonesdeploy setup`; run it on its own
+to reapply the configured runtime after changing its existing configuration.
 
 ## remote ssl
 

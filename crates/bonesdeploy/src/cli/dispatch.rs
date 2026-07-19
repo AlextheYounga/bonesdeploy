@@ -5,6 +5,8 @@ use crate::commands::{
     config, deploy_project, doctor, init, push_state, releases, remote_bootstrap, remote_helpers, remote_runtime,
     remote_ssl, rollback, secrets, setup, skill, status, update, version,
 };
+// ponytail: direct command dispatch keeps CLI routing visible; split only if commands need shared dispatch state.
+#[expect(clippy::cognitive_complexity)]
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init { non_interactive, project_name, branch, remote, host, port, template, runtime_vars } => {
@@ -24,6 +26,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Doctor { local } => doctor::run(*local).await.map(|_| ()),
         Command::Status => status::run().await,
         Command::Skill { command } => skill::dispatch(command.as_ref()).await,
+        Command::Guide { format } => skill::run_next(*format).await,
         Command::Push => push_state::run(true),
         Command::Secrets { command } => match command {
             SecretsCommand::Init => secrets::init(),

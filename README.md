@@ -127,7 +127,7 @@ For CI or AI agents, pick a runtime template and pass variables non-interactivel
 
 ```sh
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --runtime-var php_version=8.5 --runtime-var install_queue_worker=true
+  --template laravel --runtime-var php_version=8.5
 ```
 
 See `bonesdeploy skill doc templates` for every template and its variables.

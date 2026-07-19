@@ -18,6 +18,7 @@ use crate::release::state as release_state;
 
 pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     privileges::ensure_root("bonesremote deploy")?;
+    let _lock = release_state::DeploymentLock::acquire(site)?;
     let bones_path = paths::bonesremote_bones_toml_path(site);
     let cfg = config::load(&bones_path)
         .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
@@ -26,7 +27,6 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
         bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
     }
 
-    let _lock = release_state::DeploymentLock::acquire(site)?;
     ensure_site_idle(site)?;
     let build_user = build_user_for(&cfg.project_name);
     ensure_build_user_ready(&build_user, Path::new(&cfg.project_root))?;

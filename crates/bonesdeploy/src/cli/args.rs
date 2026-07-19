@@ -56,6 +56,11 @@ pub enum Command {
         #[command(subcommand)]
         command: Option<SkillCommand>,
     },
+    #[command(hide = true)]
+    Guide {
+        #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
+        format: GuideFormat,
+    },
     /// Publish .bones/ into bonesremote's remote control-plane state
     Push,
     /// Manage encrypted local secrets and push them to remote shared/

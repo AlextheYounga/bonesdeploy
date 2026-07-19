@@ -18,7 +18,7 @@ Non-interactive (agents, CI):
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --runtime-var php_version=8.5 --runtime-var install_queue_worker=true
+  --template laravel --runtime-var php_version=8.5
 ```
 
 `--template none` or omitting the flag means "build from scratch" — no
@@ -28,16 +28,15 @@ framework runtime, you wire your own. Most projects pick a template.
 
 ### laravel
 
-PHP + PHP-FPM. Ships the Laravel queue worker optionally.
+PHP + PHP-FPM.
 
 | Key | Type | Choices | Default |
 |-----|------|---------|---------|
 | `php_version` | choice | 8.2, 8.3, 8.4, 8.5 | 8.5 |
-| `install_queue_worker` | bool | — | false |
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --runtime-var php_version=8.5 --runtime-var install_queue_worker=true
+  --template laravel --runtime-var php_version=8.5
 ```
 
 ### django
@@ -47,14 +46,10 @@ Python + Gunicorn.
 | Key | Type | Choices | Default |
 |-----|------|---------|---------|
 | `wsgi_module` | text | — | `config.wsgi:application` |
-| `python_version` | choice | 3.11, 3.12, 3.13 | 3.12 |
-| `install_postgres` | bool | — | false |
-| `static_root` | text | — | `staticfiles` |
-| `media_root` | text | — | `media` |
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template django --runtime-var python_version=3.13 --runtime-var install_postgres=true
+  --template django --runtime-var wsgi_module=project.wsgi:application
 ```
 
 ### next
@@ -92,14 +87,11 @@ Ruby + Puma.
 
 | Key | Type | Choices | Default |
 |-----|------|---------|---------|
-| `ruby_version` | choice | 3.2, 3.3, 3.4 | 3.3 |
-| `install_postgres` | bool | — | false |
-| `install_redis` | bool | — | false |
 | `rails_env` | text | — | `production` |
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template rails --runtime-var ruby_version=3.4 --runtime-var install_postgres=true
+  --template rails --runtime-var rails_env=production
 ```
 
 ### sveltekit
@@ -125,14 +117,3 @@ bonesdeploy init --non-interactive --project-name atlas --host deploy.example.co
 `--runtime-var` answers are validated against the template's schema before
 they reach `bones.toml`. Unknown keys, wrong types, and out-of-range choices
 are rejected. You can't typo `php_verison` and ship a broken config.
-
-## Changing templates later
-
-Already provisioned and want to switch framework? Run:
-
-```
-bonesdeploy remote runtime --yes
-```
-
-You'll be prompted again. This is the one case where `remote runtime` runs
-on its own, outside of `setup`.

@@ -292,9 +292,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - `bonesdeploy skill` prints the orientation doc (`SKILL.md`) baked into the binary.
   - `bonesdeploy skill list` prints the names of every embedded topic doc.
   - `bonesdeploy skill doc <name>` prints a specific topic doc (`commands`, `workflows`, `methodology`).
-  - `bonesdeploy skill next [--format text|json]` (the former `guide` command) inspects `.bones/bones.toml` and the remote host, then suggests the next prompt-free command. `--format json` returns the same `Report` struct `status` consumes.
+  - `bonesdeploy skill next [--format text|json]` supersedes `guide` and inspects `.bones/bones.toml` and the remote host, then suggests the next prompt-free command. `--format json` returns the same `Report` struct `status` consumes. The hidden `guide` command remains as a compatibility alias.
   - Topic docs are markdown files under `crates/bonesdeploy/skill/` and are embedded with `rust-embed` alongside `kit/` and `runtimes/`.
-  - Replaces the older `guide` command.
 - **version**:
   - Echoes the installed `bonesdeploy` version.
 

@@ -225,7 +225,7 @@ mod tests {
     use anyhow::Result;
     use clap::Parser;
 
-    use crate::cli::args::Cli;
+    use crate::cli::args::{Cli, Command};
     use crate::commands::skill::prompt_free_init_command;
 
     /// The guide's prompt-free init command must stay valid against the real CLI.
@@ -239,7 +239,7 @@ mod tests {
         let parsed = Cli::try_parse_from(["bonesdeploy"].into_iter().chain(argv.iter().copied()))
             .map_err(|err| anyhow::anyhow!("guide init command should parse, got: {err}"))?;
         // Force-use parsed to confirm it is the expected variant.
-        assert!(matches!(parsed.command, crate::cli::args::Command::Init { .. }));
+        assert!(matches!(parsed.command, Command::Init { .. }));
         Ok(())
     }
 
@@ -248,5 +248,12 @@ mod tests {
         let command = prompt_free_init_command("atlas");
         assert!(command.contains("--non-interactive"), "expected --non-interactive, got: {command}");
         assert!(!command.contains("--yes"), "stale --yes flag leaked into guide: {command}");
+    }
+
+    #[test]
+    fn guide_compatibility_command_still_parses() -> Result<()> {
+        let parsed = Cli::try_parse_from(["bonesdeploy", "guide", "--format", "json"])?;
+        assert!(matches!(parsed.command, Command::Guide { .. }));
+        Ok(())
     }
 }

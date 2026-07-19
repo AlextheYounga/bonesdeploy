@@ -9,7 +9,6 @@ use shared::config::bonesinfra_input;
 
 /// Shared question keys used by more than one template.
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
-pub(crate) const INSTALL_POSTGRES_KEY: &str = "install_postgres";
 
 mod django;
 mod laravel;
@@ -179,31 +178,29 @@ mod tests {
     }
 
     #[test]
-    fn laravel_questions_match_bonesinfra_shape() -> Result<()> {
+    fn laravel_questions_include_supported_values() -> Result<()> {
         let qs = questions("laravel")?;
-        assert_eq!(qs.len(), 2);
+        assert_eq!(qs.len(), 1);
         assert_eq!(qs[0].key, "php_version");
         assert!(matches!(qs[0].kind, QuestionKind::Choice { default: "8.5", .. }));
-        assert_eq!(qs[1].key, "install_queue_worker");
-        assert!(matches!(qs[1].kind, QuestionKind::Bool { default: false }));
         Ok(())
     }
 
     #[test]
-    fn django_questions_match_bonesinfra_shape() -> Result<()> {
+    fn django_questions_include_supported_values() -> Result<()> {
         let qs = questions("django")?;
-        assert_eq!(qs.len(), 5);
+        assert_eq!(qs.len(), 1);
         assert_eq!(qs[0].key, "wsgi_module");
         assert!(matches!(qs[0].kind, QuestionKind::Text { default: "config.wsgi:application" }));
         Ok(())
     }
 
     #[test]
-    fn rails_questions_match_bonesinfra_shape() -> Result<()> {
+    fn rails_questions_include_supported_values() -> Result<()> {
         let qs = questions("rails")?;
-        assert_eq!(qs.len(), 4);
-        assert_eq!(qs[0].key, "ruby_version");
-        assert!(matches!(qs[0].kind, QuestionKind::Choice { default: "3.3", .. }));
+        assert_eq!(qs.len(), 1);
+        assert_eq!(qs[0].key, "rails_env");
+        assert!(matches!(qs[0].kind, QuestionKind::Text { default: "production" }));
         Ok(())
     }
 
@@ -236,7 +233,7 @@ mod tests {
     #[test]
     fn validate_rejects_wrong_type() -> Result<()> {
         let mut answers = Map::new();
-        answers.insert("install_queue_worker".to_string(), Value::String("banana".to_string()));
+        answers.insert("php_version".to_string(), Value::Bool(true));
         match validate_answers("laravel", &answers) {
             Ok(()) => bail!("expected error for wrong type"),
             Err(err) => assert!(format!("{err:#}").contains("wrong type"), "got: {err:#}"),

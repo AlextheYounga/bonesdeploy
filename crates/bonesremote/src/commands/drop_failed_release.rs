@@ -48,7 +48,9 @@ pub fn run(site: &str) -> Result<()> {
 }
 
 fn ensure_release_not_active(project_root: &Path, release: &str) -> Result<()> {
-    if release_state::current_release_name(&project_root.to_string_lossy()).ok().as_deref() == Some(release) {
+    let current = release_state::current_release_name(&project_root.to_string_lossy())
+        .context("Failed to determine the active release before cleanup")?;
+    if current == release {
         bail!("Refusing to remove active release {release}");
     }
     Ok(())
@@ -76,6 +78,18 @@ mod tests {
         symlink(&release, root.join(paths::CURRENT_LINK))?;
 
         assert!(ensure_release_not_active(&root, "active-release").is_err());
+
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn cleanup_requires_a_readable_active_release() -> Result<()> {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let root = env::temp_dir().join(format!("bonesremote_drop_missing_current_{}_{}", process::id(), nonce));
+        fs::create_dir_all(&root)?;
+
+        assert!(ensure_release_not_active(&root, "candidate").is_err());
 
         fs::remove_dir_all(root)?;
         Ok(())
