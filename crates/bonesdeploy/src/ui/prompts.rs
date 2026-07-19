@@ -1,9 +1,11 @@
 use anyhow::{Result, anyhow, bail};
 use console::style;
 use inquire::{Confirm, Select, Text};
+use serde_json::Value;
 
 use crate::config::Bones;
 use crate::infra::git;
+use crate::runtimes::{Question, QuestionKind};
 
 fn config_default<'a>(
     existing_config: Option<&'a Bones>,
@@ -19,54 +21,39 @@ fn config_default<'a>(
 }
 
 pub fn prompt_runtime_questions(
-    questions: &serde_json::Value,
-    defaults: &serde_json::Value,
-) -> Result<serde_json::Value> {
+    questions: &[Question],
+    defaults: &serde_json::Map<String, Value>,
+) -> Result<serde_json::Map<String, Value>> {
     let mut answers = defaults.clone();
-    let questions = questions.as_array().cloned().unwrap_or_default();
 
     for question in questions {
-        let key = question["key"].as_str().unwrap_or("");
-        if key.is_empty() {
-            continue;
-        }
-        let label = question["label"].as_str().unwrap_or(key);
-        let question_type = question["type"].as_str().unwrap_or("text");
-        let default = answers.get(key).or(question.get("default")).cloned();
-
-        let answer: serde_json::Value = match question_type {
-            "bool" => {
-                let default_bool = default.as_ref().and_then(serde_json::Value::as_bool).unwrap_or(false);
-                let choice = Confirm::new(label).with_default(default_bool).prompt().map_err(|err| anyhow!(err))?;
-                serde_json::Value::Bool(choice)
+        let current = answers.get(question.key).cloned().unwrap_or_else(|| question.default_value());
+        let answer: Value = match question.kind {
+            QuestionKind::Bool { default } => {
+                let default_bool = current.as_bool().unwrap_or(default);
+                let choice =
+                    Confirm::new(question.label).with_default(default_bool).prompt().map_err(|err| anyhow!(err))?;
+                Value::Bool(choice)
             }
-            "choice" => {
-                let choices: Vec<String> = question["choices"]
-                    .as_array()
-                    .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
-                    .unwrap_or_default();
-                if choices.is_empty() {
-                    default.unwrap_or(serde_json::Value::Null)
-                } else {
-                    let default_idx = default
-                        .as_ref()
-                        .and_then(|v| v.as_str())
-                        .and_then(|d| choices.iter().position(|c| c == d))
-                        .unwrap_or(0);
-                    let choice = Select::new(label, choices.clone())
-                        .with_starting_cursor(default_idx)
-                        .prompt()
-                        .map_err(|err| anyhow!(err))?;
-                    serde_json::Value::String(choice)
-                }
+            QuestionKind::Choice { choices, default } => {
+                let choices: Vec<String> = choices.iter().map(|c| (*c).to_string()).collect();
+                let default_idx = current
+                    .as_str()
+                    .and_then(|d| choices.iter().position(|c| c == d))
+                    .unwrap_or_else(|| choices.iter().position(|c| c == default).unwrap_or(0));
+                let choice = Select::new(question.label, choices.clone())
+                    .with_starting_cursor(default_idx)
+                    .prompt()
+                    .map_err(|err| anyhow!(err))?;
+                Value::String(choice)
             }
-            _ => {
-                let default_str = default.as_ref().and_then(|v| v.as_str()).unwrap_or("");
-                let input = Text::new(label).with_default(default_str).prompt().map_err(|err| anyhow!(err))?;
-                serde_json::Value::String(input)
+            QuestionKind::Text { default } => {
+                let default_str = current.as_str().unwrap_or(default);
+                let input = Text::new(question.label).with_default(default_str).prompt().map_err(|err| anyhow!(err))?;
+                Value::String(input)
             }
         };
-        answers[key] = answer;
+        answers.insert(question.key.to_string(), answer);
     }
 
     Ok(answers)

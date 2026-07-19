@@ -5,12 +5,19 @@ real. Don't invent.
 
 ## init
 
-`bonesdeploy init [--non-interactive] [--project-name <name>] [--branch <b>] [--remote <r>] [--host <h>] [--port <p>]`
+`bonesdeploy init [--non-interactive] [--project-name <name>] [--branch <b>] [--remote <r>] [--host <h>] [--port <p>] [--template <t>] [--runtime-var <key=value>]...`
 
 Claims a project. Loads `.bones/bones.toml` if present; otherwise prompts.
-`--non-interactive` is for CI and AI: every required field must come from a flag.
-Creates the local `.bones` symlink, updates `.gitignore`, and adds the
+`--non-interactive` is for CI and AI: every required field must come from a
+flag. Creates the local `.bones` symlink, updates `.gitignore`, and adds the
 deployment remote. Prints next steps. Does not provision anything.
+
+`--template <t>` picks a runtime template (`laravel`, `django`, `next`,
+`nuxt`, `rails`, `sveltekit`, `vue`, or `none`). Omitted or `none` means
+"build from scratch." `--runtime-var <key=value>` overrides a template
+variable, repeated as needed. Booleans are `true`/`false` (case-insensitive);
+everything else is a string. See `bonesdeploy skill doc templates` for every
+template's variables. Unknown keys and bad choices are rejected.
 
 ## setup
 

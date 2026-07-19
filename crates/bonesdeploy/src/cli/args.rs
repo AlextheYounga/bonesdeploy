@@ -29,6 +29,12 @@ pub enum Command {
         /// SSH port (default: 22)
         #[arg(long)]
         port: Option<String>,
+        /// Runtime template (laravel, django, next, nuxt, rails, sveltekit, vue, or none)
+        #[arg(long)]
+        template: Option<String>,
+        /// Runtime variable override, repeated (e.g. `--runtime-var php_version=8.5`)
+        #[arg(long = "runtime-var", value_name = "KEY=VALUE")]
+        runtime_vars: Vec<String>,
     },
     /// Run the full first-time deployment setup
     Setup {

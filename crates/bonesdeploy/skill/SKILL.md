@@ -14,7 +14,10 @@ any bonesdeploy project without reading a single line of YAML.
 
 ## The five moves
 
-1. `bonesdeploy init` — claim a project, point it at a fresh VPS.
+1. `bonesdeploy init` — claim a project, point it at a fresh VPS, pick a
+   runtime template. Non-interactive agents: pass `--template <name>` and
+   `--runtime-var key=value` (see `bonesdeploy skill doc templates` for
+   every template and every variable).
 2. `bonesdeploy setup --yes` — provision the server in one shot: bootstrap
    (users, bare repo, `bonesremote`), runtime (nginx, app service, AppArmor),
    `.bones/` sync, and `doctor`. One command. Don't split it unless something
@@ -86,6 +89,7 @@ values.
 ## Going deeper
 
 - `bonesdeploy skill doc commands` — every command, every flag, every exit.
+- `bonesdeploy skill doc templates` — every runtime template and its `--runtime-var` keys.
 - `bonesdeploy skill doc workflows` — the end-to-end flows, including git-triggered deploy.
 - `bonesdeploy skill doc methodology` — permission model, just-in-time mutations, identity classes.
 - `bonesdeploy skill list` — names of every embedded doc.

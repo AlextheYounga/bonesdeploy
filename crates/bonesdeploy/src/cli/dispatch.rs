@@ -7,7 +7,7 @@ use crate::commands::{
 };
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init { non_interactive, project_name, branch, remote, host, port } => {
+        Command::Init { non_interactive, project_name, branch, remote, host, port, template, runtime_vars } => {
             init::run(&init::Args {
                 non_interactive: *non_interactive,
                 project_name: project_name.clone(),
@@ -15,6 +15,8 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 remote: remote.clone(),
                 host: host.clone(),
                 port: port.clone(),
+                template: template.clone(),
+                runtime_vars: runtime_vars.clone(),
             })?;
             Ok(())
         }

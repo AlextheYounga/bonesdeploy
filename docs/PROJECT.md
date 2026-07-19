@@ -220,6 +220,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy remote setup` and `bonesdeploy remote runtime` before first deploy.
   - Saves config to `.bones/bones.toml`.
+  - Runtime template selection and per-template questions are sourced from `crates/bonesdeploy/src/runtimes/<fw>.rs` (typed Rust, embedded in the binary). `init` no longer calls `bonesinfra runtime questions` or prefetches `bonesinfra`.
+  - `--template <name>` selects a runtime template non-interactively. `--runtime-var <key=value>` (repeated) overrides template variables; answers are validated against the template's question schema before writing `bones.toml`.
 
 - **doctor**
   - This command checks all concerns in your local environment.

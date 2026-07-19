@@ -43,7 +43,7 @@ pub(super) fn materialize_fresh_bones(
     if let Some(template_name) = runtime.template {
         embedded::scaffold_runtime_deployment(&template_name, bones_dir)?;
         embedded::scaffold_runtime_secrets(&template_name, bones_dir)?;
-        runtimes::apply(&template_name, cfg, bones_dir)?;
+        runtimes::configure(&template_name, cfg, bones_dir)?;
         println!("Runtime template: {template_name}");
     } else {
         println!("Runtime template: custom");
