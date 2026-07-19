@@ -19,6 +19,36 @@ struct Kit;
 #[folder = "./runtimes/"]
 struct RuntimeAssets;
 
+#[derive(Embed)]
+#[folder = "./skill/"]
+struct SkillAssets;
+
+/// Skill doc names, sorted, excluding the orientation doc `SKILL`.
+pub fn skill_doc_names() -> Vec<String> {
+    SkillAssets::iter()
+        .map(|p| p.to_string())
+        .filter(|p| !p.starts_with("SKILL"))
+        .map(|p| p.trim_end_matches(".md").to_string())
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+/// Orientation doc printed by `bonesdeploy skill` (no subcommand).
+pub fn skill_orientation() -> Result<String> {
+    let asset =
+        SkillAssets::get("SKILL.md").ok_or_else(|| anyhow!("embedded skill orientation SKILL.md is missing"))?;
+    Ok(String::from_utf8(asset.data.to_vec())?)
+}
+
+/// Named skill doc printed by `bonesdeploy skill doc <name>`.
+pub fn skill_doc(name: &str) -> Result<String> {
+    let path = format!("{name}.md");
+    let asset =
+        SkillAssets::get(&path).ok_or_else(|| anyhow!("no skill doc named {name}. Run `bonesdeploy skill list`."))?;
+    Ok(String::from_utf8(asset.data.to_vec())?)
+}
+
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
         let Some(asset) = Kit::get(&file_path) else {
@@ -151,7 +181,9 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 mod tests {
     use anyhow::Result;
 
-    use super::{Kit, Runtime, RuntimeAssets, runtime_defaults, runtime_names};
+    use super::{
+        Kit, Runtime, RuntimeAssets, runtime_defaults, runtime_names, skill_doc, skill_doc_names, skill_orientation,
+    };
 
     #[test]
     fn next_runtime_includes_the_build_script() {
@@ -292,6 +324,31 @@ mod tests {
         let config: Runtime = serde_json::from_value(serde_json::Value::Object(answers))?;
         assert_eq!(config.extra.get("static").map(ToString::to_string).as_deref(), Some("true"));
         assert!(toml::to_string(&config)?.contains("static = true"));
+        Ok(())
+    }
+
+    #[test]
+    fn skill_orientation_loads_and_names_the_five_moves() -> Result<()> {
+        let doc = skill_orientation()?;
+        assert!(doc.contains("# BonesDeploy: the skill"));
+        assert!(doc.contains("The five moves"), "orientation doc lost its five-moves anchor");
+        assert!(doc.contains("bonesdeploy skill next"), "orientation must point agents at `skill next`");
+        Ok(())
+    }
+
+    #[test]
+    fn skill_doc_names_cover_the_expected_topics() {
+        let names = skill_doc_names();
+        assert!(names.contains(&"commands".to_string()), "missing `commands` skill doc");
+        assert!(names.contains(&"workflows".to_string()), "missing `workflows` skill doc");
+        assert!(names.contains(&"methodology".to_string()), "missing `methodology` skill doc");
+        assert!(!names.contains(&"SKILL".to_string()), "SKILL.md must be excluded from `skill list`");
+    }
+
+    #[test]
+    fn skill_doc_lookup_round_trips_for_known_names() -> Result<()> {
+        let commands = skill_doc("commands")?;
+        assert!(commands.contains("# BonesDeploy commands"));
         Ok(())
     }
 }

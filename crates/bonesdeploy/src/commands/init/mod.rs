@@ -15,21 +15,23 @@ pub struct Args {
     pub remote: Option<String>,
     pub host: Option<String>,
     pub port: Option<String>,
+    pub template: Option<String>,
+    pub runtime_vars: Vec<String>,
 }
 
 use crate::config as bones_config;
-use crate::infra::bonesinfra;
 use crate::infra::git;
 use crate::ui::output;
 use shared::paths;
 
+#[derive(Debug)]
 pub(super) struct RuntimeSelection {
     template: Option<String>,
     config: serde_json::Map<String, serde_json::Value>,
 }
 
 pub fn run(args: &Args) -> Result<()> {
-    run_with_prefetch(args, bonesinfra::prefetch)
+    run_with_prefetch(args, || Ok(()))
 }
 
 pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<()>) -> Result<()> {
@@ -167,6 +169,8 @@ mod tests {
             remote: None,
             host: Some(String::from("deploy.example.com")),
             port: None,
+            template: None,
+            runtime_vars: Vec::new(),
         }
     }
 

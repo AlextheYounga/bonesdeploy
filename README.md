@@ -123,6 +123,15 @@ From your project repo:
 bonesdeploy init
 ```
 
+For CI or AI agents, pick a runtime template and pass variables non-interactively:
+
+```sh
+bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
+  --template laravel --runtime-var php_version=8.5 --runtime-var install_queue_worker=true
+```
+
+See `bonesdeploy skill doc templates` for every template and its variables.
+
 This creates:
 
 ```text
@@ -212,10 +221,19 @@ bonesdeploy doctor --local
 are expected next steps (such as the first Git push after setup), and red
 failures need attention. Pending first-push state exits successfully so setup
 can finish without looking broken. For agents and scripts, use the stable
-machine-readable guide:
+machine-readable next-step guide:
 
 ```sh
-bonesdeploy guide --format json
+bonesdeploy skill next --format json
+```
+
+Embedded documentation for AI agents lives under the `skill` command:
+
+```sh
+bonesdeploy skill                    # orientation doc
+bonesdeploy skill list               # names of every embedded doc
+bonesdeploy skill doc workflows      # end-to-end flows
+bonesdeploy skill doc methodology    # permission model and doctrine
 ```
 
 Sync `.bones/` changes to the server:

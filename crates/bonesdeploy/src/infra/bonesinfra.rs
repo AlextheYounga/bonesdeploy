@@ -4,16 +4,10 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
-use serde_json::Value;
 use shared::paths;
 
 const REPOSITORY_URL: &str = "https://github.com/AlextheYounga/bonesinfra.git";
 const CHECKOUT_DIR: &str = "bonesinfra";
-
-pub fn prefetch() -> Result<()> {
-    ensure_available()?;
-    Ok(())
-}
 
 pub fn run(args: &[&str]) -> Result<()> {
     let executable = ensure_available()?;
@@ -55,20 +49,6 @@ pub fn run_with_stdin(args: &[&str], stdin_json: &str) -> Result<()> {
     }
 
     Ok(())
-}
-
-pub fn runtime_questions(runtime: &str) -> Result<Value> {
-    let executable = ensure_available()?;
-    let output = base_command(&executable, &["runtime", "questions", runtime]).output().with_context(|| {
-        format!("Failed to run bonesinfra runtime questions {runtime} from {}", executable.display())
-    })?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("bonesinfra failed:\n{}", stderr.trim());
-    }
-
-    serde_json::from_slice(&output.stdout).context("Failed to parse JSON output from bonesinfra")
 }
 
 fn base_command(executable: &Path, args: &[&str]) -> Command {

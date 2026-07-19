@@ -220,6 +220,8 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy remote setup` and `bonesdeploy remote runtime` before first deploy.
   - Saves config to `.bones/bones.toml`.
+  - Runtime template selection and per-template questions are sourced from `crates/bonesdeploy/src/runtimes/<fw>.rs` (typed Rust, embedded in the binary). `init` no longer calls `bonesinfra runtime questions` or prefetches `bonesinfra`.
+  - `--template <name>` selects a runtime template non-interactively. `--runtime-var <key=value>` (repeated) overrides template variables; answers are validated against the template's question schema before writing `bones.toml`.
 
 - **doctor**
   - This command checks all concerns in your local environment.
@@ -285,6 +287,14 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - `--file <path>` overrides the config file location (defaults to `.bones/bones.toml`).
   - `<key>` prints a single value when supplied; when omitted, dumps the whole file.
 
+- **skill**
+  - Embedded documentation for AI agents, plus the state-aware next-step compass.
+  - `bonesdeploy skill` prints the orientation doc (`SKILL.md`) baked into the binary.
+  - `bonesdeploy skill list` prints the names of every embedded topic doc.
+  - `bonesdeploy skill doc <name>` prints a specific topic doc (`commands`, `workflows`, `methodology`).
+  - `bonesdeploy skill next [--format text|json]` (the former `guide` command) inspects `.bones/bones.toml` and the remote host, then suggests the next prompt-free command. `--format json` returns the same `Report` struct `status` consumes.
+  - Topic docs are markdown files under `crates/bonesdeploy/skill/` and are embedded with `rust-embed` alongside `kit/` and `runtimes/`.
+  - Replaces the older `guide` command.
 - **version**:
   - Echoes the installed `bonesdeploy` version.
 
