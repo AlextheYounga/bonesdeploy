@@ -5,16 +5,20 @@
 ```
 bonesdeploy init
 bonesdeploy setup --yes
-bonesdeploy remote ssl --yes --domain app.example.com --email ops@example.com
 git push production master
+bonesdeploy remote ssl --yes --domain app.example.com --email ops@example.com
 bonesdeploy deploy
 ```
 
-`setup --yes` does bootstrap + runtime + initial push. After that, you push
-your source to the bare repo once (so `bonesremote` has something to build),
-then `deploy`. That's the whole dance.
+`setup --yes` does bootstrap + runtime + push + doctor in one shot. You do
+not need `remote runtime` separately — it's already inside `setup`. After
+setup, push your source to the bare repo once (so `bonesremote` has
+something to build), then `deploy`. That's the whole dance.
 
 ## First-time setup, the explicit path
+
+Use this only when you want each step to fail independently — the first
+time, you probably do, because you'll want to see where it breaks.
 
 ```
 bonesdeploy init
@@ -26,9 +30,8 @@ bonesdeploy remote ssl --yes --domain app.example.com --email ops@example.com
 bonesdeploy deploy
 ```
 
-Use this when you want to see each step fail independently. You will, the
-first time. There's no shame in being explicit while you're learning the
-shape of the thing.
+`setup --yes` is just these first four steps in sequence. There's no shame in
+being explicit while you're learning the shape of the thing.
 
 ## The daily deploy
 

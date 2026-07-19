@@ -15,13 +15,23 @@ any bonesdeploy project without reading a single line of YAML.
 ## The five moves
 
 1. `bonesdeploy init` — claim a project, point it at a fresh VPS.
-2. `bonesdeploy setup --yes` — provision the server: users, bare repo, `bonesremote`.
-3. `bonesdeploy remote runtime --yes` — install the framework runtime (nginx, app service, AppArmor).
-4. `bonesdeploy remote ssl --yes --domain app.example.com --email ops@example.com` — TLS.
+2. `bonesdeploy setup --yes` — provision the server in one shot: bootstrap
+   (users, bare repo, `bonesremote`), runtime (nginx, app service, AppArmor),
+   `.bones/` sync, and `doctor`. One command. Don't split it unless something
+   fails. If it does, re-run `setup` after you fix the cause — it's idempotent.
+3. `git push <remote> <branch>` — publish the source so `bonesremote` has
+   something to build. Required once, before the first deploy.
+4. `bonesdeploy remote ssl --yes --domain app.example.com --email ops@example.com`
+   — TLS. Separate from `setup` because certificate concerns and runtime
+   concerns are different concerns.
 5. `bonesdeploy deploy` — ship the release.
 
 That's a deployment. In between, you repeat move five. Nothing else matters
 until move five works.
+
+Note: `bonesdeploy setup` already runs `remote runtime` for you. You only run
+`bonesdeploy remote runtime --yes` on its own when you're changing the
+framework template on an already-provisioned box.
 
 ## What you actually own
 

@@ -16,10 +16,12 @@ deployment remote. Prints next steps. Does not provision anything.
 
 `bonesdeploy setup [--yes]`
 
-Runs the full first-time remote provisioning: `remote bootstrap`, `remote
-runtime`, and the initial `push`. This is the one-shot path. `--yes` skips the
+The full first-time remote provisioning, in order: `remote bootstrap` →
+`remote runtime` → `push` → `doctor`. One command. `--yes` skips the
 runtime confirmation. Use `remote bootstrap` + `remote runtime` separately
-when you want to control the steps.
+only when you want to control the steps or when you're changing the
+framework template on an already-provisioned box. Idempotent — re-run it
+after fixing whatever made it fail.
 
 ## doctor
 
@@ -115,7 +117,8 @@ the hidden `bonesinfra` checkout. Runs as root (or
 Installs the framework runtime: AppArmor profile, nginx router + per-site
 config, systemd service. Prompts for a template (laravel, django, next, nuxt,
 sveltekit, vue, rails) when not set. Writes the selection into `bones.toml`.
-Does not do TLS — that's `remote ssl`.
+Does not do TLS — that's `remote ssl`. Already included in `bonesdeploy
+setup`. Run it on its own only when changing templates on a provisioned box.
 
 ## remote ssl
 
