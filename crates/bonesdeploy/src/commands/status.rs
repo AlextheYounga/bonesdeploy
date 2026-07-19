@@ -1,9 +1,11 @@
 use anyhow::Result;
+use console::style;
 use serde::Deserialize;
 
 use crate::commands::guide;
 use crate::config;
 use crate::infra::ssh;
+use crate::ui::output;
 
 #[derive(Debug, Deserialize)]
 struct RemoteReport {
@@ -29,37 +31,42 @@ pub async fn run() -> Result<()> {
     let report = guide::build_report().await?;
     let cfg = report.cfg.as_ref();
 
-    println!("Project: {}", report.project);
+    println!("{} {}", style("Project").dim(), style(&report.project).bold());
 
     if let Some(cfg) = cfg {
-        println!("Host: {}", cfg.host);
-        println!("Branch: {}", cfg.branch);
+        println!("{} {}", style("Host").dim(), cfg.host);
+        println!("{} {}", style("Branch").dim(), cfg.branch);
     }
 
-    println!("State: {}", report.state_label);
+    println!("{} {}", style("State").dim(), report.state_label);
 
-    let remote = match cfg {
-        Some(cfg) => match remote_status(cfg).await {
-            Ok(remote) => Some(remote),
-            Err(error) => {
-                println!("Remote: unavailable ({error:#})");
-                None
+    if let Some(cfg) = cfg {
+        match remote_status(cfg).await {
+            Ok(remote) => {
+                println!("{} {}", style("Release").dim(), style(&remote.current_release).bold());
+                println!("{} {}", style("SSL").dim(), ssl_state(&remote.ssl));
+                if !remote.services.is_empty() {
+                    println!();
+                    println!("{}", style("Services").dim());
+                    for service in &remote.services {
+                        println!(
+                            "  {} {}  {}/{}",
+                            service_marker(&service.state),
+                            service.name,
+                            style(&service.state).dim(),
+                            style(&service.enabled).dim(),
+                        );
+                    }
+                }
             }
-        },
-        None => Some(empty_remote_status()),
-    };
-
-    if let Some(remote) = remote {
-        println!("Current release: {}", remote.current_release);
-        println!("SSL: {}", ssl_state(&remote.ssl));
-        println!();
-        println!("Services:");
-        for service in &remote.services {
-            println!("{} {} {}/{}", service_marker(&service.state), service.name, service.state, service.enabled);
+            Err(error) => {
+                println!("{} Remote unavailable: {error:#}", output::failure_marker());
+            }
         }
     }
+
     println!();
-    println!("Next: {}", report.next.command);
+    println!("{}", output::next_step(&report.next.command));
 
     Ok(())
 }
@@ -73,14 +80,6 @@ async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
     Ok(serde_json::from_str(&output?)?)
 }
 
-fn empty_remote_status() -> RemoteReport {
-    RemoteReport {
-        current_release: String::from("unknown"),
-        ssl: RemoteSslStatus { enabled: false, domain: String::new() },
-        services: Vec::new(),
-    }
-}
-
 fn ssl_state(ssl: &RemoteSslStatus) -> String {
     if ssl.enabled {
         if ssl.domain.is_empty() { String::from("enabled") } else { format!("enabled ({})", ssl.domain) }
@@ -89,10 +88,10 @@ fn ssl_state(ssl: &RemoteSslStatus) -> String {
     }
 }
 
-fn service_marker(state: &str) -> &'static str {
+fn service_marker(state: &str) -> String {
     match state {
-        "active" => "✓",
-        "unknown" => "?",
-        _ => "✗",
+        "active" => output::success_marker(),
+        "unknown" => output::pending_marker(),
+        _ => output::failure_marker(),
     }
 }
