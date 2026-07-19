@@ -35,7 +35,9 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     run_staged_deployment(site, &target_revision)
 }
 
+#[expect(clippy::too_many_lines)]
 fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
+    stage("Staging release");
     if let Err(error) = lifecycle::stage::run(site) {
         return finish_abort(site, None, error);
     }
@@ -56,6 +58,7 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
         return finish_abort(site, None, error);
     }
 
+    stage("Exporting source");
     let context_dir = match lifecycle::checkout::ensure_build_context(site) {
         Ok(context) => context,
         Err(error) => return finish_abort(site, None, error),
@@ -65,14 +68,16 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
         return finish_abort(site, Some(&context_dir), error);
     }
 
-    if let Err(error) = lifecycle::checkout::run(site, &target_revision, &context_dir) {
+    if let Err(error) = lifecycle::checkout::run(site, target_revision, &context_dir) {
         return finish_abort(site, Some(&context_dir), error);
     }
 
+    stage("Building release");
     if let Err(error) = lifecycle::build::run(site, &context_dir) {
         return finish_abort(site, Some(&context_dir), error);
     }
 
+    stage("Preparing release");
     if let Err(error) = prepare_release(site, &context_dir, &mut deployment) {
         return finish_abort(site, Some(&context_dir), error);
     }
@@ -81,14 +86,17 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
         Ok(release) => release,
         Err(error) => return finish_abort(site, Some(&context_dir), error),
     };
+    stage("Activating release");
     if let Err(error) = lifecycle::activate::run(site) {
         return finish_abort(site, Some(&context_dir), error);
     }
 
+    stage("Restarting services");
     if let Err(error) = service::run(site) {
         return finish_failed_activation(site, &previous_release, Some(&context_dir), error);
     }
 
+    stage("Pruning old releases");
     if let Err(error) = release_state::clear_staged_release(site) {
         return finish_abort_without_release_drop(site, Some(&context_dir), error);
     }
@@ -97,11 +105,20 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
         return finish_abort_without_release_drop(site, Some(&context_dir), error);
     }
 
+    stage("Cleaning up");
     if let Err(error) = cleanup(site, Some(&context_dir)) {
         return finish_abort_without_release_drop(site, Some(&context_dir), error);
     }
     release_state::clear_active_deployment(site)?;
     Ok(())
+}
+
+fn stage(name: &str) {
+    println!("{} {}", ansi("1;36", "->"), ansi("2", &format!("{name}...")));
+}
+
+fn ansi(code: &str, value: &str) -> String {
+    format!("\x1b[{code}m{value}\x1b[0m")
 }
 
 fn current_release(site: &str) -> Result<PathBuf> {
