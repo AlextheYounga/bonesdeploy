@@ -288,6 +288,7 @@ mod tests {
             port: None,
             template: None,
             runtime_vars: Vec::new(),
+            dbs: Vec::new(),
         };
 
         let cfg = collect_non_interactive("workspace", Some(&existing), &args)?;
@@ -313,6 +314,7 @@ mod tests {
             port: None,
             template: None,
             runtime_vars: Vec::new(),
+            dbs: Vec::new(),
         };
 
         let result = collect_non_interactive("workspace", Some(&existing), &args);

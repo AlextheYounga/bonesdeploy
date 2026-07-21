@@ -17,6 +17,7 @@ pub struct Args {
     pub port: Option<String>,
     pub template: Option<String>,
     pub runtime_vars: Vec<String>,
+    pub dbs: Vec<String>,
 }
 
 use crate::config as bones_config;
@@ -52,6 +53,10 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
         if is_fresh { config::collect_fresh_config(args)? } else { config::load_or_collect_config(bones_toml, args)? };
     let runtime_selection =
         if is_fresh { Some(runtime::collect_runtime_config(args, &cfg.project_name)?) } else { None };
+
+    if is_fresh {
+        cfg.dbs.services = runtime::collect_database_services(args)?;
+    }
 
     if let Some(runtime) = runtime_selection {
         scaffold::materialize_fresh_bones(bones_dir, had_bones_entry, &mut cfg, runtime)?;
@@ -171,6 +176,7 @@ mod tests {
             port: None,
             template: None,
             runtime_vars: Vec::new(),
+            dbs: Vec::new(),
         }
     }
 

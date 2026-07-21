@@ -6,6 +6,7 @@ pub mod init;
 pub mod push_state;
 pub mod releases;
 pub mod remote_bootstrap;
+pub mod remote_dbs;
 pub mod remote_helpers;
 pub mod remote_runtime;
 pub mod remote_ssl;

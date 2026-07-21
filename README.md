@@ -127,7 +127,7 @@ For CI or AI agents, pick a runtime template and pass variables non-interactivel
 
 ```sh
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --runtime-var php_version=8.5
+  --template laravel --runtime-var php_version=8.5 --db postgres --db valkey
 ```
 
 See `bonesdeploy skill doc templates` for every template and its variables.
@@ -170,6 +170,14 @@ Provision the site runtime:
 ```sh
 bonesdeploy remote runtime
 ```
+
+Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
+
+```sh
+bonesdeploy remote dbs
+```
+
+Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; use an SSH tunnel for workstation access. Generated credentials live in the protected remote `shared/.env`, never in `.bones/`. MariaDB and MySQL are alternatives and cannot share one host.
 
 Add SSL after DNS points at the server:
 

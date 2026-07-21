@@ -33,6 +33,11 @@ runtime_user = ""
 runtime_group = ""
 release_group = ""
 
+# Select during `bonesdeploy init`, or set manually. Services are only reachable
+# on localhost; access them remotely with an SSH tunnel.
+[dbs]
+services = []
+
 # File permissions
 # Applied during `bonesremote release promote`.
 # mode is an octal permission mask (e.g. 750, 640, 770).

@@ -95,6 +95,8 @@ Everything else is defaulted or derived for Debian/Ubuntu-first usability:
 
 Users can override any default by editing `.bones/bones.toml` after init.
 
+`[dbs].services` is selected during init (or with repeated non-interactive `--db` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost, generates credentials on the host, and writes connection values only to the protected `shared/.env`. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
+
 Example `bones.toml`:
 ```toml
 [app]
@@ -265,6 +267,10 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Loads the template's `operations.py` at runtime to install framework-specific packages and services.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
   - Does not handle SSL; use `remote ssl` for TLS configuration.
+
+- **remote dbs**:
+  - Provisions the services selected in `[dbs]`; `bonesdeploy setup` runs this after bootstrap.
+  - Keeps all database listeners loopback-only and does not publish credentials into the remote control-plane dataset.
 
 - **remote ssl**
   - Delegates to the hidden `bonesinfra` checkout by running `python -m bonesinfra ssl apply --config <path>` against the configured host as root.

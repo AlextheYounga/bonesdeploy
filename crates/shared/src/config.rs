@@ -37,6 +37,7 @@ pub struct Bones {
     #[serde(rename = "build")]
     pub buildtime: Buildtime,
     pub runtime: Runtime,
+    pub dbs: Dbs,
 }
 
 impl Deref for Bones {
@@ -168,6 +169,34 @@ impl Default for Runtime {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
+pub struct Dbs {
+    pub services: Vec<String>,
+}
+
+pub const DATABASE_SERVICES: &[&str] = &["postgres", "mariadb", "mysql", "mongodb", "valkey", "redis"];
+
+/// # Errors
+/// Returns an error when a configured database service is unsupported.
+pub fn validate_database_services(services: &[String]) -> Result<()> {
+    for service in services {
+        if !DATABASE_SERVICES.contains(&service.as_str()) {
+            bail!("unsupported database service: {service}");
+        }
+    }
+    if services.iter().any(|service| service == "mariadb") && services.iter().any(|service| service == "mysql") {
+        bail!("mariadb and mysql cannot be provisioned together; select one server implementation");
+    }
+    let mut unique = services.to_vec();
+    unique.sort();
+    unique.dedup();
+    if unique.len() != services.len() {
+        bail!("database services must not contain duplicates");
+    }
+    Ok(())
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Shared {
     pub paths: Vec<SharedPath>,
 }
@@ -272,6 +301,7 @@ pub fn load(path: &Path) -> Result<Bones> {
     let mut config: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     apply_derived_defaults(&mut config);
     validate_host(&config.host)?;
+    validate_database_services(&config.dbs.services)?;
     Ok(config)
 }
 

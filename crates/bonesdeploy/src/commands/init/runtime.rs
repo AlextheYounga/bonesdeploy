@@ -1,6 +1,8 @@
 use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
-use shared::config::{bonesinfra_input, runtime_group_for, runtime_user_for};
+use shared::config::{
+    DATABASE_SERVICES, bonesinfra_input, runtime_group_for, runtime_user_for, validate_database_services,
+};
 
 use super::{Args, RuntimeSelection};
 use crate::infra::embedded;
@@ -26,6 +28,14 @@ pub(super) fn collect_runtime_config(args: &Args, project_name: &str) -> Result<
     let mut map = map;
     inject_runtime_identity(&mut map, project_name);
     Ok(RuntimeSelection { template: Some(template_name), config: map })
+}
+
+pub(super) fn collect_database_services(args: &Args) -> Result<Vec<String>> {
+    if args.non_interactive {
+        validate_database_services(&args.dbs)?;
+        return Ok(args.dbs.clone());
+    }
+    prompts::choose_database_services(DATABASE_SERVICES)
 }
 
 fn resolve_template(args: &Args) -> Result<Option<String>> {
@@ -108,6 +118,7 @@ mod tests {
             port: None,
             template: template.map(String::from),
             runtime_vars: runtime_vars.iter().map(|value| String::from(*value)).collect(),
+            dbs: Vec::new(),
         }
     }
 
@@ -190,6 +201,18 @@ mod tests {
         let args = args_non_interactive(None, &[]);
         let selection = collect_runtime_config(&args, "atlas")?;
         assert!(selection.template.is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn non_interactive_database_services_are_validated() -> Result<()> {
+        let mut args = args_non_interactive(None, &[]);
+        args.dbs = vec![String::from("postgres"), String::from("valkey")];
+        assert_eq!(collect_database_services(&args)?, args.dbs);
+        args.dbs = vec![String::from("unknown")];
+        assert!(collect_database_services(&args).is_err());
+        args.dbs = vec![String::from("postgres"), String::from("postgres")];
+        assert!(collect_database_services(&args).is_err());
         Ok(())
     }
 }
