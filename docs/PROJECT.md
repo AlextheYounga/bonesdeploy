@@ -73,7 +73,7 @@ BonesRemote holds one OS-backed deployment lock per site. Deploys, cancellations
 │       └── 01_prepare.sh
 ```
 
-Python infra scripts and templates are managed separately by the hidden `bonesinfra` checkout under `~/.config/bonesdeploy/_lib/bonesinfra`; see `crates/bonesdeploy/src/infra/bonesinfra.rs`.
+Python infra scripts and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`), are embedded into the `bonesdeploy` binary, and are materialized on demand into a venv under `~/.config/bonesdeploy/_lib/bonesinfra`; see `crates/bonesinfra/src/lib.rs`.
 
 ### Bones TOML
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
@@ -161,9 +161,10 @@ The optional git push transport uses two thin internal adapters (local `pre-push
 This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order inside bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; other files, including `README.md`, are ignored. Bonesremote prepares the image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. Before scripts run, Bonesremote streams the deployment bundle into the container's disposable filesystem at `/workspace/deployment`; it does not bind-mount the root-owned control-plane path. The build container receives the exported source tree and private persistent build cache at `/workspace/cache`; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or host bonesremote control-plane files. The cache is provisioned by BonesInfra at `/var/lib/bonesdeploy/users/<site>-build/cache` and is used only for tool and package downloads. Prepare scripts live in `.bones/deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to a runtime-owned candidate release, and are the right place for migrations, cache warmups, and other runtime-state work. For each prepare script, Bonesremote opens the root-owned shared `functions.sh` and script, then streams both as one stdin input to the runtime-user shell; the runtime user receives no filesystem access to the deployment bundle. Before prepare scripts run, `bonesremote` wires each `[runtime.shared].paths` entry into the candidate; after prepare succeeds, it seals the release before activation.
 
 ## Crate Structure
-This Cargo workspace has three crates under `crates/`:
+This Cargo workspace has four crates under `crates/`:
 - `bonesdeploy` for the local CLI binary
 - `bonesremote` for the server-side binary
+- `bonesinfra` for the embedded Python provisioning runtime (pyinfra operations, runtime templates) and the Rust wrapper that materializes and runs it
 - `shared` for code that must be common to both binaries
 
 ### Path Centralization
@@ -195,12 +196,15 @@ bonesdeploy/
 │   │       ├── release/
 │   │       ├── release_state.rs
 │   │       └── main.rs
+│   ├── bonesinfra/
+│   │   ├── python/             # Python package (pyinfra operations, runtimes, Jinja2 templates)
+│   │   └── src/                # embeds python/, materializes it, runs `python -m bonesinfra`
 │   └── shared/                 # config schema + central paths
 └── docs/
 ```
 
 ### Per-Framework Templates
-Runtime templates ship starter overlays that `bonesdeploy remote runtime` uses when scaffolding infrastructure for a matching framework. Each template lives in the `bonesinfra` repo (`https://github.com/AlextheYounga/bonesinfra.git`) — framework runtime assets (`operations.py`, Jinja2 templates) stay together:
+Runtime templates ship starter overlays that `bonesdeploy remote runtime` uses when scaffolding infrastructure for a matching framework. Each template lives in the embedded `bonesinfra` package (`crates/bonesinfra/python/src/bonesinfra/runtimes/`) — framework runtime assets and Jinja2 templates stay together:
 
 - `runtimes/laravel/`        → Laravel (PHP + PHP-FPM)
 - `runtimes/django/`         → Django (Python + Gunicorn)
@@ -210,7 +214,7 @@ Runtime templates ship starter overlays that `bonesdeploy remote runtime` uses w
 - `runtimes/vue/`           → Vue (Node)
 - `runtimes/rails/`         → Rails (Ruby)
 
-Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the `bonesinfra` repo.
+Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the `bonesinfra` crate.
 
 ### BonesDeploy CLI Commands
 - **init**:
@@ -250,7 +254,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Omits the `--revision` flag, so `bonesremote deploy` uses the configured branch from `bones.toml`.
 
 - ****remote setup****
-  - Delegates to the hidden `bonesinfra` checkout by running `python -m bonesinfra setup apply --config <path>` against the configured host as root (or `BONES_BOOTSTRAP_SSH_USER`).
+  - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra setup apply --config <path>` against the configured host as root (or `BONES_BOOTSTRAP_SSH_USER`).
   - Passes `bones.toml` deployment values plus computed paths and variables as JSON on stdin.
   - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
@@ -261,13 +265,13 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **remote runtime**:
   - Prompts for a framework template, refreshes `.bones/runtime/`, and writes the selected settings into `.bones/bones.toml`.
   - Reapplies template-specific defaults into `.bones/bones.toml` only when they still match generic or previous-template values.
-  - After a `y/N` confirmation, delegates to the hidden `bonesinfra` checkout by running `python -m bonesinfra runtime apply --config <path> --runtime-config <path>` against the configured host as the configured `ssh_user`.
+  - After a `y/N` confirmation, delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra runtime apply --config <path> --runtime-config <path>` against the configured host as the configured `ssh_user`.
   - Loads the template's `operations.py` at runtime to install framework-specific packages and services.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
   - Does not handle SSL; use `remote ssl` for TLS configuration.
 
 - **remote ssl**
-  - Delegates to the hidden `bonesinfra` checkout by running `python -m bonesinfra ssl apply --config <path>` against the configured host as root.
+  - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra ssl apply --config <path>` against the configured host as root.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
   - Separate from `remote runtime` to keep certificate management decoupled from app runtime concerns.

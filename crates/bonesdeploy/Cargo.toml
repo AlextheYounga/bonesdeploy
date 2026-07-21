@@ -17,6 +17,7 @@ toml_edit = "0.22"
 tempfile = "3.27"
 tokio = { version = "1.52.3", features = ["rt", "rt-multi-thread", "macros"] }
 shared = { path = "../shared" }
+bonesinfra = { path = "../bonesinfra" }
 
 [lints.clippy]
 # broad groups (lower priority so individual lint overrides take effect)

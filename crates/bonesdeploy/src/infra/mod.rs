@@ -1,4 +1,4 @@
-pub mod bonesinfra;
+pub use bonesinfra;
 pub mod bootstrap_ssh;
 pub mod embedded;
 pub mod git;
