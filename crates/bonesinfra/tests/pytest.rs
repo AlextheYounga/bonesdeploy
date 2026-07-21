@@ -7,9 +7,8 @@
 use std::env;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 
 use anyhow::{Context, Result, bail};
 
@@ -26,48 +25,24 @@ fn python_test_suite_passes() -> Result<()> {
     let venv = venv_dir();
     ensure_venv(&python_dir, &venv)?;
 
-    let mut pytest = Command::new(venv.join("bin/python"));
-    pytest.current_dir(&python_dir).args(["-m", "pytest", "--color=yes"]);
-    let output = run(pytest, "pytest suite for bonesinfra/python")?;
-    report_summary(&output);
-    Ok(())
-}
+    let status = Command::new(venv.join("bin/python"))
+        .current_dir(&python_dir)
+        .args(["-m", "pytest"])
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .context("Failed to start pytest")?;
 
-/// Writes pytest's final summary line ("N passed in Xs") straight to the stderr
-/// file descriptor: libtest only captures Rust's print macros, so this stays
-/// visible on success while the full report is reserved for failures.
-fn report_summary(output: &Output) {
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let Some(summary) = stdout.lines().rev().find(|line| !line.trim().is_empty()) else {
-        return;
-    };
-    let summary = strip_ansi(summary);
-    let _ = writeln!(io::stderr(), "bonesinfra pytest: {}", summary.trim_matches(['=', ' ']));
-}
-
-fn strip_ansi(line: &str) -> String {
-    let mut plain = String::with_capacity(line.len());
-    let mut chars = line.chars();
-    while let Some(c) = chars.next() {
-        if c == '\u{1b}' {
-            for follower in chars.by_ref() {
-                if follower.is_ascii_alphabetic() {
-                    break;
-                }
-            }
-        } else {
-            plain.push(c);
-        }
+    if !status.success() {
+        bail!("pytest suite failed");
     }
-    plain
+    Ok(())
 }
 
 /// Venv location under the cargo target directory, so `cargo clean` resets it.
 fn venv_dir() -> PathBuf {
-    let target = env::var_os("CARGO_TARGET_DIR").map_or_else(
-        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target"),
-        PathBuf::from,
-    );
+    let target = env::var_os("CARGO_TARGET_DIR")
+        .map_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target"), PathBuf::from);
     target.join("bonesinfra-pytest-venv")
 }
 
@@ -79,8 +54,7 @@ fn ensure_venv(python_dir: &Path, venv: &Path) -> Result<()> {
     }
 
     if venv.exists() {
-        fs::remove_dir_all(venv)
-            .with_context(|| format!("Failed to reset the pytest venv at {}", venv.display()))?;
+        fs::remove_dir_all(venv).with_context(|| format!("Failed to reset the pytest venv at {}", venv.display()))?;
     }
 
     let mut create = Command::new("python3");
