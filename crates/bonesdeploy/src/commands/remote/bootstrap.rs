@@ -6,11 +6,10 @@ use serde_json::Value;
 use shared::config as shared_config;
 use shared::paths;
 
+use super::data;
 use crate::config;
 use crate::ui::output;
 use crate::ui::prompts;
-
-pub mod data;
 
 pub fn run(skip_confirm: bool, show_next: bool) -> Result<()> {
     if !skip_confirm && !prompts::confirm_remote_setup()? {

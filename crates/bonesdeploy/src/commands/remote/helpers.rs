@@ -7,7 +7,7 @@ use serde_json::Value;
 use shared::config as shared_config;
 use shared::paths;
 
-use super::remote_bootstrap::data;
+use super::data;
 use crate::config;
 use crate::ui::output;
 use crate::ui::prompts;

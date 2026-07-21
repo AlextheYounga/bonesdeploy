@@ -2,8 +2,8 @@ use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, ReleasesCommand, RemoteCommand, SecretsCommand};
 use crate::commands::{
-    config, deploy_project, doctor, init, push_state, releases, remote_bootstrap, remote_helpers, remote_runtime,
-    remote_ssl, rollback, secrets, setup, skill, status, update, version,
+    config, deploy_project, doctor, init, push_state, releases, remote, rollback, secrets, setup, skill, status,
+    update, version,
 };
 // ponytail: direct command dispatch keeps CLI routing visible; split only if commands need shared dispatch state.
 #[expect(clippy::cognitive_complexity)]
@@ -42,10 +42,10 @@ pub async fn run(cli: &Cli) -> Result<()> {
             update::run(update::Options { skip_local: *skip_local, skip_remote: *skip_remote }).await
         }
         Command::Remote { command } => match command {
-            RemoteCommand::Bootstrap => remote_bootstrap::run(false, true),
-            RemoteCommand::Runtime { yes } => remote_runtime::run(*yes, true),
-            RemoteCommand::Ssl { yes, domain, email } => remote_ssl::run(*yes, domain.clone(), email.clone()),
-            RemoteCommand::Helpers { yes } => remote_helpers::run(*yes),
+            RemoteCommand::Bootstrap => remote::bootstrap::run(false, true),
+            RemoteCommand::Runtime { yes } => remote::runtime::run(*yes, true),
+            RemoteCommand::Ssl { yes, domain, email } => remote::ssl::run(*yes, domain.clone(), email.clone()),
+            RemoteCommand::Helpers { yes } => remote::helpers::run(*yes),
         },
         Command::Rollback => rollback::run().await,
         Command::Config { file, key } => config::run(file.as_deref(), key.as_deref()),
