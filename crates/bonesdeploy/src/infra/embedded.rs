@@ -51,6 +51,9 @@ pub fn skill_doc(name: &str) -> Result<String> {
 
 pub fn scaffold(bones_dir: &Path) -> Result<()> {
     for file_path in Kit::iter() {
+        if file_path == "custom.py" && bones_dir.join(file_path.as_ref()).exists() {
+            continue;
+        }
         let Some(asset) = Kit::get(&file_path) else {
             continue;
         };
@@ -179,15 +182,31 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
     use anyhow::Result;
+    use tempfile::TempDir;
 
     use super::{
-        Kit, Runtime, RuntimeAssets, runtime_defaults, runtime_names, skill_doc, skill_doc_names, skill_orientation,
+        Kit, Runtime, RuntimeAssets, runtime_defaults, runtime_names, scaffold, skill_doc, skill_doc_names,
+        skill_orientation,
     };
 
     #[test]
     fn next_runtime_includes_the_build_script() {
         assert!(RuntimeAssets::get("next/deployment/build/02_run_build.sh").is_some());
+    }
+
+    #[test]
+    fn scaffold_preserves_existing_custom_py() -> Result<()> {
+        let temp = TempDir::new()?;
+        let custom = temp.path().join("custom.py");
+        fs::write(&custom, "# user hook\n")?;
+
+        scaffold(temp.path())?;
+
+        assert_eq!(fs::read_to_string(custom)?, "# user hook\n");
+        Ok(())
     }
 
     #[test]
