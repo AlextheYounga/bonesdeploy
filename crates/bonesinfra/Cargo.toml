@@ -8,6 +8,9 @@ anyhow = "1.0.103"
 rust-embed = { version = "8.11.0", features = ["include-exclude"] }
 shared = { path = "../shared" }
 
+[dev-dependencies]
+anyhow = "1.0.103"
+
 [lints.clippy]
 # broad groups (lower priority so individual lint overrides take effect)
 correctness = { level = "deny", priority = -1 }
