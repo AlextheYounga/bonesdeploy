@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/shared", "crates/bonesdeploy", "crates/bonesremote", "tests/cleancode", "crates/bonesinfra"]
+members = ["crates/shared", "crates/bonesdeploy", "crates/bonesremote", "tests/cleancode", "crates/bonesinfra", "e2e"]
 
 [workspace.lints.clippy]
 # broad groups (lower priority so individual lint overrides take effect)
