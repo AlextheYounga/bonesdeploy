@@ -2,7 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, build_group_for, build_user_for, extract_env_vars, load_buildtime, load_runtime};
+use shared::config::{
+    self, build_group_for, build_user_for, extract_env_vars, is_numbered_shell_script, load_buildtime, load_runtime,
+};
 use shared::paths;
 
 use super::ownership;
@@ -103,24 +105,12 @@ fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
     {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() && is_script(&path) {
+        if path.is_file() && path.file_name().and_then(|name| name.to_str()).is_some_and(is_numbered_shell_script) {
             scripts.push(path);
         }
     }
     scripts.sort();
     Ok(scripts)
-}
-
-fn is_script(path: &Path) -> bool {
-    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-        return false;
-    };
-    let bytes = name.as_bytes();
-    bytes.len() > 6
-        && bytes[0].is_ascii_digit()
-        && bytes[1].is_ascii_digit()
-        && bytes[2] == b'_'
-        && path.extension().is_some_and(|extension| extension == "sh")
 }
 
 #[cfg(test)]

@@ -5,6 +5,7 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
+use shared::config::is_numbered_shell_script;
 use shared::{config, paths};
 
 use crate::commands::ensure_site_idle;
@@ -12,8 +13,6 @@ use crate::privileges;
 use crate::release::state::DeploymentLock;
 
 const POST_RECEIVE_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/post-receive"));
-
-const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] = &[paths::BONES_TOML, paths::DEPLOYMENT_DIR];
 
 fn validate_site_name(site: &str) -> Result<()> {
     config::validate_project_name(site).map_err(|error| anyhow::anyhow!("Invalid site name: {error}"))
@@ -114,6 +113,7 @@ fn extract_stdin_archive(destination: &Path) -> Result<()> {
 fn validate_site_dataset(site: &str, root: &Path) -> Result<()> {
     validate_top_level_entries(root)?;
     reject_symlinks(root)?;
+    validate_deployment_entries(root)?;
 
     let bones_path = root.join(paths::BONES_TOML);
     if !bones_path.is_file() {
@@ -134,11 +134,47 @@ fn validate_top_level_entries(root: &Path) -> Result<()> {
         let name = entry.file_name();
         let Some(name) = name.to_str() else { bail!("Imported dataset contains a non-UTF-8 entry") };
 
-        if ALLOWED_TOP_LEVEL_ENTRIES.contains(&name) {
+        match name {
+            paths::BONES_TOML if entry.file_type()?.is_file() => {}
+            paths::DEPLOYMENT_DIR if entry.file_type()?.is_dir() => {}
+            _ => bail!("Imported dataset contains unsupported entry: {name}"),
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_deployment_entries(root: &Path) -> Result<()> {
+    let deployment = root.join(paths::DEPLOYMENT_DIR);
+    if !deployment.is_dir() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(&deployment).with_context(|| format!("Failed to read {}", deployment.display()))? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { bail!("Imported dataset contains a non-UTF-8 entry") };
+        match name {
+            paths::DEPLOYMENT_FUNCTIONS_FILE if entry.file_type()?.is_file() => {}
+            paths::DEPLOYMENT_BUILD_DIR | paths::DEPLOYMENT_PREPARE_DIR if entry.file_type()?.is_dir() => {
+                validate_numbered_scripts(&entry.path())?;
+            }
+            _ => bail!("Imported dataset contains unsupported deployment entry: {name}"),
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_numbered_scripts(directory: &Path) -> Result<()> {
+    for entry in fs::read_dir(directory).with_context(|| format!("Failed to read {}", directory.display()))? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { bail!("Imported dataset contains a non-UTF-8 entry") };
+        if entry.file_type()?.is_file() && is_numbered_shell_script(name) {
             continue;
         }
-
-        bail!("Imported dataset contains unsupported entry: {name}");
+        bail!("Imported dataset contains unsupported deployment script: {}", entry.path().display());
     }
 
     Ok(())
@@ -180,7 +216,7 @@ mod tests {
     use crate::commands::ensure_site_idle;
     use crate::release::state::{self as release_state, DeploymentLock};
 
-    use super::{validate_top_level_entries, write_post_receive_hook};
+    use super::{validate_deployment_entries, validate_top_level_entries, write_post_receive_hook};
     use shared::paths;
 
     #[test]
@@ -231,6 +267,39 @@ mod tests {
 
         let result = validate_top_level_entries(&root);
 
+        fs::remove_dir_all(&root)?;
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn validate_deployment_entries_allows_only_direct_numbered_shell_scripts() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-deployment-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(root.join("deployment/build"))?;
+        fs::create_dir_all(root.join("deployment/prepare"))?;
+        fs::write(root.join("deployment/functions.sh"), "#!/bin/bash\n")?;
+        fs::write(root.join("deployment/build/01_build.sh"), "#!/bin/bash\n")?;
+        fs::write(root.join("deployment/prepare/02_prepare.sh"), "#!/bin/bash\n")?;
+
+        let result = validate_deployment_entries(&root);
+        fs::remove_dir_all(&root)?;
+        assert!(result.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn validate_deployment_entries_rejects_nested_and_unlisted_files() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-deployment-reject-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(root.join("deployment/build/nested"))?;
+        fs::write(root.join("deployment/build/README.md"), "not a script\n")?;
+
+        let result = validate_deployment_entries(&root);
         fs::remove_dir_all(&root)?;
         assert!(result.is_err());
         Ok(())

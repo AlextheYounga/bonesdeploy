@@ -8,7 +8,7 @@ use toml::Table;
 use crate::config;
 use crate::infra::ssh;
 use crate::ui::output;
-use shared::paths;
+use shared::{config::is_numbered_shell_script, paths};
 
 pub async fn run(local_only: bool) -> Result<bool> {
     println!("{} Checking deployment...", console::style("bonesdeploy doctor").bold());
@@ -166,22 +166,13 @@ fn check_deployment_scripts() -> Option<String> {
             if path.extension().is_none_or(|extension| extension != "sh") {
                 continue;
             }
-            if !is_deployment_script(&name) {
+            if !is_numbered_shell_script(&name) {
                 return Some(format!("Deployment script must use the NN_name.sh convention: {subdir}/{name}"));
             }
         }
     }
 
     None
-}
-
-fn is_deployment_script(name: &str) -> bool {
-    let bytes = name.as_bytes();
-    bytes.len() > 6
-        && bytes[0].is_ascii_digit()
-        && bytes[1].is_ascii_digit()
-        && bytes[2] == b'_'
-        && Path::new(name).extension().is_some_and(|extension| extension == "sh")
 }
 
 fn check_local_branch(cfg: &config::Bones) -> Option<String> {
