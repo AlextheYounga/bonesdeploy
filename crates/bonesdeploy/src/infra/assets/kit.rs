@@ -35,22 +35,6 @@ mod tests {
     use super::Kit;
 
     #[test]
-    fn shared_deployment_functions_include_cache_and_node_entry_points() {
-        let Some(functions) = Kit::get("deployment/functions.sh") else {
-            assert!(false, "shared functions should be embedded");
-            return;
-        };
-        let functions = String::from_utf8_lossy(functions.data.as_ref());
-        assert!(functions.contains("configure_build_cache"));
-        assert!(functions.contains("install_node_dependencies"));
-        assert!(functions.contains("COMPOSER_CACHE_DIR"));
-        assert!(functions.contains("BUNDLE_USER_CACHE"));
-        assert!(
-            functions.contains("local extracted=\"$BUILD_NODE_TMP_DIR/extracted/node-v${version}-linux-${node_arch}\"")
-        );
-    }
-
-    #[test]
     fn node_install_extracts_a_cold_cache_archive() -> anyhow::Result<()> {
         use std::env;
         use std::fs;

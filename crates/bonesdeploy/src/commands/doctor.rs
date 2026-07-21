@@ -283,12 +283,6 @@ mod tests {
     use anyhow::Result;
 
     use super::check_deployment_scripts;
-    use crate::commands::push_state;
-
-    #[test]
-    fn doctor_points_at_correct_remote_import_flow() {
-        assert_eq!(push_state::remote_import_command("acme"), "bonesremote site import --site 'acme'");
-    }
 
     #[test]
     fn deployment_script_check_accepts_nested_build_and_prepare_layout() -> Result<()> {

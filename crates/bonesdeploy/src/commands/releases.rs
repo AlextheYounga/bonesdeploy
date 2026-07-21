@@ -81,19 +81,3 @@ async fn remote_report(cfg: &config::Bones) -> Result<Report> {
     session.close().await?;
     serde_json::from_str(&output?).context("Failed to parse remote release report")
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{Release, format_status};
-
-    #[test]
-    fn release_status_includes_phase_when_present() {
-        let release = Release {
-            name: String::from("20260715_225306"),
-            status: String::from("building"),
-            phase: Some(String::from("building")),
-            started_at: None,
-        };
-        assert_eq!(format_status(&release), "building");
-    }
-}

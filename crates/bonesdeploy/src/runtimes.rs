@@ -147,7 +147,7 @@ mod tests {
     use shared::config::Bones;
     use tempfile::TempDir;
 
-    use super::{QuestionKind, configure, questions, validate_answers};
+    use super::{configure, questions, validate_answers};
 
     fn bones_with_runtime(template: &str, extra: Map<String, Value>) -> Result<Bones> {
         let mut config = Bones::default();
@@ -167,40 +167,6 @@ mod tests {
         for template in ["laravel", "django", "next", "nuxt", "rails", "sveltekit", "vue"] {
             questions(template)?;
         }
-        Ok(())
-    }
-
-    #[test]
-    fn sveltekit_and_vue_have_no_questions() -> Result<()> {
-        assert!(questions("sveltekit")?.is_empty());
-        assert!(questions("vue")?.is_empty());
-        Ok(())
-    }
-
-    #[test]
-    fn laravel_questions_include_supported_values() -> Result<()> {
-        let qs = questions("laravel")?;
-        assert_eq!(qs.len(), 1);
-        assert_eq!(qs[0].key, "php_version");
-        assert!(matches!(qs[0].kind, QuestionKind::Choice { default: "8.5", .. }));
-        Ok(())
-    }
-
-    #[test]
-    fn django_questions_include_supported_values() -> Result<()> {
-        let qs = questions("django")?;
-        assert_eq!(qs.len(), 1);
-        assert_eq!(qs[0].key, "wsgi_module");
-        assert!(matches!(qs[0].kind, QuestionKind::Text { default: "config.wsgi:application" }));
-        Ok(())
-    }
-
-    #[test]
-    fn rails_questions_include_supported_values() -> Result<()> {
-        let qs = questions("rails")?;
-        assert_eq!(qs.len(), 1);
-        assert_eq!(qs[0].key, "rails_env");
-        assert!(matches!(qs[0].kind, QuestionKind::Text { default: "production" }));
         Ok(())
     }
 

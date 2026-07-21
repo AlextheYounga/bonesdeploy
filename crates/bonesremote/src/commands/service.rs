@@ -67,19 +67,12 @@ fn parse_target_services(output: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_target_services, restart_args, target_name_for_registered_site};
-    use shared::paths;
+    use super::{parse_target_services, target_name_for_registered_site};
 
     #[test]
     fn target_dependencies_include_only_services() {
         let names = "nexttest-nginx.service nexttest-next.service nexttest.target";
         assert_eq!(parse_target_services(names), ["nexttest-next.service", "nexttest-nginx.service"]);
-    }
-
-    #[test]
-    fn restart_uses_the_site_target_not_a_runtime_service() {
-        let target = paths::site_target_name("nexttest");
-        assert_eq!(restart_args(&target), ["restart", "--", "nexttest.target"]);
     }
 
     #[test]

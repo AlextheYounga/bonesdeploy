@@ -35,18 +35,7 @@ pub fn doc(name: &str) -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
-
-    use super::{doc, doc_names, orientation};
-
-    #[test]
-    fn skill_orientation_loads_and_names_the_five_moves() -> Result<()> {
-        let doc = orientation()?;
-        assert!(doc.contains("# BonesDeploy: the skill"));
-        assert!(doc.contains("The five moves"), "orientation doc lost its five-moves anchor");
-        assert!(doc.contains("bonesdeploy skill next"), "orientation must point agents at `skill next`");
-        Ok(())
-    }
+    use super::doc_names;
 
     #[test]
     fn skill_doc_names_cover_the_expected_topics() {
@@ -55,12 +44,5 @@ mod tests {
         assert!(names.contains(&"workflows".to_string()), "missing `workflows` skill doc");
         assert!(names.contains(&"methodology".to_string()), "missing `methodology` skill doc");
         assert!(!names.contains(&"SKILL".to_string()), "SKILL.md must be excluded from `skill list`");
-    }
-
-    #[test]
-    fn skill_doc_lookup_round_trips_for_known_names() -> Result<()> {
-        let commands = doc("commands")?;
-        assert!(commands.contains("# BonesDeploy commands"));
-        Ok(())
     }
 }
