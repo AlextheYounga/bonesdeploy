@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 
 use crate::config;
-use crate::infra::{bootstrap_ssh, ssh};
+use crate::infra::ssh;
 use crate::ui::output;
 use shared::config as shared_config;
 use shared::config::parse_port;
@@ -122,7 +122,7 @@ pub async fn push() -> Result<()> {
         runtime.runtime_group
     };
 
-    let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
+    let ssh_user = config::bootstrap_ssh_user(&cfg);
     let port = parse_port(&cfg.port)?;
     let session = ssh::connect_as(&ssh_user, &cfg.host, port).await?;
 

@@ -15,6 +15,20 @@ pub fn is_configured(config: &Bones) -> bool {
         && !config.repo_path.is_empty()
 }
 
+/// Resolves the SSH user for provisioning commands: `BONES_BOOTSTRAP_SSH_USER`
+/// overrides the configured `ssh_user`; blank values fall back to `root`.
+pub fn bootstrap_ssh_user(config: &Bones) -> String {
+    if let Ok(env_user) = env::var("BONES_BOOTSTRAP_SSH_USER") {
+        let trimmed = env_user.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    let trimmed = config.ssh_user.trim();
+    if trimmed.is_empty() { String::from("root") } else { trimmed.to_string() }
+}
+
 pub fn default_project_root_for(project_name: &str) -> String {
     paths::default_project_root_for(project_name)
 }
@@ -91,7 +105,7 @@ mod tests {
     use anyhow::Result;
     use shared::paths;
 
-    use super::{Bones, default_project_root_for, save};
+    use super::{Bones, bootstrap_ssh_user, default_project_root_for, save};
     use shared::config::load;
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -117,6 +131,30 @@ mod tests {
         config.branch = String::from("master");
         config.deploy_on_push = true;
         config
+    }
+
+    #[test]
+    fn bootstrap_ssh_user_defaults_to_root() {
+        let mut config = Bones::default();
+        config.ssh_user = String::new();
+        assert_eq!(bootstrap_ssh_user(&config), "root");
+    }
+
+    #[test]
+    fn bootstrap_ssh_user_uses_config_value() {
+        let mut config = Bones::default();
+        config.ssh_user = String::from("ubuntu");
+        assert_eq!(bootstrap_ssh_user(&config), "ubuntu");
+    }
+
+    #[test]
+    fn bootstrap_ssh_user_trims_and_rejects_blank_values() {
+        let mut config = Bones::default();
+        config.ssh_user = String::from("   ");
+        assert_eq!(bootstrap_ssh_user(&config), "root");
+
+        config.ssh_user = String::from("  ubuntu  ");
+        assert_eq!(bootstrap_ssh_user(&config), "ubuntu");
     }
 
     #[test]

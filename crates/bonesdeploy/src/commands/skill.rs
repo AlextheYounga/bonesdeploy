@@ -7,7 +7,7 @@ use shared::paths::bonesremote_bones_toml_path;
 
 use crate::cli::args::{GuideFormat, SkillCommand};
 use crate::config;
-use crate::infra::embedded;
+use crate::infra::assets::skill;
 use crate::infra::ssh;
 
 #[derive(Clone, Debug, Serialize)]
@@ -43,18 +43,18 @@ pub async fn dispatch(command: Option<&SkillCommand>) -> Result<()> {
 }
 
 pub fn print_orientation() -> Result<()> {
-    print!("{}", embedded::skill_orientation()?);
+    print!("{}", skill::orientation()?);
     Ok(())
 }
 
 pub fn list_docs() {
-    for name in embedded::skill_doc_names() {
+    for name in skill::doc_names() {
         println!("{name}");
     }
 }
 
 pub fn print_doc(name: &str) -> Result<()> {
-    print!("{}", embedded::skill_doc(name)?);
+    print!("{}", skill::doc(name)?);
     Ok(())
 }
 

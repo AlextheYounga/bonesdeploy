@@ -3,7 +3,7 @@ use serde_json::Value;
 use shared::config::{bonesinfra_input, runtime_group_for, runtime_user_for};
 
 use super::{Args, RuntimeSelection};
-use crate::infra::embedded;
+use crate::infra::assets::runtimes as runtime_assets;
 use crate::runtimes;
 use crate::ui::prompts;
 
@@ -11,12 +11,12 @@ pub(super) fn collect_runtime_config(args: &Args, project_name: &str) -> Result<
     let template = resolve_template(args)?;
 
     let Some(template_name) = template else {
-        let mut vars = embedded::base_runtime_defaults()?;
+        let mut vars = runtime_assets::base_runtime_defaults()?;
         inject_runtime_identity(&mut vars, project_name);
         return Ok(RuntimeSelection { template: None, config: vars });
     };
 
-    let defaults = embedded::runtime_defaults(&template_name)
+    let defaults = runtime_assets::runtime_defaults(&template_name)
         .with_context(|| format!("Failed to load embedded defaults for template {template_name}"))?;
     let map = if args.non_interactive {
         collect_non_interactive_answers(&template_name, args, &defaults)?
@@ -36,7 +36,7 @@ fn resolve_template(args: &Args) -> Result<Option<String>> {
     if args.non_interactive {
         return Ok(None);
     }
-    let available = embedded::runtime_names();
+    let available = runtime_assets::runtime_names();
     prompts::choose_template(&available)
 }
 

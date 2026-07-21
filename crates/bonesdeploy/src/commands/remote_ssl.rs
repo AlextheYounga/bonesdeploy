@@ -10,8 +10,6 @@ use shared::paths;
 use super::push_state;
 use super::remote_bootstrap::data;
 use crate::config;
-use crate::infra::bonesinfra;
-use crate::infra::bootstrap_ssh;
 use crate::ui::output;
 use crate::ui::prompts;
 
@@ -51,7 +49,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
 
     println!("{} {}", style("Configuring HTTPS for").cyan().bold(), style(&cfg.domain).bold());
 
-    let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
+    let ssh_user = config::bootstrap_ssh_user(&cfg);
     let mut deploy_data = data::ssl(&cfg, &runtime.web_root, &cfg.domain, &cfg.email);
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from(shared_config::bonesinfra_input::SSH_USER), Value::String(ssh_user));

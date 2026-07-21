@@ -7,8 +7,6 @@ use shared::config as shared_config;
 use shared::paths;
 
 use crate::config;
-use crate::infra::bonesinfra;
-use crate::infra::bootstrap_ssh;
 use crate::ui::output;
 use crate::ui::prompts;
 
@@ -23,7 +21,7 @@ pub fn run(skip_confirm: bool, show_next: bool) -> Result<()> {
     let cfg = config::load(bones_toml)?;
     let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
 
-    let ssh_user = bootstrap_ssh::resolve(Some(&cfg.ssh_user));
+    let ssh_user = config::bootstrap_ssh_user(&cfg);
 
     println!("Bootstrapping remote server...");
 

@@ -2,7 +2,6 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 
-use crate::infra::bonesinfra;
 use crate::infra::git;
 use crate::ui::output;
 use crate::ui::prompts;

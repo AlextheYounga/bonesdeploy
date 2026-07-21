@@ -35,7 +35,7 @@ pub async fn connect_as(user: &str, host: &str, port: u16) -> Result<Session> {
 pub fn external_command(user: &str, host: &str, port: &str) -> Command {
     let mut command = Command::new("ssh");
     command
-        .args(["-p", port, "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null"])
+        .args(["-p", port, "-o", "StrictHostKeyChecking=accept-new"])
         .arg(format!("{user}@{host}"));
     command
 }

@@ -8,7 +8,7 @@ use shared::paths;
 
 use super::RuntimeSelection;
 use crate::config;
-use crate::infra::embedded;
+use crate::infra::assets::{kit, runtimes as runtime_assets};
 use crate::infra::git;
 use crate::runtimes;
 
@@ -27,7 +27,7 @@ pub(super) fn materialize_fresh_bones(
             .with_context(|| format!("Stale file at {}, cannot create directory", config_dir.display()))?;
     }
     fs::create_dir_all(&config_dir)?;
-    embedded::scaffold(&config_dir)?;
+    kit::scaffold(&config_dir)?;
 
     if had_bones_entry {
         fs::remove_file(bones_dir)
@@ -37,12 +37,12 @@ pub(super) fn materialize_fresh_bones(
 
     cfg.runtime = serde_json::from_value(serde_json::Value::Object(runtime.config.clone()))?;
     if let Some(template_name) = &runtime.template {
-        cfg.buildtime = embedded::runtime_buildtime_defaults(template_name)?;
+        cfg.buildtime = runtime_assets::runtime_buildtime_defaults(template_name)?;
     }
 
     if let Some(template_name) = runtime.template {
-        embedded::scaffold_runtime_deployment(&template_name, bones_dir)?;
-        embedded::scaffold_runtime_secrets(&template_name, bones_dir)?;
+        runtime_assets::scaffold_runtime_deployment(&template_name, bones_dir)?;
+        runtime_assets::scaffold_runtime_secrets(&template_name, bones_dir)?;
         runtimes::configure(&template_name, cfg, bones_dir)?;
         println!("Runtime template: {template_name}");
     } else {

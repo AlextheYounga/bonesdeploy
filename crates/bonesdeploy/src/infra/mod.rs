@@ -1,5 +1,3 @@
-pub use bonesinfra;
-pub mod bootstrap_ssh;
-pub mod embedded;
+pub mod assets;
 pub mod git;
 pub mod ssh;

@@ -110,8 +110,7 @@ fn parse_ssh_style_url(url: &str) -> Option<RemoteConnectionDetails> {
     let authority = &rest[..slash_idx];
     let path = rest[slash_idx..].trim();
 
-    let (user, host_port) = authority.rsplit_once('@').unwrap_or(("", authority));
-    let _user = if user.is_empty() { "git" } else { user };
+    let (_, host_port) = authority.rsplit_once('@').unwrap_or(("", authority));
     let (host, port) = host_port.split_once(':').unwrap_or((host_port, "22"));
 
     if host.is_empty() || Path::new(path).extension().is_none_or(|ext| !ext.eq_ignore_ascii_case("git")) {
@@ -132,8 +131,7 @@ fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
         return None;
     }
 
-    let (user, host) = left.trim().rsplit_once('@').unwrap_or(("", left.trim()));
-    let _user = if user.is_empty() { "git" } else { user };
+    let (_, host) = left.trim().rsplit_once('@').unwrap_or(("", left.trim()));
 
     if host.is_empty() || Path::new(right).extension().is_none_or(|ext| !ext.eq_ignore_ascii_case("git")) {
         return None;
