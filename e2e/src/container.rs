@@ -19,7 +19,11 @@ impl Container {
     /// Launches a fresh container from `image` with a unique harness name.
     pub fn launch(image: &str) -> Result<Self> {
         let name = format!("{CONTAINER_PREFIX}-{}", unique_suffix());
-        incus(&["launch", image, &name])?;
+        incus(&[
+            "launch", image, &name,
+            "--config", "limits.memory=1GiB",
+            "--config", "limits.cpu=1",
+        ])?;
         Ok(Self { name, keep: keep_artifacts() })
     }
 

@@ -1,5 +1,7 @@
 """Security invariants in Jinja2 templates — negative assertions only."""
 
+import jinja2
+
 from . import helpers
 
 N = helpers.SRC_DIR / "bonesinfra"
@@ -7,6 +9,20 @@ N = helpers.SRC_DIR / "bonesinfra"
 
 def _read(name):
     return helpers.read(N / name)
+
+
+def test_every_template_parses_as_jinja():
+    """All .j2 assets must survive Jinja parsing. Catches Go-template syntax
+    (podman/docker --format '{{.Field}}') left unescaped inside Jinja templates,
+    which otherwise only explodes at provision time on a real server."""
+    env = jinja2.Environment()
+    templates = sorted(N.rglob("*.j2"))
+    assert templates, "no .j2 templates found — SRC_DIR layout changed?"
+    for path in templates:
+        try:
+            env.parse(helpers.read(path))
+        except jinja2.TemplateSyntaxError as err:
+            raise AssertionError(f"{path.relative_to(N)} L{err.lineno}: {err.message}") from err
 
 
 def test_default_deny_config_is_default_deny_only():

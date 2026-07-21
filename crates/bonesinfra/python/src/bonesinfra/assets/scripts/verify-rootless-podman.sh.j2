@@ -13,4 +13,5 @@ systemctl is-active --quiet "user@${USER_UID}.service" || { echo "ERROR: build u
 
 test -S "/run/user/${USER_UID}/bus" || { echo "ERROR: build user D-Bus socket is missing" >&2; exit 1; }
 
-HOME="$BUILD_HOME" XDG_RUNTIME_DIR="/run/user/${USER_UID}" podman info --format '{{.Host.Security.Rootless}}' | grep -qx true || { echo "ERROR: rootless Podman is unavailable" >&2; exit 1; }
+{# The podman --format argument is a Go template; raw-escape it from Jinja. #}
+HOME="$BUILD_HOME" XDG_RUNTIME_DIR="/run/user/${USER_UID}" podman info --format '{% raw %}{{.Host.Security.Rootless}}{% endraw %}' | grep -qx true || { echo "ERROR: rootless Podman is unavailable" >&2; exit 1; }
