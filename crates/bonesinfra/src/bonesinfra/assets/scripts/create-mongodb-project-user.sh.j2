@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ADMIN_FILE="{{ admin_file }}"
+ENV="{{ env }}"
+PROJECT="{{ project }}"
+USER="{{ user }}"
+
+install -d -m 0700 /root/.config/bonesinfra
+
+if [ -f "$ADMIN_FILE" ]; then
+  admin_password=$(sed -n 's/^MONGODB_ADMIN_PASSWORD=//p' "$ADMIN_FILE" | head -n1)
+else
+  admin_password=$(openssl rand -hex 24)
+  printf 'MONGODB_ADMIN_USER=bonesinfra_admin\nMONGODB_ADMIN_PASSWORD=%s\n' "$admin_password" > "$ADMIN_FILE"
+  chmod 0600 "$ADMIN_FILE"
+fi
+
+if ! mongosh --username bonesinfra_admin --password "$admin_password" --authenticationDatabase admin --quiet --eval "db.getSiblingDB('admin').getUser('bonesinfra_admin')" >/dev/null 2>&1; then
+  mongosh --quiet --eval "db.getSiblingDB('admin').createUser({user: 'bonesinfra_admin', pwd: '$admin_password', roles: [{role: 'root', db: 'admin'}]})"
+fi
+
+password=$(sed -n 's/^MONGODB_PASSWORD=//p' "$ENV" | head -n1)
+[ -n "$password" ] || password=$(openssl rand -hex 24)
+
+mongosh --username bonesinfra_admin --password "$admin_password" --authenticationDatabase admin --quiet --eval "const database = db.getSiblingDB('$PROJECT'); const existing = database.getUser('$USER'); if (existing) database.updateUser('$USER', {pwd: '$password', roles: [{role: 'readWrite', db: '$PROJECT'}]}); else database.createUser({user: '$USER', pwd: '$password', roles: [{role: 'readWrite', db: '$PROJECT'}]})"
+
+sed -i '/^MONGODB_USER=/d; /^MONGODB_URI=/d' "$ENV"
+printf 'MONGODB_PASSWORD=%s\nMONGODB_USER=%s\nMONGODB_URI=mongodb://%s:%s@127.0.0.1:27017/%s?authSource=%s\n' "$password" "$USER" "$USER" "$password" "$PROJECT" "$PROJECT" >> "$ENV"
