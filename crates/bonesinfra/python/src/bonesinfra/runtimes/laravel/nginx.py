@@ -1,7 +1,7 @@
-from pyinfra.operations import files, server
+from pyinfra.operations import files
 
 from bonesinfra.domain.context import template_data
-from bonesinfra.runtimes.common import php_fpm_pool
+from bonesinfra.runtimes.common import php_fpm_pool, validation
 
 
 def setup(here, ctx, paths, php_version):
@@ -20,8 +20,8 @@ def setup(here, ctx, paths, php_version):
         _sudo=True,
     )
 
-    server.shell(
-        name="Validate nginx configuration with Laravel config",
-        commands=[f"nginx -t -c {paths['site_nginx_config']}"],
-        _sudo=True,
+    validation.run_as_runtime_user(
+        ctx,
+        "Validate nginx configuration with Laravel config",
+        f"nginx -t -c {paths['site_nginx_config']}",
     )

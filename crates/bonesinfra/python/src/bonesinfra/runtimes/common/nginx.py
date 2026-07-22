@@ -1,8 +1,9 @@
 from pathlib import Path
 
-from pyinfra.operations import files, server
+from pyinfra.operations import files
 
 from bonesinfra.domain.context import template_data
+from bonesinfra.runtimes.common import validation
 
 
 def _ensure_runtime_socket_dir(ctx, paths):
@@ -40,10 +41,10 @@ def render_proxy(ctx, *, paths, socket_path=None, port=None):
         _sudo=True,
     )
     _ensure_runtime_socket_dir(ctx, paths)
-    server.shell(
-        name="Validate nginx configuration with app config",
-        commands=[f"nginx -t -c {paths['site_nginx_config']}"],
-        _sudo=True,
+    validation.run_as_runtime_user(
+        ctx,
+        "Validate nginx configuration with app config",
+        f"nginx -t -c {paths['site_nginx_config']}",
     )
 
 
@@ -61,8 +62,8 @@ def render_static(ctx, *, paths, root="dist"):
         _sudo=True,
     )
     _ensure_runtime_socket_dir(ctx, paths)
-    server.shell(
-        name="Validate nginx configuration with static config",
-        commands=[f"nginx -t -c {paths['site_nginx_config']}"],
-        _sudo=True,
+    validation.run_as_runtime_user(
+        ctx,
+        "Validate nginx configuration with static config",
+        f"nginx -t -c {paths['site_nginx_config']}",
     )

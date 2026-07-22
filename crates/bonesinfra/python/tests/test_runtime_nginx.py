@@ -2,6 +2,7 @@ import pytest
 
 from bonesinfra.deploys.runtime import nginx as runtime_nginx
 from bonesinfra.domain.context import DeployContext
+from bonesinfra.runtimes.common import nginx as common_nginx
 
 
 def _make_ctx(tmp_path, *, domain: str = "", preview_domain: str = "preview.example.com"):
@@ -83,3 +84,16 @@ def test_runtime_nginx_migrates_site_service_to_target(monkeypatch):
 
     assert shell_calls[0]["commands"] == ["rm -f -- /etc/systemd/system/multi-user.target.wants/shop-nginx.service"]
     assert {"service": "shop.target", "enabled": True, "running": True, "restarted": True}.items() <= calls[1].items()
+
+
+def test_static_nginx_validation_runs_as_runtime_user(tmp_path, monkeypatch):
+    ctx = _make_ctx(tmp_path)
+    calls = []
+
+    monkeypatch.setattr(common_nginx.files, "template", _noop)
+    monkeypatch.setattr(common_nginx.files, "directory", _noop)
+    monkeypatch.setattr(common_nginx.validation.server, "shell", lambda **kwargs: calls.append(kwargs))
+
+    common_nginx.render_static(ctx, paths=ctx.paths_dict)
+
+    assert calls[0]["_sudo_user"] == "lawsnipe"
