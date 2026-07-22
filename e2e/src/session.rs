@@ -2,9 +2,15 @@
 //! own SSH keypair, ssh config, known_hosts, and gitconfig. Nothing from the
 //! real user environment leaks in, and container host keys never pollute the
 //! real `~/.ssh/known_hosts`.
+//!
+//! An `ssh` shim is installed at `<home>/bin/ssh` and prepended to PATH.
+//! OpenSSH ignores `$HOME` for config discovery (it uses getpwuid), so the
+//! shim is the only reliable way to force `-F <session-config>` onto every
+//! bare `Command::new("ssh")` call in the process tree.
 
 use std::ffi::OsStr;
 use std::fs;
+use std::os::unix::fs::PermissionsExt as _;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -44,6 +50,14 @@ impl Session {
         let gitconfig = "[user]\n\tname = Bones E2E\n\temail = e2e@bonesdeploy.test\n[init]\n\tdefaultBranch = main\n";
         fs::write(home.join(".gitconfig"), gitconfig).context("Failed to write .gitconfig")?;
 
+        let bin_dir = home.join("bin");
+        fs::create_dir_all(&bin_dir).with_context(|| format!("Failed to create {}", bin_dir.display()))?;
+        let shim_path = bin_dir.join("ssh");
+        fs::write(&shim_path, "#!/bin/sh\nexec /usr/bin/ssh -F \"$HOME/.ssh/config\" \"$@\"\n")
+            .context("Failed to write ssh shim")?;
+        fs::set_permissions(&shim_path, fs::Permissions::from_mode(0o755))
+            .context("Failed to make ssh shim executable")?;
+
         Ok(Self { home, keep: keep_artifacts() })
     }
 
@@ -56,14 +70,25 @@ impl Session {
         fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))
     }
 
-    /// A command wired to this session: fake `HOME`, no ssh-agent, and a
+    /// A command wired to this session: fake `HOME`, no ssh-agent, a
     /// persistent `XDG_CONFIG_HOME` so the materialized bonesinfra venv is
-    /// cached across runs instead of rebuilt every time.
+    /// cached across runs, and `bin/` prepended to PATH so the session ssh
+    /// shim intercepts every bare `ssh` invocation in the process tree.
     pub fn command(&self, program: impl AsRef<OsStr>) -> Command {
+        let bin_dir = self.home.join("bin");
+        let path = match std::env::var_os("PATH") {
+            Some(p) => {
+                let mut dirs = std::env::split_paths(&p).collect::<Vec<_>>();
+                dirs.insert(0, bin_dir);
+                std::env::join_paths(dirs).unwrap_or(p)
+            }
+            None => bin_dir.into_os_string(),
+        };
         let mut command = Command::new(program);
         command
             .env("HOME", &self.home)
             .env("XDG_CONFIG_HOME", scratch_dir().join("xdg-config"))
+            .env("PATH", path)
             .env_remove("SSH_AUTH_SOCK");
         command
     }
