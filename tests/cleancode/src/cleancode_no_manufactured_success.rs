@@ -109,5 +109,5 @@ fn no_suspicious_fallback() {
 
     assert!(files_scanned > 0, "No parsable Rust files were found to check.");
 
-    assert!(all_violations.is_empty(), "Suspicious fallback(s) found:\n{}", all_violations.join("\n"),);
+    assert!(all_violations.is_empty(), "Suspicious fallback(s) found:\n{}", all_violations.join("\n"));
 }

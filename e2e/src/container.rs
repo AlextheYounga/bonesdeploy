@@ -25,11 +25,17 @@ impl Container {
         // by default. Requires the host to delegate a matching range to root
         // in /etc/subuid and /etc/subgid — see e2e/README.md.
         incus(&[
-            "launch", image, &name,
-            "--config", "limits.memory=1GiB",
-            "--config", "limits.cpu=1",
-            "--config", "security.nesting=true",
-            "--config", "security.idmap.size=10000000",
+            "launch",
+            image,
+            &name,
+            "--config",
+            "limits.memory=1GiB",
+            "--config",
+            "limits.cpu=1",
+            "--config",
+            "security.nesting=true",
+            "--config",
+            "security.idmap.size=10000000",
         ])?;
         Ok(Self { name, keep: keep_artifacts() })
     }
@@ -100,11 +106,8 @@ impl Container {
         let json = incus(&["list", &self.name, "--format", "json"])?;
         let instances: serde_json::Value = serde_json::from_str(&json).context("Failed to parse incus list output")?;
 
-        let networks = instances
-            .get(0)
-            .and_then(|i| i.get("state"))
-            .and_then(|s| s.get("network"))
-            .and_then(|n| n.as_object());
+        let networks =
+            instances.get(0).and_then(|i| i.get("state")).and_then(|s| s.get("network")).and_then(|n| n.as_object());
         let Some(networks) = networks else { return Ok(None) };
 
         for (interface, details) in networks {

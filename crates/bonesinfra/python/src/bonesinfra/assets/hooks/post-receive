@@ -7,8 +7,8 @@ SITE=$(basename "$GIT_DIR")
 SITE=${SITE%.git}
 
 if [ -z "$SITE" ] || [ "$SITE" = "." ] || [ "$SITE" = "/" ]; then
-    echo "[bonesdeploy] Could not derive site name from GIT_DIR=$GIT_DIR"
-    exit 1
+	echo "[bonesdeploy] Could not derive site name from GIT_DIR=$GIT_DIR"
+	exit 1
 fi
 
 exec sudo bonesremote hook post-receive --site "$SITE"

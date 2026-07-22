@@ -10,4 +10,4 @@ rm /tmp/mongodb-server-8.0.asc
 . /etc/os-release
 component=main
 [ "$ID" = ubuntu ] && component=multiverse
-echo "deb [signed-by=/etc/apt/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/$ID $VERSION_CODENAME/mongodb-org/8.0 $component" > /etc/apt/sources.list.d/mongodb-org-8.0.list
+echo "deb [signed-by=/etc/apt/keyrings/mongodb-server-8.0.gpg] https://repo.mongodb.org/apt/$ID $VERSION_CODENAME/mongodb-org/8.0 $component" >/etc/apt/sources.list.d/mongodb-org-8.0.list

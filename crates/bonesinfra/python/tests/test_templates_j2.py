@@ -15,7 +15,7 @@ def test_every_template_parses_as_jinja():
     """All .j2 assets must survive Jinja parsing. Catches Go-template syntax
     (podman/docker --format '{{.Field}}') left unescaped inside Jinja templates,
     which otherwise only explodes at provision time on a real server."""
-    env = jinja2.Environment()
+    env = jinja2.Environment(autoescape=True)
     templates = sorted(N.rglob("*.j2"))
     assert templates, "no .j2 templates found — SRC_DIR layout changed?"
     for path in templates:

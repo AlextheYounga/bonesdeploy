@@ -6,10 +6,7 @@ use anyhow::{Context, Result, bail};
 
 /// Runs `incus <args>` and returns stdout, failing loudly with stderr attached.
 pub fn incus(args: &[&str]) -> Result<String> {
-    let output = Command::new("incus")
-        .args(args)
-        .output()
-        .context("Failed to run `incus` — is Incus installed?")?;
+    let output = Command::new("incus").args(args).output().context("Failed to run `incus` — is Incus installed?")?;
 
     if !output.status.success() {
         bail!(

@@ -55,10 +55,7 @@ fn no_duplicated_state_literals() {
 }
 
 fn workspace_root() -> &'static Path {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("tests/cleancode should live under the workspace root")
+    Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
 }
 
 fn collect_state_literals(project_root: &Path) -> Vec<StateLiteral> {

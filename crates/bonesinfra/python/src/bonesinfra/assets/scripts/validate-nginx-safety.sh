@@ -7,5 +7,5 @@ printf '%s\n' "$output"
 [ "$status" -eq 0 ] || exit "$status"
 
 case "$output" in
-  *"conflicting server name"*) exit 1 ;;
+*"conflicting server name"*) exit 1 ;;
 esac

@@ -52,10 +52,7 @@ fn terms_in_line(line: &str) -> Vec<&'static str> {
 /// Detects legacy-language smell terms like legacy, hack, or workaround in source code.
 #[test]
 fn no_legacy_terms() {
-    let project_root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(|p| p.parent())
-        .expect("cleancode crate should be two levels deep under workspace root");
+    let project_root = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."));
     let files = collect_source_files(project_root);
 
     assert!(!files.is_empty(), "No source files found in crates/.");

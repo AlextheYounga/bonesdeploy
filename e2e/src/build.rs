@@ -45,10 +45,8 @@ pub fn artifacts() -> Result<Artifacts> {
 }
 
 fn ensure_musl_target() -> Result<()> {
-    let installed = Command::new("rustup")
-        .args(["target", "list", "--installed"])
-        .output()
-        .context("Failed to run rustup")?;
+    let installed =
+        Command::new("rustup").args(["target", "list", "--installed"]).output().context("Failed to run rustup")?;
     if String::from_utf8_lossy(&installed.stdout).lines().any(|line| line.trim() == MUSL_TARGET) {
         return Ok(());
     }
