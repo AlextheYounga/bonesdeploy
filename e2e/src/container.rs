@@ -138,6 +138,17 @@ impl Container {
         Ok(())
     }
 
+    /// Debian's rootless Podman defaults to pasta, which crashes inside our
+    /// nested Incus test containers. This affects only disposable e2e guests.
+    pub fn use_slirp4netns(&self) -> Result<()> {
+        self.exec(
+            "install -d -m 0755 /etc/containers/containers.conf.d \
+             && printf '%s\\n' '[network]' 'default_rootless_network_cmd = \"slirp4netns\"' \
+                > /etc/containers/containers.conf.d/99-bonesdeploy-e2e.conf",
+        )?;
+        Ok(())
+    }
+
     /// Stops the container (required before `incus publish`).
     pub fn stop(&self) -> Result<()> {
         incus(&["stop", &self.name])?;

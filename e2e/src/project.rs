@@ -14,21 +14,31 @@ pub struct SampleProject {
 }
 
 impl SampleProject {
-    /// Creates a git repository with one commit on `main`.
-    pub fn create(session: &Session) -> Result<Self> {
+    /// Expands a fixture archive into a git repository with one commit on `main`.
+    pub fn from_fixture(session: &Session, fixture: &Path) -> Result<Self> {
         let dir = scratch_dir().join(format!("project-{}", unique_suffix()));
         fs::create_dir_all(&dir).with_context(|| format!("Failed to create {}", dir.display()))?;
-        fs::write(dir.join("index.html"), "<h1>bones e2e</h1>\n").context("Failed to write sample file")?;
+        mdpack::unpack_from_path(fixture, Some(&dir), mdpack::UnpackOptions::default())
+            .map_err(|error| anyhow::anyhow!("Failed to expand fixture {}: {error}", fixture.display()))?;
 
         let project = Self { dir, keep: keep_artifacts() };
         project.git(session, &["init"])?;
         project.git(session, &["add", "-A"])?;
-        project.git(session, &["commit", "-m", "initial commit"])?;
+        project.git(session, &["commit", "-m", "fixture"])?;
         Ok(project)
     }
 
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+
+    pub fn push(&self, session: &Session, remote: &str, branch: &str) -> Result<()> {
+        self.git(session, &["push", remote, branch])
+    }
+
+    pub fn read_file(&self, path: &str) -> Result<String> {
+        let path = self.dir.join(path);
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))
     }
 
     /// Runs the given bonesdeploy binary in the project directory with output

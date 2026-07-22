@@ -58,6 +58,12 @@ subprocess output to the terminal.
   built as a static musl binary and pre-seeded into the container, so
   bootstrap's `command -v bonesremote` guard skips the
   cargo-install-from-GitHub path and the container runs your working tree.
+- **Rootless build networking** — each disposable guest selects Podman's
+  `slirp4netns` backend. Debian's default `pasta` backend crashes in nested
+  Incus containers; production provisioning is not changed.
+- **Framework fixtures** — `fixtures/*.md` are mdpack archives of real
+  framework projects. Each scenario expands its archive into a disposable Git
+  repository, pushes `main`, and runs `bonesdeploy deploy`.
 - **Cleanup** — containers, session homes, and sample projects are dropped at
   the end of each test, pass or fail.
 

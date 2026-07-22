@@ -6,6 +6,7 @@ use e2e::session::Session;
 use e2e::{build, image, incus};
 
 use std::ops::Deref;
+use std::path::Path;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use dtor::dtor;
@@ -60,6 +61,7 @@ impl Harness {
 
         let container = Container::launch(&base)?;
         container.wait_ready()?;
+        container.use_slirp4netns()?;
         container.authorize_root_key(&session.public_key()?)?;
         container.wait_active("ssh")?;
         // Pre-seed the locally built bonesremote so bootstrap uses this working tree.
@@ -69,8 +71,9 @@ impl Harness {
         Ok(Self { artifacts, container, host, session })
     }
 
-    pub fn provision(&self, site: &str, template: &str, runtime_vars: &[&str]) -> Result<()> {
-        let project = SampleProject::create(&self.session)?;
+    pub fn provision(&self, site: &str, template: &str, runtime_vars: &[&str]) -> Result<SampleProject> {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures").join(format!("{template}.md"));
+        let project = SampleProject::from_fixture(&self.session, &fixture)?;
         let mut init_args = vec![
             "init",
             "--non-interactive",
@@ -88,7 +91,21 @@ impl Harness {
         }
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &init_args)?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["setup", "--yes"])?;
-        self.assert_site(site)
+        self.assert_site(site)?;
+        Ok(project)
+    }
+
+    pub fn deploy(&self, project: &SampleProject) -> Result<()> {
+        project.push(&self.session, "production", "main")?;
+        project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["deploy"])
+    }
+
+    pub fn seed_shared_env(&self, site: &str, content: &str) -> Result<()> {
+        let content = shell_quote(content);
+        self.exec(&format!(
+            "printf '%s' {content} > /srv/sites/{site}/shared/.env && chown {site}:{site} /srv/sites/{site}/shared/.env && chmod 640 /srv/sites/{site}/shared/.env"
+        ))?;
+        Ok(())
     }
 
     pub fn assert_site(&self, site: &str) -> Result<()> {
@@ -114,15 +131,23 @@ impl Harness {
     }
 
     pub fn assert_route(&self, site: &str, expected_content: &str) -> Result<()> {
-        let preview_host = format!("{}-{}.nip.io", site, self.host.replace('.', "-"));
-        let response = self.exec(&format!(
-            "curl --silent --show-error --fail --max-time 10 --resolve {preview_host}:80:127.0.0.1 http://{preview_host}/"
-        ))?;
+        let response = self.route_response(site)?;
         if response.contains(expected_content) {
             Ok(())
         } else {
             bail!("Route for {site} did not contain {expected_content:?}: {response}")
         }
+    }
+
+    pub fn assert_deployed(&self, site: &str) -> Result<()> {
+        self.exec(&format!(
+            "test \"$(readlink -f /srv/sites/{site}/current)\" != /srv/sites/{site}/releases/19700101_000000"
+        ))?;
+        let response = self.route_response(site)?;
+        if response.contains("It's Working!") {
+            bail!("Route for {site} still served the placeholder: {response}")
+        }
+        Ok(())
     }
 
     pub fn assert_owner(&self, path: &str, owner: &str) -> Result<()> {
@@ -134,4 +159,15 @@ impl Harness {
     fn exec(&self, script: &str) -> Result<String> {
         self.container.exec(script)
     }
+
+    fn route_response(&self, site: &str) -> Result<String> {
+        let preview_host = format!("{}-{}.nip.io", site, self.host.replace('.', "-"));
+        self.exec(&format!(
+            "curl --silent --show-error --fail --max-time 10 --resolve {preview_host}:80:127.0.0.1 http://{preview_host}/"
+        ))
+    }
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }

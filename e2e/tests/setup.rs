@@ -18,46 +18,52 @@ mod vue;
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn laravel() -> Result<()> {
     let h = harness::shared_harness()?;
-    laravel::provision(&h)?;
-    laravel::assert_running(&h)
+    let project = laravel::provision(&h)?;
+    laravel::assert_running(&h)?;
+    laravel::deploy(&h, &project)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn next_server() -> Result<()> {
     let h = harness::shared_harness()?;
-    next::provision_server(&h)?;
-    next::assert_server_running(&h)
+    let project = next::provision_server(&h)?;
+    next::assert_server_running(&h)?;
+    next::deploy_server(&h, &project)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn next_static() -> Result<()> {
     let h = harness::shared_harness()?;
-    next::provision_static(&h)?;
-    next::assert_static_running(&h)
+    let project = next::provision_static(&h)?;
+    next::assert_static_running(&h)?;
+    next::deploy_static(&h, &project)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn nuxt_server() -> Result<()> {
     let h = harness::shared_harness()?;
-    nuxt::provision_server(&h)?;
-    nuxt::assert_server_running(&h)
+    let project = nuxt::provision_server(&h)?;
+    nuxt::assert_server_running(&h)?;
+    nuxt::deploy_server(&h, &project)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn nuxt_static() -> Result<()> {
     let h = harness::shared_harness()?;
-    nuxt::provision_static(&h)?;
-    nuxt::assert_static_running(&h)
+    let project = nuxt::provision_static(&h)?;
+    nuxt::assert_static_running(&h)?;
+    nuxt::deploy_static(&h, &project)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn vue() -> Result<()> {
     let h = harness::shared_harness()?;
-    vue::provision(&h)?;
-    vue::assert_running(&h)
+    let project = vue::provision(&h)?;
+    vue::assert_running(&h)?;
+    vue::deploy(&h, &project)
 }
