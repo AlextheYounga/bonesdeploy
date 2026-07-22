@@ -27,8 +27,9 @@ pub fn ensure_base() -> Result<String> {
 }
 
 fn image_exists(alias: &str) -> Result<bool> {
-    let listing = incus(&["image", "list", &format!("local:{alias}"), "--format", "csv"])?;
-    Ok(!listing.trim().is_empty())
+    // `image show` resolves aliases directly; `image list <alias>` filter
+    // matching is unreliable for this.
+    Ok(incus(&["image", "show", &format!("local:{alias}")]).is_ok())
 }
 
 fn build_base() -> Result<()> {

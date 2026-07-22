@@ -19,10 +19,17 @@ impl Container {
     /// Launches a fresh container from `image` with a unique harness name.
     pub fn launch(image: &str) -> Result<Self> {
         let name = format!("{CONTAINER_PREFIX}-{}", unique_suffix());
+        // Rootless podman inside the container needs nested user namespaces
+        // (security.nesting) and an idmap big enough to hold the build user's
+        // subuid range (~165536-231071); Incus only maps the first 65536 uids
+        // by default. Requires the host to delegate a matching range to root
+        // in /etc/subuid and /etc/subgid — see e2e/README.md.
         incus(&[
             "launch", image, &name,
             "--config", "limits.memory=1GiB",
             "--config", "limits.cpu=1",
+            "--config", "security.nesting=true",
+            "--config", "security.idmap.size=10000000",
         ])?;
         Ok(Self { name, keep: keep_artifacts() })
     }

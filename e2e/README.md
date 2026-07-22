@@ -12,6 +12,24 @@ sudo incus admin init --minimal
 sudo usermod -aG incus-admin $USER   # then re-login
 ```
 
+Root needs a subordinate uid/gid range wide enough for nested user
+namespaces (rootless podman runs inside the test container, and its build
+user's subuids sit above the first 65536 ids):
+
+```sh
+echo "root:100000:1000000000" | sudo tee /etc/subuid /etc/subgid
+sudo systemctl restart incus
+```
+
+If the host firewall default-denies input, allow DHCP/DNS on the Incus
+bridge or containers never get an IPv4 address:
+
+```sh
+sudo ufw allow in on incusbr0
+sudo ufw route allow in on incusbr0
+sudo ufw route allow out on incusbr0
+```
+
 The musl target for the container-side `bonesremote` binary is installed
 automatically on first run (`rustup target add x86_64-unknown-linux-musl`).
 
