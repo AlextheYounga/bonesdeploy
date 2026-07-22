@@ -14,25 +14,50 @@ mod nuxt;
 #[path = "setup/vue.rs"]
 mod vue;
 
-use harness::Harness;
+#[test]
+#[ignore = "requires a running Incus daemon; see e2e/README.md"]
+fn laravel() -> Result<()> {
+    let h = harness::shared_harness()?;
+    laravel::provision(&h)?;
+    laravel::assert_running(&h)
+}
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
-fn full_setup_provisions_framework_sites_together() -> Result<()> {
-    let harness = Harness::create()?;
+fn next_server() -> Result<()> {
+    let h = harness::shared_harness()?;
+    next::provision_server(&h)?;
+    next::assert_server_running(&h)
+}
 
-    vue::provision(&harness)?;
-    nuxt::provision_static(&harness)?;
-    nuxt::provision_server(&harness)?;
-    next::provision_static(&harness)?;
-    next::provision_server(&harness)?;
-    laravel::provision(&harness)?;
+#[test]
+#[ignore = "requires a running Incus daemon; see e2e/README.md"]
+fn next_static() -> Result<()> {
+    let h = harness::shared_harness()?;
+    next::provision_static(&h)?;
+    next::assert_static_running(&h)
+}
 
-    vue::assert_running(&harness)?;
-    nuxt::assert_static_running(&harness)?;
-    nuxt::assert_server_running(&harness)?;
-    next::assert_static_running(&harness)?;
-    next::assert_server_running(&harness)?;
-    laravel::assert_running(&harness)?;
-    Ok(())
+#[test]
+#[ignore = "requires a running Incus daemon; see e2e/README.md"]
+fn nuxt_server() -> Result<()> {
+    let h = harness::shared_harness()?;
+    nuxt::provision_server(&h)?;
+    nuxt::assert_server_running(&h)
+}
+
+#[test]
+#[ignore = "requires a running Incus daemon; see e2e/README.md"]
+fn nuxt_static() -> Result<()> {
+    let h = harness::shared_harness()?;
+    nuxt::provision_static(&h)?;
+    nuxt::assert_static_running(&h)
+}
+
+#[test]
+#[ignore = "requires a running Incus daemon; see e2e/README.md"]
+fn vue() -> Result<()> {
+    let h = harness::shared_harness()?;
+    vue::provision(&h)?;
+    vue::assert_running(&h)
 }

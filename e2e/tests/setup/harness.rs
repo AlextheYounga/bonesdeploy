@@ -5,6 +5,45 @@ use e2e::project::SampleProject;
 use e2e::session::Session;
 use e2e::{build, image, incus};
 
+use std::ops::Deref;
+use std::sync::{Mutex, MutexGuard, OnceLock};
+
+use dtor::dtor;
+
+static HARNESS: OnceLock<Mutex<Option<Harness>>> = OnceLock::new();
+
+pub struct HarnessRef {
+    _guard: MutexGuard<'static, Option<Harness>>,
+}
+
+impl Deref for HarnessRef {
+    type Target = Harness;
+
+    fn deref(&self) -> &Harness {
+        match self._guard.as_ref() {
+            Some(h) => h,
+            None => std::process::abort(),
+        }
+    }
+}
+
+#[dtor(unsafe)]
+fn teardown_harness() {
+    if let Some(mutex) = HARNESS.get() {
+        let mut guard = mutex.lock().unwrap_or_else(|e| e.into_inner());
+        drop(guard.take());
+    }
+}
+
+pub fn shared_harness() -> Result<HarnessRef> {
+    let mutex = HARNESS.get_or_init(|| Mutex::new(None));
+    let mut guard = mutex.lock().unwrap_or_else(|e| e.into_inner());
+    if guard.is_none() {
+        *guard = Some(Harness::create()?);
+    }
+    Ok(HarnessRef { _guard: guard })
+}
+
 pub struct Harness {
     artifacts: build::Artifacts,
     container: Container,
