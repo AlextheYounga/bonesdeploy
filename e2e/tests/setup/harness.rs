@@ -67,13 +67,6 @@ impl Harness {
         Ok(())
     }
 
-    pub fn write_placeholder(&self, site: &str, web_root: &str, marker: &str) -> Result<()> {
-        self.exec(&format!(
-            "printf '%s\\n' '{marker}' > /srv/sites/{site}/current/{web_root}/index.html"
-        ))?;
-        Ok(())
-    }
-
     pub fn write_laravel_probe(&self, site: &str, marker: &str) -> Result<()> {
         self.exec(&format!(
             "printf '%s\\n' '<?php error_log(\"{marker}\"); header(\"Content-Type: text/plain\"); echo \"{marker}\";' > /srv/sites/{site}/current/public/index.php"
@@ -81,15 +74,15 @@ impl Harness {
         Ok(())
     }
 
-    pub fn assert_route(&self, site: &str, marker: &str) -> Result<()> {
+    pub fn assert_route(&self, site: &str, expected_content: &str) -> Result<()> {
         let preview_host = format!("{}-{}.nip.io", site, self.host.replace('.', "-"));
         let response = self.exec(&format!(
             "curl --silent --show-error --fail --max-time 10 --resolve {preview_host}:80:127.0.0.1 http://{preview_host}/"
         ))?;
-        if response.contains(marker) {
+        if response.contains(expected_content) {
             Ok(())
         } else {
-            bail!("Route for {site} did not contain {marker:?}: {response}")
+            bail!("Route for {site} did not contain {expected_content:?}: {response}")
         }
     }
 

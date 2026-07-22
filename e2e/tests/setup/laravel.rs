@@ -15,8 +15,5 @@ pub fn assert_running(harness: &Harness) -> Result<()> {
     harness.assert_site(SITE)?;
     harness.assert_service(&format!("php{PHP_VERSION}-fpm.service"))?;
     harness.assert_route(SITE, MARKER)?;
-    harness.assert_owner(
-        &format!("/var/log/bonesdeploy/{SITE}/php-worker-error.log"),
-        &format!("{SITE}:{SITE}"),
-    )
+    harness.assert_owner(&format!("/var/log/bonesdeploy/{SITE}/php-worker-error.log"), &format!("{SITE}:{SITE}"))
 }
