@@ -42,14 +42,35 @@ cargo test-e2e
 The alias (in `.cargo/config.toml`) expands to
 `cargo test -p e2e -- --ignored --test-threads=1 --nocapture`. Tests are
 `#[ignore]`d so `cargo test --workspace` stays fast and offline.
-`--test-threads=1` is required: scenarios share the Incus daemon and stream
-subprocess output to the terminal.
+`--test-threads=1` is required: test scenarios share the Incus daemon and
+stream subprocess output to the terminal.
+
+### Running individual framework tests
+
+The setup suite is split into one test per framework. All tests within the
+same test binary share a single container (the first test run bootstraps
+the server; the rest reuse it). Run a subset by passing a test-name filter:
+
+```sh
+# Single framework
+cargo test -p e2e --test setup -- vue --ignored --test-threads=1 --nocapture
+
+# Multiple frameworks
+cargo test -p e2e --test setup -- vue laravel --ignored --test-threads=1 --nocapture
+```
+
+Test names: `laravel`, `next_server`, `next_static`, `nuxt_server`,
+`nuxt_static`, `vue`.
 
 ## How it works
 
 - **Base image** — on first run a Debian container is prepared with sshd and
-  published as the local image `bonesdeploy-e2e-base`. Every test launches
-  from it, so per-test container startup is seconds, not minutes.
+  published as the local image `bonesdeploy-e2e-base`.
+- **Shared container** — all tests in a test binary share a single Incus
+  container launched lazily on the first `Harness::create()`. The first test
+  pays the bootstrap cost; subsequent tests skip it. The container is
+  deleted at process exit via a `#[dtor]` hook (fires even when tests are
+  filtered, panicked, or killed cleanly).
 - **Isolated session** — each run gets a throwaway `HOME` under `target/e2e/`
   with its own SSH keypair, ssh config, and gitconfig. Your real `~/.ssh` is
   never read or written. `XDG_CONFIG_HOME` points at a shared cache so the
@@ -63,9 +84,12 @@ subprocess output to the terminal.
   Incus containers; production provisioning is not changed.
 - **Framework fixtures** — `fixtures/*.md` are mdpack archives of real
   framework projects. Each scenario expands its archive into a disposable Git
-  repository, pushes `main`, and runs `bonesdeploy deploy`.
-- **Cleanup** — containers, session homes, and sample projects are dropped at
-  the end of each test, pass or fail.
+  repository, copies `.env.production` to the site's `shared/.env`, pushes
+  `main`, and runs `bonesdeploy deploy`.
+- **Cleanup** — sample project directories are dropped at the end of each
+  test. The shared container and session home are dropped at process exit via
+  a `#[dtor]` hook (the `dtor` crate registers a destructor that fires when
+  the test binary exits, even on panics or filtered runs).
 
 ## Environment knobs
 

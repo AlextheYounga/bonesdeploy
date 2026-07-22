@@ -21,14 +21,7 @@ pub fn assert_running(harness: &Harness) -> Result<()> {
 }
 
 pub fn deploy(harness: &Harness, project: &SampleProject) -> Result<()> {
-    let env = project
-        .read_file(".env.production")?
-        .replace("laraveltest", SITE)
-        .replace("APP_NAME=Laravel", "APP_NAME=e2elaravel")
-        .replace("APP_KEY=", "APP_KEY=base64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=")
-        .replace("APP_DEBUG=true", "APP_DEBUG=false");
-    harness.seed_shared_env(SITE, &env)?;
-    harness.deploy(project)?;
+    harness.deploy(SITE, project)?;
     harness.assert_deployed(SITE)?;
     harness.assert_owner(&format!("/var/log/bonesdeploy/{SITE}/php-worker-error.log"), &format!("{SITE}:{SITE}"))
 }

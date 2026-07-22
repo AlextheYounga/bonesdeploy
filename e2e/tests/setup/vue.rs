@@ -15,6 +15,6 @@ pub fn assert_running(harness: &Harness) -> Result<()> {
 }
 
 pub fn deploy(harness: &Harness, project: &SampleProject) -> Result<()> {
-    harness.deploy(project)?;
+    harness.deploy(SITE, project)?;
     harness.assert_deployed(SITE)
 }

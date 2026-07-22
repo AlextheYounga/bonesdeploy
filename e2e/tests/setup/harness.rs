@@ -95,7 +95,8 @@ impl Harness {
         Ok(project)
     }
 
-    pub fn deploy(&self, project: &SampleProject) -> Result<()> {
+    pub fn deploy(&self, site: &str, project: &SampleProject) -> Result<()> {
+        self.seed_shared_env(site, &project.read_file(".env.production")?)?;
         project.push(&self.session, "production", "main")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["deploy"])
     }
