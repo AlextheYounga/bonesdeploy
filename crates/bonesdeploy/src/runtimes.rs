@@ -92,6 +92,7 @@ pub fn validate_answers(template: &str, answers: &serde_json::Map<String, Value>
 pub fn configure(template: &str, cfg: &mut Bones, bones_dir: &Path) -> Result<()> {
     match template {
         "next" => next::configure(cfg),
+        "nuxt" => nuxt::configure(cfg),
         _ => {}
     }
 
@@ -234,6 +235,16 @@ mod tests {
             bones_with_runtime("next", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
         configure("next", &mut config, temp.path())?;
         assert_eq!(config.runtime.web_root, "out");
+        Ok(())
+    }
+
+    #[test]
+    fn configure_static_nuxt_overrides_web_root() -> Result<()> {
+        let temp = TempDir::new()?;
+        let mut config =
+            bones_with_runtime("nuxt", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
+        configure("nuxt", &mut config, temp.path())?;
+        assert_eq!(config.runtime.web_root, ".output/public");
         Ok(())
     }
 
