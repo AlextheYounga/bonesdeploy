@@ -36,6 +36,11 @@ impl SampleProject {
         self.git(session, &["push", remote, branch])
     }
 
+    pub fn commit(&self, session: &Session, message: &str) -> Result<()> {
+        self.git(session, &["add", "-A"])?;
+        self.git(session, &["commit", "-m", message])
+    }
+
     /// Runs the given bonesdeploy binary in the project directory with output
     /// streaming to the terminal.
     pub fn bonesdeploy(&self, session: &Session, binary: &Path, args: &[&str]) -> Result<()> {

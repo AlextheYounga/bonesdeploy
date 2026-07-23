@@ -90,6 +90,7 @@ impl Harness {
             init_args.extend(["--runtime-var", *runtime_var]);
         }
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &init_args)?;
+        project.commit(&self.session, "bonesdeploy init")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["setup", "--yes"])?;
         self.assert_site(site)?;
         Ok(project)
