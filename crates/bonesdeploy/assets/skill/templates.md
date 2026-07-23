@@ -33,6 +33,7 @@ PHP + PHP-FPM.
 | Key | Type | Choices | Default |
 |-----|------|---------|---------|
 | `php_version` | choice | 8.2, 8.3, 8.4, 8.5 | 8.5 |
+| `install_queue_worker` | bool | — | false |
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
@@ -45,6 +46,7 @@ Python + Gunicorn.
 
 | Key | Type | Choices | Default |
 |-----|------|---------|---------|
+| `python_version` | choice | 3.12, 3.13, 3.14 | 3.14 |
 | `wsgi_module` | text | — | `config.wsgi:application` |
 
 ```

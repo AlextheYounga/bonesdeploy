@@ -11,14 +11,19 @@ pub(crate) fn configure(cfg: &mut Bones) {
     }
 }
 
-pub(crate) fn environment_example(_project_name: &str) -> String {
+pub(crate) fn environment_example(project_name: &str, site_url: &str) -> String {
     super::join_env_lines(&[
         "NODE_ENV=production",
-        "NEXT_PUBLIC_API_URL=\"https://api.example.com\"",
-        "NEXT_PUBLIC_SITE_NAME=\"",
+        &format!("NEXT_PUBLIC_API_URL=\"{site_url}\""),
+        &format!("NEXT_PUBLIC_SITE_NAME=\"{project_name}\""),
     ])
 }
 
 pub(crate) fn build_environment_example() -> String {
-    super::join_env_lines(&[super::BUILD_ENV_HEADER, "NODE_VERSION=", "NEXT_PUBLIC_API_URL=", "NEXT_PUBLIC_SITE_NAME="])
+    super::join_env_lines(&[
+        super::BUILD_ENV_HEADER,
+        super::NODE_VERSION_DEFAULT,
+        "NEXT_PUBLIC_API_URL=",
+        "NEXT_PUBLIC_SITE_NAME=",
+    ])
 }

@@ -47,8 +47,8 @@ pub fn scaffold_runtime_deployment(runtime: &str, bones_dir: &Path) -> Result<()
     scaffold_runtime_assets(runtime, bones_dir, paths::KIT_DEPLOYMENT_DIR)
 }
 
-pub fn scaffold_runtime_env_build(runtime: &str, project_root: &Path) -> Result<()> {
-    let Some(content) = runtimes::build_environment_example(runtime) else {
+pub fn scaffold_runtime_env_build(runtime: &str, project_root: &Path, runtime_config: &Runtime) -> Result<()> {
+    let Some(content) = runtimes::build_environment_example(runtime, runtime_config) else {
         return Ok(());
     };
 
@@ -122,7 +122,10 @@ mod tests {
     #[test]
     fn every_runtime_has_a_build_environment_example() {
         for runtime in runtime_names() {
-            assert!(runtimes::build_environment_example(&runtime).is_some(), "{runtime} is missing .env.build");
+            assert!(
+                runtimes::build_environment_example(&runtime, &Runtime::default()).is_some(),
+                "{runtime} is missing .env.build"
+            );
         }
     }
 
@@ -132,12 +135,12 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root)?;
 
-        scaffold_runtime_env_build("next", &root)?;
+        scaffold_runtime_env_build("next", &root, &Runtime::default())?;
         let generated = fs::read_to_string(root.join(".env.build"))?;
         assert!(generated.contains("NEXT_PUBLIC_API_URL="));
 
         fs::write(root.join(".env.build"), "CUSTOM=value\n")?;
-        scaffold_runtime_env_build("next", &root)?;
+        scaffold_runtime_env_build("next", &root, &Runtime::default())?;
         assert_eq!(fs::read_to_string(root.join(".env.build"))?, "CUSTOM=value\n");
 
         fs::remove_dir_all(root).ok();

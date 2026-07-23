@@ -39,7 +39,7 @@ pub(super) fn materialize_fresh_bones(
     cfg.runtime = serde_json::from_value(serde_json::Value::Object(runtime.config.clone()))?;
 
     if let Some(template_name) = runtime.template {
-        runtime_assets::scaffold_runtime_env_build(&template_name, Path::new("."))?;
+        runtime_assets::scaffold_runtime_env_build(&template_name, Path::new("."), &cfg.runtime)?;
         runtime_assets::scaffold_runtime_deployment(&template_name, bones_dir)?;
         runtimes::configure(&template_name, cfg);
         println!("Runtime template: {template_name}");

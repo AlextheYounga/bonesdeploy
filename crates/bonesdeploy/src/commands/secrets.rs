@@ -62,8 +62,19 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
         .with_context(|| format!("Failed to create {}", paths::LOCAL_BONES_SECRETS_DIR))?;
 
     let temp_path = create_temp_edit_path()?;
-    fs::write(&temp_path, runtimes::environment_example(&cfg.runtime.template, &cfg.project_name).unwrap_or_default())
-        .with_context(|| format!("Failed to write default secrets to {}", temp_path.display()))?;
+    let mut effective_config = cfg.clone();
+    shared_config::apply_derived_defaults(&mut effective_config);
+    fs::write(
+        &temp_path,
+        runtimes::environment_example(
+            &effective_config.runtime.template,
+            &effective_config.project_name,
+            &effective_config.domain,
+            &effective_config.preview_domain,
+        )
+        .unwrap_or_default(),
+    )
+    .with_context(|| format!("Failed to write default secrets to {}", temp_path.display()))?;
     fs::set_permissions(&temp_path, Permissions::from_mode(0o600))?;
 
     let encrypted_result = run_gpg(&[

@@ -1,11 +1,12 @@
 use anyhow::{Result, bail};
 use serde_json::Value;
-use shared::config::Bones;
 use shared::config::bonesinfra_input;
+use shared::config::{Bones, Runtime};
 
 /// Shared question keys used by more than one template.
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
 const BUILD_ENV_HEADER: &str = "# Committed, non-secret values used while building this project.";
+pub(crate) const NODE_VERSION_DEFAULT: &str = "NODE_VERSION=v24.15.0";
 
 mod django;
 mod laravel;
@@ -91,23 +92,29 @@ pub fn configure(template: &str, cfg: &mut Bones) {
     }
 }
 
-pub fn environment_example(template: &str, project_name: &str) -> Option<String> {
+pub fn environment_example(template: &str, project_name: &str, domain: &str, preview_domain: &str) -> Option<String> {
+    let site_url = environment_url(domain, preview_domain);
     Some(match template {
-        "django" => django::environment_example(project_name),
-        "laravel" => laravel::environment_example(project_name),
-        "next" => next::environment_example(project_name),
-        "nuxt" => nuxt::environment_example(project_name),
-        "rails" => rails::environment_example(project_name),
-        "sveltekit" => sveltekit::environment_example(project_name),
-        "vue" => vue::environment_example(project_name),
+        "django" => django::environment_example(project_name, &site_url),
+        "laravel" => laravel::environment_example(project_name, &site_url),
+        "next" => next::environment_example(project_name, &site_url),
+        "nuxt" => nuxt::environment_example(project_name, &site_url),
+        "rails" => rails::environment_example(project_name, &site_url),
+        "sveltekit" => sveltekit::environment_example(project_name, &site_url),
+        "vue" => vue::environment_example(project_name, &site_url),
         _ => return None,
     })
 }
 
-pub(crate) fn build_environment_example(template: &str) -> Option<String> {
+pub(crate) fn environment_url(domain: &str, preview_domain: &str) -> String {
+    let host = if domain.is_empty() { preview_domain } else { domain };
+    if host.is_empty() { String::new() } else { format!("https://{host}") }
+}
+
+pub(crate) fn build_environment_example(template: &str, runtime: &Runtime) -> Option<String> {
     Some(match template {
-        "django" => django::build_environment_example(),
-        "laravel" => laravel::build_environment_example(),
+        "django" => django::build_environment_example(runtime),
+        "laravel" => laravel::build_environment_example(runtime),
         "next" => next::build_environment_example(),
         "nuxt" => nuxt::build_environment_example(),
         "rails" => rails::build_environment_example(),
@@ -127,7 +134,7 @@ mod tests {
     use serde_json::{Map, Value, json};
     use shared::config::Bones;
 
-    use super::{configure, environment_example, questions, validate_answers};
+    use super::{Runtime, build_environment_example, configure, environment_example, questions, validate_answers};
 
     fn bones_with_runtime(template: &str, extra: Map<String, Value>) -> Result<Bones> {
         let mut config = Bones::default();
@@ -153,21 +160,45 @@ mod tests {
     #[test]
     fn every_template_has_an_environment_example() {
         for template in ["laravel", "django", "next", "nuxt", "rails", "sveltekit", "vue"] {
-            assert!(environment_example(template, "atlas").is_some(), "missing environment example for {template}");
+            assert!(
+                environment_example(template, "atlas", "", "atlas.example.com").is_some(),
+                "missing environment example for {template}"
+            );
         }
     }
 
     #[test]
     fn environment_examples_use_project_name_in_shared_paths() {
-        let laravel = environment_example("laravel", "atlas").expect("Laravel environment defaults");
+        let laravel = environment_example("laravel", "atlas", "example.com", "atlas.example.com")
+            .expect("Laravel environment defaults");
         assert!(laravel.contains("/srv/sites/atlas/shared/storage"));
+        assert!(laravel.contains("APP_URL=https://example.com"));
         assert!(!laravel.contains("<project>"));
 
-        let django = environment_example("django", "atlas").expect("Django environment defaults");
+        let django =
+            environment_example("django", "atlas", "", "atlas.example.com").expect("Django environment defaults");
         assert!(django.contains("/srv/sites/atlas/shared/database.sqlite"));
 
-        let rails = environment_example("rails", "atlas").expect("Rails environment defaults");
+        let rails = environment_example("rails", "atlas", "", "atlas.example.com").expect("Rails environment defaults");
         assert!(rails.contains("/srv/sites/atlas/shared/storage/production.sqlite3"));
+    }
+
+    #[test]
+    fn laravel_build_environment_uses_selected_php_version() {
+        let runtime: Runtime = serde_json::from_value(serde_json::json!({ "php_version": "8.3" })).unwrap();
+
+        let environment = build_environment_example("laravel", &runtime).expect("Laravel build environment");
+        assert!(environment.contains("PHP_VERSION=8.3"));
+        assert!(!environment.contains("PHP_VERSION=8.5"));
+    }
+
+    #[test]
+    fn django_build_environment_uses_selected_python_version() {
+        let runtime: Runtime = serde_json::from_value(serde_json::json!({ "python_version": "3.12" })).unwrap();
+
+        let environment = build_environment_example("django", &runtime).expect("Django build environment");
+        assert!(environment.contains("PYTHON_VERSION=3.12"));
+        assert!(!environment.contains("PYTHON_VERSION=3.14"));
     }
 
     #[test]
