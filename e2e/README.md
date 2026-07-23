@@ -84,8 +84,9 @@ Test names: `laravel`, `next_server`, `next_static`, `nuxt_server`,
   Incus containers; production provisioning is not changed.
 - **Framework fixtures** — `fixtures/*.md` are mdpack archives of real
   framework projects. Each scenario expands its archive into a disposable Git
-  repository, copies `.env.production` to the site's `shared/.env`, pushes
-  `main`, and runs `bonesdeploy deploy`.
+  repository, pushes `main`, and runs `bonesdeploy deploy`. Project setup now
+  creates the encrypted default `.bones/secrets/.env.gpg`; the runtime seeds
+  the remote shared environment file itself.
 - **Cleanup** — sample project directories are dropped at the end of each
   test. The shared container and session home are dropped at process exit via
   a `#[dtor]` hook (the `dtor` crate registers a destructor that fires when

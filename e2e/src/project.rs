@@ -36,11 +36,6 @@ impl SampleProject {
         self.git(session, &["push", remote, branch])
     }
 
-    pub fn read_file(&self, path: &str) -> Result<String> {
-        let path = self.dir.join(path);
-        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))
-    }
-
     /// Runs the given bonesdeploy binary in the project directory with output
     /// streaming to the terminal.
     pub fn bonesdeploy(&self, session: &Session, binary: &Path, args: &[&str]) -> Result<()> {

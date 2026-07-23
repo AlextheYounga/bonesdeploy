@@ -96,17 +96,8 @@ impl Harness {
     }
 
     pub fn deploy(&self, site: &str, project: &SampleProject) -> Result<()> {
-        self.seed_shared_env(site, &project.read_file(".env.production")?)?;
         project.push(&self.session, "production", "main")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["deploy"])
-    }
-
-    pub fn seed_shared_env(&self, site: &str, content: &str) -> Result<()> {
-        let content = shell_quote(content);
-        self.exec(&format!(
-            "printf '%s' {content} > /srv/sites/{site}/shared/.env && chown {site}:{site} /srv/sites/{site}/shared/.env && chmod 640 /srv/sites/{site}/shared/.env"
-        ))?;
-        Ok(())
     }
 
     pub fn assert_site(&self, site: &str) -> Result<()> {
@@ -167,8 +158,4 @@ impl Harness {
             "curl --silent --show-error --fail --max-time 10 --resolve {preview_host}:80:127.0.0.1 http://{preview_host}/"
         ))
     }
-}
-
-fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
