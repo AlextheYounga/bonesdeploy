@@ -21,7 +21,7 @@ pub fn assert_running(harness: &Harness) -> Result<()> {
 }
 
 pub fn deploy(harness: &Harness, project: &SampleProject) -> Result<()> {
-    harness.deploy(SITE, project)?;
+    harness.deploy(project)?;
     harness.assert_deployed(SITE)?;
     harness.assert_owner(&format!("/var/log/bonesdeploy/{SITE}/php-worker-error.log"), &format!("{SITE}:{SITE}"))
 }

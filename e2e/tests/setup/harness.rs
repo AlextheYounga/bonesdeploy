@@ -95,7 +95,7 @@ impl Harness {
         Ok(project)
     }
 
-    pub fn deploy(&self, site: &str, project: &SampleProject) -> Result<()> {
+    pub fn deploy(&self, project: &SampleProject) -> Result<()> {
         project.push(&self.session, "production", "main")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["deploy"])
     }

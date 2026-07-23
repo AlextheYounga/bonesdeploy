@@ -26,11 +26,11 @@ pub fn assert_server_running(harness: &Harness) -> Result<()> {
 }
 
 pub fn deploy_static(harness: &Harness, project: &SampleProject) -> Result<()> {
-    harness.deploy(STATIC_SITE, project)?;
+    harness.deploy(project)?;
     harness.assert_deployed(STATIC_SITE)
 }
 
 pub fn deploy_server(harness: &Harness, project: &SampleProject) -> Result<()> {
-    harness.deploy(SERVER_SITE, project)?;
+    harness.deploy(project)?;
     harness.assert_deployed(SERVER_SITE)
 }
