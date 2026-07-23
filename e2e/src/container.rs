@@ -29,7 +29,7 @@ impl Container {
             image,
             &name,
             "--config",
-            "limits.memory=1GiB",
+            "limits.memory=2GiB",
             "--config",
             "limits.cpu=1",
             "--config",
