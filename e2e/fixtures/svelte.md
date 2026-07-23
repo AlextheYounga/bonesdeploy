@@ -3,6 +3,14 @@ Source Tree:
 ```txt
 svelte
 |-- .env.example
+|-- .env.production
+|-- .gitignore
+|-- .npmrc
+|-- .nvmrc
+|-- .prettierignore
+|-- .vscode
+|   |-- extensions.json
+|   `-- settings.json
 |-- README.md
 |-- drizzle.config.ts
 |-- package-lock.json
@@ -51,6 +59,87 @@ svelte
 ```example
 # Drizzle
 DATABASE_URL=local.db
+```
+
+`.env.production`:
+
+```production
+NODE_VERSION=v24.15.0
+```
+
+`.gitignore`:
+
+```txt
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+# SQLite
+*.db
+```
+
+`.npmrc`:
+
+```txt
+engine-strict=true
+```
+
+`.nvmrc`:
+
+```txt
+v24.15.0
+```
+
+`.prettierignore`:
+
+```txt
+# Package Managers
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+bun.lock
+bun.lockb
+
+# Miscellaneous
+/static/
+/drizzle/
+```
+
+`.vscode/extensions.json`:
+
+```json
+{
+	"recommendations": ["svelte.svelte-vscode", "bradlc.vscode-tailwindcss", "esbenp.prettier-vscode"]
+}
+```
+
+`.vscode/settings.json`:
+
+```json
+{
+	"files.associations": {
+		"*.css": "tailwindcss"
+	}
+}
 ```
 
 `README.md`:

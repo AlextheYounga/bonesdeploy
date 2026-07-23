@@ -2,6 +2,9 @@ Source Tree:
 
 ```txt
 nuxt
+|-- .env.production
+|-- .gitignore
+|-- .nvmrc
 |-- README.md
 |-- app
 |   `-- app.vue
@@ -12,6 +15,48 @@ nuxt
 |   |-- favicon.ico
 |   `-- robots.txt
 `-- tsconfig.json
+```
+
+`.env.production`:
+
+```production
+NODE_VERSION=v24.15.0
+```
+
+`.gitignore`:
+
+```txt
+# Nuxt dev/build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+dist
+
+# Node dependencies
+node_modules
+
+# Logs
+logs
+*.log
+
+# Misc
+.DS_Store
+.fleet
+.idea
+
+# Local env files
+.env
+.env.*
+!.env.example
+.bones
+```
+
+`.nvmrc`:
+
+```txt
+v24.15.0
 ```
 
 `README.md`:

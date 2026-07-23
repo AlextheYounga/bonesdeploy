@@ -2,6 +2,19 @@ Source Tree:
 
 ```txt
 laravel
+|-- .editorconfig
+|-- .env.example
+|-- .env.production
+|-- .gitattributes
+|-- .github
+|   |-- dependabot.yml
+|   `-- workflows
+|       `-- tests.yml
+|-- .gitignore
+|-- .npmrc
+|-- .nvmrc
+|-- .prettierignore
+|-- .prettierrc
 |-- app
 |   |-- Actions
 |   |   `-- Fortify
@@ -53,6 +66,7 @@ laravel
 |   |-- services.php
 |   `-- session.php
 |-- database
+|   |-- .gitignore
 |   |-- factories
 |   |   `-- UserFactory.php
 |   |-- migrations
@@ -71,6 +85,7 @@ laravel
 |-- pint.json
 |-- pnpm-workspace.yaml
 |-- public
+|   |-- .htaccess
 |   |-- apple-touch-icon.png
 |   |-- favicon.ico
 |   |-- favicon.svg
@@ -328,6 +343,7 @@ laravel
 |   |   `-- public
 |   |       `-- .gitignore
 |   |-- framework
+|   |   |-- .gitignore
 |   |   |-- cache
 |   |   |   |-- .gitignore
 |   |   |   `-- data
@@ -361,6 +377,339 @@ laravel
 |       `-- ExampleTest.php
 |-- tsconfig.json
 `-- vite.config.ts
+```
+
+`.editorconfig`:
+
+```txt
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_size = 4
+indent_style = space
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[{compose,docker-compose}.{yml,yaml}]
+indent_size = 4
+```
+
+`.env.example`:
+
+```example
+APP_NAME=Laravel
+APP_ENV=local
+APP_KEY=
+APP_DEBUG=true
+APP_URL=http://localhost
+
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+
+APP_MAINTENANCE_DRIVER=file
+# APP_MAINTENANCE_STORE=database
+
+# PHP_CLI_SERVER_WORKERS=4
+
+BCRYPT_ROUNDS=12
+
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+
+DB_CONNECTION=sqlite
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
+# DB_DATABASE=laravel
+# DB_USERNAME=root
+# DB_PASSWORD=
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+
+BROADCAST_CONNECTION=log
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=database
+
+CACHE_STORE=database
+# CACHE_PREFIX=
+
+MEMCACHED_HOST=127.0.0.1
+
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_MAILER=log
+MAIL_SCHEME=null
+MAIL_HOST=127.0.0.1
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=
+AWS_USE_PATH_STYLE_ENDPOINT=false
+
+VITE_APP_NAME="${APP_NAME}"
+```
+
+`.env.production`:
+
+```production
+APP_NAME=Laravel
+APP_ENV=production
+APP_KEY=
+APP_DEBUG=true
+APP_URL=
+
+PHP_VERSION=8.5
+NODE_VERSION=v24.15.0
+
+APP_LOCALE=en
+APP_FALLBACK_LOCALE=en
+APP_FAKER_LOCALE=en_US
+
+APP_MAINTENANCE_DRIVER=file
+# APP_MAINTENANCE_STORE=database
+
+# PHP_CLI_SERVER_WORKERS=4
+
+BCRYPT_ROUNDS=12
+
+LOG_CHANNEL=stack
+LOG_STACK=single
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+
+DB_CONNECTION=sqlite
+DB_DATABASE=/srv/sites/laraveltest/shared/database.sqlite
+
+LARAVEL_STORAGE_PATH=/srv/sites/laraveltest/shared/storage
+VIEW_COMPILED_PATH=/srv/sites/laraveltest/shared/storage/framework/views
+CACHE_PATH=/srv/sites/laraveltest/shared/cache
+UPLOADS_PATH=/srv/sites/laraveltest/shared/uploads
+
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
+# DB_DATABASE=laravel
+# DB_USERNAME=root
+# DB_PASSWORD=
+
+SESSION_DRIVER=database
+SESSION_LIFETIME=120
+SESSION_ENCRYPT=false
+SESSION_PATH=/
+SESSION_DOMAIN=null
+
+BROADCAST_CONNECTION=log
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=database
+
+CACHE_STORE=database
+# CACHE_PREFIX=
+
+MEMCACHED_HOST=127.0.0.1
+
+REDIS_CLIENT=phpredis
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_MAILER=log
+MAIL_SCHEME=null
+MAIL_HOST=127.0.0.1
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_FROM_ADDRESS="hello@example.com"
+MAIL_FROM_NAME="${APP_NAME}"
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_DEFAULT_REGION=us-east-1
+AWS_BUCKET=
+AWS_USE_PATH_STYLE_ENDPOINT=false
+
+VITE_APP_NAME="${APP_NAME}"
+```
+
+`.gitattributes`:
+
+```txt
+* text=auto eol=lf
+
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+
+CHANGELOG.md export-ignore
+README.md export-ignore
+.github/workflows/browser-tests.yml export-ignore
+```
+
+`.github/dependabot.yml`:
+
+```yml
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+```
+
+`.github/workflows/tests.yml`:
+
+```yml
+name: tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # v2
+        with:
+          php-version: '8.3'
+          tools: composer:v2
+          coverage: none
+
+      - name: Setup Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version: '22'
+
+      - name: Setup Application
+        run: composer setup
+
+      - name: Run CI Checks
+        run: composer ci:check
+```
+
+`.gitignore`:
+
+```txt
+/.phpunit.cache
+/bootstrap/ssr
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/resources/js/actions
+/resources/js/routes
+/resources/js/wayfinder
+/vendor
+.DS_Store
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+Homestead.json
+Homestead.yaml
+npm-debug.log
+yarn-error.log
+/auth.json
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
+.bones
+```
+
+`.npmrc`:
+
+```txt
+ignore-scripts=true
+```
+
+`.nvmrc`:
+
+```txt
+v24.15.0
+```
+
+`.prettierignore`:
+
+```txt
+resources/js/components/ui/*
+resources/views/mail/*
+```
+
+`.prettierrc`:
+
+```txt
+{
+    "semi": true,
+    "singleQuote": true,
+    "singleAttributePerLine": false,
+    "htmlWhitespaceSensitivity": "css",
+    "printWidth": 80,
+    "plugins": [
+        "prettier-plugin-tailwindcss"
+    ],
+    "tailwindFunctions": [
+        "clsx",
+        "cn",
+        "cva"
+    ],
+    "tailwindStylesheet": "resources/css/app.css",
+    "tabWidth": 4,
+    "overrides": [
+        {
+            "files": "**/*.yml",
+            "options": {
+                "tabWidth": 2
+            }
+        }
+    ]
+}
 ```
 
 `app/Actions/Fortify/CreateNewUser.php`:
@@ -13992,6 +14341,12 @@ return [
 ];
 ```
 
+`database/.gitignore`:
+
+```txt
+*.sqlite*
+```
+
 `database/factories/UserFactory.php`:
 
 ```php
@@ -21651,6 +22006,36 @@ packages:
 
 publicHoistPattern:
   - '@inertiajs/core'
+```
+
+`public/.htaccess`:
+
+```txt
+<IfModule mod_rewrite.c>
+    <IfModule mod_negotiation.c>
+        Options -MultiViews -Indexes
+    </IfModule>
+
+    RewriteEngine On
+
+    # Handle Authorization Header
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Handle X-XSRF-Token Header
+    RewriteCond %{HTTP:x-xsrf-token} .
+    RewriteRule .* - [E=HTTP_X_XSRF_TOKEN:%{HTTP:X-XSRF-Token}]
+
+    # Redirect Trailing Slashes If Not A Folder...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} (.+)/$
+    RewriteRule ^ %1 [L,R=301]
+
+    # Send Requests To Front Controller...
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [L]
+</IfModule>
 ```
 
 `public/favicon.svg`:
@@ -30291,6 +30676,20 @@ require __DIR__.'/settings.php';
 ```txt
 *
 !.gitignore
+```
+
+`storage/framework/.gitignore`:
+
+```txt
+compiled.php
+config.php
+down
+events.scanned.php
+maintenance.php
+routes.php
+routes.scanned.php
+schedule-*
+services.json
 ```
 
 `storage/framework/cache/.gitignore`:

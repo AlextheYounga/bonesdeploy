@@ -2,6 +2,12 @@ Source Tree:
 
 ```txt
 vue
+|-- .env.production
+|-- .gitignore
+|-- .nvmrc
+|-- .oxfmtrc.json
+|-- .vscode
+|   `-- extensions.json
 |-- README.md
 |-- env.d.ts
 |-- index.html
@@ -40,6 +46,85 @@ vue
 |-- tsconfig.vitest.json
 |-- vite.config.ts
 `-- vitest.config.ts
+```
+
+`.env.production`:
+
+```production
+NODE_VERSION=v24.15.0
+```
+
+`.gitignore`:
+
+```txt
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+.DS_Store
+dist
+dist-ssr
+coverage
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+*.tsbuildinfo
+
+.eslintcache
+
+# Cypress
+/cypress/videos/
+/cypress/screenshots/
+
+# Vitest
+__screenshots__/
+
+# Vite
+*.timestamp-*-*.mjs
+.bones
+```
+
+`.nvmrc`:
+
+```txt
+v24.15.0
+```
+
+`.oxfmtrc.json`:
+
+```json
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "semi": false,
+  "singleQuote": true
+}
+```
+
+`.vscode/extensions.json`:
+
+```json
+{
+  "recommendations": [
+    "Vue.volar",
+    "vitest.explorer",
+    "oxc.oxc-vscode"
+  ]
+}
 ```
 
 `README.md`:

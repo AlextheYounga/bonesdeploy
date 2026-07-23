@@ -2,6 +2,19 @@ Source Tree:
 
 ```txt
 rails
+|-- .dockerignore
+|-- .env.production
+|-- .gitattributes
+|-- .github
+|   |-- dependabot.yml
+|   `-- workflows
+|       `-- ci.yml
+|-- .gitignore
+|-- .kamal
+|   `-- secrets
+|-- .nvmrc
+|-- .rubocop.yml
+|-- .ruby-version
 |-- Dockerfile
 |-- Gemfile
 |-- Gemfile.lock
@@ -9,10 +22,14 @@ rails
 |-- Rakefile
 |-- app
 |   |-- assets
+|   |   |-- images
+|   |   |   `-- .keep
 |   |   `-- stylesheets
 |   |       `-- application.css
 |   |-- controllers
-|   |   `-- application_controller.rb
+|   |   |-- application_controller.rb
+|   |   `-- concerns
+|   |       `-- .keep
 |   |-- helpers
 |   |   `-- application_helper.rb
 |   |-- jobs
@@ -20,7 +37,9 @@ rails
 |   |-- mailers
 |   |   `-- application_mailer.rb
 |   |-- models
-|   |   `-- application_record.rb
+|   |   |-- application_record.rb
+|   |   `-- concerns
+|   |       `-- .keep
 |   `-- views
 |       |-- layouts
 |       |   |-- application.html.erb
@@ -67,6 +86,9 @@ rails
 |-- config.ru
 |-- db
 |   `-- seeds.rb
+|-- lib
+|   `-- tasks
+|       `-- .keep
 |-- log
 |   `-- .keep
 |-- public
@@ -78,12 +100,451 @@ rails
 |   |-- icon.png
 |   |-- icon.svg
 |   `-- robots.txt
+|-- script
+|   `-- .keep
 |-- storage
 |   `-- .keep
 |-- test
+|   |-- controllers
+|   |   `-- .keep
+|   |-- fixtures
+|   |   `-- files
+|   |       `-- .keep
+|   |-- helpers
+|   |   `-- .keep
+|   |-- integration
+|   |   `-- .keep
+|   |-- mailers
+|   |   `-- .keep
+|   |-- models
+|   |   `-- .keep
 |   `-- test_helper.rb
-`-- tmp
+|-- tmp
+|   `-- .keep
+`-- vendor
     `-- .keep
+```
+
+`.dockerignore`:
+
+```txt
+# See https://docs.docker.com/engine/reference/builder/#dockerignore-file for more about ignoring files.
+
+# Ignore git directory.
+/.git/
+/.gitignore
+
+# Ignore bundler config.
+/.bundle
+
+# Ignore all environment files.
+/.env*
+
+# Ignore all default key files.
+/config/master.key
+/config/credentials/*.key
+
+# Ignore all logfiles and tempfiles.
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+
+# Ignore pidfiles, but keep the directory.
+/tmp/pids/*
+!/tmp/pids/.keep
+
+# Ignore storage (uploaded files in development and any SQLite databases).
+/storage/*
+!/storage/.keep
+/tmp/storage/*
+!/tmp/storage/.keep
+
+# Ignore assets.
+/node_modules/
+/app/assets/builds/*
+!/app/assets/builds/.keep
+/public/assets
+
+# Ignore CI service files.
+/.github
+
+# Ignore Kamal files.
+/config/deploy*.yml
+/.kamal
+
+# Ignore development files
+/.devcontainer
+
+# Ignore Docker-related files
+/.dockerignore
+/Dockerfile*
+```
+
+`.env.production`:
+
+```production
+# ==============================
+# Application Settings
+# ==============================
+RAILS_ENV=development
+PORT=3000
+# Run `bin/rails secret` to generate a new key
+SECRET_KEY_BASE=your_long_random_secret_string_here
+RAILS_MAX_THREADS=5
+
+NODE_VERSION=v24.15.0
+
+# ==============================
+# Database Configuration (PostgreSQL)
+# ==============================
+# You can use a unified URL...
+DATABASE_URL=postgres://localhost/myapp_development
+# ...or individual connection parameters
+POSTGRES_USER=my_db_user
+POSTGRES_PASSWORD=my_db_password
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+
+# ==============================
+# Redis / Sidekiq (Background Jobs)
+# ==============================
+REDIS_URL=redis://localhost:6379/1
+
+# ==============================
+# Outbound Email (SMTP Example)
+# ==============================
+SMTP_ADDRESS=smtp.sendgrid.net
+SMTP_PORT=587
+SMTP_USERNAME=apikey
+SMTP_PASSWORD=your_email_provider_api_key
+SMTP_DOMAIN=yourdomain.com
+MAILER_SENDER_ADDRESS=noreply@yourdomain.com
+
+# ==============================
+# Cloud Storage (Active Storage / AWS S3)
+# ==============================
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+AWS_REGION=us-east-1
+AWS_BUCKET=your-app-bucket-name
+
+# ==============================
+# Third-Party APIs
+# ==============================
+STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_pub_key
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
+
+GITHUB_CLIENT_ID=your_oauth_client_id
+GITHUB_CLIENT_SECRET=your_oauth_client_secret
+```
+
+`.gitattributes`:
+
+```txt
+# See https://git-scm.com/docs/gitattributes for more about git attribute files.
+
+# Mark the database schema as having been generated.
+db/schema.rb linguist-generated
+
+# Mark any vendored files as having been vendored.
+vendor/* linguist-vendored
+config/credentials/*.yml.enc diff=rails_credentials
+config/credentials.yml.enc diff=rails_credentials
+```
+
+`.github/dependabot.yml`:
+
+```yml
+version: 2
+updates:
+- package-ecosystem: bundler
+  directory: "/"
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 10
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 10
+```
+
+`.github/workflows/ci.yml`:
+
+```yml
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [ master ]
+
+jobs:
+  scan_ruby:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Scan for common Rails security vulnerabilities using static analysis
+        run: bin/brakeman --no-pager
+      
+      - name: Scan for known security vulnerabilities in gems used
+        run: bin/bundler-audit
+      
+  scan_js:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Scan for security vulnerabilities in JavaScript dependencies
+        run: bin/importmap audit
+
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      RUBOCOP_CACHE_ROOT: tmp/rubocop
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Prepare RuboCop cache
+        uses: actions/cache@v4
+        env:
+          DEPENDENCIES_HASH: ${{ hashFiles('.ruby-version', '**/.rubocop.yml', '**/.rubocop_todo.yml', 'Gemfile.lock') }}
+        with:
+          path: ${{ env.RUBOCOP_CACHE_ROOT }}
+          key: rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-${{ github.ref_name == github.event.repository.default_branch && github.run_id || 'default' }}
+          restore-keys: |
+            rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-
+
+      - name: Lint code for consistent style
+        run: bin/rubocop -f github
+
+  test:
+    runs-on: ubuntu-latest
+
+    # services:
+    #  redis:
+    #    image: valkey/valkey:8
+    #    ports:
+    #      - 6379:6379
+    #    options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libvips
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Run tests
+        env:
+          RAILS_ENV: test
+          # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
+          # REDIS_URL: redis://localhost:6379/0
+        run: bin/rails db:test:prepare test
+
+  system-test:
+    runs-on: ubuntu-latest
+
+    # services:
+    #  redis:
+    #    image: valkey/valkey:8
+    #    ports:
+    #      - 6379:6379
+    #    options: --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libvips
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Run System Tests
+        env:
+          RAILS_ENV: test
+          # RAILS_MASTER_KEY: ${{ secrets.RAILS_MASTER_KEY }}
+          # REDIS_URL: redis://localhost:6379/0
+        run: bin/rails db:test:prepare test:system
+
+      - name: Keep screenshots from failed system tests
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: screenshots
+          path: ${{ github.workspace }}/tmp/screenshots
+          if-no-files-found: ignore
+```
+
+`.gitignore`:
+
+```txt
+*.rbc
+capybara-*.html
+.rspec
+/db/*.sqlite3
+/db/*.sqlite3-journal
+/db/*.sqlite3-[0-9]*
+/public/system
+/coverage/
+/spec/tmp
+*.orig
+rerun.txt
+pickle-email-*.html
+
+# Ignore all logfiles and tempfiles.
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+
+# TODO Comment out this rule if you are OK with secrets being uploaded to the repo
+config/initializers/secret_token.rb
+config/master.key
+
+# Only include if you have production secrets in this file, which is no longer a Rails default
+# config/secrets.yml
+
+# dotenv, dotenv-rails
+# TODO Comment out these rules if environment variables can be committed
+.env
+.env*.local
+
+## Environment normalization:
+/.bundle
+/vendor/bundle
+
+# these should all be checked in to normalize the environment:
+# Gemfile.lock, .ruby-version, .ruby-gemset
+
+# unless supporting rvm < 1.11.0 or doing something fancy, ignore this:
+.rvmrc
+
+# if using bower-rails ignore default bower_components path bower.json files
+/vendor/assets/bower_components
+*.bowerrc
+bower.json
+
+# Ignore pow environment settings
+.powenv
+
+# Ignore Byebug command history file.
+.byebug_history
+
+# Ignore node_modules
+node_modules/
+
+# Ignore precompiled javascript packs
+/public/packs
+/public/packs-test
+/public/assets
+
+# Ignore yarn files
+/yarn-error.log
+yarn-debug.log*
+.yarn-integrity
+
+# Ignore uploaded files in development
+/storage/*
+!/storage/.keep
+/public/uploads
+
+# General
+.DS_Store
+*DS_Store
+Thumbs.db
+Desktop.ini
+*.db
+*.sqlite
+*.sqlite3
+__trash__
+.Trashes
+*.log
+*.tmp
+*.temp
+*.bak
+*~
+*.swp
+*.swo
+```
+
+`.kamal/secrets`:
+
+```txt
+# Secrets defined here are available for reference under registry/password, env/secret, builder/secrets,
+# and accessories/*/env/secret in config/deploy.yml. All secrets should be pulled from either
+# password manager, ENV, or a file. DO NOT ENTER RAW CREDENTIALS HERE! This file needs to be safe for git.
+
+# Example of extracting secrets from 1password (or another compatible pw manager)
+# SECRETS=$(kamal secrets fetch --adapter 1password --account your-account --from Vault/Item KAMAL_REGISTRY_PASSWORD RAILS_MASTER_KEY)
+# KAMAL_REGISTRY_PASSWORD=$(kamal secrets extract KAMAL_REGISTRY_PASSWORD ${SECRETS})
+# RAILS_MASTER_KEY=$(kamal secrets extract RAILS_MASTER_KEY ${SECRETS})
+
+# Example of extracting secrets from Rails credentials
+# KAMAL_REGISTRY_PASSWORD=$(rails credentials:fetch kamal.registry_password)
+
+# Use a GITHUB_TOKEN if private repositories are needed for the image
+# GITHUB_TOKEN=$(gh config get -h github.com oauth_token)
+
+# Grab the registry password from ENV
+# KAMAL_REGISTRY_PASSWORD=$KAMAL_REGISTRY_PASSWORD
+
+# Improve security by using a password manager. Never check config/master.key into git!
+RAILS_MASTER_KEY=$(cat config/master.key)
+```
+
+`.nvmrc`:
+
+```txt
+v24.15.0
+```
+
+`.rubocop.yml`:
+
+```yml
+# Omakase Ruby styling for Rails
+inherit_gem: { rubocop-rails-omakase: rubocop.yml }
+
+# Overwrite or add rules to create your own house style
+#
+# # Use `[a, [b, c]]` not `[ a, [ b, c ] ]`
+# Layout/SpaceInsideArrayLiteralBrackets:
+#   Enabled: false
+```
+
+`.ruby-version`:
+
+```txt
+ruby-3.4.8
 ```
 
 `Dockerfile`:
@@ -837,6 +1298,12 @@ require_relative "config/application"
 Rails.application.load_tasks
 ```
 
+`app/assets/images/.keep`:
+
+```txt
+
+```
+
 `app/assets/stylesheets/application.css`:
 
 ```css
@@ -862,6 +1329,12 @@ class ApplicationController < ActionController::Base
   # Changes to the importmap will invalidate the etag for HTML responses
   stale_when_importmap_changes
 end
+```
+
+`app/controllers/concerns/.keep`:
+
+```txt
+
 ```
 
 `app/helpers/application_helper.rb`:
@@ -898,6 +1371,12 @@ end
 class ApplicationRecord < ActiveRecord::Base
   primary_abstract_class
 end
+```
+
+`app/models/concerns/.keep`:
+
+```txt
+
 ```
 
 `app/views/layouts/application.html.erb`:
@@ -1904,6 +2383,12 @@ local:
 #   end
 ```
 
+`lib/tasks/.keep`:
+
+```txt
+
+```
+
 `log/.keep`:
 
 ```txt
@@ -2624,7 +3109,49 @@ local:
 # See https://www.robotstxt.org/robotstxt.html for documentation on how to use the robots.txt file
 ```
 
+`script/.keep`:
+
+```txt
+
+```
+
 `storage/.keep`:
+
+```txt
+
+```
+
+`test/controllers/.keep`:
+
+```txt
+
+```
+
+`test/fixtures/files/.keep`:
+
+```txt
+
+```
+
+`test/helpers/.keep`:
+
+```txt
+
+```
+
+`test/integration/.keep`:
+
+```txt
+
+```
+
+`test/mailers/.keep`:
+
+```txt
+
+```
+
+`test/models/.keep`:
 
 ```txt
 
@@ -2651,6 +3178,12 @@ end
 ```
 
 `tmp/.keep`:
+
+```txt
+
+```
+
+`vendor/.keep`:
 
 ```txt
 

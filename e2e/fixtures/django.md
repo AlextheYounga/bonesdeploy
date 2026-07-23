@@ -2,6 +2,10 @@ Source Tree:
 
 ```txt
 django
+|-- .env.production
+|-- .gitignore
+|-- .nvmrc
+|-- .python-version
 |-- README.md
 |-- djangotest
 |   |-- __init__.py
@@ -12,6 +16,40 @@ django
 |-- manage.py
 |-- pyproject.toml
 `-- uv.lock
+```
+
+`.env.production`:
+
+```production
+PYTHON_VERSION=3.14
+NODE_VERSION=v24.15.0
+```
+
+`.gitignore`:
+
+```txt
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+```
+
+`.nvmrc`:
+
+```txt
+v24.15.0
+```
+
+`.python-version`:
+
+```txt
+3.14
 ```
 
 `README.md`:
