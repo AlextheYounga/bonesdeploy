@@ -50,6 +50,54 @@ pub fn scaffold_runtime_secrets(runtime: &str, bones_dir: &Path) -> Result<()> {
     scaffold_runtime_assets(runtime, bones_dir, paths::KIT_SECRETS_DIR)
 }
 
+pub fn scaffold_runtime_env_build(runtime: &str, project_root: &Path) -> Result<()> {
+    let Some(content) = runtime_env_build_content(runtime) else {
+        return Ok(());
+    };
+
+    let destination = project_root.join(paths::ENV_BUILD_FILE);
+    if destination.exists() {
+        return Ok(());
+    }
+
+    fs::write(&destination, content).with_context(|| format!("Failed to write {}", destination.display()))?;
+    Ok(())
+}
+
+fn runtime_env_build_content(runtime: &str) -> Option<String> {
+    let lines = match runtime {
+        "django" | "rails" => [
+            "# Committed, non-secret values used while building this project.",
+            "# Pin Node when this project includes a frontend build.",
+            "NODE_VERSION=",
+        ]
+        .as_slice(),
+        "laravel" => {
+            ["# Committed, non-secret values used while building this project.", "NODE_VERSION=", "PHP_VERSION=8.5"]
+                .as_slice()
+        }
+        "next" => [
+            "# Committed, non-secret values used while building this project.",
+            "NODE_VERSION=",
+            "NEXT_PUBLIC_API_URL=",
+            "NEXT_PUBLIC_SITE_NAME=",
+        ]
+        .as_slice(),
+        "nuxt" => [
+            "# Committed, non-secret values used while building this project.",
+            "NODE_VERSION=",
+            "NUXT_PUBLIC_SITE_URL=",
+        ]
+        .as_slice(),
+        "sveltekit" | "vue" => {
+            ["# Committed, non-secret values used while building this project.", "NODE_VERSION="].as_slice()
+        }
+        _ => return None,
+    };
+
+    Some(format!("{}\n", lines.join("\n")))
+}
+
 fn scaffold_runtime_assets(runtime: &str, bones_dir: &Path, asset_prefix: &str) -> Result<()> {
     let runtime_prefix = format!("{runtime}/");
 
@@ -98,11 +146,40 @@ fn runtime_defaults_from_bytes(asset_path: &str, bytes: Option<impl AsRef<[u8]>>
 mod tests {
     use anyhow::Result;
 
-    use super::{Runtime, RuntimeAssets, runtime_defaults, runtime_names};
+    use std::fs;
+
+    use super::{
+        Runtime, RuntimeAssets, runtime_defaults, runtime_env_build_content, runtime_names, scaffold_runtime_env_build,
+    };
 
     #[test]
     fn next_runtime_includes_the_build_script() {
         assert!(RuntimeAssets::get("next/deployment/build/02_run_build.sh").is_some());
+    }
+
+    #[test]
+    fn every_runtime_has_a_build_environment_example() {
+        for runtime in runtime_names() {
+            assert!(runtime_env_build_content(&runtime).is_some(), "{runtime} is missing .env.build");
+        }
+    }
+
+    #[test]
+    fn runtime_build_environment_example_does_not_overwrite_existing_file() -> Result<()> {
+        let root = std::env::temp_dir().join(format!("bonesdeploy-runtime-env-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root)?;
+
+        scaffold_runtime_env_build("next", &root)?;
+        let generated = fs::read_to_string(root.join(".env.build"))?;
+        assert!(generated.contains("NEXT_PUBLIC_API_URL="));
+
+        fs::write(root.join(".env.build"), "CUSTOM=value\n")?;
+        scaffold_runtime_env_build("next", &root)?;
+        assert_eq!(fs::read_to_string(root.join(".env.build"))?, "CUSTOM=value\n");
+
+        fs::remove_dir_all(root).ok();
+        Ok(())
     }
 
     #[test]

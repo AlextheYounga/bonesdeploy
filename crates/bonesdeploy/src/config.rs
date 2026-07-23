@@ -113,10 +113,20 @@ mod tests {
     }
 
     fn minimal_toml(project_name: &str) -> String {
-        format!(
-            "[app]\nremote_name = \"production\"\nproject_name = \"{project_name}\"\nrepo_path = \"{}\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.deploy]\nbranch = \"master\"\ndeploy_on_push = true\n",
-            paths::default_repo_path_for(project_name)
-        )
+        [
+            "[app]".to_string(),
+            "remote_name = \"production\"".to_string(),
+            format!("project_name = \"{project_name}\""),
+            format!("repo_path = \"{}\"", paths::default_repo_path_for(project_name)),
+            "[app.server]".to_string(),
+            "host = \"deploy.example.com\"".to_string(),
+            "port = \"22\"".to_string(),
+            "[app.deploy]".to_string(),
+            "branch = \"master\"".to_string(),
+            "deploy_on_push = true".to_string(),
+        ]
+        .join("\n")
+            + "\n"
     }
 
     fn sample_config(project_name: &str) -> Bones {
