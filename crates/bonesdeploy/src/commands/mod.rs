@@ -1,6 +1,6 @@
 pub(crate) mod config;
 
-pub mod deploy_project;
+pub mod deploy;
 pub mod doctor;
 pub mod init;
 pub mod push_state;

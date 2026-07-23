@@ -2,8 +2,8 @@ use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, ReleasesCommand, RemoteCommand, SecretsCommand};
 use crate::commands::{
-    config, deploy_project, doctor, init, push_state, releases, remote, rollback, secrets, setup, skill, status,
-    update, version,
+    config, deploy, doctor, init, push_state, releases, remote, rollback, secrets, setup, skill, status, update,
+    version,
 };
 // ponytail: direct command dispatch keeps CLI routing visible; split only if commands need shared dispatch state.
 #[expect(clippy::cognitive_complexity)]
@@ -34,7 +34,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             SecretsCommand::Edit => secrets::edit(),
             SecretsCommand::Push => secrets::push().await,
         },
-        Command::Deploy => deploy_project::run().await,
+        Command::Deploy => deploy::run().await,
         Command::Releases { command } => match command {
             None => releases::list().await,
             Some(ReleasesCommand::Kill { release }) => releases::kill(release).await,

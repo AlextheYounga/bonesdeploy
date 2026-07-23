@@ -12,7 +12,7 @@ mod laravel;
 mod next;
 mod nuxt;
 mod rails;
-mod svelte;
+mod sveltekit;
 mod vue;
 
 /// A promptable runtime question, lifted verbatim from bonesinfra's old
@@ -50,7 +50,7 @@ pub fn questions(template: &str) -> Result<&'static [Question]> {
         "next" => next::questions(),
         "nuxt" => nuxt::questions(),
         "rails" => rails::questions(),
-        "sveltekit" => svelte::questions(),
+        "sveltekit" => sveltekit::questions(),
         "vue" => vue::questions(),
         other => bail!("unknown runtime template: {other}"),
     })
@@ -98,7 +98,7 @@ pub fn environment_example(template: &str, project_name: &str) -> Option<String>
         "next" => next::environment_example(project_name),
         "nuxt" => nuxt::environment_example(project_name),
         "rails" => rails::environment_example(project_name),
-        "sveltekit" => svelte::environment_example(project_name),
+        "sveltekit" => sveltekit::environment_example(project_name),
         "vue" => vue::environment_example(project_name),
         _ => return None,
     })
@@ -111,7 +111,7 @@ pub(crate) fn build_environment_example(template: &str) -> Option<String> {
         "next" => next::build_environment_example(),
         "nuxt" => nuxt::build_environment_example(),
         "rails" => rails::build_environment_example(),
-        "sveltekit" => svelte::build_environment_example(),
+        "sveltekit" => sveltekit::build_environment_example(),
         "vue" => vue::build_environment_example(),
         _ => return None,
     })

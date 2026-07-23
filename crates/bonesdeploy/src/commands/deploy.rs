@@ -25,17 +25,13 @@ pub async fn run() -> Result<()> {
         style(&cfg.host).dim(),
     );
 
-    // Ensure local .bones/ is published into the remote control plane before triggering deploy.
     push_state::sync_bones_directory(&cfg).context("Failed to publish .bones to bonesremote.")?;
 
     let session = ssh::connect_privileged(&cfg).await?;
-
     let command = format!("bonesremote deploy --site {}", ssh::shell_quote(&cfg.project_name));
     ssh::stream_cmd(&session, &command).await?;
-
     session.close().await?;
 
     println!("{} Deployment complete.", output::success_marker());
-
     Ok(())
 }
