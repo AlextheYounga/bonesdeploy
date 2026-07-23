@@ -34,7 +34,7 @@ pub fn default_project_root_for(project_name: &str) -> String {
 }
 
 pub fn bones_config_dir(project_name: &str) -> PathBuf {
-    paths::bones_config_root().join(format!("{project_name}.bones"))
+    paths::bones_projects_root().join(format!("{project_name}.bones"))
 }
 
 pub fn repo_directory_name() -> Result<String> {

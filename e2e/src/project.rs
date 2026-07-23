@@ -4,7 +4,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::session::Session;
 use crate::{keep_artifacts, scratch_dir, status_ok, unique_suffix};
@@ -39,6 +39,19 @@ impl SampleProject {
 
     pub fn commit(&self, session: &Session, message: &str) -> Result<()> {
         self.git(session, &["add", "-A"])?;
+
+        let staged = session
+            .command("git")
+            .current_dir(&self.dir)
+            .args(["diff", "--cached", "--quiet"])
+            .status()
+            .context("Failed to inspect staged project changes")?;
+        match staged.code() {
+            Some(0) => return Ok(()),
+            Some(1) => {}
+            _ => bail!("git diff --cached --quiet failed ({staged})"),
+        }
+
         self.git(session, &["commit", "-m", message])
     }
 

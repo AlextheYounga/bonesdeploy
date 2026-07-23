@@ -64,7 +64,7 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     }
 
     scaffold::update_gitignore()?;
-    scaffold::ensure_config_gitignore(&cfg.project_name)?;
+    scaffold::ensure_config_gitignore()?;
     scaffold::ensure_env_build()?;
     bones_config::save(&cfg, bones_toml)?;
     secrets::initialize_defaults(&cfg)?;
@@ -243,7 +243,7 @@ mod tests {
             let config_gitignore = paths::bones_config_root().join(".gitignore");
             assert!(config_gitignore.is_file());
             let gitignore_content = fs::read_to_string(config_gitignore)?;
-            assert!(gitignore_content.contains("_lib"));
+            assert!(gitignore_content.contains("projects/"));
             assert!(gitignore_content.contains("atlas.bones"));
 
             Ok(())

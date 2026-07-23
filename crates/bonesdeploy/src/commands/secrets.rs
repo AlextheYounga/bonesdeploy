@@ -21,7 +21,17 @@ const LOCAL_ENV_SECRET: &str = ".bones/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
 
 fn gpg_home() -> PathBuf {
-    paths::bones_config_lib_root().join("gnupg")
+    let current = paths::bones_data_root().join("gnupg");
+    if current.exists() {
+        return current;
+    }
+
+    let legacy = paths::bones_config_root().join("_lib/gnupg");
+    if legacy.exists() {
+        return legacy;
+    }
+
+    current
 }
 
 fn gpg_command() -> Command {

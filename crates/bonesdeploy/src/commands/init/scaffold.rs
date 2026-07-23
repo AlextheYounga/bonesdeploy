@@ -68,14 +68,14 @@ pub(super) fn update_gitignore() -> Result<()> {
     Ok(())
 }
 
-pub(super) fn ensure_config_gitignore(project_name: &str) -> Result<()> {
+pub(super) fn ensure_config_gitignore() -> Result<()> {
     let gitignore = paths::bones_config_root().join(".gitignore");
-    let project_entry = format!("{project_name}.bones");
+    let project_entry = format!("{}/", paths::BONES_CONFIG_PROJECTS_DIR);
 
     if gitignore.exists() {
         let content = fs::read_to_string(&gitignore)?;
         let mut missing = Vec::new();
-        for entry in [paths::BONES_CONFIG_LIB_DIR, &project_entry] {
+        for entry in [&project_entry] {
             if !content.lines().any(|line| line.trim() == entry) {
                 missing.push(entry);
             }
@@ -91,11 +91,7 @@ pub(super) fn ensure_config_gitignore(project_name: &str) -> Result<()> {
         }
         fs::write(&gitignore, format!("{content}{separator}{append}"))?;
     } else {
-        let mut content = String::new();
-        for entry in [paths::BONES_CONFIG_LIB_DIR, &project_entry] {
-            content.push_str(entry);
-            content.push('\n');
-        }
+        let content = format!("{project_entry}\n");
         fs::write(&gitignore, content)?;
     }
 

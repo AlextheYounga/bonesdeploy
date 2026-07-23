@@ -71,9 +71,9 @@ impl Session {
     }
 
     /// A command wired to this session: fake `HOME`, no ssh-agent, a
-    /// persistent `XDG_CONFIG_HOME` so the materialized bonesinfra venv is
-    /// cached across runs, and `bin/` prepended to PATH so the session ssh
-    /// shim intercepts every bare `ssh` invocation in the process tree.
+    /// isolated XDG config, data, and cache roots, and `bin/` prepended to
+    /// PATH so the session ssh shim intercepts every bare `ssh` invocation in
+    /// the process tree.
     pub fn command(&self, program: impl AsRef<OsStr>) -> Command {
         let bin_dir = self.home.join("bin");
         let path = match std::env::var_os("PATH") {
@@ -88,6 +88,8 @@ impl Session {
         command
             .env("HOME", &self.home)
             .env("XDG_CONFIG_HOME", scratch_dir().join("xdg-config"))
+            .env("XDG_DATA_HOME", scratch_dir().join("xdg-data"))
+            .env("XDG_CACHE_HOME", scratch_dir().join("xdg-cache"))
             .env("PATH", path)
             .env_remove("SSH_AUTH_SOCK");
         command

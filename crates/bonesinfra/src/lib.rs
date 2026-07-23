@@ -1,7 +1,7 @@
 //! Embedded bonesinfra Python runtime.
 //!
 //! The Python package under `python/` is embedded into the binary and
-//! materialized on demand into `~/.config/bonesdeploy/_lib/bonesinfra`,
+//! materialized on demand into `~/.cache/bonesdeploy/bonesinfra`,
 //! where a venv is created and the package installed. A content-hash stamp
 //! keeps the materialized copy in sync with the embedded source: any change
 //! to the embedded tree triggers a fresh extraction and reinstall.
@@ -193,7 +193,7 @@ fn setup_venv(checkout: &Path) -> Result<()> {
 }
 
 fn checkout_dir() -> PathBuf {
-    paths::bones_config_lib_root().join(CHECKOUT_DIR)
+    paths::bones_cache_root().join(CHECKOUT_DIR)
 }
 
 #[cfg(test)]

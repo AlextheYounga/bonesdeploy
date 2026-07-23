@@ -4,7 +4,6 @@ use anyhow::{Result, bail};
 use shared::paths;
 
 use crate::config;
-use crate::infra::bonesinfra;
 use crate::infra::git;
 use crate::ui::{output, prompts};
 

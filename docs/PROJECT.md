@@ -73,7 +73,7 @@ BonesRemote holds one OS-backed deployment lock per site. Deploys, cancellations
 │       └── 01_prepare.sh
 ```
 
-Python infra scripts and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`), are embedded into the `bonesdeploy` binary, and are materialized on demand into a venv under `~/.config/bonesdeploy/_lib/bonesinfra`; see `crates/bonesinfra/src/lib.rs`.
+Python infra scripts and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`), are embedded into the `bonesdeploy` binary, and are materialized on demand into a venv under `~/.cache/bonesdeploy/bonesinfra`; see `crates/bonesinfra/src/lib.rs`. Project configuration lives under `~/.config/bonesdeploy/projects`, while the application GPG keyring lives under `~/.local/share/bonesdeploy/gnupg`.
 
 ### Bones TOML
 This stores crucial data we will need and is collected on running `bonesdeploy init` via user prompts.  
@@ -220,7 +220,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 ### BonesDeploy CLI Commands
 - **init**:
   - Loads existing config from `.bones/bones.toml` or collects user input via prompts.
-  - For fresh init, waits until prompts complete before creating `.config/bonesdeploy/<project>.bones/` and the local `.bones` symlink.
+  - For fresh init, waits until prompts complete before creating `.config/bonesdeploy/projects/<project>.bones/` and the local `.bones` symlink.
   - Updates `.gitignore` to add .bones folder.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy remote setup` and `bonesdeploy remote runtime` before first deploy.
@@ -233,7 +233,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Checks are reported as pass, pending, or failure. A pending first Git push is expected after remote setup and exits successfully; broken prerequisites still exit non-zero.
   - Loads config from `.bones/bones.toml`
   - Runs local checks:
-    - `.bones` folder exists and is a symlink (warns if it is not a symlink to `~/.config/bonesdeploy/<project>.bones/`).
+    - `.bones` folder exists and is a symlink (warns if it is not a symlink to `~/.config/bonesdeploy/projects/<project>.bones/`).
     - Deployment scripts under `.bones/deployment/build/` and `.bones/deployment/prepare/` are ordered with numeric prefixes.
     - Local `pre-push` guard is installed properly when `deploy_on_push = true`. Checks for the presence and version marker in the baked script.
   - Runs remote checks (skipped with `--local`):

@@ -39,7 +39,7 @@ framework template on an already-provisioned box.
 ## What you actually own
 
 A directory called `.bones/` in your repo. It's a symlink to
-`~/.config/bonesdeploy/<project>.bones/`. Inside:
+`~/.config/bonesdeploy/projects/<project>.bones/`. Inside:
 
 - `bones.toml` — the project's configuration. Edit it by hand. It's the source of truth.
 - `deployment/build/NN_*.sh` — runs in a container during build.
