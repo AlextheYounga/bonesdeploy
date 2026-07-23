@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
+use serde_json::Value;
 use shared::config::{self, build_group_for, build_user_for, extract_env_vars, load_buildtime, load_runtime};
 use shared::paths;
 
@@ -70,7 +71,8 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
 fn resolve_build_env(site: &str, cfg: &config::Bones) -> Result<Vec<(String, String)>> {
     let buildtime = load_buildtime(&paths::bonesremote_site_root(site))?.unwrap_or_default();
 
-    let mut env_vars: Vec<(String, String)> = buildtime.extra.into_iter().collect();
+    let mut env_vars = derived_config_env(cfg)?;
+    env_vars.extend(buildtime.extra);
 
     if buildtime.vars.is_empty() {
         return Ok(env_vars);
@@ -94,6 +96,55 @@ fn resolve_build_env(site: &str, cfg: &config::Bones) -> Result<Vec<(String, Str
 
     env_vars.extend(vars);
     Ok(env_vars)
+}
+
+const DERIVED_ENV_DENYLIST: &[&str] = &[
+    "runtime.permissions",
+    "runtime.shared",
+    "runtime.runtime_user",
+    "runtime.runtime_group",
+    "runtime.release_group",
+    "app.server.host",
+    "app.server.port",
+    "app.dns",
+    "app.ssl_enabled",
+];
+
+fn derived_config_env(cfg: &config::Bones) -> Result<Vec<(String, String)>> {
+    let value = serde_json::to_value(cfg).context("Failed to serialize configuration for build environment")?;
+    let mut values = Vec::new();
+    flatten_scalars(&value, &mut Vec::new(), &mut values);
+    Ok(values)
+}
+
+fn flatten_scalars<'a>(value: &'a Value, path: &mut Vec<&'a str>, values: &mut Vec<(String, String)>) {
+    match value {
+        Value::Object(entries) => {
+            for (key, value) in entries {
+                path.push(key);
+                flatten_scalars(value, path, values);
+                path.pop();
+            }
+        }
+        Value::String(value) => add_scalar(path, value, values),
+        Value::Bool(value) => add_scalar(path, &value.to_string(), values),
+        Value::Number(value) => add_scalar(path, &value.to_string(), values),
+        Value::Array(_) | Value::Null => {}
+    }
+}
+
+fn add_scalar(path: &[&str], value: &str, values: &mut Vec<(String, String)>) {
+    let path_name = path.join(".");
+    if path.is_empty()
+        || DERIVED_ENV_DENYLIST
+            .iter()
+            .any(|denied| path_name == *denied || path_name.starts_with(&format!("{denied}.")))
+    {
+        return;
+    }
+
+    let name = format!("BONES_{}", path.join("_").to_ascii_uppercase());
+    values.push((name, value.to_string()));
 }
 
 fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
@@ -130,8 +181,9 @@ mod tests {
     use std::process;
 
     use anyhow::Result;
+    use shared::config::load;
 
-    use super::list_scripts;
+    use super::{derived_config_env, list_scripts};
 
     #[test]
     fn list_scripts_only_includes_numbered_shell_scripts() -> Result<()> {
@@ -151,6 +203,28 @@ mod tests {
         assert_eq!(scripts, vec![root.join("01_first.sh"), root.join("02_second.sh")]);
 
         fs::remove_dir_all(&root).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn derived_environment_exports_scalars_but_not_operational_config() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-derived-env-{}", process::id()));
+        fs::create_dir_all(&root)?;
+        fs::write(
+            root.join("bones.toml"),
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"nuxt\"\nweb_root = \".output/public\"\nis_static = true\n",
+        )?;
+        let cfg = load(&root.join("bones.toml"))?;
+
+        let env = derived_config_env(&cfg)?;
+
+        assert!(env.contains(&("BONES_RUNTIME_TEMPLATE".to_string(), "nuxt".to_string())));
+        assert!(env.contains(&("BONES_RUNTIME_IS_STATIC".to_string(), "true".to_string())));
+        assert!(env.contains(&("BONES_APP_PROJECT_NAME".to_string(), "demo".to_string())), "{env:?}");
+        assert!(!env.iter().any(|(key, _)| key == "BONES_APP_SERVER_HOST"));
+        assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_APP_DNS_")));
+        assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_RUNTIME_SHARED_")));
+        fs::remove_dir_all(root).ok();
         Ok(())
     }
 }
