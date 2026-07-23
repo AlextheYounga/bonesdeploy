@@ -122,6 +122,7 @@ fn add_numbered_scripts(files: &mut Vec<PathBuf>, directory: &Path, name: &str) 
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::os::unix::fs::symlink;
     use std::path::Path;
     use std::process::Command;
 
@@ -153,7 +154,7 @@ mod tests {
         fs::write(bones.join("deployment/build/nested/02_nested.sh"), "#!/bin/bash\n")?;
         fs::write(bones.join("deployment/prepare/02_prepare.sh"), "#!/bin/bash\n")?;
         fs::write(bones.join("deployment/prepare/03_prepare.py"), "print()\n")?;
-        std::os::unix::fs::symlink("01_build.sh", bones.join("deployment/build/04_link.sh"))?;
+        symlink("01_build.sh", bones.join("deployment/build/04_link.sh"))?;
 
         let archive = temp.path().join("state.tar.gz");
         fs::write(&archive, archive_bones_directory_at(&bones)?)?;
@@ -178,7 +179,7 @@ mod tests {
         let bones = temp.path().join("bones");
         fs::create_dir_all(&bones)?;
         fs::write(bones.join("actual.toml"), "[app]\n")?;
-        std::os::unix::fs::symlink("actual.toml", bones.join("bones.toml"))?;
+        symlink("actual.toml", bones.join("bones.toml"))?;
 
         assert!(archive_bones_directory_at(&bones).is_err());
         Ok(())

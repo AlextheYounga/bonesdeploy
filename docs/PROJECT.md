@@ -95,7 +95,7 @@ Everything else is defaulted or derived for Debian/Ubuntu-first usability:
 
 Users can override any default by editing `.bones/bones.toml` after init.
 
-`[dbs].services` is selected during init (or with repeated non-interactive `--db` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost, generates credentials on the host, and writes connection values only to the protected `shared/.env`. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
+`[dbs].services` is selected during init (or with repeated non-interactive `--db` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost, generates credentials on the host, and writes connection values only to the protected `shared/.env`. Redis and Valkey use separate per-project instances; PostgreSQL, MariaDB, MySQL, and MongoDB use database-scoped accounts. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
 
 Example `bones.toml`:
 ```toml
