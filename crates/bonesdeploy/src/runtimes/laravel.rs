@@ -40,6 +40,5 @@ pub(crate) fn build_environment_example(runtime: &Runtime) -> String {
     super::join_env_lines(&[
         super::BUILD_ENV_HEADER,
         super::NODE_VERSION_DEFAULT,
-        &format!("PHP_VERSION={php_version}"),
     ])
 }
