@@ -10,3 +10,11 @@ pub(crate) fn configure(cfg: &mut Bones) {
         cfg.runtime.web_root = String::from(".output/public");
     }
 }
+
+pub(crate) fn environment_example() -> String {
+    super::join_env_lines(&["NODE_ENV=production", "NUXT_PUBLIC_SITE_URL=https://example.com"])
+}
+
+pub(crate) fn build_environment_example() -> String {
+    super::join_env_lines(&[super::BUILD_ENV_HEADER, "NODE_VERSION=", "NUXT_PUBLIC_SITE_URL="])
+}

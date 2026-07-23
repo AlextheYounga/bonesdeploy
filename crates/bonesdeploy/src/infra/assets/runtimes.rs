@@ -11,6 +11,7 @@ use shared::config::Runtime;
 use shared::paths;
 
 use super::{kit, write_asset};
+use crate::runtimes;
 
 #[derive(Embed)]
 #[folder = "./assets/runtimes/"]
@@ -47,7 +48,7 @@ pub fn scaffold_runtime_deployment(runtime: &str, bones_dir: &Path) -> Result<()
 }
 
 pub fn scaffold_runtime_env_build(runtime: &str, project_root: &Path) -> Result<()> {
-    let Some(content) = runtime_env_build_content(runtime) else {
+    let Some(content) = runtimes::build_environment_example(runtime) else {
         return Ok(());
     };
 
@@ -58,40 +59,6 @@ pub fn scaffold_runtime_env_build(runtime: &str, project_root: &Path) -> Result<
 
     fs::write(&destination, content).with_context(|| format!("Failed to write {}", destination.display()))?;
     Ok(())
-}
-
-fn runtime_env_build_content(runtime: &str) -> Option<String> {
-    let lines = match runtime {
-        "django" | "rails" => [
-            "# Committed, non-secret values used while building this project.",
-            "# Pin Node when this project includes a frontend build.",
-            "NODE_VERSION=",
-        ]
-        .as_slice(),
-        "laravel" => {
-            ["# Committed, non-secret values used while building this project.", "NODE_VERSION=", "PHP_VERSION=8.5"]
-                .as_slice()
-        }
-        "next" => [
-            "# Committed, non-secret values used while building this project.",
-            "NODE_VERSION=",
-            "NEXT_PUBLIC_API_URL=",
-            "NEXT_PUBLIC_SITE_NAME=",
-        ]
-        .as_slice(),
-        "nuxt" => [
-            "# Committed, non-secret values used while building this project.",
-            "NODE_VERSION=",
-            "NUXT_PUBLIC_SITE_URL=",
-        ]
-        .as_slice(),
-        "sveltekit" | "vue" => {
-            ["# Committed, non-secret values used while building this project.", "NODE_VERSION="].as_slice()
-        }
-        _ => return None,
-    };
-
-    Some(format!("{}\n", lines.join("\n")))
 }
 
 fn scaffold_runtime_assets(runtime: &str, bones_dir: &Path, asset_prefix: &str) -> Result<()> {
@@ -140,13 +107,12 @@ fn runtime_defaults_from_bytes(asset_path: &str, bytes: Option<impl AsRef<[u8]>>
 
 #[cfg(test)]
 mod tests {
+    use crate::runtimes;
     use anyhow::Result;
 
     use std::fs;
 
-    use super::{
-        Runtime, RuntimeAssets, runtime_defaults, runtime_env_build_content, runtime_names, scaffold_runtime_env_build,
-    };
+    use super::{Runtime, RuntimeAssets, runtime_defaults, runtime_names, scaffold_runtime_env_build};
 
     #[test]
     fn next_runtime_includes_the_build_script() {
@@ -156,7 +122,7 @@ mod tests {
     #[test]
     fn every_runtime_has_a_build_environment_example() {
         for runtime in runtime_names() {
-            assert!(runtime_env_build_content(&runtime).is_some(), "{runtime} is missing .env.build");
+            assert!(runtimes::build_environment_example(&runtime).is_some(), "{runtime} is missing .env.build");
         }
     }
 

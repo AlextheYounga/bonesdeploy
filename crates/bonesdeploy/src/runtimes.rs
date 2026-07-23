@@ -5,6 +5,7 @@ use shared::config::bonesinfra_input;
 
 /// Shared question keys used by more than one template.
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
+const BUILD_ENV_HEADER: &str = "# Committed, non-secret values used while building this project.";
 
 mod django;
 mod laravel;
@@ -90,13 +91,44 @@ pub fn configure(template: &str, cfg: &mut Bones) {
     }
 }
 
+#[cfg_attr(not(test), expect(dead_code))]
+pub fn environment_example(template: &str) -> Option<String> {
+    Some(match template {
+        "django" => django::environment_example(),
+        "laravel" => laravel::environment_example(),
+        "next" => next::environment_example(),
+        "nuxt" => nuxt::environment_example(),
+        "rails" => rails::environment_example(),
+        "sveltekit" => svelte::environment_example(),
+        "vue" => vue::environment_example(),
+        _ => return None,
+    })
+}
+
+pub(crate) fn build_environment_example(template: &str) -> Option<String> {
+    Some(match template {
+        "django" => django::build_environment_example(),
+        "laravel" => laravel::build_environment_example(),
+        "next" => next::build_environment_example(),
+        "nuxt" => nuxt::build_environment_example(),
+        "rails" => rails::build_environment_example(),
+        "sveltekit" => svelte::build_environment_example(),
+        "vue" => vue::build_environment_example(),
+        _ => return None,
+    })
+}
+
+pub(crate) fn join_env_lines(lines: &[&str]) -> String {
+    format!("{}\n", lines.join("\n"))
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::{Result, bail};
     use serde_json::{Map, Value, json};
     use shared::config::Bones;
 
-    use super::{configure, questions, validate_answers};
+    use super::{configure, environment_example, questions, validate_answers};
 
     fn bones_with_runtime(template: &str, extra: Map<String, Value>) -> Result<Bones> {
         let mut config = Bones::default();
@@ -117,6 +149,13 @@ mod tests {
             questions(template)?;
         }
         Ok(())
+    }
+
+    #[test]
+    fn every_template_has_an_environment_example() {
+        for template in ["laravel", "django", "next", "nuxt", "rails", "sveltekit", "vue"] {
+            assert!(environment_example(template).is_some(), "missing environment example for {template}");
+        }
     }
 
     #[test]
