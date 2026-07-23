@@ -90,6 +90,9 @@ impl Harness {
             init_args.extend(["--runtime-var", *runtime_var]);
         }
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &init_args)?;
+        if template == "laravel" {
+            project.generate_laravel_app_key(&self.session, &self.artifacts.bonesdeploy)?;
+        }
         project.commit(&self.session, "bonesdeploy init")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["setup", "--yes"])?;
         self.assert_site(site)?;

@@ -1,6 +1,7 @@
 //! A minimal sample repository to run bonesdeploy commands against.
 
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
@@ -39,6 +40,26 @@ impl SampleProject {
     pub fn commit(&self, session: &Session, message: &str) -> Result<()> {
         self.git(session, &["add", "-A"])?;
         self.git(session, &["commit", "-m", message])
+    }
+
+    pub fn generate_laravel_app_key(&self, session: &Session, binary: &Path) -> Result<()> {
+        let editor = self.dir.join(".bones-e2e-secrets-editor.sh");
+        fs::write(
+            &editor,
+            "#!/usr/bin/env bash\nset -euo pipefail\nkey=$(openssl rand -base64 32 | tr -d '\\n')\nsed -i \"s|^APP_KEY=.*|APP_KEY=base64:$key|\" \"$1\"\n",
+        )?;
+        fs::set_permissions(&editor, fs::Permissions::from_mode(0o700))?;
+
+        let editor_path = editor.to_string_lossy().into_owned();
+        let status = session
+            .command(binary)
+            .current_dir(&self.dir)
+            .args(["secrets", "edit"])
+            .env("EDITOR", editor_path)
+            .status()
+            .with_context(|| "Failed to run bonesdeploy secrets edit")?;
+        fs::remove_file(&editor).ok();
+        status_ok(status, "bonesdeploy secrets edit")
     }
 
     /// Runs the given bonesdeploy binary in the project directory with output
