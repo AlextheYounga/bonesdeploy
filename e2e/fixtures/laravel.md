@@ -501,12 +501,12 @@ LOG_DEPRECATIONS_CHANNEL=null
 LOG_LEVEL=debug
 
 DB_CONNECTION=sqlite
-DB_DATABASE=/srv/sites/laraveltest/shared/database.sqlite
+DB_DATABASE=/srv/sites/e2elaravel/shared/database.sqlite
 
-LARAVEL_STORAGE_PATH=/srv/sites/laraveltest/shared/storage
-VIEW_COMPILED_PATH=/srv/sites/laraveltest/shared/storage/framework/views
-CACHE_PATH=/srv/sites/laraveltest/shared/cache
-UPLOADS_PATH=/srv/sites/laraveltest/shared/uploads
+LARAVEL_STORAGE_PATH=/srv/sites/e2elaravel/shared/storage
+VIEW_COMPILED_PATH=/srv/sites/e2elaravel/shared/storage/framework/views
+CACHE_PATH=/srv/sites/e2elaravel/shared/cache
+UPLOADS_PATH=/srv/sites/e2elaravel/shared/uploads
 
 # DB_HOST=127.0.0.1
 # DB_PORT=3306
