@@ -1,7 +1,7 @@
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use openssh::{KnownHosts, Session, SessionBuilder, Stdio};
+use openssh::{Session, SessionBuilder, Stdio};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use crate::config::Bones;
@@ -23,8 +23,10 @@ pub async fn connect_privileged(config: &Bones) -> Result<Session> {
 }
 
 pub async fn connect_as(user: &str, host: &str, port: u16) -> Result<Session> {
+    // Default KnownHosts::Add is accept-new: an unknown host key is enrolled on
+    // first contact, but a *changed* key is rejected. Never use KnownHosts::Accept
+    // (which maps to StrictHostKeyChecking=no) for control-plane SSH.
     SessionBuilder::default()
-        .known_hosts_check(KnownHosts::Accept)
         .user(user.into())
         .port(port)
         .connect(host)
