@@ -17,6 +17,7 @@ pub struct Args {
     pub port: Option<String>,
     pub template: Option<String>,
     pub runtime_vars: Vec<String>,
+    pub dbs: Vec<String>,
 }
 
 use crate::commands::secrets;
@@ -53,6 +54,10 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
         if is_fresh { config::collect_fresh_config(args)? } else { config::load_or_collect_config(bones_toml, args)? };
     let runtime_selection =
         if is_fresh { Some(runtime::collect_runtime_config(args, &cfg.project_name)?) } else { None };
+
+    if is_fresh {
+        cfg.dbs.services = runtime::collect_database_services(args)?;
+    }
 
     if let Some(runtime) = runtime_selection {
         scaffold::materialize_fresh_bones(bones_dir, had_bones_entry, &mut cfg, runtime)?;
@@ -174,6 +179,7 @@ mod tests {
             port: None,
             template: None,
             runtime_vars: Vec::new(),
+            dbs: Vec::new(),
         }
     }
 
@@ -211,6 +217,8 @@ mod tests {
             let bones_dir = repo_dir.join(".bones");
             assert!(bones_dir.join("bones.toml").is_file());
             assert!(bones_dir.join("bones.toml").is_file());
+            let custom = fs::read_to_string(bones_dir.join("custom.py"))?;
+            assert!(custom.contains("Local-only BonesInfra extension hooks"));
             assert!(!bones_dir.join("hooks").exists(), ".bones should not contain a hooks/ directory");
             let deploy_dir = bones_dir.join("deployment");
             assert!(deploy_dir.is_dir());

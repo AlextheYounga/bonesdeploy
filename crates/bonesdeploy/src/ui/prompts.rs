@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow, bail};
 use console::style;
-use inquire::{Confirm, Select, Text};
+use inquire::{Confirm, MultiSelect, Select, Text};
 use serde_json::Value;
 
 use crate::config::Bones;
@@ -93,6 +93,14 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
     let template_name = available_templates[idx].clone();
 
     Ok(Some(template_name))
+}
+
+pub fn choose_database_services(services: &[&str]) -> Result<Vec<String>> {
+    MultiSelect::new("Database services:", services.to_vec())
+        .with_help_message("All services listen on localhost; use SSH port forwarding for remote access.")
+        .prompt()
+        .map(|selected| selected.into_iter().map(str::to_string).collect())
+        .map_err(|err| anyhow!(err))
 }
 
 pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bones>) -> Result<String> {
@@ -226,6 +234,13 @@ pub fn confirm_remote_ssl() -> Result<bool> {
 
 pub fn confirm_remote_helpers() -> Result<bool> {
     confirm_prompt("Install remote helper tools?", "Helper tools install shell and editor utilities on the server.")
+}
+
+pub fn confirm_remote_dbs() -> Result<bool> {
+    confirm_prompt(
+        "Provision database services?",
+        "Database services will be bound to localhost and credentials written to shared/.env.",
+    )
 }
 
 fn confirm_prompt(prompt: &str, message: &str) -> Result<bool> {

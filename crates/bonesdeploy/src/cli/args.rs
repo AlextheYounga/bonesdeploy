@@ -35,6 +35,9 @@ pub enum Command {
         /// Runtime variable override, repeated (e.g. `--runtime-var php_version=8.5`)
         #[arg(long = "runtime-var", value_name = "KEY=VALUE")]
         runtime_vars: Vec<String>,
+        /// Database service to provision, repeated (postgres, mariadb, mysql, mongodb, valkey, redis)
+        #[arg(long = "db", value_name = "SERVICE")]
+        dbs: Vec<String>,
     },
     /// Run the full first-time deployment setup
     Setup {
@@ -148,6 +151,12 @@ pub enum RemoteCommand {
     /// Install helper tools on the remote host (starship, neovim, aptui, etc.)
     Helpers {
         /// Skip helper installation confirmation prompts
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Provision configured database services (bound to localhost only)
+    Dbs {
+        /// Skip database setup confirmation prompt
         #[arg(long)]
         yes: bool,
     },

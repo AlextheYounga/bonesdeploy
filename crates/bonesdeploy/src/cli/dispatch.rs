@@ -9,7 +9,7 @@ use crate::commands::{
 #[expect(clippy::cognitive_complexity)]
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init { non_interactive, project_name, branch, remote, host, port, template, runtime_vars } => {
+        Command::Init { non_interactive, project_name, branch, remote, host, port, template, runtime_vars, dbs } => {
             init::run(&init::Args {
                 non_interactive: *non_interactive,
                 project_name: project_name.clone(),
@@ -19,6 +19,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 port: port.clone(),
                 template: template.clone(),
                 runtime_vars: runtime_vars.clone(),
+                dbs: dbs.clone(),
             })?;
             Ok(())
         }
@@ -46,6 +47,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             RemoteCommand::Runtime { yes } => remote::runtime::run(*yes, true),
             RemoteCommand::Ssl { yes, domain, email } => remote::ssl::run(*yes, domain.clone(), email.clone()),
             RemoteCommand::Helpers { yes } => remote::helpers::run(*yes),
+            RemoteCommand::Dbs { yes } => remote::dbs::run(*yes, true),
         },
         Command::Rollback => rollback::run().await,
         Command::Config { file, key } => config::run(file.as_deref(), key.as_deref()),

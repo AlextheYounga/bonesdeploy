@@ -15,6 +15,7 @@ pub async fn run(skip_confirm: bool) -> Result<()> {
     println!("{} {}", style("Setting up").cyan().bold(), style(&cfg.host).bold());
 
     remote::bootstrap::run(skip_confirm, false).with_context(|| setup_error("bootstrapping remote server"))?;
+    remote::dbs::run(true, false).with_context(|| setup_error("provisioning databases"))?;
     remote::runtime::run(true, false).with_context(|| setup_error("applying runtime"))?;
     push_state::run(false).with_context(|| setup_error("syncing .bones"))?;
     let pending_first_push = doctor::run(false).await.with_context(|| setup_error("checking deployment"))?;
