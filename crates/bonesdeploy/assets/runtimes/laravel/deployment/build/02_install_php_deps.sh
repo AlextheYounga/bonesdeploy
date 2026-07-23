@@ -63,14 +63,16 @@ install_system_packages() {
 			"php${PHP_VERSION}-sqlite3" \
 			"php${PHP_VERSION}-xml" \
 			"php${PHP_VERSION}-zip" \
-			composer \
+			curl \
+			ca-certificates \
 			git \
 			unzip
 	else
 		apt-get update
 		apt-get install -y --no-install-recommends \
-			composer \
 			git \
+			curl \
+			ca-certificates \
 			php-cli \
 			php-curl \
 			php-mbstring \
@@ -79,6 +81,34 @@ install_system_packages() {
 			php-zip \
 			unzip
 	fi
+}
+
+php_command() {
+	if [ -n "${PHP_VERSION:-}" ]; then
+		echo "php${PHP_VERSION}"
+	else
+		echo php
+	fi
+}
+
+install_composer() {
+	local php_bin
+	local installer="/tmp/composer-setup.php"
+	local expected_checksum
+	local actual_checksum
+
+	php_bin="$(php_command)"
+	curl -fsSL https://getcomposer.org/installer -o "$installer"
+	expected_checksum="$(curl -fsSL https://composer.github.io/installer.sig)"
+	actual_checksum="$("$php_bin" -r "echo hash_file('sha384', '$installer');")"
+
+	if [ "$expected_checksum" != "$actual_checksum" ]; then
+		rm -f "$installer"
+		die "Composer installer checksum mismatch."
+	fi
+
+	"$php_bin" "$installer" --quiet --install-dir=/usr/local/bin --filename=composer.phar
+	rm -f "$installer"
 }
 
 configure_environment() {
@@ -90,7 +120,7 @@ configure_environment() {
 install_composer_dependencies() {
 	log "Installing Composer dependencies..."
 
-	composer install \
+	"$(php_command)" /usr/local/bin/composer.phar install \
 		--no-dev \
 		--prefer-dist \
 		--no-interaction \
@@ -102,6 +132,7 @@ main() {
 	require_environment
 	install_system_packages
 	configure_environment
+	install_composer
 
 	install_composer_dependencies
 

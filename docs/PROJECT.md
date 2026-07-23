@@ -91,7 +91,7 @@ Everything else is defaulted or derived for Debian/Ubuntu-first usability:
 - `deploy_on_push`: defaults to `false`
 - `releases`: defaults to `5`
 
-`[runtime]` in `.bones/bones.toml` contains the selected template, web root, runtime identity, permissions, and shared paths. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively. Shared paths are declared under `[runtime.shared].paths`; deploys only wire the paths listed there, so framework-specific writable paths must not be hardcoded globally.
+`[runtime]` in `.bones/bones.toml` contains the selected template, web root, runtime identity, permissions, and shared paths. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively. Shared paths are declared under `[runtime.shared].paths`; deploys only wire the paths listed there, so framework-specific writable paths must not be hardcoded globally. Shared storage paths must be created by the framework itself; BonesDeploy only wires the declared paths into each release.
 
 Users can override any default by editing `.bones/bones.toml` after init.
 
@@ -252,6 +252,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 - **deploy**
   - Publishes the local `.bones/` dataset into remote bonesremote site state first, then SSHes into the configured host and runs `bonesremote deploy --site <project>` directly.
+  - Pushes the decrypted local `.bones/secrets/.env.gpg` into the remote `shared/.env` before starting the deployment.
   - Omits the `--revision` flag, so `bonesremote deploy` uses the configured branch from `bones.toml`.
 
 - ****remote setup****
