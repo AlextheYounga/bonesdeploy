@@ -11,7 +11,7 @@ pub(crate) fn configure(cfg: &mut Bones) {
     }
 }
 
-pub(crate) fn environment_example() -> String {
+pub(crate) fn environment_example(_project_name: &str) -> String {
     super::join_env_lines(&["NODE_ENV=production", "NUXT_PUBLIC_SITE_URL=https://example.com"])
 }
 

@@ -66,7 +66,7 @@ write shell scripts, numbered, in lexical order. The constraint is the feature.
 
 ## How to push secrets
 
-- `bonesdeploy secrets init` — bootstrap GPG-encrypted `.env`.
+- `bonesdeploy secrets init` — bootstrap GPG-encrypted `.env` (also performed by `bonesdeploy init`).
 - `bonesdeploy secrets edit` — decrypt, edit, re-encrypt.
 - `bonesdeploy secrets push` — ship the decrypted `.env` to remote `shared/.env`.
 

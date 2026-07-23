@@ -8,11 +8,11 @@ pub fn questions() -> &'static [Question] {
     }]
 }
 
-pub(crate) fn environment_example() -> String {
+pub(crate) fn environment_example(project_name: &str) -> String {
     super::join_env_lines(&[
         "DJANGO_SETTINGS_MODULE=myproject.settings.production",
         "SECRET_KEY=",
-        "DATABASE_URL=sqlite:////srv/sites/<project>/shared/database.sqlite",
+        &format!("DATABASE_URL=sqlite:////srv/sites/{project_name}/shared/database.sqlite"),
     ])
 }
 

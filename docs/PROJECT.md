@@ -281,7 +281,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **secrets**
   - Subcommands: `init`, `edit`, `push`.
   - Manages GPG-encrypted environment secrets under `.bones/secrets/`.
-  - `secrets init` bootstraps the `.bones/secrets/` directory and GPG recipients.
+  - `init` bootstraps `.bones/secrets/.env.gpg` with the selected runtime's defaults; `secrets init` remains an idempotent manual equivalent.
   - `secrets edit` decrypts `.bones/secrets/.env.gpg` for editing and re-encrypts on save.
   - `secrets push` uploads the decrypted `.env` to the remote `shared/.env` over SSH.
 

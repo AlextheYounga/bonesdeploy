@@ -11,6 +11,7 @@ use anyhow::{Context, Result, bail};
 
 use crate::config;
 use crate::infra::ssh;
+use crate::runtimes;
 use crate::ui::output;
 use shared::config as shared_config;
 use shared::config::parse_port;
@@ -30,8 +31,6 @@ fn gpg_command() -> Command {
 }
 
 pub fn init() -> Result<()> {
-    ensure_gpg_installed()?;
-
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
     if !bones_dir.is_dir() {
         bail!("Missing .bones config\n\n{}", output::next_step("bonesdeploy init"));
@@ -43,14 +42,44 @@ pub fn init() -> Result<()> {
     }
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
-    let _key_fingerprint = ensure_project_key(&cfg.project_name)?;
-
-    fs::create_dir_all(paths::LOCAL_BONES_SECRETS_DIR)
-        .with_context(|| format!("Failed to create {}", paths::LOCAL_BONES_SECRETS_DIR))?;
+    initialize_defaults(&cfg)?;
 
     println!("{} Secrets initialized.", output::success_marker());
     println!();
     println!("{}", output::next_step("bonesdeploy secrets edit"));
+    Ok(())
+}
+
+pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
+    let encrypted_path = Path::new(LOCAL_ENV_SECRET);
+    if encrypted_path.is_file() {
+        return Ok(());
+    }
+
+    ensure_gpg_installed()?;
+    let key_fingerprint = ensure_project_key(&cfg.project_name)?;
+    fs::create_dir_all(paths::LOCAL_BONES_SECRETS_DIR)
+        .with_context(|| format!("Failed to create {}", paths::LOCAL_BONES_SECRETS_DIR))?;
+
+    let temp_path = create_temp_edit_path()?;
+    fs::write(&temp_path, runtimes::environment_example(&cfg.runtime.template, &cfg.project_name).unwrap_or_default())
+        .with_context(|| format!("Failed to write default secrets to {}", temp_path.display()))?;
+    fs::set_permissions(&temp_path, Permissions::from_mode(0o600))?;
+
+    let encrypted_result = run_gpg(&[
+        "--batch",
+        "--yes",
+        "--output",
+        encrypted_path.to_str().ok_or_else(|| anyhow::anyhow!("Invalid encrypted path"))?,
+        "--encrypt",
+        "--recipient",
+        &key_fingerprint,
+        temp_path.to_str().ok_or_else(|| anyhow::anyhow!("Invalid temp path"))?,
+    ]);
+    let cleanup_result = fs::remove_file(&temp_path);
+    encrypted_result?;
+    cleanup_result.with_context(|| format!("Failed to remove temporary secrets file {}", temp_path.display()))?;
+    fs::set_permissions(encrypted_path, Permissions::from_mode(0o640))?;
     Ok(())
 }
 

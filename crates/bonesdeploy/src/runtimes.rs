@@ -91,16 +91,15 @@ pub fn configure(template: &str, cfg: &mut Bones) {
     }
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
-pub fn environment_example(template: &str) -> Option<String> {
+pub fn environment_example(template: &str, project_name: &str) -> Option<String> {
     Some(match template {
-        "django" => django::environment_example(),
-        "laravel" => laravel::environment_example(),
-        "next" => next::environment_example(),
-        "nuxt" => nuxt::environment_example(),
-        "rails" => rails::environment_example(),
-        "sveltekit" => svelte::environment_example(),
-        "vue" => vue::environment_example(),
+        "django" => django::environment_example(project_name),
+        "laravel" => laravel::environment_example(project_name),
+        "next" => next::environment_example(project_name),
+        "nuxt" => nuxt::environment_example(project_name),
+        "rails" => rails::environment_example(project_name),
+        "sveltekit" => svelte::environment_example(project_name),
+        "vue" => vue::environment_example(project_name),
         _ => return None,
     })
 }
@@ -154,8 +153,21 @@ mod tests {
     #[test]
     fn every_template_has_an_environment_example() {
         for template in ["laravel", "django", "next", "nuxt", "rails", "sveltekit", "vue"] {
-            assert!(environment_example(template).is_some(), "missing environment example for {template}");
+            assert!(environment_example(template, "atlas").is_some(), "missing environment example for {template}");
         }
+    }
+
+    #[test]
+    fn environment_examples_use_project_name_in_shared_paths() {
+        let laravel = environment_example("laravel", "atlas").expect("Laravel environment defaults");
+        assert!(laravel.contains("/srv/sites/atlas/shared/storage"));
+        assert!(!laravel.contains("<project>"));
+
+        let django = environment_example("django", "atlas").expect("Django environment defaults");
+        assert!(django.contains("/srv/sites/atlas/shared/database.sqlite"));
+
+        let rails = environment_example("rails", "atlas").expect("Rails environment defaults");
+        assert!(rails.contains("/srv/sites/atlas/shared/storage/production.sqlite3"));
     }
 
     #[test]

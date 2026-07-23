@@ -11,7 +11,7 @@ pub(crate) fn configure(cfg: &mut Bones) {
     }
 }
 
-pub(crate) fn environment_example() -> String {
+pub(crate) fn environment_example(_project_name: &str) -> String {
     super::join_env_lines(&[
         "NODE_ENV=production",
         "NEXT_PUBLIC_API_URL=\"https://api.example.com\"",

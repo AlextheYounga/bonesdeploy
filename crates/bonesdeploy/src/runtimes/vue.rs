@@ -5,7 +5,7 @@ pub fn questions() -> &'static [Question] {
     &[]
 }
 
-pub(crate) fn environment_example() -> String {
+pub(crate) fn environment_example(_project_name: &str) -> String {
     super::join_env_lines(&["NODE_ENV=production"])
 }
 

@@ -8,7 +8,7 @@ pub fn questions() -> &'static [Question] {
     }]
 }
 
-pub(crate) fn environment_example() -> String {
+pub(crate) fn environment_example(project_name: &str) -> String {
     super::join_env_lines(&[
         "APP_ENV=production",
         "APP_DEBUG=false",
@@ -16,12 +16,12 @@ pub(crate) fn environment_example() -> String {
         "PHP_VERSION=8.5",
         "",
         "DB_CONNECTION=sqlite",
-        "DB_DATABASE=/srv/sites/<project>/shared/database.sqlite",
+        &format!("DB_DATABASE=/srv/sites/{project_name}/shared/database.sqlite"),
         "",
-        "LARAVEL_STORAGE_PATH=/srv/sites/<project>/shared/storage",
-        "VIEW_COMPILED_PATH=/srv/sites/<project>/shared/storage/framework/views",
-        "CACHE_PATH=/srv/sites/<project>/shared/cache",
-        "UPLOADS_PATH=/srv/sites/<project>/shared/uploads",
+        &format!("LARAVEL_STORAGE_PATH=/srv/sites/{project_name}/shared/storage"),
+        &format!("VIEW_COMPILED_PATH=/srv/sites/{project_name}/shared/storage/framework/views"),
+        &format!("CACHE_PATH=/srv/sites/{project_name}/shared/cache"),
+        &format!("UPLOADS_PATH=/srv/sites/{project_name}/shared/uploads"),
     ])
 }
 

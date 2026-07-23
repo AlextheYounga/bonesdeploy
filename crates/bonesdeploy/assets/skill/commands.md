@@ -99,7 +99,7 @@ No rebuild. The first answer to a bad deploy.
 
 ## secrets
 
-`bonesdeploy secrets init`
+`bonesdeploy secrets init` (also performed automatically by `bonesdeploy init`)
 `bonesdeploy secrets edit`
 `bonesdeploy secrets push`
 

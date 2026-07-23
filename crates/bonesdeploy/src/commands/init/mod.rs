@@ -19,6 +19,7 @@ pub struct Args {
     pub runtime_vars: Vec<String>,
 }
 
+use crate::commands::secrets;
 use crate::config as bones_config;
 use crate::infra::git;
 use crate::ui::output;
@@ -61,6 +62,7 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     scaffold::ensure_config_gitignore(&cfg.project_name)?;
     scaffold::ensure_env_build()?;
     bones_config::save(&cfg, bones_toml)?;
+    secrets::initialize_defaults(&cfg)?;
 
     if is_fresh {
         println!("{} bonesdeploy initialized.", output::success_marker());

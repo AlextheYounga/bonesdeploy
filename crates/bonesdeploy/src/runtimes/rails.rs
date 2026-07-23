@@ -4,11 +4,11 @@ pub fn questions() -> &'static [Question] {
     &[Question { key: "rails_env", label: "Rails environment", kind: QuestionKind::Text { default: "production" } }]
 }
 
-pub(crate) fn environment_example() -> String {
+pub(crate) fn environment_example(project_name: &str) -> String {
     super::join_env_lines(&[
         "RAILS_ENV=production",
         "SECRET_KEY_BASE=",
-        "DATABASE_URL=sqlite:////srv/sites/<project>/shared/storage/production.sqlite3",
+        &format!("DATABASE_URL=sqlite:////srv/sites/{project_name}/shared/storage/production.sqlite3"),
     ])
 }
 

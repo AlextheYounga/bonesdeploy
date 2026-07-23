@@ -64,7 +64,7 @@ deployment. They're a convenience on top of it.
 ## Secrets, end to end
 
 ```
-bonesdeploy secrets init
+bonesdeploy secrets init     # already performed by bonesdeploy init
 bonesdeploy secrets edit     # add NEXT_PUBLIC_API_URL=... etc.
 bonesdeploy secrets push
 bonesdeploy deploy
