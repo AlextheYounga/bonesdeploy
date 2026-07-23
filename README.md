@@ -275,9 +275,6 @@ preview_domain = ""
 email = ""
 ssl_enabled = false
 
-[build]
-vars = []
-
 [runtime]
 template = "custom"
 ```
@@ -302,7 +299,7 @@ Build scripts in `.bones/deployment/build/` must be numbered (for example `01_in
 
 Build scripts can set framework-specific runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool.
 
-BonesRemote also exposes scalar values from `bones.toml` as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Application secrets remain opt-in through `[build].vars`.
+BonesRemote also exposes scalar values from `bones.toml` as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use `shared/.env` for runtime secrets.
 
 Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager, Podman, and the Infra-provisioned build cache before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 

@@ -59,6 +59,7 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
 
     scaffold::update_gitignore()?;
     scaffold::ensure_config_gitignore(&cfg.project_name)?;
+    scaffold::ensure_env_build()?;
     bones_config::save(&cfg, bones_toml)?;
 
     if is_fresh {
@@ -216,6 +217,11 @@ mod tests {
             assert!(bones_toml.contains("runtime_user = \"atlas\""));
             assert!(bones_toml.contains("[runtime]"));
 
+            let env_build = repo_dir.join(".env.build");
+            assert!(env_build.is_file(), ".env.build should be created");
+            let env_build_content = fs::read_to_string(&env_build)?;
+            assert!(env_build_content.contains("Do not place passwords"));
+
             let pre_push = repo_dir.join(".git/hooks/pre-push");
             assert!(pre_push.is_file(), "guaranteed pre-push guard should be installed");
             let guard_content = fs::read_to_string(&pre_push)?;
@@ -246,6 +252,20 @@ mod tests {
 
             assert!(sentinel.is_file());
             assert_eq!(fs::read_to_string(&sentinel)?, original);
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn init_preserves_existing_env_build() -> Result<()> {
+        with_temp_repo(|repo_dir, _home_dir| {
+            let env_build = repo_dir.join(".env.build");
+            fs::write(&env_build, "CUSTOM_VAR=custom_value\n")?;
+
+            run_init()?;
+
+            assert_eq!(fs::read_to_string(&env_build)?, "CUSTOM_VAR=custom_value\n");
 
             Ok(())
         })

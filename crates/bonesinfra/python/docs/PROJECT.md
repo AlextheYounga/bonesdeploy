@@ -379,7 +379,7 @@ Typed fields read from nested `bones.toml` tables:
 ## BuildConfig
 
 BonesInfra reads resource limits from the optional `[build.resources]` table.
-`build.vars` is consumed by BonesRemote and is not retained in `DeployContext`.
+Build-time variables come from `.env.build` in the exported source tree, not from `bones.toml`.
 
 ## RuntimeConfig
 

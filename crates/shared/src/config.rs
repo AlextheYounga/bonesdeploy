@@ -1,10 +1,13 @@
 use std::collections::BTreeMap;
+use std::fmt;
 use std::fs;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
+use std::result::Result as StdResult;
 
 use anyhow::{bail, Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::de::MapAccess;
+use serde::{de, Deserialize, Serialize};
 
 use crate::paths;
 
@@ -186,55 +189,44 @@ pub enum SharedPathType {
     Dir,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize)]
 pub struct Buildtime {
-    #[serde(default)]
-    pub vars: Vec<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, String>,
 }
 
-/// # Errors
-/// Returns an error when the configuration cannot be read or parsed.
-pub fn load_buildtime(config_dir: &Path) -> Result<Option<Buildtime>> {
-    let path = config_dir.join(paths::BONES_TOML);
-    if !path.exists() {
-        return Ok(None);
-    }
-    let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let bones: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(Some(bones.buildtime))
-}
-
-#[must_use]
-pub fn extract_env_vars(env_content: &str, var_names: &[String]) -> Vec<(String, String)> {
-    env_content
-        .lines()
-        .filter_map(|line| {
-            let trimmed = line.trim();
-            if trimmed.is_empty() || trimmed.starts_with('#') {
-                return None;
-            }
-            let (key, value) = trimmed.split_once('=')?;
-            let key = key.trim();
-            if !var_names.iter().any(|name| name == key) {
-                return None;
-            }
-            let value = strip_quotes(value.trim());
-            Some((key.to_string(), value.to_string()))
-        })
-        .collect()
-}
-
-fn strip_quotes(s: &str) -> &str {
-    let bytes = s.as_bytes();
-    if bytes.len() >= 2
-        && ((bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"')
-            || (bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\''))
+impl<'de> Deserialize<'de> for Buildtime {
+    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
     {
-        &s[1..s.len() - 1]
-    } else {
-        s
+        struct BuildtimeVisitor;
+
+        impl<'de> de::Visitor<'de> for BuildtimeVisitor {
+            type Value = Buildtime;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a [build] table")
+            }
+
+            fn visit_map<M>(self, mut access: M) -> StdResult<Buildtime, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                let mut extra = BTreeMap::new();
+                while let Some((key, value)) = access.next_entry::<String, toml::Value>()? {
+                    if key == "vars" {
+                        return Err(de::Error::custom(
+                            "[build].vars has been removed. Use .env.build for build-time variables.",
+                        ));
+                    }
+                    extra.insert(key, value.to_string());
+                }
+                Ok(Buildtime { extra })
+            }
+        }
+
+        deserializer.deserialize_map(BuildtimeVisitor)
     }
 }
 
@@ -277,10 +269,6 @@ pub fn load(path: &Path) -> Result<Bones> {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, fs};
-
-    use toml::de::Error;
-
     use super::*;
 
     #[test]
@@ -296,7 +284,7 @@ mod tests {
     }
 
     #[test]
-    fn runtime_parses_shared_paths() -> Result<(), Error> {
+    fn runtime_parses_shared_paths() -> Result<()> {
         let runtime: Runtime = toml::from_str(
             r#"
 web_root = "public"
@@ -318,44 +306,10 @@ paths = [
     }
 
     #[test]
-    fn extract_env_vars_parses_all_quote_styles() {
-        assert_eq!(
-            extract_env_vars("KEY=hello\nOTHER=world", &["KEY".into()]),
-            vec![("KEY".to_string(), "hello".to_string())]
-        );
-        assert_eq!(
-            extract_env_vars(r#"KEY="hello world""#, &["KEY".into()]),
-            vec![("KEY".to_string(), "hello world".to_string())]
-        );
-        assert_eq!(
-            extract_env_vars("KEY='hello world'", &["KEY".into()]),
-            vec![("KEY".to_string(), "hello world".to_string())]
-        );
-    }
-
-    #[test]
-    fn extract_env_vars_skips_comments_and_blank_lines() {
-        let content = "# comment\n\nKEY=val\n  \nOTHER=other";
-        let vars = extract_env_vars(content, &["KEY".into()]);
-        assert_eq!(vars, vec![("KEY".to_string(), "val".to_string())]);
-    }
-
-    #[test]
-    fn extract_env_vars_returns_only_requested_keys() {
-        let content = "A=1\nB=2\nC=3";
-        let vars = extract_env_vars(content, &["A".into(), "C".into()]);
-        assert_eq!(vars, vec![("A".to_string(), "1".to_string()), ("C".to_string(), "3".to_string())]);
-    }
-
-    #[test]
-    fn load_buildtime_reads_nested_build_settings() -> Result<()> {
-        let dir = env::temp_dir().join("bones-buildtime-vars");
-        fs::create_dir_all(&dir)?;
-        fs::write(dir.join("bones.toml"), "[build]\nvars = [\"A\"]\ntool_version = \"8.5\"\n")?;
-        let result = load_buildtime(&dir)?.ok_or_else(|| anyhow::anyhow!("build settings should exist"))?;
-        assert_eq!(result.vars, vec!["A"]);
-        assert_eq!(result.extra.get("tool_version").map(String::as_str), Some("8.5"));
-        fs::remove_dir_all(&dir)?;
-        Ok(())
+    fn buildtime_rejects_removed_vars_key() {
+        let result: std::result::Result<Buildtime, _> = toml::from_str(r#"vars = ["A"]"#);
+        assert!(result.is_err(), "[build].vars should be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains(".env.build"), "error should mention .env.build: {err}");
     }
 }

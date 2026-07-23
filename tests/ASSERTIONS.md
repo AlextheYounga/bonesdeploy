@@ -12,6 +12,7 @@
 
 ## `crates/bonesdeploy/src/commands/init/mod.rs`
 - failure before completed prompts leaves no bones assets. (failure_before_completed_prompts_leaves_no_bones_assets)
+- init preserves existing env build. (init_preserves_existing_env_build)
 - materializes base bones assets. (materializes_base_bones_assets)
 - repairs dangling bones symlink. (repairs_dangling_bones_symlink)
 - rerun preserves existing bones assets. (rerun_preserves_existing_bones_assets)
@@ -105,7 +106,13 @@
 - parse user uid reads uid field. (parse_user_uid_reads_uid_field)
 
 ## `crates/bonesremote/src/release/lifecycle/build/run_scripts.rs`
+- build env includes env build values. (build_env_includes_env_build_values)
+- denied values remain absent in build env. (denied_values_remain_absent_in_build_env)
+- derived bones values are present in build env. (derived_bones_values_are_present_in_build_env)
+- derived bones values cannot be overridden by env build. (derived_bones_values_cannot_be_overridden_by_env_build)
+- derived environment exports scalars but not operational config. (derived_environment_exports_scalars_but_not_operational_config)
 - list scripts only includes numbered shell scripts. (list_scripts_only_includes_numbered_shell_scripts)
+- missing env build is not an error. (missing_env_build_is_not_an_error)
 
 ## `crates/bonesremote/src/release/lifecycle/build/tree.rs`
 - candidate tree is writable by its temporary owner. (candidate_tree_is_writable_by_its_temporary_owner)
@@ -150,13 +157,22 @@
 - omitted nested sections keep app defaults. (omitted_nested_sections_keep_app_defaults)
 
 ## `crates/shared/src/config.rs`
-- extract env vars parses all quote styles. (extract_env_vars_parses_all_quote_styles)
-- extract env vars returns only requested keys. (extract_env_vars_returns_only_requested_keys)
-- extract env vars skips comments and blank lines. (extract_env_vars_skips_comments_and_blank_lines)
-- load buildtime reads nested build settings. (load_buildtime_reads_nested_build_settings)
+- buildtime rejects removed vars key. (buildtime_rejects_removed_vars_key)
 - runtime parses shared paths. (runtime_parses_shared_paths)
 - validate host accepts hostnames and ips. (validate_host_accepts_hostnames_and_ips)
 - validate host rejects shell metacharacters. (validate_host_rejects_shell_metacharacters)
+
+## `crates/shared/src/env_build.rs`
+- allows valid underscore names. (allows_valid_underscore_names)
+- derived bones values cannot be overridden. (derived_bones_values_cannot_be_overridden)
+- load reads env build from directory. (load_reads_env_build_from_directory)
+- load returns empty map when file missing. (load_returns_empty_map_when_file_missing)
+- parses quoted values. (parses_quoted_values)
+- parses unquoted values. (parses_unquoted_values)
+- rejects bones reserved prefix. (rejects_bones_reserved_prefix)
+- rejects duplicate keys. (rejects_duplicate_keys)
+- rejects invalid keys. (rejects_invalid_keys)
+- skips comments and blank lines. (skips_comments_and_blank_lines)
 
 ## `tests/cleancode/src/cleancode_file_too_long.rs`
 - Verifies all Rust source files stay at or below 400 lines. (source_files_stay_under_400_lines)

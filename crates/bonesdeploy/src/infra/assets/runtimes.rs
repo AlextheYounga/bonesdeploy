@@ -7,7 +7,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use rust_embed::Embed;
 use serde_json::{Map, Value};
 
-use shared::config::{Buildtime, Runtime};
+use shared::config::Runtime;
 use shared::paths;
 
 use super::{kit, write_asset};
@@ -48,20 +48,6 @@ pub fn scaffold_runtime_deployment(runtime: &str, bones_dir: &Path) -> Result<()
 
 pub fn scaffold_runtime_secrets(runtime: &str, bones_dir: &Path) -> Result<()> {
     scaffold_runtime_assets(runtime, bones_dir, paths::KIT_SECRETS_DIR)
-}
-
-pub fn runtime_buildtime_defaults(runtime: &str) -> Result<Buildtime> {
-    let asset_path = format!("{runtime}/bones.toml");
-    let Some(asset) = RuntimeAssets::get(&asset_path) else { return Ok(Buildtime::default()) };
-    let value: toml::Value = toml::from_str(str::from_utf8(asset.data.as_ref())?)
-        .with_context(|| format!("Failed to parse embedded build-time defaults at {asset_path}"))?;
-    value
-        .get("build")
-        .cloned()
-        .map(toml::Value::try_into)
-        .transpose()
-        .with_context(|| format!("Failed to parse [build] defaults at {asset_path}"))
-        .map(Option::unwrap_or_default)
 }
 
 fn scaffold_runtime_assets(runtime: &str, bones_dir: &Path, asset_prefix: &str) -> Result<()> {

@@ -17,9 +17,3 @@ paths = [
   { path = "storage", type = "dir" },
   { path = ".env", type = "file" },
 ]
-
-[build]
-vars = [
-	# "NODE_VERSION",
-	"PHP_VERSION"
-]

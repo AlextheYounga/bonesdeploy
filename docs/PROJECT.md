@@ -119,37 +119,36 @@ branch = "master"
 deploy_on_push = false
 releases = 5
 
-[build]
-vars = ["NEXT_PUBLIC_API_URL"]
-
 [runtime]
 template = "next"
 web_root = "public"
 ```
 
 ### Build-time configuration
-`[build]` in `.bones/bones.toml` declares which environment variables should be injected into the build container at build time. It supports two sources:
+`.env.build` at the project root declares non-secret values injected into the build container at build time. It is committed to Git and parsed without shell evaluation.
 
-1. **`vars`** — names of environment variables from `shared/.env` (secrets). Values come from `bonesdeploy secrets push`, not this file.
-2. **Any other key under `[build]`** — literal (non-secret) value injected as a same-named environment variable, e.g. `BUILD_TARGET = "production"` is exposed as `$BUILD_TARGET`. These are build-time configuration constants, not secrets.
-
-```toml
-# .bones/bones.toml
-[build]
-# `vars` pulls from shared/.env — never put secret values here.
-vars = [
-  "NEXT_PUBLIC_API_URL",
-  "NEXT_PUBLIC_GA_ID",
-]
-
-# Keys under [build] (except `vars`) are injected directly as env vars.
-# Non-secret, safe to commit, e.g. $BUILD_TARGET in build scripts.
-BUILD_TARGET = "production"
+```env
+# .env.build
+# Committed, non-secret values used while building this project.
+# Do not place passwords, tokens, or private keys here.
+NEXT_PUBLIC_API_URL=https://api.example.com
+NEXT_PUBLIC_SITE_NAME=Example
 ```
 
-The file is pushed with `bonesdeploy push` and read by `bonesremote` during the build phase. It first injects literal keys into the build container, then overlays the `vars` values from `shared/.env` on top. If a name appears in both places, the value from `.env` wins.
+Rules:
+- `.env.build` is committed to Git and visible in plaintext.
+- It is never copied into runtime `shared/`.
+- Missing `.env.build` means no additional build variables — existing projects do not break.
+- `BONES_*` names are reserved and cannot be used.
+- Duplicate keys and invalid names fail clearly during the build.
 
-Top-level keys are for **non-secret build constants** (e.g. toolchain versions, feature flags). They are committed to version control and visible in plaintext. Putting secret values at the top level would expose them to the build container, the repository, and potentially inlined client bundles — use `vars` and `bonesdeploy secrets push` instead.
+The build environment consists of:
+1. Existing generic variables (`PROJECT_NAME`, `WEB_ROOT`, etc.).
+2. Values from committed `.env.build`.
+3. Derived `BONES_*` values from `bones.toml`.
+4. Fixed internal values such as `BUILD_CACHE_DIR`.
+
+Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. Runtime secrets belong in `shared/.env` via `bonesdeploy secrets push`.
 
 ### Hooks
 The optional git push transport uses two thin internal adapters (local `pre-push` guard and remote `post-receive` trigger) that are embedded in the binaries. They are not visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
@@ -358,8 +357,7 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 3. `bonesremote deploy` orchestrates the full pipeline:
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
-    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `[build].vars` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
-   - **release_promote** — Copy safe artifacts into a runtime-owned candidate release
+    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed and injected into the container via `--env`.   - **release_promote** — Copy safe artifacts into a runtime-owned candidate release
    - **wire_shared** — Symlink declared shared paths into the candidate release
    - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
    - **release_finalize** — Seal the prepared release as `root:<site>`
@@ -384,8 +382,7 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
    - This command orchestrates the full pipeline:
       - **stage_release** — Create timestamped release state
        - **release_checkout** — Export source from the bare repo into temporary context
-       - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. If `[build].vars` declares env var names, those vars are read from `shared/.env` on the host and injected into the container via `--env`.
-      - **release_promote** — Copy safe artifacts into a runtime-owned candidate at `releases/<release>`
+       - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed and injected into the container via `--env`.      - **release_promote** — Copy safe artifacts into a runtime-owned candidate at `releases/<release>`
       - **wire_shared** — Link shared runtime paths
       - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
       - **release_finalize** — Seal the prepared release as `root:<site>`

@@ -70,9 +70,9 @@ write shell scripts, numbered, in lexical order. The constraint is the feature.
 - `bonesdeploy secrets edit` — decrypt, edit, re-encrypt.
 - `bonesdeploy secrets push` — ship the decrypted `.env` to remote `shared/.env`.
 
-Never commit plaintext secrets. Never put secret values in `bones.toml`. The
-`[build].vars` list names env vars pulled from `shared/.env` — names only, not
-values.
+Never commit plaintext secrets. Never put secret values in `bones.toml`. Use
+`.env.build` for committed public build values; use `shared/.env` for runtime
+secrets via `bonesdeploy secrets push`.
 
 ## What this tool will not do
 

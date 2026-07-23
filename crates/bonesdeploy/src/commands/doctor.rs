@@ -3,7 +3,6 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::Result;
-use toml::Table;
 
 use crate::config;
 use crate::infra::ssh;
@@ -31,12 +30,6 @@ pub async fn run(local_only: bool) -> Result<bool> {
         "deploy branch",
         local_branch_issue,
         cfg.as_ref().map(|c| format!("git checkout -b {} && git push {} {}", c.branch, c.remote_name, c.branch)),
-    );
-
-    issues += print_check(
-        "buildtime env vars",
-        check_buildtime_config(),
-        Some(String::from("add names to [build].vars in .bones/bones.toml for build-time env vars")),
     );
 
     if deploy_on_push {
@@ -251,27 +244,6 @@ async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
         }
         Err(error) => (Some(format!("remote doctor failed\n  {error}")), false),
     }
-}
-
-fn check_buildtime_config() -> Option<String> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    let Ok(content) = fs::read_to_string(bones_toml) else {
-        return None;
-    };
-    let Ok(toml_value) = content.parse::<Table>() else {
-        return None;
-    };
-    let is_next =
-        toml_value.get("runtime").and_then(|runtime| runtime.get("template")).and_then(|v| v.as_str()) == Some("next");
-    if !is_next {
-        return None;
-    }
-
-    if toml_value.get("build").is_none_or(|build| build.get("vars").is_none()) {
-        return Some(String::from("Next.js requires [build].vars in .bones/bones.toml for build-time env vars"));
-    }
-
-    None
 }
 
 #[cfg(test)]

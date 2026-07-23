@@ -3,7 +3,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
-use shared::config::{self, build_group_for, build_user_for, extract_env_vars, load_buildtime, load_runtime};
+use shared::config::{self, build_group_for, build_user_for, load_runtime};
+use shared::env_build;
 use shared::paths;
 
 use super::ownership;
@@ -36,7 +37,7 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
     let runtime = load_runtime(&paths::bonesremote_site_root(site))
         .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
 
-    let build_env_vars = resolve_build_env(site, cfg)?;
+    let build_env_vars = resolve_build_env(cfg, context)?;
     let deployment_dir = scripts_dir.parent().context("Build scripts directory has no deployment parent")?;
     let build_cache_dir = paths::bonesdeploy_user_cache(&build_user);
 
@@ -68,33 +69,17 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
     Ok(())
 }
 
-fn resolve_build_env(site: &str, cfg: &config::Bones) -> Result<Vec<(String, String)>> {
-    let buildtime = load_buildtime(&paths::bonesremote_site_root(site))?.unwrap_or_default();
+fn resolve_build_env(cfg: &config::Bones, source_context: &Path) -> Result<Vec<(String, String)>> {
+    let buildtime = cfg.buildtime.clone();
 
     let mut env_vars = derived_config_env(cfg)?;
     env_vars.extend(buildtime.extra);
 
-    if buildtime.vars.is_empty() {
-        return Ok(env_vars);
+    let env_build = env_build::load(source_context)?;
+    for (key, value) in env_build {
+        env_vars.push((key, value));
     }
 
-    let env_path = Path::new(&cfg.project_root).join(paths::SHARED_DIR).join(paths::DOT_ENV);
-    let env_content = fs::read_to_string(&env_path).with_context(|| {
-        format!(
-            "[build].vars requests values but {} is missing. Run `bonesdeploy secrets push` first.",
-            env_path.display()
-        )
-    })?;
-
-    let vars = extract_env_vars(&env_content, &buildtime.vars);
-
-    for name in &buildtime.vars {
-        if !vars.iter().any(|(k, _)| k == name) {
-            bail!("[build].vars requests `{name}` but it was not found in {}.", env_path.display());
-        }
-    }
-
-    env_vars.extend(vars);
     Ok(env_vars)
 }
 
@@ -183,7 +168,7 @@ mod tests {
     use anyhow::Result;
     use shared::config::load;
 
-    use super::{derived_config_env, list_scripts};
+    use super::{derived_config_env, list_scripts, resolve_build_env};
 
     #[test]
     fn list_scripts_only_includes_numbered_shell_scripts() -> Result<()> {
@@ -225,6 +210,128 @@ mod tests {
         assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_APP_DNS_")));
         assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_RUNTIME_SHARED_")));
         fs::remove_dir_all(root).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn build_env_includes_env_build_values() -> Result<()> {
+        let site_root = env::temp_dir().join(format!("bonesremote-env-build-include-{}", process::id()));
+        let source = env::temp_dir().join(format!("bonesremote-env-build-src-{}", process::id()));
+        let _ = fs::remove_dir_all(&site_root);
+        let _ = fs::remove_dir_all(&source);
+        fs::create_dir_all(&site_root)?;
+        fs::create_dir_all(&source)?;
+        fs::write(
+            site_root.join("bones.toml"),
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"nuxt\"\n",
+        )?;
+        fs::write(source.join(".env.build"), "NEXT_PUBLIC_API_URL=https://api.example.com\n")?;
+        let cfg = load(&site_root.join("bones.toml"))?;
+
+        let env = resolve_build_env(&cfg, &source)?;
+
+        assert!(
+            env.contains(&("NEXT_PUBLIC_API_URL".to_string(), "https://api.example.com".to_string())),
+            "should include .env.build value: {env:?}"
+        );
+        fs::remove_dir_all(site_root).ok();
+        fs::remove_dir_all(source).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn derived_bones_values_are_present_in_build_env() -> Result<()> {
+        let site_root = env::temp_dir().join(format!("bonesremote-env-build-derived-{}", process::id()));
+        let source = env::temp_dir().join(format!("bonesremote-env-build-derived-src-{}", process::id()));
+        let _ = fs::remove_dir_all(&site_root);
+        let _ = fs::remove_dir_all(&source);
+        fs::create_dir_all(&site_root)?;
+        fs::create_dir_all(&source)?;
+        fs::write(
+            site_root.join("bones.toml"),
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"next\"\n",
+        )?;
+        let cfg = load(&site_root.join("bones.toml"))?;
+
+        let env = resolve_build_env(&cfg, &source)?;
+
+        assert!(env.contains(&("BONES_RUNTIME_TEMPLATE".to_string(), "next".to_string())));
+        assert!(env.contains(&("BONES_APP_PROJECT_NAME".to_string(), "demo".to_string())));
+        fs::remove_dir_all(site_root).ok();
+        fs::remove_dir_all(source).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn denied_values_remain_absent_in_build_env() -> Result<()> {
+        let site_root = env::temp_dir().join(format!("bonesremote-env-build-denied-{}", process::id()));
+        let source = env::temp_dir().join(format!("bonesremote-env-build-denied-src-{}", process::id()));
+        let _ = fs::remove_dir_all(&site_root);
+        let _ = fs::remove_dir_all(&source);
+        fs::create_dir_all(&site_root)?;
+        fs::create_dir_all(&source)?;
+        fs::write(
+            site_root.join("bones.toml"),
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.dns]\ndomain = \"app.example.com\"\n[runtime]\ntemplate = \"nuxt\"\n",
+        )?;
+        let cfg = load(&site_root.join("bones.toml"))?;
+
+        let env = resolve_build_env(&cfg, &source)?;
+
+        assert!(!env.iter().any(|(key, _)| key == "BONES_APP_SERVER_HOST"), "server host should be denied");
+        assert!(!env.iter().any(|(key, _)| key == "BONES_APP_SERVER_PORT"), "server port should be denied");
+        assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_APP_DNS")), "dns should be denied");
+        assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_RUNTIME_SHARED")), "shared should be denied");
+        fs::remove_dir_all(site_root).ok();
+        fs::remove_dir_all(source).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn derived_bones_values_cannot_be_overridden_by_env_build() -> Result<()> {
+        let site_root = env::temp_dir().join(format!("bonesremote-env-build-override-{}", process::id()));
+        let source = env::temp_dir().join(format!("bonesremote-env-build-override-src-{}", process::id()));
+        let _ = fs::remove_dir_all(&site_root);
+        let _ = fs::remove_dir_all(&source);
+        fs::create_dir_all(&site_root)?;
+        fs::create_dir_all(&source)?;
+        fs::write(
+            site_root.join("bones.toml"),
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"next\"\n",
+        )?;
+        fs::write(source.join(".env.build"), "BONES_RUNTIME_TEMPLATE=evil\n")?;
+        let cfg = load(&site_root.join("bones.toml"))?;
+
+        let result = resolve_build_env(&cfg, &source);
+
+        assert!(result.is_err(), "BONES_* in .env.build should be rejected");
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("reserved"), "error should mention reserved: {err}");
+        fs::remove_dir_all(site_root).ok();
+        fs::remove_dir_all(source).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn missing_env_build_is_not_an_error() -> Result<()> {
+        let site_root = env::temp_dir().join(format!("bonesremote-env-build-missing-{}", process::id()));
+        let source = env::temp_dir().join(format!("bonesremote-env-build-missing-src-{}", process::id()));
+        let _ = fs::remove_dir_all(&site_root);
+        let _ = fs::remove_dir_all(&source);
+        fs::create_dir_all(&site_root)?;
+        fs::create_dir_all(&source)?;
+        fs::write(
+            site_root.join("bones.toml"),
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"nuxt\"\n",
+        )?;
+        let cfg = load(&site_root.join("bones.toml"))?;
+
+        let env = resolve_build_env(&cfg, &source)?;
+
+        assert!(env.contains(&("BONES_RUNTIME_TEMPLATE".to_string(), "nuxt".to_string())));
+        assert!(!env.iter().any(|(key, _)| key == "NEXT_PUBLIC_API_URL"), "no .env.build means no extra vars");
+        fs::remove_dir_all(site_root).ok();
+        fs::remove_dir_all(source).ok();
         Ok(())
     }
 }

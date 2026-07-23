@@ -70,9 +70,9 @@ bonesdeploy secrets push
 bonesdeploy deploy
 ```
 
-`[build].vars = ["NEXT_PUBLIC_API_URL"]` in `bones.toml` tells `bonesremote`
-to inject that env var into the build container. The value comes from
-`shared/.env` on the host, not from `bones.toml`. `bones.toml` is committed;
+`.env.build` at the project root holds committed, non-secret build-time values
+(e.g. `NEXT_PUBLIC_API_URL=https://api.example.com`). Runtime secrets come from
+`shared/.env` via `bonesdeploy secrets push`. `bones.toml` is committed;
 `shared/.env` is not. That's the contract.
 
 ## Recovery

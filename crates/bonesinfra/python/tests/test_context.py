@@ -31,7 +31,6 @@ branch = "main"
 releases = 7
 
 [build]
-vars = ["PUBLIC_URL"]
 
 [build.resources]
 cpu_quota_percent = 50

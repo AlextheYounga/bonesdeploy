@@ -8,6 +8,3 @@ paths = [
   { path = "*", type = "file", mode = "640" },
   { path = "dist", type = "dir", mode = "755", recursive = true },
 ]
-
-[build]
-vars = []

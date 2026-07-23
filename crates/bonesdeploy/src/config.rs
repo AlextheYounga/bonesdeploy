@@ -76,7 +76,6 @@ fn annotate_sections(content: &str) -> String {
         ("[app.server]", "# Remote server connection."),
         ("[app.dns]", "# Domains, email, and TLS."),
         ("[app.deploy]", "# Branch and deployment behavior."),
-        ("[build]", "# Environment variables and constants injected during builds."),
         ("[runtime]", "# Framework runtime settings."),
         ("[runtime.permissions]", "# Release file permissions."),
         ("[runtime.shared]", "# Paths persisted in the shared release directory."),

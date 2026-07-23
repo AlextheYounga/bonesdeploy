@@ -16,6 +16,3 @@ paths = [
   { path = "staticfiles", type = "dir" },
   { path = "media", type = "dir" },
 ]
-
-[build]
-vars = []

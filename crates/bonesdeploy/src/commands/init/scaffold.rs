@@ -11,6 +11,7 @@ use crate::config;
 use crate::infra::assets::{kit, runtimes as runtime_assets};
 use crate::infra::git;
 use crate::runtimes;
+use shared::env_build;
 
 const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/pre-push"));
 
@@ -36,9 +37,6 @@ pub(super) fn materialize_fresh_bones(
     unix_fs::symlink(&config_dir, bones_dir)?;
 
     cfg.runtime = serde_json::from_value(serde_json::Value::Object(runtime.config.clone()))?;
-    if let Some(template_name) = &runtime.template {
-        cfg.buildtime = runtime_assets::runtime_buildtime_defaults(template_name)?;
-    }
 
     if let Some(template_name) = runtime.template {
         runtime_assets::scaffold_runtime_deployment(&template_name, bones_dir)?;
@@ -129,5 +127,15 @@ pub(super) fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
 
     let remote_url = format!("{}@{}:{}", default_deploy_user(), cfg.host, cfg.repo_path);
     git::add_remote(&cfg.remote_name, &remote_url)?;
+    Ok(())
+}
+
+pub(super) fn ensure_env_build() -> Result<()> {
+    let env_build_path = Path::new(paths::ENV_BUILD_FILE);
+    if env_build_path.exists() {
+        return Ok(());
+    }
+    fs::write(env_build_path, env_build::default_content())
+        .with_context(|| format!("Failed to write {}", env_build_path.display()))?;
     Ok(())
 }

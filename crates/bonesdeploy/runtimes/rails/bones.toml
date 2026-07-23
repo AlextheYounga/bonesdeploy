@@ -19,6 +19,3 @@ paths = [
   { path = "log", type = "dir" },
   { path = "storage", type = "dir" },
 ]
-
-[build]
-vars = []
