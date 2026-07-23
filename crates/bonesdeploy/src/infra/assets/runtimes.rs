@@ -13,7 +13,7 @@ use shared::paths;
 use super::{kit, write_asset};
 
 #[derive(Embed)]
-#[folder = "./runtimes/"]
+#[folder = "./assets/runtimes/"]
 struct RuntimeAssets;
 
 pub fn runtime_names() -> Vec<String> {
@@ -44,10 +44,6 @@ pub fn scaffold_runtime_deployment(runtime: &str, bones_dir: &Path) -> Result<()
     }
     kit::scaffold_deployment_functions(bones_dir)?;
     scaffold_runtime_assets(runtime, bones_dir, paths::KIT_DEPLOYMENT_DIR)
-}
-
-pub fn scaffold_runtime_secrets(runtime: &str, bones_dir: &Path) -> Result<()> {
-    scaffold_runtime_assets(runtime, bones_dir, paths::KIT_SECRETS_DIR)
 }
 
 pub fn scaffold_runtime_env_build(runtime: &str, project_root: &Path) -> Result<()> {

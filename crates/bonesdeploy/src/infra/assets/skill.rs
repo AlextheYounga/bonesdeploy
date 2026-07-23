@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use rust_embed::Embed;
 
 #[derive(Embed)]
-#[folder = "./skill/"]
+#[folder = "./assets/skill/"]
 struct SkillAssets;
 
 /// Skill doc names, sorted, excluding the orientation doc `SKILL`.

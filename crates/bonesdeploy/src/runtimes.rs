@@ -1,8 +1,4 @@
-use std::fs;
-use std::io::ErrorKind;
-use std::path::Path;
-
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use serde_json::Value;
 use shared::config::Bones;
 use shared::config::bonesinfra_input;
@@ -85,68 +81,20 @@ pub fn validate_answers(template: &str, answers: &serde_json::Map<String, Value>
     Ok(())
 }
 
-/// Apply template-specific post-scaffold configuration: runtime config
-/// overrides (e.g. Next static → `web_root = "out"`) and `.env.prod.example`
-/// substitutions (`<project>` and per-framework keys like Laravel's
-/// `APP_URL`). Idempotent. Reads and writes the example file at most once.
-pub fn configure(template: &str, cfg: &mut Bones, bones_dir: &Path) -> Result<()> {
+/// Apply template-specific post-scaffold runtime configuration.
+pub fn configure(template: &str, cfg: &mut Bones) {
     match template {
         "next" => next::configure(cfg),
         "nuxt" => nuxt::configure(cfg),
         _ => {}
     }
-
-    configure_env_example(template, cfg, bones_dir)
-}
-
-fn configure_env_example(template: &str, cfg: &Bones, bones_dir: &Path) -> Result<()> {
-    let example = bones_dir.join("secrets/.env.prod.example");
-    let content = match fs::read_to_string(&example) {
-        Ok(content) => content,
-        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(error).with_context(|| format!("Failed to read {}", example.display())),
-    };
-
-    let mut configured = content.replace("<project>", &cfg.project_name);
-    configured = match template {
-        "laravel" => laravel::configure_env_example(&configured, cfg),
-        _ => configured,
-    };
-
-    if configured != content {
-        fs::write(&example, configured).with_context(|| format!("Failed to write {}", example.display()))?;
-    }
-
-    Ok(())
-}
-
-pub(crate) fn set_env_value(content: &str, key: &str, value: &str) -> String {
-    let mut configured = content
-        .lines()
-        .map(|line| {
-            if line.strip_prefix(key).is_some_and(|suffix| suffix.starts_with('=')) {
-                format!("{key}={value}")
-            } else {
-                line.to_string()
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
-
-    if content.ends_with('\n') {
-        configured.push('\n');
-    }
-    configured
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs;
-
     use anyhow::{Result, bail};
     use serde_json::{Map, Value, json};
     use shared::config::Bones;
-    use tempfile::TempDir;
 
     use super::{configure, questions, validate_answers};
 
@@ -230,80 +178,28 @@ mod tests {
 
     #[test]
     fn configure_static_next_overrides_web_root() -> Result<()> {
-        let temp = TempDir::new()?;
         let mut config =
             bones_with_runtime("next", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
-        configure("next", &mut config, temp.path())?;
+        configure("next", &mut config);
         assert_eq!(config.runtime.web_root, "out");
         Ok(())
     }
 
     #[test]
     fn configure_static_nuxt_overrides_web_root() -> Result<()> {
-        let temp = TempDir::new()?;
         let mut config =
             bones_with_runtime("nuxt", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
-        configure("nuxt", &mut config, temp.path())?;
+        configure("nuxt", &mut config);
         assert_eq!(config.runtime.web_root, ".output/public");
         Ok(())
     }
 
     #[test]
     fn configure_server_next_keeps_web_root() -> Result<()> {
-        let temp = TempDir::new()?;
         let mut config =
             bones_with_runtime("next", [("is_static".to_string(), Value::Bool(false))].into_iter().collect())?;
-        configure("next", &mut config, temp.path())?;
+        configure("next", &mut config);
         assert_eq!(config.runtime.web_root, "public");
-        Ok(())
-    }
-
-    #[test]
-    fn configure_substitutes_project_in_env_example() -> Result<()> {
-        let temp = TempDir::new()?;
-        let secrets = temp.path().join("secrets");
-        fs::create_dir(&secrets)?;
-        let example = secrets.join(".env.prod.example");
-        fs::write(&example, "DATABASE_URL=sqlite:////srv/sites/<project>/shared/database.sqlite\n")?;
-
-        let mut config = bones_with_runtime("next", Map::new())?;
-        configure("next", &mut config, temp.path())?;
-
-        assert_eq!(fs::read_to_string(example)?, "DATABASE_URL=sqlite:////srv/sites/atlas/shared/database.sqlite\n");
-        Ok(())
-    }
-
-    #[test]
-    fn configure_laravel_substitutes_app_url_from_preview_domain() -> Result<()> {
-        let temp = TempDir::new()?;
-        let secrets = temp.path().join("secrets");
-        fs::create_dir(&secrets)?;
-        let example = secrets.join(".env.prod.example");
-        fs::write(&example, "APP_URL=https://example.com\nDB=/srv/sites/<project>/shared/db\n")?;
-
-        let mut config = bones_with_runtime("laravel", Map::new())?;
-        config.preview_domain = String::from("atlas-203-0-113-10.nip.io");
-        configure("laravel", &mut config, temp.path())?;
-
-        assert_eq!(
-            fs::read_to_string(example)?,
-            "APP_URL=http://atlas-203-0-113-10.nip.io\nDB=/srv/sites/atlas/shared/db\n"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn configure_laravel_without_preview_domain_leaves_app_url_alone() -> Result<()> {
-        let temp = TempDir::new()?;
-        let secrets = temp.path().join("secrets");
-        fs::create_dir(&secrets)?;
-        let example = secrets.join(".env.prod.example");
-        fs::write(&example, "APP_URL=https://example.com\n")?;
-
-        let mut config = bones_with_runtime("laravel", Map::new())?;
-        configure("laravel", &mut config, temp.path())?;
-
-        assert_eq!(fs::read_to_string(example)?, "APP_URL=https://example.com\n");
         Ok(())
     }
 }

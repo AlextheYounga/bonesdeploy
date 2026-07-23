@@ -8,7 +8,7 @@ use shared::paths;
 use super::write_asset;
 
 #[derive(Embed)]
-#[folder = "./kit/"]
+#[folder = "./assets/kit/"]
 pub(super) struct Kit;
 
 pub fn scaffold(bones_dir: &Path) -> Result<()> {

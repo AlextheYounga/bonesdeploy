@@ -68,7 +68,6 @@ pub const GIT_PRE_PUSH_HOOK: &str = ".git/hooks/pre-push";
 pub const PRE_PUSH_HOOK_NAME: &str = "pre-push";
 pub const HOOKS_DIR: &str = "hooks";
 pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";
-pub const KIT_SECRETS_DIR: &str = "secrets/";
 pub const BONES_CONFIG_LIB_DIR: &str = "_lib";
 
 #[must_use]

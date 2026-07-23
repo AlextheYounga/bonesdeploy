@@ -1,4 +1,4 @@
-use super::{Bones, Question, QuestionKind, set_env_value};
+use super::{Question, QuestionKind};
 
 pub fn questions() -> &'static [Question] {
     &[Question {
@@ -6,11 +6,4 @@ pub fn questions() -> &'static [Question] {
         label: "PHP version",
         kind: QuestionKind::Choice { choices: &["8.2", "8.3", "8.4", "8.5"], default: "8.5" },
     }]
-}
-
-pub(crate) fn configure_env_example(content: &str, cfg: &Bones) -> String {
-    if cfg.preview_domain.is_empty() {
-        return content.to_string();
-    }
-    set_env_value(content, "APP_URL", &format!("http://{}", cfg.preview_domain))
 }

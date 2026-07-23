@@ -13,7 +13,7 @@ use crate::infra::git;
 use crate::runtimes;
 use shared::env_build;
 
-const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/pre-push"));
+const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/hooks/pre-push"));
 
 pub(super) fn materialize_fresh_bones(
     bones_dir: &Path,
@@ -41,8 +41,7 @@ pub(super) fn materialize_fresh_bones(
     if let Some(template_name) = runtime.template {
         runtime_assets::scaffold_runtime_env_build(&template_name, Path::new("."))?;
         runtime_assets::scaffold_runtime_deployment(&template_name, bones_dir)?;
-        runtime_assets::scaffold_runtime_secrets(&template_name, bones_dir)?;
-        runtimes::configure(&template_name, cfg, bones_dir)?;
+        runtimes::configure(&template_name, cfg);
         println!("Runtime template: {template_name}");
     } else {
         println!("Runtime template: custom");
