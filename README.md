@@ -24,8 +24,8 @@ BonesDeploy builds two binaries:
 - **`bonesdeploy`** — the local CLI
 - **`bonesremote`** — the remote release runner
 
-And wraps a Python runtime:
-- **`bonesinfra`** - https://github.com/AlextheYounga/bonesinfra
+And embeds a Python provisioning runtime:
+- **`bonesinfra`** — `crates/bonesinfra/python/`, embedded by the Rust `bonesinfra` crate
 
 ## The Point
 

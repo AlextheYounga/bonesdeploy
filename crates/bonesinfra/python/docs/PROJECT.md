@@ -1,10 +1,14 @@
 # BonesInfra Project Notes
 
-BonesInfra is the hidden Python provisioning engine for BonesDeploy.
+BonesInfra is the hidden Python provisioning engine embedded in the BonesDeploy
+monorepo.
 
 It is not the public product interface. It is called by `bonesdeploy` to run pyinfra-based provisioning, runtime setup, SSL setup, and runtime-specific infrastructure tasks.
 
-The user should normally never call `bonesinfra` directly, except for dev testing.
+The user should normally never call `bonesinfra` directly, except for dev
+testing. The Rust `bonesinfra` crate embeds this Python tree into the
+`bonesdeploy` binary, materializes it into an isolated cache, creates its
+virtualenv, and invokes `python -m bonesinfra`.
 
 ______________________________________________________________________
 
@@ -42,7 +46,6 @@ BonesInfra owns:
 - runtime provisioning
 - SSL provisioning
 - runtime catalog
-- runtime questions
 - framework-specific infrastructure
 - Jinja2 templates used by provisioning
 - runtime package installation
@@ -58,8 +61,8 @@ Repository and site paths come from `app.repo_path` and `app.project_root`.
 
 Each build user's outer `user-<UID>.slice` is limited by root-owned systemd
 resource control. The defaults are configurable in `bones.toml` under
-`[build.resources]`: `cpu_quota_percent = 75`, `memory_high_percent = 60`, and
-`memory_max_percent = 75`. CPUQuota is that percentage of each online CPU;
+`[build.resources]`: `cpu_quota_percent = 80`, `memory_high_percent = 80`, and
+`memory_max_percent = 80`. CPUQuota is that percentage of each online CPU;
 MemoryHigh is the soft reclaim/throttling threshold, while MemoryMax is the hard
 cgroup ceiling, so exceeding it fails the build rather than starving the host.
 These are host-level limits, not rootless Podman delegation.
@@ -86,17 +89,16 @@ BonesInfra exposes a command-line interface because Rust needs a stable process 
 
 That CLI is private.
 
-Current script entrypoint:
+The Python package's development entrypoint is:
 
 ```text
 bonesinfra = "bonesinfra.__main__:main"
 ```
 
-Expected private command shapes:
+The private command shapes currently used by the Rust CLI are:
 
 ```sh
 bonesinfra runtime list
-bonesinfra runtime questions <runtime>
 bonesinfra helpers apply --config <bones.toml>
 bonesinfra setup apply --config <bones.toml>
 bonesinfra runtime apply --config <bones.toml>
@@ -105,7 +107,10 @@ bonesinfra ssl apply --config <bones.toml>
 
 `ssh_user` is read from `bones.toml` (`app.server.ssh_user` key, default `"root"`) instead of a CLI flag.
 
-This command surface is an internal contract with `bonesdeploy`.
+This command surface is an internal contract with `bonesdeploy`. Runtime
+questions are owned by the Rust runtime definitions under
+`crates/bonesdeploy/src/runtimes/`; BonesInfra receives the resulting
+`bones.toml` and does not prompt for runtime settings.
 
 Do not treat it as public user-facing API unless that decision is made deliberately later.
 
@@ -113,22 +118,25 @@ ______________________________________________________________________
 
 # Package Layout
 
-BonesInfra uses a `src/` Python package layout.
+The Python source is one part of the Rust `bonesinfra` crate, not a standalone
+repository. It retains a normal `src/` Python package layout so it can be
+tested and installed locally.
 
 Expected structure:
 
 ```text
-bonesinfra/
-├── pyproject.toml
-├── README.md
-├── docs/
-│   └── PROJECT.md
-└── src/
-    └── bonesinfra/
+crates/bonesinfra/
+├── Cargo.toml                 # Rust embedding/materialization crate
+├── src/lib.rs                 # embeds and runs the Python package
+├── tests/pytest.rs            # Rust-side Python runtime checks
+└── python/
+    ├── pyproject.toml         # Python package metadata and dev tooling
+    ├── docs/PROJECT.md
+    ├── tests/
+    └── src/bonesinfra/        # importable Python package
         ├── __init__.py
         ├── __main__.py
         ├── cli/
-        ├── app/
         ├── domain/
         ├── infra/
         ├── deploys/
@@ -136,9 +144,14 @@ bonesinfra/
         └── assets/
 ```
 
-The outer `bonesinfra/` is the repository.
+The monorepo root is the repository. `crates/bonesinfra/python` is the
+Python package source tree, and `crates/bonesinfra` is the Rust crate that
+embeds it for production use.
 
-The inner `src/bonesinfra/` is the importable Python package.
+For Python-only development, run tools from `crates/bonesinfra/python` with
+the checked-in `pyproject.toml` and `uv.lock`. Production execution goes
+through the Rust crate's embedded copy, not the working tree or a checkout of
+an external repository.
 
 The package should run through:
 
@@ -168,7 +181,7 @@ Allowed:
 
 - declare commands
 - declare arguments/options
-- call app services
+- load the deploy context and select a deploy plan
 - print JSON for query commands
 
 Not allowed:
@@ -182,38 +195,25 @@ Not allowed:
 
 CLI should stay thin.
 
-Example:
+Example shape:
 
 ```python
 def setup_apply_cmd(config: str):
-    setup_apply.apply(config)
+    ctx = DeployContext.from_files(config)
+    run(ctx=ctx, config_path=config, deploy=deploy_setup)
 ```
 
-## `app/`
+## `cli/` and `infra/`
 
-Owns use-case orchestration.
+The current package keeps command orchestration in `cli/app.py` and the
+pyinfra bridge in `infra/pyinfra_runner.py`; there is no separate Python
+`app/` layer.
 
-Examples:
-
-```text
-app/setup_apply.py
-app/runtime_apply.py
-app/ssl_apply.py
-app/runtime_catalog.py
-```
-
-Responsibilities:
-
-- load deploy context via `DeployContext.from_files()`
-- validate use-case-level requirements
-- call the correct deploy plan
-- call the pyinfra runner through `apply.run_plan()`
-
-App code may know that setup uses `deploys.setup.plan`.
-
-App code should not contain raw pyinfra operations.
-
-`apply.run_plan()` passes `ctx: DeployContext` directly to `pyinfra_runner.run()` — no flat dict involved.
+The CLI commands load `DeployContext.from_files()`, validate command-specific
+requirements, select a deploy plan, and pass it to `infra.pyinfra_runner.run()`.
+The runner owns pyinfra connection and execution concerns. CLI code should
+not contain raw pyinfra operations, and the runner should not contain
+framework-specific provisioning logic.
 
 ## `domain/`
 
@@ -249,12 +249,10 @@ No flat dict. No `host.data` side-channel.
 
 Owns external machinery.
 
-Examples:
+Current examples:
 
 ```text
 infra/pyinfra_runner.py
-infra/toml_store.py
-infra/stdin_json.py
 ```
 
 Responsibilities:
@@ -262,11 +260,12 @@ Responsibilities:
 - run pyinfra programmatically
 - load TOML files
 - read stdin JSON overrides if supported
-- bridge app services to external libraries
+- bridge CLI-selected deploy plans to pyinfra
 
 Infra code may import pyinfra.
 
-App/domain/CLI should avoid direct pyinfra dependency.
+Domain code should avoid direct pyinfra dependency; the runner and deploy
+plans are the pyinfra boundary.
 
 ## `deploys/`
 
@@ -336,22 +335,22 @@ runtimes/
 
 Each runtime should expose a consistent interface.
 
-Recommended interface:
+Current interface:
 
 ```python
-def questions() -> list[dict]: ...
-def deploy(ctx) -> None: ...      # ctx: DeployContext
+def deploy(ctx) -> None: ...  # ctx: DeployContext
 ```
 
-A runtime may have a no-op deploy, but it should be explicit.
-
-Avoid silent runtime import failure.
+A runtime may have a no-op deploy, but it should be explicit. Runtime modules
+are selected by the Python catalog for infrastructure application; user-facing
+runtime questions are defined in the Rust CLI.
 
 ______________________________________________________________________
 
 # Deploy Context
 
-`DeployContext` is the main object passed from app services into pyinfra plans.
+`DeployContext` is the main object passed from CLI-selected deploy plans into
+pyinfra operations.
 
 It mirrors the three top-level config sections:
 
@@ -361,6 +360,7 @@ class DeployContext:
     app: AppConfig
     build: BuildConfig
     runtime: RuntimeConfig
+    dbs: DbsConfig
 ```
 
 ## AppConfig
@@ -434,7 +434,6 @@ Runtime query commands should return stable JSON:
 
 ```sh
 bonesinfra runtime list
-bonesinfra runtime questions laravel
 ```
 
 Expected `runtime list` response:
@@ -443,27 +442,8 @@ Expected `runtime list` response:
 ["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"]
 ```
 
-Expected `runtime questions` response:
-
-```json
-[
-  {
-    "key": "php_version",
-    "type": "choice",
-    "label": "PHP version",
-    "choices": ["8.2", "8.3", "8.4", "8.5"],
-    "default": "8.5"
-  },
-  {
-    "key": "install_queue_worker",
-    "type": "bool",
-    "label": "Install Laravel queue worker?",
-    "default": false
-  }
-]
-```
-
-Rust depends on this data to prompt users.
+Rust does not depend on a Python question endpoint. It owns the prompt schema
+and writes the selected values into `bones.toml` before invoking BonesInfra.
 
 ______________________________________________________________________
 
@@ -651,12 +631,10 @@ Add tests that enforce boundaries.
 Suggested tests:
 
 ```text
-- cli/ files do not import pyinfra
+- cli/ files do not import pyinfra.operations
 - domain/ files do not import pyinfra
-- app/ files do not import pyinfra.operations
 - runtime registry imports every declared runtime
-- every runtime exposes `questions()` and `deploy(ctx)` or explicit no-op deploy
-- runtime question JSON matches contract schema
+- every runtime exposes `deploy(ctx)` or an explicit no-op deploy
 - deploy context parses typed dataclasses correctly
 - `template_data()` produces expected flat dict keys
 - no sys.path mutation
@@ -709,7 +687,7 @@ ______________________________________________________________________
 The current target is clarity, not cleverness.
 
 ```text
-Typer CLI -> app service -> DeployContext.from_files() -> apply.run_plan() -> pyinfra_runner.run(ctx) -> deploy plan -> grouped operations
+Typer CLI -> DeployContext.from_files() -> pyinfra_runner.run(ctx) -> deploy plan -> grouped operations
 ```
 
 Keep files small.
