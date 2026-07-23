@@ -5,7 +5,6 @@ svelte
 |-- .env.example
 |-- .gitignore
 |-- .npmrc
-|-- .nvmrc
 |-- .prettierignore
 |-- .vscode
 |   |-- extensions.json
@@ -94,12 +93,6 @@ vite.config.ts.timestamp-*
 
 ```txt
 engine-strict=true
-```
-
-`.nvmrc`:
-
-```txt
-v24.15.0
 ```
 
 `.prettierignore`:

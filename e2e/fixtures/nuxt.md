@@ -3,7 +3,6 @@ Source Tree:
 ```txt
 nuxt
 |-- .gitignore
-|-- .nvmrc
 |-- README.md
 |-- app
 |   `-- app.vue
@@ -44,12 +43,6 @@ logs
 .env.*
 !.env.example
 .bones
-```
-
-`.nvmrc`:
-
-```txt
-v24.15.0
 ```
 
 `README.md`:

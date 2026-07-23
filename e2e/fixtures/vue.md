@@ -3,7 +3,6 @@ Source Tree:
 ```txt
 vue
 |-- .gitignore
-|-- .nvmrc
 |-- .oxfmtrc.json
 |-- .vscode
 |   `-- extensions.json
@@ -91,12 +90,6 @@ __screenshots__/
 # Vite
 *.timestamp-*-*.mjs
 .bones
-```
-
-`.nvmrc`:
-
-```txt
-v24.15.0
 ```
 
 `.oxfmtrc.json`:

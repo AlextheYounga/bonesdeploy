@@ -3,7 +3,6 @@ Source Tree:
 ```txt
 django
 |-- .gitignore
-|-- .nvmrc
 |-- .python-version
 |-- README.md
 |-- djangotest
@@ -30,12 +29,6 @@ wheels/
 
 # Virtual environments
 .venv
-```
-
-`.nvmrc`:
-
-```txt
-v24.15.0
 ```
 
 `.python-version`:

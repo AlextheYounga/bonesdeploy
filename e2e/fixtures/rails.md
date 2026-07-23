@@ -11,7 +11,6 @@ rails
 |-- .gitignore
 |-- .kamal
 |   `-- secrets
-|-- .nvmrc
 |-- .rubocop.yml
 |-- .ruby-version
 |-- Dockerfile
@@ -461,12 +460,6 @@ __trash__
 
 # Improve security by using a password manager. Never check config/master.key into git!
 RAILS_MASTER_KEY=$(cat config/master.key)
-```
-
-`.nvmrc`:
-
-```txt
-v24.15.0
 ```
 
 `.rubocop.yml`:

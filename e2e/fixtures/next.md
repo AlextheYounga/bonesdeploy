@@ -3,7 +3,6 @@ Source Tree:
 ```txt
 next
 |-- .gitignore
-|-- .nvmrc
 |-- AGENTS.md
 |-- CLAUDE.md
 |-- README.md
@@ -71,12 +70,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .bones
-```
-
-`.nvmrc`:
-
-```txt
-v24.15.0
 ```
 
 `AGENTS.md`:

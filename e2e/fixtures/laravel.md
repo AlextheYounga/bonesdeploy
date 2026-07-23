@@ -11,7 +11,6 @@ laravel
 |       `-- tests.yml
 |-- .gitignore
 |-- .npmrc
-|-- .nvmrc
 |-- .prettierignore
 |-- .prettierrc
 |-- app
@@ -586,12 +585,6 @@ yarn-error.log
 
 ```txt
 ignore-scripts=true
-```
-
-`.nvmrc`:
-
-```txt
-v24.15.0
 ```
 
 `.prettierignore`:
