@@ -2,7 +2,6 @@ Source Tree:
 
 ```txt
 vue
-|-- .env.production
 |-- .gitignore
 |-- .nvmrc
 |-- .oxfmtrc.json
@@ -47,12 +46,6 @@ vue
 |-- tsconfig.vitest.json
 |-- vite.config.ts
 `-- vitest.config.ts
-```
-
-`.env.production`:
-
-```production
-NODE_VERSION=v24.15.0
 ```
 
 `.gitignore`:

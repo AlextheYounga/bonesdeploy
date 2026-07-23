@@ -2,7 +2,6 @@ Source Tree:
 
 ```txt
 next
-|-- .env.production
 |-- .gitignore
 |-- .nvmrc
 |-- AGENTS.md
@@ -25,15 +24,6 @@ next
 |   |-- vercel.svg
 |   `-- window.svg
 `-- tsconfig.json
-```
-
-`.env.production`:
-
-```production
-NODE_ENV=production
-NEXT_PUBLIC_API_URL="https://api.example.com"
-NEXT_PUBLIC_SITE_NAME=""
-NODE_VERSION=v24.15.0
 ```
 
 `.gitignore`:

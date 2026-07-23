@@ -2,7 +2,6 @@ Source Tree:
 
 ```txt
 django
-|-- .env.production
 |-- .gitignore
 |-- .nvmrc
 |-- .python-version
@@ -16,13 +15,6 @@ django
 |-- manage.py
 |-- pyproject.toml
 `-- uv.lock
-```
-
-`.env.production`:
-
-```production
-PYTHON_VERSION=3.14
-NODE_VERSION=v24.15.0
 ```
 
 `.gitignore`:

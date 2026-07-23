@@ -3,7 +3,6 @@ Source Tree:
 ```txt
 rails
 |-- .dockerignore
-|-- .env.production
 |-- .gitattributes
 |-- .github
 |   |-- dependabot.yml
@@ -179,64 +178,6 @@ rails
 # Ignore Docker-related files
 /.dockerignore
 /Dockerfile*
-```
-
-`.env.production`:
-
-```production
-# ==============================
-# Application Settings
-# ==============================
-RAILS_ENV=development
-PORT=3000
-# Run `bin/rails secret` to generate a new key
-SECRET_KEY_BASE=your_long_random_secret_string_here
-RAILS_MAX_THREADS=5
-
-NODE_VERSION=v24.15.0
-
-# ==============================
-# Database Configuration (PostgreSQL)
-# ==============================
-# You can use a unified URL...
-DATABASE_URL=postgres://localhost/myapp_development
-# ...or individual connection parameters
-POSTGRES_USER=my_db_user
-POSTGRES_PASSWORD=my_db_password
-POSTGRES_HOST=localhost
-POSTGRES_PORT=5432
-
-# ==============================
-# Redis / Sidekiq (Background Jobs)
-# ==============================
-REDIS_URL=redis://localhost:6379/1
-
-# ==============================
-# Outbound Email (SMTP Example)
-# ==============================
-SMTP_ADDRESS=smtp.sendgrid.net
-SMTP_PORT=587
-SMTP_USERNAME=apikey
-SMTP_PASSWORD=your_email_provider_api_key
-SMTP_DOMAIN=yourdomain.com
-MAILER_SENDER_ADDRESS=noreply@yourdomain.com
-
-# ==============================
-# Cloud Storage (Active Storage / AWS S3)
-# ==============================
-AWS_ACCESS_KEY_ID=your_aws_access_key
-AWS_SECRET_ACCESS_KEY=your_aws_secret_key
-AWS_REGION=us-east-1
-AWS_BUCKET=your-app-bucket-name
-
-# ==============================
-# Third-Party APIs
-# ==============================
-STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_pub_key
-STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
-
-GITHUB_CLIENT_ID=your_oauth_client_id
-GITHUB_CLIENT_SECRET=your_oauth_client_secret
 ```
 
 `.gitattributes`:
@@ -1542,7 +1483,7 @@ exec "./bin/rails", "server", *ARGV
 
 # If running the rails server then create or migrate existing database
 if [ "${@: -2:1}" == "./bin/rails" ] && [ "${@: -1:1}" == "server" ]; then
-  ./bin/rails db:prepare
+	./bin/rails db:prepare
 fi
 
 exec "${@}"

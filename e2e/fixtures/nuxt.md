@@ -2,7 +2,6 @@ Source Tree:
 
 ```txt
 nuxt
-|-- .env.production
 |-- .gitignore
 |-- .nvmrc
 |-- README.md
@@ -15,12 +14,6 @@ nuxt
 |   |-- favicon.ico
 |   `-- robots.txt
 `-- tsconfig.json
-```
-
-`.env.production`:
-
-```production
-NODE_VERSION=v24.15.0
 ```
 
 `.gitignore`:

@@ -3,7 +3,6 @@ Source Tree:
 ```txt
 svelte
 |-- .env.example
-|-- .env.production
 |-- .gitignore
 |-- .npmrc
 |-- .nvmrc
@@ -59,12 +58,6 @@ svelte
 ```example
 # Drizzle
 DATABASE_URL=local.db
-```
-
-`.env.production`:
-
-```production
-NODE_VERSION=v24.15.0
 ```
 
 `.gitignore`:
