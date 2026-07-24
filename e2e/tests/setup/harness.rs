@@ -89,6 +89,9 @@ impl Harness {
         for runtime_var in runtime_vars {
             init_args.extend(["--runtime-var", *runtime_var]);
         }
+        if template == "next" && runtime_vars.contains(&"is_static=true") {
+            project.configure_next_static()?;
+        }
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &init_args)?;
         if template == "laravel" {
             project.generate_laravel_app_key(&self.session, &self.artifacts.bonesdeploy)?;

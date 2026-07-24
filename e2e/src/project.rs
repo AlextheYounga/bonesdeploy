@@ -33,6 +33,17 @@ impl SampleProject {
         &self.dir
     }
 
+    pub fn configure_next_static(&self) -> Result<()> {
+        let path = self.dir.join("next.config.ts");
+        let source = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+        let updated = source.replace(r#"output: "standalone""#, r#"output: "export""#);
+        if updated == source {
+            bail!("Next fixture does not declare output: \"standalone\" in {}", path.display());
+        }
+        fs::write(&path, updated).with_context(|| format!("Failed to write {}", path.display()))?;
+        Ok(())
+    }
+
     pub fn push(&self, session: &Session, remote: &str, branch: &str) -> Result<()> {
         self.git(session, &["push", remote, branch])
     }
