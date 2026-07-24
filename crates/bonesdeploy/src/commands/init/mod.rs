@@ -112,6 +112,8 @@ mod tests {
         original_dir: PathBuf,
         original_home: Option<String>,
         original_xdg_config_home: Option<String>,
+        original_xdg_data_home: Option<String>,
+        original_xdg_cache_home: Option<String>,
     }
 
     impl TestEnvironment {
@@ -120,6 +122,8 @@ mod tests {
             let original_dir = env::current_dir()?;
             let original_home = env::var("HOME").ok();
             let original_xdg_config_home = env::var("XDG_CONFIG_HOME").ok();
+            let original_xdg_data_home = env::var("XDG_DATA_HOME").ok();
+            let original_xdg_cache_home = env::var("XDG_CACHE_HOME").ok();
 
             env::set_current_dir(repo_dir)?;
 
@@ -127,9 +131,18 @@ mod tests {
             unsafe {
                 env::set_var("HOME", home_dir);
                 env::set_var("XDG_CONFIG_HOME", home_dir.join(".config"));
+                env::set_var("XDG_DATA_HOME", home_dir.join(".local/share"));
+                env::set_var("XDG_CACHE_HOME", home_dir.join(".cache"));
             }
 
-            Ok(Self { _lock: lock, original_dir, original_home, original_xdg_config_home })
+            Ok(Self {
+                _lock: lock,
+                original_dir,
+                original_home,
+                original_xdg_config_home,
+                original_xdg_data_home,
+                original_xdg_cache_home,
+            })
         }
     }
 
@@ -163,6 +176,25 @@ mod tests {
                     // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
                     unsafe {
                         env::remove_var("XDG_CONFIG_HOME");
+                    }
+                }
+            }
+
+            for (name, original) in
+                [("XDG_DATA_HOME", &self.original_xdg_data_home), ("XDG_CACHE_HOME", &self.original_xdg_cache_home)]
+            {
+                match original {
+                    Some(value) => {
+                        // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
+                        unsafe {
+                            env::set_var(name, value);
+                        }
+                    }
+                    None => {
+                        // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
+                        unsafe {
+                            env::remove_var(name);
+                        }
                     }
                 }
             }
@@ -231,6 +263,9 @@ mod tests {
             assert!(env_build.is_file(), ".env.build should be created");
             let env_build_content = fs::read_to_string(&env_build)?;
             assert!(env_build_content.contains("Do not place passwords"));
+
+            let gitignore = fs::read_to_string(repo_dir.join(".gitignore"))?;
+            assert!(gitignore.lines().any(|line| line.trim() == "!.env.build"));
 
             let pre_push = repo_dir.join(".git/hooks/pre-push");
             assert!(pre_push.is_file(), "guaranteed pre-push guard should be installed");

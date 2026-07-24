@@ -52,17 +52,23 @@ pub(super) fn materialize_fresh_bones(
 
 pub(super) fn update_gitignore() -> Result<()> {
     let gitignore = Path::new(".gitignore");
-    let entry = paths::LOCAL_BONES_DIR;
+    let entries = [paths::LOCAL_BONES_DIR, "!.env.build"];
 
     if gitignore.exists() {
         let content = fs::read_to_string(gitignore)?;
-        if content.lines().any(|line| line.trim() == entry) {
+        let missing = entries
+            .iter()
+            .filter(|entry| !content.lines().any(|line| line.trim() == **entry))
+            .copied()
+            .collect::<Vec<_>>();
+        if missing.is_empty() {
             return Ok(());
         }
         let separator = if content.ends_with('\n') { "" } else { "\n" };
-        fs::write(gitignore, format!("{content}{separator}{entry}\n"))?;
+        let additions = missing.join("\n");
+        fs::write(gitignore, format!("{content}{separator}{additions}\n"))?;
     } else {
-        fs::write(gitignore, format!("{entry}\n"))?;
+        fs::write(gitignore, format!("{}\n", entries.join("\n")))?;
     }
 
     Ok(())

@@ -221,7 +221,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 - **init**:
   - Loads existing config from `.bones/bones.toml` or collects user input via prompts.
   - For fresh init, waits until prompts complete before creating `.config/bonesdeploy/projects/<project>.bones/` and the local `.bones` symlink.
-  - Updates `.gitignore` to add .bones folder.
+  - Updates `.gitignore` to add `.bones` and explicitly keep the generated `.env.build` trackable even when the project ignores `.env.*` files.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy remote setup` and `bonesdeploy remote runtime` before first deploy.
   - Saves config to `.bones/bones.toml`.
