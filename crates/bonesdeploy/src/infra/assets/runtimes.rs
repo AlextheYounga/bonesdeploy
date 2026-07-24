@@ -120,6 +120,16 @@ mod tests {
     }
 
     #[test]
+    fn nuxt_build_selects_generate_or_build_from_static_mode() {
+        let script = RuntimeAssets::get("nuxt/deployment/build/02_run_build.sh")
+            .map(|asset| String::from_utf8_lossy(asset.data.as_ref()).into_owned())
+            .unwrap_or_default();
+        assert!(script.contains("BONES_RUNTIME_IS_STATIC"));
+        assert!(script.contains("corepack pnpm \"$command\""));
+        assert!(script.contains("npm run \"$command\""));
+    }
+
+    #[test]
     fn every_runtime_has_a_build_environment_example() {
         for runtime in runtime_names() {
             if let Some(content) = runtimes::build_environment_example(&runtime, &Runtime::default()) {
