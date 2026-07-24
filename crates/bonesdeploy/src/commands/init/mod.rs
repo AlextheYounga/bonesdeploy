@@ -272,14 +272,13 @@ mod tests {
             let guard_content = fs::read_to_string(&pre_push)?;
             assert!(guard_content.contains("bonesdeploy-pre-push-v1"));
 
-            let config_root = paths::bones_config_root().join("atlas.bones");
+            let config_root = paths::bones_projects_root().join("atlas.bones");
             assert!(!config_root.join("hooks").exists(), "config hooks/ should not be created");
 
             let config_gitignore = paths::bones_config_root().join(".gitignore");
             assert!(config_gitignore.is_file());
             let gitignore_content = fs::read_to_string(config_gitignore)?;
             assert!(gitignore_content.contains("projects/"));
-            assert!(gitignore_content.contains("atlas.bones"));
 
             Ok(())
         })
@@ -328,7 +327,7 @@ mod tests {
             };
             assert!(err.to_string().contains("--host is required"));
             assert!(!repo_dir.join(".bones").exists());
-            assert!(!paths::bones_config_root().join("atlas.bones").exists());
+            assert!(!paths::bones_projects_root().join("atlas.bones").exists());
 
             Ok(())
         })
@@ -345,7 +344,7 @@ mod tests {
 
             let bones_dir = repo_dir.join(".bones");
             assert!(bones_dir.join("bones.toml").is_file());
-            assert_eq!(fs::read_link(&bones_dir)?, paths::bones_config_root().join("atlas.bones"));
+            assert_eq!(fs::read_link(&bones_dir)?, paths::bones_projects_root().join("atlas.bones"));
 
             Ok(())
         })
