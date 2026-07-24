@@ -2,13 +2,12 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::Result;
 use shared::{config, paths};
 
 use crate::release::script_runner::validate_build_cache;
 
 pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
-    if let Err(error) = validate_site_name(site) {
+    if let Err(error) = config::validate_site_name(site) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
     }
@@ -174,10 +173,6 @@ fn check_site_layout(shared_root: &Path, releases_root: &Path, issues: &mut Vec<
     if !releases_root.is_dir() {
         issues.push(format!("releases root is missing: {}", releases_root.display()));
     }
-}
-
-fn validate_site_name(site: &str) -> Result<()> {
-    config::validate_project_name(site).map_err(|error| anyhow::anyhow!("Invalid site name: {error}"))
 }
 
 fn check_site_target_exists(site: &str, issues: &mut Vec<String>) {

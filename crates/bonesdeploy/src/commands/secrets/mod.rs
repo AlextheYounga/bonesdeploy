@@ -1,10 +1,10 @@
 use std::env;
 use std::fs::{self, OpenOptions, Permissions};
-use std::io::{ErrorKind, Write as IoWrite};
+use std::io::ErrorKind;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process;
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
@@ -17,29 +17,10 @@ use shared::config as shared_config;
 use shared::config::parse_port;
 use shared::paths;
 
+mod gpg;
+
 const LOCAL_ENV_SECRET: &str = ".bones/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
-
-fn gpg_home() -> PathBuf {
-    let current = paths::bones_data_root().join("gnupg");
-    if current.exists() {
-        return current;
-    }
-
-    // TODO: remove after existing projects have migrated their GPG keyrings.
-    let previous_gpg_home = paths::bones_config_root().join("_lib/gnupg");
-    if previous_gpg_home.exists() {
-        return previous_gpg_home;
-    }
-
-    current
-}
-
-fn gpg_command() -> Command {
-    let mut cmd = Command::new("gpg");
-    cmd.arg("--homedir").arg(gpg_home().as_os_str());
-    cmd
-}
 
 pub fn init() -> Result<()> {
     let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
@@ -67,8 +48,8 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
         return Ok(());
     }
 
-    ensure_gpg_installed()?;
-    let key_fingerprint = ensure_project_key(&cfg.project_name)?;
+    gpg::ensure_installed()?;
+    let key_fingerprint = gpg::ensure_project_key(&cfg.project_name)?;
     fs::create_dir_all(paths::LOCAL_BONES_SECRETS_DIR)
         .with_context(|| format!("Failed to create {}", paths::LOCAL_BONES_SECRETS_DIR))?;
 
@@ -88,7 +69,7 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     .with_context(|| format!("Failed to write default secrets to {}", temp_path.display()))?;
     fs::set_permissions(&temp_path, Permissions::from_mode(0o600))?;
 
-    let encrypted_result = run_gpg(&[
+    let encrypted_result = gpg::run(&[
         "--batch",
         "--yes",
         "--output",
@@ -106,10 +87,10 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
 }
 
 pub fn edit() -> Result<()> {
-    ensure_gpg_installed()?;
+    gpg::ensure_installed()?;
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
-    let key_fingerprint = ensure_project_key(&cfg.project_name)?;
+    let key_fingerprint = gpg::ensure_project_key(&cfg.project_name)?;
 
     let encrypted_path = Path::new(LOCAL_ENV_SECRET);
 
@@ -120,7 +101,7 @@ pub fn edit() -> Result<()> {
     let temp_path = create_temp_edit_path()?;
 
     if encrypted_path.is_file() {
-        run_gpg(&[
+        gpg::run(&[
             "--batch",
             "--yes",
             "--decrypt",
@@ -132,7 +113,7 @@ pub fn edit() -> Result<()> {
 
     let edit_result = open_editor(&temp_path);
     let encrypt_result = if edit_result.is_ok() {
-        run_gpg(&[
+        gpg::run(&[
             "--batch",
             "--yes",
             "--output",
@@ -163,7 +144,7 @@ pub fn edit() -> Result<()> {
 }
 
 pub async fn push() -> Result<()> {
-    ensure_gpg_installed()?;
+    gpg::ensure_installed()?;
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
     let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
@@ -182,7 +163,7 @@ pub async fn push() -> Result<()> {
         bail!("Missing encrypted secrets\n\n{}", output::next_step("bonesdeploy secrets edit"));
     }
 
-    let plaintext = decrypt_secret(encrypted_path)?;
+    let plaintext = gpg::decrypt(encrypted_path)?;
     let shared = Path::new(&cfg.project_root).join(paths::SHARED_DIR);
     let target = shared.join(paths::DOT_ENV);
     let parent = target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
@@ -197,96 +178,6 @@ pub async fn push() -> Result<()> {
     session.close().await?;
     println!("{} Secrets pushed.", output::success_marker());
     Ok(())
-}
-
-fn ensure_gpg_installed() -> Result<()> {
-    let output = Command::new("gpg").arg("--version").output().context("gpg is required.")?;
-    if !output.status.success() {
-        bail!("gpg is required.")
-    }
-    Ok(())
-}
-
-fn ensure_gpg_home() -> Result<()> {
-    let home = gpg_home();
-    fs::create_dir_all(&home).with_context(|| format!("Failed to create {}", home.display()))?;
-    fs::set_permissions(&home, Permissions::from_mode(0o700))
-        .with_context(|| format!("Failed to chmod 0700 {}", home.display()))?;
-    Ok(())
-}
-
-fn ensure_project_key(project_name: &str) -> Result<String> {
-    ensure_gpg_home()?;
-
-    let uid = format!("BonesDeploy secrets: {project_name}");
-
-    if let Some(fingerprint) = find_key_fingerprint(&uid)? {
-        return Ok(fingerprint);
-    }
-
-    generate_project_key(project_name, &uid)
-}
-
-fn find_key_fingerprint(uid: &str) -> Result<Option<String>> {
-    let mut cmd = gpg_command();
-    cmd.args(["--list-keys", "--with-colons", "--with-fingerprint", uid]);
-    let output = cmd.output().context("Failed to run gpg --list-keys")?;
-
-    if !output.status.success() {
-        return Ok(None);
-    }
-
-    Ok(extract_fingerprint(&String::from_utf8_lossy(&output.stdout)))
-}
-
-fn extract_fingerprint(output: &str) -> Option<String> {
-    for line in output.lines() {
-        if line.starts_with("fpr:") {
-            let parts: Vec<&str> = line.split(':').collect();
-            if parts.len() >= 10 {
-                return Some(parts[9].to_string());
-            }
-        }
-    }
-    None
-}
-
-fn generate_project_key(project_name: &str, uid: &str) -> Result<String> {
-    let email = format!("{project_name}@bonesdeploy.local");
-    let params = format!(
-        "Key-Type: RSA\n\
-         Key-Length: 4096\n\
-         Key-Usage: cert\n\
-         Subkey-Type: RSA\n\
-         Subkey-Length: 4096\n\
-         Subkey-Usage: encrypt\n\
-         Name-Real: {uid}\n\
-         Name-Email: {email}\n\
-         %no-protection\n\
-         %commit\n"
-    );
-
-    let mut child = gpg_command()
-        .args(["--batch", "--generate-key"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .context("Failed to spawn gpg --generate-key")?;
-
-    {
-        let mut stdin = child.stdin.take().ok_or_else(|| anyhow::anyhow!("stdin was not piped"))?;
-        stdin.write_all(params.as_bytes()).context("Failed to write batch key params to gpg")?;
-    }
-
-    let output = child.wait_with_output().context("Failed to wait for gpg --generate-key")?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("Failed to generate GPG key: {stderr}");
-    }
-
-    find_key_fingerprint(uid)?.ok_or_else(|| anyhow::anyhow!("Key was generated but fingerprint could not be found"))
 }
 
 fn open_editor(path: &Path) -> Result<()> {
@@ -322,44 +213,4 @@ fn create_temp_edit_path() -> Result<PathBuf> {
         .with_context(|| format!("Failed to create temp file {}", path.display()))?;
 
     Ok(path)
-}
-
-fn decrypt_secret(path: &Path) -> Result<Vec<u8>> {
-    let mut cmd = gpg_command();
-    cmd.args(["--batch", "--yes", "--decrypt"]).arg(path);
-    let output = cmd.output().with_context(|| format!("Failed to run gpg for {}", path.display()))?;
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!("Failed to decrypt {}\n{stderr}", path.display());
-    }
-
-    Ok(output.stdout)
-}
-
-fn run_gpg(args: &[&str]) -> Result<()> {
-    let mut cmd = gpg_command();
-    cmd.args(args);
-    let status = cmd.status().context("Failed to run gpg")?;
-    if !status.success() {
-        bail!("gpg failed with status {status}");
-    }
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::extract_fingerprint;
-
-    #[test]
-    fn extract_fingerprint_parses_fpr_line() {
-        let output = "tru::1:1754651437:0:3:1:3\nfpr:::::::::ABCDEF1234567890ABCDEF1234567890ABCDEF:\nuid:::::::::Test <test@example.com>:\n";
-        assert_eq!(extract_fingerprint(output).as_deref(), Some("ABCDEF1234567890ABCDEF1234567890ABCDEF"));
-    }
-
-    #[test]
-    fn extract_fingerprint_returns_none_without_fpr_line() {
-        let output = "tru::1:1754651437:0:3:1:3\nuid:::::::::Test <test@example.com>:\n";
-        assert_eq!(extract_fingerprint(output), None);
-    }
 }

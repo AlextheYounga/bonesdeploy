@@ -5,18 +5,14 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
-use shared::config::is_numbered_shell_script;
-use shared::{config, paths};
+use shared::config::{self, is_numbered_shell_script, validate_site_name};
+use shared::paths;
 
 use crate::commands::ensure_site_idle;
 use crate::privileges;
 use crate::release::state::DeploymentLock;
 
 const POST_RECEIVE_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/post-receive"));
-
-fn validate_site_name(site: &str) -> Result<()> {
-    config::validate_project_name(site).map_err(|error| anyhow::anyhow!("Invalid site name: {error}"))
-}
 
 /// # Errors
 ///

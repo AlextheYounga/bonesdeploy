@@ -38,6 +38,12 @@ pub fn validate_project_name(project_name: &str) -> Result<()> {
     bail!("Invalid project name: {project_name}")
 }
 
+/// # Errors
+/// Returns an error when `site` is not a valid site name.
+pub fn validate_site_name(site: &str) -> Result<()> {
+    validate_project_name(site).map_err(|error| anyhow::anyhow!("Invalid site name: {error}"))
+}
+
 #[must_use]
 pub fn is_numbered_shell_script(name: &str) -> bool {
     let Some((number, script_name)) = name.split_once('_') else {
