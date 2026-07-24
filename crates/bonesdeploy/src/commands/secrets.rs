@@ -26,9 +26,10 @@ fn gpg_home() -> PathBuf {
         return current;
     }
 
-    let legacy = paths::bones_config_root().join("_lib/gnupg");
-    if legacy.exists() {
-        return legacy;
+    // TODO: remove after existing projects have migrated their GPG keyrings.
+    let previous_gpg_home = paths::bones_config_root().join("_lib/gnupg");
+    if previous_gpg_home.exists() {
+        return previous_gpg_home;
     }
 
     current
