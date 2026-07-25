@@ -44,9 +44,27 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
     shared_config::apply_derived_defaults(&mut to_serialize);
 
     let serialized = toml::to_string_pretty(&to_serialize).context("Failed to serialize bones.toml")?;
-    let content = annotate_sections(&compact_inline_table_arrays(&serialized)?);
+    let body = annotate_sections(&compact_inline_table_arrays(&serialized)?);
+    let content = format!("{}\n\n{}", file_header(config), body);
     fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
+}
+
+fn file_header(config: &Bones) -> String {
+    let name = &config.project_name;
+    format!(
+        "# bonesdeploy configuration for {name}\n\
+         #\n\
+         # The following values are always derived from project_name:\n\
+         #   repo_path     = \"{repo_path}\"\n\
+         #   project_root  = \"{project_root}\"\n\
+         #   runtime_user  = \"{runtime_user}\"\n\
+         #   runtime_group = \"{runtime_group}\"",
+        repo_path = paths::default_repo_path_for(name),
+        project_root = paths::default_project_root_for(name),
+        runtime_user = shared_config::runtime_user_for(name),
+        runtime_group = shared_config::runtime_group_for(name),
+    )
 }
 
 fn compact_inline_table_arrays(content: &str) -> Result<String> {
@@ -158,6 +176,18 @@ mod tests {
         assert!(content.contains("domain = \"app.example.com\""));
         assert!(content.contains("email = \"ops@example.com\""));
 
+        fs::remove_file(path)?;
+        Ok(())
+    }
+
+    #[test]
+    fn save_writes_file_header() -> Result<()> {
+        let path = temp_path("file_header.toml");
+        save(&sample_config("phoenix"), &path)?;
+        let content = fs::read_to_string(&path)?;
+        assert!(content.starts_with("# bonesdeploy configuration for phoenix"), "{content}");
+        assert!(content.contains("#   repo_path     = \"/home/git/phoenix.git\""), "{content}");
+        assert!(content.contains("#   runtime_group = \"phoenix\""), "{content}");
         fs::remove_file(path)?;
         Ok(())
     }

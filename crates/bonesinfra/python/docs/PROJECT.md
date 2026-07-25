@@ -57,7 +57,7 @@ distribution-allocated subordinate UID/GID mappings, and a lingering systemd
 user manager for rootless Podman. Runtime application users remain home-less
 and non-login.
 
-Repository and site paths are always derived from `project_name`: `repo_path` defaults to `/srv/git/<project>.git` and `project_root` defaults to `/srv/sites/<project>`.
+Repository and site paths are always derived from `project_name`: `repo_path` defaults to `/home/git/<project>.git` and `project_root` defaults to `/srv/sites/<project>`.
 
 Each build user's outer `user-<UID>.slice` is limited by root-owned systemd
 resource control at 80% CPU quota, 80% memory high, and 80% memory max.

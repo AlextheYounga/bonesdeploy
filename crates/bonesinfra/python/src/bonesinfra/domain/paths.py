@@ -4,7 +4,7 @@ from pathlib import Path
 ASSETS_DIR = Path(__file__).parent.parent / "assets"
 SCRIPTS_DIR = ASSETS_DIR / "scripts"
 
-DEFAULT_REPO_PARENT = "/srv/git"
+DEFAULT_REPO_PARENT = "/home/git"
 IMAGE_STORE_GRAPH_ROOT = "/var/lib/bonesdeploy/image-store"
 IMAGE_STORE_RUN_ROOT = "/run/bonesdeploy/image-store"
 BUILD_CACHE_NAME = "cache"

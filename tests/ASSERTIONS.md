@@ -38,6 +38,7 @@
 - save adds comments to nested sections. (save_adds_comments_to_nested_sections)
 - save formats permission entries as inline tables. (save_formats_permission_entries_as_inline_tables)
 - save persists ssl settings. (save_persists_ssl_settings)
+- save writes file header. (save_writes_file_header)
 
 ## `crates/bonesdeploy/src/infra/bootstrap_ssh.rs`
 - defaults to root. (defaults_to_root)
