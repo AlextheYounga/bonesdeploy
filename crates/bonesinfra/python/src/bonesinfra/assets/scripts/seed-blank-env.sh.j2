@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENV_PATH="{{ env_path }}"
+RUNTIME_USER="{{ runtime_user }}"
+RUNTIME_GROUP="{{ runtime_group }}"
+
+touch "$ENV_PATH"
+chown "${RUNTIME_USER}:${RUNTIME_GROUP}" "$ENV_PATH"
+chmod 640 "$ENV_PATH"

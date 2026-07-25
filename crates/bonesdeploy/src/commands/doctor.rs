@@ -3,12 +3,11 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::Result;
-use toml::Table;
 
 use crate::config;
 use crate::infra::ssh;
 use crate::ui::output;
-use shared::paths;
+use shared::{config::is_numbered_shell_script, paths};
 
 pub async fn run(local_only: bool) -> Result<bool> {
     println!("{} Checking deployment...", console::style("bonesdeploy doctor").bold());
@@ -31,12 +30,6 @@ pub async fn run(local_only: bool) -> Result<bool> {
         "deploy branch",
         local_branch_issue,
         cfg.as_ref().map(|c| format!("git checkout -b {} && git push {} {}", c.branch, c.remote_name, c.branch)),
-    );
-
-    issues += print_check(
-        "buildtime env vars",
-        check_buildtime_config(),
-        Some(String::from("add names to [build].vars in .bones/bones.toml for build-time env vars")),
     );
 
     if deploy_on_push {
@@ -166,22 +159,13 @@ fn check_deployment_scripts() -> Option<String> {
             if path.extension().is_none_or(|extension| extension != "sh") {
                 continue;
             }
-            if !is_deployment_script(&name) {
+            if !is_numbered_shell_script(&name) {
                 return Some(format!("Deployment script must use the NN_name.sh convention: {subdir}/{name}"));
             }
         }
     }
 
     None
-}
-
-fn is_deployment_script(name: &str) -> bool {
-    let bytes = name.as_bytes();
-    bytes.len() > 6
-        && bytes[0].is_ascii_digit()
-        && bytes[1].is_ascii_digit()
-        && bytes[2] == b'_'
-        && Path::new(name).extension().is_some_and(|extension| extension == "sh")
 }
 
 fn check_local_branch(cfg: &config::Bones) -> Option<String> {
@@ -233,7 +217,7 @@ async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
         Ok(session) => session,
         Err(error) => return (Some(format!("Cannot connect as privileged remote user\n  {error}")), false),
     };
-    let command = format!("bonesremote doctor --site {}", &cfg.project_name);
+    let command = format!("bonesremote doctor --site {}", cfg.project_name);
     let result = ssh::run_cmd(&session, &command).await;
     // The remote command has finished; ignore failure while closing this short-lived SSH session.
     let _ = session.close().await;
@@ -253,27 +237,6 @@ async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
     }
 }
 
-fn check_buildtime_config() -> Option<String> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    let Ok(content) = fs::read_to_string(bones_toml) else {
-        return None;
-    };
-    let Ok(toml_value) = content.parse::<Table>() else {
-        return None;
-    };
-    let is_next =
-        toml_value.get("runtime").and_then(|runtime| runtime.get("template")).and_then(|v| v.as_str()) == Some("next");
-    if !is_next {
-        return None;
-    }
-
-    if toml_value.get("build").is_none_or(|build| build.get("vars").is_none()) {
-        return Some(String::from("Next.js requires [build].vars in .bones/bones.toml for build-time env vars"));
-    }
-
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use std::env;
@@ -283,12 +246,6 @@ mod tests {
     use anyhow::Result;
 
     use super::check_deployment_scripts;
-    use crate::commands::push_state;
-
-    #[test]
-    fn doctor_points_at_correct_remote_import_flow() {
-        assert_eq!(push_state::remote_import_command("acme"), "bonesremote site import --site 'acme'");
-    }
 
     #[test]
     fn deployment_script_check_accepts_nested_build_and_prepare_layout() -> Result<()> {

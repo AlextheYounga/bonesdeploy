@@ -2,11 +2,12 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{Result, bail};
 use shared::{config, paths};
 
+use crate::release::script_runner::validate_build_cache;
+
 pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
-    if let Err(error) = validate_site_name(site) {
+    if let Err(error) = config::validate_site_name(site) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
     }
@@ -28,7 +29,7 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
     check_runtime_identity(&runtime_user, &runtime_group, issues);
     check_build_user(&build_user, issues);
     check_site_layout(&shared_root, &releases_root, issues);
-    check_service_exists(&cfg.project_name, issues);
+    check_site_target_exists(&cfg.project_name, issues);
 }
 
 fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
@@ -47,6 +48,14 @@ fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
     let expected_home = paths::bonesdeploy_user_home(build_user);
     if account_home(&passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
         issues.push(format!("build user home must be {}: {build_user}", expected_home.display()));
+    }
+
+    let Some((uid, gid)) = account_identity(&passwd, build_user) else {
+        issues.push(format!("build user has invalid passwd identity: {build_user}"));
+        return;
+    };
+    if let Err(error) = validate_build_cache(&paths::bonesdeploy_user_cache(build_user), uid, gid) {
+        issues.push(error.to_string());
     }
 }
 
@@ -166,27 +175,58 @@ fn check_site_layout(shared_root: &Path, releases_root: &Path, issues: &mut Vec<
     }
 }
 
-fn validate_site_name(site: &str) -> Result<()> {
-    if site.is_empty() {
-        bail!("Site name cannot be empty");
-    }
-
-    if site.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') {
-        return Ok(());
-    }
-
-    bail!("Invalid site name: {site}")
-}
-
-fn check_service_exists(site: &str, issues: &mut Vec<String>) {
-    let service_name = paths::nginx_service_name(site);
-    let output = Command::new("systemctl").args(["show", "--property=LoadState", "--value", &service_name]).output();
+fn check_site_target_exists(site: &str, issues: &mut Vec<String>) {
+    let target_name = paths::site_target_name(site);
+    let output =
+        Command::new("systemctl").args(["show", "--property=LoadState", "--value", "--", &target_name]).output();
 
     match output {
-        Ok(output) if output.status.success() && service_exists(&String::from_utf8_lossy(&output.stdout)) => {}
-        Ok(_) => issues.push(format!("service is missing: {service_name}")),
-        Err(error) => issues.push(format!("could not inspect service {service_name} ({error})")),
+        Ok(output) if output.status.success() && service_exists(&String::from_utf8_lossy(&output.stdout)) => {
+            check_target_membership(&target_name, issues);
+        }
+        Ok(_) => issues.push(format!("site target is missing: {target_name}")),
+        Err(error) => issues.push(format!("could not inspect site target {target_name} ({error})")),
     }
+}
+
+fn check_target_membership(target: &str, issues: &mut Vec<String>) {
+    let output =
+        Command::new("systemctl").args(["show", "--property=Requires", "--value", "--no-pager", "--", target]).output();
+    let services = match output {
+        Ok(output) if output.status.success() => required_services(&String::from_utf8_lossy(&output.stdout)),
+        Ok(_) => {
+            issues.push(format!("could not inspect required services for site target: {target}"));
+            return;
+        }
+        Err(error) => {
+            issues.push(format!("could not inspect required services for site target {target} ({error})"));
+            return;
+        }
+    };
+    if services.is_empty() {
+        issues.push(format!("site target has no registered services: {target}"));
+        return;
+    }
+
+    for service in services {
+        check_required_service_active(target, &service, issues);
+    }
+}
+
+fn required_services(output: &str) -> Vec<String> {
+    output.split_whitespace().filter(|name| name.ends_with(paths::SYSTEMD_SERVICE_SUFFIX)).map(str::to_owned).collect()
+}
+
+fn check_required_service_active(target: &str, service: &str, issues: &mut Vec<String>) {
+    match Command::new("systemctl").args(["is-active", "--quiet", "--", service]).status() {
+        Ok(status) if status.success() => {}
+        Ok(_) => issues.push(inactive_service_issue(target, service)),
+        Err(error) => issues.push(format!("could not inspect required service {service} for {target} ({error})")),
+    }
+}
+
+fn inactive_service_issue(target: &str, service: &str) -> String {
+    format!("required service {service} for site target {target} is not active")
 }
 
 fn account_exists(passwd: &str, account: &str) -> bool {
@@ -195,6 +235,12 @@ fn account_exists(passwd: &str, account: &str) -> bool {
 
 fn account_home<'a>(passwd: &'a str, account: &str) -> Option<&'a str> {
     account_field(passwd, account, 5)
+}
+
+fn account_identity(passwd: &str, account: &str) -> Option<(u32, u32)> {
+    let uid = account_field(passwd, account, 2)?.parse().ok()?;
+    let gid = account_field(passwd, account, 3)?.parse().ok()?;
+    Some((uid, gid))
 }
 
 fn account_field<'a>(passwd: &'a str, account: &str, index: usize) -> Option<&'a str> {
@@ -223,7 +269,10 @@ fn service_exists(load_state: &str) -> bool {
 mod tests {
     use std::{env, fs, process, process::Command};
 
-    use super::{account_exists, account_home, group_members, hook_uses_thin_trigger, service_exists};
+    use super::{
+        account_exists, account_home, account_identity, group_members, hook_uses_thin_trigger, required_services,
+        service_exists,
+    };
 
     #[test]
     fn empty_bare_repo_is_pending_before_first_push() {
@@ -262,6 +311,7 @@ mod tests {
     fn build_user_home_is_parsed() {
         let passwd = "demo-build:x:1002:1002::/var/lib/bonesdeploy/users/demo-build:/usr/sbin/nologin\n";
         assert_eq!(account_home(passwd, "demo-build"), Some("/var/lib/bonesdeploy/users/demo-build"));
+        assert_eq!(account_identity(passwd, "demo-build"), Some((1002, 1002)));
     }
 
     #[test]
@@ -272,5 +322,11 @@ mod tests {
         );
         assert_eq!(group_members("demo:x:1000:\n", "demo"), Some(Vec::new()));
         assert_eq!(group_members("demo:x:1000:\n", "nope"), None);
+    }
+
+    #[test]
+    fn target_without_required_services_is_rejected() {
+        assert!(required_services("").is_empty());
+        assert!(required_services("nexttest.target").is_empty());
     }
 }

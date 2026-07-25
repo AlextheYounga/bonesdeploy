@@ -27,6 +27,7 @@ pub const LOCAL_BONES_TOML: &str = ".bones/bones.toml";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
 pub const LOCAL_BONES_SECRETS_DIR: &str = ".bones/secrets";
 pub const DOT_ENV: &str = ".env";
+pub const ENV_BUILD_FILE: &str = ".env.build";
 
 pub const BONES_DIR: &str = "bones";
 pub const BONES_TOML: &str = "bones.toml";
@@ -34,6 +35,7 @@ pub const NGINX_CONF: &str = "nginx.conf";
 pub const INDEX_HTML: &str = "index.html";
 pub const GIT_HEAD: &str = "HEAD";
 pub const DEPLOYMENT_DIR: &str = "deployment";
+pub const DEPLOYMENT_FUNCTIONS_FILE: &str = "functions.sh";
 pub const DEPLOYMENT_BUILD_DIR: &str = "build";
 pub const DEPLOYMENT_PREPARE_DIR: &str = "prepare";
 pub const RELEASES_DIR: &str = "releases";
@@ -54,18 +56,20 @@ pub const BONESREMOTE_BINARY: &str = "bonesremote";
 pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
 pub const BONESREMOTE_SITES_DIR: &str = "sites";
 pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
+pub const BUILD_CACHE_DIR: &str = "cache";
 pub const NGINX_SOCKET: &str = "nginx.sock";
 pub const NGINX_PID: &str = "nginx.pid";
 pub const PHP_FPM_SOCKET: &str = "php-fpm.sock";
 pub const DEFAULT_NGINX_SITE: &str = "default";
+pub const SYSTEMD_SERVICE_SUFFIX: &str = ".service";
 
 pub const GIT_HOOKS_DIR: &str = ".git/hooks";
 pub const GIT_PRE_PUSH_HOOK: &str = ".git/hooks/pre-push";
 pub const PRE_PUSH_HOOK_NAME: &str = "pre-push";
 pub const HOOKS_DIR: &str = "hooks";
 pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";
-pub const KIT_SECRETS_DIR: &str = "secrets/";
-pub const BONES_CONFIG_LIB_DIR: &str = "_lib";
+pub const BONES_CONFIG_PROJECTS_DIR: &str = "projects";
+pub const BONESDEPLOY_DIR: &str = "bonesdeploy";
 
 #[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
@@ -93,8 +97,19 @@ pub fn ssl_certificate_key_path(domain: &str) -> String {
 }
 
 #[must_use]
-pub fn nginx_service_name(project_name: &str) -> String {
-    format!("{project_name}-nginx.service")
+pub fn site_target_name(project_name: &str) -> String {
+    format!("{project_name}.target")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::site_target_name;
+
+    #[test]
+    fn site_target_name_is_exactly_project_derived() {
+        assert_eq!(site_target_name("nexttest"), "nexttest.target");
+        assert_ne!(site_target_name("shop"), "shop-admin.target");
+    }
 }
 
 #[must_use]
@@ -133,6 +148,11 @@ pub fn bonesdeploy_user_home(user: &str) -> PathBuf {
 }
 
 #[must_use]
+pub fn bonesdeploy_user_cache(user: &str) -> PathBuf {
+    bonesdeploy_user_home(user).join(BUILD_CACHE_DIR)
+}
+
+#[must_use]
 pub fn bonesremote_sites_root_resolved() -> PathBuf {
     if let Some(root) = env::var_os("BONESREMOTE_SITES_ROOT") {
         let raw = root.to_string_lossy().to_string();
@@ -162,8 +182,24 @@ pub fn bones_config_root() -> PathBuf {
 }
 
 #[must_use]
-pub fn bones_config_lib_root() -> PathBuf {
-    bones_config_root().join(BONES_CONFIG_LIB_DIR)
+pub fn bones_projects_root() -> PathBuf {
+    bones_config_root().join(BONES_CONFIG_PROJECTS_DIR)
+}
+
+#[must_use]
+pub fn bones_data_root() -> PathBuf {
+    if let Some(dir) = env::var("XDG_DATA_HOME").ok().filter(|v| !v.is_empty()) {
+        return Path::new(&dir).join(BONESDEPLOY_DIR);
+    }
+    home_dir().join(".local/share").join(BONESDEPLOY_DIR)
+}
+
+#[must_use]
+pub fn bones_cache_root() -> PathBuf {
+    if let Some(dir) = env::var("XDG_CACHE_HOME").ok().filter(|v| !v.is_empty()) {
+        return Path::new(&dir).join(BONESDEPLOY_DIR);
+    }
+    home_dir().join(".cache").join(BONESDEPLOY_DIR)
 }
 
 #[must_use]

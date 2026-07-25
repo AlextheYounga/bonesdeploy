@@ -4,7 +4,14 @@ use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 
-pub(super) fn harden_release_tree(source: &Path, destination: &Path, release_group: &str) -> Result<()> {
+use super::ownership;
+
+pub(super) fn prepare_release_tree(
+    source: &Path,
+    destination: &Path,
+    runtime_user: &str,
+    release_group: &str,
+) -> Result<()> {
     if !source.is_dir() {
         bail!("Source tree is not a directory: {}", source.display());
     }
@@ -14,8 +21,12 @@ pub(super) fn harden_release_tree(source: &Path, destination: &Path, release_gro
     clear_directory_children(destination)?;
 
     copy_hardened(source, destination, source)?;
-    seal_release(destination, release_group)?;
+    set_release_tree_owner(destination, ownership::user_uid(runtime_user)?, release_group)?;
     Ok(())
+}
+
+pub(super) fn seal_release_tree(destination: &Path, release_group: &str) -> Result<()> {
+    set_release_tree_owner(destination, root_uid()?, release_group)
 }
 
 fn copy_hardened(source: &Path, destination: &Path, tree_root: &Path) -> Result<()> {
@@ -87,21 +98,21 @@ pub(super) fn normalize_relative_path(path: &Path, root: &Path) -> Result<PathBu
     Ok(normalized)
 }
 
-fn seal_release(destination: &Path, release_group: &str) -> Result<()> {
+fn set_release_tree_owner(destination: &Path, uid: u32, release_group: &str) -> Result<()> {
+    let gid = site_group_gid(release_group)?;
+    set_release_tree_identity(destination, uid, gid)
+}
+
+fn set_release_tree_identity(destination: &Path, uid: u32, gid: u32) -> Result<()> {
     use std::os::unix::fs::MetadataExt;
     use std::os::unix::fs::chown;
-
-    let gid = site_group_gid(release_group)?;
-    let uid = root_uid()?;
-
     let metadata = fs::symlink_metadata(destination)
         .with_context(|| format!("Failed to inspect {} for sealing", destination.display()))?;
     if metadata.file_type().is_symlink() {
         return Ok(());
     }
 
-    chown(destination, Some(uid), Some(gid))
-        .with_context(|| format!("Failed to chown {} to root:{}", destination.display(), release_group))?;
+    chown(destination, Some(uid), Some(gid)).with_context(|| format!("Failed to chown {}", destination.display()))?;
 
     let mode = if metadata.file_type().is_dir() {
         0o750
@@ -118,7 +129,7 @@ fn seal_release(destination: &Path, release_group: &str) -> Result<()> {
             .with_context(|| format!("Failed to read {} for sealing", destination.display()))?
         {
             let entry = entry?;
-            seal_release(&entry.path(), release_group)?;
+            set_release_tree_identity(&entry.path(), uid, gid)?;
         }
     }
 
@@ -150,12 +161,15 @@ fn clear_directory_children(path: &Path) -> Result<()> {
 mod tests {
     use std::env;
     use std::fs;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
     use std::path::Path;
     use std::process;
 
     use anyhow::Result;
 
-    use super::{clear_directory_children, normalize_relative_path, validate_symlink_target};
+    use super::{
+        clear_directory_children, normalize_relative_path, set_release_tree_identity, validate_symlink_target,
+    };
 
     #[test]
     fn clear_directory_children_only_removes_entries() -> Result<()> {
@@ -171,6 +185,26 @@ mod tests {
 
         assert!(root.exists(), "clear must not remove the directory itself");
         assert!(fs::read_dir(&root)?.next().is_none());
+
+        fs::remove_dir_all(&root).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn candidate_tree_is_writable_by_its_temporary_owner() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-promote-writable-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        let public = root.join("public");
+        fs::create_dir_all(&public)?;
+        fs::write(public.join("index.php"), "<?php")?;
+
+        let metadata = fs::metadata(&root)?;
+        set_release_tree_identity(&root, metadata.uid(), metadata.gid())?;
+
+        assert_eq!(fs::metadata(&public)?.permissions().mode() & 0o777, 0o750);
+        assert_eq!(fs::metadata(public.join("index.php"))?.permissions().mode() & 0o777, 0o640);
 
         fs::remove_dir_all(&root).ok();
         Ok(())

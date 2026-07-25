@@ -104,7 +104,7 @@ pub enum ReleaseCommand {
 
 #[derive(Subcommand)]
 pub enum ServiceCommand {
-    /// Restart the per-site nginx service
+    /// Restart all services registered with the per-site lifecycle target
     Restart {
         #[arg(long)]
         site: String,

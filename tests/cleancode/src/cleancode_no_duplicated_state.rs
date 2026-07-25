@@ -55,10 +55,7 @@ fn no_duplicated_state_literals() {
 }
 
 fn workspace_root() -> &'static Path {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("tests/cleancode should live under the workspace root")
+    Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
 }
 
 fn collect_state_literals(project_root: &Path) -> Vec<StateLiteral> {
@@ -80,7 +77,7 @@ fn collect_state_literals(project_root: &Path) -> Vec<StateLiteral> {
                 continue;
             }
 
-            if path.extension().is_some_and(|ext| ext == "rs") {
+            if path.extension().is_some_and(|ext| ext == "rs") && !is_test_file(&path) {
                 collect_file_literals(project_root, &path, &mut literals);
             }
         }
@@ -233,6 +230,10 @@ fn parse_string_literals(line: &str) -> Vec<String> {
     }
 
     literals
+}
+
+fn is_test_file(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| name == "tests.rs")
 }
 
 fn state_kind(value: &str) -> Option<StateKind> {

@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, load_runtime, runtime_user_for};
+use shared::config::{self, is_numbered_shell_script, load_runtime, runtime_user_for};
 use shared::paths;
 
 use crate::privileges;
@@ -20,8 +20,8 @@ pub fn run(site: &str) -> Result<()> {
         bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
     }
 
-    let scripts_dir =
-        paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR).join(paths::DEPLOYMENT_PREPARE_DIR);
+    let deployment_dir = paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR);
+    let scripts_dir = deployment_dir.join(paths::DEPLOYMENT_PREPARE_DIR);
     if !scripts_dir.is_dir() {
         println!("No prepare scripts at {}; skipping prepare.", scripts_dir.display());
         return Ok(());
@@ -32,6 +32,12 @@ pub fn run(site: &str) -> Result<()> {
         println!("No prepare scripts found at {}; skipping prepare.", scripts_dir.display());
         return Ok(());
     }
+    let shared_functions = deployment_dir.join(paths::DEPLOYMENT_FUNCTIONS_FILE);
+    if !shared_functions.is_file() {
+        bail!("Shared prepare functions are missing or not a regular file: {}", shared_functions.display());
+    }
+    fs::File::open(&shared_functions)
+        .with_context(|| format!("Shared prepare functions are unreadable: {}", shared_functions.display()))?;
 
     let release_name = release_state::read_staged_release(site)?;
     let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
@@ -45,7 +51,6 @@ pub fn run(site: &str) -> Result<()> {
     let runtime_user = runtime.runtime_user;
 
     let runtime_user = if runtime_user.is_empty() { runtime_user_for(&cfg.project_name) } else { runtime_user };
-
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
         println!("Running prepare script {script_name}...");
@@ -59,6 +64,7 @@ pub fn run(site: &str) -> Result<()> {
                 project_root: &cfg.project_root,
                 runtime_user: &runtime_user,
                 web_root: &web_root,
+                shared_functions: &shared_functions,
             },
         )
         .with_context(|| format!("Failed to execute prepare script {}", script.display()))?;
@@ -78,24 +84,12 @@ fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
     {
         let entry = entry?;
         let path = entry.path();
-        if path.is_file() && is_script(&path) {
+        if path.is_file() && path.file_name().and_then(|name| name.to_str()).is_some_and(is_numbered_shell_script) {
             scripts.push(path);
         }
     }
     scripts.sort();
     Ok(scripts)
-}
-
-fn is_script(path: &Path) -> bool {
-    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-        return false;
-    };
-    let bytes = name.as_bytes();
-    bytes.len() > 6
-        && bytes[0].is_ascii_digit()
-        && bytes[1].is_ascii_digit()
-        && bytes[2] == b'_'
-        && path.extension().is_some_and(|extension| extension == "sh")
 }
 
 #[cfg(test)]

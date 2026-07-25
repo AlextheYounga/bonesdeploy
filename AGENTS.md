@@ -32,4 +32,7 @@ When you are done working, please run and address all warnings/errors:
 
 And finally, please update any related documentation **if necessary, use your best judgement**:
 - `docs/PROJECT.md`
+- `crates/bonesinfra/python/docs/PROJECT.md`
 - `README.md`
+
+Please DO NOT run the e2e tests yourself. They are way too long. 

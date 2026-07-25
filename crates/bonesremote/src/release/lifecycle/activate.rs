@@ -31,7 +31,6 @@ pub fn run(site: &str) -> Result<()> {
     }
 
     release_state::point_symlink_atomically(&current_link, Path::new(&release_dir))?;
-    release_state::clear_staged_release(site)?;
 
     println!("Activated release: {release_name}");
     Ok(())

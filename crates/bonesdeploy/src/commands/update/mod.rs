@@ -2,9 +2,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use console::style;
 use tempfile::TempDir;
 
 use shared::paths;
+
+use crate::ui::output;
 
 mod release;
 mod sync;
@@ -20,12 +23,12 @@ pub struct Options {
 }
 
 pub async fn run(options: Options) -> Result<()> {
-    println!("Checking for updates...");
+    println!("{}", style("Checking for updates").cyan().bold());
     let current_local = release::current_local_version();
     let current_remote = release::current_remote_version();
 
     if options.skip_local && options.skip_remote {
-        println!("Already up to date.");
+        println!("{} Already up to date.", output::success_marker());
         return Ok(());
     }
 
@@ -39,7 +42,7 @@ pub async fn run(options: Options) -> Result<()> {
 
     if !options.skip_local {
         if current_local != master_versions.bonesdeploy {
-            println!("Updating bonesdeploy...");
+            println!("{}", style("Updating bonesdeploy").cyan().bold());
             release::update_local_from_source(SOURCE_REPO_URL)?;
             updated = true;
         }
@@ -48,15 +51,15 @@ pub async fn run(options: Options) -> Result<()> {
     }
 
     if !options.skip_remote && current_remote != master_versions.bonesremote {
-        println!("Updating bonesremote...");
+        println!("{}", style("Updating bonesremote").cyan().bold());
         release::update_remote_from_source(SOURCE_REPO_URL, &master_versions.bonesremote).await?;
         updated = true;
     }
 
     if updated {
-        println!("Update complete.");
+        println!("{} Update complete.", output::success_marker());
     } else {
-        println!("Already up to date.");
+        println!("{} Already up to date.", output::success_marker());
     }
 
     Ok(())

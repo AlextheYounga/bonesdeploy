@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ENV="{{ env }}"
+USER="{{ user }}"
+DATABASE="{{ project }}"
+
+password=$(sed -n 's/^MYSQL_PASSWORD=//p' "$ENV" | head -n1)
+[ -n "$password" ] || password=$(openssl rand -hex 24)
+
+mysql -e "CREATE DATABASE IF NOT EXISTS $DATABASE; CREATE USER IF NOT EXISTS '$USER'@'localhost' IDENTIFIED BY '$password'; GRANT ALL PRIVILEGES ON $DATABASE.* TO '$USER'@'localhost'; FLUSH PRIVILEGES;"
+
+grep -q '^MYSQL_PASSWORD=' "$ENV" || printf 'MYSQL_PASSWORD=%s\nMYSQL_USER=%s\nMYSQL_DATABASE=%s\nMYSQL_URL=mysql://%s:%s@127.0.0.1:3306/%s\n' "$password" "$USER" "$DATABASE" "$USER" "$password" "$DATABASE" >> "$ENV"
+
+install -d -m 0755 /etc/mysql/conf.d
+printf '[mysqld]\nbind-address = 127.0.0.1\n' > /etc/mysql/conf.d/bonesdeploy.cnf

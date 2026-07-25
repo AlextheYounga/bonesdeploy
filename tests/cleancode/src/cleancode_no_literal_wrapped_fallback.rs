@@ -28,7 +28,7 @@ impl<'ast> Visit<'ast> for FallbackVisitor {
         let receiver_is_literal_wrapper = match node.receiver.as_ref() {
             Expr::Call(ExprCall { func, .. }) => {
                 if let Expr::Path(p) = func.as_ref() {
-                    let ident = p.path.get_ident().map(|i| i.to_string());
+                    let ident = p.path.get_ident().map(ToString::to_string);
                     matches!(ident.as_deref(), Some("Some" | "Ok"))
                 } else {
                     false
@@ -113,5 +113,5 @@ fn no_literal_wrapped_fallback() {
 
     assert!(files_scanned > 0, "No parsable Rust files were found to check.");
 
-    assert!(all_violations.is_empty(), "Provably unnecessary fallback(s) found:\n{}", all_violations.join("\n"),);
+    assert!(all_violations.is_empty(), "Provably unnecessary fallback(s) found:\n{}", all_violations.join("\n"));
 }

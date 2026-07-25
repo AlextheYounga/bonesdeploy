@@ -12,12 +12,16 @@
 
 ## `crates/bonesdeploy/src/commands/init/mod.rs`
 - failure before completed prompts leaves no bones assets. (failure_before_completed_prompts_leaves_no_bones_assets)
+- init preserves existing env build. (init_preserves_existing_env_build)
 - materializes base bones assets. (materializes_base_bones_assets)
 - repairs dangling bones symlink. (repairs_dangling_bones_symlink)
 - rerun preserves existing bones assets. (rerun_preserves_existing_bones_assets)
 
 ## `crates/bonesdeploy/src/commands/push_state.rs`
 - local secrets path stays under bones dir. (local_secrets_path_stays_under_bones_dir)
+
+## `crates/bonesdeploy/src/commands/releases.rs`
+- release status includes phase when present. (release_status_includes_phase_when_present)
 
 ## `crates/bonesdeploy/src/commands/remote_bootstrap/data.rs`
 - base data includes preview domain. (base_data_includes_preview_domain)
@@ -34,6 +38,8 @@
 - load applies default project root from project name. (load_applies_default_project_root_from_project_name)
 - load applies default repo path from project name. (load_applies_default_repo_path_from_project_name)
 - load preserves explicit repo and project root overrides. (load_preserves_explicit_repo_and_project_root_overrides)
+- save adds comments to nested sections. (save_adds_comments_to_nested_sections)
+- save formats permission entries as inline tables. (save_formats_permission_entries_as_inline_tables)
 - save includes derived repo and project root. (save_includes_derived_repo_and_project_root)
 - save persists ssl settings. (save_persists_ssl_settings)
 
@@ -41,6 +47,11 @@
 - defaults to root. (defaults_to_root)
 - trims and rejects blank values. (trims_and_rejects_blank_values)
 - uses config value. (uses_config_value)
+
+## `crates/bonesdeploy/src/infra/embedded.rs`
+- next runtime includes the build script. (next_runtime_includes_the_build_script)
+- runtime answers accept boolean template settings. (runtime_answers_accept_boolean_template_settings)
+- runtime defaults fit the single file schema. (runtime_defaults_fit_the_single_file_schema)
 
 ## `crates/bonesdeploy/src/infra/git.rs`
 - parse remote url rejects non git paths. (parse_remote_url_rejects_non_git_paths)
@@ -55,6 +66,11 @@
 - remote command failure includes stdout and stderr. (remote_command_failure_includes_stdout_and_stderr)
 - shell quote preserves single quotes. (shell_quote_preserves_single_quotes)
 
+## `crates/bonesdeploy/src/runtimes.rs`
+- laravel environment uses the assigned preview domain. (laravel_environment_uses_the_assigned_preview_domain)
+- server next keeps its server output. (server_next_keeps_its_server_output)
+- static next uses static output and project environment example. (static_next_uses_static_output_and_project_environment_example)
+
 ## `crates/bonesremote/src/commands/doctor/site.rs`
 - account exists matches passwd entries. (account_exists_matches_passwd_entries)
 - build user home is parsed. (build_user_home_is_parsed)
@@ -68,25 +84,38 @@
 - ignores tags. (ignores_tags)
 - resolves newrev for configured branch. (resolves_newrev_for_configured_branch)
 
-## `crates/bonesremote/src/commands/release_prune.rs`
+## `crates/bonesremote/src/commands/release/kill.rs`
+- wait returns when process is already gone. (wait_returns_when_process_is_already_gone)
+
+## `crates/bonesremote/src/commands/release/list.rs`
+- parses process start ticks after parenthesized name. (parses_process_start_ticks_after_parenthesized_name)
+
+## `crates/bonesremote/src/commands/release/prune.rs`
 - prune old releases keeps active release when within keep limit. (prune_old_releases_keeps_active_release_when_within_keep_limit)
 - prune old releases removes oldest inactive releases up to keep limit. (prune_old_releases_removes_oldest_inactive_releases_up_to_keep_limit)
 
 ## `crates/bonesremote/src/commands/site.rs`
 - install repo post receive hook writes baked trigger. (install_repo_post_receive_hook_writes_baked_trigger)
-- validate top level entries allows buildtime toml. (validate_top_level_entries_allows_buildtime_toml)
+- validate top level entries allows single config. (validate_top_level_entries_allows_single_config)
 - validate top level entries rejects unexpected file. (validate_top_level_entries_rejects_unexpected_file)
 
 ## `crates/bonesremote/src/commands/status.rs`
-- parses unit names from systemctl output. (parses_unit_names_from_systemctl_output)
+- parses registered units from target properties. (parses_registered_units_from_target_properties)
 
 ## `crates/bonesremote/src/release/lifecycle/build/ownership.rs`
 - parse user uid reads uid field. (parse_user_uid_reads_uid_field)
 
 ## `crates/bonesremote/src/release/lifecycle/build/run_scripts.rs`
+- build env includes env build values. (build_env_includes_env_build_values)
+- denied values remain absent in build env. (denied_values_remain_absent_in_build_env)
+- derived bones values are present in build env. (derived_bones_values_are_present_in_build_env)
+- derived bones values cannot be overridden by env build. (derived_bones_values_cannot_be_overridden_by_env_build)
+- derived environment exports scalars but not operational config. (derived_environment_exports_scalars_but_not_operational_config)
 - list scripts only includes numbered shell scripts. (list_scripts_only_includes_numbered_shell_scripts)
+- missing env build is not an error. (missing_env_build_is_not_an_error)
 
 ## `crates/bonesremote/src/release/lifecycle/build/tree.rs`
+- candidate tree is writable by its temporary owner. (candidate_tree_is_writable_by_its_temporary_owner)
 - clear directory children only removes entries. (clear_directory_children_only_removes_entries)
 - normalize relative path rejects escape. (normalize_relative_path_rejects_escape)
 - validate symlink target rejects absolute and escaping targets. (validate_symlink_target_rejects_absolute_and_escaping_targets)
@@ -95,7 +124,6 @@
 - list scripts sorts prepare scripts. (list_scripts_sorts_prepare_scripts)
 
 ## `crates/bonesremote/src/release/lifecycle/wire_shared.rs`
-- ensure shared leaf requires existing path. (ensure_shared_leaf_requires_existing_path)
 - link relative creates symlink to shared target. (link_relative_creates_symlink_to_shared_target)
 - remove if present handles files dirs and missing. (remove_if_present_handles_files_dirs_and_missing)
 - validate shared path rejects absolute and parent paths. (validate_shared_path_rejects_absolute_and_parent_paths)
@@ -106,6 +134,7 @@
 - build container name is deterministic per project. (build_container_name_is_deterministic_per_project)
 - build image commands use the foreground user session. (build_image_commands_use_the_foreground_user_session)
 - podman build command mounts only source tree. (podman_build_command_mounts_only_source_tree)
+- podman build command places environment before image. (podman_build_command_places_environment_before_image)
 - podman exec and remove commands use source working directory. (podman_exec_and_remove_commands_use_source_working_directory)
 
 ## `crates/bonesremote/src/release/script_runner/mod.rs`
@@ -119,22 +148,31 @@
 - list releases sorted skips placeholder. (list_releases_sorted_skips_placeholder)
 - point symlink atomically creates parent dirs and points to target. (point_symlink_atomically_creates_parent_dirs_and_points_to_target)
 - point symlink atomically repoints existing link. (point_symlink_atomically_repoints_existing_link)
+- failed release cleanup refuses to remove the active release. (active_release_cannot_be_dropped)
+- failed activation restores the previous release. (failed_activation_restores_previous_release)
 - read staged release rejects empty file. (read_staged_release_rejects_empty_file)
 - write then read staged release round trips. (write_then_read_staged_release_round_trips)
 
+## `crates/shared/src/app.rs`
+- omitted nested sections keep app defaults. (omitted_nested_sections_keep_app_defaults)
+
 ## `crates/shared/src/config.rs`
-- build identity helpers are derived from project name. (build_identity_helpers_are_derived_from_project_name)
-- extract env vars parses double quoted values. (extract_env_vars_parses_double_quoted_values)
-- extract env vars parses single quoted values. (extract_env_vars_parses_single_quoted_values)
-- extract env vars parses unquoted values. (extract_env_vars_parses_unquoted_values)
-- extract env vars returns only requested keys. (extract_env_vars_returns_only_requested_keys)
-- extract env vars skips comments and blank lines. (extract_env_vars_skips_comments_and_blank_lines)
-- load buildtime empty vars is fine. (load_buildtime_empty_vars_is_fine)
-- load buildtime parses vars array. (load_buildtime_parses_vars_array)
-- load buildtime returns none for missing file. (load_buildtime_returns_none_for_missing_file)
+- buildtime rejects removed vars key. (buildtime_rejects_removed_vars_key)
 - runtime parses shared paths. (runtime_parses_shared_paths)
 - validate host accepts hostnames and ips. (validate_host_accepts_hostnames_and_ips)
 - validate host rejects shell metacharacters. (validate_host_rejects_shell_metacharacters)
+
+## `crates/shared/src/env_build.rs`
+- allows valid underscore names. (allows_valid_underscore_names)
+- derived bones values cannot be overridden. (derived_bones_values_cannot_be_overridden)
+- load reads env build from directory. (load_reads_env_build_from_directory)
+- load returns empty map when file missing. (load_returns_empty_map_when_file_missing)
+- parses quoted values. (parses_quoted_values)
+- parses unquoted values. (parses_unquoted_values)
+- rejects bones reserved prefix. (rejects_bones_reserved_prefix)
+- rejects duplicate keys. (rejects_duplicate_keys)
+- rejects invalid keys. (rejects_invalid_keys)
+- skips comments and blank lines. (skips_comments_and_blank_lines)
 
 ## `tests/cleancode/src/cleancode_file_too_long.rs`
 - Verifies all Rust source files stay at or below 400 lines. (source_files_stay_under_400_lines)

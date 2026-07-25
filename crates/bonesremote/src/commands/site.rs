@@ -5,25 +5,14 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
-use shared::{config, paths};
+use shared::config::{self, is_numbered_shell_script, validate_site_name};
+use shared::paths;
 
+use crate::commands::ensure_site_idle;
 use crate::privileges;
+use crate::release::state::DeploymentLock;
 
 const POST_RECEIVE_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/post-receive"));
-
-const ALLOWED_TOP_LEVEL_ENTRIES: &[&str] = &[paths::BONES_TOML, paths::DEPLOYMENT_DIR];
-
-fn validate_site_name(site: &str) -> Result<()> {
-    if site.is_empty() {
-        bail!("Site name cannot be empty");
-    }
-
-    if site.chars().all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-') {
-        return Ok(());
-    }
-
-    bail!("Invalid site name: {site}")
-}
 
 /// # Errors
 ///
@@ -39,33 +28,61 @@ pub fn import(site: &str) -> Result<()> {
     let staging_dir = unique_site_path(&sites_root, site, "incoming");
     fs::create_dir_all(&staging_dir).with_context(|| format!("Failed to create {}", staging_dir.display()))?;
 
-    extract_stdin_archive(&staging_dir)?;
-    validate_site_dataset(site, &staging_dir)?;
-    replace_site_dir(site, &staging_dir)?;
-    install_repo_post_receive_hook(site)?;
+    if let Err(error) = import_staged_site(site, &staging_dir) {
+        if let Err(cleanup_error) = fs::remove_dir_all(&staging_dir) {
+            return Err(error).context(format!(
+                "Failed to clean up import staging directory {}: {cleanup_error}",
+                staging_dir.display()
+            ));
+        }
+        return Err(error);
+    }
     println!("Imported site state for {site}.");
     Ok(())
 }
 
-fn install_repo_post_receive_hook(site: &str) -> Result<()> {
-    let site_root = paths::bonesremote_site_root(site);
-    write_post_receive_hook(&site_root)
+fn import_staged_site(site: &str, staging_dir: &Path) -> Result<()> {
+    extract_stdin_archive(staging_dir)?;
+    validate_site_dataset(site, staging_dir)?;
+
+    let _lock = DeploymentLock::acquire(site)?;
+    ensure_site_idle(site)?;
+    write_post_receive_hook(staging_dir)?;
+    replace_site_dir(site, staging_dir)
 }
 
 fn write_post_receive_hook(site_root: &Path) -> Result<()> {
     let cfg = config::load(&site_root.join(paths::BONES_TOML))?;
+    validate_repo_path(&cfg.repo_path, &cfg.project_name)?;
     let target = Path::new(&cfg.repo_path).join(paths::HOOKS_DIR).join("post-receive");
+    write_hook_file(&target)
+}
+
+fn write_hook_file(target: &Path) -> Result<()> {
     let target_parent = target.parent().context("post-receive hook target has no parent")?;
 
     fs::create_dir_all(target_parent).with_context(|| format!("Failed to create {}", target_parent.display()))?;
-    fs::write(&target, POST_RECEIVE_SCRIPT).with_context(|| format!("Failed to write {}", target.display()))?;
+    fs::write(target, POST_RECEIVE_SCRIPT).with_context(|| format!("Failed to write {}", target.display()))?;
 
-    let mut perms =
-        fs::metadata(&target).with_context(|| format!("Failed to stat {}", target.display()))?.permissions();
+    let mut perms = fs::metadata(target).with_context(|| format!("Failed to stat {}", target.display()))?.permissions();
     perms.set_mode(0o755);
-    fs::set_permissions(&target, perms).with_context(|| format!("Failed to chmod {}", target.display()))?;
+    fs::set_permissions(target, perms).with_context(|| format!("Failed to chmod {}", target.display()))?;
 
     Ok(())
+}
+
+// Confused-deputy guard: the imported bones.toml supplies `repo_path`, and this
+// function writes `<repo_path>/hooks/post-receive` as root. Reject anything that
+// is not the canonical site repository under the configured parent so an
+// imported dataset cannot redirect the hook write at an unintended path.
+fn validate_repo_path(repo_path: &str, project_name: &str) -> Result<()> {
+    let expected = paths::default_repo_path_for(project_name);
+    if repo_path == expected {
+        return Ok(());
+    }
+    bail!(
+        "Imported repo_path '{repo_path}' does not match the expected site repository '{expected}'; refusing to write hook outside the configured repository parent"
+    );
 }
 
 fn replace_site_dir(site: &str, staging_dir: &Path) -> Result<()> {
@@ -110,6 +127,7 @@ fn extract_stdin_archive(destination: &Path) -> Result<()> {
 fn validate_site_dataset(site: &str, root: &Path) -> Result<()> {
     validate_top_level_entries(root)?;
     reject_symlinks(root)?;
+    validate_deployment_entries(root)?;
 
     let bones_path = root.join(paths::BONES_TOML);
     if !bones_path.is_file() {
@@ -130,11 +148,47 @@ fn validate_top_level_entries(root: &Path) -> Result<()> {
         let name = entry.file_name();
         let Some(name) = name.to_str() else { bail!("Imported dataset contains a non-UTF-8 entry") };
 
-        if ALLOWED_TOP_LEVEL_ENTRIES.contains(&name) {
+        match name {
+            paths::BONES_TOML if entry.file_type()?.is_file() => {}
+            paths::DEPLOYMENT_DIR if entry.file_type()?.is_dir() => {}
+            _ => bail!("Imported dataset contains unsupported entry: {name}"),
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_deployment_entries(root: &Path) -> Result<()> {
+    let deployment = root.join(paths::DEPLOYMENT_DIR);
+    if !deployment.is_dir() {
+        return Ok(());
+    }
+
+    for entry in fs::read_dir(&deployment).with_context(|| format!("Failed to read {}", deployment.display()))? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { bail!("Imported dataset contains a non-UTF-8 entry") };
+        match name {
+            paths::DEPLOYMENT_FUNCTIONS_FILE if entry.file_type()?.is_file() => {}
+            paths::DEPLOYMENT_BUILD_DIR | paths::DEPLOYMENT_PREPARE_DIR if entry.file_type()?.is_dir() => {
+                validate_numbered_scripts(&entry.path())?;
+            }
+            _ => bail!("Imported dataset contains unsupported deployment entry: {name}"),
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_numbered_scripts(directory: &Path) -> Result<()> {
+    for entry in fs::read_dir(directory).with_context(|| format!("Failed to read {}", directory.display()))? {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { bail!("Imported dataset contains a non-UTF-8 entry") };
+        if entry.file_type()?.is_file() && is_numbered_shell_script(name) {
             continue;
         }
-
-        bail!("Imported dataset contains unsupported entry: {name}");
+        bail!("Imported dataset contains unsupported deployment script: {}", entry.path().display());
     }
 
     Ok(())
@@ -173,8 +227,32 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{validate_top_level_entries, write_post_receive_hook};
+    use crate::commands::ensure_site_idle;
+    use crate::release::state::{self as release_state, DeploymentLock};
+
+    use super::{validate_deployment_entries, validate_repo_path, validate_top_level_entries, write_hook_file};
     use shared::paths;
+
+    #[test]
+    fn imports_share_a_stable_lock_and_reject_staged_releases() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-lock-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(root.join("unitapp"))?;
+        let _guard = release_state::set_sites_root_for_tests(root.clone());
+
+        let lock = DeploymentLock::acquire("unitapp")?;
+        fs::rename(root.join("unitapp"), root.join("unitapp.backup"))?;
+        fs::create_dir_all(root.join("unitapp"))?;
+        assert!(DeploymentLock::acquire("unitapp").is_err());
+        drop(lock);
+
+        release_state::write_staged_release("unitapp", "20260507_151501")?;
+        assert!(ensure_site_idle("unitapp").is_err());
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
 
     #[test]
     fn validate_top_level_entries_allows_single_config() -> Result<()> {
@@ -209,49 +287,73 @@ mod tests {
     }
 
     #[test]
-    fn install_repo_post_receive_hook_writes_baked_trigger() -> Result<()> {
+    fn validate_deployment_entries_allows_only_direct_numbered_shell_scripts() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-deployment-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(root.join("deployment/build"))?;
+        fs::create_dir_all(root.join("deployment/prepare"))?;
+        fs::write(root.join("deployment/functions.sh"), "#!/bin/bash\n")?;
+        fs::write(root.join("deployment/build/01_build.sh"), "#!/bin/bash\n")?;
+        fs::write(root.join("deployment/prepare/02_prepare.sh"), "#!/bin/bash\n")?;
+
+        let result = validate_deployment_entries(&root);
+        fs::remove_dir_all(&root)?;
+        assert!(result.is_ok());
+        Ok(())
+    }
+
+    #[test]
+    fn validate_deployment_entries_rejects_nested_and_unlisted_files() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-deployment-reject-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(root.join("deployment/build/nested"))?;
+        fs::write(root.join("deployment/build/README.md"), "not a script\n")?;
+
+        let result = validate_deployment_entries(&root);
+        fs::remove_dir_all(&root)?;
+        assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn write_hook_file_installs_baked_trigger_with_executable_mode() -> Result<()> {
         let root = env::temp_dir().join(format!("bonesremote-site-hook-test-{}", process::id()));
         if root.exists() {
             fs::remove_dir_all(&root)?;
         }
 
         let repo_root = root.join("repos/unitapp.git");
-        let site_root = root.join("sites/unitapp");
-        fs::create_dir_all(&site_root)?;
-        fs::write(
-            site_root.join(paths::BONES_TOML),
-            format!(
-                r#"
-[app]
-remote_name = "production"
-project_name = "unitapp"
-repo_path = "{}"
-project_root = "/srv/sites/unitapp"
-[app.server]
-ssh_user = "root"
-host = "example.com"
-port = "22"
-[app.dns]
-preview_domain = ""
-[app.deploy]
-branch = "main"
-deploy_on_push = false
-releases = 5
-"#,
-                repo_root.display()
-            ),
-        )?;
-
-        let result = write_post_receive_hook(&site_root);
-
         let target = repo_root.join(paths::HOOKS_DIR).join("post-receive");
+
+        write_hook_file(&target)?;
+
         let contents = fs::read_to_string(&target)?;
         let mode = fs::metadata(&target)?.permissions().mode() & 0o777;
 
-        result?;
         assert!(contents.contains("bonesdeploy-post-receive-v1"));
         assert_eq!(mode, 0o755);
         fs::remove_dir_all(&root)?;
         Ok(())
+    }
+
+    #[test]
+    fn validate_repo_path_rejects_paths_outside_configured_parent() {
+        // Lexical match against the canonical /home/git/<project>.git path.
+        assert!(validate_repo_path("/home/git/unitapp.git", "unitapp").is_ok());
+
+        // Traversal attempts, absolute mismatches, and relative paths are all rejected
+        // because they are not byte-equal to the expected canonical path.
+        assert!(validate_repo_path("/home/git/../etc/passwd", "unitapp").is_err());
+        assert!(validate_repo_path("/home/git/other.git", "unitapp").is_err());
+        assert!(validate_repo_path("/srv/repos/unitapp.git", "unitapp").is_err());
+        assert!(validate_repo_path("relative/unitapp.git", "unitapp").is_err());
+        assert!(validate_repo_path("/home/git/unitapp.git/", "unitapp").is_err());
+        assert!(validate_repo_path("", "unitapp").is_err());
+        // Project name mismatch must also fail.
+        assert!(validate_repo_path("/home/git/unitapp.git", "other").is_err());
     }
 }

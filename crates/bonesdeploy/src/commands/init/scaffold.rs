@@ -8,10 +8,12 @@ use shared::paths;
 
 use super::RuntimeSelection;
 use crate::config;
-use crate::infra::embedded;
+use crate::infra::assets::{kit, runtimes as runtime_assets};
 use crate::infra::git;
+use crate::runtimes;
+use shared::env_build;
 
-const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/pre-push"));
+const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/hooks/pre-push"));
 
 pub(super) fn materialize_fresh_bones(
     bones_dir: &Path,
@@ -26,7 +28,7 @@ pub(super) fn materialize_fresh_bones(
             .with_context(|| format!("Stale file at {}, cannot create directory", config_dir.display()))?;
     }
     fs::create_dir_all(&config_dir)?;
-    embedded::scaffold(&config_dir)?;
+    kit::scaffold(&config_dir)?;
 
     if had_bones_entry {
         fs::remove_file(bones_dir)
@@ -35,13 +37,11 @@ pub(super) fn materialize_fresh_bones(
     unix_fs::symlink(&config_dir, bones_dir)?;
 
     cfg.runtime = serde_json::from_value(serde_json::Value::Object(runtime.config.clone()))?;
-    if let Some(template_name) = &runtime.template {
-        cfg.buildtime = embedded::runtime_buildtime_defaults(template_name)?;
-    }
 
     if let Some(template_name) = runtime.template {
-        embedded::scaffold_runtime_deployment(&template_name, bones_dir)?;
-        embedded::scaffold_runtime_secrets(&template_name, bones_dir)?;
+        runtime_assets::scaffold_runtime_env_build(&template_name, Path::new("."), &cfg.runtime)?;
+        runtime_assets::scaffold_runtime_deployment(&template_name, bones_dir)?;
+        runtimes::configure(&template_name, cfg);
         println!("Runtime template: {template_name}");
     } else {
         println!("Runtime template: custom");
@@ -52,30 +52,36 @@ pub(super) fn materialize_fresh_bones(
 
 pub(super) fn update_gitignore() -> Result<()> {
     let gitignore = Path::new(".gitignore");
-    let entry = paths::LOCAL_BONES_DIR;
+    let entries = [paths::LOCAL_BONES_DIR, "!.env.build"];
 
     if gitignore.exists() {
         let content = fs::read_to_string(gitignore)?;
-        if content.lines().any(|line| line.trim() == entry) {
+        let missing = entries
+            .iter()
+            .filter(|entry| !content.lines().any(|line| line.trim() == **entry))
+            .copied()
+            .collect::<Vec<_>>();
+        if missing.is_empty() {
             return Ok(());
         }
         let separator = if content.ends_with('\n') { "" } else { "\n" };
-        fs::write(gitignore, format!("{content}{separator}{entry}\n"))?;
+        let additions = missing.join("\n");
+        fs::write(gitignore, format!("{content}{separator}{additions}\n"))?;
     } else {
-        fs::write(gitignore, format!("{entry}\n"))?;
+        fs::write(gitignore, format!("{}\n", entries.join("\n")))?;
     }
 
     Ok(())
 }
 
-pub(super) fn ensure_config_gitignore(project_name: &str) -> Result<()> {
+pub(super) fn ensure_config_gitignore() -> Result<()> {
     let gitignore = paths::bones_config_root().join(".gitignore");
-    let project_entry = format!("{project_name}.bones");
+    let project_entry = format!("{}/", paths::BONES_CONFIG_PROJECTS_DIR);
 
     if gitignore.exists() {
         let content = fs::read_to_string(&gitignore)?;
         let mut missing = Vec::new();
-        for entry in [paths::BONES_CONFIG_LIB_DIR, &project_entry] {
+        for entry in [&project_entry] {
             if !content.lines().any(|line| line.trim() == entry) {
                 missing.push(entry);
             }
@@ -91,11 +97,7 @@ pub(super) fn ensure_config_gitignore(project_name: &str) -> Result<()> {
         }
         fs::write(&gitignore, format!("{content}{separator}{append}"))?;
     } else {
-        let mut content = String::new();
-        for entry in [paths::BONES_CONFIG_LIB_DIR, &project_entry] {
-            content.push_str(entry);
-            content.push('\n');
-        }
+        let content = format!("{project_entry}\n");
         fs::write(&gitignore, content)?;
     }
 
@@ -127,5 +129,15 @@ pub(super) fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
 
     let remote_url = format!("{}@{}:{}", default_deploy_user(), cfg.host, cfg.repo_path);
     git::add_remote(&cfg.remote_name, &remote_url)?;
+    Ok(())
+}
+
+pub(super) fn ensure_env_build() -> Result<()> {
+    let env_build_path = Path::new(paths::ENV_BUILD_FILE);
+    if env_build_path.exists() {
+        return Ok(());
+    }
+    fs::write(env_build_path, env_build::default_content())
+        .with_context(|| format!("Failed to write {}", env_build_path.display()))?;
     Ok(())
 }
