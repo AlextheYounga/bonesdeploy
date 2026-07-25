@@ -6,7 +6,11 @@ from pyinfra.facts.server import Users
 from pyinfra.operations import server
 
 from bonesinfra.deploys.setup.image_store import BASE_IMAGE
-from bonesinfra.domain.context import DEFAULT_BUILD_CPU_QUOTA_PERCENT, DEPLOY_USER
+from bonesinfra.domain.context import DEPLOY_USER
+
+_BUILD_CPU_QUOTA_PERCENT = 80
+_BUILD_MEMORY_HIGH_PERCENT = 80
+_BUILD_MEMORY_MAX_PERCENT = 80
 from bonesinfra.domain.paths import ASSETS_DIR, BUILD_CACHE_NAME, IMAGE_STORE_GRAPH_ROOT, SCRIPTS_DIR
 from bonesinfra.infra.deploy_helpers import mkdir, render
 
@@ -48,7 +52,7 @@ def build_cache_for(project_name: str) -> str:
     return f"{build_home_for(project_name)}/{BUILD_CACHE_NAME}"
 
 
-def cpu_quota_for(online_cpu_count: int, per_cpu_percent: int = DEFAULT_BUILD_CPU_QUOTA_PERCENT) -> str:
+def cpu_quota_for(online_cpu_count: int, per_cpu_percent: int = _BUILD_CPU_QUOTA_PERCENT) -> str:
     if online_cpu_count < 1:
         raise ValueError("online_cpu_count must be positive")
     return f"{online_cpu_count * per_cpu_percent}%"
@@ -105,8 +109,7 @@ def ensure_users_and_groups(ctx):
     build_user = build_user_for(ctx.app.project_name)
     build_group = build_group_for(ctx.app.project_name)
     build_home = build_home_for(ctx.app.project_name)
-    resources = ctx.build.resources
-    cpu_quota = cpu_quota_for(host.get_fact(Cpus), resources.cpu_quota_percent)
+    cpu_quota = cpu_quota_for(host.get_fact(Cpus))
     staged_dropin = f"{BUILD_SYSTEMD_STAGING_ROOT}/{build_user}.slice.conf"
 
     server.user(
@@ -191,8 +194,8 @@ def ensure_users_and_groups(ctx):
         src=ASSETS_DIR / "systemd/bonesdeploy-build.slice.j2",
         dest=staged_dropin,
         cpu_quota=cpu_quota,
-        memory_high=f"{resources.memory_high_percent}%",
-        memory_max=f"{resources.memory_max_percent}%",
+        memory_high=f"{_BUILD_MEMORY_HIGH_PERCENT}%",
+        memory_max=f"{_BUILD_MEMORY_MAX_PERCENT}%",
     )
     server.script_template(
         name=f"Install and apply resource limits for {build_user}",
@@ -200,8 +203,8 @@ def ensure_users_and_groups(ctx):
         build_user=build_user,
         staged_dropin=staged_dropin,
         cpu_quota=cpu_quota,
-        memory_high=f"{resources.memory_high_percent}%",
-        memory_max=f"{resources.memory_max_percent}%",
+        memory_high=f"{_BUILD_MEMORY_HIGH_PERCENT}%",
+        memory_max=f"{_BUILD_MEMORY_MAX_PERCENT}%",
         _sudo=True,
     )
     configure_build_user_storage(ctx.app.project_name)

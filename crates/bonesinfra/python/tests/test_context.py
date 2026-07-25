@@ -30,18 +30,8 @@ ssl_enabled = true
 branch = "main"
 releases = 7
 
-[build]
-
-[build.resources]
-cpu_quota_percent = 50
-memory_high_percent = 70
-memory_max_percent = 90
-
 [runtime]
 web_root = "dist"
-runtime_user = "lawsnipe-web"
-runtime_group = "lawsnipe-web"
-release_group = "ignored"
 {extra}"""
     )
     return path
@@ -60,22 +50,14 @@ def test_reads_nested_single_file_config(tmp_path):
     assert ctx.paths.current_web_root == "/var/www/lawsnipe/current/dist"
     assert ctx.app.deploy.branch == "main"
     assert ctx.app.dns.ssl_enabled is True
-    assert ctx.runtime.runtime_user == "lawsnipe-web"
-    assert ctx.runtime.runtime_group == "lawsnipe-web"
-
-
-def test_build_resources_are_configurable(tmp_path):
-    ctx = DeployContext.from_files(str(_write_config(tmp_path)))
-    assert ctx.build.resources.cpu_quota_percent == 50
-    assert ctx.build.resources.memory_high_percent == 70
-    assert ctx.build.resources.memory_max_percent == 90
+    assert ctx.runtime.runtime_user == "lawsnipe"
+    assert ctx.runtime.runtime_group == "lawsnipe"
 
 
 def test_template_data_contains_runtime_values(tmp_path):
     td = template_data(DeployContext.from_files(str(_write_config(tmp_path))))
-    assert td["runtime_user"] == "lawsnipe-web"
-    assert td["runtime_group"] == "lawsnipe-web"
-    assert "release_group" not in td
+    assert td["runtime_user"] == "lawsnipe"
+    assert td["runtime_group"] == "lawsnipe"
 
 
 def test_missing_nested_tables_use_defaults(tmp_path):

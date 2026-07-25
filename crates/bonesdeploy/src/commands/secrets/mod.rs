@@ -147,12 +147,7 @@ pub async fn push() -> Result<()> {
     gpg::ensure_installed()?;
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
-    let runtime_group = if runtime.runtime_group.is_empty() {
-        shared_config::runtime_group_for(&cfg.project_name)
-    } else {
-        runtime.runtime_group
-    };
+    let runtime_group = shared_config::runtime_group_for(&cfg.project_name);
 
     let ssh_user = config::bootstrap_ssh_user(&cfg);
     let port = parse_port(&cfg.port)?;

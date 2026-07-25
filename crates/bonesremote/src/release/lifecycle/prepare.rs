@@ -48,9 +48,7 @@ pub fn run(site: &str) -> Result<()> {
     let runtime = load_runtime(&paths::bonesremote_site_root(site))
         .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
     let web_root = runtime.web_root;
-    let runtime_user = runtime.runtime_user;
-
-    let runtime_user = if runtime_user.is_empty() { runtime_user_for(&cfg.project_name) } else { runtime_user };
+    let runtime_user = runtime_user_for(&cfg.project_name);
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
         println!("Running prepare script {script_name}...");

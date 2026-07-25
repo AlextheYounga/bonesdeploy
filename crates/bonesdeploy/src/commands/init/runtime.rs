@@ -1,20 +1,17 @@
 use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
-use shared::config::{
-    DATABASE_SERVICES, bonesinfra_input, runtime_group_for, runtime_user_for, validate_database_services,
-};
+use shared::config::{DATABASE_SERVICES, validate_database_services};
 
 use super::{Args, RuntimeSelection};
 use crate::infra::assets::runtimes as runtime_assets;
 use crate::runtimes;
 use crate::ui::prompts;
 
-pub(super) fn collect_runtime_config(args: &Args, project_name: &str) -> Result<RuntimeSelection> {
+pub(super) fn collect_runtime_config(args: &Args) -> Result<RuntimeSelection> {
     let template = resolve_template(args)?;
 
     let Some(template_name) = template else {
-        let mut vars = runtime_assets::base_runtime_defaults()?;
-        inject_runtime_identity(&mut vars, project_name);
+        let vars = runtime_assets::base_runtime_defaults()?;
         return Ok(RuntimeSelection { template: None, config: vars });
     };
 
@@ -25,8 +22,6 @@ pub(super) fn collect_runtime_config(args: &Args, project_name: &str) -> Result<
     } else {
         collect_interactive_answers(&template_name, &defaults)?
     };
-    let mut map = map;
-    inject_runtime_identity(&mut map, project_name);
     Ok(RuntimeSelection { template: Some(template_name), config: map })
 }
 
@@ -97,10 +92,6 @@ fn parse_runtime_value(raw: &str) -> Value {
     }
 }
 
-fn inject_runtime_identity(vars: &mut serde_json::Map<String, Value>, project_name: &str) {
-    vars.insert(bonesinfra_input::RUNTIME_USER.into(), Value::String(runtime_user_for(project_name)));
-    vars.insert(bonesinfra_input::RUNTIME_GROUP.into(), Value::String(runtime_group_for(project_name)));
-}
 
 #[cfg(test)]
 mod tests {
@@ -167,8 +158,7 @@ mod tests {
     #[test]
     fn validate_accepts_known_runtime_vars() -> Result<()> {
         let args = args_non_interactive(Some("laravel"), &["php_version=8.5"]);
-        let project = "atlas";
-        let selection = collect_runtime_config(&args, project)?;
+        let selection = collect_runtime_config(&args)?;
         assert_eq!(selection.template.as_deref(), Some("laravel"));
         assert_eq!(selection.config.get("php_version"), Some(&Value::String("8.5".to_string())));
         Ok(())
@@ -177,7 +167,7 @@ mod tests {
     #[test]
     fn validate_rejects_unknown_runtime_var() -> Result<()> {
         let args = args_non_interactive(Some("laravel"), &["php_verison=8.5"]);
-        match collect_runtime_config(&args, "atlas") {
+        match collect_runtime_config(&args) {
             Ok(_) => anyhow::bail!("expected error for unknown runtime var"),
             Err(err) => {
                 let msg = format!("{err:#}");
@@ -190,7 +180,7 @@ mod tests {
     #[test]
     fn template_none_uses_base_defaults() -> Result<()> {
         let args = args_non_interactive(Some("none"), &[]);
-        let selection = collect_runtime_config(&args, "atlas")?;
+        let selection = collect_runtime_config(&args)?;
         assert!(selection.template.is_none());
         assert!(selection.config.contains_key("web_root") || selection.config.is_empty());
         Ok(())
@@ -199,7 +189,7 @@ mod tests {
     #[test]
     fn template_omitted_uses_base_defaults() -> Result<()> {
         let args = args_non_interactive(None, &[]);
-        let selection = collect_runtime_config(&args, "atlas")?;
+        let selection = collect_runtime_config(&args)?;
         assert!(selection.template.is_none());
         Ok(())
     }
