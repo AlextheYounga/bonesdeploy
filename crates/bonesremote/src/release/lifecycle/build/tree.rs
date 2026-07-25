@@ -6,12 +6,7 @@ use anyhow::{Context, Result, bail};
 
 use super::ownership;
 
-pub(super) fn prepare_release_tree(
-    source: &Path,
-    destination: &Path,
-    runtime_user: &str,
-    release_group: &str,
-) -> Result<()> {
+pub(super) fn prepare_release_tree(source: &Path, destination: &Path, runtime_user: &str, group: &str) -> Result<()> {
     if !source.is_dir() {
         bail!("Source tree is not a directory: {}", source.display());
     }
@@ -21,12 +16,12 @@ pub(super) fn prepare_release_tree(
     clear_directory_children(destination)?;
 
     copy_hardened(source, destination, source)?;
-    set_release_tree_owner(destination, ownership::user_uid(runtime_user)?, release_group)?;
+    set_release_tree_owner(destination, ownership::user_uid(runtime_user)?, group)?;
     Ok(())
 }
 
-pub(super) fn seal_release_tree(destination: &Path, release_group: &str) -> Result<()> {
-    set_release_tree_owner(destination, root_uid()?, release_group)
+pub(super) fn seal_release_tree(destination: &Path, group: &str) -> Result<()> {
+    set_release_tree_owner(destination, root_uid()?, group)
 }
 
 fn copy_hardened(source: &Path, destination: &Path, tree_root: &Path) -> Result<()> {
@@ -98,8 +93,8 @@ pub(super) fn normalize_relative_path(path: &Path, root: &Path) -> Result<PathBu
     Ok(normalized)
 }
 
-fn set_release_tree_owner(destination: &Path, uid: u32, release_group: &str) -> Result<()> {
-    let gid = site_group_gid(release_group)?;
+fn set_release_tree_owner(destination: &Path, uid: u32, group: &str) -> Result<()> {
+    let gid = site_group_gid(group)?;
     set_release_tree_identity(destination, uid, gid)
 }
 

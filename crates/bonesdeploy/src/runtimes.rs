@@ -1,6 +1,5 @@
 use anyhow::{Result, bail};
 use serde_json::Value;
-use shared::config::bonesinfra_input;
 use shared::config::{Bones, Runtime};
 
 /// Shared question keys used by more than one template.
@@ -59,14 +58,10 @@ pub fn questions(template: &str) -> Result<&'static [Question]> {
 
 /// Validate non-interactive `--runtime-var` answers against a template's
 /// question schema. Catches agent typos and bad values before they reach
-/// `bones.toml`. Identity keys (`runtime_user`, `runtime_group`) are
-/// injected later and skipped here.
+/// `bones.toml`.
 pub fn validate_answers(template: &str, answers: &serde_json::Map<String, Value>) -> Result<()> {
     let schema = questions(template)?;
     for (key, value) in answers {
-        if key == bonesinfra_input::RUNTIME_USER || key == bonesinfra_input::RUNTIME_GROUP {
-            continue;
-        }
         let Some(question) = schema.iter().find(|q| q.key == key.as_str()) else {
             bail!("unknown runtime var for {template}: {key}");
         };
@@ -246,15 +241,6 @@ mod tests {
             answers.insert(q.key.to_string(), q.default_value());
         }
         validate_answers("laravel", &answers)?;
-        Ok(())
-    }
-
-    #[test]
-    fn validate_skips_runtime_identity_keys() -> Result<()> {
-        let mut answers = Map::new();
-        answers.insert("runtime_user".to_string(), Value::String("atlas".to_string()));
-        answers.insert("runtime_group".to_string(), Value::String("atlas".to_string()));
-        validate_answers("next", &answers)?;
         Ok(())
     }
 

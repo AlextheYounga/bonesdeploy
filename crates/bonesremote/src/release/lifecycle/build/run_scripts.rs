@@ -70,10 +70,7 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
 }
 
 fn resolve_build_env(cfg: &config::Bones, source_context: &Path) -> Result<Vec<(String, String)>> {
-    let buildtime = cfg.buildtime.clone();
-
     let mut env_vars = derived_config_env(cfg)?;
-    env_vars.extend(buildtime.extra);
 
     let env_build = env_build::load(source_context)?;
     for (key, value) in env_build {
@@ -88,7 +85,6 @@ const DERIVED_ENV_DENYLIST: &[&str] = &[
     "runtime.shared",
     "runtime.runtime_user",
     "runtime.runtime_group",
-    "runtime.release_group",
     "app.server.host",
     "app.server.port",
     "app.dns",

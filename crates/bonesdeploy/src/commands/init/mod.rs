@@ -53,7 +53,7 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     let mut cfg =
         if is_fresh { config::collect_fresh_config(args)? } else { config::load_or_collect_config(bones_toml, args)? };
     let runtime_selection =
-        if is_fresh { Some(runtime::collect_runtime_config(args, &cfg.project_name)?) } else { None };
+        if is_fresh { Some(runtime::collect_runtime_config(args)?) } else { None };
 
     if is_fresh {
         cfg.dbs.services = runtime::collect_database_services(args)?;

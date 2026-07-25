@@ -130,7 +130,6 @@ fn materializes_base_bones_assets() -> Result<()> {
         assert!(deploy_dir.is_dir());
         assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
         let bones_toml = fs::read_to_string(bones_dir.join("bones.toml"))?;
-        assert!(bones_toml.contains("runtime_user = \"atlas\""));
         assert!(bones_toml.contains("[runtime]"));
 
         let env_build = repo_dir.join(".env.build");

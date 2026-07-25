@@ -91,7 +91,7 @@ Everything else is defaulted or derived for Debian/Ubuntu-first usability:
 - `deploy_on_push`: defaults to `false`
 - `releases`: defaults to `5`
 
-`[runtime]` in `.bones/bones.toml` contains the selected template, web root, runtime identity, permissions, and shared paths. Those identity values default to `{project_name}`, `{project_name}`, and `{project_name}-release` respectively. Shared paths are declared under `[runtime.shared].paths`; deploys only wire the paths listed there, so framework-specific writable paths must not be hardcoded globally. Shared storage paths must be created by the framework itself; BonesDeploy only wires the declared paths into each release.
+`[runtime]` in `.bones/bones.toml` contains the selected template, web root, permissions, and shared paths. The runtime identity (`runtime_user`, `runtime_group`) is always derived from `project_name` and is not stored in `bones.toml`. Shared paths are declared under `[runtime.shared].paths`; deploys only wire the paths listed there, so framework-specific writable paths must not be hardcoded globally. Shared storage paths must be created by the framework itself; BonesDeploy only wires the declared paths into each release.
 
 Users can override any default by editing `.bones/bones.toml` after init.
 

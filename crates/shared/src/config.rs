@@ -1,13 +1,10 @@
 use std::collections::BTreeMap;
-use std::fmt;
 use std::fs;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
-use std::result::Result as StdResult;
 
 use anyhow::{bail, Context, Result};
-use serde::de::MapAccess;
-use serde::{de, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::paths;
 
@@ -30,15 +27,12 @@ pub mod bonesinfra_input {
     pub const REPO_PATH: &str = "repo_path";
     pub const RUNTIME_USER: &str = "runtime_user";
     pub const RUNTIME_GROUP: &str = "runtime_group";
-    pub const RELEASE_GROUP: &str = "release_group";
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Bones {
     pub app: App,
-    #[serde(rename = "build")]
-    pub buildtime: Buildtime,
     pub runtime: Runtime,
     pub dbs: Dbs,
 }
@@ -94,11 +88,6 @@ pub fn runtime_group_for(project_name: &str) -> String {
 }
 
 #[must_use]
-pub fn release_group_for(project_name: &str) -> String {
-    format!("{project_name}-release")
-}
-
-#[must_use]
 pub fn build_user_for(project_name: &str) -> String {
     format!("{project_name}-build")
 }
@@ -142,12 +131,6 @@ pub struct Runtime {
     #[serde(default = "paths::default_web_root")]
     pub web_root: String,
     #[serde(default)]
-    pub runtime_user: String,
-    #[serde(default)]
-    pub runtime_group: String,
-    #[serde(default)]
-    pub release_group: String,
-    #[serde(default)]
     pub shared: Shared,
     #[serde(default)]
     pub permissions: Option<toml::Value>,
@@ -160,9 +143,6 @@ impl Default for Runtime {
         Self {
             template: String::new(),
             web_root: paths::default_web_root(),
-            runtime_user: String::new(),
-            runtime_group: String::new(),
-            release_group: String::new(),
             shared: Shared::default(),
             permissions: None,
             extra: BTreeMap::new(),
@@ -216,47 +196,6 @@ pub struct SharedPath {
 pub enum SharedPathType {
     File,
     Dir,
-}
-
-#[derive(Clone, Debug, Default, Serialize)]
-pub struct Buildtime {
-    #[serde(flatten)]
-    pub extra: BTreeMap<String, String>,
-}
-
-impl<'de> Deserialize<'de> for Buildtime {
-    fn deserialize<D>(deserializer: D) -> StdResult<Self, D::Error>
-    where
-        D: de::Deserializer<'de>,
-    {
-        struct BuildtimeVisitor;
-
-        impl<'de> de::Visitor<'de> for BuildtimeVisitor {
-            type Value = Buildtime;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a [build] table")
-            }
-
-            fn visit_map<M>(self, mut access: M) -> StdResult<Buildtime, M::Error>
-            where
-                M: MapAccess<'de>,
-            {
-                let mut extra = BTreeMap::new();
-                while let Some((key, value)) = access.next_entry::<String, toml::Value>()? {
-                    if key == "vars" {
-                        return Err(de::Error::custom(
-                            "[build].vars has been removed. Use .env.build for build-time variables.",
-                        ));
-                    }
-                    extra.insert(key, value.to_string());
-                }
-                Ok(Buildtime { extra })
-            }
-        }
-
-        deserializer.deserialize_map(BuildtimeVisitor)
-    }
 }
 
 /// # Errors
@@ -333,13 +272,5 @@ paths = [
         assert_eq!(runtime.shared.paths[1].path, "storage");
         assert_eq!(runtime.shared.paths[1].path_type, SharedPathType::Dir);
         Ok(())
-    }
-
-    #[test]
-    fn buildtime_rejects_removed_vars_key() {
-        let result: std::result::Result<Buildtime, _> = toml::from_str(r#"vars = ["A"]"#);
-        assert!(result.is_err(), "[build].vars should be rejected");
-        let err = result.unwrap_err().to_string();
-        assert!(err.contains(".env.build"), "error should mention .env.build: {err}");
     }
 }

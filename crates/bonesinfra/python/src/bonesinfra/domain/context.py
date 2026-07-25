@@ -12,15 +12,9 @@ DEPLOY_USER = "git"
 DEFAULT_SSH_USER = "root"
 DEFAULT_SSH_PORT = "22"
 DEFAULT_WEB_ROOT = "public"
-DEFAULT_BUILD_CPU_QUOTA_PERCENT = 80
-DEFAULT_BUILD_MEMORY_HIGH_PERCENT = 80
-DEFAULT_BUILD_MEMORY_MAX_PERCENT = 80
-
-
 @dataclass
 class DeployContext:
     app: AppConfig
-    build: BuildConfig
     runtime: RuntimeConfig
     dbs: DbsConfig
 
@@ -32,8 +26,6 @@ class DeployContext:
         server_cfg = _table(app_cfg, "server")
         dns_cfg = _table(app_cfg, "dns")
         deploy_cfg = _table(app_cfg, "deploy")
-        build_cfg = _table(bones_cfg, "build")
-        resources_cfg = _table(build_cfg, "resources")
         runtime_cfg = _table(bones_cfg, "runtime")
         dbs_cfg = _table(bones_cfg, "dbs")
         project_name = str(app_cfg.get("project_name", ""))
@@ -55,27 +47,20 @@ class DeployContext:
             ),
             deploy=DeployConfig(branch=str(deploy_cfg.get("branch", "master"))),
         )
-        build = BuildConfig(
-            resources=BuildResourceLimits(
-                cpu_quota_percent=int(resources_cfg.get("cpu_quota_percent", DEFAULT_BUILD_CPU_QUOTA_PERCENT)),
-                memory_high_percent=int(resources_cfg.get("memory_high_percent", DEFAULT_BUILD_MEMORY_HIGH_PERCENT)),
-                memory_max_percent=int(resources_cfg.get("memory_max_percent", DEFAULT_BUILD_MEMORY_MAX_PERCENT)),
-            ),
-        )
 
         runtime = RuntimeConfig(
             web_root=str(runtime_cfg.get("web_root") or DEFAULT_WEB_ROOT),
-            runtime_user=str(runtime_cfg.get("runtime_user") or project_name),
-            runtime_group=str(runtime_cfg.get("runtime_group") or project_name),
+            runtime_user=project_name,
+            runtime_group=project_name,
             data={
                 key: value
                 for key, value in runtime_cfg.items()
-                if key not in {"web_root", "runtime_user", "runtime_group", "permissions", "release_group", "shared"}
+                if key not in {"web_root", "permissions", "shared"}
             },
         )
 
         dbs = DbsConfig(services=_database_services(dbs_cfg.get("services", [])))
-        return cls(app=app, build=build, runtime=runtime, dbs=dbs)
+        return cls(app=app, runtime=runtime, dbs=dbs)
 
     @property
     def paths(self) -> DeploymentPaths:
@@ -126,24 +111,6 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
     return data
 
 
-@dataclass(frozen=True)
-class BuildResourceLimits:
-    cpu_quota_percent: int = DEFAULT_BUILD_CPU_QUOTA_PERCENT
-    memory_high_percent: int = DEFAULT_BUILD_MEMORY_HIGH_PERCENT
-    memory_max_percent: int = DEFAULT_BUILD_MEMORY_MAX_PERCENT
-
-    def __post_init__(self) -> None:
-        for name, value in (
-            ("cpu_quota_percent", self.cpu_quota_percent),
-            ("memory_high_percent", self.memory_high_percent),
-            ("memory_max_percent", self.memory_max_percent),
-        ):
-            if type(value) is not int or not 1 <= value <= 100:  # noqa: PLR2004
-                raise ValueError(f"{name} must be an integer from 1 to 100")
-        if self.memory_high_percent > self.memory_max_percent:
-            raise ValueError("memory_high_percent must not exceed memory_max_percent")
-
-
 @dataclass
 class AppConfig:
     project_name: str
@@ -172,11 +139,6 @@ class DnsConfig:
 @dataclass
 class DeployConfig:
     branch: str
-
-
-@dataclass
-class BuildConfig:
-    resources: BuildResourceLimits = field(default_factory=BuildResourceLimits)
 
 
 @dataclass

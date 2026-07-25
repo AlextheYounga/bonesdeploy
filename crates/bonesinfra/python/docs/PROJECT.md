@@ -239,9 +239,8 @@ Domain code should not import pyinfra.
 `domain/context.py` mirrors the top-level `bones.toml` sections:
 
 - **`AppConfig`**: the `[app]`, `[app.server]`, `[app.dns]`, and `[app.deploy]` tables
-- **`BuildConfig`**: the `[build]` and `[build.resources]` tables
 - **`RuntimeConfig`**: the typed `[runtime]` identity fields, plus dynamic runtime settings
-- **`DeployContext`**: wraps `app`, `build`, and `runtime` and provides derived deployment paths
+- **`DeployContext`**: wraps `app`, `runtime`, and `dbs` and provides derived deployment paths
 
 No flat dict. No `host.data` side-channel.
 
@@ -352,13 +351,12 @@ ______________________________________________________________________
 `DeployContext` is the main object passed from CLI-selected deploy plans into
 pyinfra operations.
 
-It mirrors the three top-level config sections:
+It mirrors the top-level config sections:
 
 ```python
 @dataclass
 class DeployContext:
     app: AppConfig
-    build: BuildConfig
     runtime: RuntimeConfig
     dbs: DbsConfig
 ```
@@ -376,16 +374,11 @@ Typed fields read from nested `bones.toml` tables:
 `DeployContext`.
 ```
 
-## BuildConfig
-
-BonesInfra reads resource limits from the optional `[build.resources]` table.
-Build-time variables come from `.env.build` in the exported source tree, not from `bones.toml`.
-
 ## RuntimeConfig
 
 ```text
-runtime_user       # process user for nginx/php-fpm (default: project_name)
-runtime_group      # process group (default: project_name)
+runtime_user       # process user for nginx/php-fpm (always project_name)
+runtime_group      # process group (always project_name)
 web_root           # release directory served by nginx (default: public)
 data               # dynamic runtime-specific settings from [runtime]
 ```
@@ -500,10 +493,9 @@ The current model uses a single per-project identity:
 
 - **Runtime user**: `<site>` (system user, nologin, no home)
 - **Runtime group**: `<site>`
-- **No separate release group** — releases are owned/sealed using the runtime group
+- Releases are owned/sealed using the runtime group
 - Directories: `releases/` is `root:runtime_group 2750`, `shared/` is `runtime_user:runtime_group 0750`
 - The deploy user (`git`) is NOT added to the runtime group
-- The `release_group` key is metadata only; provisioning does not use it
 
 ## Sudoers Contract
 
