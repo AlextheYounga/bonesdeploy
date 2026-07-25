@@ -58,54 +58,19 @@ impl TestEnvironment {
 impl Drop for TestEnvironment {
     fn drop(&mut self) {
         let _ = env::set_current_dir(&self.original_dir);
+        restore_env_var("HOME", &self.original_home);
+        restore_env_var("XDG_CONFIG_HOME", &self.original_xdg_config_home);
+        restore_env_var("XDG_DATA_HOME", &self.original_xdg_data_home);
+        restore_env_var("XDG_CACHE_HOME", &self.original_xdg_cache_home);
+    }
+}
 
-        match &self.original_home {
-            Some(home) => {
-                // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
-                unsafe {
-                    env::set_var("HOME", home);
-                }
-            }
-            None => {
-                // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
-                unsafe {
-                    env::remove_var("HOME");
-                }
-            }
-        }
-
-        match &self.original_xdg_config_home {
-            Some(home) => {
-                // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
-                unsafe {
-                    env::set_var("XDG_CONFIG_HOME", home);
-                }
-            }
-            None => {
-                // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
-                unsafe {
-                    env::remove_var("XDG_CONFIG_HOME");
-                }
-            }
-        }
-
-        for (name, original) in
-            [("XDG_DATA_HOME", &self.original_xdg_data_home), ("XDG_CACHE_HOME", &self.original_xdg_cache_home)]
-        {
-            match original {
-                Some(value) => {
-                    // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
-                    unsafe {
-                        env::set_var(name, value);
-                    }
-                }
-                None => {
-                    // Safety: these tests serialize access with a process-wide mutex and restore env vars on drop.
-                    unsafe {
-                        env::remove_var(name);
-                    }
-                }
-            }
+fn restore_env_var(name: &str, original: &Option<String>) {
+    // Safety: TestEnvironment holds the test mutex for its entire lifetime; see enter().
+    unsafe {
+        match original {
+            Some(value) => env::set_var(name, value),
+            None => env::remove_var(name),
         }
     }
 }
