@@ -213,12 +213,6 @@ pub fn apply_derived_defaults(config: &mut Bones) {
     if config.ssh_user.is_empty() {
         config.ssh_user = String::from("root");
     }
-    if config.repo_path.is_empty() {
-        config.repo_path = default_repo_path_for(&project_name);
-    }
-    if config.project_root.is_empty() {
-        config.project_root = paths::default_project_root_for(&project_name);
-    }
     if config.preview_domain.is_empty() {
         config.preview_domain = default_preview_domain_for(&project_name, &config.host);
     }

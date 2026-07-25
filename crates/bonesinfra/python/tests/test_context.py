@@ -13,8 +13,6 @@ def _write_config(tmp_path: Path, extra: str = "") -> Path:
         f"""[app]
 project_name = "lawsnipe"
 remote_name = "production"
-repo_path = "/var/lib/git/lawsnipe.git"
-project_root = "/var/www/lawsnipe"
 
 [app.server]
 host = "example.com"
@@ -41,13 +39,13 @@ def test_reads_nested_single_file_config(tmp_path):
     ctx = DeployContext.from_files(str(_write_config(tmp_path)))
 
     assert ctx.app.project_name == "lawsnipe"
-    assert ctx.app.repo_path == "/var/lib/git/lawsnipe.git"
-    assert ctx.app.project_root == "/var/www/lawsnipe"
+    assert ctx.app.repo_path == "/srv/git/lawsnipe.git"
+    assert ctx.app.project_root == "/srv/sites/lawsnipe"
     assert ctx.app.server.host == "example.com"
     assert ctx.app.server.port == "2222"
-    assert ctx.paths.repo == "/var/lib/git/lawsnipe.git"
-    assert ctx.paths.project_root == "/var/www/lawsnipe"
-    assert ctx.paths.current_web_root == "/var/www/lawsnipe/current/dist"
+    assert ctx.paths.repo == "/srv/git/lawsnipe.git"
+    assert ctx.paths.project_root == "/srv/sites/lawsnipe"
+    assert ctx.paths.current_web_root == "/srv/sites/lawsnipe/current/dist"
     assert ctx.app.deploy.branch == "main"
     assert ctx.app.dns.ssl_enabled is True
     assert ctx.runtime.runtime_user == "lawsnipe"

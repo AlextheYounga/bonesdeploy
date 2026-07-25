@@ -1,5 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::paths;
+
 #[derive(Clone, Debug)]
 pub struct App {
     pub remote_name: String,
@@ -24,8 +26,6 @@ pub struct App {
 struct AppFile {
     remote_name: String,
     project_name: String,
-    repo_path: String,
-    project_root: String,
     server: Server,
     dns: Dns,
     deploy: Deploy,
@@ -76,10 +76,6 @@ impl Default for Deploy {
 struct AppDocument<'a> {
     remote_name: &'a str,
     project_name: &'a str,
-    #[serde(skip_serializing_if = "str::is_empty")]
-    repo_path: &'a str,
-    #[serde(skip_serializing_if = "str::is_empty")]
-    project_root: &'a str,
     server: ServerDocument<'a>,
     dns: DnsDocument<'a>,
     deploy: DeployDocument<'a>,
@@ -136,13 +132,13 @@ impl<'de> Deserialize<'de> for App {
     {
         let file = AppFile::deserialize(deserializer)?;
         Ok(Self {
+            repo_path: paths::default_repo_path_for(&file.project_name),
+            project_root: paths::default_project_root_for(&file.project_name),
             remote_name: file.remote_name,
             project_name: file.project_name,
             ssh_user: file.server.ssh_user,
             host: file.server.host,
             port: file.server.port,
-            repo_path: file.repo_path,
-            project_root: file.project_root,
             branch: file.deploy.branch,
             preview_domain: file.dns.preview_domain,
             deploy_on_push: file.deploy.on_push,
@@ -162,8 +158,6 @@ impl Serialize for App {
         AppDocument {
             remote_name: &self.remote_name,
             project_name: &self.project_name,
-            repo_path: &self.repo_path,
-            project_root: &self.project_root,
             server: ServerDocument { host: &self.host, ssh_user: &self.ssh_user, port: &self.port },
             dns: DnsDocument {
                 domain: &self.domain,

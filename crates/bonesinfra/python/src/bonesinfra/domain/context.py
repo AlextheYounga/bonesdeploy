@@ -32,8 +32,8 @@ class DeployContext:
 
         app = AppConfig(
             project_name=project_name,
-            repo_path=str(app_cfg.get("repo_path") or f"{DEFAULT_REPO_PARENT}/{project_name}.git"),
-            project_root=str(app_cfg.get("project_root") or f"{DEFAULT_PROJECT_ROOT_PARENT}/{project_name}"),
+            repo_path=f"{DEFAULT_REPO_PARENT}/{project_name}.git",
+            project_root=f"{DEFAULT_PROJECT_ROOT_PARENT}/{project_name}",
             server=ServerConfig(
                 host=str(server_cfg.get("host", "")),
                 ssh_user=str(server_cfg.get("ssh_user", DEFAULT_SSH_USER)),

@@ -57,15 +57,14 @@ distribution-allocated subordinate UID/GID mappings, and a lingering systemd
 user manager for rootless Podman. Runtime application users remain home-less
 and non-login.
 
-Repository and site paths come from `app.repo_path` and `app.project_root`.
+Repository and site paths are always derived from `project_name`: `repo_path` defaults to `/srv/git/<project>.git` and `project_root` defaults to `/srv/sites/<project>`.
 
 Each build user's outer `user-<UID>.slice` is limited by root-owned systemd
-resource control. The defaults are configurable in `bones.toml` under
-`[build.resources]`: `cpu_quota_percent = 80`, `memory_high_percent = 80`, and
-`memory_max_percent = 80`. CPUQuota is that percentage of each online CPU;
-MemoryHigh is the soft reclaim/throttling threshold, while MemoryMax is the hard
-cgroup ceiling, so exceeding it fails the build rather than starving the host.
-These are host-level limits, not rootless Podman delegation.
+resource control at 80% CPU quota, 80% memory high, and 80% memory max.
+CPUQuota is that percentage of each online CPU; MemoryHigh is the soft
+reclaim/throttling threshold, while MemoryMax is the hard cgroup ceiling, so
+exceeding it fails the build rather than starving the host. These are
+host-level limits, not rootless Podman delegation.
 
 BonesInfra does not own:
 
