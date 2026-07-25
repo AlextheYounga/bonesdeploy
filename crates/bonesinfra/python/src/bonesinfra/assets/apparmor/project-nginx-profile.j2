@@ -42,7 +42,7 @@ profile {{ apparmor_profile_name | default("bonesdeploy-" ~ project_name ~ "-ngi
   {{ paths.runtime_socket_dir }}/*/ r,
   {{ paths.runtime_socket_dir }}/*/*.sock rw,
 
-  # Repos default to /srv/git/<project>.git; runtime policy should not depend on
+  # Repos default to /home/git/<project>.git; runtime policy should not depend on
   # repo-owned config.
   deny /root/** r,
   deny /etc/ssh/** r,

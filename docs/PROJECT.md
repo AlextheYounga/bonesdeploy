@@ -83,10 +83,7 @@ Collects the following project information from the user:
 - `remote_name`: existing remote selection when available, otherwise prompted; defaults to `production`. Must point to a fresh VPS, not a code host like GitHub.
 - `host`: prompted when not inferable from selected remote
 - `port`: defaults to `22`, prompt shown when remote inference is unavailable
-- `repo_path`: inferred from selected remote URL when possible, else defaults to `/home/git/{project_name}.git`
-
 Everything else is defaulted or derived for Debian/Ubuntu-first usability:
-- `project_root`: defaults to `/srv/sites/{project_name}`
 - `ssh_user`: defaults to `root`
 - `deploy_on_push`: defaults to `false`
 - `releases`: defaults to `5`
@@ -102,8 +99,6 @@ Example `bones.toml`:
 [app]
 remote_name = "production"
 project_name = "lawsnipe"
-repo_path = "/home/git/lawsnipe.git"
-project_root = "/srv/sites/lawsnipe"
 
 [app.server]
 ssh_user = "root"

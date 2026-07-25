@@ -35,13 +35,10 @@
 - refresh local bones updates scaffold without touching configs. (refresh_local_bones_updates_scaffold_without_touching_configs)
 
 ## `crates/bonesdeploy/src/config.rs`
-- load applies default project root from project name. (load_applies_default_project_root_from_project_name)
-- load applies default repo path from project name. (load_applies_default_repo_path_from_project_name)
-- load preserves explicit repo and project root overrides. (load_preserves_explicit_repo_and_project_root_overrides)
 - save adds comments to nested sections. (save_adds_comments_to_nested_sections)
 - save formats permission entries as inline tables. (save_formats_permission_entries_as_inline_tables)
-- save includes derived repo and project root. (save_includes_derived_repo_and_project_root)
 - save persists ssl settings. (save_persists_ssl_settings)
+- save writes file header. (save_writes_file_header)
 
 ## `crates/bonesdeploy/src/infra/bootstrap_ssh.rs`
 - defaults to root. (defaults_to_root)
