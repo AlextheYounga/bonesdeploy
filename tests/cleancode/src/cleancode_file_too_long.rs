@@ -19,14 +19,11 @@ fn source_files_stay_under_400_lines() {
 
     assert!(file_count > 0, "No source files found. This test should be run from the project root.");
 
-    assert!(violations.is_empty(), "File(s) exceed {} line(s):\n{}", MAX_LINES, violations.join("\n"),);
+    assert!(violations.is_empty(), "File(s) exceed {} line(s):\n{}", MAX_LINES, violations.join("\n"));
 }
 
 fn workspace_root() -> &'static Path {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .and_then(Path::parent)
-        .expect("tests/cleancode should live under the workspace root")
+    Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../.."))
 }
 
 fn visit_dirs(dir: &Path, file_count: &mut usize, violations: &mut Vec<String>) {

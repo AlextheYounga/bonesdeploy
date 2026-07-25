@@ -29,6 +29,15 @@ pub enum Command {
         /// SSH port (default: 22)
         #[arg(long)]
         port: Option<String>,
+        /// Runtime template (laravel, django, next, nuxt, rails, sveltekit, vue, or none)
+        #[arg(long)]
+        template: Option<String>,
+        /// Runtime variable override, repeated (e.g. `--runtime-var php_version=8.5`)
+        #[arg(long = "runtime-var", value_name = "KEY=VALUE")]
+        runtime_vars: Vec<String>,
+        /// Database service to provision, repeated (postgres, mariadb, mysql, mongodb, valkey, redis)
+        #[arg(long = "db", value_name = "SERVICE")]
+        dbs: Vec<String>,
     },
     /// Run the full first-time deployment setup
     Setup {
@@ -44,9 +53,14 @@ pub enum Command {
     },
     /// Show the current deployment state and next steps
     Status,
-    /// Suggest the next prompt-free command to run
+    /// Embedded documentation and next-step guidance for AI agents
+    Skill {
+        /// Optional subcommand: `next`, `list`, or `doc <name>`
+        #[command(subcommand)]
+        command: Option<SkillCommand>,
+    },
+    #[command(hide = true)]
     Guide {
-        /// Output format
         #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
         format: GuideFormat,
     },
@@ -80,13 +94,13 @@ pub enum Command {
     },
     /// Roll back current release to the previous one
     Rollback,
-    /// Get a config value from a TOML file
+    /// Read a value from .bones/bones.toml, or dump the whole file when no key is given
     Config {
-        /// Path to TOML config file
+        /// Path to TOML config file (default: .bones/bones.toml)
         #[arg(long)]
-        file: String,
-        /// Key to read
-        key: String,
+        file: Option<String>,
+        /// Key to read; omit to dump the whole file
+        key: Option<String>,
     },
     /// Print the version
     Version,
@@ -139,6 +153,29 @@ pub enum RemoteCommand {
         /// Skip helper installation confirmation prompts
         #[arg(long)]
         yes: bool,
+    },
+    /// Provision configured database services (bound to localhost only)
+    Dbs {
+        /// Skip database setup confirmation prompt
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SkillCommand {
+    /// Suggest the next prompt-free command to run, based on actual state
+    Next {
+        /// Output format
+        #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
+        format: GuideFormat,
+    },
+    /// List every embedded skill doc by name
+    List,
+    /// Print a specific embedded skill doc
+    Doc {
+        /// Doc name (see `bonesdeploy skill list`)
+        name: String,
     },
 }
 

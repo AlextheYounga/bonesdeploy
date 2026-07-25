@@ -27,6 +27,7 @@ pub const LOCAL_BONES_TOML: &str = ".bones/bones.toml";
 pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
 pub const LOCAL_BONES_SECRETS_DIR: &str = ".bones/secrets";
 pub const DOT_ENV: &str = ".env";
+pub const ENV_BUILD_FILE: &str = ".env.build";
 
 pub const BONES_DIR: &str = "bones";
 pub const BONES_TOML: &str = "bones.toml";
@@ -67,8 +68,8 @@ pub const GIT_PRE_PUSH_HOOK: &str = ".git/hooks/pre-push";
 pub const PRE_PUSH_HOOK_NAME: &str = "pre-push";
 pub const HOOKS_DIR: &str = "hooks";
 pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";
-pub const KIT_SECRETS_DIR: &str = "secrets/";
-pub const BONES_CONFIG_LIB_DIR: &str = "_lib";
+pub const BONES_CONFIG_PROJECTS_DIR: &str = "projects";
+pub const BONESDEPLOY_DIR: &str = "bonesdeploy";
 
 #[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
@@ -181,8 +182,24 @@ pub fn bones_config_root() -> PathBuf {
 }
 
 #[must_use]
-pub fn bones_config_lib_root() -> PathBuf {
-    bones_config_root().join(BONES_CONFIG_LIB_DIR)
+pub fn bones_projects_root() -> PathBuf {
+    bones_config_root().join(BONES_CONFIG_PROJECTS_DIR)
+}
+
+#[must_use]
+pub fn bones_data_root() -> PathBuf {
+    if let Some(dir) = env::var("XDG_DATA_HOME").ok().filter(|v| !v.is_empty()) {
+        return Path::new(&dir).join(BONESDEPLOY_DIR);
+    }
+    home_dir().join(".local/share").join(BONESDEPLOY_DIR)
+}
+
+#[must_use]
+pub fn bones_cache_root() -> PathBuf {
+    if let Some(dir) = env::var("XDG_CACHE_HOME").ok().filter(|v| !v.is_empty()) {
+        return Path::new(&dir).join(BONESDEPLOY_DIR);
+    }
+    home_dir().join(".cache").join(BONESDEPLOY_DIR)
 }
 
 #[must_use]

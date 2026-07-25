@@ -2,13 +2,12 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::Result;
 use shared::{config, paths};
 
 use crate::release::script_runner::validate_build_cache;
 
 pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
-    if let Err(error) = validate_site_name(site) {
+    if let Err(error) = config::validate_site_name(site) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
     }
@@ -176,10 +175,6 @@ fn check_site_layout(shared_root: &Path, releases_root: &Path, issues: &mut Vec<
     }
 }
 
-fn validate_site_name(site: &str) -> Result<()> {
-    config::validate_project_name(site).map_err(|error| anyhow::anyhow!("Invalid site name: {error}"))
-}
-
 fn check_site_target_exists(site: &str, issues: &mut Vec<String>) {
     let target_name = paths::site_target_name(site);
     let output =
@@ -275,8 +270,8 @@ mod tests {
     use std::{env, fs, process, process::Command};
 
     use super::{
-        account_exists, account_home, account_identity, group_members, hook_uses_thin_trigger, inactive_service_issue,
-        required_services, service_exists,
+        account_exists, account_home, account_identity, group_members, hook_uses_thin_trigger, required_services,
+        service_exists,
     };
 
     #[test]
@@ -333,13 +328,5 @@ mod tests {
     fn target_without_required_services_is_rejected() {
         assert!(required_services("").is_empty());
         assert!(required_services("nexttest.target").is_empty());
-    }
-
-    #[test]
-    fn inactive_required_service_names_the_target_and_service() {
-        assert_eq!(
-            inactive_service_issue("nexttest.target", "nexttest-next.service"),
-            "required service nexttest-next.service for site target nexttest.target is not active"
-        );
     }
 }

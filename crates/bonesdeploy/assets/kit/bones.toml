@@ -1,0 +1,42 @@
+[app]
+# Project identity
+project_name = "mysite"
+remote_name = "production"
+
+[app.server]
+host = ''
+ssh_user = "root"
+port = '22'
+
+[app.dns]
+domain = ''
+preview_domain = ""
+email = ''
+ssl_enabled = false
+
+[app.deploy]
+branch = 'master'
+deploy_on_push = false
+releases = 5
+
+
+[runtime]
+runtime_user = ""
+runtime_group = ""
+release_group = ""
+
+# Select during `bonesdeploy init`, or set manually. Services are only reachable
+# on localhost; access them remotely with an SSH tunnel.
+[dbs]
+services = []
+
+# File permissions
+# Applied during `bonesremote release promote`.
+# mode is an octal permission mask (e.g. 750, 640, 770).
+# Set recursive = true for directories whose contents also
+# need the same mode.
+[runtime.permissions]
+paths = [
+	{ path = "*", type = "dir", mode = "750" },
+	{ path = "*", type = "file", mode = "640" }
+]

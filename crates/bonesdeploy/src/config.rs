@@ -15,12 +15,26 @@ pub fn is_configured(config: &Bones) -> bool {
         && !config.repo_path.is_empty()
 }
 
+/// Resolves the SSH user for provisioning commands: `BONES_BOOTSTRAP_SSH_USER`
+/// overrides the configured `ssh_user`; blank values fall back to `root`.
+pub fn bootstrap_ssh_user(config: &Bones) -> String {
+    if let Ok(env_user) = env::var("BONES_BOOTSTRAP_SSH_USER") {
+        let trimmed = env_user.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    let trimmed = config.ssh_user.trim();
+    if trimmed.is_empty() { String::from("root") } else { trimmed.to_string() }
+}
+
 pub fn default_project_root_for(project_name: &str) -> String {
     paths::default_project_root_for(project_name)
 }
 
 pub fn bones_config_dir(project_name: &str) -> PathBuf {
-    paths::bones_config_root().join(format!("{project_name}.bones"))
+    paths::bones_projects_root().join(format!("{project_name}.bones"))
 }
 
 pub fn repo_directory_name() -> Result<String> {
@@ -62,7 +76,6 @@ fn annotate_sections(content: &str) -> String {
         ("[app.server]", "# Remote server connection."),
         ("[app.dns]", "# Domains, email, and TLS."),
         ("[app.deploy]", "# Branch and deployment behavior."),
-        ("[build]", "# Environment variables and constants injected during builds."),
         ("[runtime]", "# Framework runtime settings."),
         ("[runtime.permissions]", "# Release file permissions."),
         ("[runtime.shared]", "# Paths persisted in the shared release directory."),
@@ -91,7 +104,7 @@ mod tests {
     use anyhow::Result;
     use shared::paths;
 
-    use super::{Bones, default_project_root_for, save};
+    use super::{Bones, bootstrap_ssh_user, default_project_root_for, save};
     use shared::config::load;
 
     fn temp_path(file_name: &str) -> PathBuf {
@@ -100,10 +113,20 @@ mod tests {
     }
 
     fn minimal_toml(project_name: &str) -> String {
-        format!(
-            "[app]\nremote_name = \"production\"\nproject_name = \"{project_name}\"\nrepo_path = \"{}\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.deploy]\nbranch = \"master\"\ndeploy_on_push = true\n",
-            paths::default_repo_path_for(project_name)
-        )
+        [
+            "[app]".to_string(),
+            "remote_name = \"production\"".to_string(),
+            format!("project_name = \"{project_name}\""),
+            format!("repo_path = \"{}\"", paths::default_repo_path_for(project_name)),
+            "[app.server]".to_string(),
+            "host = \"deploy.example.com\"".to_string(),
+            "port = \"22\"".to_string(),
+            "[app.deploy]".to_string(),
+            "branch = \"master\"".to_string(),
+            "deploy_on_push = true".to_string(),
+        ]
+        .join("\n")
+            + "\n"
     }
 
     fn sample_config(project_name: &str) -> Bones {
@@ -117,6 +140,30 @@ mod tests {
         config.branch = String::from("master");
         config.deploy_on_push = true;
         config
+    }
+
+    #[test]
+    fn bootstrap_ssh_user_defaults_to_root() {
+        let mut config = Bones::default();
+        config.ssh_user = String::new();
+        assert_eq!(bootstrap_ssh_user(&config), "root");
+    }
+
+    #[test]
+    fn bootstrap_ssh_user_uses_config_value() {
+        let mut config = Bones::default();
+        config.ssh_user = String::from("ubuntu");
+        assert_eq!(bootstrap_ssh_user(&config), "ubuntu");
+    }
+
+    #[test]
+    fn bootstrap_ssh_user_trims_and_rejects_blank_values() {
+        let mut config = Bones::default();
+        config.ssh_user = String::from("   ");
+        assert_eq!(bootstrap_ssh_user(&config), "root");
+
+        config.ssh_user = String::from("  ubuntu  ");
+        assert_eq!(bootstrap_ssh_user(&config), "ubuntu");
     }
 
     #[test]

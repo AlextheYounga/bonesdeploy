@@ -1,0 +1,4 @@
+[alias]
+# Incus end-to-end suite; serial because scenarios share the Incus daemon
+# and stream subprocess output. See e2e/README.md.
+test-e2e = "test -p e2e -- --ignored --test-threads=1 --nocapture"

@@ -3,15 +3,11 @@ use std::os::unix::fs::symlink;
 use std::path::{Component, Path};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, SharedPath};
+use shared::config::{self, SharedPath, validate_site_name};
 use shared::paths;
 
 use crate::privileges;
 use crate::release::state as release_state;
-
-fn validate_site_name(site: &str) -> Result<()> {
-    config::validate_project_name(site).map_err(|error| anyhow::anyhow!("Invalid site name: {error}"))
-}
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release wire")?;

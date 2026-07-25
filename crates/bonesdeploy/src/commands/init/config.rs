@@ -66,12 +66,6 @@ fn collect_from_existing(
         &project_name,
         config::default_project_root_for,
     );
-    let deploy_on_push = existing_config.map_or(false, |cfg| cfg.deploy_on_push);
-    let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
-
-    let ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
-    let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
-    let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 
     let mut config = config::Bones::default();
     config.remote_name = remote_name;
@@ -81,11 +75,7 @@ fn collect_from_existing(
     config.repo_path = repo_path;
     config.project_root = project_root;
     config.branch = branch;
-    config.deploy_on_push = deploy_on_push;
-    config.releases_keep = releases_keep;
-    config.ssl_enabled = ssl_enabled;
-    config.domain = domain;
-    config.email = email;
+    apply_existing_fields(&mut config, existing_config);
     Ok(config)
 }
 
@@ -120,12 +110,6 @@ pub(super) fn collect_non_interactive(
         &project_name,
         config::default_project_root_for,
     );
-    let deploy_on_push = existing_config.map_or(false, |cfg| cfg.deploy_on_push);
-    let releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
-
-    let ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
-    let domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
-    let email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 
     let mut config = config::Bones::default();
     config.remote_name = remote_name;
@@ -135,11 +119,7 @@ pub(super) fn collect_non_interactive(
     config.repo_path = repo_path;
     config.project_root = project_root;
     config.branch = branch;
-    config.deploy_on_push = deploy_on_push;
-    config.releases_keep = releases_keep;
-    config.ssl_enabled = ssl_enabled;
-    config.domain = domain;
-    config.email = email;
+    apply_existing_fields(&mut config, existing_config);
     Ok(config)
 }
 
@@ -258,6 +238,14 @@ pub fn existing_path_override(
     if resolved == default_for(current_project_name) { String::new() } else { resolved }
 }
 
+fn apply_existing_fields(config: &mut config::Bones, existing_config: Option<&config::Bones>) {
+    config.deploy_on_push = existing_config.map_or(false, |cfg| cfg.deploy_on_push);
+    config.releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
+    config.ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
+    config.domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
+    config.email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::{Result, bail};
@@ -286,6 +274,9 @@ mod tests {
             remote: None,
             host: Some(String::from("deploy.example.com")),
             port: None,
+            template: None,
+            runtime_vars: Vec::new(),
+            dbs: Vec::new(),
         };
 
         let cfg = collect_non_interactive("workspace", Some(&existing), &args)?;
@@ -309,6 +300,9 @@ mod tests {
             remote: None,
             host: None,
             port: None,
+            template: None,
+            runtime_vars: Vec::new(),
+            dbs: Vec::new(),
         };
 
         let result = collect_non_interactive("workspace", Some(&existing), &args);
