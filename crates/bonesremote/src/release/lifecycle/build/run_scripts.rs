@@ -51,12 +51,15 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
     };
     let mut container = deploy_output::BuildContainer::start(context, &build_env)?;
 
+    let logs_dir = paths::bonesremote_site_logs(site);
+    fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;
+
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
         println!("Running build script {script_name}...");
 
         let status = container
-            .run_script(&script, &context.join(format!("{script_name}.log")))
+            .run_script(&script, &logs_dir.join(format!("{script_name}.log")))
             .with_context(|| format!("Failed to execute build script {}", script.display()))?;
 
         if !status.success() {

@@ -53,13 +53,24 @@ _add_sury_repo() {
 install_system_packages() {
 	log "Installing PHP and Composer build packages..."
 	export DEBIAN_FRONTEND=noninteractive
+	# Prevent dpkg triggers from trying to start/restart daemons. policy-rc.d
+	# blocks the action; the systemctl stub prevents deb-systemd-invoke from
+	# hanging while waiting for a dbus socket that doesn't exist in the container.
+	printf '#!/bin/sh\nexit 101\n' >/usr/sbin/policy-rc.d
+	chmod +x /usr/sbin/policy-rc.d
+	printf '#!/bin/sh\nexit 0\n' >/usr/bin/systemctl
+	chmod +x /usr/bin/systemctl
 
 	if [ -n "${PHP_VERSION:-}" ]; then
 		_add_sury_repo
 		apt-get install -y --no-install-recommends \
+			"php${PHP_VERSION}-bcmath" \
 			"php${PHP_VERSION}-cli" \
 			"php${PHP_VERSION}-curl" \
+			"php${PHP_VERSION}-gd" \
+			"php${PHP_VERSION}-intl" \
 			"php${PHP_VERSION}-mbstring" \
+			"php${PHP_VERSION}-mysql" \
 			"php${PHP_VERSION}-sqlite3" \
 			"php${PHP_VERSION}-xml" \
 			"php${PHP_VERSION}-zip" \
@@ -73,14 +84,19 @@ install_system_packages() {
 			git \
 			curl \
 			ca-certificates \
+			php-bcmath \
 			php-cli \
 			php-curl \
+			php-gd \
+			php-intl \
 			php-mbstring \
+			php-mysql \
 			php-sqlite3 \
 			php-xml \
 			php-zip \
 			unzip
 	fi
+	log "System packages installed."
 }
 
 php_command() {
@@ -98,8 +114,9 @@ install_composer() {
 	local actual_checksum
 
 	php_bin="$(php_command)"
-	curl -fsSL https://getcomposer.org/installer -o "$installer"
-	expected_checksum="$(curl -fsSL https://composer.github.io/installer.sig)"
+	log "Downloading Composer installer..."
+	curl -fsSL --connect-timeout 15 https://getcomposer.org/installer -o "$installer"
+	expected_checksum="$(curl -fsSL --connect-timeout 15 https://composer.github.io/installer.sig)"
 	actual_checksum="$("$php_bin" -r "echo hash_file('sha384', '$installer');")"
 
 	if [ "$expected_checksum" != "$actual_checksum" ]; then

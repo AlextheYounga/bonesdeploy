@@ -2,12 +2,24 @@
 
 set -Eeuo pipefail
 
-artisan_command_exists() {
-	local command_name="$1"
-
-	php artisan list --raw 2>/dev/null |
-		awk '{ print $1 }' |
-		grep -qx -- "$command_name"
+ensure_storage_dirs() {
+	log "Ensuring Laravel storage directory structure..."
+	# If storage is a symlink (e.g. linked to shared/storage by the release
+	# lifecycle), mkdir -p fails with EEXIST on a dangling symlink because
+	# the symlink inode exists but stat can't resolve it to a directory.
+	# Resolve the real target path first so mkdir operates on the destination.
+	local base
+	if [ -L storage ]; then
+		base="$(readlink -m storage)"
+	else
+		base="${PWD}/storage"
+	fi
+	mkdir -p \
+		"${base}/framework/cache/data" \
+		"${base}/framework/sessions" \
+		"${base}/framework/views" \
+		"${base}/logs" \
+		"${base}/app/public"
 }
 
 ensure_app_key() {
@@ -32,21 +44,12 @@ run_migrations() {
 	php artisan migrate --force
 }
 
-restart_queue_workers() {
-	if artisan_command_exists "queue:restart"; then
-		php artisan queue:restart || true
-	fi
-}
-
 finish_laravel_prepare() {
-	php artisan optimize:clear
 	php artisan optimize
-	php artisan package:discover --ansi || true
-	restart_queue_workers
-	php artisan up
 }
 
 main() {
+	ensure_storage_dirs
 	ensure_app_key
 	ensure_storage_link
 	run_migrations

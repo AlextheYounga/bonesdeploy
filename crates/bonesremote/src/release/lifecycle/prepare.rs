@@ -49,6 +49,9 @@ pub fn run(site: &str) -> Result<()> {
         .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
     let web_root = runtime.web_root;
     let runtime_user = runtime_user_for(&cfg.project_name);
+    let logs_dir = paths::bonesremote_site_logs(site);
+    fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;
+
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
         println!("Running prepare script {script_name}...");
@@ -56,7 +59,7 @@ pub fn run(site: &str) -> Result<()> {
         let status = deploy_output::run_prepare_script(
             &script,
             &release_dir,
-            &release_dir.join(format!("{script_name}.log")),
+            &logs_dir.join(format!("{script_name}.log")),
             &deploy_output::PrepareScriptEnv {
                 project_name: &cfg.project_name,
                 project_root: &cfg.project_root,

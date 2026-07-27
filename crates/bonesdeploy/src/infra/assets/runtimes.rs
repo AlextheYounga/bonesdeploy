@@ -183,6 +183,18 @@ mod tests {
     }
 
     #[test]
+    fn laravel_prepare_only_mutates_candidate_and_required_runtime_state() {
+        let script = RuntimeAssets::get("laravel/deployment/prepare/01_prepare_laravel.sh")
+            .map(|asset| String::from_utf8_lossy(asset.data.as_ref()).into_owned())
+            .unwrap_or_default();
+
+        assert!(script.contains("php artisan optimize"));
+        for command in ["optimize:clear", "package:discover", "queue:restart", "artisan up"] {
+            assert!(!script.contains(command), "prepare must not run {command}");
+        }
+    }
+
+    #[test]
     fn runtime_defaults_fit_the_single_file_schema() -> Result<()> {
         for runtime in runtime_names() {
             let defaults = runtime_defaults(&runtime)?;

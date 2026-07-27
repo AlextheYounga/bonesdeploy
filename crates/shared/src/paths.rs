@@ -143,6 +143,11 @@ pub fn bonesremote_tmp_builds_root(site: &str) -> PathBuf {
 }
 
 #[must_use]
+pub fn bonesremote_site_logs(site: &str) -> PathBuf {
+    bonesremote_site_root(site).join(LOGS_DIR)
+}
+
+#[must_use]
 pub fn bonesdeploy_user_home(user: &str) -> PathBuf {
     Path::new(BONESDEPLOY_USERS_ROOT).join(user)
 }

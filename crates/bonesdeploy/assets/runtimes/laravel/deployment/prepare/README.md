@@ -6,7 +6,7 @@ Scripts in this directory run after the build is promoted into a release.
 
 - Runs as the site's runtime user (e.g. `<project>`, not root and not `<project>-build`).
 - Working directory: the promoted release directory.
-- **Has access** to `.env`, `shared/` symlinks (storage, bootstrap/cache, database.sqlite), and the database.
+- **Has access** to `.env`, configured shared-path symlinks, and the database.
 
 ## Contract
 
@@ -20,11 +20,7 @@ Scripts in this directory run after the build is promoted into a release.
 php artisan key:generate --force
 php artisan storage:link --force
 php artisan migrate --force
-php artisan optimize:clear
 php artisan optimize
-php artisan package:discover --ansi
-php artisan queue:restart
-php artisan up
 ```
 
 ## Adding Scripts

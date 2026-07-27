@@ -205,14 +205,33 @@ node_install() {
 	BUILD_NODE_TMP_DIR=""
 }
 
+node_corepack_version() {
+	local node_version major minor
+	node_version="$(node --version)"
+	node_version="${node_version#v}"
+	major="${node_version%%.*}"
+	minor="${node_version#*.}"
+	minor="${minor%%.*}"
+
+	# Corepack 0.25+ requires Node >= 18.17 / >= 20.10 (uses URL.canParse).
+	if [ "$major" -lt 18 ] ||
+		{ [ "$major" -eq 18 ] && [ "$minor" -lt 17 ]; } ||
+		{ [ "$major" -eq 20 ] && [ "$minor" -lt 10 ]; }; then
+		echo "0.24.1"
+	else
+		echo "$COREPACK_VERSION"
+	fi
+}
+
 node_ensure_corepack() {
 	export PATH="$NODE_DIR/bin:$PATH"
 
-	local installed_version
+	local target_version installed_version
+	target_version="$(node_corepack_version)"
 	installed_version="$(corepack --version 2>/dev/null || true)"
-	if [ "$installed_version" != "$COREPACK_VERSION" ]; then
-		log "Installing Corepack ${COREPACK_VERSION}..."
-		npm install --global --prefix "$NODE_DIR" "corepack@${COREPACK_VERSION}"
+	if [ "$installed_version" != "$target_version" ]; then
+		log "Installing Corepack ${target_version}..."
+		npm install --global --prefix "$NODE_DIR" "corepack@${target_version}"
 	fi
 
 	corepack enable --install-directory "$NODE_DIR/bin" 2>/dev/null || true
