@@ -5,9 +5,9 @@ from pyinfra.operations import server
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
-from bonesinfra.services.runtime import node
 from bonesinfra.frameworks.common import validation
 from bonesinfra.pyinfra.operations import render
+from bonesinfra.services.runtime import node
 
 
 class SvelteKitFramework(ServerFramework):
@@ -17,7 +17,7 @@ class SvelteKitFramework(ServerFramework):
     def install_packages(self, ctx):
         self.node_binary = node.install(ctx)
 
-    def apparmor_exec_paths(self, ctx, paths):
+    def apparmor_exec_paths(self, ctx, paths):  # noqa: ARG002
         return [self.node_binary]
 
     def exec_command(self, ctx, paths):
@@ -52,4 +52,4 @@ class SvelteKitFramework(ServerFramework):
         )
 
 
-FRAMEWORK = SvelteKitFramework()
+SVELTEKIT_FRAMEWORK = SvelteKitFramework()

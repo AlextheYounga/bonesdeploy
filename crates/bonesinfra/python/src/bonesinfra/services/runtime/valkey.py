@@ -52,4 +52,4 @@ class ValKeyService(RuntimeService):
         )
 
 
-SERVICE = ValKeyService()
+VALKEY_SERVICE = ValKeyService()

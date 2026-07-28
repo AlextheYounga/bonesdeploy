@@ -6,4 +6,4 @@ class MariaDBService(MySQLService):
     implementation = "mariadb"
 
 
-SERVICE = MariaDBService()
+MARIADB_SERVICE = MariaDBService()

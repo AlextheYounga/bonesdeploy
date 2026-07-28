@@ -24,7 +24,10 @@ class MongoDBService(RuntimeService):
             name="Configure MongoDB for project",
             commands=[
                 "sed -ri 's/^[[:space:]]*bindIp:.*/  bindIp: 127.0.0.1/' /etc/mongod.conf",
-                "grep -q '^security:' /etc/mongod.conf || printf '\\nsecurity:\\n  authorization: enabled\\n' >> /etc/mongod.conf",
+                (
+                    "grep -q '^security:' /etc/mongod.conf || "
+                    "printf '\\nsecurity:\\n  authorization: enabled\\n' >> /etc/mongod.conf"
+                ),
             ],
             _sudo=True,
         )
@@ -47,4 +50,4 @@ class MongoDBService(RuntimeService):
         )
 
 
-SERVICE = MongoDBService()
+MONGODB_SERVICE = MongoDBService()

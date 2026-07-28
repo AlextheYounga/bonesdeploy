@@ -1,9 +1,9 @@
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
-from bonesinfra.services.runtime import node
 from bonesinfra.frameworks.common import validation
 from bonesinfra.pyinfra.operations import mkdir, render
+from bonesinfra.services.runtime import node
 
 
 class NextFramework(ServerFramework):
@@ -16,15 +16,18 @@ class NextFramework(ServerFramework):
     def install_packages(self, ctx):
         self.node_binary = node.install(ctx)
 
-    def apparmor_exec_paths(self, ctx, paths):
+    def apparmor_exec_paths(self, ctx, paths):  # noqa: ARG002
         return [self.node_binary]
 
     def apparmor_network(self):
         return "network inet stream,"
 
-    def exec_command(self, ctx, paths):
+    def exec_command(self, ctx, paths):  # noqa: ARG002
         port = ctx.runtime.data.get("internal_port", self.default_port)
-        return f"/usr/bin/env NODE_ENV=production PORT={port} HOSTNAME=127.0.0.1 {self.node_binary} .next/standalone/server.js"
+        return (
+            f"/usr/bin/env NODE_ENV=production PORT={port} HOSTNAME=127.0.0.1 "
+            f"{self.node_binary} .next/standalone/server.js"
+        )
 
     def validate(self, ctx, paths):
         validation.run_as_runtime_user(
@@ -53,4 +56,4 @@ class NextFramework(ServerFramework):
         )
 
 
-FRAMEWORK = NextFramework()
+NEXT_FRAMEWORK = NextFramework()

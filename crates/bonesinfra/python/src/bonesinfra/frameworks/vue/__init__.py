@@ -5,4 +5,4 @@ class VueFramework(StaticFramework):
     static_root = "dist"
 
 
-FRAMEWORK = VueFramework()
+VUE_FRAMEWORK = VueFramework()

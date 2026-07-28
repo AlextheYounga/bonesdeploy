@@ -11,4 +11,4 @@ class LaravelFramework(PHPFramework):
         php_packages.install_php(php_version)
 
 
-FRAMEWORK = LaravelFramework()
+LARAVEL_FRAMEWORK = LaravelFramework()

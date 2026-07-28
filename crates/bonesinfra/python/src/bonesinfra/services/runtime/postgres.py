@@ -34,4 +34,4 @@ class PostgresService(RuntimeService):
         )
 
 
-SERVICE = PostgresService()
+POSTGRES_SERVICE = PostgresService()

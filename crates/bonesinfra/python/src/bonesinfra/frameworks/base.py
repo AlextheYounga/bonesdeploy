@@ -1,13 +1,10 @@
-from pyinfra.operations import files, server
+from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
-from bonesinfra.services.linux.apparmor import app as apparmor
-from bonesinfra.frameworks.common import logs, php_fpm_pool
-from bonesinfra.frameworks.common import paths as common_paths
-from bonesinfra.frameworks.common import systemd as service
-from bonesinfra.frameworks.common import validation
+from bonesinfra.frameworks.common import logs, paths as common_paths, php_fpm_pool, systemd as service
 from bonesinfra.pyinfra.operations import mkdir, render
+from bonesinfra.services.linux.apparmor import app as apparmor
 from bonesinfra.services.linux.nginx import site as nginx_site
 
 
@@ -66,10 +63,10 @@ class ServerFramework(Framework):
     def exec_command(self, ctx, paths) -> str:
         raise NotImplementedError
 
-    def writable_paths(self, ctx, paths) -> list:
+    def writable_paths(self, ctx, paths) -> list:  # noqa: ARG002
         return []
 
-    def apparmor_exec_paths(self, ctx, paths) -> list:
+    def apparmor_exec_paths(self, ctx, paths) -> list:  # noqa: ARG002
         return []
 
     def apparmor_network(self) -> str | None:

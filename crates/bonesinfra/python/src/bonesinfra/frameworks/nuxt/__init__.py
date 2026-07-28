@@ -1,8 +1,8 @@
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
-from bonesinfra.services.runtime import node
 from bonesinfra.pyinfra.operations import mkdir, render
+from bonesinfra.services.runtime import node
 
 
 class NuxtFramework(ServerFramework):
@@ -13,12 +13,14 @@ class NuxtFramework(ServerFramework):
     def install_packages(self, ctx):
         self.node_binary = node.install(ctx)
 
-    def apparmor_exec_paths(self, ctx, paths):
+    def apparmor_exec_paths(self, ctx, paths):  # noqa: ARG002
         return [self.node_binary]
 
-    def exec_command(self, ctx, paths):
+    def exec_command(self, ctx, paths):  # noqa: ARG002
         socket = self.socket_path(paths)
-        return f"/usr/bin/env NODE_ENV=production NITRO_UNIX_SOCKET={socket} {self.node_binary} .output/server/index.mjs"
+        return (
+            f"/usr/bin/env NODE_ENV=production NITRO_UNIX_SOCKET={socket} {self.node_binary} .output/server/index.mjs"
+        )
 
     def seed_placeholder(self, ctx, paths):
         server_dir = f"{paths['placeholder_release']}/.output/server"
@@ -40,4 +42,4 @@ class NuxtFramework(ServerFramework):
         )
 
 
-FRAMEWORK = NuxtFramework()
+NUXT_FRAMEWORK = NuxtFramework()

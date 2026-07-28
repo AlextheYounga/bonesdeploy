@@ -17,7 +17,9 @@ def deploy_ssl(ctx, custom: ModuleType | None = None):
     )
 
     nginx_router.install_default_deny_server(paths)
-    nginx_router.render_router_config(ctx, paths, ssl_enabled=False, stage="certbot challenge", validate=True, reload=True)
+    nginx_router.render_router_config(
+        ctx, paths, ssl_enabled=False, stage="certbot challenge", validate=True, reload=True
+    )
     obtain_certificate(ctx, paths)
     nginx_router.render_router_config(ctx, paths, ssl_enabled=True, stage="SSL enable", validate=True, reload=True)
 

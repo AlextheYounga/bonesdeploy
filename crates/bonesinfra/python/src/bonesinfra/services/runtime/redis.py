@@ -7,4 +7,4 @@ class RedisService(ValKeyService):
     package_user = "redis"
 
 
-SERVICE = RedisService()
+REDIS_SERVICE = RedisService()

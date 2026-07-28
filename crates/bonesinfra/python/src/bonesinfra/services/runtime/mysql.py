@@ -37,4 +37,4 @@ class MySQLService(RuntimeService):
         )
 
 
-SERVICE = MySQLService()
+MYSQL_SERVICE = MySQLService()

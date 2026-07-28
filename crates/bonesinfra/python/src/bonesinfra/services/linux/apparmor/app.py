@@ -1,14 +1,13 @@
 from pyinfra.operations import server
 
-from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.pyinfra.operations import render
 
 
-def render_profile(
+def render_profile(  # noqa: PLR0913
     ctx,
     *,
-    paths,
+    paths,  # noqa: ARG001
     runtime,
     apparmor_exec_paths,
     apparmor_writable_paths,

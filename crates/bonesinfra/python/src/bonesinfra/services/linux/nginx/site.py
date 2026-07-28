@@ -2,7 +2,7 @@ from pyinfra.operations import files
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
-from bonesinfra.frameworks.common import php_fpm_pool, validation
+from bonesinfra.frameworks.common import validation
 
 
 def _ensure_runtime_socket_dir(ctx, paths):

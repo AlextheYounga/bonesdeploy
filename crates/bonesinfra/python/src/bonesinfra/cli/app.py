@@ -9,8 +9,8 @@ from bonesinfra.cli.commands.runtime import deploy_runtime
 from bonesinfra.cli.commands.setup import deploy_setup
 from bonesinfra.cli.commands.ssl import deploy_ssl
 from bonesinfra.config.context import DeployContext
-from bonesinfra.pyinfra.runner import run
 from bonesinfra.frameworks import list_frameworks
+from bonesinfra.pyinfra.runner import run
 
 app = typer.Typer()
 runtime_app = typer.Typer()

@@ -12,6 +12,8 @@ DEPLOY_USER = "git"
 DEFAULT_SSH_USER = "root"
 DEFAULT_SSH_PORT = "22"
 DEFAULT_WEB_ROOT = "public"
+
+
 @dataclass
 class DeployContext:
     app: AppConfig
@@ -52,11 +54,7 @@ class DeployContext:
             web_root=str(runtime_cfg.get("web_root") or DEFAULT_WEB_ROOT),
             runtime_user=project_name,
             runtime_group=project_name,
-            data={
-                key: value
-                for key, value in runtime_cfg.items()
-                if key not in {"web_root", "permissions", "shared"}
-            },
+            data={key: value for key, value in runtime_cfg.items() if key not in {"web_root", "permissions", "shared"}},
         )
 
         dbs = DbsConfig(services=_database_services(dbs_cfg.get("services", [])))

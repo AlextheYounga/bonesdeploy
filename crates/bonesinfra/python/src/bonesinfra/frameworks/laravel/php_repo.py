@@ -11,8 +11,8 @@ PHP_SURY_PREREQUISITES = [
 
 
 def _resolve_codename():
-    from pyinfra import host
-    from pyinfra.facts.server import LinuxDistribution
+    from pyinfra import host  # noqa: PLC0415
+    from pyinfra.facts.server import LinuxDistribution  # noqa: PLC0415
 
     deb = host.get_fact(LinuxDistribution)
     release_meta = deb.get("release_meta", {}) if deb else {}
@@ -25,7 +25,7 @@ def _resolve_codename():
 
 
 def add_php_apt_source():
-    from pyinfra.operations import apt, server
+    from pyinfra.operations import apt, server  # noqa: PLC0415
 
     apt.packages(
         name="Install PHP repo prerequisites",

@@ -14,13 +14,13 @@ class DjangoFramework(ServerFramework):
     service_name = "gunicorn"
     runtime_label = "Gunicorn"
 
-    def install_packages(self, ctx):
+    def install_packages(self, ctx):  # noqa: ARG002
         python_packages.install_packages()
 
-    def apparmor_exec_paths(self, ctx, paths):
+    def apparmor_exec_paths(self, ctx, paths):  # noqa: ARG002
         return [f"{paths['current']}/.venv/bin/gunicorn"]
 
-    def writable_paths(self, ctx, paths):
+    def writable_paths(self, ctx, paths):  # noqa: ARG002
         return [f"{paths['shared']}/media"]
 
     def exec_command(self, ctx, paths):
@@ -64,4 +64,4 @@ class DjangoFramework(ServerFramework):
         )
 
 
-FRAMEWORK = DjangoFramework()
+DJANGO_FRAMEWORK = DjangoFramework()

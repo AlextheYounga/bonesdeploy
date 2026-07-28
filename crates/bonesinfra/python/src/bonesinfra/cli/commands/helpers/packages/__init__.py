@@ -1,7 +1,7 @@
 from pyinfra.operations import apt, server
 
-from bonesinfra.config.paths import SCRIPTS_DIR
 from bonesinfra.cli.commands.helpers.packages import neovim, rainfrog, starship
+from bonesinfra.config.paths import SCRIPTS_DIR
 
 HELPER_APT_PACKAGES: list[str] = [
     "age",
@@ -58,4 +58,3 @@ def install_debian_command_aliases():
         src=str(SCRIPTS_DIR / "install-debian-aliases.sh"),
         _sudo=True,
     )
-
