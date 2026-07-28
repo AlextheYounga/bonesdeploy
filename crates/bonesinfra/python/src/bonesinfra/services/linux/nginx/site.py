@@ -1,8 +1,7 @@
-from pathlib import Path
-
 from pyinfra.operations import files
 
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.common import php_fpm_pool, validation
 
 
@@ -27,11 +26,10 @@ def _ensure_runtime_socket_dir(ctx, paths):
 
 
 def render_proxy(ctx, *, paths, socket_path=None, port=None):
-    here = Path(__file__).parent
     app_proxy_target = f"http://unix:{socket_path}:" if socket_path else f"http://127.0.0.1:{port}"
     files.template(
         name="Deploy per-site app nginx config",
-        src=str(here / "assets/app-site-nginx.conf.j2"),
+        src=str(ASSETS_DIR / "nginx/app-site-nginx.conf.j2"),
         dest=paths["site_nginx_config"],
         user="root",
         group=ctx.runtime.runtime_group,
@@ -49,10 +47,9 @@ def render_proxy(ctx, *, paths, socket_path=None, port=None):
 
 
 def render_static(ctx, *, paths, root="dist"):
-    here = Path(__file__).parent
     files.template(
         name="Deploy per-site static nginx config",
-        src=str(here / "assets/static-site-nginx.conf.j2"),
+        src=str(ASSETS_DIR / "nginx/static-site-nginx.conf.j2"),
         dest=paths["site_nginx_config"],
         user="root",
         group=ctx.runtime.runtime_group,

@@ -4,12 +4,13 @@ from pyinfra.operations import files, server
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
-from bonesinfra.frameworks.common import apparmor, logs, php_fpm_pool
+from bonesinfra.services.linux.apparmor import app as apparmor
+from bonesinfra.frameworks.common import logs, php_fpm_pool
 from bonesinfra.frameworks.common import paths as common_paths
 from bonesinfra.frameworks.common import systemd as service
 from bonesinfra.frameworks.common import validation
 from bonesinfra.pyinfra.operations import mkdir, render
-from bonesinfra.nginx import site as nginx_site
+from bonesinfra.services.linux.nginx import site as nginx_site
 
 
 class Framework:
@@ -117,7 +118,7 @@ class ServerFramework(Framework):
         if net := self.apparmor_network():
             apparmor_kwargs["apparmor_network"] = net
 
-        profile_name = apparmor.render_app_profile(
+        profile_name = apparmor.render_profile(
             ctx,
             paths=paths,
             runtime=self.service_name,

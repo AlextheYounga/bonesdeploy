@@ -1,9 +1,10 @@
 from types import ModuleType
 
-from bonesinfra.cli.commands.runtime import apparmor, packages, template_runtime
+from bonesinfra.services.linux.apparmor import nginx as apparmor
+from bonesinfra.services.linux.nginx import router as nginx
+from bonesinfra.cli.commands.runtime import packages, template_runtime
 from bonesinfra.cli.hooks import call_hook
 from bonesinfra.frameworks import get_framework
-from bonesinfra.nginx import router as nginx
 
 
 def deploy_runtime(ctx, custom: ModuleType | None = None):

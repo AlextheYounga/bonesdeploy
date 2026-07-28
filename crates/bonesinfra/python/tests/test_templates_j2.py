@@ -38,7 +38,7 @@ def test_default_deny_config_is_default_deny_only():
 
 def test_common_apparmor_profile_uses_configurable_network():
     """AppArmor network rule must come from the template variable, not be hardcoded."""
-    c = _read("frameworks/common/assets/app-profile.j2")
+    c = _read("assets/apparmor/app-profile.j2")
     helpers.assert_contains(c, '{{ apparmor_network | default("network unix stream,") }}')
     helpers.assert_not_contains(c, "{{ paths.current }}/** r,")
 

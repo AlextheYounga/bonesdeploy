@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from bonesinfra.cli.commands.helpers import plan as helpers_plan
-from bonesinfra.cli.commands.runtime import plan as runtime_plan
-from bonesinfra.cli.commands.setup import plan as setup_plan
-from bonesinfra.cli.commands.ssl import plan as ssl_plan
+import bonesinfra.cli.commands.helpers as helpers_plan
+import bonesinfra.cli.commands.runtime as runtime_plan
+import bonesinfra.cli.commands.setup as setup_plan
+import bonesinfra.cli.commands.ssl as ssl_plan
 from bonesinfra.cli import hooks as custom_mod
 from bonesinfra.config.context import DeployContext
 

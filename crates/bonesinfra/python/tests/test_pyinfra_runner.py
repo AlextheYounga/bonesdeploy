@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import pyinfra.connectors.ssh as pyinfra_ssh
 
 from bonesinfra.config.context import DeployContext
-from bonesinfra.pyinfra import pyinfra_runner
+from bonesinfra.pyinfra import runner
 
 sentinel_key = object()
 
@@ -49,23 +49,23 @@ port = 2222
 
     seen = {}
 
-    monkeypatch.setattr(pyinfra_runner, "setup_output", lambda: None)
-    monkeypatch.setattr(pyinfra_runner, "print_banner", lambda: None)
-    monkeypatch.setattr(pyinfra_runner, "print_target", _noop_print_target)
-    monkeypatch.setattr(pyinfra_runner, "print_connected", lambda: None)
-    monkeypatch.setattr(pyinfra_runner, "print_done", lambda success: seen.setdefault("done", success))
-    monkeypatch.setattr(pyinfra_runner, "stop_live_output", lambda: None)
-    monkeypatch.setattr(pyinfra_runner, "activity", _noop_activity)
-    monkeypatch.setattr(pyinfra_runner, "run_ops", _noop_run_ops)
+    monkeypatch.setattr(runner, "setup_output", lambda: None)
+    monkeypatch.setattr(runner, "print_banner", lambda: None)
+    monkeypatch.setattr(runner, "print_target", _noop_print_target)
+    monkeypatch.setattr(runner, "print_connected", lambda: None)
+    monkeypatch.setattr(runner, "print_done", lambda success: seen.setdefault("done", success))
+    monkeypatch.setattr(runner, "stop_live_output", lambda: None)
+    monkeypatch.setattr(runner, "activity", _noop_activity)
+    monkeypatch.setattr(runner, "run_ops", _noop_run_ops)
     monkeypatch.setattr(pyinfra_ssh, "get_private_key", _noop_get_private_key)
 
     def fake_connect_all(state):
         host = next(iter(state.inventory))
         seen["kwargs"] = host.connector.make_paramiko_kwargs()
 
-    monkeypatch.setattr(pyinfra_runner, "connect_all", fake_connect_all)
+    monkeypatch.setattr(runner, "connect_all", fake_connect_all)
 
-    pyinfra_runner.run(ctx=ctx, config_path=str(config_path), ssh_key="~/.ssh/id_ed25519", deploy=_noop_deploy)
+    runner.run(ctx=ctx, config_path=str(config_path), ssh_key="~/.ssh/id_ed25519", deploy=_noop_deploy)
 
     assert seen["kwargs"]["username"] == "root"
     assert seen["kwargs"]["port"] == 2222

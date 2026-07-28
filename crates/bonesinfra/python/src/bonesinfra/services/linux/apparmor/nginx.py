@@ -13,34 +13,31 @@ def setup(ctx, paths, nginx_apparmor_network="network unix stream,"):
         running=True,
         _sudo=True,
     )
-
     server.shell(
         name="Verify apparmor kernel enabled",
         commands=[f"cat {paths['apparmor_enabled_param']}"],
         _sudo=True,
     )
 
-    apparmor_profile_name = f"bonesdeploy-{ctx.app.project_name}-nginx"
-    apparmor_profile_path = f"/etc/apparmor.d/{apparmor_profile_name}"
+    profile_name = f"bonesdeploy-{ctx.app.project_name}-nginx"
+    profile_path = f"/etc/apparmor.d/{profile_name}"
 
     render(
-        "Deploy per-project apparmor profile",
+        "Deploy per-project nginx AppArmor profile",
         ASSETS_DIR / "apparmor/project-nginx-profile.j2",
-        apparmor_profile_path,
+        profile_path,
         mode="0644",
-        apparmor_profile_name=apparmor_profile_name,
+        apparmor_profile_name=profile_name,
         nginx_apparmor_network=nginx_apparmor_network,
         **template_data(ctx, paths=paths),
     )
-
     server.shell(
-        name="Load updated apparmor profile",
-        commands=[f"apparmor_parser -r {apparmor_profile_path}"],
+        name="Load updated nginx AppArmor profile",
+        commands=[f"apparmor_parser -r {profile_path}"],
         _sudo=True,
     )
-
     server.shell(
-        name="Ensure project profile is in enforce mode",
-        commands=[f"aa-enforce {apparmor_profile_path}"],
+        name="Ensure nginx profile is in enforce mode",
+        commands=[f"aa-enforce {profile_path}"],
         _sudo=True,
     )

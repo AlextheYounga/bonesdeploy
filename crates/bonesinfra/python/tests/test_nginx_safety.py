@@ -1,4 +1,4 @@
-from bonesinfra.nginx import router as nginx_router
+from bonesinfra.services.linux.nginx import router as nginx_router
 
 
 def test_validate_config_rejects_conflicting_server_name_warning(monkeypatch):

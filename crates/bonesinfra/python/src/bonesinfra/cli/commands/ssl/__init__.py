@@ -4,7 +4,7 @@ from pyinfra.operations import server
 
 from bonesinfra.cli.hooks import call_hook
 from bonesinfra.pyinfra.operations import mkdir
-from bonesinfra.nginx import router as nginx_router
+from bonesinfra.services.linux.nginx import router as nginx_router
 
 
 def deploy_ssl(ctx, custom: ModuleType | None = None):
