@@ -130,6 +130,8 @@ pub struct Runtime {
     pub template: String,
     #[serde(default = "paths::default_web_root")]
     pub web_root: String,
+    #[serde(default = "default_node_version")]
+    pub node_version: String,
     #[serde(default)]
     pub shared: Shared,
     #[serde(default)]
@@ -143,11 +145,17 @@ impl Default for Runtime {
         Self {
             template: String::new(),
             web_root: paths::default_web_root(),
+            node_version: default_node_version(),
             shared: Shared::default(),
             permissions: None,
             extra: BTreeMap::new(),
         }
     }
+}
+
+#[must_use]
+pub fn default_node_version() -> String {
+    String::from("24.18.0")
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

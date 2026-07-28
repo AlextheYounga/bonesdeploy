@@ -21,6 +21,7 @@ releases = 5
 
 
 [runtime]
+node_version = "24.18.0"
 
 # Select during `bonesdeploy init`, or set manually. Services are only reachable
 # on localhost; access them remotely with an SSH tunnel.

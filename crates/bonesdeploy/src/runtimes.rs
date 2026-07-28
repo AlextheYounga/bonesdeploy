@@ -5,7 +5,6 @@ use shared::config::{Bones, Runtime};
 /// Shared question keys used by more than one template.
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
 const BUILD_ENV_HEADER: &str = "# Committed, non-secret values used while building this project.";
-pub(crate) const NODE_VERSION_DEFAULT: &str = "NODE_VERSION=v24.15.0";
 
 mod django;
 mod laravel;

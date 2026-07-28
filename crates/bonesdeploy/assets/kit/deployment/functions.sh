@@ -101,6 +101,11 @@ node_read_version_from_package_json() {
 }
 
 node_read_version() {
+	if [ -n "${BONES_RUNTIME_NODE_VERSION:-}" ]; then
+		echo "$BONES_RUNTIME_NODE_VERSION"
+		return
+	fi
+
 	if [ -n "${NODE_VERSION:-}" ]; then
 		echo "$NODE_VERSION"
 		return

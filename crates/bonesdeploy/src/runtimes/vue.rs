@@ -10,5 +10,5 @@ pub(crate) fn environment_example(_project_name: &str, _site_url: &str) -> Strin
 }
 
 pub(crate) fn build_environment_example() -> String {
-    super::join_env_lines(&[super::BUILD_ENV_HEADER, super::NODE_VERSION_DEFAULT])
+    super::join_env_lines(&[super::BUILD_ENV_HEADER])
 }

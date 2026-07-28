@@ -292,7 +292,10 @@ mod tests {
         let result = resolve_build_env(&cfg, &source);
 
         assert!(result.is_err(), "BONES_* in .env.build should be rejected");
-        let err = result.unwrap_err().to_string();
+        let err = match result {
+            Ok(_) => return Err(anyhow::anyhow!("reserved BONES_* variable unexpectedly succeeded")),
+            Err(error) => error.to_string(),
+        };
         assert!(err.contains("reserved"), "error should mention reserved: {err}");
         fs::remove_dir_all(site_root).ok();
         fs::remove_dir_all(source).ok();

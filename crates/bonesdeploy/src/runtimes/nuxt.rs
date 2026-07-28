@@ -16,5 +16,5 @@ pub(crate) fn environment_example(_project_name: &str, site_url: &str) -> String
 }
 
 pub(crate) fn build_environment_example() -> String {
-    super::join_env_lines(&[super::BUILD_ENV_HEADER, super::NODE_VERSION_DEFAULT, "NUXT_PUBLIC_SITE_URL="])
+    super::join_env_lines(&[super::BUILD_ENV_HEADER, "NUXT_PUBLIC_SITE_URL="])
 }

@@ -5,7 +5,8 @@ from pyinfra.operations import server
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
-from bonesinfra.frameworks.common import node, validation
+from bonesinfra.services.runtime import node
+from bonesinfra.frameworks.common import validation
 from bonesinfra.pyinfra.operations import render
 
 
@@ -14,17 +15,17 @@ class SvelteKitFramework(ServerFramework):
     runtime_label = "SvelteKit app server"
 
     def install_packages(self, ctx):
-        node.install_packages()
+        self.node_binary = node.install(ctx)
 
     def apparmor_exec_paths(self, ctx, paths):
-        return ["/usr/bin/node"]
+        return [self.node_binary]
 
     def exec_command(self, ctx, paths):
         socket = self.socket_path(paths)
         origin = f"https://{ctx.app.dns.domain}" if ctx.app.dns.domain else "https://localhost"
         return (
             f"/usr/bin/env --chdir={paths['current']} NODE_ENV=production SOCKET_PATH={socket} "
-            f"ORIGIN={origin} node --env-file=.env build"
+            f"ORIGIN={origin} {self.node_binary} --env-file=.env build"
         )
 
     def validate(self, ctx, paths):

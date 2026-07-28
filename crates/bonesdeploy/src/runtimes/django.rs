@@ -29,9 +29,5 @@ pub(crate) fn environment_example(project_name: &str, _site_url: &str) -> String
 pub(crate) fn build_environment_example(runtime: &Runtime) -> String {
     let python_version =
         runtime.extra.get("python_version").and_then(|value| value.as_str()).unwrap_or(DEFAULT_PYTHON_VERSION);
-    super::join_env_lines(&[
-        super::BUILD_ENV_HEADER,
-        &format!("PYTHON_VERSION={python_version}"),
-        super::NODE_VERSION_DEFAULT,
-    ])
+    super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("PYTHON_VERSION={python_version}")])
 }

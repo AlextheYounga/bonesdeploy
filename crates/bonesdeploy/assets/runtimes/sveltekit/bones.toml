@@ -1,6 +1,7 @@
 [runtime]
 template = "sveltekit"
 web_root = "build"
+node_version = "24.18.0"
 
 [runtime.permissions]
 paths = [

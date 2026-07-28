@@ -13,9 +13,5 @@ pub(crate) fn environment_example(project_name: &str, _site_url: &str) -> String
 }
 
 pub(crate) fn build_environment_example() -> String {
-    super::join_env_lines(&[
-        super::BUILD_ENV_HEADER,
-        "# Pin Node when this project includes a frontend build.",
-        super::NODE_VERSION_DEFAULT,
-    ])
+    super::join_env_lines(&[super::BUILD_ENV_HEADER, "# Pin Node when this project includes a frontend build."])
 }

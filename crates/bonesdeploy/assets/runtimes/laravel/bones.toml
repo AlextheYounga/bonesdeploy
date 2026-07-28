@@ -1,6 +1,7 @@
 [runtime]
 template = "laravel"
 web_root = "public"
+node_version = "24.18.0"
 
 [runtime.permissions]
 paths = [

@@ -99,9 +99,5 @@ pub(crate) fn environment_example(project_name: &str, site_url: &str) -> String 
 
 pub(crate) fn build_environment_example(runtime: &Runtime) -> String {
     let php_version = runtime.extra.get("php_version").and_then(|value| value.as_str()).unwrap_or(PHP_DEFAULT_VERSION);
-    super::join_env_lines(&[
-        super::BUILD_ENV_HEADER,
-        super::NODE_VERSION_DEFAULT,
-        &format!("PHP_VERSION={php_version}"),
-    ])
+    super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("PHP_VERSION={php_version}")])
 }

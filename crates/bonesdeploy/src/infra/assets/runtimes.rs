@@ -133,7 +133,7 @@ mod tests {
     fn every_runtime_has_a_build_environment_example() {
         for runtime in runtime_names() {
             if let Some(content) = runtimes::build_environment_example(&runtime, &Runtime::default()) {
-                assert!(content.contains("NODE_VERSION=v24.15.0"), "{runtime} must pin Node in .env.build");
+                assert!(content.contains("Committed, non-secret"), "{runtime} must include build environment header");
             } else {
                 assert!(false, "{runtime} is missing .env.build");
             }

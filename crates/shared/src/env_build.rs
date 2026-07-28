@@ -105,6 +105,7 @@ fn strip_quotes(s: &str) -> &str {
 }
 
 #[cfg(test)]
+#[expect(clippy::absolute_paths, clippy::unwrap_used)]
 mod tests {
     use super::*;
 
