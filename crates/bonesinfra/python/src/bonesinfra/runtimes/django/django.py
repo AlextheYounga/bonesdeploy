@@ -13,7 +13,7 @@ def deploy(ctx):
     paths = service.runtime_paths(ctx)
     socket_path = f"{paths['runtime_socket_dir']}/gunicorn/gunicorn.sock"
     wsgi_module = ctx.runtime.data.get("wsgi_module", "config.wsgi:application")
-    writable = [f"{paths['shared']}/staticfiles", f"{paths['shared']}/media"]
+    writable = [f"{paths['shared']}/media"]
     gunicorn_bin = f"{paths['current']}/.venv/bin/gunicorn"
     python_packages.install_packages()
     common_paths.ensure_runtime_dirs(ctx)
@@ -48,8 +48,8 @@ def _seed_placeholder_server(ctx, paths):
     """Create a venv with gunicorn and a minimal WSGI app in the placeholder
     release so the app service can start before any real release is deployed.
 
-    ponytail: bonesremote service restart only restarts
-    <project>-nginx.service, not <project>-gunicorn.service.
+    The first real deployment replaces this release before the site target
+    restarts Gunicorn.
     """
     placeholder = paths["placeholder_release"]
     server.shell(

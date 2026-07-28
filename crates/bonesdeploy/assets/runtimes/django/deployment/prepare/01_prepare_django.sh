@@ -29,6 +29,13 @@ install_python_dependencies() {
 	log "No requirements.txt found; skipping Python dependency install."
 }
 
+validate_application() {
+	[ -x "$VENV_DIR/bin/gunicorn" ] || die "gunicorn not found in $VENV_DIR; add it to requirements.txt"
+
+	log "Checking Django production configuration..."
+	python manage.py check --deploy
+}
+
 run_migrations() {
 	if [ "${BONES_DJANGO_SKIP_MIGRATIONS:-0}" = "1" ]; then
 		log "Skipping migrations because BONES_DJANGO_SKIP_MIGRATIONS=1."
@@ -58,6 +65,7 @@ main() {
 	ensure_virtualenv
 	activate_virtualenv
 	install_python_dependencies
+	validate_application
 	run_migrations
 	collect_static
 
