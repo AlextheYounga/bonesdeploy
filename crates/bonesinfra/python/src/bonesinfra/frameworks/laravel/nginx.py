@@ -1,4 +1,4 @@
-from bonesinfra.frameworks.laravel import php_fpm_pool
+from bonesinfra.frameworks.common import php_fpm_pool
 from pyinfra.operations import files
 
 from bonesinfra.domain.context import template_data

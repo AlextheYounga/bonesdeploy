@@ -12,8 +12,8 @@ def deploy_runtime(ctx, custom: ModuleType | None = None):
     template = ctx.runtime.data.get("template")
     uses_tcp = False
     if template:
-        runtime_mod = get_framework(template)
-        uses_tcp = getattr(runtime_mod, "USES_TCP", False) and not ctx.runtime.data.get("is_static", True)
+        framework = get_framework(template)
+        uses_tcp = framework.uses_tcp and not ctx.runtime.data.get("is_static", True)
 
     nginx_apparmor_network = "network inet stream," if uses_tcp else "network unix stream,"
     nginx_address_families = "AF_UNIX AF_INET" if uses_tcp else "AF_UNIX"

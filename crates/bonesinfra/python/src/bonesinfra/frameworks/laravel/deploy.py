@@ -1,15 +1,17 @@
 from pathlib import Path
 
-from bonesinfra.frameworks.laravel import nginx, php_fpm, php_packages, php_repo
+from bonesinfra.frameworks.base import PHPFramework
+from bonesinfra.frameworks.laravel import php_packages, php_repo
 
 
-def deploy(ctx):
-    here = Path(__file__).parent
-    php_version = ctx.runtime.data.get("php_version", "8.5")
-    paths = ctx.paths_dict
+class LaravelFramework(PHPFramework):
+    assets_dir = Path(__file__).parent
+    nginx_template = "assets/nginx/laravel-site-nginx.conf.j2"
 
-    php_repo.add_php_apt_source()
-    php_packages.install_php(php_version)
+    def install_packages(self, ctx):
+        php_version = self.php_version(ctx)
+        php_repo.add_php_apt_source()
+        php_packages.install_php(php_version)
 
-    php_fpm.setup_pool(here, ctx, paths, php_version)
-    nginx.setup(here, ctx, paths, php_version)
+
+FRAMEWORK = LaravelFramework()

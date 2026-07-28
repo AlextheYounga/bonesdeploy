@@ -1,21 +1,21 @@
 import sys
 
-from bonesinfra.frameworks import laravel
-from bonesinfra.frameworks.django import django
-from bonesinfra.frameworks.next import next as next_runtime
-from bonesinfra.frameworks.nuxt import nuxt
-from bonesinfra.frameworks.rails import rails
-from bonesinfra.frameworks.sveltekit import svelte
-from bonesinfra.frameworks.vue import vue
+from bonesinfra.frameworks.django.django import FRAMEWORK as _django
+from bonesinfra.frameworks.laravel.deploy import FRAMEWORK as _laravel
+from bonesinfra.frameworks.next.next import FRAMEWORK as _next
+from bonesinfra.frameworks.nuxt.nuxt import FRAMEWORK as _nuxt
+from bonesinfra.frameworks.rails.rails import FRAMEWORK as _rails
+from bonesinfra.frameworks.sveltekit.svelte import FRAMEWORK as _sveltekit
+from bonesinfra.frameworks.vue.vue import FRAMEWORK as _vue
 
 FRAMEWORKS = {
-    "laravel": laravel,
-    "django": django,
-    "next": next_runtime,
-    "nuxt": nuxt,
-    "rails": rails,
-    "sveltekit": svelte,
-    "vue": vue,
+    "django": _django,
+    "laravel": _laravel,
+    "next": _next,
+    "nuxt": _nuxt,
+    "rails": _rails,
+    "sveltekit": _sveltekit,
+    "vue": _vue,
 }
 
 
@@ -24,8 +24,8 @@ def list_frameworks():
 
 
 def get_framework(name):
-    module = FRAMEWORKS.get(name)
-    if module is None:
-        print(f"Unknown runtime: {name}. Available: {', '.join(list_frameworks())}", file=sys.stderr)
+    framework = FRAMEWORKS.get(name)
+    if framework is None:
+        print(f"Unknown framework: {name}. Available: {', '.join(list_frameworks())}", file=sys.stderr)
         sys.exit(1)
-    return module
+    return framework

@@ -1,29 +1,8 @@
-from pathlib import Path
-
-from bonesinfra.domain.context import template_data
-from bonesinfra.infra.operations import mkdir, render
-from bonesinfra.frameworks.common import nginx, systemd as service
-
-VUE_STATIC_ROOT = "dist"
+from bonesinfra.frameworks.base import StaticFramework
 
 
-def deploy(ctx):
-    paths = service.runtime_paths(ctx)
-    static_web_root = f"{paths['placeholder_release']}/{VUE_STATIC_ROOT}"
-    mkdir(
-        name="Ensure Vue static placeholder output directory exists",
-        path=static_web_root,
-        user="root",
-        group=ctx.runtime.runtime_group,
-        mode="0750",
-    )
-    render(
-        "Seed Vue static placeholder index page",
-        Path(__file__).parents[2] / "assets/nginx/index.html.j2",
-        f"{static_web_root}/index.html",
-        user="root",
-        group=ctx.runtime.runtime_group,
-        mode="0640",
-        **template_data(ctx, paths=paths),
-    )
-    nginx.render_static(ctx, paths=paths, root=VUE_STATIC_ROOT)
+class VueFramework(StaticFramework):
+    static_root = "dist"
+
+
+FRAMEWORK = VueFramework()

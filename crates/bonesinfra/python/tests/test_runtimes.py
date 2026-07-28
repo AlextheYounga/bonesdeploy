@@ -5,7 +5,7 @@ from bonesinfra.frameworks import list_frameworks
 from bonesinfra.frameworks.laravel import php_fpm
 
 FRAMEWORKS_MODULES = {
-    "laravel": "bonesinfra.frameworks.laravel",
+    "laravel": "bonesinfra.frameworks.laravel.deploy",
     "django": "bonesinfra.frameworks.django.django",
     "next": "bonesinfra.frameworks.next.next",
     "nuxt": "bonesinfra.frameworks.nuxt.nuxt",
@@ -15,13 +15,15 @@ FRAMEWORKS_MODULES = {
 }
 
 
-def test_runtimes_have_deploy():
+def test_frameworks_expose_framework_instance():
     for name, module_path in FRAMEWORKS_MODULES.items():
         mod = importlib.import_module(module_path)
-        assert callable(getattr(mod, "deploy", None)), f"{name}: missing deploy()"
+        framework = getattr(mod, "FRAMEWORK", None)
+        assert framework is not None, f"{name}: missing FRAMEWORK"
+        assert callable(getattr(framework, "deploy", None)), f"{name}: FRAMEWORK.deploy() not callable"
 
 
-def test_runtime_registry_is_explicit():
+def test_framework_registry_is_explicit():
     assert list_frameworks() == sorted(FRAMEWORKS_MODULES)
 
 
@@ -43,9 +45,9 @@ def test_laravel_php_fpm_cleans_orphaned_project_pools(monkeypatch):
 
 def test_next_declares_uses_tcp():
     mod = importlib.import_module("bonesinfra.frameworks.next.next")
-    assert getattr(mod, "USES_TCP", False) is True
+    assert mod.FRAMEWORK.uses_tcp is True
 
 
 def test_nuxt_does_not_declare_uses_tcp():
     mod = importlib.import_module("bonesinfra.frameworks.nuxt.nuxt")
-    assert not hasattr(mod, "USES_TCP")
+    assert mod.FRAMEWORK.uses_tcp is False
