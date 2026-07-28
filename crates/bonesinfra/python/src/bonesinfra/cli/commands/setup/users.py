@@ -12,7 +12,7 @@ _BUILD_CPU_QUOTA_PERCENT = 80
 _BUILD_MEMORY_HIGH_PERCENT = 80
 _BUILD_MEMORY_MAX_PERCENT = 80
 from bonesinfra.config.paths import ASSETS_DIR, BUILD_CACHE_NAME, IMAGE_STORE_GRAPH_ROOT, SCRIPTS_DIR
-from bonesinfra.infra.operations import mkdir, render
+from bonesinfra.pyinfra.operations import mkdir, render
 
 BUILD_USER_HOME_ROOT = "/var/lib/bonesdeploy/users"
 BUILD_SYSTEMD_STAGING_ROOT = "/run/bonesdeploy"

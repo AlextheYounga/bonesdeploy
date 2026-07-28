@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import pyinfra.connectors.ssh as pyinfra_ssh
 
 from bonesinfra.config.context import DeployContext
-from bonesinfra.infra import pyinfra_runner
+from bonesinfra.pyinfra import pyinfra_runner
 
 sentinel_key = object()
 

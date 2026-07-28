@@ -8,7 +8,7 @@ from bonesinfra.frameworks.common import apparmor, logs, php_fpm_pool
 from bonesinfra.frameworks.common import paths as common_paths
 from bonesinfra.frameworks.common import systemd as service
 from bonesinfra.frameworks.common import validation
-from bonesinfra.infra.operations import mkdir, render
+from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.nginx import site as nginx_site
 
 

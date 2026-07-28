@@ -7,7 +7,7 @@ from bonesinfra.config.context import template_data
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import validation
 from bonesinfra.frameworks.rails import ruby_packages
-from bonesinfra.infra.operations import render
+from bonesinfra.pyinfra.operations import render
 
 
 class RailsFramework(ServerFramework):

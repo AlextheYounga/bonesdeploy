@@ -1,5 +1,5 @@
 from bonesinfra.config.paths import ASSETS_DIR
-from bonesinfra.infra.operations import render
+from bonesinfra.pyinfra.operations import render
 
 AUTO_UPGRADES_PATH = "/etc/apt/apt.conf.d/20auto-upgrades"
 UNATTENDED_UPGRADES_PATH = "/etc/apt/apt.conf.d/50unattended-upgrades"

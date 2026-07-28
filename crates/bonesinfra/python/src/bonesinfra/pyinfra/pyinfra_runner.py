@@ -12,7 +12,7 @@ from pyinfra.context import ctx_config, ctx_host, ctx_inventory, ctx_state
 
 from bonesinfra.config.context import DeployContext
 from bonesinfra.cli.hooks import load_custom_module
-from bonesinfra.infra.output import (
+from bonesinfra.cli.output import (
     BonesDeployCallback,
     activity,
     print_banner,

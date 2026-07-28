@@ -4,7 +4,7 @@ from pyinfra.operations import files, server
 
 from bonesinfra.config.context import DEPLOY_USER
 from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
-from bonesinfra.infra.operations import mkdir
+from bonesinfra.pyinfra.operations import mkdir
 
 
 def _user_env_command(user, command):

@@ -2,7 +2,7 @@ from pyinfra.operations import files
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
-from bonesinfra.infra.operations import render
+from bonesinfra.pyinfra.operations import render
 
 
 def seed(ctx, paths):

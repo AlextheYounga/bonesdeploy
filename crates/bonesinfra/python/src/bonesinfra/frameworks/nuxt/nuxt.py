@@ -3,7 +3,7 @@ from pathlib import Path
 from bonesinfra.config.context import template_data
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import node
-from bonesinfra.infra.operations import mkdir, render
+from bonesinfra.pyinfra.operations import mkdir, render
 
 
 class NuxtFramework(ServerFramework):

@@ -6,7 +6,7 @@ from pyinfra.operations import server
 from bonesinfra.config.context import template_data
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import node, validation
-from bonesinfra.infra.operations import render
+from bonesinfra.pyinfra.operations import render
 
 
 class SvelteKitFramework(ServerFramework):

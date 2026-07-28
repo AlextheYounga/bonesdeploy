@@ -3,7 +3,7 @@ from types import ModuleType
 from pyinfra.operations import server
 
 from bonesinfra.cli.hooks import call_hook
-from bonesinfra.infra.operations import mkdir
+from bonesinfra.pyinfra.operations import mkdir
 from bonesinfra.nginx import router as nginx_router
 
 

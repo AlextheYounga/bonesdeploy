@@ -4,7 +4,7 @@ from pyinfra.operations import server
 
 from bonesinfra.config.context import DEPLOY_USER
 from bonesinfra.config.paths import ASSETS_DIR
-from bonesinfra.infra.operations import render
+from bonesinfra.pyinfra.operations import render
 
 
 def install(paths):

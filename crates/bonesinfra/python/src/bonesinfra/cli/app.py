@@ -9,7 +9,7 @@ from bonesinfra.cli.commands.runtime.plan import deploy_runtime
 from bonesinfra.cli.commands.setup.plan import deploy_setup
 from bonesinfra.cli.commands.ssl.plan import deploy_ssl
 from bonesinfra.config.context import DeployContext
-from bonesinfra.infra.pyinfra_runner import run
+from bonesinfra.pyinfra.pyinfra_runner import run
 from bonesinfra.frameworks import list_frameworks
 
 app = typer.Typer()
