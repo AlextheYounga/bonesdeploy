@@ -1,20 +1,18 @@
 from types import ModuleType
 
-from bonesinfra.deploys.setup import (
+from bonesinfra.cli.commands.setup import (
     bonesremote,
     directories,
     disable_algif_aead,
-    fail2ban,
-    firewall,
     image_store,
     packages,
     placeholder,
     sudoers,
-    unattended_upgrades,
     users,
 )
-from bonesinfra.deploys.setup.packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
+from bonesinfra.cli.commands.setup.packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
 from bonesinfra.domain.custom import call_hook
+from bonesinfra.services.linux import fail2ban, firewall, unattended_upgrades
 
 
 def deploy_setup(ctx, custom: ModuleType | None = None):

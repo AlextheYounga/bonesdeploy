@@ -1,4 +1,4 @@
-from bonesinfra.deploys._shared import nginx_safety
+from bonesinfra.cli.commands._shared import nginx_safety
 
 
 def test_validate_config_rejects_conflicting_server_name_warning(monkeypatch):

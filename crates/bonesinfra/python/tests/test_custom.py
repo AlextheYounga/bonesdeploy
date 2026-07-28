@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from bonesinfra.deploys.helpers import plan as helpers_plan
-from bonesinfra.deploys.runtime import plan as runtime_plan
-from bonesinfra.deploys.setup import plan as setup_plan
-from bonesinfra.deploys.ssl import plan as ssl_plan
+from bonesinfra.cli.commands.helpers import plan as helpers_plan
+from bonesinfra.cli.commands.runtime import plan as runtime_plan
+from bonesinfra.cli.commands.setup import plan as setup_plan
+from bonesinfra.cli.commands.ssl import plan as ssl_plan
 from bonesinfra.domain import custom as custom_mod
 from bonesinfra.domain.context import DeployContext
 
@@ -102,7 +102,7 @@ def _stub_setup_plan(monkeypatch, record: list[str]) -> None:
     monkeypatch.setattr(setup_plan, "SUPPLEMENTARY_PACKAGES", [])
     monkeypatch.setattr(setup_plan, "packages", types.SimpleNamespace(install_system=_rec("install_system", record)))
     monkeypatch.setattr(
-        setup_plan, "kernel_hardening", types.SimpleNamespace(configure=_rec("kernel_hardening", record))
+        setup_plan, "disable_algif_aead", types.SimpleNamespace(configure=_rec("disable_algif_aead", record))
     )
     monkeypatch.setattr(
         setup_plan,
@@ -165,7 +165,7 @@ def test_only_invoked_phase_hook_runs(tmp_path, monkeypatch):
         types.SimpleNamespace(setup=_rec("nginx.setup", record), start_services=_rec("nginx.start", record)),
     )
     monkeypatch.setattr(runtime_plan, "template_runtime", types.SimpleNamespace(load=_rec("template_runtime", record)))
-    monkeypatch.setattr(runtime_plan, "get_runtime", _rec("get_runtime", record))
+    monkeypatch.setattr(runtime_plan, "get_framework", _rec("get_framework", record))
 
     _custom(
         tmp_path,

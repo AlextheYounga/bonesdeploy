@@ -38,7 +38,7 @@ def test_default_deny_config_is_default_deny_only():
 
 def test_common_apparmor_profile_uses_configurable_network():
     """AppArmor network rule must come from the template variable, not be hardcoded."""
-    c = _read("runtimes/common/assets/app-profile.j2")
+    c = _read("frameworks/common/assets/app-profile.j2")
     helpers.assert_contains(c, '{{ apparmor_network | default("network unix stream,") }}')
     helpers.assert_not_contains(c, "{{ paths.current }}/** r,")
 
@@ -55,7 +55,7 @@ def test_site_nginx_service_runtime_dir_is_traversable():
 def test_app_service_runtime_dir_stays_private():
     """App runtime dirs stay 0750 — only the per-site nginx (same runtime user)
     needs to reach app sockets, so no world traversal is required."""
-    c = _read("runtimes/common/assets/app.service.j2")
+    c = _read("frameworks/common/assets/app.service.j2")
     helpers.assert_contains(c, "RuntimeDirectoryMode=0750")
 
 

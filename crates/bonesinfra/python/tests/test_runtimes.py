@@ -1,28 +1,28 @@
 import importlib
 from types import SimpleNamespace
 
-from bonesinfra.runtimes import list_runtimes
-from bonesinfra.runtimes.laravel import php_fpm
+from bonesinfra.frameworks import list_frameworks
+from bonesinfra.frameworks.laravel import php_fpm
 
-RUNTIMES_MODULES = {
-    "laravel": "bonesinfra.runtimes.laravel",
-    "django": "bonesinfra.runtimes.django.django",
-    "next": "bonesinfra.runtimes.next.next",
-    "nuxt": "bonesinfra.runtimes.nuxt.nuxt",
-    "rails": "bonesinfra.runtimes.rails.rails",
-    "sveltekit": "bonesinfra.runtimes.sveltekit.svelte",
-    "vue": "bonesinfra.runtimes.vue.vue",
+FRAMEWORKS_MODULES = {
+    "laravel": "bonesinfra.frameworks.laravel",
+    "django": "bonesinfra.frameworks.django.django",
+    "next": "bonesinfra.frameworks.next.next",
+    "nuxt": "bonesinfra.frameworks.nuxt.nuxt",
+    "rails": "bonesinfra.frameworks.rails.rails",
+    "sveltekit": "bonesinfra.frameworks.sveltekit.svelte",
+    "vue": "bonesinfra.frameworks.vue.vue",
 }
 
 
 def test_runtimes_have_deploy():
-    for name, module_path in RUNTIMES_MODULES.items():
+    for name, module_path in FRAMEWORKS_MODULES.items():
         mod = importlib.import_module(module_path)
         assert callable(getattr(mod, "deploy", None)), f"{name}: missing deploy()"
 
 
 def test_runtime_registry_is_explicit():
-    assert list_runtimes() == sorted(RUNTIMES_MODULES)
+    assert list_frameworks() == sorted(FRAMEWORKS_MODULES)
 
 
 def test_laravel_php_fpm_cleans_orphaned_project_pools(monkeypatch):
@@ -42,10 +42,10 @@ def test_laravel_php_fpm_cleans_orphaned_project_pools(monkeypatch):
 
 
 def test_next_declares_uses_tcp():
-    mod = importlib.import_module("bonesinfra.runtimes.next.next")
+    mod = importlib.import_module("bonesinfra.frameworks.next.next")
     assert getattr(mod, "USES_TCP", False) is True
 
 
 def test_nuxt_does_not_declare_uses_tcp():
-    mod = importlib.import_module("bonesinfra.runtimes.nuxt.nuxt")
+    mod = importlib.import_module("bonesinfra.frameworks.nuxt.nuxt")
     assert not hasattr(mod, "USES_TCP")

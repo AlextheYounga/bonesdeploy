@@ -3,14 +3,14 @@ import sys
 
 import typer
 
-from bonesinfra.deploys.dbs.plan import deploy_dbs
-from bonesinfra.deploys.helpers.plan import deploy_helpers
-from bonesinfra.deploys.runtime.plan import deploy_runtime
-from bonesinfra.deploys.setup.plan import deploy_setup
-from bonesinfra.deploys.ssl.plan import deploy_ssl
+from bonesinfra.cli.commands.dbs.plan import deploy_dbs
+from bonesinfra.cli.commands.helpers.plan import deploy_helpers
+from bonesinfra.cli.commands.runtime.plan import deploy_runtime
+from bonesinfra.cli.commands.setup.plan import deploy_setup
+from bonesinfra.cli.commands.ssl.plan import deploy_ssl
 from bonesinfra.domain.context import DeployContext
 from bonesinfra.infra.pyinfra_runner import run
-from bonesinfra.runtimes import list_runtimes
+from bonesinfra.frameworks import list_frameworks
 
 app = typer.Typer()
 runtime_app = typer.Typer()
@@ -33,7 +33,7 @@ def _validate_host(ctx: DeployContext) -> None:
 
 @runtime_app.command("list")
 def runtime_list():
-    print(json.dumps(list_runtimes()))
+    print(json.dumps(list_frameworks()))
 
 
 @runtime_app.command("apply")

@@ -1,8 +1,8 @@
 import pytest
 
-from bonesinfra.deploys.runtime import nginx as runtime_nginx
+from bonesinfra.cli.commands.runtime import host_nginx as runtime_nginx
 from bonesinfra.domain.context import DeployContext
-from bonesinfra.runtimes.common import nginx as common_nginx
+from bonesinfra.frameworks.common import nginx as common_nginx
 
 
 def _make_ctx(tmp_path, *, domain: str = "", preview_domain: str = "preview.example.com"):

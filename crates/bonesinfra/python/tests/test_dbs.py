@@ -1,7 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from bonesinfra.deploys.dbs import services
+from bonesinfra.services.runtime import catalog as services
 
 
 def _ctx(service_names):
