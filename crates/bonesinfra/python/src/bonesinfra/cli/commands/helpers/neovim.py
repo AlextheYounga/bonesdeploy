@@ -1,6 +1,6 @@
 from pyinfra.operations import files, server
 
-from bonesinfra.domain.paths import ASSETS_DIR, SCRIPTS_DIR
+from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
 
 NVIM_CONFIG_DIR = "/etc/xdg/nvim"
 INSTALL_SCRIPT = "/usr/local/lib/bonesinfra/install-neovim.sh"

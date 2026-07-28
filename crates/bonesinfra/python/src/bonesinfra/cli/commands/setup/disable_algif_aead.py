@@ -1,6 +1,6 @@
 from pyinfra.operations import server
 
-from bonesinfra.domain.paths import ASSETS_DIR
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.infra.operations import render
 
 DISABLE_ALGIF_PATH = "/etc/modprobe.d/disable-algif.conf"

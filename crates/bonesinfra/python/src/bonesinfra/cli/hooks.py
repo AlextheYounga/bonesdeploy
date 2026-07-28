@@ -18,7 +18,7 @@ from types import ModuleType
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from bonesinfra.domain.context import DeployContext
+    from bonesinfra.config.context import DeployContext
 
 HOOK_NAMES = ("after_setup", "after_runtime", "after_ssl")
 

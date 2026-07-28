@@ -1,6 +1,6 @@
 from pyinfra.operations import files, server
 
-from bonesinfra.domain.paths import ASSETS_DIR
+from bonesinfra.config.paths import ASSETS_DIR
 
 STARSHIP_BIN = "/usr/local/bin/starship"
 STARSHIP_CONFIG = "/etc/starship.toml"

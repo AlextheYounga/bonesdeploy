@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from bonesinfra.domain.context import DeployContext, template_data
+from bonesinfra.config.context import DeployContext, template_data
 
 
 def _write_config(tmp_path: Path, extra: str = "") -> Path:

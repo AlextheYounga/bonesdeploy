@@ -2,8 +2,8 @@ from pathlib import Path
 
 from pyinfra.operations import files
 
-from bonesinfra.domain.context import template_data
-from bonesinfra.frameworks.common import validation
+from bonesinfra.config.context import template_data
+from bonesinfra.frameworks.common import php_fpm_pool, validation
 
 
 def _ensure_runtime_socket_dir(ctx, paths):
@@ -65,5 +65,25 @@ def render_static(ctx, *, paths, root="dist"):
     validation.run_as_runtime_user(
         ctx,
         "Validate nginx configuration with static config",
+        f"nginx -t -c {paths['site_nginx_config']}",
+    )
+
+
+def render_php_fpm(ctx, *, paths, template_src, php_fpm_socket_path):
+    files.template(
+        name="Deploy PHP framework per-site nginx config",
+        src=str(template_src),
+        dest=paths["site_nginx_config"],
+        user="root",
+        group=ctx.runtime.runtime_group,
+        mode="0640",
+        laravel_php_fpm_socket_path=php_fpm_socket_path,
+        **template_data(ctx, paths=paths),
+        _sudo=True,
+    )
+    _ensure_runtime_socket_dir(ctx, paths)
+    validation.run_as_runtime_user(
+        ctx,
+        "Validate nginx configuration with PHP config",
         f"nginx -t -c {paths['site_nginx_config']}",
     )

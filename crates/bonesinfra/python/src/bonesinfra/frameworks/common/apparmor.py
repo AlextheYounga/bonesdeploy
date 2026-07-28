@@ -2,7 +2,7 @@ from pathlib import Path
 
 from pyinfra.operations import files, server
 
-from bonesinfra.domain.context import template_data
+from bonesinfra.config.context import template_data
 
 
 def render_app_profile(  # noqa: PLR0913

@@ -1,6 +1,6 @@
 from pyinfra.operations import apt, server
 
-from bonesinfra.domain.paths import SCRIPTS_DIR
+from bonesinfra.config.paths import SCRIPTS_DIR
 
 HELPER_APT_PACKAGES: list[str] = [
     "age",

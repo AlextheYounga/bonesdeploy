@@ -11,7 +11,7 @@ from bonesinfra.cli.commands.setup import (
     users,
 )
 from bonesinfra.cli.commands.setup.packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
-from bonesinfra.domain.custom import call_hook
+from bonesinfra.cli.hooks import call_hook
 from bonesinfra.services.linux import fail2ban, firewall, unattended_upgrades
 
 

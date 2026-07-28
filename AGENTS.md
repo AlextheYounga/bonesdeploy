@@ -43,7 +43,7 @@ Testing:
 - Test observable behavior rather than private implementation details.
 - Trivial declarations and delegation do not need dedicated tests.
 
-Never cut corners on validation at trust boundaries, correct terminology, security, authorization, accessibility, data integrity, concurrency, or error handling that prevents data loss. Be lazy about unnecessary code, not about correctness.
+Never cut corners on validation at trust boundaries, clarity, correct terminology, security, authorization, accessibility, data integrity, concurrency, or error handling that prevents data loss. Be lazy about unnecessary code, not about correctness.
 
 When you are done working, please run and address all warnings/errors:
 - `cargo clippy`

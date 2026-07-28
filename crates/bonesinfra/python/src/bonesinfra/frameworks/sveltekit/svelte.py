@@ -3,7 +3,7 @@ from shlex import quote
 
 from pyinfra.operations import server
 
-from bonesinfra.domain.context import template_data
+from bonesinfra.config.context import template_data
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import node, validation
 from bonesinfra.infra.operations import render

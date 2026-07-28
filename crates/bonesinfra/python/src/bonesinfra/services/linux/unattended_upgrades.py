@@ -1,4 +1,4 @@
-from bonesinfra.domain.paths import ASSETS_DIR
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.infra.operations import render
 
 AUTO_UPGRADES_PATH = "/etc/apt/apt.conf.d/20auto-upgrades"

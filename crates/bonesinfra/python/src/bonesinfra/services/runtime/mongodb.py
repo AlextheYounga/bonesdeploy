@@ -1,6 +1,6 @@
 from pyinfra.operations import apt, server, systemd
 
-from bonesinfra.domain.paths import SCRIPTS_DIR
+from bonesinfra.config.paths import SCRIPTS_DIR
 from bonesinfra.services.runtime.base import RuntimeService
 
 

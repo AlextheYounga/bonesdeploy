@@ -11,8 +11,8 @@ from bonesinfra.cli.commands.helpers import plan as helpers_plan
 from bonesinfra.cli.commands.runtime import plan as runtime_plan
 from bonesinfra.cli.commands.setup import plan as setup_plan
 from bonesinfra.cli.commands.ssl import plan as ssl_plan
-from bonesinfra.domain import custom as custom_mod
-from bonesinfra.domain.context import DeployContext
+from bonesinfra.cli import hooks as custom_mod
+from bonesinfra.config.context import DeployContext
 
 
 def _write_config(tmp: Path) -> Path:
@@ -185,9 +185,13 @@ def test_missing_hook_is_noop_in_ssl_plan(tmp_path, monkeypatch):
     record: list[str] = []
     monkeypatch.setattr(ssl_plan, "mkdir", _rec("mkdir", record))
     monkeypatch.setattr(
-        ssl_plan, "nginx_safety", types.SimpleNamespace(install_default_deny_server=_rec("default_deny", record))
+        ssl_plan,
+        "nginx_router",
+        types.SimpleNamespace(
+            install_default_deny_server=_rec("default_deny", record),
+            render_router_config=_rec("render", record),
+        ),
     )
-    monkeypatch.setattr(ssl_plan, "_render_router_config", _rec("render", record))
     monkeypatch.setattr(ssl_plan, "obtain_certificate", _rec("obtain", record))
 
     _custom(tmp_path, "# no hooks defined\n")

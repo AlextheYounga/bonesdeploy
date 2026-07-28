@@ -2,8 +2,8 @@ from shlex import quote
 
 from pyinfra.operations import files, server
 
-from bonesinfra.domain.context import DEPLOY_USER
-from bonesinfra.domain.paths import ASSETS_DIR, SCRIPTS_DIR
+from bonesinfra.config.context import DEPLOY_USER
+from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
 from bonesinfra.infra.operations import mkdir
 
 

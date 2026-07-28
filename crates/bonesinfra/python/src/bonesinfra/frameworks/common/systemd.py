@@ -4,8 +4,8 @@ from shlex import quote
 
 from pyinfra.operations import files, server, systemd
 
-from bonesinfra.domain.context import template_data
-from bonesinfra.domain.paths import ETC_SYSTEMD_SYSTEM
+from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ETC_SYSTEMD_SYSTEM
 from bonesinfra.frameworks.common import validation
 
 SERVICE_NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")

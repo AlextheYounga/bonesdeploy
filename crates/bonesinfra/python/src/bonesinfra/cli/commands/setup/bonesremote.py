@@ -1,6 +1,6 @@
 from pyinfra.operations import server
 
-from bonesinfra.domain.paths import BONESDEPLOY_REPO
+from bonesinfra.config.paths import BONESDEPLOY_REPO
 
 
 def install():

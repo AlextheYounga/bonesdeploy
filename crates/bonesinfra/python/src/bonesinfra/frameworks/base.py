@@ -2,13 +2,14 @@ from pathlib import Path
 
 from pyinfra.operations import files, server
 
-from bonesinfra.domain.context import template_data
-from bonesinfra.domain.paths import ASSETS_DIR, SCRIPTS_DIR
-from bonesinfra.frameworks.common import apparmor, logs, nginx, php_fpm_pool
+from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
+from bonesinfra.frameworks.common import apparmor, logs, php_fpm_pool
 from bonesinfra.frameworks.common import paths as common_paths
 from bonesinfra.frameworks.common import systemd as service
 from bonesinfra.frameworks.common import validation
 from bonesinfra.infra.operations import mkdir, render
+from bonesinfra.nginx import site as nginx_site
 
 
 class Framework:
@@ -25,7 +26,7 @@ class StaticFramework(Framework):
         paths = service.runtime_paths(ctx)
         common_paths.ensure_runtime_dirs(ctx)
         self._seed_static_placeholder(ctx, paths)
-        nginx.render_static(ctx, paths=paths, root=self.static_root)
+        nginx_site.render_static(ctx, paths=paths, root=self.static_root)
 
     def _seed_static_placeholder(self, ctx, paths):
         static_web_root = f"{paths['placeholder_release']}/{self.static_root}"
@@ -104,7 +105,7 @@ class ServerFramework(Framework):
             mode="0640",
             **template_data(ctx, paths=paths),
         )
-        nginx.render_static(ctx, paths=paths, root=self.static_root)
+        nginx_site.render_static(ctx, paths=paths, root=self.static_root)
 
     def _deploy_as_server(self, ctx):
         paths = service.runtime_paths(ctx)
@@ -140,9 +141,9 @@ class ServerFramework(Framework):
 
         if self.uses_tcp:
             port = ctx.runtime.data.get("internal_port", self.default_port)
-            nginx.render_proxy(ctx, paths=paths, port=port)
+            nginx_site.render_proxy(ctx, paths=paths, port=port)
         else:
-            nginx.render_proxy(ctx, paths=paths, socket_path=self.socket_path(paths))
+            nginx_site.render_proxy(ctx, paths=paths, socket_path=self.socket_path(paths))
 
         service.enable_and_start(ctx, self.service_name, apparmor_profile_name=profile_name)
 
@@ -175,19 +176,9 @@ class PHPFramework(Framework):
         php_fpm_pool.validate_php_fpm(php_version)
         php_fpm_pool.reload_php_fpm(php_version)
 
-        files.template(
-            name="Deploy PHP framework per-site nginx config",
-            src=str(self.assets_dir / self.nginx_template),
-            dest=paths["site_nginx_config"],
-            user="root",
-            group=ctx.runtime.runtime_group,
-            mode="0640",
-            laravel_php_fpm_socket_path=php_fpm_pool.socket_path(project, php_version),
-            **template_data(ctx, paths=paths),
-            _sudo=True,
-        )
-        validation.run_as_runtime_user(
+        nginx_site.render_php_fpm(
             ctx,
-            "Validate nginx configuration with PHP config",
-            f"nginx -t -c {paths['site_nginx_config']}",
+            paths=paths,
+            template_src=self.assets_dir / self.nginx_template,
+            php_fpm_socket_path=php_fpm_pool.socket_path(project, php_version),
         )

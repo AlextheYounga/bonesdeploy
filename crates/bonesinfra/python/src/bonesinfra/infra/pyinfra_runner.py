@@ -10,8 +10,8 @@ from pyinfra.api.exceptions import PyinfraError
 from pyinfra.api.operations import run_ops
 from pyinfra.context import ctx_config, ctx_host, ctx_inventory, ctx_state
 
-from bonesinfra.domain.context import DeployContext
-from bonesinfra.domain.custom import load_custom_module
+from bonesinfra.config.context import DeployContext
+from bonesinfra.cli.hooks import load_custom_module
 from bonesinfra.infra.output import (
     BonesDeployCallback,
     activity,

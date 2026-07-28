@@ -1,7 +1,7 @@
 from pyinfra.operations import server, systemd
 
-from bonesinfra.domain.context import template_data
-from bonesinfra.domain.paths import ASSETS_DIR
+from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.infra.operations import render
 
 

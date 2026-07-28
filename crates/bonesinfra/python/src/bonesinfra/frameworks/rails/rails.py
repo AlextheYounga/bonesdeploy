@@ -3,7 +3,7 @@ from shlex import quote
 
 from pyinfra.operations import server
 
-from bonesinfra.domain.context import template_data
+from bonesinfra.config.context import template_data
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import validation
 from bonesinfra.frameworks.rails import ruby_packages

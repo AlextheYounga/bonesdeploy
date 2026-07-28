@@ -1,6 +1,6 @@
 from pyinfra.operations import files, server, systemd
 
-from bonesinfra.domain.context import template_data
+from bonesinfra.config.context import template_data
 from bonesinfra.frameworks.common import logs
 
 PHP_FPM_SOCKET_PARENT = "/run/php"

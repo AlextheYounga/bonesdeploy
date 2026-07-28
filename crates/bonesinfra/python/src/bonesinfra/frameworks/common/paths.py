@@ -1,6 +1,6 @@
 from pyinfra.operations import files
 
-from bonesinfra.domain.paths import RUNTIME_SOCKET_PARENT
+from bonesinfra.config.paths import RUNTIME_SOCKET_PARENT
 
 
 def ensure_runtime_dirs(ctx):

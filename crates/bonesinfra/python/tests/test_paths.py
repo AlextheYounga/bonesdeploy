@@ -1,6 +1,6 @@
 """Deployment paths should match the v1 host layout."""
 
-from bonesinfra.domain.paths import DeploymentPaths
+from bonesinfra.config.paths import DeploymentPaths
 
 
 def test_paths_default_repo_parent_is_srv_git():

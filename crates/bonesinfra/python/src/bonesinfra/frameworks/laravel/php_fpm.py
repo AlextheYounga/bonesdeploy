@@ -1,6 +1,6 @@
 from pyinfra.operations import server
 
-from bonesinfra.domain.paths import SCRIPTS_DIR
+from bonesinfra.config.paths import SCRIPTS_DIR
 from bonesinfra.frameworks.common import php_fpm_pool
 
 

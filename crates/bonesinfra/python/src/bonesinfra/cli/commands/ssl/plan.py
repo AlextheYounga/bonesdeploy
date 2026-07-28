@@ -1,12 +1,10 @@
 from types import ModuleType
 
-from pyinfra.operations import server, systemd
+from pyinfra.operations import server
 
-from bonesinfra.cli.commands._shared import nginx_safety
-from bonesinfra.domain.context import template_data
-from bonesinfra.domain.custom import call_hook
-from bonesinfra.domain.paths import ASSETS_DIR
-from bonesinfra.infra.operations import letsencrypt_cert_paths, mkdir, render
+from bonesinfra.cli.hooks import call_hook
+from bonesinfra.infra.operations import mkdir
+from bonesinfra.nginx import router as nginx_router
 
 
 def deploy_ssl(ctx, custom: ModuleType | None = None):
@@ -18,43 +16,12 @@ def deploy_ssl(ctx, custom: ModuleType | None = None):
         mode="0755",
     )
 
-    nginx_safety.install_default_deny_server(paths)
-    _render_router_config(ctx, paths, ssl_enabled=False, stage="certbot challenge")
+    nginx_router.install_default_deny_server(paths)
+    nginx_router.render_router_config(ctx, paths, ssl_enabled=False, stage="certbot challenge", validate=True, reload=True)
     obtain_certificate(ctx, paths)
-    _render_router_config(ctx, paths, ssl_enabled=True, stage="SSL enable")
+    nginx_router.render_router_config(ctx, paths, ssl_enabled=True, stage="SSL enable", validate=True, reload=True)
 
     call_hook(custom, "after_ssl", ctx)
-
-
-def _render_router_config(ctx, paths, ssl_enabled, stage):
-    nginx_server_name = ctx.app.dns.domain
-
-    extra = {
-        "nginx_server_name": nginx_server_name,
-        "nginx_ssl_enabled": ssl_enabled,
-    }
-    if ssl_enabled:
-        cert_path, key_path = letsencrypt_cert_paths(nginx_server_name)
-        extra["nginx_ssl_certificate_path"] = cert_path
-        extra["nginx_ssl_certificate_key_path"] = key_path
-
-    render(
-        f"Render nginx config ({stage})",
-        ASSETS_DIR / "nginx/router.conf.j2",
-        paths["nginx_site_available"],
-        mode="0644",
-        **extra,
-        **template_data(ctx, paths=paths),
-    )
-
-    nginx_safety.validate_config(f"Validate nginx configuration ({stage})")
-
-    systemd.service(
-        name=f"Reload nginx ({stage})",
-        service="nginx",
-        reloaded=True,
-        _sudo=True,
-    )
 
 
 def obtain_certificate(ctx, paths):
