@@ -1,9 +1,9 @@
-from pathlib import Path
 from shlex import quote
 
 from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import node, validation
 from bonesinfra.pyinfra.operations import render
@@ -37,7 +37,7 @@ class SvelteKitFramework(ServerFramework):
     def seed_placeholder(self, ctx, paths):
         render(
             "Seed placeholder SvelteKit build entrypoint",
-            Path(__file__).parent / "assets/placeholder-index.js.j2",
+            ASSETS_DIR / "sveltekit/placeholder-index.js.j2",
             f"{paths['placeholder_release']}/build",
             user="root",
             group=ctx.runtime.runtime_group,

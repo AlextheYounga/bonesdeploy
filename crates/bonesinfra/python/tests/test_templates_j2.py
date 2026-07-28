@@ -55,7 +55,7 @@ def test_site_nginx_service_runtime_dir_is_traversable():
 def test_app_service_runtime_dir_stays_private():
     """App runtime dirs stay 0750 — only the per-site nginx (same runtime user)
     needs to reach app sockets, so no world traversal is required."""
-    c = _read("frameworks/common/assets/app.service.j2")
+    c = _read("assets/systemd/app.service.j2")
     helpers.assert_contains(c, "RuntimeDirectoryMode=0750")
 
 

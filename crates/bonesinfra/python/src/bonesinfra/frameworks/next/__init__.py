@@ -1,6 +1,5 @@
-from pathlib import Path
-
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import node, validation
 from bonesinfra.pyinfra.operations import mkdir, render
@@ -44,7 +43,7 @@ class NextFramework(ServerFramework):
         )
         render(
             "Seed placeholder Next.js standalone server",
-            Path(__file__).parent / "assets/placeholder-server.js.j2",
+            ASSETS_DIR / "next/placeholder-server.js.j2",
             f"{server_dir}/server.js",
             user="root",
             group=ctx.runtime.runtime_group,

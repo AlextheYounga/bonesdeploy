@@ -5,13 +5,13 @@ from bonesinfra.frameworks import list_frameworks
 from bonesinfra.frameworks.laravel import php_fpm
 
 FRAMEWORKS_MODULES = {
-    "laravel": "bonesinfra.frameworks.laravel.deploy",
-    "django": "bonesinfra.frameworks.django.django",
-    "next": "bonesinfra.frameworks.next.next",
-    "nuxt": "bonesinfra.frameworks.nuxt.nuxt",
-    "rails": "bonesinfra.frameworks.rails.rails",
-    "sveltekit": "bonesinfra.frameworks.sveltekit.svelte",
-    "vue": "bonesinfra.frameworks.vue.vue",
+    "laravel": "bonesinfra.frameworks.laravel",
+    "django": "bonesinfra.frameworks.django",
+    "next": "bonesinfra.frameworks.next",
+    "nuxt": "bonesinfra.frameworks.nuxt",
+    "rails": "bonesinfra.frameworks.rails",
+    "sveltekit": "bonesinfra.frameworks.sveltekit",
+    "vue": "bonesinfra.frameworks.vue",
 }
 
 
@@ -44,10 +44,10 @@ def test_laravel_php_fpm_cleans_orphaned_project_pools(monkeypatch):
 
 
 def test_next_declares_uses_tcp():
-    mod = importlib.import_module("bonesinfra.frameworks.next.next")
+    mod = importlib.import_module("bonesinfra.frameworks.next")
     assert mod.FRAMEWORK.uses_tcp is True
 
 
 def test_nuxt_does_not_declare_uses_tcp():
-    mod = importlib.import_module("bonesinfra.frameworks.nuxt.nuxt")
+    mod = importlib.import_module("bonesinfra.frameworks.nuxt")
     assert mod.FRAMEWORK.uses_tcp is False

@@ -5,7 +5,7 @@ from shlex import quote
 from pyinfra.operations import files, server, systemd
 
 from bonesinfra.config.context import template_data
-from bonesinfra.config.paths import ETC_SYSTEMD_SYSTEM
+from bonesinfra.config.paths import ASSETS_DIR, ETC_SYSTEMD_SYSTEM
 from bonesinfra.frameworks.common import validation
 
 SERVICE_NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")
@@ -17,10 +17,9 @@ def runtime_paths(ctx):
 
 def render_target(ctx, *, paths):
     """Install the root-owned systemd lifecycle target for this site."""
-    here = Path(__file__).parent
     files.template(
         name="Deploy site systemd target",
-        src=str(here / "assets/site.target.j2"),
+        src=str(ASSETS_DIR / "systemd/site.target.j2"),
         dest=paths["systemd_site_target"],
         user="root",
         group="root",
@@ -80,11 +79,10 @@ def render_app_service(  # noqa: PLR0913
     runtime_write_paths,
     runtime_address_families="AF_UNIX",
 ):
-    here = Path(__file__).parent
     project = ctx.app.project_name
     files.template(
         name=f"Deploy {name} systemd service",
-        src=str(here / "assets/app.service.j2"),
+        src=str(ASSETS_DIR / "systemd/app.service.j2"),
         dest=f"/etc/systemd/system/{project}-{name}.service",
         user="root",
         group="root",

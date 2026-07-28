@@ -1,9 +1,9 @@
-from pathlib import Path
 from shlex import quote
 
 from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import validation
 from bonesinfra.frameworks.django import python_packages
@@ -55,7 +55,7 @@ class DjangoFramework(ServerFramework):
         )
         render(
             "Seed placeholder WSGI application",
-            Path(__file__).parent / "assets/placeholder-wsgi.py.j2",
+            ASSETS_DIR / "django/placeholder-wsgi.py.j2",
             f"{placeholder}/config/wsgi.py",
             user="root",
             group=ctx.runtime.runtime_group,

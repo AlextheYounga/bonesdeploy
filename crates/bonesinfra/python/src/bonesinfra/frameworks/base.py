@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from pyinfra.operations import files, server
 
 from bonesinfra.config.context import template_data
@@ -150,7 +148,6 @@ class ServerFramework(Framework):
 
 
 class PHPFramework(Framework):
-    assets_dir: Path
     nginx_template: str
 
     def php_version(self, ctx) -> str:
@@ -173,13 +170,13 @@ class PHPFramework(Framework):
             current_pool=php_fpm_pool.pool_config_path(project, php_version),
             _sudo=True,
         )
-        php_fpm_pool.render_pool(ctx, here=self.assets_dir, paths=paths, php_version=php_version)
+        php_fpm_pool.render_pool(ctx, paths=paths, php_version=php_version)
         php_fpm_pool.validate_php_fpm(php_version)
         php_fpm_pool.reload_php_fpm(php_version)
 
         nginx_site.render_php_fpm(
             ctx,
             paths=paths,
-            template_src=self.assets_dir / self.nginx_template,
+            template_src=ASSETS_DIR / self.nginx_template,
             php_fpm_socket_path=php_fpm_pool.socket_path(project, php_version),
         )

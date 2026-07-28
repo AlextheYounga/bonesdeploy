@@ -1,6 +1,5 @@
-from pathlib import Path
-
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import node
 from bonesinfra.pyinfra.operations import mkdir, render
@@ -32,7 +31,7 @@ class NuxtFramework(ServerFramework):
         )
         render(
             "Seed placeholder Nuxt nitro server",
-            Path(__file__).parent / "assets/placeholder-server.mjs.j2",
+            ASSETS_DIR / "nuxt/placeholder-server.mjs.j2",
             f"{server_dir}/index.mjs",
             user="root",
             group=ctx.runtime.runtime_group,

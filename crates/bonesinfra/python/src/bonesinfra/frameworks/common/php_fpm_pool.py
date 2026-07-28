@@ -1,6 +1,7 @@
 from pyinfra.operations import files, server, systemd
 
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.common import logs
 
 PHP_FPM_SOCKET_PARENT = "/run/php"
@@ -18,11 +19,11 @@ def ensure_log_dir(ctx):
     logs.ensure(ctx)
 
 
-def render_pool(ctx, *, here, paths, php_version):
+def render_pool(ctx, *, paths, php_version):
     project = ctx.app.project_name
     files.template(
         name="Deploy Laravel PHP-FPM pool config",
-        src=str(here / "assets/php/php-fpm-pool.conf.j2"),
+        src=str(ASSETS_DIR / "php/php-fpm-pool.conf.j2"),
         dest=pool_config_path(project, php_version),
         user="root",
         group="root",

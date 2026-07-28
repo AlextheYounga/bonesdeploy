@@ -1,9 +1,9 @@
-from pathlib import Path
 from shlex import quote
 
 from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import validation
 from bonesinfra.frameworks.rails import ruby_packages
@@ -43,7 +43,7 @@ class RailsFramework(ServerFramework):
         placeholder = paths["placeholder_release"]
         render(
             "Seed placeholder Gemfile",
-            Path(__file__).parent / "assets/placeholder-Gemfile.j2",
+            ASSETS_DIR / "rails/placeholder-Gemfile.j2",
             f"{placeholder}/Gemfile",
             user="root",
             group=ctx.runtime.runtime_group,
@@ -57,7 +57,7 @@ class RailsFramework(ServerFramework):
         )
         render(
             "Seed placeholder Rack config",
-            Path(__file__).parent / "assets/placeholder-config.ru.j2",
+            ASSETS_DIR / "rails/placeholder-config.ru.j2",
             f"{placeholder}/config.ru",
             user="root",
             group=ctx.runtime.runtime_group,
