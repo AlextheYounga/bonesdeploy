@@ -16,6 +16,8 @@ SERVICES = {
     "valkey": VALKEY_SERVICE,
 }
 
+__all__ = ["get_service"]
+
 
 def get_service(name):
     svc = SERVICES.get(name)

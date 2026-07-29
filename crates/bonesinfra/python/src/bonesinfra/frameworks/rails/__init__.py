@@ -6,7 +6,7 @@ from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import validation
-from bonesinfra.frameworks.rails import ruby_packages
+from bonesinfra.services.languages import RUBY
 from bonesinfra.pyinfra.operations import render
 
 
@@ -15,10 +15,10 @@ class RailsFramework(ServerFramework):
     runtime_label = "Puma"
 
     def install_packages(self, _ctx):
-        ruby_packages.install_packages()
+        self.ruby_binary = RUBY.install(_ctx)
 
     def apparmor_exec_paths(self, _ctx, _paths):
-        return ["/usr/bin/ruby*", "/usr/bin/bundle*"]
+        return [self.ruby_binary, "/usr/bin/bundle*"]
 
     def writable_paths(self, _ctx, paths):
         return [
@@ -30,13 +30,13 @@ class RailsFramework(ServerFramework):
     def exec_command(self, ctx, paths):
         rails_env = ctx.runtime.data.get("rails_env", "production")
         socket = self.socket_path(paths)
-        return f"/usr/bin/env RAILS_ENV={rails_env} bundle exec puma -e {rails_env} -b unix://{socket}"
+        return f"/usr/bin/env RAILS_ENV={rails_env} {self.ruby_binary} -S bundle exec puma -e {rails_env} -b unix://{socket}"
 
     def validate(self, ctx, paths):
         validation.run_as_runtime_user(
             ctx,
             "Validate Puma availability as runtime user",
-            f"cd {quote(paths['current'])} && bundle exec puma --help >/dev/null",
+            f"cd {quote(paths['current'])} && {self.ruby_binary} -S bundle exec puma --help >/dev/null",
         )
 
     def seed_placeholder(self, ctx, paths):
@@ -52,7 +52,7 @@ class RailsFramework(ServerFramework):
         )
         server.shell(
             name="Install placeholder gems",
-            commands=[f"cd {quote(placeholder)} && bundle install"],
+            commands=[f"cd {quote(placeholder)} && {self.ruby_binary} -S bundle install"],
             _sudo=True,
         )
         render(

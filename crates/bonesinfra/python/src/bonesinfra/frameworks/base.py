@@ -2,10 +2,13 @@ from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
-from bonesinfra.frameworks.common import logs, paths as common_paths, php_fpm_pool, systemd as service
+from bonesinfra.frameworks.common import paths as common_paths
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.linux.apparmor import app as apparmor
 from bonesinfra.services.linux.nginx import site as nginx_site
+from bonesinfra.services.linux import systemd as service
+from bonesinfra.frameworks.common import logs
+from bonesinfra.services.runtime import php_fpm
 
 
 class Framework:
@@ -151,7 +154,9 @@ class PHPFramework(Framework):
         return ctx.runtime.data.get("php_version", "8.5")
 
     def install_packages(self, ctx):
-        pass
+        from bonesinfra.services.languages import PHP
+
+        PHP.install(ctx)
 
     def deploy(self, ctx):
         php_version = self.php_version(ctx)
@@ -159,21 +164,21 @@ class PHPFramework(Framework):
         project = ctx.app.project_name
 
         self.install_packages(ctx)
-        php_fpm_pool.ensure_log_dir(ctx)
+        php_fpm.PHP_FPM_SERVICE.ensure_log_dir(ctx)
         server.script_template(
             name="Remove orphaned PHP-FPM pools from other PHP versions",
             src=str(SCRIPTS_DIR / "cleanup-orphaned-php-pools.sh.j2"),
             project=project,
-            current_pool=php_fpm_pool.pool_config_path(project, php_version),
+            current_pool=php_fpm.PHP_FPM_SERVICE.pool_config_path(project, php_version),
             _sudo=True,
         )
-        php_fpm_pool.render_pool(ctx, paths=paths, php_version=php_version)
-        php_fpm_pool.validate_php_fpm(php_version)
-        php_fpm_pool.reload_php_fpm(php_version)
+        php_fpm.PHP_FPM_SERVICE.render_pool(ctx, paths=paths, php_version=php_version)
+        php_fpm.PHP_FPM_SERVICE.validate_php_fpm(php_version)
+        php_fpm.PHP_FPM_SERVICE.reload_php_fpm(php_version)
 
         nginx_site.render_php_fpm(
             ctx,
             paths=paths,
             template_src=ASSETS_DIR / self.nginx_template,
-            php_fpm_socket_path=php_fpm_pool.socket_path(project, php_version),
+            php_fpm_socket_path=php_fpm.PHP_FPM_SERVICE.socket_path(project, php_version),
         )

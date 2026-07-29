@@ -4,7 +4,7 @@ from pyinfra.operations import files, server, systemd
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
-from bonesinfra.frameworks.common import systemd as service
+from bonesinfra.services.linux import systemd as service
 from bonesinfra.pyinfra.operations import letsencrypt_cert_paths, mkdir, render
 
 

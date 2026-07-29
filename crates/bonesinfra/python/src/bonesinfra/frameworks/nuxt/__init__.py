@@ -2,7 +2,7 @@ from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.pyinfra.operations import mkdir, render
-from bonesinfra.services.runtime import node
+from bonesinfra.services.languages import NODE
 
 
 class NuxtFramework(ServerFramework):
@@ -11,7 +11,7 @@ class NuxtFramework(ServerFramework):
     static_root = ".output/public"
 
     def install_packages(self, ctx):
-        self.node_binary = node.install(ctx)
+        self.node_binary = NODE.install(ctx)
 
     def apparmor_exec_paths(self, _ctx, _paths):
         return [self.node_binary]

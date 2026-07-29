@@ -3,7 +3,7 @@ from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import validation
 from bonesinfra.pyinfra.operations import mkdir, render
-from bonesinfra.services.runtime import node
+from bonesinfra.services.languages import NODE
 
 
 class NextFramework(ServerFramework):
@@ -14,7 +14,7 @@ class NextFramework(ServerFramework):
     static_root = "out"
 
     def install_packages(self, ctx):
-        self.node_binary = node.install(ctx)
+        self.node_binary = NODE.install(ctx)
 
     def apparmor_exec_paths(self, _ctx, _paths):
         return [self.node_binary]

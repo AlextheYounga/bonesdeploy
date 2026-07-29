@@ -1,8 +1,8 @@
-[{{ laravel_php_fpm_pool_name }}]
+[{{ php_fpm_pool_name }}]
 user = {{ runtime_user }}
 group = {{ runtime_group }}
 
-listen = {{ laravel_php_fpm_socket_path }}
+listen = {{ php_fpm_socket_path }}
 listen.owner = {{ runtime_user }}
 listen.group = {{ runtime_group }}
 listen.mode = 0660

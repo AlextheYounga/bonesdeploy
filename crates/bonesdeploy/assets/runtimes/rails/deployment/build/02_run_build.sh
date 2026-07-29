@@ -13,6 +13,10 @@ skip_unless_rails_project() {
 
 install_system_packages() {
 	log "Installing Ruby and native build packages..."
+	local ruby_version="${RUBY_VERSION:-}"
+	if [ -z "$ruby_version" ]; then
+		die "RUBY_VERSION must be set in bones.toml"
+	fi
 	export DEBIAN_FRONTEND=noninteractive
 	apt-get update
 	apt-get install -y --no-install-recommends \
@@ -25,8 +29,9 @@ install_system_packages() {
 		libssl-dev \
 		libyaml-dev \
 		pkg-config \
+		"ruby${ruby_version}" \
+		"ruby${ruby_version}-dev" \
 		ruby-bundler \
-		ruby-full \
 		zlib1g-dev
 }
 
