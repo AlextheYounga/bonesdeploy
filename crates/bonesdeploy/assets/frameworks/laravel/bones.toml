@@ -1,10 +1,10 @@
-[runtime]
+[framework]
 template = "laravel"
 web_root = "public"
 node_version = "24.18.0"
 php_version = "8.5"
 
-[runtime.permissions]
+[framework.permissions]
 paths = [
   { path = "*", type = "dir", mode = "750" },
   { path = "*", type = "file", mode = "640" },
@@ -14,7 +14,7 @@ paths = [
   { path = "database/database.sqlite", type = "file", mode = "660", recursive = false },
 ]
 
-[runtime.shared]
+[framework.shared]
 paths = [
   { path = "storage", type = "dir" },
   { path = ".env", type = "file" },

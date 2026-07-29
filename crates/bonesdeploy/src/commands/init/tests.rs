@@ -84,8 +84,8 @@ fn init_args() -> Args {
         host: Some(String::from("deploy.example.com")),
         port: None,
         template: None,
-        runtime_vars: Vec::new(),
-        dbs: Vec::new(),
+        framework_vars: Vec::new(),
+        services: Vec::new(),
     }
 }
 
@@ -130,7 +130,7 @@ fn materializes_base_bones_assets() -> Result<()> {
         assert!(deploy_dir.is_dir());
         assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
         let bones_toml = fs::read_to_string(bones_dir.join("bones.toml"))?;
-        assert!(bones_toml.contains("[runtime]"));
+        assert!(bones_toml.contains("[framework]"));
 
         let env_build = repo_dir.join(".env.build");
         assert!(env_build.is_file(), ".env.build should be created");

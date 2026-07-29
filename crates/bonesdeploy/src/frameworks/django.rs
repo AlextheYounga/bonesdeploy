@@ -1,5 +1,5 @@
 use super::{Question, QuestionKind};
-use shared::config::Runtime;
+use shared::config::Framework;
 
 const DEFAULT_PYTHON_VERSION: &str = "3.14";
 
@@ -26,8 +26,8 @@ pub(crate) fn environment_example(project_name: &str, _site_url: &str) -> String
     ])
 }
 
-pub(crate) fn build_environment_example(runtime: &Runtime) -> String {
+pub(crate) fn build_environment_example(framework: &Framework) -> String {
     let python_version =
-        runtime.extra.get("python_version").and_then(|value| value.as_str()).unwrap_or(DEFAULT_PYTHON_VERSION);
+        framework.extra.get("python_version").and_then(|value| value.as_str()).unwrap_or(DEFAULT_PYTHON_VERSION);
     super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("PYTHON_VERSION={python_version}")])
 }

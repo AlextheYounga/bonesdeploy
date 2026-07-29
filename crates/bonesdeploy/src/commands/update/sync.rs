@@ -26,24 +26,28 @@ fn sync_kit_deployment_functions(source_dir: &Path, bones_dir: &Path) -> Result<
 
 fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> Result<PathBuf> {
     let bones_toml = bones_dir.join(paths::BONES_TOML);
-    let Some(template) = selected_runtime_template(&bones_toml)? else {
+    let Some(template) = selected_framework_template(&bones_toml)? else {
         return Ok(source_dir.join("crates/bonesdeploy/kit/deployment"));
     };
 
-    let runtime_deployment = source_dir.join("crates/bonesdeploy/runtimes").join(template).join("deployment");
-    Ok(if runtime_deployment.is_dir() {
-        runtime_deployment
+    let framework_deployment = source_dir.join("crates/bonesdeploy/frameworks").join(template).join("deployment");
+    Ok(if framework_deployment.is_dir() {
+        framework_deployment
     } else {
         source_dir.join("crates/bonesdeploy/kit/deployment")
     })
 }
 
-fn selected_runtime_template(runtime_toml: &Path) -> Result<Option<String>> {
+fn selected_framework_template(framework_toml: &Path) -> Result<Option<String>> {
     let content =
-        fs::read_to_string(runtime_toml).with_context(|| format!("Failed to read {}", runtime_toml.display()))?;
+        fs::read_to_string(framework_toml).with_context(|| format!("Failed to read {}", framework_toml.display()))?;
     let value: toml::Value =
-        toml::from_str(&content).with_context(|| format!("Failed to parse {}", runtime_toml.display()))?;
-    Ok(value.get("runtime").and_then(|runtime| runtime.get("template")).and_then(toml::Value::as_str).map(String::from))
+        toml::from_str(&content).with_context(|| format!("Failed to parse {}", framework_toml.display()))?;
+    Ok(value
+        .get("framework")
+        .and_then(|framework| framework.get("template"))
+        .and_then(toml::Value::as_str)
+        .map(String::from))
 }
 
 fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {
@@ -103,13 +107,16 @@ mod tests {
 
         write(&source_dir.join("crates/bonesdeploy/kit/deployment/build/01_build.sh"), "generic deploy")?;
         write(&source_dir.join("crates/bonesdeploy/kit/deployment/functions.sh"), "shared functions")?;
-        write(&source_dir.join("crates/bonesdeploy/runtimes/laravel/deployment/build/01_build.sh"), "laravel deploy")?;
+        write(
+            &source_dir.join("crates/bonesdeploy/frameworks/laravel/deployment/build/01_build.sh"),
+            "laravel deploy",
+        )?;
 
-        write(&bones_dir.join("bones.toml"), "[runtime]\ntemplate = 'laravel'\n")?;
+        write(&bones_dir.join("bones.toml"), "[framework]\ntemplate = 'laravel'\n")?;
 
         refresh_local_bones_from_source(&source_dir, &bones_dir)?;
 
-        assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "[runtime]\ntemplate = 'laravel'\n");
+        assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "[framework]\ntemplate = 'laravel'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
         assert_eq!(fs::read_to_string(bones_dir.join("deployment/functions.sh"))?, "shared functions");
 

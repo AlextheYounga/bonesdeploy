@@ -2,7 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, is_numbered_shell_script, load_runtime, runtime_user_for};
+use shared::config::{self, is_numbered_shell_script, load_framework, runtime_user_for};
 use shared::paths;
 
 use crate::privileges;
@@ -45,9 +45,9 @@ pub fn run(site: &str) -> Result<()> {
         bail!("Promoted release is missing: {}", release_dir.display());
     }
 
-    let runtime = load_runtime(&paths::bonesremote_site_root(site))
-        .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
-    let web_root = runtime.web_root;
+    let framework = load_framework(&paths::bonesremote_site_root(site))
+        .with_context(|| format!("Failed to load framework configuration for {site}"))?;
+    let web_root = framework.web_root;
     let runtime_user = runtime_user_for(&cfg.project_name);
     let logs_dir = paths::bonesremote_site_logs(site);
     fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;

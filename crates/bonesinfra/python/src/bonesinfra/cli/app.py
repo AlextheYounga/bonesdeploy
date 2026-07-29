@@ -3,9 +3,9 @@ import sys
 
 import typer
 
-from bonesinfra.cli.commands.dbs import deploy_dbs
 from bonesinfra.cli.commands.helpers import deploy_helpers
 from bonesinfra.cli.commands.runtime import deploy_runtime
+from bonesinfra.cli.commands.services import deploy_services
 from bonesinfra.cli.commands.setup import deploy_setup
 from bonesinfra.cli.commands.ssl import deploy_ssl
 from bonesinfra.config.context import DeployContext
@@ -17,12 +17,12 @@ runtime_app = typer.Typer()
 setup_app = typer.Typer()
 ssl_app = typer.Typer()
 helpers_app = typer.Typer()
-dbs_app = typer.Typer()
+services_app = typer.Typer()
 app.add_typer(runtime_app, name="runtime", help="Runtime operations")
 app.add_typer(setup_app, name="setup", help="Setup operations")
 app.add_typer(ssl_app, name="ssl", help="SSL operations")
 app.add_typer(helpers_app, name="helpers", help="Helper tool operations")
-app.add_typer(dbs_app, name="dbs", help="Database service operations")
+app.add_typer(services_app, name="services", help="Service operations")
 
 
 def _validate_host(ctx: DeployContext) -> None:
@@ -75,10 +75,10 @@ def helpers_apply_cmd(
     run(ctx=ctx, config_path=config, deploy=deploy_helpers)
 
 
-@dbs_app.command("apply")
-def dbs_apply_cmd(
+@services_app.command("apply")
+def services_apply_cmd(
     config: str = typer.Option(..., "--config", help="Path to bones.toml"),
 ):
     ctx = DeployContext.from_files(config)
     _validate_host(ctx)
-    run(ctx=ctx, config_path=config, deploy=deploy_dbs)
+    run(ctx=ctx, config_path=config, deploy=deploy_services)

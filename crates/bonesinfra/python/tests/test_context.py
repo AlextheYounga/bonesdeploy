@@ -28,7 +28,7 @@ ssl_enabled = true
 branch = "main"
 releases = 7
 
-[runtime]
+[framework]
 web_root = "dist"
 {extra}"""
     )
@@ -71,17 +71,17 @@ def test_missing_nested_tables_use_defaults(tmp_path):
 
 
 def test_database_services_are_read_and_validated(tmp_path):
-    ctx = DeployContext.from_files(_write_config(tmp_path, '\n[dbs]\nservices = ["postgres", "valkey"]\n'))
-    assert ctx.dbs.services == ("postgres", "valkey")
+    ctx = DeployContext.from_files(_write_config(tmp_path, '\n[services]\nservices = ["postgres", "valkey"]\n'))
+    assert ctx.services.services == ("postgres", "valkey")
 
 
 def test_conflicting_mysql_implementations_are_rejected(tmp_path):
-    path = _write_config(tmp_path, '\n[dbs]\nservices = ["mariadb", "mysql"]\n')
+    path = _write_config(tmp_path, '\n[services]\nservices = ["mariadb", "mysql"]\n')
     with pytest.raises(ValueError, match="cannot be provisioned together"):
         DeployContext.from_files(str(path))
 
 
 def test_duplicate_database_services_are_rejected(tmp_path):
-    path = _write_config(tmp_path, '\n[dbs]\nservices = ["postgres", "postgres"]\n')
+    path = _write_config(tmp_path, '\n[services]\nservices = ["postgres", "postgres"]\n')
     with pytest.raises(ValueError, match="must not contain duplicates"):
         DeployContext.from_files(str(path))

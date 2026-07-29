@@ -26,7 +26,7 @@ class ValKeyService(RuntimeService):
             name=f"Configure isolated {self.service} instance for project",
             src=str(SCRIPTS_DIR / "setup-key-value-store.sh.j2"),
             env=env_path,
-            config=f"/etc/bonesinfra/dbs/{service_name}.conf",
+            config=f"/etc/bonesinfra/services/{service_name}.conf",
             data=f"/var/lib/{self.service}/{project}",
             default_port=str(self.default_port),
             password_key=self.service.upper() + "_PASSWORD",

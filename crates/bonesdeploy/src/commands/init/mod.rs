@@ -16,8 +16,8 @@ pub struct Args {
     pub host: Option<String>,
     pub port: Option<String>,
     pub template: Option<String>,
-    pub runtime_vars: Vec<String>,
-    pub dbs: Vec<String>,
+    pub framework_vars: Vec<String>,
+    pub services: Vec<String>,
 }
 
 use crate::commands::secrets;
@@ -27,7 +27,7 @@ use crate::ui::output;
 use shared::paths;
 
 #[derive(Debug)]
-pub(super) struct RuntimeSelection {
+pub(super) struct FrameworkSelection {
     template: Option<String>,
     config: serde_json::Map<String, serde_json::Value>,
 }
@@ -52,14 +52,14 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let mut cfg =
         if is_fresh { config::collect_fresh_config(args)? } else { config::load_or_collect_config(bones_toml, args)? };
-    let runtime_selection = if is_fresh { Some(runtime::collect_runtime_config(args)?) } else { None };
+    let framework_selection = if is_fresh { Some(runtime::collect_framework_config(args)?) } else { None };
 
     if is_fresh {
-        cfg.dbs.services = runtime::collect_database_services(args)?;
+        cfg.services.services = runtime::collect_database_services(args)?;
     }
 
-    if let Some(runtime) = runtime_selection {
-        scaffold::materialize_fresh_bones(bones_dir, had_bones_entry, &mut cfg, runtime)?;
+    if let Some(framework) = framework_selection {
+        scaffold::materialize_fresh_bones(bones_dir, had_bones_entry, &mut cfg, framework)?;
     }
 
     scaffold::update_gitignore()?;

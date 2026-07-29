@@ -5,6 +5,7 @@ from bonesinfra.services.runtime.base import RuntimeService
 
 MONGO_DB_CONFIG = "/etc/mongod.conf"
 
+
 class MongoDBService(RuntimeService):
     def provision(self, ctx):
         server.script(

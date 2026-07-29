@@ -1,10 +1,10 @@
-[runtime]
+[framework]
 template = "rails"
 web_root = "public"
 node_version = "24.18.0"
 ruby_version = "3.3"
 
-[runtime.permissions]
+[framework.permissions]
 paths = [
   { path = "*", type = "dir", mode = "750" },
   { path = "*", type = "file", mode = "640" },
@@ -14,7 +14,7 @@ paths = [
   { path = "public/assets", type = "dir", mode = "750", recursive = true },
 ]
 
-[runtime.shared]
+[framework.shared]
 paths = [
   { path = ".env", type = "file" },
   { path = "tmp", type = "dir" },
