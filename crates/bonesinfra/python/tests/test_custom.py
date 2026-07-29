@@ -157,7 +157,6 @@ def test_after_setup_runs_last_and_receives_ctx(tmp_path, monkeypatch):
 
 def test_only_invoked_phase_hook_runs(tmp_path, monkeypatch):
     record: list[str] = []
-    monkeypatch.setattr(runtime_plan, "packages", types.SimpleNamespace(install_apt=_rec("apt", record)))
     monkeypatch.setattr(runtime_plan, "apparmor", types.SimpleNamespace(setup=_rec("apparmor", record)))
     monkeypatch.setattr(
         runtime_plan,

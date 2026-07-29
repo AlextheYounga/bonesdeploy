@@ -1,6 +1,6 @@
 from types import ModuleType
 
-from bonesinfra.cli.commands.runtime import packages, template_runtime
+from bonesinfra.cli.commands.runtime import template_runtime
 from bonesinfra.cli.hooks import call_hook
 from bonesinfra.frameworks import get_framework
 from bonesinfra.services.linux.apparmor import nginx as apparmor
@@ -9,7 +9,6 @@ from bonesinfra.services.linux.nginx import router as nginx
 
 def deploy_runtime(ctx, custom: ModuleType | None = None):
     paths = ctx.paths_dict
-    packages.install_apt(ctx)
 
     template = ctx.runtime.data.get("template")
     uses_tcp = False
