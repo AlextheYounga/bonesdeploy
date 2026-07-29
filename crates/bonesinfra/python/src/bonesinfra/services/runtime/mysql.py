@@ -17,7 +17,7 @@ class MySQLService(RuntimeService):
             cache_time=3600,
             _sudo=True,
         )
-        project = self._db_identifier(ctx.app.project_name)
+        project = self._identifier(ctx.app.project_name)
         env_path = f"{ctx.paths_dict['shared']}/.env"
         server.script_template(
             name=f"Configure {self.implementation} for project",

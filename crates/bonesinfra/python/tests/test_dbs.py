@@ -84,9 +84,9 @@ def test_mongodb_project_account_is_not_a_cluster_admin(monkeypatch):
 
 
 def test_database_identifier_rejects_unsafe_project_names():
-    assert RuntimeService._db_identifier("atlas-api") == "atlas_api"
+    assert RuntimeService._identifier("atlas-api") == "atlas_api"
     try:
-        RuntimeService._db_identifier("atlas;drop")
+        RuntimeService._identifier("atlas;drop")
     except ValueError:
         pass
     else:

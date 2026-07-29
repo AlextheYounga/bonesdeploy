@@ -3,13 +3,17 @@ from tempfile import NamedTemporaryFile
 
 from pyinfra import host
 from pyinfra.facts.server import LinuxDistribution
-from pyinfra.operations import apt, server
+from pyinfra.operations import apt, files, server, systemd
 
+from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
+from bonesinfra.frameworks.common import logs
 from bonesinfra.services.languages.base import LanguageRuntime
 
 PHP_SURY_KEYRING_URL = "https://packages.sury.org/debsuryorg-archive-keyring.deb"
 PHP_SURY_KEYRING_DEST = "/usr/share/keyrings/deb.sury.org-php.gpg"
 PHP_SURY_PREREQUISITES = ["apt-transport-https", "ca-certificates", "curl", "lsb-release"]
+PHP_FPM_SOCKET_PARENT = "/run/php"
 
 
 class PHPRuntime(LanguageRuntime):
@@ -81,6 +85,51 @@ class PHPRuntime(LanguageRuntime):
             filename="php",
             _sudo=True,
         )
+
+    def configure_fpm_pool(self, ctx, *, paths) -> str:
+        project = ctx.app.project_name
+        pool_config = self.pool_config_path(project)
+
+        logs.ensure(ctx)
+        server.script_template(
+            name="Remove orphaned PHP-FPM pools from other PHP versions",
+            src=str(SCRIPTS_DIR / "cleanup-orphaned-php-pools.sh.j2"),
+            project=project,
+            current_pool=pool_config,
+            _sudo=True,
+        )
+        files.template(
+            name="Deploy PHP-FPM pool config",
+            src=str(ASSETS_DIR / "php/php-fpm-pool.conf.j2"),
+            dest=pool_config,
+            user="root",
+            group="root",
+            mode="0644",
+            php_fpm_pool_name=project,
+            php_fpm_socket_path=self.socket_path(project),
+            **template_data(ctx, paths=paths),
+            _sudo=True,
+        )
+        server.shell(
+            name="Validate PHP-FPM configuration",
+            commands=[f"php-fpm{self.version} --test"],
+            _sudo=True,
+        )
+        systemd.service(
+            name="Enable and restart PHP-FPM service",
+            service=f"php{self.version}-fpm",
+            enabled=True,
+            running=True,
+            restarted=True,
+            _sudo=True,
+        )
+        return self.socket_path(project)
+
+    def socket_path(self, project: str) -> str:
+        return f"{PHP_FPM_SOCKET_PARENT}/php{self.version}-fpm-{project}.sock"
+
+    def pool_config_path(self, project: str) -> str:
+        return f"/etc/php/{self.version}/fpm/pool.d/{project}.conf"
 
 
 PHP = PHPRuntime()

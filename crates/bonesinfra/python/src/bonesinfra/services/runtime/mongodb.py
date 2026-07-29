@@ -19,7 +19,7 @@ class MongoDBService(RuntimeService):
             update=True,
             _sudo=True,
         )
-        project = self._db_identifier(ctx.app.project_name)
+        project = self._identifier(ctx.app.project_name)
         env_path = f"{ctx.paths_dict['shared']}/.env"
         server.shell(
             name="Configure MongoDB for project",

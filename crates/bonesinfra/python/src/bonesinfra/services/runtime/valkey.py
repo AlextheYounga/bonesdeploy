@@ -19,7 +19,7 @@ class ValKeyService(RuntimeService):
             cache_time=3600,
             _sudo=True,
         )
-        project = self._db_identifier(ctx.app.project_name)
+        project = self._identifier(ctx.app.project_name)
         env_path = f"{ctx.paths_dict['shared']}/.env"
         service_name = f"{project}-{self.service}"
         server.script_template(

@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 
 from bonesinfra.services.languages import NODE, PYTHON, RUBY
+from bonesinfra.services.languages.php import PHPRuntime
 
 
 def _context(**runtime_data):
@@ -26,3 +27,37 @@ def test_language_runtime_stores_selected_version_and_executable(monkeypatch):
 def test_language_runtime_rejects_non_major_minor_versions(runtime, key, value):
     with pytest.raises(ValueError, match=key):
         runtime.install(_context(**{key: value}))
+
+
+def test_php_runtime_configures_the_project_fpm_pool(monkeypatch):
+    runtime = PHPRuntime()
+    runtime.version = "8.5"
+    calls = {}
+    ctx = SimpleNamespace(
+        app=SimpleNamespace(project_name="atlas"),
+        runtime=SimpleNamespace(runtime_user="atlas", runtime_group="atlas"),
+    )
+
+    monkeypatch.setattr("bonesinfra.services.languages.php.logs.ensure", lambda ctx: calls.setdefault("logs", ctx))
+    monkeypatch.setattr(
+        "bonesinfra.services.languages.php.server.script_template", lambda **kwargs: calls.setdefault("cleanup", kwargs)
+    )
+    monkeypatch.setattr(
+        "bonesinfra.services.languages.php.files.template", lambda **kwargs: calls.setdefault("pool", kwargs)
+    )
+    monkeypatch.setattr(
+        "bonesinfra.services.languages.php.server.shell", lambda **kwargs: calls.setdefault("validation", kwargs)
+    )
+    monkeypatch.setattr(
+        "bonesinfra.services.languages.php.systemd.service", lambda **kwargs: calls.setdefault("service", kwargs)
+    )
+    monkeypatch.setattr("bonesinfra.services.languages.php.template_data", lambda _ctx, **_kwargs: {})
+
+    socket_path = runtime.configure_fpm_pool(ctx, paths={"current": "/srv/sites/atlas/current"})
+
+    assert socket_path == "/run/php/php8.5-fpm-atlas.sock"
+    assert calls["cleanup"]["current_pool"] == "/etc/php/8.5/fpm/pool.d/atlas.conf"
+    assert calls["pool"]["dest"] == "/etc/php/8.5/fpm/pool.d/atlas.conf"
+    assert calls["pool"]["php_fpm_socket_path"] == socket_path
+    assert calls["validation"]["commands"] == ["php-fpm8.5 --test"]
+    assert calls["service"]["service"] == "php8.5-fpm"

@@ -1,14 +1,11 @@
-from pyinfra.operations import server
-
 from bonesinfra.config.context import template_data
-from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
+from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.common import logs, paths as common_paths
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import PHP
 from bonesinfra.services.linux import systemd as service
 from bonesinfra.services.linux.apparmor import app as apparmor
 from bonesinfra.services.linux.nginx import site as nginx_site
-from bonesinfra.services.runtime import php_fpm
 
 
 class Framework:
@@ -150,33 +147,15 @@ class ServerFramework(Framework):
 class PHPFramework(Framework):
     nginx_template: str
 
-    def php_version(self, ctx) -> str:
-        return ctx.runtime.data.get("php_version", "8.5")
-
-    def install_packages(self, ctx):
-        PHP.install(ctx)
-
     def deploy(self, ctx):
-        php_version = self.php_version(ctx)
         paths = ctx.paths_dict
-        project = ctx.app.project_name
 
-        self.install_packages(ctx)
-        php_fpm.PHP_FPM_SERVICE.ensure_log_dir(ctx)
-        server.script_template(
-            name="Remove orphaned PHP-FPM pools from other PHP versions",
-            src=str(SCRIPTS_DIR / "cleanup-orphaned-php-pools.sh.j2"),
-            project=project,
-            current_pool=php_fpm.PHP_FPM_SERVICE.pool_config_path(project, php_version),
-            _sudo=True,
-        )
-        php_fpm.PHP_FPM_SERVICE.render_pool(ctx, paths=paths, php_version=php_version)
-        php_fpm.PHP_FPM_SERVICE.validate_php_fpm(php_version)
-        php_fpm.PHP_FPM_SERVICE.reload_php_fpm(php_version)
+        PHP.install(ctx)
+        php_fpm_socket_path = PHP.configure_fpm_pool(ctx, paths=paths)
 
         nginx_site.render_php_fpm(
             ctx,
             paths=paths,
             template_src=ASSETS_DIR / self.nginx_template,
-            php_fpm_socket_path=php_fpm.PHP_FPM_SERVICE.socket_path(project, php_version),
+            php_fpm_socket_path=php_fpm_socket_path,
         )
