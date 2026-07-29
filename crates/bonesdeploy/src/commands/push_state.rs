@@ -84,6 +84,8 @@ fn publishable_files(bones_dir: &Path) -> Result<Vec<PathBuf>> {
         add_numbered_scripts(&mut files, &deployment.join(directory), directory)?;
     }
 
+    add_tree_files(&mut files, &bones_dir.join(paths::CONFS_DIR))?;
+
     Ok(files)
 }
 
@@ -119,6 +121,33 @@ fn add_numbered_scripts(files: &mut Vec<PathBuf>, directory: &Path, name: &str) 
     Ok(())
 }
 
+fn add_tree_files(files: &mut Vec<PathBuf>, directory: &Path) -> Result<()> {
+    if !directory.is_dir() || directory.is_symlink() {
+        return Ok(());
+    }
+    let Some(parent) = directory.parent() else {
+        return Ok(());
+    };
+    collect_regular_files(files, directory, parent)?;
+    Ok(())
+}
+
+fn collect_regular_files(files: &mut Vec<PathBuf>, dir: &Path, root: &Path) -> Result<()> {
+    for entry in fs::read_dir(dir).with_context(|| format!("Failed to read {}", dir.display()))? {
+        let entry = entry?;
+        let path = entry.path();
+        if entry.file_type()?.is_dir() && !path.is_symlink() {
+            collect_regular_files(files, &path, root)?;
+        } else if entry.file_type()?.is_file() && !path.is_symlink() {
+            let relative = path
+                .strip_prefix(root)
+                .with_context(|| format!("Failed to strip prefix {} from {}", root.display(), path.display()))?;
+            files.push(relative.to_path_buf());
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs;
@@ -145,6 +174,7 @@ mod tests {
         fs::create_dir_all(bones.join("deployment/build/nested"))?;
         fs::create_dir_all(bones.join("deployment/prepare"))?;
         fs::create_dir_all(bones.join("secrets"))?;
+        fs::create_dir_all(bones.join("confs/nginx"))?;
         fs::write(bones.join("bones.toml"), "[app]\n")?;
         fs::write(bones.join("custom.py"), "raise RuntimeError\n")?;
         fs::write(bones.join("secrets/.env"), "SECRET=value\n")?;
@@ -155,21 +185,26 @@ mod tests {
         fs::write(bones.join("deployment/prepare/02_prepare.sh"), "#!/bin/bash\n")?;
         fs::write(bones.join("deployment/prepare/03_prepare.py"), "print()\n")?;
         symlink("01_build.sh", bones.join("deployment/build/04_link.sh"))?;
+        fs::write(bones.join("confs/nginx/app-site-nginx.conf.j2"), "worker_processes 1;\n")?;
+        fs::write(bones.join("confs/nginx/static-site-nginx.conf.j2"), "worker_processes 1;\n")?;
 
         let archive = temp.path().join("state.tar.gz");
         fs::write(&archive, archive_bones_directory_at(&bones)?)?;
         let output = Command::new("tar").args(["-tzf"]).arg(&archive).output()?;
 
         assert!(output.status.success());
-        assert_eq!(
-            String::from_utf8(output.stdout)?.lines().collect::<Vec<_>>(),
-            [
-                "bones.toml",
-                "deployment/functions.sh",
-                "deployment/build/01_build.sh",
-                "deployment/prepare/02_prepare.sh"
-            ]
-        );
+        let mut actual: Vec<_> = String::from_utf8(output.stdout)?.lines().map(String::from).collect();
+        actual.sort();
+        let mut expected = vec![
+            "bones.toml",
+            "confs/nginx/app-site-nginx.conf.j2",
+            "confs/nginx/static-site-nginx.conf.j2",
+            "deployment/functions.sh",
+            "deployment/build/01_build.sh",
+            "deployment/prepare/02_prepare.sh",
+        ];
+        expected.sort();
+        assert_eq!(actual, expected);
         Ok(())
     }
 
