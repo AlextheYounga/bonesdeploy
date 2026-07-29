@@ -112,7 +112,7 @@ def ensure_users_and_groups(ctx):
     cpu_quota = cpu_quota_for(host.get_fact(Cpus))
     staged_dropin = f"{BUILD_SYSTEMD_STAGING_ROOT}/{build_user}.slice.conf"
 
-    server.user(  # noqa: S604
+    server.user(
         name="Ensure deploy user exists",
         user=DEPLOY_USER,
         shell="/bin/bash",
@@ -135,7 +135,7 @@ def ensure_users_and_groups(ctx):
     existing_user = host.get_fact(Users).get(ctx.runtime.runtime_user)
 
     if existing_user is None:
-        server.user(  # noqa: S604
+        server.user(
             name="Ensure runtime user exists with groups",
             user=ctx.runtime.runtime_user,
             system=True,
@@ -158,7 +158,7 @@ def ensure_users_and_groups(ctx):
     # useradd allocates unused subuid/subgid ranges for new non-system users.
     # ponytail: damaged existing mappings fail verification; repair them with
     # administrator-selected usermod ranges rather than guessing new ownership.
-    server.user(  # noqa: S604
+    server.user(
         name="Ensure build user exists",
         user=build_user,
         group=build_group,

@@ -14,13 +14,13 @@ class RailsFramework(ServerFramework):
     service_name = "puma"
     runtime_label = "Puma"
 
-    def install_packages(self, ctx):  # noqa: ARG002
+    def install_packages(self, _ctx):
         ruby_packages.install_packages()
 
-    def apparmor_exec_paths(self, ctx, paths):  # noqa: ARG002
+    def apparmor_exec_paths(self, _ctx, _paths):
         return ["/usr/bin/ruby*", "/usr/bin/bundle*"]
 
-    def writable_paths(self, ctx, paths):  # noqa: ARG002
+    def writable_paths(self, _ctx, paths):
         return [
             f"{paths['shared']}/tmp",  # noqa: S108
             f"{paths['shared']}/log",

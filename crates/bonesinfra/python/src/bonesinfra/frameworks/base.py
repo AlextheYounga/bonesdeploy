@@ -63,10 +63,10 @@ class ServerFramework(Framework):
     def exec_command(self, ctx, paths) -> str:
         raise NotImplementedError
 
-    def writable_paths(self, ctx, paths) -> list:  # noqa: ARG002
+    def writable_paths(self, _ctx, _paths) -> list:
         return []
 
-    def apparmor_exec_paths(self, ctx, paths) -> list:  # noqa: ARG002
+    def apparmor_exec_paths(self, _ctx, _paths) -> list:
         return []
 
     def apparmor_network(self) -> str | None:

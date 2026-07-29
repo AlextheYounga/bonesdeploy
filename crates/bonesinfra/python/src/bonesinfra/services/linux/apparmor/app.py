@@ -4,10 +4,10 @@ from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.pyinfra.operations import render
 
 
-def render_profile(  # noqa: PLR0913
+def render_profile(
     ctx,
     *,
-    paths,  # noqa: ARG001
+    paths,
     runtime,
     apparmor_exec_paths,
     apparmor_writable_paths,

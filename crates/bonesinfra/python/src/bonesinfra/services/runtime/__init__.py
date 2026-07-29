@@ -20,6 +20,6 @@ SERVICES = {
 def get_service(name):
     svc = SERVICES.get(name)
     if svc is None:
-        print(f"Unknown service: {name}. Available: {', '.join(sorted(SERVICES))}", file=sys.stderr)  # noqa: T201
+        print(f"Unknown service: {name}. Available: {', '.join(sorted(SERVICES))}", file=sys.stderr)
         sys.exit(1)
     return svc

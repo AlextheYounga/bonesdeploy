@@ -17,7 +17,7 @@ class SvelteKitFramework(ServerFramework):
     def install_packages(self, ctx):
         self.node_binary = node.install(ctx)
 
-    def apparmor_exec_paths(self, ctx, paths):  # noqa: ARG002
+    def apparmor_exec_paths(self, _ctx, _paths):
         return [self.node_binary]
 
     def exec_command(self, ctx, paths):

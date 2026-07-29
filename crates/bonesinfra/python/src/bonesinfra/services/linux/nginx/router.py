@@ -48,7 +48,7 @@ def validate_config(name="Validate nginx configuration"):
     )
 
 
-def render_router_config(ctx, paths, *, ssl_enabled, stage=None, validate=False, reload=False):  # noqa: PLR0913
+def render_router_config(ctx, paths, *, ssl_enabled, stage=None, validate=False, reload=False):
     nginx_server_name = ctx.app.dns.domain or ctx.app.dns.preview_domain
     label = f" ({stage})" if stage else ""
     cert_path, key_path = letsencrypt_cert_paths(nginx_server_name)

@@ -26,6 +26,6 @@ def list_frameworks():
 def get_framework(name):
     framework = FRAMEWORKS.get(name)
     if framework is None:
-        print(f"Unknown framework: {name}. Available: {', '.join(list_frameworks())}", file=sys.stderr)  # noqa: T201
+        print(f"Unknown framework: {name}. Available: {', '.join(list_frameworks())}", file=sys.stderr)
         sys.exit(1)
     return framework

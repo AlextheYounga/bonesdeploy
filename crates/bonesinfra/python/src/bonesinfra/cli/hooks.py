@@ -46,7 +46,7 @@ def load_custom_module(config_path: str | Path) -> ModuleType | None:
     module = importlib.util.module_from_spec(spec)
     try:
         spec.loader.exec_module(module)
-    except Exception as exc:  # noqa: BLE001  # surface any load failure with the file path visible
+    except Exception as exc:  # surface any load failure with the file path visible
         print(f"Error loading {path}: {exc}", file=sys.stderr)
         sys.exit(3)
 

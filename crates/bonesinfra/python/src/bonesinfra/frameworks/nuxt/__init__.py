@@ -13,10 +13,10 @@ class NuxtFramework(ServerFramework):
     def install_packages(self, ctx):
         self.node_binary = node.install(ctx)
 
-    def apparmor_exec_paths(self, ctx, paths):  # noqa: ARG002
+    def apparmor_exec_paths(self, _ctx, _paths):
         return [self.node_binary]
 
-    def exec_command(self, ctx, paths):  # noqa: ARG002
+    def exec_command(self, _ctx, paths):
         socket = self.socket_path(paths)
         return (
             f"/usr/bin/env NODE_ENV=production NITRO_UNIX_SOCKET={socket} {self.node_binary} .output/server/index.mjs"

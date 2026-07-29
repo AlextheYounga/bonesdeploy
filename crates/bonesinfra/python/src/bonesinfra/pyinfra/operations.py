@@ -12,14 +12,14 @@ def mkdir(name, path, user="root", group="root", mode="0755"):
     )
 
 
-def render(name, src, dest, user="root", group="root", mode="0644", **data):  # noqa: PLR0913
+def render(name, src, dest, **data):
     files.template(
         name=name,
         src=str(src),
         dest=dest,
-        user=user,
-        group=group,
-        mode=mode,
+        user="root",
+        group="root",
+        mode="0644",
         **data,
         _sudo=True,
     )
