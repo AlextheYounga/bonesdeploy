@@ -1,71 +1,130 @@
-use std::fs;
-use std::io::ErrorKind;
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use super::types::Account;
+use super::types::{Account, FileKind, FileNode, PathTree};
 
-pub(super) fn writable_in_path_chain<'a>(
-    path: &Path,
-    accounts: &'a [&Account],
-) -> Result<Option<(&'a Account, PathBuf)>, String> {
-    let mut chain = Vec::new();
-    let mut cursor = Some(path);
-    while let Some(item) = cursor {
-        chain.push(item.to_path_buf());
-        cursor = item.parent();
-    }
-    for item in chain {
-        for account in accounts {
-            if account_can_write(&item, account)? {
-                return Ok(Some((account, item)));
-            }
-        }
-    }
-    Ok(None)
+#[derive(Debug, Eq, PartialEq)]
+pub(super) enum Authority {
+    Granted,
+    Denied,
+    Unverified(String),
 }
 
-pub(super) fn find_runtime_writable(path: &Path, account: &Account) -> Result<Option<PathBuf>, String> {
-    if account_can_write(path, account)?
-        || fs::symlink_metadata(path).map_err(|error| format!("cannot inspect {}: {error}", path.display()))?.uid()
-            == account.uid
-    {
-        return Ok(Some(path.to_path_buf()));
+pub(super) fn account_can_modify(path: &Path, account: &Account, tree: &PathTree) -> Authority {
+    let Some(node) = tree.node(path) else {
+        return Authority::Unverified(format!("metadata was not collected for {}", path.display()));
+    };
+    match can_traverse_to(path, account, tree) {
+        Authority::Granted => {}
+        decision => return decision,
     }
-    let metadata = fs::symlink_metadata(path).map_err(|error| format!("cannot inspect {}: {error}", path.display()))?;
-    if !metadata.is_dir() {
-        return Ok(None);
+    if node.kind == FileKind::Symlink {
+        return Authority::Denied;
     }
-    for entry in fs::read_dir(path).map_err(|error| format!("cannot read {}: {error}", path.display()))? {
-        let entry = entry.map_err(|error| format!("cannot enumerate {}: {error}", path.display()))?;
-        if let Some(writable) = find_runtime_writable(&entry.path(), account)? {
-            return Ok(Some(writable));
-        }
+    if node.has_acl {
+        return Authority::Unverified(format!("{} has a POSIX ACL that has not been evaluated", path.display()));
     }
-    Ok(None)
+    if node.uid == account.uid {
+        return Authority::Granted;
+    }
+    let permission = permission_class(node, account);
+    let writable = permission & 0o2 != 0;
+    let searchable = node.kind != FileKind::Directory || permission & 0o1 != 0;
+    if writable && searchable { Authority::Granted } else { Authority::Denied }
 }
 
-pub(super) fn account_can_write(path: &Path, account: &Account) -> Result<bool, String> {
-    let metadata = fs::symlink_metadata(path).map_err(|error| format!("cannot inspect {}: {error}", path.display()))?;
-    let mode = metadata.permissions().mode();
-    Ok(if metadata.uid() == account.uid {
-        mode & 0o200 != 0
-    } else if account.groups.contains(&metadata.gid()) {
-        mode & 0o020 != 0
+fn can_traverse_to(path: &Path, account: &Account, tree: &PathTree) -> Authority {
+    let mut ancestors: Vec<_> = path.ancestors().skip(1).collect();
+    ancestors.reverse();
+    for ancestor in ancestors {
+        let Some(node) = tree.node(ancestor) else {
+            return Authority::Unverified(format!("ancestor metadata was not collected for {}", ancestor.display()));
+        };
+        if node.kind != FileKind::Directory {
+            return Authority::Denied;
+        }
+        if node.has_acl {
+            return Authority::Unverified(format!(
+                "{} has a POSIX ACL that has not been evaluated",
+                ancestor.display()
+            ));
+        }
+        if node.uid == account.uid {
+            continue;
+        }
+        if permission_class(node, account) & 0o1 == 0 {
+            return Authority::Denied;
+        }
+    }
+    Authority::Granted
+}
+
+fn permission_class(node: &FileNode, account: &Account) -> u32 {
+    if node.uid == account.uid {
+        (node.mode >> 6) & 0o7
+    } else if account.groups.contains(&node.gid) {
+        (node.mode >> 3) & 0o7
     } else {
-        mode & 0o002 != 0
-    })
+        node.mode & 0o7
+    }
 }
 
 pub(super) fn has_login_shell(shell: &str) -> bool {
     !matches!(shell, "/usr/sbin/nologin" | "/sbin/nologin" | "/bin/false")
 }
 
-// Resolves a symlink, returning None if the target does not exist.
-pub(super) fn try_canonicalize(path: &Path) -> Result<Option<PathBuf>, String> {
-    match fs::canonicalize(path) {
-        Ok(target) => Ok(Some(target)),
-        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(format!("cannot resolve {}: {error}", path.display())),
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+    use std::path::{Path, PathBuf};
+
+    use super::{Authority, account_can_modify};
+    use crate::commands::doctor::security::types::{Account, FileKind, FileNode, PathTree};
+
+    fn account() -> Account {
+        Account {
+            name: "atlas".to_string(),
+            uid: 1001,
+            gid: 1001,
+            shell: "/usr/sbin/nologin".to_string(),
+            groups: BTreeSet::from([1001]),
+        }
+    }
+
+    fn node(path: &str, kind: FileKind, uid: u32, mode: u32) -> FileNode {
+        FileNode { path: PathBuf::from(path), kind, uid, gid: uid, mode, has_acl: false }
+    }
+
+    fn tree(mut nodes: Vec<FileNode>) -> PathTree {
+        nodes.extend([node("/", FileKind::Directory, 0, 0o755), node("/srv", FileKind::Directory, 0, 0o755)]);
+        PathTree { requested: PathBuf::from("/srv/sites"), nodes }
+    }
+
+    #[test]
+    fn symlink_mode_bits_do_not_grant_replacement_authority() {
+        let evidence = tree(vec![
+            node("/srv/sites", FileKind::Directory, 0, 0o755),
+            node("/srv/sites/current", FileKind::Symlink, 1001, 0o777),
+        ]);
+
+        assert_eq!(account_can_modify(Path::new("/srv/sites/current"), &account(), &evidence), Authority::Denied);
+    }
+
+    #[test]
+    fn writable_file_behind_unsearchable_directory_is_not_effectively_writable() {
+        let evidence = tree(vec![
+            node("/srv/sites", FileKind::Directory, 0, 0o700),
+            node("/srv/sites/unit.service", FileKind::File, 1001, 0o600),
+        ]);
+
+        assert_eq!(account_can_modify(Path::new("/srv/sites/unit.service"), &account(), &evidence), Authority::Denied);
+    }
+
+    #[test]
+    fn acl_evidence_is_unverified_instead_of_passing() {
+        let mut protected = node("/srv/sites", FileKind::Directory, 0, 0o755);
+        protected.has_acl = true;
+        let evidence = tree(vec![protected]);
+
+        assert!(matches!(account_can_modify(Path::new("/srv/sites"), &account(), &evidence), Authority::Unverified(_)));
     }
 }

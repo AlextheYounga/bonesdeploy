@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum Status {
@@ -51,28 +51,73 @@ pub(super) struct Site {
     pub(super) build: Account,
 }
 
-pub(super) fn pass(rule: &'static str, observed: String) -> Finding {
-    Finding {
-        rule,
-        principle: "Linux identities and writable parents define effective authority.",
-        expected: "Untrusted identities cannot modify protected state.".to_string(),
-        observed,
-        risk: "The checked authority boundary is intact.".to_string(),
-        remediation: "None.".to_string(),
-        status: Status::Pass,
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum FileKind {
+    Directory,
+    File,
+    Symlink,
+    Other,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct FileNode {
+    pub(super) path: PathBuf,
+    pub(super) kind: FileKind,
+    pub(super) uid: u32,
+    pub(super) gid: u32,
+    pub(super) mode: u32,
+    pub(super) has_acl: bool,
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct PathTree {
+    pub(super) requested: PathBuf,
+    pub(super) nodes: Vec<FileNode>,
+}
+
+impl PathTree {
+    pub(super) fn node(&self, path: &Path) -> Option<&FileNode> {
+        self.nodes.iter().find(|node| node.path == path)
     }
 }
 
-pub(super) fn fail(rule: &'static str, observed: String) -> Finding {
-    Finding {
-        rule,
-        principle: "Linux identities and writable parents define effective authority.",
-        expected: "Untrusted identities cannot modify protected state.".to_string(),
-        observed,
-        risk: "A compromised application could gain authority outside its site.".to_string(),
-        remediation: "Restore root ownership and remove write access from untrusted identities.".to_string(),
-        status: Status::Fail,
-    }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum CurrentState {
+    Missing,
+    Broken,
+    NotSymlink,
+    Active(PathBuf),
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct ReleaseEvidence {
+    pub(super) site: String,
+    pub(super) releases_root: PathBuf,
+    pub(super) current: CurrentState,
+    pub(super) filesystem: PathTree,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) enum PolicyDecision {
+    Allowed,
+    Denied,
+    Unverified(String),
+}
+
+#[derive(Clone, Debug)]
+pub(super) struct SudoEvidence {
+    pub(super) user: String,
+    pub(super) command: Vec<String>,
+    pub(super) decision: PolicyDecision,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct Rule {
+    pub(super) name: &'static str,
+    pub(super) principle: &'static str,
+    pub(super) expected: &'static str,
+    pub(super) risk: &'static str,
+    pub(super) remediation: &'static str,
 }
 
 pub(super) fn unverified(rule: &'static str, observed: String) -> Finding {
@@ -84,5 +129,17 @@ pub(super) fn unverified(rule: &'static str, observed: String) -> Finding {
         risk: "The boundary may be weakened but could not be verified.".to_string(),
         remediation: "Fix read-only inspection access and rerun doctor as root.".to_string(),
         status: Status::Unverified,
+    }
+}
+
+pub(super) fn finding(status: Status, rule: Rule, observed: String) -> Finding {
+    Finding {
+        rule: rule.name,
+        principle: rule.principle,
+        expected: rule.expected.to_string(),
+        observed,
+        risk: rule.risk.to_string(),
+        remediation: rule.remediation.to_string(),
+        status,
     }
 }

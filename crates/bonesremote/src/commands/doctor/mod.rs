@@ -2,6 +2,8 @@ use anyhow::Result;
 use shared::paths;
 use std::io::{self, IsTerminal};
 
+use crate::privileges;
+
 fn style(code: &str, value: &str) -> String {
     if io::stdout().is_terminal() { format!("\x1b[{code}m{value}\x1b[0m") } else { value.to_string() }
 }
@@ -12,6 +14,7 @@ mod site;
 mod system;
 
 pub fn run(site: Option<&str>) -> Result<()> {
+    privileges::ensure_root("bonesremote doctor")?;
     println!("{}", style("1", &format!("{} doctor", paths::BONESREMOTE_BINARY)));
 
     let mut issues: Vec<String> = Vec::new();
@@ -19,7 +22,6 @@ pub fn run(site: Option<&str>) -> Result<()> {
 
     system::check_supported_distribution(&mut issues);
     system::check_podman_available(&mut issues);
-    system::check_passwordless_sudo(&mut issues);
     apparmor::check_support(&mut issues);
 
     let security_report = security::audit();
