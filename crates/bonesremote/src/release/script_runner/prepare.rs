@@ -162,14 +162,17 @@ mod tests {
     }
 
     #[test]
-    fn runtime_prepare_templates_do_not_source_control_plane_files() -> Result<()> {
-        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../bonesdeploy/assets/runtimes");
-        for runtime in ["laravel", "rails", "django"] {
+    fn framework_prepare_templates_do_not_source_control_plane_files() -> Result<()> {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../bonesdeploy/assets/frameworks");
+        for framework in ["laravel", "rails", "django"] {
             let template = fs::read_to_string(
-                root.join(runtime).join("deployment/prepare").join(format!("01_prepare_{runtime}.sh")),
+                root.join(framework).join("deployment/prepare").join(format!("01_prepare_{framework}.sh")),
             )?;
-            assert!(!template.contains("DEPLOYMENT_DIR"), "{runtime} prepare template still references DEPLOYMENT_DIR");
-            assert!(!template.contains("functions.sh"), "{runtime} prepare template still sources functions.sh");
+            assert!(
+                !template.contains("DEPLOYMENT_DIR"),
+                "{framework} prepare template still references DEPLOYMENT_DIR"
+            );
+            assert!(!template.contains("functions.sh"), "{framework} prepare template still sources functions.sh");
         }
         Ok(())
     }

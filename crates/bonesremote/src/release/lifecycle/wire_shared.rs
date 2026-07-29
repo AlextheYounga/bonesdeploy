@@ -15,8 +15,8 @@ pub fn run(site: &str) -> Result<()> {
 
     let bones_path = paths::bonesremote_bones_toml_path(site);
     let cfg = config::load(&bones_path).context("Failed to load remote site state")?;
-    let runtime =
-        config::load_runtime(&paths::bonesremote_site_root(site)).context("Failed to load remote runtime state")?;
+    let framework =
+        config::load_framework(&paths::bonesremote_site_root(site)).context("Failed to load remote framework state")?;
 
     if cfg.project_name != site {
         bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
@@ -31,12 +31,12 @@ pub fn run(site: &str) -> Result<()> {
     let shared_dir = release_state::shared_dir(&cfg.project_root);
     if !shared_dir.is_dir() {
         bail!(
-            "Shared root is missing: {}. Run 'bonesdeploy remote setup' or runtime provisioning first.",
+            "Shared root is missing: {}. Run 'bonesdeploy remote setup' or framework provisioning first.",
             shared_dir.display()
         );
     }
 
-    for shared_path in &runtime.shared.paths {
+    for shared_path in &framework.shared.paths {
         validate_shared_path(shared_path)?;
         let target = shared_dir.join(&shared_path.path);
         link_relative(&release_dir, &shared_path.path, &target)?;
@@ -48,11 +48,11 @@ pub fn run(site: &str) -> Result<()> {
 fn validate_shared_path(shared_path: &SharedPath) -> Result<()> {
     let path = Path::new(&shared_path.path);
     if shared_path.path.is_empty() || path.is_absolute() {
-        bail!("Invalid shared path in [runtime].shared: {}", shared_path.path);
+        bail!("Invalid shared path in [framework].shared: {}", shared_path.path);
     }
 
     if !path.components().all(|component| matches!(component, Component::Normal(_))) {
-        bail!("Invalid shared path in [runtime].shared: {}", shared_path.path);
+        bail!("Invalid shared path in [framework].shared: {}", shared_path.path);
     }
 
     Ok(())

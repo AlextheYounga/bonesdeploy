@@ -9,7 +9,17 @@ use crate::commands::{
 #[expect(clippy::cognitive_complexity)]
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
-        Command::Init { non_interactive, project_name, branch, remote, host, port, template, runtime_vars, dbs } => {
+        Command::Init {
+            non_interactive,
+            project_name,
+            branch,
+            remote,
+            host,
+            port,
+            template,
+            framework_vars,
+            services,
+        } => {
             init::run(&init::Args {
                 non_interactive: *non_interactive,
                 project_name: project_name.clone(),
@@ -18,8 +28,8 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 host: host.clone(),
                 port: port.clone(),
                 template: template.clone(),
-                runtime_vars: runtime_vars.clone(),
-                dbs: dbs.clone(),
+                framework_vars: framework_vars.clone(),
+                services: services.clone(),
             })?;
             Ok(())
         }
@@ -44,10 +54,10 @@ pub async fn run(cli: &Cli) -> Result<()> {
         }
         Command::Remote { command } => match command {
             RemoteCommand::Bootstrap => remote::bootstrap::run(false, true),
-            RemoteCommand::Runtime { yes } => remote::runtime::run(*yes, true),
+            RemoteCommand::Framework { yes } => remote::framework::run(*yes, true),
             RemoteCommand::Ssl { yes, domain, email } => remote::ssl::run(*yes, domain.clone(), email.clone()),
             RemoteCommand::Helpers { yes } => remote::helpers::run(*yes),
-            RemoteCommand::Dbs { yes } => remote::dbs::run(*yes, true),
+            RemoteCommand::Services { yes } => remote::services::run(*yes, true),
         },
         Command::Rollback => rollback::run().await,
         Command::Config { file, key } => config::run(file.as_deref(), key.as_deref()),

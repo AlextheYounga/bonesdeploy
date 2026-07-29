@@ -6,11 +6,11 @@ use anyhow::{Context, Result};
 use shared::config::default_deploy_user;
 use shared::paths;
 
-use super::RuntimeSelection;
+use super::FrameworkSelection;
 use crate::config;
-use crate::infra::assets::{kit, runtimes as runtime_assets};
+use crate::frameworks;
+use crate::infra::assets::{frameworks as framework_assets, kit};
 use crate::infra::git;
-use crate::runtimes;
 use shared::env_build;
 
 const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/hooks/pre-push"));
@@ -19,7 +19,7 @@ pub(super) fn materialize_fresh_bones(
     bones_dir: &Path,
     had_bones_entry: bool,
     cfg: &mut config::Bones,
-    runtime: RuntimeSelection,
+    framework: FrameworkSelection,
 ) -> Result<()> {
     let config_dir = config::bones_config_dir(&cfg.project_name);
 
@@ -36,12 +36,12 @@ pub(super) fn materialize_fresh_bones(
     }
     unix_fs::symlink(&config_dir, bones_dir)?;
 
-    cfg.runtime = serde_json::from_value(serde_json::Value::Object(runtime.config.clone()))?;
+    cfg.framework = serde_json::from_value(serde_json::Value::Object(framework.config.clone()))?;
 
-    if let Some(template_name) = runtime.template {
-        runtime_assets::scaffold_runtime_env_build(&template_name, Path::new("."), &cfg.runtime)?;
-        runtime_assets::scaffold_runtime_deployment(&template_name, bones_dir)?;
-        runtimes::configure(&template_name, cfg);
+    if let Some(template_name) = framework.template {
+        framework_assets::scaffold_framework_env_build(&template_name, Path::new("."), &cfg.framework)?;
+        framework_assets::scaffold_framework_deployment(&template_name, bones_dir)?;
+        frameworks::configure(&template_name, cfg);
         println!("Runtime template: {template_name}");
     } else {
         println!("Runtime template: custom");

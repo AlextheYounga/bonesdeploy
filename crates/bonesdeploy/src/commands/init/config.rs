@@ -275,8 +275,8 @@ mod tests {
             host: Some(String::from("deploy.example.com")),
             port: None,
             template: None,
-            runtime_vars: Vec::new(),
-            dbs: Vec::new(),
+            framework_vars: Vec::new(),
+            services: Vec::new(),
         };
 
         let cfg = collect_non_interactive("workspace", Some(&existing), &args)?;
@@ -301,8 +301,8 @@ mod tests {
             host: None,
             port: None,
             template: None,
-            runtime_vars: Vec::new(),
-            dbs: Vec::new(),
+            framework_vars: Vec::new(),
+            services: Vec::new(),
         };
 
         let result = collect_non_interactive("workspace", Some(&existing), &args);

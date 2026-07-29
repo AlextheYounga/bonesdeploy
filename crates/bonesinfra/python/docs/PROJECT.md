@@ -108,7 +108,7 @@ bonesinfra ssl apply --config <bones.toml>
 
 This command surface is an internal contract with `bonesdeploy`. Runtime
 questions are owned by the Rust runtime definitions under
-`crates/bonesdeploy/src/runtimes/`; BonesInfra receives the resulting
+`crates/bonesdeploy/src/frameworks/`; BonesInfra receives the resulting
 `bones.toml` and does not prompt for runtime settings.
 
 Do not treat it as public user-facing API unless that decision is made deliberately later.
@@ -139,7 +139,7 @@ crates/bonesinfra/
         ├── domain/
         ├── infra/
         ├── deploys/
-        ├── runtimes/
+        ├── frameworks/
         └── assets/
 ```
 
@@ -238,7 +238,7 @@ Domain code should not import pyinfra.
 `domain/context.py` mirrors the top-level `bones.toml` sections:
 
 - **`AppConfig`**: the `[app]`, `[app.server]`, `[app.dns]`, and `[app.deploy]` tables
-- **`RuntimeConfig`**: the typed `[runtime]` identity fields, plus dynamic runtime settings
+- **`FrameworkConfig`**: the typed `[framework]` identity fields, plus dynamic runtime settings
 - **`DeployContext`**: wraps `app`, `runtime`, and `dbs` and provides derived deployment paths
 
 No flat dict. No `host.data` side-channel.
@@ -312,14 +312,14 @@ Deploy plans use `ctx.paths_dict`, derived from `ctx.app` and `ctx.runtime.web_r
 
 Raw pyinfra operations should live in focused modules.
 
-## `runtimes/`
+## `frameworks/`
 
 Owns runtime-specific infrastructure.
 
 Examples:
 
 ```text
-runtimes/
+frameworks/
 ├── __init__.py
 ├── common/
 ├── laravel/
@@ -356,7 +356,7 @@ It mirrors the top-level config sections:
 @dataclass
 class DeployContext:
     app: AppConfig
-    runtime: RuntimeConfig
+    runtime: FrameworkConfig
     dbs: DbsConfig
 ```
 
@@ -373,13 +373,13 @@ Typed fields read from nested `bones.toml` tables:
 `DeployContext`.
 ```
 
-## RuntimeConfig
+## FrameworkConfig
 
 ```text
 runtime_user       # process user for nginx/php-fpm (always project_name)
 runtime_group      # process group (always project_name)
 web_root           # release directory served by nginx (default: public)
-data               # dynamic runtime-specific settings from [runtime]
+data               # dynamic runtime-specific settings from [framework]
 ```
 
 ## template_data()
@@ -575,7 +575,7 @@ Runtime modules should be small and grouped by concern.
 Example Laravel layout:
 
 ```text
-runtimes/laravel/
+frameworks/laravel/
 ├── __init__.py
 ├── metadata.py
 ├── deploy.py
@@ -587,7 +587,7 @@ runtimes/laravel/
 
 Laravel should not be one giant file.
 
-Shared runtime helpers live under `runtimes/common/`, including common AppArmor, nginx, service, Node, path, validation, logging, and PHP-FPM pool helpers.
+Shared runtime helpers live under `frameworks/common/`, including common AppArmor, nginx, service, Node, path, validation, logging, and PHP-FPM pool helpers.
 
 Django, Rails, Node, Vue, etc. can stay small, but they should still follow the same interface.
 

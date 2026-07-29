@@ -14,16 +14,16 @@ pub fn run(yes: bool, show_next: bool) -> Result<()> {
         bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_TOML);
     }
     let cfg = config::load(bones_toml)?;
-    if cfg.dbs.services.is_empty() {
+    if cfg.services.services.is_empty() {
         return Ok(());
     }
-    if !yes && !prompts::confirm_remote_dbs()? {
-        println!("Skipped database setup.");
+    if !yes && !prompts::confirm_remote_services()? {
+        println!("Skipped service setup.");
         return Ok(());
     }
-    println!("Provisioning database services...");
-    bonesinfra::run(&["dbs", "apply", "--config", paths::LOCAL_BONES_TOML])?;
-    println!("Database services applied.");
+    println!("Provisioning services...");
+    bonesinfra::run(&["services", "apply", "--config", paths::LOCAL_BONES_TOML])?;
+    println!("Services applied.");
     if show_next {
         println!();
         println!("{}", output::next_step("bonesdeploy push"));

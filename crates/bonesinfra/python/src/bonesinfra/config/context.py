@@ -17,8 +17,8 @@ DEFAULT_WEB_ROOT = "public"
 @dataclass
 class DeployContext:
     app: AppConfig
-    runtime: RuntimeConfig
-    dbs: DbsConfig
+    runtime: FrameworkConfig
+    services: ServicesConfig
 
     @classmethod
     def from_files(cls, config_path: str) -> DeployContext:
@@ -28,8 +28,8 @@ class DeployContext:
         server_cfg = _table(app_cfg, "server")
         dns_cfg = _table(app_cfg, "dns")
         deploy_cfg = _table(app_cfg, "deploy")
-        runtime_cfg = _table(bones_cfg, "runtime")
-        dbs_cfg = _table(bones_cfg, "dbs")
+        runtime_cfg = _table(bones_cfg, "framework")
+        services_cfg = _table(bones_cfg, "services")
         project_name = str(app_cfg.get("project_name", ""))
 
         app = AppConfig(
@@ -50,15 +50,15 @@ class DeployContext:
             deploy=DeployConfig(branch=str(deploy_cfg.get("branch", "master"))),
         )
 
-        runtime = RuntimeConfig(
+        runtime = FrameworkConfig(
             web_root=str(runtime_cfg.get("web_root") or DEFAULT_WEB_ROOT),
             runtime_user=project_name,
             runtime_group=project_name,
             data={key: value for key, value in runtime_cfg.items() if key not in {"web_root", "permissions", "shared"}},
         )
 
-        dbs = DbsConfig(services=_database_services(dbs_cfg.get("services", [])))
-        return cls(app=app, runtime=runtime, dbs=dbs)
+        services = ServicesConfig(services=_database_services(services_cfg.get("services", [])))
+        return cls(app=app, runtime=runtime, services=services)
 
     @property
     def paths(self) -> DeploymentPaths:
@@ -140,7 +140,7 @@ class DeployConfig:
 
 
 @dataclass
-class RuntimeConfig:
+class FrameworkConfig:
     web_root: str
     runtime_user: str
     runtime_group: str
@@ -148,7 +148,7 @@ class RuntimeConfig:
 
 
 @dataclass(frozen=True)
-class DbsConfig:
+class ServicesConfig:
     services: tuple[str, ...] = ()
 
 
@@ -161,7 +161,7 @@ def _table(parent: dict[str, Any], name: str) -> dict[str, Any]:
 
 def _database_services(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(service, str) for service in value):
-        raise TypeError("bones.toml [dbs].services must be an array of strings")
+        raise TypeError("bones.toml [services].services must be an array of strings")
     supported = {"postgres", "mariadb", "mysql", "mongodb", "valkey", "redis"}
     services = tuple(value)
     unsupported = set(services) - supported

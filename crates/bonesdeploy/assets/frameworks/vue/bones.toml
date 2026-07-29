@@ -1,9 +1,9 @@
-[runtime]
+[framework]
 template = "vue"
 web_root = "dist"
 node_version = "24.18.0"
 
-[runtime.permissions]
+[framework.permissions]
 paths = [
   { path = "*", type = "dir", mode = "750" },
   { path = "*", type = "file", mode = "640" },

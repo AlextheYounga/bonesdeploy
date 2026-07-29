@@ -10,8 +10,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 
 use crate::config;
+use crate::frameworks;
 use crate::infra::ssh;
-use crate::runtimes;
 use crate::ui::output;
 use shared::config as shared_config;
 use shared::config::parse_port;
@@ -58,8 +58,8 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     shared_config::apply_derived_defaults(&mut effective_config);
     fs::write(
         &temp_path,
-        runtimes::environment_example(
-            &effective_config.runtime.template,
+        frameworks::environment_example(
+            &effective_config.framework.template,
             &effective_config.project_name,
             &effective_config.domain,
             &effective_config.preview_domain,
