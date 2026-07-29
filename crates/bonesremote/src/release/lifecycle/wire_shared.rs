@@ -3,7 +3,7 @@ use std::os::unix::fs::symlink;
 use std::path::{Component, Path};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, SharedPath, validate_site_name};
+use shared::config::{self, SharedPath};
 use shared::paths;
 
 use crate::privileges;
@@ -11,17 +11,10 @@ use crate::release::state as release_state;
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release wire")?;
-    validate_site_name(site)?;
 
-    let bones_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&bones_path).context("Failed to load remote site state")?;
+    let cfg = super::load_site_config(site)?;
     let framework =
         config::load_framework(&paths::bonesremote_site_root(site)).context("Failed to load remote framework state")?;
-
-    if cfg.project_name != site {
-        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
-    }
-
     let release_name = release_state::read_staged_release(site)?;
     let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
     if !release_dir.is_dir() {

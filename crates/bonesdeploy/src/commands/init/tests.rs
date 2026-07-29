@@ -58,14 +58,14 @@ impl TestEnvironment {
 impl Drop for TestEnvironment {
     fn drop(&mut self) {
         let _ = env::set_current_dir(&self.original_dir);
-        restore_env_var("HOME", &self.original_home);
-        restore_env_var("XDG_CONFIG_HOME", &self.original_xdg_config_home);
-        restore_env_var("XDG_DATA_HOME", &self.original_xdg_data_home);
-        restore_env_var("XDG_CACHE_HOME", &self.original_xdg_cache_home);
+        restore_env_var("HOME", self.original_home.as_ref());
+        restore_env_var("XDG_CONFIG_HOME", self.original_xdg_config_home.as_ref());
+        restore_env_var("XDG_DATA_HOME", self.original_xdg_data_home.as_ref());
+        restore_env_var("XDG_CACHE_HOME", self.original_xdg_cache_home.as_ref());
     }
 }
 
-fn restore_env_var(name: &str, original: &Option<String>) {
+fn restore_env_var(name: &str, original: Option<&String>) {
     // Safety: TestEnvironment holds the test mutex for its entire lifetime; see enter().
     unsafe {
         match original {
@@ -115,22 +115,25 @@ fn with_temp_repo(test: impl FnOnce(&Path, &Path) -> Result<()>) -> Result<()> {
     test(&repo_dir, &home_dir)
 }
 
+fn assert_bones_dir(bones_dir: &Path) -> Result<()> {
+    assert!(bones_dir.join("bones.toml").is_file());
+    let custom = fs::read_to_string(bones_dir.join("custom.py"))?;
+    assert!(custom.contains("Local-only BonesInfra extension hooks"));
+    assert!(!bones_dir.join("hooks").exists(), ".bones should not contain a hooks/ directory");
+    let deploy_dir = bones_dir.join("deployment");
+    assert!(deploy_dir.is_dir());
+    assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
+    let bones_toml = fs::read_to_string(bones_dir.join("bones.toml"))?;
+    assert!(bones_toml.contains("[framework]"));
+    Ok(())
+}
+
 #[test]
 fn materializes_base_bones_assets() -> Result<()> {
     with_temp_repo(|repo_dir, _home_dir| {
         run_init()?;
 
-        let bones_dir = repo_dir.join(".bones");
-        assert!(bones_dir.join("bones.toml").is_file());
-        assert!(bones_dir.join("bones.toml").is_file());
-        let custom = fs::read_to_string(bones_dir.join("custom.py"))?;
-        assert!(custom.contains("Local-only BonesInfra extension hooks"));
-        assert!(!bones_dir.join("hooks").exists(), ".bones should not contain a hooks/ directory");
-        let deploy_dir = bones_dir.join("deployment");
-        assert!(deploy_dir.is_dir());
-        assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
-        let bones_toml = fs::read_to_string(bones_dir.join("bones.toml"))?;
-        assert!(bones_toml.contains("[framework]"));
+        assert_bones_dir(&repo_dir.join(".bones"))?;
 
         let env_build = repo_dir.join(".env.build");
         assert!(env_build.is_file(), ".env.build should be created");

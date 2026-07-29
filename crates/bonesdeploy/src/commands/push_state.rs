@@ -194,7 +194,7 @@ mod tests {
 
         assert!(output.status.success());
         let mut actual: Vec<_> = String::from_utf8(output.stdout)?.lines().map(String::from).collect();
-        actual.sort();
+        actual.sort_unstable();
         let mut expected = vec![
             "bones.toml",
             "confs/nginx/app-site-nginx.conf.j2",
@@ -203,7 +203,7 @@ mod tests {
             "deployment/build/01_build.sh",
             "deployment/prepare/02_prepare.sh",
         ];
-        expected.sort();
+        expected.sort_unstable();
         assert_eq!(actual, expected);
         Ok(())
     }

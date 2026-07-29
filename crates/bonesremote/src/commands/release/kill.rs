@@ -10,8 +10,8 @@ use shared::paths;
 
 use crate::commands::{drop_failed_release, release::list};
 use crate::privileges;
+use crate::release::lifecycle::build::{ensure_build_user_ready, remove_build_container};
 use crate::release::lifecycle::checkout;
-use crate::release::script_runner::{ensure_build_user_ready, remove_build_container};
 use crate::release::state::{self as release_state, DeploymentPhase};
 
 const PROCESS_STOP_TIMEOUT: Duration = Duration::from_secs(5);

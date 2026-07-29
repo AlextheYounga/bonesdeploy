@@ -6,25 +6,22 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result, bail};
 use shared::paths;
 
-mod container;
-pub(crate) use container::{BuildContainer, remove_build_container};
-
-pub(crate) struct BuildScriptEnv<'a> {
-    pub(crate) project_name: &'a str,
-    pub(crate) build_user: &'a str,
-    pub(crate) web_root: &'a str,
-    pub(crate) deployment_dir: &'a Path,
-    pub(crate) build_cache_dir: &'a Path,
-    pub(crate) build_env_vars: &'a [(String, String)],
+pub(super) struct BuildScriptEnv<'a> {
+    pub(super) project_name: &'a str,
+    pub(super) build_user: &'a str,
+    pub(super) web_root: &'a str,
+    pub(super) deployment_dir: &'a Path,
+    pub(super) build_cache_dir: &'a Path,
+    pub(super) build_env_vars: &'a [(String, String)],
 }
 
-fn build_user_command(build_user: &str) -> Command {
+pub(super) fn build_user_command(build_user: &str) -> Command {
     let mut command = Command::new("systemd-run");
     command.arg(format!("--machine={build_user}@")).args(["--quiet", "--user", "--collect", "--pipe", "--wait"]);
     command
 }
 
-fn build_user_control_command(build_user: &str) -> Command {
+pub(super) fn build_user_control_command(build_user: &str) -> Command {
     let mut command = build_user_command(build_user);
     command.arg("--property=RuntimeMaxSec=20s");
     command
@@ -99,17 +96,36 @@ pub(crate) fn validate_build_cache(path: &Path, uid: u32, gid: u32) -> Result<()
 }
 
 #[cfg(test)]
-#[test]
-fn build_cache_validation_requires_private_owned_directory() -> Result<()> {
-    let root = super::temp_dir("bonesremote-build-cache")?;
-    let cache = root.join("cache");
-    fs::create_dir(&cache)?;
-    fs::set_permissions(&cache, PermissionsExt::from_mode(0o700))?;
-    let metadata = fs::metadata(&cache)?;
-    validate_build_cache(&cache, metadata.uid(), metadata.gid())?;
+mod tests {
+    use std::env;
+    use std::fs;
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    fs::set_permissions(&cache, PermissionsExt::from_mode(0o755))?;
-    assert!(validate_build_cache(&cache, metadata.uid(), metadata.gid()).is_err());
-    fs::remove_dir_all(root).ok();
-    Ok(())
+    use anyhow::Result;
+
+    use super::validate_build_cache;
+
+    fn temp_dir(prefix: &str) -> Result<PathBuf> {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
+        let path = env::temp_dir().join(format!("{prefix}_{nanos}"));
+        fs::create_dir_all(&path)?;
+        Ok(path)
+    }
+
+    #[test]
+    fn build_cache_validation_requires_private_owned_directory() -> Result<()> {
+        let root = temp_dir("bonesremote-build-cache")?;
+        let cache = root.join("cache");
+        fs::create_dir(&cache)?;
+        fs::set_permissions(&cache, PermissionsExt::from_mode(0o700))?;
+        let metadata = fs::metadata(&cache)?;
+        validate_build_cache(&cache, metadata.uid(), metadata.gid())?;
+
+        fs::set_permissions(&cache, PermissionsExt::from_mode(0o755))?;
+        assert!(validate_build_cache(&cache, metadata.uid(), metadata.gid()).is_err());
+        fs::remove_dir_all(root).ok();
+        Ok(())
+    }
 }

@@ -7,8 +7,9 @@ use shared::config::{self, build_group_for, build_user_for, is_numbered_shell_sc
 use shared::env_build;
 use shared::paths;
 
+use super::build_user::BuildScriptEnv;
+use super::container::BuildContainer;
 use super::ownership;
-use crate::release::script_runner as deploy_output;
 
 pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()> {
     if !context.is_dir() {
@@ -41,7 +42,7 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
     let deployment_dir = scripts_dir.parent().context("Build scripts directory has no deployment parent")?;
     let build_cache_dir = paths::bonesdeploy_user_cache(&build_user);
 
-    let build_env = deploy_output::BuildScriptEnv {
+    let build_env = BuildScriptEnv {
         project_name: &cfg.project_name,
         build_user: &build_user,
         web_root: &framework.web_root,
@@ -49,7 +50,7 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
         build_cache_dir: &build_cache_dir,
         build_env_vars: &build_env_vars,
     };
-    let mut container = deploy_output::BuildContainer::start(context, &build_env)?;
+    let mut container = BuildContainer::start(context, &build_env)?;
 
     let logs_dir = paths::bonesremote_site_logs(site);
     fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;

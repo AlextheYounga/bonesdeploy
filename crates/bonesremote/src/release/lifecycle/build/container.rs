@@ -4,8 +4,8 @@ use std::process::{Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, bail};
 
-use super::{BuildScriptEnv, build_user_command, build_user_control_command};
-use crate::release::script_runner::output;
+use super::build_user::{BuildScriptEnv, build_user_command, build_user_control_command};
+use crate::release::output;
 
 const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
 
@@ -20,7 +20,7 @@ fn service_command(build_user: &str, container_name: &str) -> Command {
     command
 }
 
-pub(crate) struct BuildContainer<'a> {
+pub(super) struct BuildContainer<'a> {
     env: &'a BuildScriptEnv<'a>,
     source_root: &'a Path,
     name: String,
@@ -28,7 +28,7 @@ pub(crate) struct BuildContainer<'a> {
 }
 
 impl<'a> BuildContainer<'a> {
-    pub(crate) fn start(source_root: &'a Path, env: &'a BuildScriptEnv<'a>) -> Result<Self> {
+    pub(super) fn start(source_root: &'a Path, env: &'a BuildScriptEnv<'a>) -> Result<Self> {
         let name = container_name(env.project_name);
         remove_existing(source_root, env, &name)?;
         ensure_image(source_root, env, &name)?;
@@ -45,7 +45,7 @@ impl<'a> BuildContainer<'a> {
         Ok(container)
     }
 
-    pub(crate) fn run_script(&self, script: &Path, log_path: &Path) -> Result<ExitStatus> {
+    pub(super) fn run_script(&self, script: &Path, log_path: &Path) -> Result<ExitStatus> {
         let script_file =
             fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
         let description = format!("podman build script {}", script.display());
@@ -60,7 +60,7 @@ impl<'a> BuildContainer<'a> {
         output::stream_child_output(&mut child, log_path, &description)
     }
 
-    pub(crate) fn remove(&mut self) -> Result<()> {
+    pub(super) fn remove(&mut self) -> Result<()> {
         if self.removed {
             return Ok(());
         }

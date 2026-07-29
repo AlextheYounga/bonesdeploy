@@ -109,13 +109,7 @@ fn set_release_tree_identity(destination: &Path, uid: u32, gid: u32) -> Result<(
 
     chown(destination, Some(uid), Some(gid)).with_context(|| format!("Failed to chown {}", destination.display()))?;
 
-    let mode = if metadata.file_type().is_dir() {
-        0o750
-    } else if metadata.mode() & 0o111 != 0 {
-        0o750
-    } else {
-        0o640
-    };
+    let mode = if metadata.file_type().is_dir() || metadata.mode() & 0o111 != 0 { 0o750 } else { 0o640 };
     fs::set_permissions(destination, fs::Permissions::from_mode(mode))
         .with_context(|| format!("Failed to set permissions on {}", destination.display()))?;
 

@@ -111,7 +111,9 @@ mod tests {
     use crate::frameworks;
     use anyhow::Result;
 
+    use std::env;
     use std::fs;
+    use std::process;
 
     use super::{Framework, FrameworkAssets, framework_defaults, framework_names, scaffold_framework_env_build};
 
@@ -143,7 +145,7 @@ mod tests {
 
     #[test]
     fn framework_build_environment_example_does_not_overwrite_existing_file() -> Result<()> {
-        let root = std::env::temp_dir().join(format!("bonesdeploy-framework-env-{}", std::process::id()));
+        let root = env::temp_dir().join(format!("bonesdeploy-framework-env-{}", process::id()));
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root)?;
 
