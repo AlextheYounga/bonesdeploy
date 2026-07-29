@@ -3,6 +3,7 @@ from pyinfra.operations import apt, server, systemd
 from bonesinfra.config.paths import SCRIPTS_DIR
 from bonesinfra.services.runtime.base import RuntimeService
 
+MONGO_DB_CONFIG = "/etc/mongod.conf"
 
 class MongoDBService(RuntimeService):
     def provision(self, ctx):
@@ -23,10 +24,10 @@ class MongoDBService(RuntimeService):
         server.shell(
             name="Configure MongoDB for project",
             commands=[
-                "sed -ri 's/^[[:space:]]*bindIp:.*/  bindIp: 127.0.0.1/' /etc/mongod.conf",
+                f"sed -ri 's/^[[:space:]]*bindIp:.*/  bindIp: 127.0.0.1/' {MONGO_DB_CONFIG}",
                 (
-                    "grep -q '^security:' /etc/mongod.conf || "
-                    "printf '\\nsecurity:\\n  authorization: enabled\\n' >> /etc/mongod.conf"
+                    f"grep -q '^security:' {MONGO_DB_CONFIG} || "
+                    f"printf '\\nsecurity:\\n  authorization: enabled\\n' >> {MONGO_DB_CONFIG}"
                 ),
             ],
             _sudo=True,
