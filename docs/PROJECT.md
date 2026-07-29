@@ -234,6 +234,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Runs remote checks (skipped with `--local`):
     - Opens a privileged SSH session and runs `bonesremote doctor --site <project>`.
     - `bonesremote doctor --site <project>` checks Podman availability, deploy-user sudo wiring, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until the configured branch is pushed.
+    - The security audit is read-only and currently verifies imported-site identity separation, untrusted write access through the parent chains of BonesRemote/systemd/sudoers/nginx/AppArmor paths, and the active release plus its `current` parent. Required security evidence that cannot be collected is reported as `UNVERIFIED` and causes doctor to fail.
   - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys.
 
 - **push**

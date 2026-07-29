@@ -7,6 +7,7 @@ fn style(code: &str, value: &str) -> String {
 }
 
 mod apparmor;
+mod security;
 mod site;
 mod system;
 
@@ -20,6 +21,10 @@ pub fn run(site: Option<&str>) -> Result<()> {
     system::check_podman_available(&mut issues);
     system::check_passwordless_sudo(&mut issues);
     apparmor::check_support(&mut issues);
+
+    let security_report = security::audit();
+    security_report.render();
+    issues.extend(security_report.required_failures());
 
     if let Some(site) = site {
         site::check(site, &mut issues, &mut pending);
