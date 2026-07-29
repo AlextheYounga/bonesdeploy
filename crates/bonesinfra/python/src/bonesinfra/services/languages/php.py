@@ -1,6 +1,8 @@
 import re
 from tempfile import NamedTemporaryFile
 
+from pyinfra import host
+from pyinfra.facts.server import LinuxDistribution
 from pyinfra.operations import apt, server
 
 from bonesinfra.services.languages.base import LanguageRuntime
@@ -59,10 +61,11 @@ class PHPRuntime(LanguageRuntime):
             _sudo=True,
         )
         apt.deb(name="Install PHP repo keyring package", src=keyring_path, _sudo=True)
-        server.shell(name="Remove stale PHP apt source file", commands=["rm -f /etc/apt/sources.list.d/php.list"], _sudo=True)
-
-        from pyinfra import host
-        from pyinfra.facts.server import LinuxDistribution
+        server.shell(
+            name="Remove stale PHP apt source file",
+            commands=["rm -f /etc/apt/sources.list.d/php.list"],
+            _sudo=True,
+        )
 
         deb = host.get_fact(LinuxDistribution)
         release_meta = deb.get("release_meta", {}) if deb else {}

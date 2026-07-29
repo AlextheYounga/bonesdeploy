@@ -1,4 +1,5 @@
 import importlib
+
 from bonesinfra.frameworks import list_frameworks
 
 FRAMEWORKS_MODULES = {

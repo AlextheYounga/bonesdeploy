@@ -6,8 +6,8 @@ from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import validation
-from bonesinfra.services.languages import RUBY
 from bonesinfra.pyinfra.operations import render
+from bonesinfra.services.languages import RUBY
 
 
 class RailsFramework(ServerFramework):

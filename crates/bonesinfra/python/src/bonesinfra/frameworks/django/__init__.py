@@ -6,8 +6,8 @@ from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import validation
-from bonesinfra.services.languages import PYTHON
 from bonesinfra.pyinfra.operations import mkdir, render
+from bonesinfra.services.languages import PYTHON
 
 
 class DjangoFramework(ServerFramework):
@@ -41,7 +41,9 @@ class DjangoFramework(ServerFramework):
         placeholder = paths["placeholder_release"]
         server.shell(
             name="Create placeholder venv with gunicorn",
-            commands=[f"cd {quote(placeholder)} && {self.python_binary} -m venv .venv && .venv/bin/pip install gunicorn"],
+            commands=[
+                f"cd {quote(placeholder)} && {self.python_binary} -m venv .venv && .venv/bin/pip install gunicorn"
+            ],
             _sudo=True,
         )
         mkdir(

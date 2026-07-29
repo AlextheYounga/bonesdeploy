@@ -2,12 +2,12 @@ from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
-from bonesinfra.frameworks.common import paths as common_paths
+from bonesinfra.frameworks.common import logs, paths as common_paths
 from bonesinfra.pyinfra.operations import mkdir, render
+from bonesinfra.services.languages import PHP
+from bonesinfra.services.linux import systemd as service
 from bonesinfra.services.linux.apparmor import app as apparmor
 from bonesinfra.services.linux.nginx import site as nginx_site
-from bonesinfra.services.linux import systemd as service
-from bonesinfra.frameworks.common import logs
 from bonesinfra.services.runtime import php_fpm
 
 
@@ -154,8 +154,6 @@ class PHPFramework(Framework):
         return ctx.runtime.data.get("php_version", "8.5")
 
     def install_packages(self, ctx):
-        from bonesinfra.services.languages import PHP
-
         PHP.install(ctx)
 
     def deploy(self, ctx):
