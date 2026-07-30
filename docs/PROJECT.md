@@ -130,6 +130,8 @@ web_root = "public"
 # Do not place passwords, tokens, or private keys here.
 NEXT_PUBLIC_API_URL=https://api.example.com
 NEXT_PUBLIC_SITE_NAME=Example
+# Laravel only: pin the Composer release used by the build.
+COMPOSER_VERSION=2.8.12
 ```
 
 Rules:
@@ -144,6 +146,10 @@ The build environment consists of:
 2. Values from committed `.env.build`.
 3. Derived `BONES_*` values from `bones.toml`.
 4. Fixed internal values such as `BUILD_CACHE_DIR`.
+
+Laravel builds use Composer `2.8.12` by default. Set `COMPOSER_VERSION` in
+`.env.build` to select another stable `x.y.z` Composer release compatible with
+the selected PHP version.
 
 Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. Runtime secrets belong in `shared/.env` via `bonesdeploy secrets push`.
 

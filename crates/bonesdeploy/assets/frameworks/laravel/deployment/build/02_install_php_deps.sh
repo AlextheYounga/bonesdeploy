@@ -107,14 +107,23 @@ php_command() {
 	fi
 }
 
+composer_version() {
+	local version="${COMPOSER_VERSION:-2.8.12}"
+
+	[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "COMPOSER_VERSION must be a stable semantic version, got: $version"
+	echo "$version"
+}
+
 install_composer() {
 	local php_bin
 	local installer="/tmp/composer-setup.php"
 	local expected_checksum
 	local actual_checksum
+	local version
 
 	php_bin="$(php_command)"
-	log "Downloading Composer installer..."
+	version="$(composer_version)"
+	log "Downloading Composer ${version} installer..."
 	curl -fsSL --connect-timeout 15 https://getcomposer.org/installer -o "$installer"
 	expected_checksum="$(curl -fsSL --connect-timeout 15 https://composer.github.io/installer.sig)"
 	actual_checksum="$("$php_bin" -r "echo hash_file('sha384', '$installer');")"
@@ -124,7 +133,7 @@ install_composer() {
 		die "Composer installer checksum mismatch."
 	fi
 
-	"$php_bin" "$installer" --quiet --install-dir=/usr/local/bin --filename=composer.phar
+	"$php_bin" "$installer" --version="$version" --install-dir=/usr/local/bin --filename=composer.phar
 	rm -f "$installer"
 }
 
