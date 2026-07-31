@@ -115,26 +115,33 @@ composer_version() {
 }
 
 install_composer() {
-	local php_bin
-	local installer="/tmp/composer-setup.php"
+	local composer="/usr/local/bin/composer.phar"
+	local temporary_composer="${composer}.tmp"
 	local expected_checksum
 	local actual_checksum
 	local version
 
-	php_bin="$(php_command)"
 	version="$(composer_version)"
-	log "Downloading Composer ${version} installer..."
-	curl -fsSL --connect-timeout 15 https://getcomposer.org/installer -o "$installer"
-	expected_checksum="$(curl -fsSL --connect-timeout 15 https://composer.github.io/installer.sig)"
-	actual_checksum="$("$php_bin" -r "echo hash_file('sha384', '$installer');")"
+	log "Downloading Composer ${version}..."
+	curl --fail --show-error --silent --location \
+		--connect-timeout 15 --max-time 120 \
+		--retry 3 --retry-delay 2 --retry-connrefused \
+		-o "$temporary_composer" \
+		"https://getcomposer.org/download/${version}/composer.phar"
+
+	read -r expected_checksum _ < <(curl --fail --show-error --silent --location \
+		--connect-timeout 15 --max-time 30 \
+		"https://getcomposer.org/download/${version}/composer.phar.sha256sum")
+	actual_checksum="$(sha256sum "$temporary_composer")"
+	actual_checksum="${actual_checksum%% *}"
 
 	if [ "$expected_checksum" != "$actual_checksum" ]; then
-		rm -f "$installer"
-		die "Composer installer checksum mismatch."
+		rm -f "$temporary_composer"
+		die "Composer checksum mismatch."
 	fi
 
-	"$php_bin" "$installer" --version="$version" --install-dir=/usr/local/bin --filename=composer.phar
-	rm -f "$installer"
+	chmod 0755 "$temporary_composer"
+	mv -f "$temporary_composer" "$composer"
 }
 
 configure_environment() {

@@ -149,7 +149,8 @@ The build environment consists of:
 
 Laravel builds use Composer `2.8.12` by default. Set `COMPOSER_VERSION` in
 `.env.build` to select another stable `x.y.z` Composer release compatible with
-the selected PHP version.
+the selected PHP version. Builds download the pinned PHAR directly with curl,
+verify its SHA-256 checksum, and use bounded network timeouts.
 
 Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. Runtime secrets belong in `shared/.env` via `bonesdeploy secrets push`.
 
