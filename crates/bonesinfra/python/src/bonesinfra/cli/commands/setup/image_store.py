@@ -28,9 +28,6 @@ def ensure_shared_store():
         name="Install shared image store storage configuration",
         src=ASSETS_DIR / "podman/image-store-storage.conf.j2",
         dest=IMAGE_STORE_STORAGE_CONF,
-        user="root",
-        group="root",
-        mode="0644",
     )
 
 

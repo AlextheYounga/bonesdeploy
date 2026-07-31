@@ -22,7 +22,6 @@ def install_default_deny_server(paths):
         "Deploy nginx default-deny server",
         ASSETS_DIR / "nginx/default-deny.conf.j2",
         paths["nginx_default_deny_site_available"],
-        mode="0644",
         paths=paths,
     )
     files.link(
@@ -56,7 +55,6 @@ def render_router_config(ctx, paths, *, ssl_enabled, stage=None, validate=False,
         f"Deploy router nginx config{label}",
         ASSETS_DIR / "nginx/router.conf.j2",
         paths["nginx_site_available"],
-        mode="0644",
         nginx_server_name=nginx_server_name,
         nginx_ssl_enabled=ssl_enabled,
         nginx_ssl_certificate_path=cert_path,
@@ -106,7 +104,6 @@ def setup(ctx, paths, *, nginx_address_families="AF_UNIX", nginx_ip_loopback_onl
         "Deploy per-site nginx systemd service",
         ASSETS_DIR / "nginx/site-nginx.service.j2",
         paths["systemd_site_nginx_service"],
-        mode="0644",
         nginx_address_families=nginx_address_families,
         nginx_ip_loopback_only=nginx_ip_loopback_only,
         **template_data(ctx, paths=paths),

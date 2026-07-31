@@ -11,9 +11,6 @@ def configure():
         "Disable the vulnerable algif_aead module",
         ASSETS_DIR / "modprobe/disable-algif.conf.j2",
         DISABLE_ALGIF_PATH,
-        user="root",
-        group="root",
-        mode="0644",
     )
 
     # Containerized hosts (LXC-style VPSes, e2e containers) share the host

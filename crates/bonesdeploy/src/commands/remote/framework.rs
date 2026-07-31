@@ -26,7 +26,7 @@ pub fn run(yes: bool, show_next: bool) -> Result<()> {
 
     println!("Applying framework...");
 
-    bonesinfra::run(&["framework", "apply", "--config", paths::LOCAL_BONES_TOML])?;
+    bonesinfra::run(&["runtime", "apply", "--config", paths::LOCAL_BONES_TOML])?;
 
     println!("Framework applied.");
     if show_next {

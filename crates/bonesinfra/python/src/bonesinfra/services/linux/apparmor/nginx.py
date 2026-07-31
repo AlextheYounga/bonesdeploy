@@ -26,7 +26,6 @@ def setup(ctx, paths, nginx_apparmor_network="network unix stream,"):
         "Deploy per-project nginx AppArmor profile",
         ASSETS_DIR / "apparmor/project-nginx-profile.j2",
         profile_path,
-        mode="0644",
         apparmor_profile_name=profile_name,
         nginx_apparmor_network=nginx_apparmor_network,
         **template_data(ctx, paths=paths),

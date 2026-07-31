@@ -10,16 +10,10 @@ def configure():
         "Install apt auto-upgrades config",
         ASSETS_DIR / "unattended-upgrades/20auto-upgrades.j2",
         AUTO_UPGRADES_PATH,
-        user="root",
-        group="root",
-        mode="0644",
     )
 
     render(
         "Install unattended-upgrades config",
         ASSETS_DIR / "unattended-upgrades/50unattended-upgrades.j2",
         UNATTENDED_UPGRADES_PATH,
-        user="root",
-        group="root",
-        mode="0644",
     )

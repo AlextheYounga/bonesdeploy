@@ -20,7 +20,6 @@ def render_profile(
         f"Deploy {runtime} AppArmor profile",
         ASSETS_DIR / "apparmor/app-profile.j2",
         profile_path,
-        mode="0644",
         apparmor_profile_name=profile_name,
         apparmor_runtime=runtime,
         apparmor_exec_paths=apparmor_exec_paths,

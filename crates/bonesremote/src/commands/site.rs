@@ -150,7 +150,7 @@ fn validate_top_level_entries(root: &Path) -> Result<()> {
 
         match name {
             paths::BONES_TOML if entry.file_type()?.is_file() => {}
-            paths::DEPLOYMENT_DIR if entry.file_type()?.is_dir() => {}
+            paths::DEPLOYMENT_DIR | paths::CONFS_DIR if entry.file_type()?.is_dir() => {}
             _ => bail!("Imported dataset contains unsupported entry: {name}"),
         }
     }
@@ -283,6 +283,23 @@ mod tests {
 
         fs::remove_dir_all(&root)?;
         assert!(result.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn validate_top_level_entries_allows_confs_directory() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-site-confs-test-{}", process::id()));
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        fs::create_dir_all(&root)?;
+        fs::write(root.join(paths::BONES_TOML), "")?;
+        fs::create_dir_all(root.join(paths::DEPLOYMENT_DIR))?;
+        fs::create_dir_all(root.join(paths::CONFS_DIR))?;
+
+        let result = validate_top_level_entries(&root);
+        fs::remove_dir_all(&root)?;
+        assert!(result.is_ok());
         Ok(())
     }
 
