@@ -32,15 +32,14 @@ chown git:git "$hook"
 chmod 0755 "$hook"
 
 sudoers=/etc/sudoers.d/bonesdeploy
-rule='git ALL=(root) NOPASSWD: /usr/local/bin/bonesremote site receive --site *'
-if ! grep -Fqx "$rule" "$sudoers" 2>/dev/null; then
-	temporary=$(mktemp)
-	if [ -f "$sudoers" ]; then
-		cat "$sudoers" >"$temporary"
-	fi
-	printf '%s\n' "$rule" >>"$temporary"
-	chmod 0440 "$temporary"
-	chown root:root "$temporary"
-	visudo -cf "$temporary"
-	mv "$temporary" "$sudoers"
+temporary=$(mktemp)
+if [ -f "$sudoers" ]; then
+	sed '/^git ALL=(root) NOPASSWD:/d' "$sudoers" >"$temporary"
 fi
+cat >>"$temporary" <<'SUDOERS'
+git ALL=(root) NOPASSWD: /usr/local/bin/bonesremote ^hook post-receive --site [a-z0-9-]+$, /usr/local/bin/bonesremote ^site receive --site [a-z0-9-]+ --revision [0-9a-f]{40}$, /usr/local/bin/bonesremote ^service restart --site [a-z0-9-]+$, /usr/local/bin/bonesremote ^release rollback --site [a-z0-9-]+$, /usr/local/bin/bonesremote ^release drop-failed --site [a-z0-9-]+$, /usr/local/bin/bonesremote ^release prune --site [a-z0-9-]+$
+SUDOERS
+chmod 0440 "$temporary"
+chown root:root "$temporary"
+visudo -cf "$temporary"
+mv "$temporary" "$sudoers"

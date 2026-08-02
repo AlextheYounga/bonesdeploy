@@ -117,6 +117,7 @@ version = "0.7.3"
 dependencies = [
  "anyhow",
  "clap",
+ "console",
  "libc",
  "serde",
  "serde_json",

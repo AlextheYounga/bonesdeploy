@@ -10,15 +10,6 @@ pub(super) enum Status {
 }
 
 impl Status {
-    pub(super) fn label(self) -> &'static str {
-        match self {
-            Self::Pass => "PASS",
-            Self::Fail => "FAIL",
-            Self::Unverified => "UNVERIFIED",
-            Self::NotApplicable => "NOT APPLICABLE",
-        }
-    }
-
     pub(super) fn requires_failure(self) -> bool {
         matches!(self, Self::Fail | Self::Unverified)
     }

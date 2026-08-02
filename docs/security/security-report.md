@@ -60,9 +60,9 @@ parent. Validate the canonical path before creating the hook.
 ### SEC-003 — Shared deploy identity has cross-site sudo authority
 
 The sudoers rule grants the common deploy user `git` passwordless access to
-several `bonesremote` commands with `--site *`. On a multi-tenant host, any
-compromise of that identity can restart, roll back, prune, or trigger a hook
-for another project.
+several `bonesremote` commands for any syntactically valid `--site` value. On
+a multi-tenant host, any compromise of that identity can restart, roll back,
+prune, or trigger a hook for another project.
 
 This is not a tenant-isolation issue when one operator intentionally owns all
 projects on a host. If tenant isolation is required, replacing `*` with

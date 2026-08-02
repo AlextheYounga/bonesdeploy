@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod privileges;
 mod release;
+mod ui;
 
 use std::process::ExitCode;
 
@@ -24,8 +25,8 @@ fn print_error(error: &anyhow::Error) {
     let Some(head) = chain.next() else {
         return;
     };
-    eprintln!("\x1b[1;31m✗\x1b[0m \x1b[1;31m{head}\x1b[0m");
+    eprintln!("{} {head}", ui::failure_marker());
     for cause in chain {
-        eprintln!("  \x1b[2mcaused by: \x1b[0m\x1b[2m{cause}\x1b[0m");
+        eprintln!("  caused by: {cause}");
     }
 }

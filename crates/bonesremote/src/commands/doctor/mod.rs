@@ -1,12 +1,8 @@
 use anyhow::Result;
 use shared::paths;
-use std::io::{self, IsTerminal};
 
 use crate::privileges;
-
-fn style(code: &str, value: &str) -> String {
-    if io::stdout().is_terminal() { format!("\x1b[{code}m{value}\x1b[0m") } else { value.to_string() }
-}
+use crate::ui;
 
 mod apparmor;
 mod security;
@@ -15,7 +11,7 @@ mod system;
 
 pub fn run(site: Option<&str>) -> Result<()> {
     privileges::ensure_root("bonesremote doctor")?;
-    println!("{}", style("1", &format!("{} doctor", paths::BONESREMOTE_BINARY)));
+    println!("{} doctor", console::style(paths::BONESREMOTE_BINARY).bold());
 
     let mut issues: Vec<String> = Vec::new();
     let mut pending: Vec<String> = Vec::new();
@@ -35,21 +31,23 @@ pub fn run(site: Option<&str>) -> Result<()> {
     if !pending.is_empty() {
         println!();
         for item in &pending {
-            println!("  {} {item}", style("1;33", "•"));
+            println!("  {} {item}", ui::pending_marker());
         }
     }
 
     if issues.is_empty() {
         if pending.is_empty() {
-            println!("\n{} All checks passed.", style("1;32", "OK"));
+            println!("\n{} All checks passed.", ui::success_marker());
         } else {
-            println!("\n{} Deployment needs one more step.", style("1;33", "PENDING"));
+            println!("\n{} Deployment needs one more step.", ui::pending_marker());
         }
         Ok(())
     } else {
         println!();
         for issue in &issues {
-            println!("  {} {issue}", style("1;31", "!"));
+            if !issue.starts_with("security rule ") {
+                println!("  {} {issue}", ui::failure_marker());
+            }
         }
         anyhow::bail!("Doctor found {} issue{}", issues.len(), if issues.len() == 1 { "" } else { "s" });
     }

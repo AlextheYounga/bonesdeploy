@@ -174,7 +174,13 @@ pub(super) fn collect_sudo_policy(user: &str, command: &[String]) -> SudoEvidenc
 
 fn classify_sudo_denial(status: Option<i32>, stderr: &str) -> PolicyDecision {
     let normalized = stderr.to_ascii_lowercase();
-    if status == Some(1) && (normalized.contains("not allowed") || normalized.contains("may not run sudo")) {
+    let inspection_failure = normalized.contains("password is required")
+        || normalized.contains("parse error")
+        || normalized.contains("syntax error")
+        || normalized.contains("unable to initialize")
+        || normalized.contains("no valid sudoers")
+        || normalized.contains("fatal");
+    if status == Some(1) && !inspection_failure {
         PolicyDecision::Denied
     } else {
         let detail = stderr.trim();
@@ -289,6 +295,7 @@ mod tests {
             classify_sudo_denial(Some(1), "Sorry, user atlas is not allowed to execute '/bin/sh' as root"),
             PolicyDecision::Denied
         );
+        assert_eq!(classify_sudo_denial(Some(1), ""), PolicyDecision::Denied);
         assert!(matches!(classify_sudo_denial(Some(1), "sudo: a password is required"), PolicyDecision::Unverified(_)));
         assert!(matches!(classify_sudo_denial(Some(2), "sudo: parse error"), PolicyDecision::Unverified(_)));
     }

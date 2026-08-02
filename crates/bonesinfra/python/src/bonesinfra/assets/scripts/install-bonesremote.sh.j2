@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+binary=/usr/local/bin/bonesremote
+if [ ! -x "$binary" ]; then
+    /root/.cargo/bin/cargo install --root /usr/local --git '{{ repo }}' bonesremote
+fi
+chown root:root "$binary"
+chmod 0755 "$binary"

@@ -11,6 +11,8 @@ mod types;
 use shared::paths;
 use std::path::PathBuf;
 
+use crate::ui;
+
 use collection::{
     collect_accounts, collect_identity_groups, collect_path_tree, collect_release, collect_sites, collect_sudo_policy,
 };
@@ -26,7 +28,8 @@ pub(super) struct Report {
 impl Report {
     pub(super) fn render(&self) {
         for finding in &self.findings {
-            println!("\n{}  {}", finding.status.label(), finding.rule);
+            let marker = if finding.status.requires_failure() { ui::failure_marker() } else { ui::success_marker() };
+            println!("\n{} {}", marker, finding.rule);
             println!("  Principle: {}", finding.principle);
             println!("  Expected: {}", finding.expected);
             println!("  Observed: {}", finding.observed);
@@ -110,6 +113,15 @@ fn deploy_sudo_checks() -> Vec<(Vec<String>, bool)> {
     let binary = paths::bonesremote_global_link().display().to_string();
     let approved = [
         vec![&binary, "hook", "post-receive", "--site", "nonexistent"],
+        vec![
+            &binary,
+            "site",
+            "receive",
+            "--site",
+            "nonexistent",
+            "--revision",
+            "0123456789abcdef0123456789abcdef0123456789",
+        ],
         vec![&binary, "service", "restart", "--site", "nonexistent"],
         vec![&binary, "release", "rollback", "--site", "nonexistent"],
         vec![&binary, "release", "drop-failed", "--site", "nonexistent"],
@@ -123,6 +135,7 @@ fn deploy_sudo_checks() -> Vec<(Vec<String>, bool)> {
         vec![&binary, "deploy", "--site", "nonexistent"],
         vec![&binary, "version"],
         vec![&binary, "service", "restart", "--site", "nonexistent", "--unexpected"],
+        vec![&binary, "site", "receive", "--site", "nonexistent", "--revision", "not-a-revision"],
     ];
     approved
         .into_iter()
@@ -176,5 +189,16 @@ mod tests {
         ];
 
         assert_eq!(evaluate_identities(&sites, &deploy).status, Status::Fail);
+    }
+
+    #[test]
+    fn deploy_sudo_checks_cover_config_receive_and_extra_arguments() {
+        let checks = super::deploy_sudo_checks();
+        assert!(checks.iter().any(|(command, allowed)| {
+            *allowed && command.windows(2).any(|pair| pair.iter().map(String::as_str).eq(["site", "receive"]))
+        }));
+        assert!(checks.iter().any(|(command, allowed)| {
+            !*allowed && command.last().is_some_and(|argument| argument == "--unexpected")
+        }));
     }
 }

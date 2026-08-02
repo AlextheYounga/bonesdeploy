@@ -279,7 +279,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
   - Installs `bonesremote` from source.
-  - Installs the deploy-user sudoers policy through `bonesinfra` host provisioning.
+  - Installs the deploy-user sudoers policy through `bonesinfra` host provisioning, with anchored site and revision arguments so trailing or malformed arguments are denied.
   - Provisions machine-level dependencies (users, groups, firewall, system packages).
 
 - **remote framework**:

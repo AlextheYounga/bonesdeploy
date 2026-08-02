@@ -117,6 +117,9 @@ impl Harness {
         self.exec(&format!(
             "test -d /home/git/{site}.bones.git && test -x /home/git/{site}.bones.git/hooks/post-receive && test \"$(git --git-dir /home/git/{site}.bones.git symbolic-ref --short HEAD)\" = master"
         ))?;
+        self.exec(&format!(
+            "test \"$(stat -c '%U:%G:%a' /usr/local/bin/bonesremote)\" = 'root:root:755' && test -f /root/.config/bonesremote/sites/{site}/bones.toml"
+        ))?;
         Ok(())
     }
 

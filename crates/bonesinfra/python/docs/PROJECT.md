@@ -481,8 +481,8 @@ Responsibilities:
 - install deploy authorized key
 - install thin post-receive hook (delegates to `bonesremote hook post-receive`)
 - configure firewall
-- install `bonesremote`
-- install validated `/etc/sudoers.d/bonesdeploy`
+- install or repair root-owned `0755` `bonesremote`
+- install validated `/etc/sudoers.d/bonesdeploy` with exact command arguments
 
 Setup should run as root or bootstrap SSH user.
 

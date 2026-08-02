@@ -1,15 +1,12 @@
 from pyinfra.operations import server
 
-from bonesinfra.config.paths import BONESDEPLOY_REPO
+from bonesinfra.config.paths import BONESDEPLOY_REPO, SCRIPTS_DIR
 
 
 def install():
-    cargo_bin = "/root/.cargo/bin/cargo"
-    server.shell(
+    server.script_template(
         name="Install bonesremote binary",
-        commands=[
-            f"command -v bonesremote >/dev/null 2>&1 ||"
-            f" {cargo_bin} install --root /usr/local --git {BONESDEPLOY_REPO} bonesremote",
-        ],
+        src=str(SCRIPTS_DIR / "install-bonesremote.sh.j2"),
+        repo=BONESDEPLOY_REPO,
         _sudo=True,
     )

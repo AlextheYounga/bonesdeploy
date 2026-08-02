@@ -10,9 +10,11 @@ import pytest
 import bonesinfra.cli.commands.helpers as helpers_plan
 import bonesinfra.cli.commands.runtime as runtime_plan
 import bonesinfra.cli.commands.setup as setup_plan
+import bonesinfra.cli.commands.setup.bonesremote as bonesremote_plan
 import bonesinfra.cli.commands.ssl as ssl_plan
 from bonesinfra.cli import hooks as custom_mod
 from bonesinfra.config.context import DeployContext
+from bonesinfra.config.paths import BONESDEPLOY_REPO
 
 
 def _write_config(tmp: Path) -> Path:
@@ -153,6 +155,26 @@ def test_after_setup_runs_last_and_receives_ctx(tmp_path, monkeypatch):
 
     assert record[-1] == "after_setup"
     assert received == [ctx]
+
+
+def test_bonesremote_install_repairs_binary_permissions(monkeypatch):
+    calls = []
+
+    def script_template(**kwargs):
+        calls.append(kwargs)
+
+    monkeypatch.setattr(bonesremote_plan, "server", types.SimpleNamespace(script_template=script_template))
+
+    bonesremote_plan.install()
+
+    assert calls == [
+        {
+            "name": "Install bonesremote binary",
+            "src": str(bonesremote_plan.SCRIPTS_DIR / "install-bonesremote.sh.j2"),
+            "repo": BONESDEPLOY_REPO,
+            "_sudo": True,
+        }
+    ]
 
 
 def test_only_invoked_phase_hook_runs(tmp_path, monkeypatch):
