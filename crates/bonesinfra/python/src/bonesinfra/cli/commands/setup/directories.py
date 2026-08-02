@@ -46,6 +46,8 @@ def setup_repo_and_project(ctx, paths):
         _sudo=True,
     )
 
+    _setup_bones_repo(paths)
+
     mkdir(
         name="Ensure project root parent directory is traversable",
         path=paths["project_root_parent"],
@@ -92,4 +94,31 @@ def setup_repo_and_project(ctx, paths):
         user="root",
         group=ctx.runtime.runtime_group,
         mode="0750",
+    )
+
+
+def _setup_bones_repo(paths):
+    bones_repo = quote(paths["bones_repo"])
+    server.shell(
+        name="Initialize bare .bones repository",
+        commands=[_user_env_command(DEPLOY_USER, f"git init --bare {bones_repo}")],
+        _sudo=True,
+        _sudo_user=DEPLOY_USER,
+    )
+
+    server.shell(
+        name="Set .bones repo default branch to master",
+        commands=[f"git --git-dir {bones_repo} symbolic-ref HEAD refs/heads/master"],
+        _sudo=True,
+        _sudo_user=DEPLOY_USER,
+    )
+
+    files.put(
+        name="Install .bones repo post-receive hook",
+        src=str(ASSETS_DIR / "hooks/config-post-receive"),
+        dest=f"{paths['bones_repo']}/hooks/post-receive",
+        user=DEPLOY_USER,
+        group=DEPLOY_USER,
+        mode="0755",
+        _sudo=True,
     )

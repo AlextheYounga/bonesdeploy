@@ -4,7 +4,6 @@
 
 ## `crates/bonesdeploy/src/commands/doctor.rs`
 - deployment script check accepts nested build and prepare layout. (deployment_script_check_accepts_nested_build_and_prepare_layout)
-- doctor points at correct remote import flow. (doctor_points_at_correct_remote_import_flow)
 
 ## `crates/bonesdeploy/src/commands/init/config.rs`
 - requires host when existing and cli are missing it. (requires_host_when_existing_and_cli_are_missing_it)
@@ -18,7 +17,12 @@
 - rerun preserves existing bones assets. (rerun_preserves_existing_bones_assets)
 
 ## `crates/bonesdeploy/src/commands/push_state.rs`
-- local secrets path stays under bones dir. (local_secrets_path_stays_under_bones_dir)
+- commits and pushes .bones content to the config bare repo. (pushes_to_bones_config_repo)
+
+## `crates/bonesdeploy/src/commands/update/patches.rs`
+- patches are ordered by registry. (patches_are_ordered_by_registry)
+- target version controls patch selection. (target_version_controls_patch_selection)
+- versions ignore prerelease suffixes. (versions_ignore_prerelease_suffixes)
 
 ## `crates/bonesdeploy/src/commands/releases.rs`
 - release status includes phase when present. (release_status_includes_phase_when_present)

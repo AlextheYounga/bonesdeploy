@@ -7,8 +7,10 @@ use tempfile::TempDir;
 
 use shared::paths;
 
+use crate::config;
 use crate::ui::output;
 
+mod patches;
 mod release;
 mod sync;
 mod version;
@@ -47,13 +49,19 @@ pub async fn run(options: Options) -> Result<()> {
             updated = true;
         }
 
+        if Path::new(paths::LOCAL_BONES_TOML).exists() {
+            let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+            patches::run_local(&cfg, &master_versions.bonesdeploy)?;
+        }
         sync::refresh_local_bones_from_source(&source_dir, Path::new(paths::LOCAL_BONES_DIR))?;
     }
 
-    if !options.skip_remote && current_remote != master_versions.bonesremote {
-        println!("{}", style("Updating bonesremote").cyan().bold());
-        release::update_remote_from_source(SOURCE_REPO_URL, &master_versions.bonesremote).await?;
-        updated = true;
+    if !options.skip_remote {
+        if current_remote != master_versions.bonesremote {
+            println!("{}", style("Updating bonesremote").cyan().bold());
+            updated = true;
+        }
+        release::update_remote_from_source(SOURCE_REPO_URL, &current_remote, &master_versions.bonesremote).await?;
     }
 
     if updated {

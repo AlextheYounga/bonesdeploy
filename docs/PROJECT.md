@@ -155,10 +155,24 @@ verify its SHA-256 checksum, and use bounded network timeouts.
 Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. Runtime secrets belong in `shared/.env` via `bonesdeploy secrets push`.
 
 ### Hooks
-The optional git push transport uses two thin internal adapters (local `pre-push` guard and remote `post-receive` trigger) that are embedded in the binaries. They are not visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
+The optional git push transport uses thin adapters: a local `pre-push` guard embedded in the `bonesdeploy` binary and a remote `post-receive` trigger embedded in the `bonesremote` binary. The config repo uses a separate `config-post-receive` trigger installed by provisioning. Neither adapter is visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
 
 - `pre-push` => Installed by `bonesdeploy init` into `.git/hooks/pre-push`. This checks if we are pushing to the bonesdeploy designated remote. If so, it runs `bonesdeploy doctor --local` and fails if doctor reports warnings or errors.
-- `post-receive` => Installed automatically into the bare repo. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/`. The canonical script is embedded in the `bonesremote` binary and installed as a side-effect of `bonesdeploy push`.
+- `post-receive` (app repo) => Installed automatically into the bare repo at `/home/git/<project>.git/`. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/`.
+- `config-post-receive` (config repo) => Installed during provisioning into `/home/git/<project>.bones.git/`. Derives `<site>` from `GIT_DIR` by stripping `.bones.git`, reads the pushed revision, and calls `sudo bonesremote site receive --site <site> --revision <rev>`. `bonesremote` archives the revision from the bones repo via `git archive`, validates the dataset, and atomically replaces the control-plane state.
+
+### Config Repo
+`bonesdeploy push` publishes the `.bones/` directory to a dedicated bare repo at `/home/git/<project>.bones.git`. A fresh `bonesdeploy init` creates the local repository, its `.gitignore`, and the `origin` remote. Existing projects need the equivalent migration setup before using this transport. The push workflow:
+1. Stages and commits all content with `"automated commit"`.
+2. Pushes `master` to `git@<host>:<project>.bones.git`.
+
+On the server, the `config-post-receive` hook triggers `bonesremote site receive`, which:
+1. Archives the pushed revision via `git archive --format=tar <rev>` from the bones repo.
+2. Extracts and validates the dataset (same validation as `site import`).
+3. Acquires the deployment lock, ensures the site is idle, and atomically replaces the control-plane state under `/root/.config/bonesremote/sites/<site>/`.
+
+### Update Patches
+`bonesdeploy update` runs the ordered, embedded migration patches after each local or remote binary update. Completed patches are recorded per project and scope, so interrupted updates retry safely without rerunning successful patches. Local patches use the project data directory; remote patches use `/var/lib/bonesdeploy/patches/<site>/` and run through the root SSH session. `--skip-local` and `--skip-remote` also skip their respective patches.
 
 ### Deployment Folder
 This folder stores build and prepare scripts that are published into bonesremote site state. Build scripts live in `.bones/deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order inside bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; other files, including `README.md`, are ignored. Bonesremote prepares the image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. Before scripts run, Bonesremote streams the deployment bundle into the container's disposable filesystem at `/workspace/deployment`; it does not bind-mount the root-owned control-plane path. The build container receives the exported source tree and private persistent build cache at `/workspace/cache`; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or host bonesremote control-plane files. The cache is provisioned by BonesInfra at `/var/lib/bonesdeploy/users/<site>-build/cache` and is used only for tool and package downloads. Prepare scripts live in `.bones/deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to a runtime-owned candidate release, and are the right place for migrations, cache warmups, and other runtime-state work. For each prepare script, Bonesremote opens the root-owned shared `functions.sh` and script, then streams both as one stdin input to the runtime-user shell; the runtime user receives no filesystem access to the deployment bundle. Before prepare scripts run, `bonesremote` wires each `[framework.shared].paths` entry into the candidate; after prepare succeeds, it seals the release before activation.
@@ -245,9 +259,10 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys.
 
 - **push**
-  - Archives the local `.bones/` dataset, excluding local secrets, and streams it to `bonesremote site import --site <project>` over SSH.
-  - `bonesremote` validates the dataset and atomically replaces the current remote site state under `/root/.config/bonesremote/sites/<project>/`.
-  - The bare repo is no longer the control-plane storage target for `push`.
+  - Publishes the local `.bones/` directory to a dedicated bare config repo at `/home/git/<project>.bones.git` on the server via `git push`.
+  - A fresh `bonesdeploy init` writes `.bones/.gitignore` (excludes plaintext `.env`), initialises the local Git repo in `.bones/`, and adds the config-repo origin. Existing projects require this migration setup before using the Git transport.
+  - Before pushing, stages and autocommits `.bones` content.
+  - The server-side `config-post-receive` hook triggers `bonesremote site receive`, which atomically replaces the current remote site state under `/root/.config/bonesremote/sites/<project>/`.
 
 - **pull**
   - Streams the current remote site dataset back from `bonesremote site export --site <project>` and extracts it into local `.bones/`.
@@ -376,7 +391,9 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
    - **post_deploy** — Prune old releases beyond `releases`
    - On failure: **drop_failed_release** — Clean up staged release
 
-### Hook Event Order on `git push`
+## Hook Event Order
+
+### App Repo: `git push` (deployment trigger)
 
 `pre-push -> post-receive`
 
@@ -385,15 +402,23 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 3. **post-receive** (remote): Resolves the configured deployment ref from stdin:
    - If `deploy_on_push = false`, exits early without deploying.
    - If the configured branch wasn't pushed, or the push deleted it, exits without deploying.
-    - Otherwise runs a single unified command:
-      ```
-      bonesremote deploy --site <site> --revision <newrev>
-      ```
+     - Otherwise runs a single unified command:
+       ```
+       bonesremote deploy --site <site> --revision <newrev>
+       ```
    - This command orchestrates the full pipeline:
-      - **stage_release** — Create timestamped release state
-       - **release_checkout** — Export source from the bare repo into temporary context
-       - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed and injected into the container via `--env`.      - **release_promote** — Copy safe artifacts into a runtime-owned candidate at `releases/<release>`
-      - **wire_shared** — Link shared runtime paths
+       - **stage_release** — Create timestamped release state
+        - **release_checkout** — Export source from the bare repo into temporary context
+        - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed and injected into the container via `--env`.      - **release_promote** — Copy safe artifacts into a runtime-owned candidate at `releases/<release>`
+       - **wire_shared** — Link shared runtime paths
+
+### Config Repo: `bonesdeploy push` (control-plane update)
+
+`git init -> commit -> push (master) -> config-post-receive`
+
+1. **push** (local): `bonesdeploy push` stages and autocommits changes, then pushes `master` to `git@<host>:<project>.bones.git`. Fresh projects receive the Git repository setup during `bonesdeploy init`.
+2. **config-post-receive** (remote): Derives `<site>` from `GIT_DIR`, reads the pushed revision from stdin, and calls `sudo bonesremote site receive --site <site> --revision <rev>`.
+3. **site receive** (remote): Archives the revision from the bones repo via `git archive`, validates the dataset, acquires the deployment lock, and atomically replaces control-plane state under `/root/.config/bonesremote/sites/<site>/`.
       - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
       - **release_finalize** — Seal the prepared release as `root:<site>`
       - **activate_release** — Repoint `current`

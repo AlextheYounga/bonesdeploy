@@ -4,6 +4,7 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 use shared::paths;
 
+use super::patches;
 use crate::config;
 use crate::infra::ssh;
 use shared::config::{default_deploy_user, parse_port};
@@ -46,7 +47,11 @@ pub(super) fn update_local_from_source(repo_url: &str) -> Result<()> {
     Ok(())
 }
 
-pub(super) async fn update_remote_from_source(repo_url: &str, _version: &str) -> Result<()> {
+pub(super) async fn update_remote_from_source(
+    repo_url: &str,
+    current_version: &str,
+    target_version: &str,
+) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     if !bones_toml.exists() {
         bail!("No {} found. Run from a bonesdeploy project directory.", paths::LOCAL_BONES_TOML);
@@ -57,11 +62,13 @@ pub(super) async fn update_remote_from_source(repo_url: &str, _version: &str) ->
     let session = ssh::connect_as("root", &cfg.host, port).await?;
 
     let install_root = paths::USR_LOCAL_BIN.trim_end_matches("/bin");
-    ssh::stream_cmd(
-        &session,
-        &format!("cargo install --locked --git {repo_url} bonesremote --force --root {install_root}"),
-    )
-    .await?;
+    if current_version != target_version {
+        ssh::stream_cmd(
+            &session,
+            &format!("cargo install --locked --git {repo_url} bonesremote --force --root {install_root}"),
+        )
+        .await?;
+    }
 
     ssh::stream_cmd(
         &session,
@@ -71,6 +78,8 @@ pub(super) async fn update_remote_from_source(repo_url: &str, _version: &str) ->
         ),
     )
     .await?;
+
+    patches::run_remote(&session, &cfg, target_version).await?;
 
     session.close().await?;
 

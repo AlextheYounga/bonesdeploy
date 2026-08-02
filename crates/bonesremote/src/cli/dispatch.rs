@@ -13,6 +13,7 @@ pub fn run(cli: &Cli) -> Result<()> {
         },
         Command::Site { command } => match command {
             SiteCommand::Import { site: site_name } => site::import(site_name),
+            SiteCommand::Receive { site: site_name, revision } => site::receive(site_name, revision),
         },
         Command::Release { command } => match command {
             ReleaseCommand::List { site: site_name } => release::list::run(site_name),

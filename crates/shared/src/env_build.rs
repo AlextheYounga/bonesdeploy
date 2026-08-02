@@ -105,8 +105,9 @@ fn strip_quotes(s: &str) -> &str {
 }
 
 #[cfg(test)]
-#[expect(clippy::absolute_paths, clippy::unwrap_used)]
 mod tests {
+    use std::env;
+
     use super::*;
 
     #[test]
@@ -156,7 +157,7 @@ mod tests {
 
     #[test]
     fn load_returns_empty_map_when_file_missing() {
-        let dir = std::env::temp_dir().join("bones-env-build-missing-test");
+        let dir = env::temp_dir().join("bones-env-build-missing-test");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let map = load(&dir).unwrap();
@@ -166,7 +167,7 @@ mod tests {
 
     #[test]
     fn load_reads_env_build_from_directory() {
-        let dir = std::env::temp_dir().join("bones-env-build-load-test");
+        let dir = env::temp_dir().join("bones-env-build-load-test");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(".env.build"), "API_URL=https://api.example.com\nSITE_NAME=Test\n").unwrap();

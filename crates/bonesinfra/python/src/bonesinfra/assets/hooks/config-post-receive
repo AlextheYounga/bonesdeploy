@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+#
+# bonesdeploy-config-post-receive-v1
+#
+# post-receive — Thin adapter installed by bonesremote for the .bones config repo
+#
+# Accepts pushed config refs, extracts the site name, validates the
+# pushed ref, and delegates import to bonesremote.
+
+set -euo pipefail
+
+# Derive site name from the .bones.git repository directory
+# e.g. /home/git/myapp.bones.git → myapp
+GIT_DIR="${GIT_DIR:-.}"
+GIT_DIR=$(cd "$GIT_DIR" && pwd)
+SITE=$(basename "$GIT_DIR")
+SITE=${SITE%.bones.git}
+
+if [ -z "$SITE" ] || [ "$SITE" = "." ] || [ "$SITE" = "/" ]; then
+	echo "[bonesdeploy-config] Could not derive site name from GIT_DIR=$GIT_DIR"
+	exit 1
+fi
+
+while read -r _oldrev newrev refname; do
+	if [ "$refname" = "refs/heads/master" ] && [ "$newrev" != "0000000000000000000000000000000000000000" ]; then
+		exec sudo bonesremote site receive --site "$SITE" --revision "$newrev"
+	fi
+done
+
+echo "[bonesdeploy-config] No matching master ref update; skipping import."
+exit 0

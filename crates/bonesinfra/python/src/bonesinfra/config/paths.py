@@ -60,6 +60,7 @@ class DeploymentPaths:
     repo: str
     repo_parent: str
     repo_head: str
+    bones_repo: str
     site_nginx_config: str
     site_root: str
     conf_root: str
@@ -111,10 +112,12 @@ class DeploymentPaths:
         runtime_nginx_dir = runtime_socket_dir / "nginx"
         conf_root = Path(DEFAULT_CONF_ROOT_PARENT) / project_name
 
+        repo = Path(repo_path)
         return cls(
             repo=repo_path,
             repo_parent=_parent_or_default(repo_path, DEFAULT_REPO_PARENT),
-            repo_head=str(Path(repo_path) / GIT_HEAD),
+            repo_head=str(repo / GIT_HEAD),
+            bones_repo=str(Path(DEFAULT_REPO_PARENT) / f"{project_name}.bones.git"),
             site_nginx_config=str(conf_root / NGINX_CONF),
             site_root=str(Path(BONESREMOTE_SITE_ROOT) / project_name),
             conf_root=str(conf_root),

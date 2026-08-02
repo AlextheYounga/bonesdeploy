@@ -62,7 +62,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
 
     cfg.ssl_enabled = true;
     config::save(&cfg, bones_toml)?;
-    push_state::sync_bones_directory(&cfg)?;
+    push_state::sync_bones_directory()?;
 
     println!("{} HTTPS configured.", output::success_marker());
     println!();

@@ -1,8 +1,9 @@
 use std::fs;
 use std::os::unix::fs::{self as unix_fs, PermissionsExt};
 use std::path::Path;
+use std::process::Command;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use shared::config::default_deploy_user;
 use shared::paths;
 
@@ -36,6 +37,8 @@ pub(super) fn materialize_fresh_bones(
     }
     unix_fs::symlink(&config_dir, bones_dir)?;
 
+    setup_bones_git_repo(bones_dir, cfg)?;
+
     cfg.framework = serde_json::from_value(serde_json::Value::Object(framework.config.clone()))?;
 
     if let Some(template_name) = framework.template {
@@ -51,7 +54,7 @@ pub(super) fn materialize_fresh_bones(
 }
 
 pub(super) fn update_gitignore() -> Result<()> {
-    let gitignore = Path::new(".gitignore");
+    let gitignore = Path::new(paths::GITIGNORE_FILE);
     let entries = [paths::LOCAL_BONES_DIR, "!.env.build"];
 
     if gitignore.exists() {
@@ -75,7 +78,7 @@ pub(super) fn update_gitignore() -> Result<()> {
 }
 
 pub(super) fn ensure_config_gitignore() -> Result<()> {
-    let gitignore = paths::bones_config_root().join(".gitignore");
+    let gitignore = paths::bones_config_root().join(paths::GITIGNORE_FILE);
     let project_entry = format!("{}/", paths::BONES_CONFIG_PROJECTS_DIR);
 
     if gitignore.exists() {
@@ -129,6 +132,41 @@ pub(super) fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
 
     let remote_url = format!("{}@{}:{}", default_deploy_user(), cfg.host, cfg.repo_path);
     git::add_remote(&cfg.remote_name, &remote_url)?;
+    Ok(())
+}
+
+fn setup_bones_git_repo(bones_dir: &Path, cfg: &config::Bones) -> Result<()> {
+    let gitignore = bones_dir.join(paths::GITIGNORE_FILE);
+    fs::write(&gitignore, paths::BONES_GITIGNORE_CONTENT)
+        .with_context(|| format!("Failed to write {}", gitignore.display()))?;
+
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(bones_dir)
+        .args(["init", "--initial-branch", "master"])
+        .output()
+        .context("Failed to init git repo in .bones")?;
+    if !output.status.success() {
+        bail!("git init failed: {}", String::from_utf8_lossy(&output.stderr));
+    }
+
+    let repo_path = paths::default_bones_repo_path_for(&cfg.project_name);
+    let remote_url = if cfg.port == "22" {
+        format!("{}@{}:{repo_path}", default_deploy_user(), cfg.host)
+    } else {
+        format!("ssh://{}@{}:{}{repo_path}", default_deploy_user(), cfg.host, cfg.port)
+    };
+
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(bones_dir)
+        .args(["remote", "add", "origin", &remote_url])
+        .output()
+        .context("Failed to add remote to .bones repo")?;
+    if !output.status.success() {
+        bail!("Failed to add remote: {}", String::from_utf8_lossy(&output.stderr));
+    }
+
     Ok(())
 }
 

@@ -1,5 +1,3 @@
-use std::process::Command;
-
 use anyhow::{Context, Result, bail};
 use openssh::{Session, SessionBuilder, Stdio};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -32,12 +30,6 @@ pub async fn connect_as(user: &str, host: &str, port: u16) -> Result<Session> {
         .connect(host)
         .await
         .with_context(|| format!("Failed to connect to {user}@{host}:{port}"))
-}
-
-pub fn external_command(user: &str, host: &str, port: &str) -> Command {
-    let mut command = Command::new("ssh");
-    command.args(["-p", port, "-o", "StrictHostKeyChecking=accept-new"]).arg(format!("{user}@{host}"));
-    command
 }
 
 pub fn shell_quote(value: &str) -> String {

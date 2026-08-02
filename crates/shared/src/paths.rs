@@ -72,11 +72,19 @@ pub const KIT_CONFS_DIR: &str = "confs/";
 pub const CONFS_DIR: &str = "confs";
 pub const BONES_CONFIG_PROJECTS_DIR: &str = "projects";
 pub const BONESDEPLOY_DIR: &str = "bonesdeploy";
+pub const GITIGNORE_FILE: &str = ".gitignore";
 
 #[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
     Path::new(DEFAULT_REPO_PARENT).join(format!("{project_name}.git")).display().to_string()
 }
+
+#[must_use]
+pub fn default_bones_repo_path_for(project_name: &str) -> String {
+    Path::new(DEFAULT_REPO_PARENT).join(format!("{project_name}.bones.git")).display().to_string()
+}
+
+pub const BONES_GITIGNORE_CONTENT: &str = "**/.env\n";
 
 #[must_use]
 pub fn default_project_root_for(project_name: &str) -> String {
