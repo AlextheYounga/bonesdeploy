@@ -7,7 +7,6 @@ set -euo pipefail
 : "${BONESDEPLOY_BONES_REPO:?missing BONESDEPLOY_BONES_REPO}"
 
 bones_dir=".bones"
-printf '%s\n' '**/.env' >"$bones_dir/.gitignore"
 
 if ! git -C "$bones_dir" rev-parse --git-dir >/dev/null 2>&1; then
 	git -C "$bones_dir" init --initial-branch master

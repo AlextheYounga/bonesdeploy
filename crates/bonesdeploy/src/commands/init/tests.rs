@@ -143,6 +143,10 @@ fn materializes_base_bones_assets() -> Result<()> {
         let gitignore = fs::read_to_string(repo_dir.join(".gitignore"))?;
         assert!(gitignore.lines().any(|line| line.trim() == "!.env.build"));
 
+        let bones_gitignore = fs::read_to_string(repo_dir.join(".bones/.gitignore"))?;
+        assert!(bones_gitignore.lines().any(|line| line.trim() == ".env"));
+        assert!(bones_gitignore.lines().any(|line| line.trim() == "__pycache__/"));
+
         let pre_push = repo_dir.join(".git/hooks/pre-push");
         assert!(pre_push.is_file(), "guaranteed pre-push guard should be installed");
         let guard_content = fs::read_to_string(&pre_push)?;

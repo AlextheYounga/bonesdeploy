@@ -5,7 +5,7 @@ use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, is_numbered_shell_script, validate_site_name};
+use shared::config::{self, validate_site_name};
 use shared::paths;
 
 use crate::commands::ensure_site_idle;
@@ -183,9 +183,8 @@ fn extract_stdin_archive(destination: &Path) -> Result<()> {
 }
 
 fn validate_site_dataset(site: &str, root: &Path) -> Result<()> {
-    validate_top_level_entries(root)?;
+    reject_plaintext_env_files(root)?;
     reject_symlinks(root)?;
-    validate_deployment_entries(root)?;
 
     let bones_path = root.join(paths::BONES_TOML);
     if !bones_path.is_file() {
@@ -200,53 +199,15 @@ fn validate_site_dataset(site: &str, root: &Path) -> Result<()> {
     Ok(())
 }
 
-fn validate_top_level_entries(root: &Path) -> Result<()> {
+fn reject_plaintext_env_files(root: &Path) -> Result<()> {
     for entry in fs::read_dir(root).with_context(|| format!("Failed to read {}", root.display()))? {
         let entry = entry?;
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else { bail!("Imported dataset contains a non-UTF-8 entry") };
-
-        match name {
-            paths::GITIGNORE_FILE | paths::BONES_TOML if entry.file_type()?.is_file() => {}
-            paths::DEPLOYMENT_DIR | paths::CONFS_DIR | "secrets" if entry.file_type()?.is_dir() => {}
-            _ => bail!("Imported dataset contains unsupported entry: {name}"),
+        if entry.file_name() == paths::DOT_ENV {
+            bail!("Imported dataset contains plaintext .env: {}", entry.path().display());
         }
-    }
-
-    Ok(())
-}
-
-fn validate_deployment_entries(root: &Path) -> Result<()> {
-    let deployment = root.join(paths::DEPLOYMENT_DIR);
-    if !deployment.is_dir() {
-        return Ok(());
-    }
-
-    for entry in fs::read_dir(&deployment).with_context(|| format!("Failed to read {}", deployment.display()))? {
-        let entry = entry?;
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else { bail!("Imported dataset contains a non-UTF-8 entry") };
-        match name {
-            paths::DEPLOYMENT_FUNCTIONS_FILE if entry.file_type()?.is_file() => {}
-            paths::DEPLOYMENT_BUILD_DIR | paths::DEPLOYMENT_PREPARE_DIR if entry.file_type()?.is_dir() => {
-                validate_numbered_scripts(&entry.path())?;
-            }
-            _ => bail!("Imported dataset contains unsupported deployment entry: {name}"),
+        if entry.file_type()?.is_dir() {
+            reject_plaintext_env_files(&entry.path())?;
         }
-    }
-
-    Ok(())
-}
-
-fn validate_numbered_scripts(directory: &Path) -> Result<()> {
-    for entry in fs::read_dir(directory).with_context(|| format!("Failed to read {}", directory.display()))? {
-        let entry = entry?;
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else { bail!("Imported dataset contains a non-UTF-8 entry") };
-        if entry.file_type()?.is_file() && is_numbered_shell_script(name) {
-            continue;
-        }
-        bail!("Imported dataset contains unsupported deployment script: {}", entry.path().display());
     }
 
     Ok(())

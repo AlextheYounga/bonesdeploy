@@ -136,9 +136,7 @@ pub(super) fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
 }
 
 pub(super) fn ensure_bones_git_repo(bones_dir: &Path, cfg: &config::Bones) -> Result<()> {
-    let gitignore = bones_dir.join(paths::GITIGNORE_FILE);
-    fs::write(&gitignore, paths::BONES_GITIGNORE_CONTENT)
-        .with_context(|| format!("Failed to write {}", gitignore.display()))?;
+    kit::scaffold_gitignore(bones_dir)?;
 
     if !bones_dir.join(".git").exists() {
         let output = Command::new("git")

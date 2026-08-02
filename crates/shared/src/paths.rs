@@ -89,8 +89,6 @@ pub fn default_bones_repo_path_for(project_name: &str) -> String {
         .to_string()
 }
 
-pub const BONES_GITIGNORE_CONTENT: &str = "**/.env\n";
-
 #[must_use]
 pub fn default_project_root_for(project_name: &str) -> String {
     Path::new(DEFAULT_PROJECT_ROOT_PARENT).join(project_name).display().to_string()
