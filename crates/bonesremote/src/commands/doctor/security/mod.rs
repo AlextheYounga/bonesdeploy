@@ -9,6 +9,7 @@ mod fs;
 mod types;
 
 use shared::paths;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use crate::ui;
@@ -25,15 +26,26 @@ pub(super) struct Report {
 
 impl Report {
     pub(super) fn render(&self) {
+        let mut rendered_rules = BTreeSet::new();
         for finding in &self.findings {
-            let marker = if finding.status.requires_failure() { ui::failure_marker() } else { ui::success_marker() };
-            println!("\n{} {}", marker, finding.rule);
-            if finding.status.requires_failure() {
-                println!("  Principle: {}", finding.principle);
-                println!("  Expected: {}", finding.expected);
-                println!("  Observed: {}", finding.observed);
-                println!("  Risk: {}", finding.risk);
-                println!("  Remediation: {}", finding.remediation);
+            if !rendered_rules.insert(finding.rule) {
+                continue;
+            }
+
+            let failures: Vec<_> = self
+                .findings
+                .iter()
+                .filter(|candidate| candidate.rule == finding.rule && candidate.status.requires_failure())
+                .collect();
+            if failures.is_empty() {
+                println!("{} {}", ui::success_marker(), finding.rule);
+                continue;
+            }
+
+            for failure in failures {
+                println!("{} {}", ui::failure_marker(), failure.rule);
+                println!("  Observed: {}", failure.observed);
+                println!("  Next: {}", failure.remediation);
             }
         }
     }

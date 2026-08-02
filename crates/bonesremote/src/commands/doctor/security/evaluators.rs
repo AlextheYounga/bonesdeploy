@@ -9,33 +9,21 @@ use super::types::{
 
 const RUNTIME_SUDO_RULE: Rule = Rule {
     name: "Runtime sudo authority is absent",
-    principle: "Sudo policy is an independent privilege path.",
-    expected: "The runtime identity has no sudo policy.",
-    risk: "A compromised application may be able to elevate through sudo.",
     remediation: "Remove the runtime identity from sudoers and all sudo-capable groups.",
 };
 
 const PRIVILEGED_PATH_RULE: Rule = Rule {
     name: "Privileged configuration is root-controlled",
-    principle: "Anything an untrusted identity can change before root interprets it is indirect root authority.",
-    expected: "Protected files, directories, symlink targets, and their parents are not modifiable by runtime, build, or deploy identities.",
-    risk: "An attacker could replace configuration or code later interpreted with root authority.",
     remediation: "Restore root ownership and remove effective write access from the reported path.",
 };
 
 const RELEASE_WRITE_RULE: Rule = Rule {
     name: "Release activation is root-controlled",
-    principle: "Ownership or effective write access lets a compromised runtime alter executable application state.",
-    expected: "The runtime identity cannot own or modify the project root, releases root, active release, or their parent chain.",
-    risk: "A compromised application could alter or activate attacker-controlled code.",
     remediation: "Seal releases as root and restore root control of activation directories.",
 };
 
 const IDENTITY_RULE: Rule = Rule {
     name: "Site identity isolation",
-    principle: "Two processes with the same Linux identity have the same discretionary authority.",
-    expected: "Every site has unique runtime/build identities that are not shared with other sites or the deploy user.",
-    risk: "A compromised application could act as another site's runtime or the deploy user.",
     remediation: "Assign distinct UIDs and primary GIDs; remove cross-site and deploy-group membership.",
 };
 
@@ -158,9 +146,6 @@ pub(super) fn evaluate_active_release(evidence: &ReleaseEvidence, runtime: &Acco
             Status::Fail,
             Rule {
                 name: "Release activation is root-controlled",
-                principle: "Activation must select only a sealed release from the site's release store.",
-                expected: "current resolves to a child of the configured releases directory.",
-                risk: "Root may execute or serve state outside the release boundary.",
                 remediation: "Reactivate a release contained by the site's releases directory.",
             },
             format!("current resolves to {} outside {}", target.display(), evidence.releases_root.display()),
@@ -207,22 +192,13 @@ fn release_current_finding(evidence: &ReleaseEvidence) -> Finding {
     match &evidence.current {
         CurrentState::Missing => finding(
             Status::NotApplicable,
-            Rule {
-                name: "Release activation is root-controlled",
-                principle: "Write access to a directory permits replacement of its entries.",
-                expected: "The runtime identity cannot modify current or an active release.",
-                risk: "No active release is exposed.",
-                remediation: "Deploy once, then rerun doctor.",
-            },
+            Rule { name: "Release activation is root-controlled", remediation: "Deploy once, then rerun doctor." },
             format!("site {} has no current entry before its first activation", evidence.site),
         ),
         CurrentState::Broken => finding(
             Status::Fail,
             Rule {
                 name: "Release activation is root-controlled",
-                principle: "Activation must resolve to a sealed release.",
-                expected: "current is a valid symlink to a release inside the site's releases directory.",
-                risk: "Service behavior and release integrity cannot be established.",
                 remediation: "Activate a valid sealed release through BonesRemote.",
             },
             format!("{} is a broken symlink", evidence.filesystem.requested.display()),
@@ -231,9 +207,6 @@ fn release_current_finding(evidence: &ReleaseEvidence) -> Finding {
             Status::Fail,
             Rule {
                 name: "Release activation is root-controlled",
-                principle: "Activation is controlled by atomically replacing a root-owned symlink.",
-                expected: "current is a symlink managed by BonesRemote.",
-                risk: "The normal atomic activation boundary has been bypassed.",
                 remediation: "Restore current through a BonesRemote activation.",
             },
             format!("{} exists but is not a symlink", evidence.filesystem.requested.display()),

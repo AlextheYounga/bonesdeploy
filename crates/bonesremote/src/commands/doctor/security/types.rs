@@ -17,10 +17,7 @@ impl Status {
 
 pub(super) struct Finding {
     pub(super) rule: &'static str,
-    pub(super) principle: &'static str,
-    pub(super) expected: String,
     pub(super) observed: String,
-    pub(super) risk: String,
     pub(super) remediation: String,
     pub(super) status: Status,
 }
@@ -104,32 +101,18 @@ pub(super) struct SudoEvidence {
 #[derive(Clone, Copy)]
 pub(super) struct Rule {
     pub(super) name: &'static str,
-    pub(super) principle: &'static str,
-    pub(super) expected: &'static str,
-    pub(super) risk: &'static str,
     pub(super) remediation: &'static str,
 }
 
 pub(super) fn unverified(rule: &'static str, observed: String) -> Finding {
     Finding {
         rule,
-        principle: "Inaccessible evidence cannot prove a security boundary.",
-        expected: "The doctor can inspect the complete boundary without changing it.".to_string(),
         observed,
-        risk: "The boundary may be weakened but could not be verified.".to_string(),
         remediation: "Fix read-only inspection access and rerun doctor as root.".to_string(),
         status: Status::Unverified,
     }
 }
 
 pub(super) fn finding(status: Status, rule: Rule, observed: String) -> Finding {
-    Finding {
-        rule: rule.name,
-        principle: rule.principle,
-        expected: rule.expected.to_string(),
-        observed,
-        risk: rule.risk.to_string(),
-        remediation: rule.remediation.to_string(),
-        status,
-    }
+    Finding { rule: rule.name, observed, remediation: rule.remediation.to_string(), status }
 }

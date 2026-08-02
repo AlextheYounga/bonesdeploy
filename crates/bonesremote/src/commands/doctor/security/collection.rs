@@ -158,7 +158,7 @@ pub(super) fn collect_identity_groups(mut account: Account) -> Result<Account, S
 
 pub(super) fn collect_sudo_policy(user: &str) -> SudoEvidence {
     let mut sudo = Command::new("sudo");
-    sudo.args(["-n", "-u", user, "sudo", "-n", "-l"]);
+    sudo.args(["-n", "-U", user, "-l"]);
     sudo.env("LC_ALL", "C");
 
     let decision = match sudo.output() {
