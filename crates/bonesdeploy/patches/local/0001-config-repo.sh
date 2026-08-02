@@ -14,9 +14,9 @@ if ! git -C "$bones_dir" rev-parse --git-dir >/dev/null 2>&1; then
 fi
 
 if [ "$BONESDEPLOY_PORT" = "22" ]; then
-	remote_url="git@${BONESDEPLOY_HOST}:${BONESDEPLOY_BONES_REPO}"
+	remote_url="root@${BONESDEPLOY_HOST}:${BONESDEPLOY_BONES_REPO}"
 else
-	remote_url="ssh://git@${BONESDEPLOY_HOST}:${BONESDEPLOY_PORT}${BONESDEPLOY_BONES_REPO}"
+	remote_url="ssh://root@${BONESDEPLOY_HOST}:${BONESDEPLOY_PORT}${BONESDEPLOY_BONES_REPO}"
 fi
 if git -C "$bones_dir" remote get-url origin >/dev/null 2>&1; then
 	actual_url=$(git -C "$bones_dir" remote get-url origin)

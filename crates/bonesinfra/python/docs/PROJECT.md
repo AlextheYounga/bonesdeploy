@@ -57,7 +57,7 @@ distribution-allocated subordinate UID/GID mappings, and a lingering systemd
 user manager for rootless Podman. Runtime application users remain home-less
 and non-login.
 
-Repository and site paths are derived from `project_name`: `repo_path` defaults to `/home/git/<project>.git`, `bones_repo` defaults to `/home/git/<project>.bones.git`, and `project_root` defaults to `/srv/sites/<project>`.
+Repository and site paths are derived from `project_name`: `repo_path` defaults to `/home/git/<project>.git`, `bones_repo` defaults to `/root/.config/bonesremote/repos/<project>.bones.git`, and `project_root` defaults to `/srv/sites/<project>`.
 
 Each build user's outer `user-<UID>.slice` is limited by root-owned systemd
 resource control at 80% CPU quota, 80% memory high, and 80% memory max.
@@ -480,6 +480,7 @@ Responsibilities:
 - seed placeholder release
 - install deploy authorized key
 - install thin post-receive hook (delegates to `bonesremote hook post-receive`)
+- initialize the root-owned `.bones` config repository and install its pre-receive import hook
 - configure firewall
 - install or repair root-owned `0755` `bonesremote`
 - install validated `/etc/sudoers.d/bonesdeploy` with exact command arguments
@@ -499,6 +500,10 @@ The current model uses a single per-project identity:
 ## Sudoers Contract
 
 The deploy user can run only these narrow commands via sudo:
+
+The `.bones` repository is not included in this policy. It is owned and pushed
+by `root`, so its pre-receive hook can invoke `bonesremote site receive` without
+crossing a sudo boundary.
 
 ```
 bonesremote hook post-receive --site *

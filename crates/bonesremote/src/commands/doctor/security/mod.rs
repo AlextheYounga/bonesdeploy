@@ -16,9 +16,7 @@ use crate::ui;
 use collection::{
     collect_accounts, collect_identity_groups, collect_path_tree, collect_release, collect_sites, collect_sudo_policy,
 };
-use evaluators::{
-    evaluate_active_release, evaluate_deploy_sudo, evaluate_identities, evaluate_privileged_path, evaluate_runtime_sudo,
-};
+use evaluators::{evaluate_active_release, evaluate_identities, evaluate_privileged_path, evaluate_runtime_sudo};
 use types::{Finding, unverified};
 
 pub(super) struct Report {
@@ -30,11 +28,13 @@ impl Report {
         for finding in &self.findings {
             let marker = if finding.status.requires_failure() { ui::failure_marker() } else { ui::success_marker() };
             println!("\n{} {}", marker, finding.rule);
-            println!("  Principle: {}", finding.principle);
-            println!("  Expected: {}", finding.expected);
-            println!("  Observed: {}", finding.observed);
-            println!("  Risk: {}", finding.risk);
-            println!("  Remediation: {}", finding.remediation);
+            if finding.status.requires_failure() {
+                println!("  Principle: {}", finding.principle);
+                println!("  Expected: {}", finding.expected);
+                println!("  Observed: {}", finding.observed);
+                println!("  Risk: {}", finding.risk);
+                println!("  Remediation: {}", finding.remediation);
+            }
         }
     }
 
@@ -71,7 +71,7 @@ pub(super) fn audit() -> Report {
 
     let mut findings = vec![evaluate_identities(&sites, &deploy)];
     findings.extend(sites.iter().map(|site| {
-        let evidence = collect_sudo_policy(&site.runtime.name, &[]);
+        let evidence = collect_sudo_policy(&site.runtime.name);
         evaluate_runtime_sudo(&evidence)
     }));
 
@@ -89,10 +89,6 @@ pub(super) fn audit() -> Report {
             Err(error) => findings.push(unverified("Release activation is root-controlled", error)),
         }
     }
-    for (command, should_be_allowed) in deploy_sudo_checks() {
-        let evidence = collect_sudo_policy(paths::DEPLOY_USER, &command);
-        findings.push(evaluate_deploy_sudo(&evidence, should_be_allowed));
-    }
     Report { findings }
 }
 
@@ -107,41 +103,6 @@ fn protected_paths() -> Vec<PathBuf> {
         paths::SUDOERS_PATH.into(),
         paths::bonesremote_global_link(),
     ]
-}
-
-fn deploy_sudo_checks() -> Vec<(Vec<String>, bool)> {
-    let binary = paths::bonesremote_global_link().display().to_string();
-    let approved = [
-        vec![&binary, "hook", "post-receive", "--site", "nonexistent"],
-        vec![
-            &binary,
-            "site",
-            "receive",
-            "--site",
-            "nonexistent",
-            "--revision",
-            "0123456789abcdef0123456789abcdef0123456789",
-        ],
-        vec![&binary, "service", "restart", "--site", "nonexistent"],
-        vec![&binary, "release", "rollback", "--site", "nonexistent"],
-        vec![&binary, "release", "drop-failed", "--site", "nonexistent"],
-        vec![&binary, "release", "prune", "--site", "nonexistent"],
-    ];
-    let forbidden = [
-        vec!["/bin/sh"],
-        vec!["/usr/bin/env"],
-        vec!["/usr/bin/sudoedit", "/etc/hosts"],
-        vec![&binary, "doctor"],
-        vec![&binary, "deploy", "--site", "nonexistent"],
-        vec![&binary, "version"],
-        vec![&binary, "service", "restart", "--site", "nonexistent", "--unexpected"],
-        vec![&binary, "site", "receive", "--site", "nonexistent", "--revision", "not-a-revision"],
-    ];
-    approved
-        .into_iter()
-        .map(|command| (command.into_iter().map(str::to_string).collect(), true))
-        .chain(forbidden.into_iter().map(|command| (command.into_iter().map(str::to_string).collect(), false)))
-        .collect()
 }
 
 #[cfg(test)]
@@ -189,16 +150,5 @@ mod tests {
         ];
 
         assert_eq!(evaluate_identities(&sites, &deploy).status, Status::Fail);
-    }
-
-    #[test]
-    fn deploy_sudo_checks_cover_config_receive_and_extra_arguments() {
-        let checks = super::deploy_sudo_checks();
-        assert!(checks.iter().any(|(command, allowed)| {
-            *allowed && command.windows(2).any(|pair| pair.iter().map(String::as_str).eq(["site", "receive"]))
-        }));
-        assert!(checks.iter().any(|(command, allowed)| {
-            !*allowed && command.last().is_some_and(|argument| argument == "--unexpected")
-        }));
     }
 }

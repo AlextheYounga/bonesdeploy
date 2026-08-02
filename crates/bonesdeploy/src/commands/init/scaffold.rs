@@ -37,7 +37,7 @@ pub(super) fn materialize_fresh_bones(
     }
     unix_fs::symlink(&config_dir, bones_dir)?;
 
-    setup_bones_git_repo(bones_dir, cfg)?;
+    ensure_bones_git_repo(bones_dir, cfg)?;
 
     cfg.framework = serde_json::from_value(serde_json::Value::Object(framework.config.clone()))?;
 
@@ -135,36 +135,34 @@ pub(super) fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
     Ok(())
 }
 
-fn setup_bones_git_repo(bones_dir: &Path, cfg: &config::Bones) -> Result<()> {
+pub(super) fn ensure_bones_git_repo(bones_dir: &Path, cfg: &config::Bones) -> Result<()> {
     let gitignore = bones_dir.join(paths::GITIGNORE_FILE);
     fs::write(&gitignore, paths::BONES_GITIGNORE_CONTENT)
         .with_context(|| format!("Failed to write {}", gitignore.display()))?;
 
-    let output = Command::new("git")
-        .args(["-C"])
-        .arg(bones_dir)
-        .args(["init", "--initial-branch", "master"])
-        .output()
-        .context("Failed to init git repo in .bones")?;
-    if !output.status.success() {
-        bail!("git init failed: {}", String::from_utf8_lossy(&output.stderr));
+    if !bones_dir.join(".git").exists() {
+        let output = Command::new("git")
+            .args(["-C"])
+            .arg(bones_dir)
+            .args(["init", "--initial-branch", "master"])
+            .output()
+            .context("Failed to init git repo in .bones")?;
+        if !output.status.success() {
+            bail!("git init failed: {}", String::from_utf8_lossy(&output.stderr));
+        }
     }
 
     let repo_path = paths::default_bones_repo_path_for(&cfg.project_name);
     let remote_url = if cfg.port == "22" {
-        format!("{}@{}:{repo_path}", default_deploy_user(), cfg.host)
+        format!("root@{}:{repo_path}", cfg.host)
     } else {
-        format!("ssh://{}@{}:{}{repo_path}", default_deploy_user(), cfg.host, cfg.port)
+        format!("ssh://root@{}:{}{repo_path}", cfg.host, cfg.port)
     };
 
-    let output = Command::new("git")
-        .args(["-C"])
-        .arg(bones_dir)
-        .args(["remote", "add", "origin", &remote_url])
-        .output()
-        .context("Failed to add remote to .bones repo")?;
-    if !output.status.success() {
-        bail!("Failed to add remote: {}", String::from_utf8_lossy(&output.stderr));
+    if git::remote_exists_at(bones_dir, "origin")? {
+        git::set_remote_url_at(bones_dir, "origin", &remote_url)?;
+    } else {
+        git::add_remote_at(bones_dir, "origin", &remote_url)?;
     }
 
     Ok(())

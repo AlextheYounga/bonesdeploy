@@ -39,6 +39,7 @@ BONESDEPLOY_NGINX_DEFAULT_DENY_KEY = "bonesdeploy-default-deny.key"
 
 BONESREMOTE_CONFIG_DIR = "/root/.config/bonesremote"
 BONESREMOTE_SITES_DIR = "sites"
+BONESREMOTE_REPOS_DIR = "repos"
 BONESREMOTE_SITE_ROOT = f"{BONESREMOTE_CONFIG_DIR}/{BONESREMOTE_SITES_DIR}"
 
 BONESREMOTE_BINARY = "bonesremote"
@@ -117,7 +118,7 @@ class DeploymentPaths:
             repo=repo_path,
             repo_parent=_parent_or_default(repo_path, DEFAULT_REPO_PARENT),
             repo_head=str(repo / GIT_HEAD),
-            bones_repo=str(Path(DEFAULT_REPO_PARENT) / f"{project_name}.bones.git"),
+            bones_repo=str(Path(BONESREMOTE_CONFIG_DIR) / BONESREMOTE_REPOS_DIR / f"{project_name}.bones.git"),
             site_nginx_config=str(conf_root / NGINX_CONF),
             site_root=str(Path(BONESREMOTE_SITE_ROOT) / project_name),
             conf_root=str(conf_root),

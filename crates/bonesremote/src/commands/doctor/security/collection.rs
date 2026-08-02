@@ -156,12 +156,9 @@ pub(super) fn collect_identity_groups(mut account: Account) -> Result<Account, S
     Ok(account)
 }
 
-pub(super) fn collect_sudo_policy(user: &str, command: &[String]) -> SudoEvidence {
+pub(super) fn collect_sudo_policy(user: &str) -> SudoEvidence {
     let mut sudo = Command::new("sudo");
     sudo.args(["-n", "-u", user, "sudo", "-n", "-l"]);
-    if !command.is_empty() {
-        sudo.arg("--").args(command);
-    }
     sudo.env("LC_ALL", "C");
 
     let decision = match sudo.output() {
@@ -169,7 +166,7 @@ pub(super) fn collect_sudo_policy(user: &str, command: &[String]) -> SudoEvidenc
         Ok(output) => classify_sudo_denial(output.status.code(), &String::from_utf8_lossy(&output.stderr)),
         Err(error) => PolicyDecision::Unverified(format!("could not execute sudo policy check: {error}")),
     };
-    SudoEvidence { user: user.to_string(), command: command.to_vec(), decision }
+    SudoEvidence { user: user.to_string(), decision }
 }
 
 fn classify_sudo_denial(status: Option<i32>, stderr: &str) -> PolicyDecision {

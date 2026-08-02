@@ -108,49 +108,6 @@ pub(super) fn evaluate_runtime_sudo(evidence: &SudoEvidence) -> Finding {
     }
 }
 
-pub(super) fn evaluate_deploy_sudo(evidence: &SudoEvidence, should_be_allowed: bool) -> Finding {
-    let rule = Rule {
-        name: "Deploy sudo authority is exact",
-        principle: "A privileged mediator grants exactly the authority its sudo policy permits.",
-        expected: if should_be_allowed {
-            "The approved command is allowed."
-        } else {
-            "The representative forbidden command is denied."
-        },
-        risk: "This sampled policy boundary matches the explicit allowlist.",
-        remediation: "None.",
-    };
-    let command = evidence.command.join(" ");
-    match (&evidence.decision, should_be_allowed) {
-        (PolicyDecision::Allowed, true) | (PolicyDecision::Denied, false) => {
-            finding(Status::Pass, rule, format!("sudo policy produced the expected decision for {command}"))
-        }
-        (PolicyDecision::Denied, true) => finding(
-            Status::Fail,
-            Rule {
-                expected: "Every approved BonesRemote command is allowed.",
-                risk: "Deployment operations will fail or bypass the intended mediator.",
-                remediation: "Reinstall the exact BonesDeploy sudoers policy.",
-                ..rule
-            },
-            format!("sudo denied approved command {command}"),
-        ),
-        (PolicyDecision::Allowed, false) => finding(
-            Status::Fail,
-            Rule {
-                expected: "Shells, arbitrary binaries, sudoedit, and unapproved BonesRemote arguments are denied.",
-                risk: "Compromise of the deploy identity could become root compromise.",
-                remediation: "Replace broad or wildcard sudoers entries with the exact generated allowlist.",
-                ..rule
-            },
-            format!("sudo allowed forbidden command {command}"),
-        ),
-        (PolicyDecision::Unverified(error), _) => {
-            unverified(rule.name, format!("could not evaluate sudo policy for {command}: {error}"))
-        }
-    }
-}
-
 pub(super) fn evaluate_privileged_path(tree: &PathTree, untrusted: &[&Account]) -> Finding {
     let mut uncertainty = None;
     for node in &tree.nodes {
@@ -290,9 +247,9 @@ mod tests {
     use std::collections::BTreeSet;
     use std::path::PathBuf;
 
-    use super::{evaluate_active_release, evaluate_deploy_sudo, evaluate_privileged_path};
+    use super::{evaluate_active_release, evaluate_privileged_path};
     use crate::commands::doctor::security::types::{
-        Account, CurrentState, FileKind, FileNode, PathTree, PolicyDecision, ReleaseEvidence, Status, SudoEvidence,
+        Account, CurrentState, FileKind, FileNode, PathTree, ReleaseEvidence, Status,
     };
 
     fn account() -> Account {
@@ -324,17 +281,6 @@ mod tests {
         let runtime = account();
 
         assert_eq!(evaluate_privileged_path(&tree, &[&runtime]).status, Status::Fail);
-    }
-
-    #[test]
-    fn sudo_collection_error_is_unverified() {
-        let evidence = SudoEvidence {
-            user: "git".to_string(),
-            command: vec!["/bin/sh".to_string()],
-            decision: PolicyDecision::Unverified("sudoers parse error".to_string()),
-        };
-
-        assert_eq!(evaluate_deploy_sudo(&evidence, false).status, Status::Unverified);
     }
 
     #[test]

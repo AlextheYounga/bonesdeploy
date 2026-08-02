@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 #
-# bonesdeploy-config-post-receive-v1
+# bonesdeploy-config-pre-receive-v1
 #
-# post-receive — Thin adapter installed by bonesremote for the .bones config repo
+# pre-receive — Thin adapter installed by bonesremote for the .bones config repo
 #
-# Accepts pushed config refs, extracts the site name, validates the
-# pushed ref, and delegates import to bonesremote.
+# Validates and imports pushed config refs before Git accepts them.
 
 set -euo pipefail
 
 # Derive site name from the .bones.git repository directory
-# e.g. /home/git/myapp.bones.git → myapp
+# e.g. /root/.config/bonesremote/repos/myapp.bones.git → myapp
 GIT_DIR="${GIT_DIR:-.}"
 GIT_DIR=$(cd "$GIT_DIR" && pwd)
 SITE=$(basename "$GIT_DIR")
@@ -23,7 +22,7 @@ fi
 
 while read -r _oldrev newrev refname; do
 	if [ "$refname" = "refs/heads/master" ] && [ "$newrev" != "0000000000000000000000000000000000000000" ]; then
-		exec sudo bonesremote site receive --site "$SITE" --revision "$newrev"
+		exec bonesremote site receive --site "$SITE" --revision "$newrev"
 	fi
 done
 

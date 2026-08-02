@@ -42,7 +42,8 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 | Identity | Owner of | Scope |
 |----------|----------|-------|
-| `git` (deploy user) | Bare repo | Ingress only |
+| `git` (deploy user) | Application bare repo | Ingress only |
+| `root` | `.bones` bare repo and config state | Ingress and control-plane import |
 | `<site>` (runtime user) | Shared files, `/run/<site>`, writable paths | Mutates runtime state |
 | `root` | System units, config dirs, users/groups, sealed releases | Provisions, deploys, and restarts services |
 
@@ -155,18 +156,18 @@ verify its SHA-256 checksum, and use bounded network timeouts.
 Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. Runtime secrets belong in `shared/.env` via `bonesdeploy secrets push`.
 
 ### Hooks
-The optional git push transport uses thin adapters: a local `pre-push` guard embedded in the `bonesdeploy` binary and a remote `post-receive` trigger embedded in the `bonesremote` binary. The config repo uses a separate `config-post-receive` trigger installed by provisioning. Neither adapter is visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
+The optional git push transport uses thin adapters: a local `pre-push` guard embedded in the `bonesdeploy` binary and a remote `post-receive` trigger embedded in the `bonesremote` binary. The config repo uses a separate `pre-receive` trigger installed by provisioning. Neither adapter is visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
 
 - `pre-push` => Installed by `bonesdeploy init` into `.git/hooks/pre-push`. This checks if we are pushing to the bonesdeploy designated remote. If so, it runs `bonesdeploy doctor --local` and fails if doctor reports warnings or errors.
 - `post-receive` (app repo) => Installed automatically into the bare repo at `/home/git/<project>.git/`. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/`.
-- `config-post-receive` (config repo) => Installed during provisioning into `/home/git/<project>.bones.git/`. Derives `<site>` from `GIT_DIR` by stripping `.bones.git`, reads the pushed revision, and calls `sudo bonesremote site receive --site <site> --revision <rev>`. `bonesremote` archives the revision from the bones repo via `git archive`, validates the dataset, and atomically replaces the control-plane state.
+- `config-pre-receive` (config repo) => Installed during provisioning into `/root/.config/bonesremote/repos/<project>.bones.git/`. Derives `<site>` from `GIT_DIR` by stripping `.bones.git`, reads the pushed revision, and calls `bonesremote site receive --site <site> --revision <rev>` directly as root before Git accepts the update. `bonesremote` archives the revision from the bones repo via `git archive`, validates the dataset, and atomically replaces the control-plane state.
 
 ### Config Repo
-`bonesdeploy push` publishes the `.bones/` directory to a dedicated bare repo at `/home/git/<project>.bones.git`. A fresh `bonesdeploy init` creates the local repository, its `.gitignore`, and the `origin` remote. Existing projects need the equivalent migration setup before using this transport. The push workflow:
+`bonesdeploy push` publishes the `.bones/` directory to a dedicated root-owned bare repo at `/root/.config/bonesremote/repos/<project>.bones.git`. A fresh `bonesdeploy init` creates the local repository, its `.gitignore`, and the `root` `origin` remote. Existing projects need the equivalent migration setup before using this transport. The push workflow:
 1. Stages and commits all content with `"automated commit"`.
-2. Pushes `master` to `git@<host>:<project>.bones.git`.
+2. Pushes `master` to `root@<host>:/root/.config/bonesremote/repos/<project>.bones.git`.
 
-On the server, the `config-post-receive` hook triggers `bonesremote site receive`, which:
+On the server, the `config-pre-receive` hook triggers `bonesremote site receive`, which:
 1. Archives the pushed revision via `git archive --format=tar <rev>` from the bones repo.
 2. Extracts and validates the dataset (same validation as `site import`).
 3. Acquires the deployment lock, ensures the site is idle, and atomically replaces the control-plane state under `/root/.config/bonesremote/sites/<site>/`.
@@ -255,14 +256,14 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Runs remote checks (skipped with `--local`):
     - Opens a privileged SSH session and runs `bonesremote doctor --site <project>`.
     - `bonesremote doctor --site <project>` requires root and checks Podman availability, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until the configured branch is pushed.
-    - The security audit is read-only and fail-closed. It verifies site identity isolation (unique UIDs/GIDs, no login shells, no cross-site group membership, deploy not in runtime groups), runtime sudo absence, deploy sudo exactness (approved BonesRemote commands allowed, shells/arbitrary binaries/extra arguments denied), privileged configuration root-control (recursively inspecting systemd, sudoers, nginx, AppArmor, and BonesRemote state plus their parent chains), and release activation (current must be a valid symlink resolving inside the site's releases directory; active releases must be immutable to the runtime identity). POSIX ACLs on protected paths are detected through extended attributes and reported as UNVERIFIED. Supplementary groups are collected through `id -G`. Required evidence that cannot be collected is reported as UNVERIFIED and causes doctor to fail.
+    - The security audit is read-only and fail-closed. It verifies site identity isolation (unique UIDs/GIDs, no login shells, no cross-site group membership, deploy not in runtime groups), runtime sudo absence, privileged configuration root-control (recursively inspecting systemd, sudoers, nginx, AppArmor, and BonesRemote state plus their parent chains), and release activation (current must be a valid symlink resolving inside the site's releases directory; active releases must be immutable to the runtime identity). The exact deploy-user sudoers policy is rendered and validated by `bonesinfra` during provisioning rather than probed with fabricated commands during doctor. POSIX ACLs on protected paths are detected through extended attributes and reported as UNVERIFIED. Supplementary groups are collected through `id -G`. Required evidence that cannot be collected is reported as UNVERIFIED and causes doctor to fail.
   - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys.
 
 - **push**
-  - Publishes the local `.bones/` directory to a dedicated bare config repo at `/home/git/<project>.bones.git` on the server via `git push`.
+  - Publishes the local `.bones/` directory to a dedicated root-owned bare config repo at `/root/.config/bonesremote/repos/<project>.bones.git` on the server via `git push`.
   - A fresh `bonesdeploy init` writes `.bones/.gitignore` (excludes plaintext `.env`), initialises the local Git repo in `.bones/`, and adds the config-repo origin. Existing projects require this migration setup before using the Git transport.
   - Before pushing, stages and autocommits `.bones` content.
-  - The server-side `config-post-receive` hook triggers `bonesremote site receive`, which atomically replaces the current remote site state under `/root/.config/bonesremote/sites/<project>/`.
+  - The server-side `config-pre-receive` hook triggers `bonesremote site receive`, which atomically replaces the current remote site state under `/root/.config/bonesremote/sites/<project>/` before Git accepts the update.
 
 - **pull**
   - Streams the current remote site dataset back from `bonesremote site export --site <project>` and extracts it into local `.bones/`.
@@ -414,10 +415,10 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 
 ### Config Repo: `bonesdeploy push` (control-plane update)
 
-`git init -> commit -> push (master) -> config-post-receive`
+`git init -> commit -> push (master) -> config-pre-receive`
 
-1. **push** (local): `bonesdeploy push` stages and autocommits changes, then pushes `master` to `git@<host>:<project>.bones.git`. Fresh projects receive the Git repository setup during `bonesdeploy init`.
-2. **config-post-receive** (remote): Derives `<site>` from `GIT_DIR`, reads the pushed revision from stdin, and calls `sudo bonesremote site receive --site <site> --revision <rev>`.
+1. **push** (local): `bonesdeploy push` stages and autocommits changes, then pushes `master` to `root@<host>:/root/.config/bonesremote/repos/<project>.bones.git`. Fresh projects receive the Git repository setup during `bonesdeploy init`.
+2. **config-pre-receive** (remote): Derives `<site>` from `GIT_DIR`, reads the pushed revision from stdin, and calls `bonesremote site receive --site <site> --revision <rev>` directly as root before accepting the push.
 3. **site receive** (remote): Archives the revision from the bones repo via `git archive`, validates the dataset, acquires the deployment lock, and atomically replaces control-plane state under `/root/.config/bonesremote/sites/<site>/`.
       - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
       - **release_finalize** — Seal the prepared release as `root:<site>`

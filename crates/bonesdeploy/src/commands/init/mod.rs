@@ -67,6 +67,9 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     scaffold::ensure_env_build()?;
     bones_config::save(&cfg, bones_toml)?;
     secrets::initialize_defaults(&cfg)?;
+    if !is_fresh {
+        scaffold::ensure_bones_git_repo(bones_dir, &cfg)?;
+    }
 
     if is_fresh {
         println!("{} bonesdeploy initialized.", output::success_marker());

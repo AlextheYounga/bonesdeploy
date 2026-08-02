@@ -87,7 +87,7 @@ Test names: `laravel`, `next_server`, `next_static`, `nuxt_server`,
   framework projects. Each scenario expands its archive into a disposable Git
   repository, pushes `main`, and runs `bonesdeploy deploy`. Project setup now
   creates the encrypted default `.bones/secrets/.env.gpg` and provisions the
-  dedicated `/home/git/<site>.bones.git` config repository; the runtime seeds
+  dedicated `/root/.config/bonesremote/repos/<site>.bones.git` config repository; the runtime seeds
   the remote shared environment file itself. Deployment therefore exercises
   the config-repository push and receive hook as well as the application
   repository deployment hook.

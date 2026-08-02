@@ -87,9 +87,9 @@ impl Session {
         let mut command = Command::new(program);
         command
             .env("HOME", &self.home)
-            .env("XDG_CONFIG_HOME", scratch_dir().join("xdg-config"))
-            .env("XDG_DATA_HOME", scratch_dir().join("xdg-data"))
-            .env("XDG_CACHE_HOME", scratch_dir().join("xdg-cache"))
+            .env("XDG_CONFIG_HOME", self.home.join(".config"))
+            .env("XDG_DATA_HOME", self.home.join(".local/share"))
+            .env("XDG_CACHE_HOME", self.home.join(".cache"))
             .env("PATH", path)
             .env_remove("SSH_AUTH_SOCK");
         command

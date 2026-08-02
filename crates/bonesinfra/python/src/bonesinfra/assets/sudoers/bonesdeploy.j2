@@ -14,4 +14,4 @@
 # authorized_keys) per project, scope each sudoers rule to that identity and a
 # literal site name, and review the hook/post-receive path derivation before
 # relying on the per-site split.
-{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} ^hook post-receive --site [a-z0-9-]+$, {{ bonesremote_path }} ^site receive --site [a-z0-9-]+ --revision [0-9a-f]{40}$, {{ bonesremote_path }} ^service restart --site [a-z0-9-]+$, {{ bonesremote_path }} ^release rollback --site [a-z0-9-]+$, {{ bonesremote_path }} ^release drop-failed --site [a-z0-9-]+$, {{ bonesremote_path }} ^release prune --site [a-z0-9-]+$
+{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} ^hook post-receive --site [a-z0-9-]+$, {{ bonesremote_path }} ^service restart --site [a-z0-9-]+$, {{ bonesremote_path }} ^release rollback --site [a-z0-9-]+$, {{ bonesremote_path }} ^release drop-failed --site [a-z0-9-]+$, {{ bonesremote_path }} ^release prune --site [a-z0-9-]+$

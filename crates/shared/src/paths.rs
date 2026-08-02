@@ -55,6 +55,7 @@ pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
 pub const BONESREMOTE_BINARY: &str = "bonesremote";
 pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
 pub const BONESREMOTE_SITES_DIR: &str = "sites";
+pub const BONESREMOTE_REPOS_DIR: &str = "repos";
 pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
 pub const BUILD_CACHE_DIR: &str = "cache";
 pub const NGINX_SOCKET: &str = "nginx.sock";
@@ -81,7 +82,11 @@ pub fn default_repo_path_for(project_name: &str) -> String {
 
 #[must_use]
 pub fn default_bones_repo_path_for(project_name: &str) -> String {
-    Path::new(DEFAULT_REPO_PARENT).join(format!("{project_name}.bones.git")).display().to_string()
+    bonesremote_config_root()
+        .join(BONESREMOTE_REPOS_DIR)
+        .join(format!("{project_name}.bones.git"))
+        .display()
+        .to_string()
 }
 
 pub const BONES_GITIGNORE_CONTENT: &str = "**/.env\n";

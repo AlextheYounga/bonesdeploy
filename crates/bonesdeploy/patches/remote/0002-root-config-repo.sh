@@ -5,8 +5,9 @@ set -euo pipefail
 : "${BONESDEPLOY_BONES_REPO:?missing BONESDEPLOY_BONES_REPO}"
 
 repo="$BONESDEPLOY_BONES_REPO"
-mkdir -p "$(dirname "$repo")"
 old_repo="/home/git/${BONESDEPLOY_SITE}.bones.git"
+mkdir -p "$(dirname "$repo")"
+
 if [ ! -e "$repo" ] && [ -e "$old_repo" ]; then
 	mv "$old_repo" "$repo"
 fi
@@ -29,7 +30,7 @@ SITE=${SITE%.bones.git}
 
 while read -r _oldrev newrev refname; do
     if [ "$refname" = "refs/heads/master" ] && [ "$newrev" != "0000000000000000000000000000000000000000" ]; then
-		exec bonesremote site receive --site "$SITE" --revision "$newrev"
+        exec bonesremote site receive --site "$SITE" --revision "$newrev"
     fi
 done
 HOOK

@@ -12,6 +12,10 @@ const LOCAL_CONFIG_REPO_PATCH: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/patches/local/0001-config-repo.sh"));
 const REMOTE_CONFIG_REPO_PATCH: &str =
     include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/patches/remote/0001-config-repo.sh"));
+const LOCAL_ROOT_CONFIG_REPO_PATCH: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/patches/local/0002-root-config-repo.sh"));
+const REMOTE_ROOT_CONFIG_REPO_PATCH: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/patches/remote/0002-root-config-repo.sh"));
 
 struct Patch {
     id: &'static str,
@@ -48,12 +52,26 @@ fn parse_component(component: Option<&str>, version: &str) -> Result<u64> {
         .ok_or_else(|| anyhow::anyhow!("invalid version '{version}'"))
 }
 
-fn local_patches() -> [Patch; 1] {
-    [Patch { id: "0001-config-repo", introduced_in: Version::new(0, 7, 3), script: LOCAL_CONFIG_REPO_PATCH }]
+fn local_patches() -> [Patch; 2] {
+    [
+        Patch { id: "0001-config-repo", introduced_in: Version::new(0, 7, 3), script: LOCAL_CONFIG_REPO_PATCH },
+        Patch {
+            id: "0002-root-config-repo",
+            introduced_in: Version::new(0, 7, 4),
+            script: LOCAL_ROOT_CONFIG_REPO_PATCH,
+        },
+    ]
 }
 
-fn remote_patches() -> [Patch; 1] {
-    [Patch { id: "0001-config-repo", introduced_in: Version::new(0, 7, 3), script: REMOTE_CONFIG_REPO_PATCH }]
+fn remote_patches() -> [Patch; 2] {
+    [
+        Patch { id: "0001-config-repo", introduced_in: Version::new(0, 7, 3), script: REMOTE_CONFIG_REPO_PATCH },
+        Patch {
+            id: "0002-root-config-repo",
+            introduced_in: Version::new(0, 7, 4),
+            script: REMOTE_ROOT_CONFIG_REPO_PATCH,
+        },
+    ]
 }
 
 pub(super) fn run_local(cfg: &config::Bones, target_version: &str) -> Result<()> {
@@ -137,6 +155,9 @@ mod tests {
         let patch = &local_patches()[0];
         assert!(Version::parse("0.7.3").is_ok_and(|version| patch.introduced_in <= version));
         assert!(Version::parse("0.7.2").is_ok_and(|version| patch.introduced_in > version));
+        let migration = &local_patches()[1];
+        assert!(Version::parse("0.7.4").is_ok_and(|version| migration.introduced_in <= version));
+        assert!(Version::parse("0.7.3").is_ok_and(|version| migration.introduced_in > version));
     }
 
     #[test]

@@ -98,7 +98,6 @@ pub(super) enum PolicyDecision {
 #[derive(Clone, Debug)]
 pub(super) struct SudoEvidence {
     pub(super) user: String,
-    pub(super) command: Vec<String>,
     pub(super) decision: PolicyDecision,
 }
 
