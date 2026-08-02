@@ -114,6 +114,9 @@ impl Harness {
         self.exec(&format!(
             "systemctl is-active --quiet {site}.target && systemctl is-active --quiet {site}-nginx.service && test -d /srv/sites/{site}"
         ))?;
+        self.exec(&format!(
+            "test -d /home/git/{site}.bones.git && test -x /home/git/{site}.bones.git/hooks/post-receive && test \"$(git --git-dir /home/git/{site}.bones.git symbolic-ref --short HEAD)\" = master"
+        ))?;
         Ok(())
     }
 
