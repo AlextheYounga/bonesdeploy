@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 import types
 from pathlib import Path
 
@@ -14,7 +16,6 @@ import bonesinfra.cli.commands.setup.bonesremote as bonesremote_plan
 import bonesinfra.cli.commands.ssl as ssl_plan
 from bonesinfra.cli import hooks as custom_mod
 from bonesinfra.config.context import DeployContext
-from bonesinfra.config.paths import BONESDEPLOY_REPO
 
 
 def _write_config(tmp: Path) -> Path:
@@ -110,7 +111,6 @@ def _stub_setup_plan(monkeypatch, record: list[str]) -> None:
         setup_plan,
         "users",
         types.SimpleNamespace(
-            install_rust=_rec("install_rust", record),
             ensure_users_and_groups=_rec("ensure_users_and_groups", record),
             install_authorized_key=_rec("install_authorized_key", record),
         ),
@@ -165,16 +165,94 @@ def test_bonesremote_install_repairs_binary_permissions(monkeypatch):
 
     monkeypatch.setattr(bonesremote_plan, "server", types.SimpleNamespace(script_template=script_template))
 
-    bonesremote_plan.install()
+    bonesremote_plan.install("0.7.4")
 
     assert calls == [
         {
             "name": "Install bonesremote binary",
             "src": str(bonesremote_plan.SCRIPTS_DIR / "install-bonesremote.sh.j2"),
-            "repo": BONESDEPLOY_REPO,
+            "bonesremote_version": "0.7.4",
             "_sudo": True,
         }
     ]
+
+
+def test_bonesremote_installer_verifies_and_installs_the_versioned_release(tmp_path):
+    artifact = "bonesremote-x86_64-unknown-linux-musl"
+    release_dir = tmp_path / "release"
+    release_dir.mkdir()
+    release_binary = release_dir / artifact
+    release_binary.write_text("#!/usr/bin/env bash\nprintf 'bonesremote 0.7.4\\n'\n")
+    release_binary.chmod(0o755)
+    checksum = subprocess.run(
+        ["/usr/bin/sha256sum", release_binary], check=True, capture_output=True, text=True
+    ).stdout.split()[0]
+    (release_dir / f"{artifact}.sha256").write_text(f"{checksum}  {artifact}\n")
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    _script(
+        fake_bin / "curl",
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        "output=${@: -1}\n"
+        "url=${@: -3:1}\n"
+        'cp "$RELEASE_DIR/${url##*/}" "$output"\n',
+    )
+    _script(fake_bin / "uname", "#!/usr/bin/env bash\nprintf '%s\\n' \"${TEST_ARCH:-x86_64}\"\n")
+    _script(
+        fake_bin / "install",
+        '#!/usr/bin/env bash\nset -euo pipefail\ncp "${@: -2:1}" "${@: -1}"\nchmod 0755 "${@: -1}"\n',
+    )
+    _script(fake_bin / "chown", "#!/usr/bin/env bash\nexit 0\n")
+
+    binary = tmp_path / "bonesremote"
+    template = (bonesremote_plan.SCRIPTS_DIR / "install-bonesremote.sh.j2").read_text()
+    script = template.replace("/usr/local/bin/bonesremote", str(binary)).replace("{{ bonesremote_version }}", "0.7.4")
+    installer = tmp_path / "install-bonesremote.sh"
+    installer.write_text(script)
+    installer.chmod(0o755)
+
+    result = subprocess.run(
+        ["/usr/bin/bash", installer],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}", "RELEASE_DIR": str(release_dir)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (
+        subprocess.run([binary, "version"], check=True, capture_output=True, text=True).stdout == "bonesremote 0.7.4\n"
+    )
+
+
+def test_bonesremote_installer_rejects_unsupported_architecture(tmp_path):
+    template = (bonesremote_plan.SCRIPTS_DIR / "install-bonesremote.sh.j2").read_text()
+    script = template.replace("/usr/local/bin/bonesremote", str(tmp_path / "bonesremote")).replace(
+        "{{ bonesremote_version }}", "0.7.4"
+    )
+    installer = tmp_path / "install-bonesremote.sh"
+    installer.write_text(script)
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    _script(fake_bin / "uname", "#!/usr/bin/env bash\nprintf 'aarch64\\n'\n")
+    result = subprocess.run(
+        ["/usr/bin/bash", installer],
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "PATH": f"{fake_bin}:{os.environ['PATH']}"},
+    )
+
+    assert result.returncode != 0
+    assert "only support x86_64" in result.stderr
+
+
+def _script(path: Path, content: str) -> None:
+    path.write_text(content)
+    path.chmod(0o755)
 
 
 def test_only_invoked_phase_hook_runs(tmp_path, monkeypatch):

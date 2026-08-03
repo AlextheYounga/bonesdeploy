@@ -32,7 +32,10 @@ pub fn run(skip_confirm: bool, show_next: bool) -> Result<()> {
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    bonesinfra::run_with_stdin(&["setup", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
+    bonesinfra::run_with_stdin(
+        &["setup", "apply", "--config", paths::LOCAL_BONES_TOML, "--bonesremote-version", env!("CARGO_PKG_VERSION")],
+        &json,
+    )?;
 
     println!("Remote bootstrap complete.");
     if show_next {

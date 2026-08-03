@@ -25,7 +25,7 @@ def test_runtime_list():
 
 
 def test_setup_apply_rejects_missing_host():
-    result = _run_no_input("setup", "apply", "--config", "/dev/null")
+    result = _run_no_input("setup", "apply", "--config", "/dev/null", "--bonesremote-version", "0.7.4")
     assert result.returncode == 3, f"Expected exit 3 for missing host, got {result.returncode}"
     assert "missing host" in result.stderr.lower()
 

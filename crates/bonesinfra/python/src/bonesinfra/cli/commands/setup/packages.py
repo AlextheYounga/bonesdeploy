@@ -1,4 +1,4 @@
-from pyinfra.operations import apt, server
+from pyinfra.operations import apt
 
 BASE_SYSTEM_PACKAGES: list[str] = [
     "build-essential",
@@ -44,13 +44,5 @@ def install_system(packages):
         present=True,
         update=True,
         cache_time=3600,
-        _sudo=True,
-    )
-
-
-def install_rust():
-    server.shell(
-        name="Install rustup and cargo",
-        commands=["curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal"],
         _sudo=True,
     )

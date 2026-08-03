@@ -465,7 +465,6 @@ Setup provisioning prepares the machine.
 Responsibilities:
 
 - install base packages
-- install Rust/cargo if needed
 - ensure deploy user
 - ensure runtime user
 - ensure runtime group
@@ -482,7 +481,7 @@ Responsibilities:
 - install thin post-receive hook (delegates to `bonesremote hook post-receive`)
 - initialize the root-owned `.bones` config repository and install its pre-receive import hook
 - configure firewall
-- install or repair root-owned `0755` `bonesremote`
+- download, checksum-verify, version-check, and install the root-owned `0755` static `x86_64` `bonesremote` release binary matching the local `bonesdeploy` version
 - install validated `/etc/sudoers.d/bonesdeploy` with exact command arguments
 
 Setup should run as root or bootstrap SSH user.

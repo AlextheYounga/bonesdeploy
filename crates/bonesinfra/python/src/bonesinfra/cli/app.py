@@ -48,10 +48,15 @@ def runtime_apply_cmd(
 @setup_app.command("apply")
 def setup_apply_cmd(
     config: str = typer.Option(..., "--config", help="Path to bones.toml"),
+    bonesremote_version: str = typer.Option(..., "--bonesremote-version", help="Release version to install"),
 ):
     ctx = DeployContext.from_files(config)
     _validate_host(ctx)
-    run(ctx=ctx, config_path=config, deploy=deploy_setup)
+    run(
+        ctx=ctx,
+        config_path=config,
+        deploy=lambda ctx, custom: deploy_setup(ctx, custom, bonesremote_version),
+    )
 
 
 @ssl_app.command("apply")

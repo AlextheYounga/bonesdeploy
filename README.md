@@ -107,13 +107,17 @@ Install the local CLI:
 cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
 ```
 
-Install the remote runner on the server:
+The remote runner is installed automatically during `bonesdeploy remote setup`.
+The embedded provisioning runtime downloads the matching `bonesremote` static
+Linux release binary from GitHub Releases and verifies its SHA-256 checksum.
+Remote updates use the same verified release artifacts; Rust and Cargo are not
+installed on the deployment host. Remote binaries currently support `x86_64`
+Debian and Ubuntu hosts only.
 
-```sh
-sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
-```
-
-Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy init` remote setup.
+`bonesdeploy update` uses the latest published GitHub release as its source of
+truth. Publish `bonesdeploy` to crates.io, then push a matching `v<version>`
+tag; the release workflow builds and publishes the corresponding `bonesremote`
+asset before that version becomes available to updates.
 
 ## Start a Project
 

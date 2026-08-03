@@ -18,14 +18,6 @@ BUILD_USER_HOME_ROOT = "/var/lib/bonesdeploy/users"
 BUILD_SYSTEMD_STAGING_ROOT = "/run/bonesdeploy"
 
 
-def install_rust():
-    server.shell(
-        name="Install rustup and cargo",
-        commands=["curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal"],
-        _sudo=True,
-    )
-
-
 def _ensure_group_membership(user, group):
     q_user = quote(user)
     q_group = quote(group)

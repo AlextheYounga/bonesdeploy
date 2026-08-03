@@ -15,13 +15,12 @@ from bonesinfra.cli.hooks import call_hook
 from bonesinfra.services.linux import fail2ban, firewall, unattended_upgrades
 
 
-def deploy_setup(ctx, custom: ModuleType | None = None):
+def deploy_setup(ctx, custom: ModuleType | None = None, bonesremote_version: str = ""):
     paths = ctx.paths_dict
     all_pkgs = BASE_SYSTEM_PACKAGES + SUPPLEMENTARY_PACKAGES
 
     packages.install_system(all_pkgs)
     disable_algif_aead.configure()
-    users.install_rust()
     image_store.ensure_shared_store()
     image_store.seed_base_image()
     users.ensure_users_and_groups(ctx)
@@ -31,7 +30,7 @@ def deploy_setup(ctx, custom: ModuleType | None = None):
     fail2ban.configure(ctx)
     unattended_upgrades.configure()
     users.install_authorized_key(ctx)
-    bonesremote.install()
+    bonesremote.install(bonesremote_version)
     sudoers.install(paths)
 
     call_hook(custom, "after_setup", ctx)

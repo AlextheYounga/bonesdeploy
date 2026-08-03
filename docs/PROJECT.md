@@ -279,9 +279,16 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
   - Passes `bones.toml` deployment values plus computed paths and variables as JSON on stdin.
   - Initializes bare git repository at `repo_path`.
   - Creates initial placeholder release with default page.
-  - Installs `bonesremote` from source.
+   - Downloads and checksum-verifies the matching static `x86_64` `bonesremote` Linux release binary from GitHub Releases.
+   - Does not install Rust or Cargo on the remote host.
   - Installs the deploy-user sudoers policy through `bonesinfra` host provisioning, with anchored site and revision arguments so trailing or malformed arguments are denied.
-  - Provisions machine-level dependencies (users, groups, firewall, system packages).
+   - Provisions machine-level dependencies (users, groups, firewall, system packages).
+
+`bonesdeploy update` resolves the latest published GitHub release, validates that
+its `v<version>` tag matches both package manifests, clones that exact tag for
+patches and scaffold updates, installs the matching crates.io `bonesdeploy`, and
+downloads the matching static `x86_64` `bonesremote` asset. ARM hosts fail
+clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 
 - **remote framework**:
   - Prompts for a framework template, refreshes `.bones/runtime/`, and writes the selected settings into `.bones/bones.toml`.
