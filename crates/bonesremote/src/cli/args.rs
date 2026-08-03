@@ -14,6 +14,9 @@ pub enum Command {
         /// Also validate the imported site state and runtime boundary for one site
         #[arg(long)]
         site: Option<String>,
+        /// Recursively inspect every file in the active release for permission drift
+        #[arg(long, requires = "site")]
+        exhaustive: bool,
     },
     /// Run the full remote deployment lifecycle
     Deploy {
@@ -116,4 +119,21 @@ pub enum ServiceCommand {
         #[arg(long)]
         site: String,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::Cli;
+
+    #[test]
+    fn exhaustive_doctor_requires_a_site() {
+        assert!(Cli::try_parse_from(["bonesremote", "doctor", "--exhaustive"]).is_err());
+    }
+
+    #[test]
+    fn exhaustive_doctor_accepts_a_site() {
+        assert!(Cli::try_parse_from(["bonesremote", "doctor", "--site", "atlas", "--exhaustive"]).is_ok());
+    }
 }

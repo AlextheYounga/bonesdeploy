@@ -9,7 +9,7 @@ mod security;
 mod site;
 mod system;
 
-pub fn run(site: Option<&str>) -> Result<()> {
+pub fn run(site: Option<&str>, exhaustive: bool) -> Result<()> {
     privileges::ensure_root("bonesremote doctor")?;
     println!("{} doctor", console::style(paths::BONESREMOTE_BINARY).bold());
 
@@ -20,7 +20,10 @@ pub fn run(site: Option<&str>) -> Result<()> {
     system::check_podman_available(&mut issues);
     apparmor::check_support(&mut issues);
 
-    let security_report = security::audit();
+    if exhaustive {
+        println!("  {} Exhaustively scanning the active release for permission drift.", ui::pending_marker());
+    }
+    let security_report = security::audit(site, exhaustive);
     security_report.render();
     issues.extend(security_report.required_failures());
 

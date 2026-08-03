@@ -90,10 +90,10 @@ pub(super) fn collect_path_tree(path: &Path, follow_symlink_targets: bool) -> Re
     let mut walked = BTreeSet::new();
     collect_parents(path, &mut nodes)?;
     walk_path(path, follow_symlink_targets, &mut nodes, &mut walked)?;
-    Ok(PathTree { requested: path.to_path_buf(), nodes: nodes.into_values().collect() })
+    Ok(PathTree { requested: path.to_path_buf(), nodes })
 }
 
-pub(super) fn collect_release(site: &Site) -> Result<ReleaseEvidence, String> {
+pub(super) fn collect_release(site: &Site, exhaustive: bool) -> Result<ReleaseEvidence, String> {
     let current_path = site.project_root.join(paths::CURRENT_LINK);
     let releases_path = site.project_root.join(paths::RELEASES_DIR);
     let releases_root = fs::canonicalize(&releases_path)
@@ -120,14 +120,18 @@ pub(super) fn collect_release(site: &Site) -> Result<ReleaseEvidence, String> {
     }
     if let CurrentState::Active(target) = &current {
         collect_parents(target, &mut nodes)?;
-        walk_path(target, false, &mut nodes, &mut walked)?;
+        if exhaustive {
+            walk_path(target, false, &mut nodes, &mut walked)?;
+        } else {
+            collect_node(target, &mut nodes)?;
+        }
     }
 
     Ok(ReleaseEvidence {
         site: site.name.clone(),
         releases_root,
         current,
-        filesystem: PathTree { requested: current_path, nodes: nodes.into_values().collect() },
+        filesystem: PathTree { requested: current_path, nodes },
     })
 }
 
@@ -304,7 +308,34 @@ fn extended_attribute_exists(path: &Path, name: &'static [u8]) -> Result<bool, S
 
 #[cfg(test)]
 mod tests {
-    use super::{PolicyDecision, classify_sudo_denial, command_output, sudo_listing_denies};
+    use std::collections::BTreeSet;
+    use std::env;
+    use std::fs;
+    use std::io;
+    use std::os::unix::fs::symlink;
+    use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::{
+        PolicyDecision, classify_sudo_denial, collect_path_tree, collect_release, command_output, sudo_listing_denies,
+    };
+    use crate::commands::doctor::security::types::{Account, Site};
+
+    fn temporary_root(name: &str) -> std::path::PathBuf {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+        env::temp_dir().join(format!("bonesremote-doctor-{name}-{}-{nonce}", process::id()))
+    }
+
+    fn site(root: &std::path::Path) -> Site {
+        let account = Account {
+            name: "atlas".to_string(),
+            uid: 1001,
+            gid: 1001,
+            shell: "/usr/sbin/nologin".to_string(),
+            groups: BTreeSet::from([1001]),
+        };
+        Site { name: "atlas".to_string(), project_root: root.to_path_buf(), runtime: account.clone(), build: account }
+    }
 
     #[test]
     fn sudo_policy_denial_is_distinct_from_collector_failure() {
@@ -332,5 +363,43 @@ mod tests {
     fn sudo_listing_denial_is_not_authority() {
         assert!(sudo_listing_denies(b"User e2evue is not allowed to run sudo on bones-e2e-487602-30de0aa3.\n", b""));
         assert!(!sudo_listing_denies(b"User e2evue may run the following commands on host:\n    (ALL) ALL\n", b""));
+    }
+
+    #[test]
+    fn protected_path_scan_does_not_follow_symlink_targets() -> Result<(), Box<dyn std::error::Error>> {
+        let root = temporary_root("protected-symlink");
+        let protected = root.join("protected");
+        let outside = root.join("outside");
+        fs::create_dir_all(&protected)?;
+        fs::create_dir_all(&outside)?;
+        fs::write(outside.join("unrelated"), "x")?;
+        symlink(&outside, protected.join("outside"))?;
+
+        let tree = collect_path_tree(&protected, false).map_err(io::Error::other)?;
+        fs::remove_dir_all(&root)?;
+
+        assert!(!tree.nodes.contains_key(&outside));
+        assert!(!tree.nodes.contains_key(&outside.join("unrelated")));
+        Ok(())
+    }
+
+    #[test]
+    fn release_boundary_scan_skips_nested_entries_unless_exhaustive() -> Result<(), Box<dyn std::error::Error>> {
+        let root = temporary_root("release-boundary");
+        let release = root.join("releases/2026-08-03");
+        let nested_file = release.join("nested/application-file");
+        fs::create_dir_all(nested_file.parent().expect("nested file has parent"))?;
+        fs::write(&nested_file, "x")?;
+        symlink(&release, root.join("current"))?;
+        let site = site(&root);
+
+        let boundary = collect_release(&site, false).map_err(io::Error::other)?;
+        let exhaustive = collect_release(&site, true).map_err(io::Error::other)?;
+        fs::remove_dir_all(&root)?;
+
+        assert!(boundary.filesystem.nodes.contains_key(&release));
+        assert!(!boundary.filesystem.nodes.contains_key(&nested_file));
+        assert!(exhaustive.filesystem.nodes.contains_key(&nested_file));
+        Ok(())
     }
 }

@@ -59,7 +59,7 @@ impl Report {
     }
 }
 
-pub(super) fn audit() -> Report {
+pub(super) fn audit(site_name: Option<&str>, exhaustive: bool) -> Report {
     let accounts = match collect_accounts() {
         Ok(accounts) => accounts,
         Err(error) => return Report { findings: vec![unverified("Site identity isolation", error)] },
@@ -90,13 +90,13 @@ pub(super) fn audit() -> Report {
     let mut untrusted: Vec<_> = sites.iter().flat_map(|site| [&site.runtime, &site.build]).collect();
     untrusted.push(&deploy);
     for path in protected_paths() {
-        match collect_path_tree(&path, true) {
+        match collect_path_tree(&path, false) {
             Ok(tree) => findings.push(evaluate_privileged_path(&tree, &untrusted)),
             Err(error) => findings.push(unverified("Privileged configuration is root-controlled", error)),
         }
     }
-    for site in &sites {
-        match collect_release(site) {
+    for site in sites.iter().filter(|site| site_name.is_none_or(|name| site.name == name)) {
+        match collect_release(site, exhaustive) {
             Ok(evidence) => findings.push(evaluate_active_release(&evidence, &site.runtime)),
             Err(error) => findings.push(unverified("Release activation is root-controlled", error)),
         }

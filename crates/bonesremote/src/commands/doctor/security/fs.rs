@@ -74,7 +74,7 @@ pub(super) fn has_login_shell(shell: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::path::{Path, PathBuf};
 
     use super::{Authority, account_can_modify};
@@ -96,7 +96,10 @@ mod tests {
 
     fn tree(mut nodes: Vec<FileNode>) -> PathTree {
         nodes.extend([node("/", FileKind::Directory, 0, 0o755), node("/srv", FileKind::Directory, 0, 0o755)]);
-        PathTree { requested: PathBuf::from("/srv/sites"), nodes }
+        PathTree {
+            requested: PathBuf::from("/srv/sites"),
+            nodes: nodes.into_iter().map(|node| (node.path.clone(), node)).collect::<BTreeMap<_, _>>(),
+        }
     }
 
     #[test]

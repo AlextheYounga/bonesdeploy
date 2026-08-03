@@ -98,7 +98,7 @@ pub(super) fn evaluate_runtime_sudo(evidence: &SudoEvidence) -> Finding {
 
 pub(super) fn evaluate_privileged_path(tree: &PathTree, untrusted: &[&Account]) -> Finding {
     let mut uncertainty = None;
-    for node in &tree.nodes {
+    for node in tree.nodes.values() {
         if node.kind == FileKind::Symlink {
             continue;
         }
@@ -153,7 +153,7 @@ pub(super) fn evaluate_active_release(evidence: &ReleaseEvidence, runtime: &Acco
     }
 
     let mut uncertainty = None;
-    for node in &evidence.filesystem.nodes {
+    for node in evidence.filesystem.nodes.values() {
         if node.kind == FileKind::Symlink {
             continue;
         }
@@ -217,7 +217,7 @@ fn release_current_finding(evidence: &ReleaseEvidence) -> Finding {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeMap, BTreeSet};
     use std::path::PathBuf;
 
     use super::{evaluate_active_release, evaluate_privileged_path};
@@ -249,7 +249,10 @@ mod tests {
                 node("/etc/systemd", FileKind::Directory, 0, 0o755),
                 node("/etc/systemd/system", FileKind::Directory, 0, 0o755),
                 node("/etc/systemd/system/atlas.service", FileKind::File, 1001, 0o600),
-            ],
+            ]
+            .into_iter()
+            .map(|node| (node.path.clone(), node))
+            .collect(),
         };
         let runtime = account();
 
@@ -259,7 +262,7 @@ mod tests {
     #[test]
     fn broken_and_out_of_tree_current_targets_fail() {
         let runtime = account();
-        let filesystem = PathTree { requested: PathBuf::from("/srv/sites/atlas/current"), nodes: Vec::new() };
+        let filesystem = PathTree { requested: PathBuf::from("/srv/sites/atlas/current"), nodes: BTreeMap::new() };
         let broken = ReleaseEvidence {
             site: "atlas".to_string(),
             releases_root: PathBuf::from("/srv/sites/atlas/releases"),

@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -60,12 +60,12 @@ pub(super) struct FileNode {
 #[derive(Clone, Debug)]
 pub(super) struct PathTree {
     pub(super) requested: PathBuf,
-    pub(super) nodes: Vec<FileNode>,
+    pub(super) nodes: BTreeMap<PathBuf, FileNode>,
 }
 
 impl PathTree {
     pub(super) fn node(&self, path: &Path) -> Option<&FileNode> {
-        self.nodes.iter().find(|node| node.path == path)
+        self.nodes.get(path)
     }
 }
 
