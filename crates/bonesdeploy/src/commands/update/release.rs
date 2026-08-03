@@ -57,7 +57,7 @@ pub(super) async fn update_remote_from_release(current_version: &str, target_ver
     let port = parse_port(&cfg.port)?;
     let session = ssh::connect_as("root", &cfg.host, port).await?;
 
-    let install_root = paths::USR_LOCAL_BIN.trim_end_matches("/bin");
+    let install_root = paths::USR_LOCAL_BIN;
     if current_version != target_version {
         ssh::stream_cmd(&session, &bonesremote_download_command(target_version, install_root)).await?;
     }
@@ -94,7 +94,7 @@ mod tests {
 
     #[test]
     fn remote_update_downloads_versioned_release_and_checksum() {
-        let command = bonesremote_download_command("0.7.3", "/usr/local");
+        let command = bonesremote_download_command("0.7.3", "/usr/local/bin");
 
         assert!(command.contains("releases/download/v0.7.3"));
         assert!(command.contains("bonesremote-x86_64-unknown-linux-musl.sha256"));
@@ -102,5 +102,7 @@ mod tests {
         assert!(command.contains("uname -m"));
         assert!(command.contains("bonesremote 0.7.3"));
         assert!(command.contains("install -o root -g root -m 0755"));
+        assert!(command.contains("'/usr/local/bin/bonesremote.tmp'"));
+        assert!(command.contains("'/usr/local/bin/bonesremote'"));
     }
 }
