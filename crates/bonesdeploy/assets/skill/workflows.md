@@ -11,7 +11,7 @@ bonesdeploy deploy
 ```
 
 `setup --yes` does bootstrap + runtime + push + doctor in one shot. You do
-not need `remote runtime` separately — it's already inside `setup`. After
+not need `remote framework` separately — it's already inside `setup`. After
 setup, push your source to the bare repo once (so `bonesremote` has
 something to build), then `deploy`. That's the whole dance.
 
@@ -23,7 +23,7 @@ time, you probably do, because you'll want to see where it breaks.
 ```
 bonesdeploy init
 bonesdeploy remote bootstrap
-bonesdeploy remote runtime --yes
+bonesdeploy remote framework --yes
 bonesdeploy push
 git push production master
 bonesdeploy remote ssl --yes --domain app.example.com --email ops@example.com
@@ -99,7 +99,7 @@ bonesdeploy pull
 Wrong runtime on the host:
 
 ```
-bonesdeploy remote runtime --yes
+bonesdeploy remote framework --yes
 ```
 
 Wrong SSL:

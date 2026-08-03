@@ -69,6 +69,13 @@ pub enum SiteCommand {
         #[arg(long)]
         site: String,
     },
+    /// Receive a pushed .bones config revision
+    Receive {
+        #[arg(long)]
+        site: String,
+        #[arg(long)]
+        revision: String,
+    },
 }
 
 #[derive(Subcommand)]

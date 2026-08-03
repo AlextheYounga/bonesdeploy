@@ -55,6 +55,7 @@ pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
 pub const BONESREMOTE_BINARY: &str = "bonesremote";
 pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
 pub const BONESREMOTE_SITES_DIR: &str = "sites";
+pub const BONESREMOTE_REPOS_DIR: &str = "repos";
 pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
 pub const BUILD_CACHE_DIR: &str = "cache";
 pub const NGINX_SOCKET: &str = "nginx.sock";
@@ -68,12 +69,24 @@ pub const GIT_PRE_PUSH_HOOK: &str = ".git/hooks/pre-push";
 pub const PRE_PUSH_HOOK_NAME: &str = "pre-push";
 pub const HOOKS_DIR: &str = "hooks";
 pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";
+pub const KIT_CONFS_DIR: &str = "confs/";
+pub const CONFS_DIR: &str = "confs";
 pub const BONES_CONFIG_PROJECTS_DIR: &str = "projects";
 pub const BONESDEPLOY_DIR: &str = "bonesdeploy";
+pub const GITIGNORE_FILE: &str = ".gitignore";
 
 #[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
     Path::new(DEFAULT_REPO_PARENT).join(format!("{project_name}.git")).display().to_string()
+}
+
+#[must_use]
+pub fn default_bones_repo_path_for(project_name: &str) -> String {
+    bonesremote_config_root()
+        .join(BONESREMOTE_REPOS_DIR)
+        .join(format!("{project_name}.bones.git"))
+        .display()
+        .to_string()
 }
 
 #[must_use]
@@ -140,6 +153,11 @@ pub fn bonesremote_staged_release_path(site: &str) -> PathBuf {
 #[must_use]
 pub fn bonesremote_tmp_builds_root(site: &str) -> PathBuf {
     bonesremote_site_root(site).join(TMP_BUILDS_DIR)
+}
+
+#[must_use]
+pub fn bonesremote_site_logs(site: &str) -> PathBuf {
+    bonesremote_site_root(site).join(LOGS_DIR)
 }
 
 #[must_use]

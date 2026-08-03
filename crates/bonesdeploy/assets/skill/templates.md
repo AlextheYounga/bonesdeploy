@@ -1,4 +1,4 @@
-# BonesDeploy runtime templates
+# BonesDeploy framework templates
 
 Seven templates ship in the binary. Each one installs a framework-specific
 runtime on the server: nginx router, systemd service, AppArmor profile, and
@@ -18,7 +18,7 @@ Non-interactive (agents, CI):
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --runtime-var php_version=8.5
+  --template laravel --framework-var php_version=8.5
 ```
 
 `--template none` or omitting the flag means "build from scratch" — no
@@ -37,7 +37,7 @@ PHP + PHP-FPM.
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --runtime-var php_version=8.5
+  --template laravel --framework-var php_version=8.5
 ```
 
 ### django
@@ -51,7 +51,7 @@ Python + Gunicorn.
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template django --runtime-var wsgi_module=project.wsgi:application
+  --template django --framework-var wsgi_module=project.wsgi:application
 ```
 
 ### next
@@ -64,7 +64,7 @@ Next.js. Static export or Node server.
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template next --runtime-var is_static=false
+  --template next --framework-var is_static=false
 ```
 
 Static Next serves from `out/`. Server Next runs the standalone server on
@@ -80,7 +80,7 @@ Nuxt. Static or Node server.
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template nuxt --runtime-var is_static=false
+  --template nuxt --framework-var is_static=false
 ```
 
 ### rails
@@ -93,7 +93,7 @@ Ruby + Puma.
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template rails --runtime-var rails_env=production
+  --template rails --framework-var rails_env=production
 ```
 
 ### sveltekit
@@ -116,6 +116,6 @@ bonesdeploy init --non-interactive --project-name atlas --host deploy.example.co
 
 ## Validation
 
-`--runtime-var` answers are validated against the template's schema before
+`--framework-var` answers are validated against the template's schema before
 they reach `bones.toml`. Unknown keys, wrong types, and out-of-range choices
 are rejected. You can't typo `php_verison` and ship a broken config.

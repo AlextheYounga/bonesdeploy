@@ -71,7 +71,7 @@ impl Harness {
         Ok(Self { artifacts, container, host, session })
     }
 
-    pub fn provision(&self, site: &str, template: &str, runtime_vars: &[&str]) -> Result<SampleProject> {
+    pub fn provision(&self, site: &str, template: &str, framework_vars: &[&str]) -> Result<SampleProject> {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures").join(format!("{template}.md"));
         let project = SampleProject::from_fixture(&self.session, &fixture)?;
         let mut init_args = vec![
@@ -86,10 +86,10 @@ impl Harness {
             "--template",
             template,
         ];
-        for runtime_var in runtime_vars {
-            init_args.extend(["--runtime-var", *runtime_var]);
+        for framework_var in framework_vars {
+            init_args.extend(["--framework-var", *framework_var]);
         }
-        if template == "next" && runtime_vars.contains(&"is_static=true") {
+        if template == "next" && framework_vars.contains(&"is_static=true") {
             project.configure_next_static()?;
         }
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &init_args)?;
@@ -113,6 +113,12 @@ impl Harness {
         self.exec("systemctl is-active --quiet nginx")?;
         self.exec(&format!(
             "systemctl is-active --quiet {site}.target && systemctl is-active --quiet {site}-nginx.service && test -d /srv/sites/{site}"
+        ))?;
+        self.exec(&format!(
+            "test -d /root/.config/bonesremote/repos/{site}.bones.git && test -x /root/.config/bonesremote/repos/{site}.bones.git/hooks/pre-receive && test ! -e /root/.config/bonesremote/repos/{site}.bones.git/hooks/post-receive && test \"$(git --git-dir /root/.config/bonesremote/repos/{site}.bones.git symbolic-ref --short HEAD)\" = master"
+        ))?;
+        self.exec(&format!(
+            "test \"$(stat -c '%U:%G:%a' /usr/local/bin/bonesremote)\" = 'root:root:755' && test -f /root/.config/bonesremote/sites/{site}/bones.toml"
         ))?;
         Ok(())
     }

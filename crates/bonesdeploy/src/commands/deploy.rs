@@ -25,7 +25,7 @@ pub async fn run() -> Result<()> {
         style(&cfg.host).dim(),
     );
 
-    push_state::sync_bones_directory(&cfg).context("Failed to publish .bones to bonesremote.")?;
+    push_state::sync_bones_directory().context("Failed to publish .bones to bonesremote.")?;
     secrets::push().await.context("Failed to push environment secrets.")?;
 
     let session = ssh::connect_privileged(&cfg).await?;

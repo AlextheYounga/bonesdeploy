@@ -2,7 +2,6 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
-use shared::config;
 use shared::paths;
 use time::OffsetDateTime;
 use time::format_description::FormatItem;
@@ -14,14 +13,7 @@ use crate::release::state as release_state;
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release stage")?;
 
-    let bones_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&bones_path)
-        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
-
-    if cfg.project_name != site {
-        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
-    }
-
+    let cfg = super::load_site_config(site)?;
     let project_root = Path::new(&cfg.project_root);
     require_dir(project_root, "project_root directory")?;
     require_dir(&Path::new(&cfg.project_root).join(paths::RELEASES_DIR), "releases")?;

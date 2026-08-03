@@ -30,7 +30,7 @@ if ! case "$port" in ""|*[!0-9]*) false;; esac; then
 fi
 test -n "$port"
 
-install -d -m 0755 -o root -g root /etc/bonesinfra/dbs
+install -d -m 0755 -o root -g root /etc/bonesinfra/services
 install -d -m 0700 -o "$PACKAGE_USER" -g "$PACKAGE_USER" "$DATA_DIR"
 
 printf 'bind 127.0.0.1\nport %s\nprotected-mode yes\ndaemonize no\nrequirepass %s\ndir %s\n' "$port" "$password" "$DATA_DIR" > "$CONFIG"

@@ -1,6 +1,6 @@
 import pytest
 
-from bonesinfra.deploys.setup.users import (
+from bonesinfra.cli.commands.setup.users import (
     build_cache_for,
     build_group_for,
     build_home_for,

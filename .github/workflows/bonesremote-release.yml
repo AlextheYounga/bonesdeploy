@@ -1,0 +1,51 @@
+name: Release bonesremote
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+
+      - name: Install musl linker
+        run: sudo apt-get update && sudo apt-get install --yes musl-tools
+
+      - name: Verify tag matches bonesremote version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "bonesremote") | .version')"
+          test "v${version}" = "${GITHUB_REF_NAME}"
+
+      - name: Build bonesremote
+        run: cargo build --locked --release --package bonesremote --target x86_64-unknown-linux-musl
+
+      - name: Package release artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="bonesremote-x86_64-unknown-linux-musl"
+          install -m 0755 target/x86_64-unknown-linux-musl/release/bonesremote "${artifact}"
+          "./${artifact}" version
+          sha256sum "${artifact}" > "${artifact}.sha256"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bonesremote-x86_64-unknown-linux-musl
+            bonesremote-x86_64-unknown-linux-musl.sha256

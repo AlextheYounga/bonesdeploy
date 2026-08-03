@@ -1,16 +1,17 @@
 use std::fs;
 use std::os::unix::fs::{self as unix_fs, PermissionsExt};
 use std::path::Path;
+use std::process::Command;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use shared::config::default_deploy_user;
 use shared::paths;
 
-use super::RuntimeSelection;
+use super::FrameworkSelection;
 use crate::config;
-use crate::infra::assets::{kit, runtimes as runtime_assets};
+use crate::frameworks;
+use crate::infra::assets::{frameworks as framework_assets, kit};
 use crate::infra::git;
-use crate::runtimes;
 use shared::env_build;
 
 const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/hooks/pre-push"));
@@ -19,7 +20,7 @@ pub(super) fn materialize_fresh_bones(
     bones_dir: &Path,
     had_bones_entry: bool,
     cfg: &mut config::Bones,
-    runtime: RuntimeSelection,
+    framework: FrameworkSelection,
 ) -> Result<()> {
     let config_dir = config::bones_config_dir(&cfg.project_name);
 
@@ -36,12 +37,14 @@ pub(super) fn materialize_fresh_bones(
     }
     unix_fs::symlink(&config_dir, bones_dir)?;
 
-    cfg.runtime = serde_json::from_value(serde_json::Value::Object(runtime.config.clone()))?;
+    ensure_bones_git_repo(bones_dir, cfg)?;
 
-    if let Some(template_name) = runtime.template {
-        runtime_assets::scaffold_runtime_env_build(&template_name, Path::new("."), &cfg.runtime)?;
-        runtime_assets::scaffold_runtime_deployment(&template_name, bones_dir)?;
-        runtimes::configure(&template_name, cfg);
+    cfg.framework = serde_json::from_value(serde_json::Value::Object(framework.config.clone()))?;
+
+    if let Some(template_name) = framework.template {
+        framework_assets::scaffold_framework_env_build(&template_name, Path::new("."), &cfg.framework)?;
+        framework_assets::scaffold_framework_deployment(&template_name, bones_dir)?;
+        frameworks::configure(&template_name, cfg);
         println!("Runtime template: {template_name}");
     } else {
         println!("Runtime template: custom");
@@ -51,7 +54,7 @@ pub(super) fn materialize_fresh_bones(
 }
 
 pub(super) fn update_gitignore() -> Result<()> {
-    let gitignore = Path::new(".gitignore");
+    let gitignore = Path::new(paths::GITIGNORE_FILE);
     let entries = [paths::LOCAL_BONES_DIR, "!.env.build"];
 
     if gitignore.exists() {
@@ -75,7 +78,7 @@ pub(super) fn update_gitignore() -> Result<()> {
 }
 
 pub(super) fn ensure_config_gitignore() -> Result<()> {
-    let gitignore = paths::bones_config_root().join(".gitignore");
+    let gitignore = paths::bones_config_root().join(paths::GITIGNORE_FILE);
     let project_entry = format!("{}/", paths::BONES_CONFIG_PROJECTS_DIR);
 
     if gitignore.exists() {
@@ -129,6 +132,37 @@ pub(super) fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
 
     let remote_url = format!("{}@{}:{}", default_deploy_user(), cfg.host, cfg.repo_path);
     git::add_remote(&cfg.remote_name, &remote_url)?;
+    Ok(())
+}
+
+pub(super) fn ensure_bones_git_repo(bones_dir: &Path, cfg: &config::Bones) -> Result<()> {
+    kit::scaffold_gitignore(bones_dir)?;
+
+    if !bones_dir.join(".git").exists() {
+        let output = Command::new("git")
+            .args(["-C"])
+            .arg(bones_dir)
+            .args(["init", "--initial-branch", "master"])
+            .output()
+            .context("Failed to init git repo in .bones")?;
+        if !output.status.success() {
+            bail!("git init failed: {}", String::from_utf8_lossy(&output.stderr));
+        }
+    }
+
+    let repo_path = paths::default_bones_repo_path_for(&cfg.project_name);
+    let remote_url = if cfg.port == "22" {
+        format!("root@{}:{repo_path}", cfg.host)
+    } else {
+        format!("ssh://root@{}:{}{repo_path}", cfg.host, cfg.port)
+    };
+
+    if git::remote_exists_at(bones_dir, "origin")? {
+        git::set_remote_url_at(bones_dir, "origin", &remote_url)?;
+    } else {
+        git::add_remote_at(bones_dir, "origin", &remote_url)?;
+    }
+
     Ok(())
 }
 

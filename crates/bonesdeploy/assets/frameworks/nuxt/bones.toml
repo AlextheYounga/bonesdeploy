@@ -1,0 +1,12 @@
+[framework]
+template = "nuxt"
+web_root = ".output/public"
+node_version = "24.18.0"
+
+[framework.permissions]
+paths = [
+  { path = "*", type = "dir", mode = "750" },
+  { path = "*", type = "file", mode = "640" },
+  { path = ".output", type = "dir", mode = "770", recursive = true },
+  { path = ".nuxt", type = "dir", mode = "770", recursive = true },
+]

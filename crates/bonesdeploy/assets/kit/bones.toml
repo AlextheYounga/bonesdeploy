@@ -20,11 +20,12 @@ deploy_on_push = false
 releases = 5
 
 
-[runtime]
+[framework]
+node_version = "24.18.0"
 
 # Select during `bonesdeploy init`, or set manually. Services are only reachable
 # on localhost; access them remotely with an SSH tunnel.
-[dbs]
+[services]
 services = []
 
 # File permissions
@@ -32,7 +33,7 @@ services = []
 # mode is an octal permission mask (e.g. 750, 640, 770).
 # Set recursive = true for directories whose contents also
 # need the same mode.
-[runtime.permissions]
+[framework.permissions]
 paths = [
 	{ path = "*", type = "dir", mode = "750" },
 	{ path = "*", type = "file", mode = "640" }

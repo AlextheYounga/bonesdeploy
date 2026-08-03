@@ -33,8 +33,8 @@ pub mod bonesinfra_input {
 #[serde(default)]
 pub struct Bones {
     pub app: App,
-    pub runtime: Runtime,
-    pub dbs: Dbs,
+    pub framework: Framework,
+    pub services: Services,
 }
 
 impl Deref for Bones {
@@ -125,11 +125,13 @@ fn sanitize_domain_label(value: &str) -> String {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Runtime {
+pub struct Framework {
     #[serde(default)]
     pub template: String,
     #[serde(default = "paths::default_web_root")]
     pub web_root: String,
+    #[serde(default = "default_node_version")]
+    pub node_version: String,
     #[serde(default)]
     pub shared: Shared,
     #[serde(default)]
@@ -138,11 +140,12 @@ pub struct Runtime {
     pub extra: BTreeMap<String, toml::Value>,
 }
 
-impl Default for Runtime {
+impl Default for Framework {
     fn default() -> Self {
         Self {
             template: String::new(),
             web_root: paths::default_web_root(),
+            node_version: default_node_version(),
             shared: Shared::default(),
             permissions: None,
             extra: BTreeMap::new(),
@@ -150,9 +153,14 @@ impl Default for Runtime {
     }
 }
 
+#[must_use]
+pub fn default_node_version() -> String {
+    String::from("24.18.0")
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Dbs {
+pub struct Services {
     pub services: Vec<String>,
 }
 
@@ -200,11 +208,11 @@ pub enum SharedPathType {
 
 /// # Errors
 /// Returns an error when the configuration cannot be read or parsed.
-pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
+pub fn load_framework(config_dir: &Path) -> Result<Framework> {
     let path = config_dir.join(paths::BONES_TOML);
     let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
     let bones: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(bones.runtime)
+    Ok(bones.framework)
 }
 
 pub fn apply_derived_defaults(config: &mut Bones) {
@@ -226,7 +234,7 @@ pub fn load(path: &Path) -> Result<Bones> {
     let mut config: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     apply_derived_defaults(&mut config);
     validate_host(&config.host)?;
-    validate_database_services(&config.dbs.services)?;
+    validate_database_services(&config.services.services)?;
     Ok(config)
 }
 
@@ -247,8 +255,8 @@ mod tests {
     }
 
     #[test]
-    fn runtime_parses_shared_paths() -> Result<()> {
-        let runtime: Runtime = toml::from_str(
+    fn framework_parses_shared_paths() -> Result<()> {
+        let framework: Framework = toml::from_str(
             r#"
 web_root = "public"
 
@@ -260,11 +268,11 @@ paths = [
 "#,
         )?;
 
-        assert_eq!(runtime.shared.paths.len(), 2);
-        assert_eq!(runtime.shared.paths[0].path, ".env");
-        assert_eq!(runtime.shared.paths[0].path_type, SharedPathType::File);
-        assert_eq!(runtime.shared.paths[1].path, "storage");
-        assert_eq!(runtime.shared.paths[1].path_type, SharedPathType::Dir);
+        assert_eq!(framework.shared.paths.len(), 2);
+        assert_eq!(framework.shared.paths[0].path, ".env");
+        assert_eq!(framework.shared.paths[0].path_type, SharedPathType::File);
+        assert_eq!(framework.shared.paths[1].path, "storage");
+        assert_eq!(framework.shared.paths[1].path_type, SharedPathType::Dir);
         Ok(())
     }
 }

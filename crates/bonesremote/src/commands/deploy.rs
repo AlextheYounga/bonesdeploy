@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use anyhow::{Context, Error, Result, bail};
-use shared::config;
 use shared::config::build_user_for;
 use shared::paths;
 use time::OffsetDateTime;
@@ -13,19 +12,13 @@ use time::macros::format_description;
 use crate::commands::{drop_failed_release, ensure_site_idle, release, service};
 use crate::privileges;
 use crate::release::lifecycle;
-use crate::release::script_runner::ensure_build_user_ready;
+use crate::release::lifecycle::build::ensure_build_user_ready;
 use crate::release::state as release_state;
 
 pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     privileges::ensure_root("bonesremote deploy")?;
     let _lock = release_state::DeploymentLock::acquire(site)?;
-    let bones_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&bones_path)
-        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
-
-    if cfg.project_name != site {
-        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
-    }
+    let cfg = lifecycle::load_site_config(site)?;
 
     ensure_site_idle(site)?;
     let build_user = build_user_for(&cfg.project_name);
@@ -78,7 +71,11 @@ fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
     }
 
     stage("Preparing release");
-    if let Err(error) = prepare_release(site, &context_dir, &mut deployment) {
+    deployment.phase = release_state::DeploymentPhase::Preparing;
+    if let Err(error) = release_state::write_active_deployment(site, &deployment) {
+        return finish_abort(site, Some(&context_dir), error);
+    }
+    if let Err(error) = run_prepare_phase(site, &context_dir) {
         return finish_abort(site, Some(&context_dir), error);
     }
 
@@ -122,12 +119,12 @@ fn ansi(code: &str, value: &str) -> String {
 }
 
 fn current_release(site: &str) -> Result<PathBuf> {
-    let cfg = config::load(&paths::bonesremote_bones_toml_path(site)).context("Failed to load remote site state")?;
+    let cfg = lifecycle::load_site_config(site)?;
     release_state::current_release_dir(&cfg.project_root)
 }
 
 fn finish_failed_activation(site: &str, previous_release: &Path, context: Option<&Path>, error: Error) -> Result<()> {
-    let cfg = config::load(&paths::bonesremote_bones_toml_path(site)).context("Failed to load remote site state")?;
+    let cfg = lifecycle::load_site_config(site)?;
     if let Err(restore_error) = restore_previous_release(Path::new(&cfg.project_root), previous_release) {
         return finish_abort_without_release_drop(
             site,
@@ -148,9 +145,7 @@ fn restore_previous_release(project_root: &Path, previous_release: &Path) -> Res
     release_state::point_symlink_atomically(&current_link, previous_release)
 }
 
-fn prepare_release(site: &str, context: &Path, deployment: &mut release_state::ActiveDeployment) -> Result<()> {
-    deployment.phase = release_state::DeploymentPhase::Preparing;
-    release_state::write_active_deployment(site, deployment)?;
+fn run_prepare_phase(site: &str, context: &Path) -> Result<()> {
     lifecycle::build::promote(site, context)?;
     lifecycle::wire_shared::run(site)?;
     lifecycle::prepare::run(site)?;
@@ -178,11 +173,7 @@ fn cleanup(site: &str, context: Option<&Path>) -> Result<()> {
 }
 
 fn abort(site: &str, context: Option<&Path>, error: Error) -> Result<()> {
-    let error = match abort_without_release_drop(site, context, error) {
-        Ok(()) => unreachable!("abort_without_release_drop always returns an error"),
-        Err(error) => error,
-    };
-    let mut error = error;
+    let mut error = abort_context_only(site, context, error);
     if let Err(drop_error) = drop_failed_release::run(site) {
         error = error.context(format!("Failed to remove failed release: {drop_error:#}"));
     }
@@ -195,8 +186,8 @@ fn finish_abort(site: &str, context: Option<&Path>, error: Error) -> Result<()> 
 }
 
 fn finish_abort_without_release_drop(site: &str, context: Option<&Path>, error: Error) -> Result<()> {
-    let result = abort_without_release_drop(site, context, error);
-    clear_active_after_result(site, result)
+    let error = abort_context_only(site, context, error);
+    clear_active_after_result(site, Err(error))
 }
 
 fn clear_active_after_result(site: &str, result: Result<()>) -> Result<()> {
@@ -207,22 +198,16 @@ fn clear_active_after_result(site: &str, result: Result<()>) -> Result<()> {
     result
 }
 
-fn abort_without_release_drop(site: &str, context: Option<&Path>, error: Error) -> Result<()> {
-    let mut error = error;
+fn abort_context_only(site: &str, context: Option<&Path>, mut error: Error) -> Error {
     if let Err(cleanup_error) = cleanup(site, context) {
         error = error.context(format!("Cleanup failed: {cleanup_error:#}"));
     }
-    Err(error)
+    error
 }
 
 pub fn rollback(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release rollback")?;
-    let bones_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&bones_path).context("Failed to load remote site state")?;
-
-    if cfg.project_name != site {
-        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
-    }
+    let cfg = lifecycle::load_site_config(site)?;
 
     let releases = release_state::list_releases_sorted(&cfg.project_root)?;
     if releases.len() < 2 {

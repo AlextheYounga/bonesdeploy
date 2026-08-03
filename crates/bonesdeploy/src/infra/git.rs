@@ -28,18 +28,48 @@ pub fn ensure_git_repository() -> Result<()> {
 }
 
 pub fn remote_exists(remote_name: &str) -> Result<bool> {
-    let output = Command::new("git").args(["remote", "get-url", remote_name]).output().context("Failed to run git")?;
-    Ok(output.status.success())
+    remote_exists_at(Path::new("."), remote_name)
 }
 
 pub fn add_remote(remote_name: &str, remote_url: &str) -> Result<()> {
+    add_remote_at(Path::new("."), remote_name, remote_url)
+}
+
+pub fn remote_exists_at(repo: &Path, remote_name: &str) -> Result<bool> {
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(repo)
+        .args(["remote", "get-url", remote_name])
+        .output()
+        .context("Failed to run git")?;
+    Ok(output.status.success())
+}
+
+pub fn add_remote_at(repo: &Path, remote_name: &str, remote_url: &str) -> Result<()> {
     let status = Command::new("git")
+        .args(["-C"])
+        .arg(repo)
         .args(["remote", "add", remote_name, remote_url])
         .status()
         .with_context(|| format!("Failed to add git remote '{remote_name}'"))?;
 
     if !status.success() {
         bail!("Failed to add git remote '{remote_name}'");
+    }
+
+    Ok(())
+}
+
+pub fn set_remote_url_at(repo: &Path, remote_name: &str, remote_url: &str) -> Result<()> {
+    let status = Command::new("git")
+        .args(["-C"])
+        .arg(repo)
+        .args(["remote", "set-url", remote_name, remote_url])
+        .status()
+        .with_context(|| format!("Failed to update git remote '{remote_name}'"))?;
+
+    if !status.success() {
+        bail!("Failed to update git remote '{remote_name}'");
     }
 
     Ok(())

@@ -4,7 +4,7 @@ use std::process::Command;
 
 use shared::{config, paths};
 
-use crate::release::script_runner::validate_build_cache;
+use crate::release::lifecycle::build::validate_build_cache;
 
 pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if let Err(error) = config::validate_site_name(site) {
@@ -26,31 +26,33 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
     check_repo_exists(&cfg.repo_path, issues);
     check_branch_ref(&cfg.repo_path, &cfg.branch, issues, pending);
     check_thin_hook(&cfg.repo_path, issues);
-    check_runtime_identity(&runtime_user, &runtime_group, issues);
-    check_build_user(&build_user, issues);
+
+    match fs::read_to_string(paths::ETC_PASSWD) {
+        Ok(passwd) => {
+            check_runtime_identity(&runtime_user, &runtime_group, &passwd, issues);
+            check_build_user(&build_user, &passwd, issues);
+        }
+        Err(error) => {
+            issues.push(format!("could not read {} to validate user accounts ({error})", paths::ETC_PASSWD));
+        }
+    }
+
     check_site_layout(&shared_root, &releases_root, issues);
     check_site_target_exists(&cfg.project_name, issues);
 }
 
-fn check_build_user(build_user: &str, issues: &mut Vec<String>) {
-    let passwd = match fs::read_to_string(paths::ETC_PASSWD) {
-        Ok(passwd) => passwd,
-        Err(error) => {
-            issues.push(format!("could not read {} to validate build user ({error})", paths::ETC_PASSWD));
-            return;
-        }
-    };
-    if !account_exists(&passwd, build_user) {
+fn check_build_user(build_user: &str, passwd: &str, issues: &mut Vec<String>) {
+    if !account_exists(passwd, build_user) {
         issues.push(format!("build user does not exist: {build_user}"));
         return;
     }
 
     let expected_home = paths::bonesdeploy_user_home(build_user);
-    if account_home(&passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
+    if account_home(passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
         issues.push(format!("build user home must be {}: {build_user}", expected_home.display()));
     }
 
-    let Some((uid, gid)) = account_identity(&passwd, build_user) else {
+    let Some((uid, gid)) = account_identity(passwd, build_user) else {
         issues.push(format!("build user has invalid passwd identity: {build_user}"));
         return;
     };
@@ -137,15 +139,8 @@ fn check_thin_hook(repo_path: &str, issues: &mut Vec<String>) {
     }
 }
 
-fn check_runtime_identity(runtime_user: &str, runtime_group: &str, issues: &mut Vec<String>) {
-    let passwd = match fs::read_to_string(paths::ETC_PASSWD) {
-        Ok(passwd) => passwd,
-        Err(error) => {
-            issues.push(format!("could not read {} to validate runtime user ({error})", paths::ETC_PASSWD));
-            return;
-        }
-    };
-    if !account_exists(&passwd, runtime_user) {
+fn check_runtime_identity(runtime_user: &str, runtime_group: &str, passwd: &str, issues: &mut Vec<String>) {
+    if !account_exists(passwd, runtime_user) {
         issues.push(format!("runtime user does not exist: {runtime_user}"));
     }
 

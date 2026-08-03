@@ -15,8 +15,8 @@ any bonesdeploy project without reading a single line of YAML.
 ## The five moves
 
 1. `bonesdeploy init` — claim a project, point it at a fresh VPS, pick a
-   runtime template. Non-interactive agents: pass `--template <name>` and
-   `--runtime-var key=value` (see `bonesdeploy skill doc templates` for
+   framework template. Non-interactive agents: pass `--template <name>` and
+   `--framework-var key=value` (see `bonesdeploy skill doc templates` for
    every template and every variable).
 2. `bonesdeploy setup --yes` — provision the server in one shot: bootstrap
    (users, bare repo, `bonesremote`), runtime (nginx, app service, AppArmor),
@@ -32,8 +32,8 @@ any bonesdeploy project without reading a single line of YAML.
 That's a deployment. In between, you repeat move five. Nothing else matters
 until move five works.
 
-Note: `bonesdeploy setup` already runs `remote runtime` for you. You only run
-`bonesdeploy remote runtime --yes` on its own when you're changing the
+Note: `bonesdeploy setup` already runs `remote framework` for you. You only run
+`bonesdeploy remote framework --yes` on its own when you're changing the
 framework template on an already-provisioned box.
 
 ## What you actually own
@@ -89,7 +89,7 @@ secrets via `bonesdeploy secrets push`.
 ## Going deeper
 
 - `bonesdeploy skill doc commands` — every command, every flag, every exit.
-- `bonesdeploy skill doc templates` — every runtime template and its `--runtime-var` keys.
+- `bonesdeploy skill doc templates` — every framework template and its `--framework-var` keys.
 - `bonesdeploy skill doc workflows` — the end-to-end flows, including git-triggered deploy.
 - `bonesdeploy skill doc methodology` — permission model, just-in-time mutations, identity classes.
 - `bonesdeploy skill list` — names of every embedded doc.
