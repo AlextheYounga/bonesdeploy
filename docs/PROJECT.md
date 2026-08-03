@@ -234,6 +234,8 @@ Framework templates ship starter overlays that `bonesdeploy remote framework` us
 
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the `bonesinfra` crate.
 
+Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves (e.g. Next's `out/`). A static site only works if the app is configured to emit that directory: for `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
+
 ### BonesDeploy CLI Commands
 - **init**:
   - Loads existing config from `.bones/bones.toml` or collects user input via prompts.

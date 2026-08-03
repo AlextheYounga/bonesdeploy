@@ -25,6 +25,7 @@ def render_profile(
         apparmor_exec_paths=apparmor_exec_paths,
         apparmor_writable_paths=apparmor_writable_paths,
         apparmor_network=apparmor_network,
+        paths=paths,
     )
     server.shell(
         name=f"Load {runtime} AppArmor profile",
