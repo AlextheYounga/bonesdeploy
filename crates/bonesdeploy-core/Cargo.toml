@@ -1,6 +1,6 @@
 [package]
 name = "bonesdeploy-core"
-version = "0.7.5"
+version = "0.7.6"
 edition = "2024"
 authors=["Alex Younger <thealexyounger@proton.me>"]
 description="Deployments with a Spine in a Barebones Framework"
