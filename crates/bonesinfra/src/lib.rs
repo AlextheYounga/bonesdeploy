@@ -1,4 +1,4 @@
-//! Embedded bonesinfra Python runtime.
+//! Embedded bonesinfra Python framework.
 //!
 //! The Python package under `python/` is embedded into the binary and
 //! materialized on demand into `~/.cache/bonesdeploy/bonesinfra`,
@@ -205,7 +205,7 @@ mod tests {
         assert!(PythonSource::get("pyproject.toml").is_some());
         assert!(PythonSource::get("README.md").is_some(), "pyproject readme reference must be embedded");
         assert!(PythonSource::get("src/bonesinfra/__main__.py").is_some());
-        assert!(PythonSource::get("src/bonesinfra/runtimes/__init__.py").is_some());
+        assert!(PythonSource::get("src/bonesinfra/frameworks/__init__.py").is_some());
     }
 
     #[test]

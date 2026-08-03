@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from bonesinfra.runtimes.common import service
+from bonesinfra.services.linux import systemd as service
 
 
 def test_register_service_uses_exact_project_derived_unit(monkeypatch):

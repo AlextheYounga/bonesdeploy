@@ -67,16 +67,16 @@ fn collect_from_existing(
         config::default_project_root_for,
     );
 
-    let mut config = config::Bones::default();
-    config.remote_name = remote_name;
-    config.project_name = project_name;
-    config.host = host;
-    config.port = port;
-    config.repo_path = repo_path;
-    config.project_root = project_root;
-    config.branch = branch;
-    apply_existing_fields(&mut config, existing_config);
-    Ok(config)
+    let mut cfg = config::Bones::default();
+    cfg.remote_name = remote_name;
+    cfg.project_name = project_name;
+    cfg.host = host;
+    cfg.port = port;
+    cfg.branch = branch;
+    cfg.repo_path = repo_path;
+    cfg.project_root = project_root;
+    apply_existing_fields(&mut cfg, existing_config);
+    Ok(cfg)
 }
 
 fn cli_or_prompt(
@@ -111,16 +111,16 @@ pub(super) fn collect_non_interactive(
         config::default_project_root_for,
     );
 
-    let mut config = config::Bones::default();
-    config.remote_name = remote_name;
-    config.project_name = project_name;
-    config.host = host;
-    config.port = port;
-    config.repo_path = repo_path;
-    config.project_root = project_root;
-    config.branch = branch;
-    apply_existing_fields(&mut config, existing_config);
-    Ok(config)
+    let mut cfg = config::Bones::default();
+    cfg.remote_name = remote_name;
+    cfg.project_name = project_name;
+    cfg.host = host;
+    cfg.port = port;
+    cfg.branch = branch;
+    cfg.repo_path = repo_path;
+    cfg.project_root = project_root;
+    apply_existing_fields(&mut cfg, existing_config);
+    Ok(cfg)
 }
 
 fn resolve_project_name(
@@ -275,8 +275,8 @@ mod tests {
             host: Some(String::from("deploy.example.com")),
             port: None,
             template: None,
-            runtime_vars: Vec::new(),
-            dbs: Vec::new(),
+            framework_vars: Vec::new(),
+            services: Vec::new(),
         };
 
         let cfg = collect_non_interactive("workspace", Some(&existing), &args)?;
@@ -301,8 +301,8 @@ mod tests {
             host: None,
             port: None,
             template: None,
-            runtime_vars: Vec::new(),
-            dbs: Vec::new(),
+            framework_vars: Vec::new(),
+            services: Vec::new(),
         };
 
         let result = collect_non_interactive("workspace", Some(&existing), &args);

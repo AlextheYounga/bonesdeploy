@@ -1,12 +1,18 @@
 """Deployment paths should match the v1 host layout."""
 
-from bonesinfra.domain.paths import DeploymentPaths
+from bonesinfra.config.paths import DeploymentPaths
 
 
 def test_paths_default_repo_parent_is_srv_git():
     paths = DeploymentPaths.new("lawsnipe", "/srv/git/lawsnipe.git", "/srv/sites/lawsnipe")
 
     assert paths.repo_parent == "/srv/git"
+
+
+def test_bones_repo_uses_root_bonesremote_repo_home():
+    paths = DeploymentPaths.new("lawsnipe", "/srv/git/lawsnipe.git", "/srv/sites/lawsnipe")
+
+    assert paths.bones_repo == "/root/.config/bonesremote/repos/lawsnipe.bones.git"
 
 
 def test_paths_include_global_nginx_default_deny_site():

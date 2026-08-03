@@ -29,10 +29,7 @@ fn resolved_tmp_root(site: &str) -> Result<PathBuf> {
 pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
     privileges::ensure_root("bonesremote release checkout")?;
 
-    let bones_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&bones_path)
-        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
-
+    let cfg = super::load_site_config(site)?;
     let archive_output = Command::new("git")
         .args(["--git-dir", &cfg.repo_path, "archive", "--format=tar", revision])
         .output()

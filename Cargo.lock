@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy"
-version = "0.7.2"
+version = "0.7.4"
 dependencies = [
  "anyhow",
  "bonesinfra",
@@ -104,7 +104,7 @@ dependencies = [
 
 [[package]]
 name = "bonesinfra"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "anyhow",
  "rust-embed",
@@ -113,10 +113,12 @@ dependencies = [
 
 [[package]]
 name = "bonesremote"
-version = "0.7.2"
+version = "0.7.4"
 dependencies = [
  "anyhow",
  "clap",
+ "console",
+ "libc",
  "serde",
  "serde_json",
  "shared",

@@ -9,7 +9,7 @@ use crate::infra::ssh;
 use crate::ui::output;
 use shared::{config::is_numbered_shell_script, paths};
 
-pub async fn run(local_only: bool) -> Result<bool> {
+pub async fn run(local_only: bool, verbose: bool) -> Result<bool> {
     println!("{} Checking deployment...", console::style("bonesdeploy doctor").bold());
 
     let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML)).ok();
@@ -37,7 +37,7 @@ pub async fn run(local_only: bool) -> Result<bool> {
     }
 
     if !local_only {
-        let (remote_issues, remote_pending) = check_remote(cfg.as_ref()).await;
+        let (remote_issues, remote_pending) = check_remote(cfg.as_ref(), verbose).await;
         issues += remote_issues;
         pending |= remote_pending;
     }
@@ -57,7 +57,7 @@ pub async fn run(local_only: bool) -> Result<bool> {
     }
 }
 
-async fn check_remote(cfg: Option<&config::Bones>) -> (usize, bool) {
+async fn check_remote(cfg: Option<&config::Bones>, verbose: bool) -> (usize, bool) {
     match cfg {
         Some(cfg) => {
             let remote_ssh_issue = check_remote_ssh(cfg).await;
@@ -67,7 +67,7 @@ async fn check_remote(cfg: Option<&config::Bones>) -> (usize, bool) {
                 Some(String::from("check host, port, and SSH access.")),
             );
             if remote_ssh_issue.is_none() {
-                let (remote_issue, pending) = check_remote_doctor(cfg).await;
+                let (remote_issue, pending) = check_remote_doctor(cfg, verbose).await;
                 issues += print_check(
                     "remote doctor",
                     remote_issue,
@@ -212,7 +212,7 @@ async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
     }
 }
 
-async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
+async fn check_remote_doctor(cfg: &config::Bones, verbose: bool) -> (Option<String>, bool) {
     let session = match ssh::connect_privileged(cfg).await {
         Ok(session) => session,
         Err(error) => return (Some(format!("Cannot connect as privileged remote user\n  {error}")), false),
@@ -224,17 +224,27 @@ async fn check_remote_doctor(cfg: &config::Bones) -> (Option<String>, bool) {
 
     match result {
         Ok(output) => {
-            let pending = output.contains("has not been pushed yet");
-            if pending {
-                for line in output.lines().filter(|line| line.contains("has not been pushed yet")) {
-                    let line = line.trim().strip_prefix('•').map_or(line.trim(), str::trim_start);
-                    println!("{} {}", output::pending_marker(), line);
-                }
-            }
+            let pending = render_remote_doctor_output(&output, verbose);
             (None, pending)
         }
         Err(error) => (Some(format!("remote doctor failed\n  {error}")), false),
     }
+}
+
+fn render_remote_doctor_output(output: &str, verbose: bool) -> bool {
+    let pending = output.contains("has not been pushed yet");
+    if verbose {
+        print!("{output}");
+        if !output.is_empty() && !output.ends_with('\n') {
+            println!();
+        }
+    } else if pending {
+        for line in output.lines().filter(|line| line.contains("has not been pushed yet")) {
+            let line = line.trim().strip_prefix('•').map_or(line.trim(), str::trim_start);
+            println!("{} {}", output::pending_marker(), line);
+        }
+    }
+    pending
 }
 
 #[cfg(test)]
@@ -245,7 +255,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::check_deployment_scripts;
+    use super::{check_deployment_scripts, render_remote_doctor_output};
 
     #[test]
     fn deployment_script_check_accepts_nested_build_and_prepare_layout() -> Result<()> {
@@ -268,5 +278,14 @@ mod tests {
         fs::remove_dir_all(&root).ok();
         assert!(result.is_none(), "nested deployment layout should be accepted: {result:?}");
         Ok(())
+    }
+
+    #[test]
+    fn verbose_remote_report_preserves_pending_state() {
+        assert!(render_remote_doctor_output(
+            "bonesremote doctor\n  • deploy branch 'main' has not been pushed yet\n",
+            true
+        ));
+        assert!(!render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
     }
 }

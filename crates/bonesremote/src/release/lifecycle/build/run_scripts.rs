@@ -3,12 +3,13 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use serde_json::Value;
-use shared::config::{self, build_group_for, build_user_for, is_numbered_shell_script, load_runtime};
+use shared::config::{self, build_group_for, build_user_for, is_numbered_shell_script, load_framework};
 use shared::env_build;
 use shared::paths;
 
+use super::build_user::BuildScriptEnv;
+use super::container::BuildContainer;
 use super::ownership;
-use crate::release::script_runner as deploy_output;
 
 pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()> {
     if !context.is_dir() {
@@ -34,29 +35,32 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
         return Ok(());
     }
 
-    let runtime = load_runtime(&paths::bonesremote_site_root(site))
+    let framework = load_framework(&paths::bonesremote_site_root(site))
         .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
 
     let build_env_vars = resolve_build_env(cfg, context)?;
     let deployment_dir = scripts_dir.parent().context("Build scripts directory has no deployment parent")?;
     let build_cache_dir = paths::bonesdeploy_user_cache(&build_user);
 
-    let build_env = deploy_output::BuildScriptEnv {
+    let build_env = BuildScriptEnv {
         project_name: &cfg.project_name,
         build_user: &build_user,
-        web_root: &runtime.web_root,
+        web_root: &framework.web_root,
         deployment_dir,
         build_cache_dir: &build_cache_dir,
         build_env_vars: &build_env_vars,
     };
-    let mut container = deploy_output::BuildContainer::start(context, &build_env)?;
+    let mut container = BuildContainer::start(context, &build_env)?;
+
+    let logs_dir = paths::bonesremote_site_logs(site);
+    fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;
 
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
         println!("Running build script {script_name}...");
 
         let status = container
-            .run_script(&script, &context.join(format!("{script_name}.log")))
+            .run_script(&script, &logs_dir.join(format!("{script_name}.log")))
             .with_context(|| format!("Failed to execute build script {}", script.display()))?;
 
         if !status.success() {
@@ -81,10 +85,10 @@ fn resolve_build_env(cfg: &config::Bones, source_context: &Path) -> Result<Vec<(
 }
 
 const DERIVED_ENV_DENYLIST: &[&str] = &[
-    "runtime.permissions",
-    "runtime.shared",
-    "runtime.runtime_user",
-    "runtime.runtime_group",
+    "framework.permissions",
+    "framework.shared",
+    "framework.runtime_user",
+    "framework.runtime_group",
     "app.server.host",
     "app.server.port",
     "app.dns",
@@ -181,18 +185,18 @@ mod tests {
         fs::create_dir_all(&root)?;
         fs::write(
             root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"nuxt\"\nweb_root = \".output/public\"\nis_static = true\n",
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[framework]\ntemplate = \"nuxt\"\nweb_root = \".output/public\"\nis_static = true\n",
         )?;
         let cfg = load(&root.join("bones.toml"))?;
 
         let env = derived_config_env(&cfg)?;
 
-        assert!(env.contains(&("BONES_RUNTIME_TEMPLATE".to_string(), "nuxt".to_string())));
-        assert!(env.contains(&("BONES_RUNTIME_IS_STATIC".to_string(), "true".to_string())));
+        assert!(env.contains(&("BONES_FRAMEWORK_TEMPLATE".to_string(), "nuxt".to_string())));
+        assert!(env.contains(&("BONES_FRAMEWORK_IS_STATIC".to_string(), "true".to_string())));
         assert!(env.contains(&("BONES_APP_PROJECT_NAME".to_string(), "demo".to_string())), "{env:?}");
         assert!(!env.iter().any(|(key, _)| key == "BONES_APP_SERVER_HOST"));
         assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_APP_DNS_")));
-        assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_RUNTIME_SHARED_")));
+        assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_FRAMEWORK_SHARED_")));
         fs::remove_dir_all(root).ok();
         Ok(())
     }
@@ -207,7 +211,7 @@ mod tests {
         fs::create_dir_all(&source)?;
         fs::write(
             site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"nuxt\"\n",
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[framework]\ntemplate = \"nuxt\"\n",
         )?;
         fs::write(source.join(".env.build"), "NEXT_PUBLIC_API_URL=https://api.example.com\n")?;
         let cfg = load(&site_root.join("bones.toml"))?;
@@ -233,13 +237,13 @@ mod tests {
         fs::create_dir_all(&source)?;
         fs::write(
             site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"next\"\n",
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[framework]\ntemplate = \"next\"\n",
         )?;
         let cfg = load(&site_root.join("bones.toml"))?;
 
         let env = resolve_build_env(&cfg, &source)?;
 
-        assert!(env.contains(&("BONES_RUNTIME_TEMPLATE".to_string(), "next".to_string())));
+        assert!(env.contains(&("BONES_FRAMEWORK_TEMPLATE".to_string(), "next".to_string())));
         assert!(env.contains(&("BONES_APP_PROJECT_NAME".to_string(), "demo".to_string())));
         fs::remove_dir_all(site_root).ok();
         fs::remove_dir_all(source).ok();
@@ -256,7 +260,7 @@ mod tests {
         fs::create_dir_all(&source)?;
         fs::write(
             site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.dns]\ndomain = \"app.example.com\"\n[runtime]\ntemplate = \"nuxt\"\n",
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.dns]\ndomain = \"app.example.com\"\n[framework]\ntemplate = \"nuxt\"\n",
         )?;
         let cfg = load(&site_root.join("bones.toml"))?;
 
@@ -265,7 +269,7 @@ mod tests {
         assert!(!env.iter().any(|(key, _)| key == "BONES_APP_SERVER_HOST"), "server host should be denied");
         assert!(!env.iter().any(|(key, _)| key == "BONES_APP_SERVER_PORT"), "server port should be denied");
         assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_APP_DNS")), "dns should be denied");
-        assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_RUNTIME_SHARED")), "shared should be denied");
+        assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_FRAMEWORK_SHARED")), "shared should be denied");
         fs::remove_dir_all(site_root).ok();
         fs::remove_dir_all(source).ok();
         Ok(())
@@ -281,15 +285,18 @@ mod tests {
         fs::create_dir_all(&source)?;
         fs::write(
             site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"next\"\n",
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[framework]\ntemplate = \"next\"\n",
         )?;
-        fs::write(source.join(".env.build"), "BONES_RUNTIME_TEMPLATE=evil\n")?;
+        fs::write(source.join(".env.build"), "BONES_FRAMEWORK_TEMPLATE=evil\n")?;
         let cfg = load(&site_root.join("bones.toml"))?;
 
         let result = resolve_build_env(&cfg, &source);
 
         assert!(result.is_err(), "BONES_* in .env.build should be rejected");
-        let err = result.unwrap_err().to_string();
+        let err = match result {
+            Ok(_) => return Err(anyhow::anyhow!("reserved BONES_* variable unexpectedly succeeded")),
+            Err(error) => error.to_string(),
+        };
         assert!(err.contains("reserved"), "error should mention reserved: {err}");
         fs::remove_dir_all(site_root).ok();
         fs::remove_dir_all(source).ok();
@@ -306,13 +313,13 @@ mod tests {
         fs::create_dir_all(&source)?;
         fs::write(
             site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"nuxt\"\n",
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[framework]\ntemplate = \"nuxt\"\n",
         )?;
         let cfg = load(&site_root.join("bones.toml"))?;
 
         let env = resolve_build_env(&cfg, &source)?;
 
-        assert!(env.contains(&("BONES_RUNTIME_TEMPLATE".to_string(), "nuxt".to_string())));
+        assert!(env.contains(&("BONES_FRAMEWORK_TEMPLATE".to_string(), "nuxt".to_string())));
         assert!(!env.iter().any(|(key, _)| key == "NEXT_PUBLIC_API_URL"), "no .env.build means no extra vars");
         fs::remove_dir_all(site_root).ok();
         fs::remove_dir_all(source).ok();

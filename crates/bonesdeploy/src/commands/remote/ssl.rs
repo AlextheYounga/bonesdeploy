@@ -16,7 +16,7 @@ use crate::ui::prompts;
 pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let mut cfg = config::load(bones_toml)?;
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
+    let framework = shared_config::load_framework(Path::new(paths::LOCAL_BONES_DIR))?;
 
     if let Some(value) = domain {
         cfg.domain = value.trim().to_string();
@@ -50,7 +50,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     println!("{} {}", style("Configuring HTTPS for").cyan().bold(), style(&cfg.domain).bold());
 
     let ssh_user = config::bootstrap_ssh_user(&cfg);
-    let mut deploy_data = data::ssl(&cfg, &runtime.web_root, &cfg.domain, &cfg.email);
+    let mut deploy_data = data::ssl(&cfg, &framework.web_root, &cfg.domain, &cfg.email);
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from(shared_config::bonesinfra_input::SSH_USER), Value::String(ssh_user));
         map.insert(String::from("host"), Value::String(cfg.host.clone()));
@@ -62,7 +62,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
 
     cfg.ssl_enabled = true;
     config::save(&cfg, bones_toml)?;
-    push_state::sync_bones_directory(&cfg)?;
+    push_state::sync_bones_directory()?;
 
     println!("{} HTTPS configured.", output::success_marker());
     println!();

@@ -106,6 +106,8 @@ fn strip_quotes(s: &str) -> &str {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
+
     use super::*;
 
     #[test]
@@ -155,7 +157,7 @@ mod tests {
 
     #[test]
     fn load_returns_empty_map_when_file_missing() {
-        let dir = std::env::temp_dir().join("bones-env-build-missing-test");
+        let dir = env::temp_dir().join("bones-env-build-missing-test");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let map = load(&dir).unwrap();
@@ -165,7 +167,7 @@ mod tests {
 
     #[test]
     fn load_reads_env_build_from_directory() {
-        let dir = std::env::temp_dir().join("bones-env-build-load-test");
+        let dir = env::temp_dir().join("bones-env-build-load-test");
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         fs::write(dir.join(".env.build"), "API_URL=https://api.example.com\nSITE_NAME=Test\n").unwrap();
@@ -177,7 +179,7 @@ mod tests {
 
     #[test]
     fn derived_bones_values_cannot_be_overridden() {
-        let result = parse("BONES_RUNTIME_TEMPLATE=evil");
+        let result = parse("BONES_FRAMEWORK_TEMPLATE=evil");
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("reserved"), "error should mention reserved: {err}");

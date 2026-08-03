@@ -70,12 +70,12 @@ fn file_header(config: &Bones) -> String {
 fn compact_inline_table_arrays(content: &str) -> Result<String> {
     let mut document = content.parse::<toml_edit::DocumentMut>().context("Failed to parse serialized bones.toml")?;
 
-    let Some(runtime) = document.get_mut("runtime").and_then(toml_edit::Item::as_table_mut) else {
+    let Some(framework) = document.get_mut("framework").and_then(toml_edit::Item::as_table_mut) else {
         return Ok(document.to_string());
     };
     for key in ["permissions", "shared"] {
         let Some(item) =
-            runtime.get_mut(key).and_then(toml_edit::Item::as_table_mut).and_then(|table| table.get_mut("paths"))
+            framework.get_mut(key).and_then(toml_edit::Item::as_table_mut).and_then(|table| table.get_mut("paths"))
         else {
             continue;
         };
@@ -91,9 +91,10 @@ fn annotate_sections(content: &str) -> String {
         ("[app.server]", "# Remote server connection."),
         ("[app.dns]", "# Domains, email, and TLS."),
         ("[app.deploy]", "# Branch and deployment behavior."),
-        ("[runtime]", "# Framework runtime settings."),
-        ("[runtime.permissions]", "# Release file permissions."),
-        ("[runtime.shared]", "# Paths persisted in the shared release directory."),
+        ("(framework]", "# Framework settings."),
+        ("[framework.permissions]", "# Release file permissions."),
+        ("[framework.shared]", "# Paths persisted in the shared release directory."),
+        ("[services]", "# Optional framework services."),
     ];
 
     let mut output = String::new();
@@ -206,7 +207,7 @@ mod tests {
     #[test]
     fn save_formats_permission_entries_as_inline_tables() -> Result<()> {
         let mut config = sample_config("phoenix");
-        config.runtime.permissions = Some(toml::from_str(
+        config.framework.permissions = Some(toml::from_str(
             r#"paths = [
                 { path = "*", type = "dir", mode = "750" },
                 { path = "storage", type = "dir", mode = "770", recursive = true },
@@ -219,19 +220,18 @@ mod tests {
 
         let document = content.parse::<toml_edit::DocumentMut>()?;
         let paths = document
-            .get("runtime")
+            .get("framework")
             .and_then(toml_edit::Item::as_table)
-            .and_then(|runtime| runtime.get("permissions"))
+            .and_then(|framework| framework.get("permissions"))
             .and_then(toml_edit::Item::as_table)
             .and_then(|permissions| permissions.get("paths"))
             .and_then(toml_edit::Item::as_array);
 
         assert!(paths.is_some_and(|paths| paths.iter().all(toml_edit::Value::is_inline_table)), "{content}");
-        assert!(!content.contains("[[runtime.permissions.paths]]"), "{content}");
+        assert!(!content.contains("[[framework.permissions.paths]]"), "{content}");
         load(&path)?;
 
         fs::remove_file(path)?;
         Ok(())
     }
-
 }

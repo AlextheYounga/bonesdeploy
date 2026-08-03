@@ -26,39 +26,3 @@ pub(super) fn check_podman_available(issues: &mut Vec<String>) {
         _ => issues.push("podman is not available; install Podman for disposable builds".to_string()),
     }
 }
-
-pub(super) fn check_passwordless_sudo(issues: &mut Vec<String>) {
-    let privileged_commands = [
-        [paths::BONESREMOTE_BINARY, "hook", "post-receive", "--site", "nonexistent"],
-        [paths::BONESREMOTE_BINARY, "service", "restart", "--site", "nonexistent"],
-        [paths::BONESREMOTE_BINARY, "release", "rollback", "--site", "nonexistent"],
-        [paths::BONESREMOTE_BINARY, "release", "drop-failed", "--site", "nonexistent"],
-        [paths::BONESREMOTE_BINARY, "release", "prune", "--site", "nonexistent"],
-    ];
-
-    let missing: Vec<String> = privileged_commands
-        .into_iter()
-        .filter(|command| !deploy_user_can_run(*command))
-        .map(|command| command.join(" "))
-        .collect();
-
-    if !missing.is_empty() {
-        issues.push(format!(
-            "deploy user is missing passwordless sudo permissions for: {} (ensure bonesinfra has provisioned the sudoers policy on this host)",
-            missing.join(", "),
-        ));
-    }
-}
-
-fn deploy_user_can_run(command: [&str; 5]) -> bool {
-    match deploy_user_sudo_check_command(command).output() {
-        Ok(output) => output.status.success(),
-        Err(_) => false,
-    }
-}
-
-fn deploy_user_sudo_check_command(command: [&str; 5]) -> Command {
-    let mut sudo = Command::new("sudo");
-    sudo.args(["-n", "-u", paths::DEPLOY_USER, "sudo", "-n", "-l"]).args(command);
-    sudo
-}

@@ -5,16 +5,16 @@ real. Don't invent.
 
 ## init
 
-`bonesdeploy init [--non-interactive] [--project-name <name>] [--branch <b>] [--remote <r>] [--host <h>] [--port <p>] [--template <t>] [--runtime-var <key=value>]...`
+`bonesdeploy init [--non-interactive] [--project-name <name>] [--branch <b>] [--remote <r>] [--host <h>] [--port <p>] [--template <t>] [--framework-var <key=value>]...`
 
 Claims a project. Loads `.bones/bones.toml` if present; otherwise prompts.
 `--non-interactive` is for CI and AI: every required field must come from a
 flag. Creates the local `.bones` symlink, updates `.gitignore`, and adds the
 deployment remote. Prints next steps. Does not provision anything.
 
-`--template <t>` picks a runtime template (`laravel`, `django`, `next`,
+`--template <t>` picks a framework template (`laravel`, `django`, `next`,
 `nuxt`, `rails`, `sveltekit`, `vue`, or `none`). Omitted or `none` means
-"build from scratch." `--runtime-var <key=value>` overrides a template
+"build from scratch." `--framework-var <key=value>` overrides a template
 variable, repeated as needed. Booleans are `true`/`false` (case-insensitive);
 everything else is a string. See `bonesdeploy skill doc templates` for every
 template's variables. Unknown keys and bad choices are rejected.
@@ -24,20 +24,20 @@ template's variables. Unknown keys and bad choices are rejected.
 `bonesdeploy setup [--yes]`
 
 The full first-time remote provisioning, in order: `remote bootstrap` →
-`remote runtime` → `push` → `doctor`. One command. `--yes` skips the
-runtime confirmation. Use `remote bootstrap` + `remote runtime` separately
+`remote framework` → `push` → `doctor`. One command. `--yes` skips the
+runtime confirmation. Use `remote bootstrap` + `remote framework` separately
 only when you want to control the steps or when you're changing the
 framework template on an already-provisioned box. Idempotent — re-run it
 after fixing whatever made it fail.
 
 ## doctor
 
-`bonesdeploy doctor [--local]`
+`bonesdeploy doctor [--local] [--verbose]`
 
 Local and remote health. Pass = silent, exit 0. Warnings or errors = exit
 non-zero. A pending first git push is success, not failure — an empty bare
 repo before the first push is expected. `--local` skips the SSH round trip; the
-`pre-push` hook uses this.
+`pre-push` hook uses this. `--verbose` prints every successful remote check.
 
 ## status
 
@@ -117,9 +117,9 @@ placeholder release, sudoers drop-in, and `bonesremote` itself. Delegates to
 the hidden `bonesinfra` checkout. Runs as root (or
 `BONES_BOOTSTRAP_SSH_USER`).
 
-## remote runtime
+## remote framework
 
-`bonesdeploy remote runtime [--yes]`
+`bonesdeploy remote framework [--yes]`
 
 Installs the framework runtime configured in `bones.toml`: AppArmor profile,
 nginx router + per-site config, and systemd service. Does not do TLS — that's
@@ -132,7 +132,7 @@ to reapply the configured runtime after changing its existing configuration.
 
 certbot webroot challenge for the configured domain. Re-renders the nginx
 router with TLS, listens on 443, redirects HTTP → HTTPS. Decoupled from
-`remote runtime` because certificate concerns and runtime concerns are
+`remote framework` because certificate concerns and runtime concerns are
 different concerns.
 
 ## remote helpers

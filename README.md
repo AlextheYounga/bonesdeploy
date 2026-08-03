@@ -8,7 +8,7 @@ A deployment CLI for plain Linux servers.
 
 > WARNING: BonesDeploy is still under active development. You probably shouldn't use this yet. There may be some cool bugs!
 
-BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, publishes the `.bones/` dataset into root-owned `bonesremote` site state, and runs the release lifecycle remotely without turning the bare Git repo into the control plane.
+BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, tracks `.bones/` in a root-owned Git repository, and runs the release lifecycle remotely from that control-plane state.
 
 No platform.  
 No control plane.  
@@ -84,9 +84,9 @@ You can still use Docker with BonesDeploy. Put `docker compose` in your deploy s
 
 Docker just is not the foundation.
 
-## Runtime Templates
+## Framework Templates
 
-Runtime templates set up the Linux pieces for a framework.
+Framework templates set up the Linux pieces for a framework.
 
 | Template | Status | Notes |
 | --- | --- | --- |
@@ -107,13 +107,17 @@ Install the local CLI:
 cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
 ```
 
-Install the remote runner on the server:
+The remote runner is installed automatically during `bonesdeploy remote setup`.
+The embedded provisioning runtime downloads the matching `bonesremote` static
+Linux release binary from GitHub Releases and verifies its SHA-256 checksum.
+Remote updates use the same verified release artifacts; Rust and Cargo are not
+installed on the deployment host. Remote binaries currently support `x86_64`
+Debian and Ubuntu hosts only.
 
-```sh
-sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
-```
-
-Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy init` remote setup.
+`bonesdeploy update` uses the latest published GitHub release as its source of
+truth. Publish `bonesdeploy` to crates.io, then push a matching `v<version>`
+tag; the release workflow builds and publishes the corresponding `bonesremote`
+asset before that version becomes available to updates.
 
 ## Start a Project
 
@@ -123,11 +127,11 @@ From your project repo:
 bonesdeploy init
 ```
 
-For CI or AI agents, pick a runtime template and pass variables non-interactively:
+For CI or AI agents, pick a framework template and pass variables non-interactively:
 
 ```sh
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --runtime-var php_version=8.5 --db postgres --db valkey
+  --template laravel --framework-var php_version=8.5 --service postgres --service valkey
 ```
 
 See `bonesdeploy skill doc templates` for every template and its variables.
@@ -168,13 +172,13 @@ bonesdeploy remote setup
 Provision the site runtime:
 
 ```sh
-bonesdeploy remote runtime
+bonesdeploy remote framework
 ```
 
 Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
 
 ```sh
-bonesdeploy remote dbs
+bonesdeploy remote services
 ```
 
 Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Generated credentials live in the protected remote `shared/.env`, never in `.bones/`. MariaDB and MySQL are alternatives and cannot share one host.
@@ -223,6 +227,12 @@ Check only the local side:
 
 ```sh
 bonesdeploy doctor --local
+```
+
+Show the full successful remote report, including every remote security check:
+
+```sh
+bonesdeploy doctor --verbose
 ```
 
 `doctor` reports three states: green checks are healthy, yellow pending items
@@ -283,7 +293,7 @@ preview_domain = ""
 email = ""
 ssl_enabled = false
 
-[runtime]
+[framework]
 template = "custom"
 ```
 
@@ -301,13 +311,13 @@ Common defaults:
         └── 01_*.sh      # prepare scripts (run as the site user before activation)
 ```
 
-The optional git push transport uses two thin internal adapters (local pre-push guard and remote post-receive trigger) that are embedded in the binaries. You do not see or manage them under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys; the default is `false`.
+The optional git push transport uses thin adapters: a local `pre-push` guard (installed by `bonesdeploy init`) and a remote `post-receive` trigger (installed by provisioning). The root-owned config repository at `/root/.config/bonesremote/repos/<project>.bones.git` uses a `pre-receive` trigger that calls `bonesremote site receive` directly before accepting the push. You do not see or manage these hooks under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys; the default is `false`.
 
 Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Bonesremote streams an ephemeral copy of the deployment bundle into the container at `/workspace/deployment`, so the build user never needs host access to bonesremote's control-plane files. BonesInfra provisions a private persistent cache for each build user; bonesremote mounts it at `/workspace/cache` and exposes `BUILD_CACHE_DIR`. The shared deployment functions use it for Node, Corepack, npm, pnpm, Yarn, Composer, and Bundler downloads. Installed dependency trees and build output remain disposable. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation. Bonesremote streams the shared functions into each prepare shell before the prepare script, so prepare scripts do not source the root-owned deployment bundle.
 
 Build scripts can set framework-specific runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool.
 
-BonesRemote also exposes scalar values from `bones.toml` as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use `shared/.env` for runtime secrets.
+BonesRemote also exposes scalar values from `bones.toml` as transient `BONES_*` variables in the build container (for example, `BONES_FRAMEWORK_IS_STATIC` and `BONES_FRAMEWORK_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use `shared/.env` for runtime secrets.
 
 Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager, Podman, and the Infra-provisioned build cache before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 

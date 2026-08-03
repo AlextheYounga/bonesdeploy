@@ -4,8 +4,8 @@ use inquire::{Confirm, MultiSelect, Select, Text};
 use serde_json::Value;
 
 use crate::config::Bones;
+use crate::frameworks::{Question, QuestionKind};
 use crate::infra::git;
-use crate::runtimes::{Question, QuestionKind};
 
 fn config_default<'a>(
     existing_config: Option<&'a Bones>,
@@ -20,7 +20,7 @@ fn config_default<'a>(
         .unwrap_or(fallback)
 }
 
-pub fn prompt_runtime_questions(
+pub fn prompt_framework_questions(
     questions: &[Question],
     defaults: &serde_json::Map<String, Value>,
 ) -> Result<serde_json::Map<String, Value>> {
@@ -79,8 +79,8 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
     }
 
     let choice =
-        Select::new("Runtime template:", vec![String::from("Use a template"), String::from("Build from scratch")])
-            .with_help_message("Choose the app runtime to configure")
+        Select::new("Framework template:", vec![String::from("Use a template"), String::from("Build from scratch")])
+            .with_help_message("Choose the app framework to configure")
             .prompt()?;
 
     if choice == "Build from scratch" {
@@ -95,8 +95,8 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
     Ok(Some(template_name))
 }
 
-pub fn choose_database_services(services: &[&str]) -> Result<Vec<String>> {
-    MultiSelect::new("Database services:", services.to_vec())
+pub fn choose_services(services: &[&str]) -> Result<Vec<String>> {
+    MultiSelect::new("Services:", services.to_vec())
         .with_help_message("All services listen on localhost; use SSH port forwarding for remote access.")
         .prompt()
         .map(|selected| selected.into_iter().map(str::to_string).collect())
@@ -224,8 +224,8 @@ pub fn confirm_remote_setup() -> Result<bool> {
     confirm_prompt("Bootstrap remote server?", "Remote bootstrap prepares the VPS for this project.")
 }
 
-pub fn confirm_remote_runtime() -> Result<bool> {
-    confirm_prompt("Apply runtime setup?", "Runtime setup installs app services for this project.")
+pub fn confirm_remote_framework() -> Result<bool> {
+    confirm_prompt("Apply framework setup?", "Framework setup installs app services for this project.")
 }
 
 pub fn confirm_remote_ssl() -> Result<bool> {
@@ -236,11 +236,8 @@ pub fn confirm_remote_helpers() -> Result<bool> {
     confirm_prompt("Install remote helper tools?", "Helper tools install shell and editor utilities on the server.")
 }
 
-pub fn confirm_remote_dbs() -> Result<bool> {
-    confirm_prompt(
-        "Provision database services?",
-        "Database services will be bound to localhost and credentials written to shared/.env.",
-    )
+pub fn confirm_remote_services() -> Result<bool> {
+    confirm_prompt("Provision services?", "Services will be bound to localhost and credentials written to shared/.env.")
 }
 
 fn confirm_prompt(prompt: &str, message: &str) -> Result<bool> {

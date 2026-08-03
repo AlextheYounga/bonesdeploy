@@ -1,3 +1,3 @@
 pub(crate) mod lifecycle;
-pub(crate) mod script_runner;
+pub(crate) mod output;
 pub(crate) mod state;

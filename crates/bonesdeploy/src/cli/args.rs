@@ -32,16 +32,16 @@ pub enum Command {
         /// Runtime template (laravel, django, next, nuxt, rails, sveltekit, vue, or none)
         #[arg(long)]
         template: Option<String>,
-        /// Runtime variable override, repeated (e.g. `--runtime-var php_version=8.5`)
-        #[arg(long = "runtime-var", value_name = "KEY=VALUE")]
-        runtime_vars: Vec<String>,
-        /// Database service to provision, repeated (postgres, mariadb, mysql, mongodb, valkey, redis)
-        #[arg(long = "db", value_name = "SERVICE")]
-        dbs: Vec<String>,
+        /// Framework variable override, repeated (e.g. `--framework-var php_version=8.5`)
+        #[arg(long = "framework-var", value_name = "KEY=VALUE")]
+        framework_vars: Vec<String>,
+        /// Optional service to provision, repeated (postgres, mariadb, mysql, mongodb, valkey, redis)
+        #[arg(long = "service", value_name = "SERVICE")]
+        services: Vec<String>,
     },
     /// Run the full first-time deployment setup
     Setup {
-        /// Skip runtime confirmation prompts
+        /// Skip framework confirmation prompts
         #[arg(long)]
         yes: bool,
     },
@@ -50,6 +50,9 @@ pub enum Command {
         /// Skip remote checks
         #[arg(long)]
         local: bool,
+        /// Show all successful remote checks
+        #[arg(long)]
+        verbose: bool,
     },
     /// Show the current deployment state and next steps
     Status,
@@ -106,6 +109,21 @@ pub enum Command {
     Version,
 }
 
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::{Cli, Command};
+
+    #[test]
+    fn doctor_accepts_verbose_flag() {
+        assert!(matches!(
+            Cli::try_parse_from(["bonesdeploy", "doctor", "--verbose"]),
+            Ok(Cli { command: Command::Doctor { local: false, verbose: true } })
+        ));
+    }
+}
+
 #[derive(Subcommand)]
 pub enum SecretsCommand {
     /// Create the local secrets config and storage directory
@@ -130,9 +148,9 @@ pub enum RemoteCommand {
     /// Run remote bootstrap against configured host
     #[command(alias = "setup")]
     Bootstrap,
-    /// Apply the configured runtime against configured host
-    Runtime {
-        /// Skip runtime confirmation prompts
+    /// Apply the configured framework against configured host
+    Framework {
+        /// Skip framework confirmation prompts
         #[arg(long)]
         yes: bool,
     },
@@ -154,9 +172,9 @@ pub enum RemoteCommand {
         #[arg(long)]
         yes: bool,
     },
-    /// Provision configured database services (bound to localhost only)
-    Dbs {
-        /// Skip database setup confirmation prompt
+    /// Provision configured services (bound to localhost only)
+    Services {
+        /// Skip service setup confirmation prompt
         #[arg(long)]
         yes: bool,
     },
