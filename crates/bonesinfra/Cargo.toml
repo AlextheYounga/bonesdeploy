@@ -2,6 +2,10 @@
 name = "bonesinfra"
 version = "0.2.7"
 edition = "2024"
+authors=["Alex Younger <thealexyounger@proton.me>"]
+description="Deployments with a Spine in a Barebones Framework"
+license="Apache-2.0"
+repository="https://github.com/AlextheYounga/bonesdeploy"
 
 [dependencies]
 anyhow = "1.0.103"
