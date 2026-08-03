@@ -8,7 +8,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 
-use shared::paths;
+use bonesdeploy_core::paths;
 
 fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()> {
     let dest = bones_dir.join(relative_path);

@@ -2,10 +2,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::config::{self, build_group_for, build_user_for, is_numbered_shell_script, load_framework};
+use bonesdeploy_core::env_build;
+use bonesdeploy_core::paths;
 use serde_json::Value;
-use shared::config::{self, build_group_for, build_user_for, is_numbered_shell_script, load_framework};
-use shared::env_build;
-use shared::paths;
 
 use super::build_user::BuildScriptEnv;
 use super::container::BuildContainer;
@@ -154,7 +154,7 @@ mod tests {
     use std::process;
 
     use anyhow::Result;
-    use shared::config::load;
+    use bonesdeploy_core::config::load;
 
     use super::{derived_config_env, list_scripts, resolve_build_env};
 

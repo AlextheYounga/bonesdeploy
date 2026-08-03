@@ -8,7 +8,7 @@ mod evaluators;
 mod fs;
 mod types;
 
-use shared::paths;
+use bonesdeploy_core::paths;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 

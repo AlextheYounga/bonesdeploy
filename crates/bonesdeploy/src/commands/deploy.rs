@@ -7,7 +7,7 @@ use crate::commands::{push_state, secrets};
 use crate::config;
 use crate::infra::ssh;
 use crate::ui::output;
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub fn local_bones_load_error() -> String {
     format!("Failed to load {}", paths::LOCAL_BONES_TOML)

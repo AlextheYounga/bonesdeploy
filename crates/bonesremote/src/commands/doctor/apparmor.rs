@@ -1,7 +1,7 @@
 use std::fs;
 use std::process::Command;
 
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub(super) fn check_support(issues: &mut Vec<String>) {
     check_apparmor_kernel_enabled(issues);

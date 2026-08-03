@@ -1,6 +1,6 @@
 use anyhow::{Result, bail};
+use bonesdeploy_core::config::{Bones, Framework};
 use serde_json::Value;
-use shared::config::{Bones, Framework};
 
 /// Shared question keys used by more than one template.
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
@@ -126,8 +126,8 @@ pub(crate) fn join_env_lines(lines: &[&str]) -> String {
 #[expect(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use anyhow::{Result, bail};
+    use bonesdeploy_core::config::Bones;
     use serde_json::{Map, Value, json};
-    use shared::config::Bones;
 
     use super::{Framework, build_environment_example, configure, environment_example, questions, validate_answers};
 

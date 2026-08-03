@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use shared::{config, paths};
+use bonesdeploy_core::{config, paths};
 
 use crate::release::lifecycle::build::validate_build_cache;
 

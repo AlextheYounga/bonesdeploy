@@ -2,7 +2,7 @@ use std::fs;
 
 use anyhow::{Context, Result, bail};
 
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub fn run(file: Option<&str>, key: Option<&str>) -> Result<()> {
     print!("{}", render(file, key)?);

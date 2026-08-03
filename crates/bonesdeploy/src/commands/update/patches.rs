@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio, id};
 
 use anyhow::{Context, Result, bail};
-use shared::paths;
+use bonesdeploy_core::paths;
 
 use crate::config;
 use crate::infra::ssh;

@@ -9,7 +9,7 @@ use crate::commands::ensure_site_idle;
 use crate::release::state::{self as release_state, DeploymentLock};
 
 use super::{reject_plaintext_env_files, validate_repo_path, write_hook_file};
-use shared::paths;
+use bonesdeploy_core::paths;
 
 #[test]
 fn imports_share_a_stable_lock_and_reject_staged_releases() -> Result<()> {

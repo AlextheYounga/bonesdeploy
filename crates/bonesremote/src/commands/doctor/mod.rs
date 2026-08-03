@@ -1,5 +1,5 @@
 use anyhow::Result;
-use shared::paths;
+use bonesdeploy_core::paths;
 
 use crate::privileges;
 use crate::ui;

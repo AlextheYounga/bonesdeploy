@@ -1,7 +1,7 @@
 use std::fs;
 use std::process::Command;
 
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub(super) fn check_supported_distribution(issues: &mut Vec<String>) {
     let os_release = fs::read_to_string(paths::ETC_OS_RELEASE);

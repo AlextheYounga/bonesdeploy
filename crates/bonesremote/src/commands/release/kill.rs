@@ -5,8 +5,8 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, build_user_for};
-use shared::paths;
+use bonesdeploy_core::config::{self, build_user_for};
+use bonesdeploy_core::paths;
 
 use crate::commands::{drop_failed_release, release::list};
 use crate::privileges;

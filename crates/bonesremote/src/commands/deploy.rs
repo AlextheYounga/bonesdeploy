@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use anyhow::{Context, Error, Result, bail};
-use shared::config::build_user_for;
-use shared::paths;
+use bonesdeploy_core::config::build_user_for;
+use bonesdeploy_core::paths;
 use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
@@ -243,7 +243,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::paths;
+    use bonesdeploy_core::paths;
 
     use super::restore_previous_release;
 

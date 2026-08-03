@@ -3,7 +3,7 @@ use openssh::{Session, SessionBuilder, Stdio};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 use crate::config::Bones;
-use shared::config::{default_deploy_user, parse_port};
+use bonesdeploy_core::config::{default_deploy_user, parse_port};
 
 pub async fn connect(config: &Bones) -> Result<Session> {
     let host = &config.host;

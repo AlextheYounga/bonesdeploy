@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
-use shared::paths;
+use bonesdeploy_core::paths;
 use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;

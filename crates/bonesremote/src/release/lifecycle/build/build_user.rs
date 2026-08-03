@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub(super) struct BuildScriptEnv<'a> {
     pub(super) project_name: &'a str,

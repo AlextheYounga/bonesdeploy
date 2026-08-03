@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Result, bail};
-use shared::paths;
+use bonesdeploy_core::paths;
 
 use crate::config;
 use crate::infra::git;

@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
-use shared::{config::validate_host, paths};
+use bonesdeploy_core::{config::validate_host, paths};
 
 use crate::config;
 use crate::infra::git;
@@ -249,7 +249,7 @@ fn apply_existing_fields(config: &mut config::Bones, existing_config: Option<&co
 #[cfg(test)]
 mod tests {
     use anyhow::{Result, bail};
-    use shared::paths;
+    use bonesdeploy_core::paths;
 
     use super::collect_non_interactive;
     use crate::config::Bones;

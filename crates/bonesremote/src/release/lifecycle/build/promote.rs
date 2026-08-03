@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use shared::config::{self, runtime_group_for, runtime_user_for};
+use bonesdeploy_core::config::{self, runtime_group_for, runtime_user_for};
 
 use super::{release_directory, staged_release_name, tree};
 

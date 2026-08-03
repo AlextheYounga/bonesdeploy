@@ -6,7 +6,7 @@ pub(crate) mod stage;
 pub(crate) mod wire_shared;
 
 use anyhow::{Context, Result, bail};
-use shared::{config, paths};
+use bonesdeploy_core::{config, paths};
 
 /// Loads the site configuration and verifies that it belongs to the named site.
 ///

@@ -4,9 +4,9 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result};
+use bonesdeploy_core::config;
+use bonesdeploy_core::paths;
 use serde::Serialize;
-use shared::config;
-use shared::paths;
 
 #[derive(Debug, Serialize)]
 struct Report {

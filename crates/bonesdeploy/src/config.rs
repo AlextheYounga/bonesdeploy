@@ -3,10 +3,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use shared::config as shared_config;
-use shared::paths;
+use bonesdeploy_core::config as shared_config;
+use bonesdeploy_core::paths;
 
-pub use shared::config::{Bones, load};
+pub use bonesdeploy_core::config::{Bones, load};
 
 pub fn is_configured(config: &Bones) -> bool {
     !config.remote_name.is_empty() && !config.project_name.is_empty() && !config.host.is_empty()
@@ -120,7 +120,7 @@ mod tests {
     use anyhow::Result;
 
     use super::{Bones, bootstrap_ssh_user, save};
-    use shared::config::load;
+    use bonesdeploy_core::config::load;
 
     fn temp_path(file_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());

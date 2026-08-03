@@ -6,7 +6,7 @@ use std::process::Command;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use anyhow::{Result, bail};
-use shared::paths;
+use bonesdeploy_core::paths;
 use tempfile::TempDir;
 
 use super::{Args, run_with_prefetch};

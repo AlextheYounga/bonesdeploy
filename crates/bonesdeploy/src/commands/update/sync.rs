@@ -3,7 +3,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub(super) fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Result<()> {
     if !bones_dir.exists() {

@@ -1,5 +1,5 @@
 use super::{Question, QuestionKind};
-use shared::config::Framework;
+use bonesdeploy_core::config::Framework;
 
 const PHP_DEFAULT_VERSION: &str = "8.5";
 

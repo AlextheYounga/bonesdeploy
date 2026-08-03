@@ -5,8 +5,8 @@ use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, validate_site_name};
-use shared::paths;
+use bonesdeploy_core::config::{self, validate_site_name};
+use bonesdeploy_core::paths;
 
 use crate::commands::ensure_site_idle;
 use crate::privileges;

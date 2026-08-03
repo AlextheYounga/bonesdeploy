@@ -4,15 +4,15 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use shared::config::default_deploy_user;
-use shared::paths;
+use bonesdeploy_core::config::default_deploy_user;
+use bonesdeploy_core::paths;
 
 use super::FrameworkSelection;
 use crate::config;
 use crate::frameworks;
 use crate::infra::assets::{frameworks as framework_assets, kit};
 use crate::infra::git;
-use shared::env_build;
+use bonesdeploy_core::env_build;
 
 const PRE_PUSH_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/hooks/pre-push"));
 

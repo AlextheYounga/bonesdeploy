@@ -3,7 +3,7 @@ use std::path::Path;
 use anyhow::Result;
 use rust_embed::Embed;
 
-use shared::paths;
+use bonesdeploy_core::paths;
 
 use super::write_asset;
 

@@ -1,8 +1,8 @@
 use std::fs;
 
 use anyhow::{Context, Result, bail};
-use shared::config;
-use shared::paths;
+use bonesdeploy_core::config;
+use bonesdeploy_core::paths;
 
 use crate::privileges;
 use crate::release::state as release_state;
@@ -61,7 +61,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::paths;
+    use bonesdeploy_core::paths;
 
     use super::prune_old_releases;
 

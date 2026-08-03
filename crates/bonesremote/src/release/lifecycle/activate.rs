@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Result, bail};
-use shared::paths;
+use bonesdeploy_core::paths;
 
 use crate::privileges;
 use crate::release::state as release_state;

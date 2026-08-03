@@ -1,9 +1,9 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use bonesdeploy_core::paths;
 use console::style;
 use serde::Deserialize;
-use shared::paths;
 
 use crate::config;
 use crate::infra::ssh;

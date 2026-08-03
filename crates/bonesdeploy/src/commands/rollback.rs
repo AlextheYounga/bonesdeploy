@@ -6,7 +6,7 @@ use console::style;
 use crate::config;
 use crate::infra::ssh;
 use crate::ui::output;
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub async fn run() -> Result<()> {
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);

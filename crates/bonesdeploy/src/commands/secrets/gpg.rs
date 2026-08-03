@@ -6,7 +6,7 @@ use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub(super) fn home() -> PathBuf {
     let current = paths::bones_data_root().join("gnupg");

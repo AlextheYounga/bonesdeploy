@@ -3,7 +3,7 @@ use std::fs;
 use std::ops::{Deref, DerefMut};
 use std::path::Path;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::paths;

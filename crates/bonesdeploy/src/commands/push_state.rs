@@ -4,7 +4,7 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 
 use crate::ui::output;
-use shared::paths;
+use bonesdeploy_core::paths;
 
 const AUTOCOMMIT_MESSAGE: &str = "automated commit";
 

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, anyhow};
+use bonesdeploy_core::config::{DATABASE_SERVICES, validate_database_services};
 use serde_json::Value;
-use shared::config::{DATABASE_SERVICES, validate_database_services};
 
 use super::{Args, FrameworkSelection};
 use crate::frameworks;

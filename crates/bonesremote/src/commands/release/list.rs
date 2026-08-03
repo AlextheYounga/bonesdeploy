@@ -2,9 +2,9 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::config;
+use bonesdeploy_core::paths;
 use serde::Serialize;
-use shared::config;
-use shared::paths;
 
 use crate::privileges;
 use crate::release::state::{self as release_state, ActiveDeployment, DeploymentPhase};

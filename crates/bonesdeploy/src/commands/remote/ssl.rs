@@ -4,8 +4,8 @@ use anyhow::{Context, Result, bail};
 use console::style;
 use serde_json::Value;
 
-use shared::config as shared_config;
-use shared::paths;
+use bonesdeploy_core::config as shared_config;
+use bonesdeploy_core::paths;
 
 use super::data;
 use crate::commands::push_state;

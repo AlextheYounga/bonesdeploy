@@ -6,8 +6,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use std::{cell::RefCell, thread_local};
 
 use anyhow::{Context, Result, bail};
-use shared::config;
-use shared::paths;
+use bonesdeploy_core::config;
+use bonesdeploy_core::paths;
 
 use crate::privileges;
 

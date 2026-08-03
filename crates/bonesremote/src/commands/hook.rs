@@ -1,8 +1,8 @@
 use std::io::{Read, stdin};
 
 use anyhow::{Context, Result};
-use shared::config;
-use shared::paths;
+use bonesdeploy_core::config;
+use bonesdeploy_core::paths;
 
 pub fn post_receive(site: &str) -> Result<()> {
     let mut stdin_buf = String::new();

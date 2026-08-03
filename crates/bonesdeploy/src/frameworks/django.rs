@@ -1,5 +1,5 @@
 use super::{Question, QuestionKind};
-use shared::config::Framework;
+use bonesdeploy_core::config::Framework;
 
 const DEFAULT_PYTHON_VERSION: &str = "3.14";
 

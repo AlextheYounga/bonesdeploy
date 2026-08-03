@@ -5,7 +5,7 @@ use anyhow::{Context, Result, bail};
 use console::style;
 use tempfile::TempDir;
 
-use shared::paths;
+use bonesdeploy_core::paths;
 
 use crate::config;
 use crate::ui::output;

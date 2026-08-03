@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 const RESERVED_PROJECT_NAMES: &[&str] = &[
     "basic",

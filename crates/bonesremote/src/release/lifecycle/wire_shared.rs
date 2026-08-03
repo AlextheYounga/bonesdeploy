@@ -3,8 +3,8 @@ use std::os::unix::fs::symlink;
 use std::path::{Component, Path};
 
 use anyhow::{Context, Result, bail};
-use shared::config::{self, SharedPath};
-use shared::paths;
+use bonesdeploy_core::config::{self, SharedPath};
+use bonesdeploy_core::paths;
 
 use crate::privileges;
 use crate::release::state as release_state;
@@ -82,7 +82,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use shared::config::{SharedPath, SharedPathType};
+    use bonesdeploy_core::config::{SharedPath, SharedPathType};
 
     use super::{link_relative, remove_if_present, validate_shared_path};
 

@@ -3,7 +3,7 @@ use std::os::unix::fs::chown;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub(super) fn chown_tree_to_user(path: &Path, user: &str, group: &str) -> Result<()> {
     let uid = user_uid(user)?;

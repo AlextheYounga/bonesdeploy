@@ -24,7 +24,7 @@ use crate::commands::secrets;
 use crate::config as bones_config;
 use crate::infra::git;
 use crate::ui::output;
-use shared::paths;
+use bonesdeploy_core::paths;
 
 #[derive(Debug)]
 pub(super) struct FrameworkSelection {

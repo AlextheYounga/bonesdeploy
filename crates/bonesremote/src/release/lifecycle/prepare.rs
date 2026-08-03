@@ -5,8 +5,8 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use shared::config::{is_numbered_shell_script, load_framework, runtime_user_for};
-use shared::paths;
+use bonesdeploy_core::config::{is_numbered_shell_script, load_framework, runtime_user_for};
+use bonesdeploy_core::paths;
 
 use crate::privileges;
 use crate::release::output;

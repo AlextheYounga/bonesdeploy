@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::ptr::null_mut;
 
-use shared::{config, paths};
+use bonesdeploy_core::{config, paths};
 
 use super::types::{
     Account, CurrentState, FileKind, FileNode, PathTree, PolicyDecision, ReleaseEvidence, Site, SudoEvidence,

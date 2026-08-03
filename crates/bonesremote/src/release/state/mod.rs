@@ -10,7 +10,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
-use shared::paths;
+use bonesdeploy_core::paths;
 
 thread_local! {
     static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
@@ -259,7 +259,7 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
-    use shared::paths;
+    use bonesdeploy_core::paths;
 
     use super::{
         ScopedRoot, clear_staged_release, current_release_name, list_releases_sorted, point_symlink_atomically,

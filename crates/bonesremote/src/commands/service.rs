@@ -4,7 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use shared::{config, paths};
+use bonesdeploy_core::{config, paths};
 
 use crate::privileges;
 

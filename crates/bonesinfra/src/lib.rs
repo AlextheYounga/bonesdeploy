@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::paths;
 use rust_embed::Embed;
-use shared::paths;
 
 #[derive(Embed)]
 #[folder = "python/"]

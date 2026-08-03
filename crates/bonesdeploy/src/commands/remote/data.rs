@@ -1,8 +1,8 @@
 use std::path::Path;
 
+use bonesdeploy_core::config as shared_config;
+use bonesdeploy_core::paths::{self, ssl_certificate_key_path, ssl_certificate_path};
 use serde_json::{Map, Value};
-use shared::config as shared_config;
-use shared::paths::{self, ssl_certificate_key_path, ssl_certificate_path};
 
 use crate::config;
 

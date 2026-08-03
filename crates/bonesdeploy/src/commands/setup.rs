@@ -1,8 +1,8 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use bonesdeploy_core::paths;
 use console::style;
-use shared::paths;
 
 use crate::commands::{doctor, push_state, remote};
 use crate::config;

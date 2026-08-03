@@ -2,12 +2,12 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use shared::paths;
+use bonesdeploy_core::paths;
 
 use super::patches;
 use crate::config;
 use crate::infra::ssh;
-use shared::config::{default_deploy_user, parse_port};
+use bonesdeploy_core::config::{default_deploy_user, parse_port};
 
 pub(super) fn current_local_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()

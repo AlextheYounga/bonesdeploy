@@ -13,9 +13,9 @@ use crate::config;
 use crate::frameworks;
 use crate::infra::ssh;
 use crate::ui::output;
-use shared::config as shared_config;
-use shared::config::parse_port;
-use shared::paths;
+use bonesdeploy_core::config as shared_config;
+use bonesdeploy_core::config::parse_port;
+use bonesdeploy_core::paths;
 
 mod gpg;
 

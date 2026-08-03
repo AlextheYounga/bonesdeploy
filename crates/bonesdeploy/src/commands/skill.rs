@@ -1,9 +1,9 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
+use bonesdeploy_core::paths;
+use bonesdeploy_core::paths::bonesremote_bones_toml_path;
 use serde::Serialize;
-use shared::paths;
-use shared::paths::bonesremote_bones_toml_path;
 
 use crate::cli::args::{GuideFormat, SkillCommand};
 use crate::config;

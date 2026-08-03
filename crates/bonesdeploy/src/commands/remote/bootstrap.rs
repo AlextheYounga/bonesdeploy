@@ -3,8 +3,8 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use serde_json::Value;
 
-use shared::config as shared_config;
-use shared::paths;
+use bonesdeploy_core::config as shared_config;
+use bonesdeploy_core::paths;
 
 use super::data;
 use crate::config;

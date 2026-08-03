@@ -7,8 +7,8 @@ use anyhow::{Context, Result, anyhow, bail};
 use rust_embed::Embed;
 use serde_json::{Map, Value};
 
-use shared::config::Framework;
-use shared::paths;
+use bonesdeploy_core::config::Framework;
+use bonesdeploy_core::paths;
 
 use super::{kit, write_asset};
 use crate::frameworks;

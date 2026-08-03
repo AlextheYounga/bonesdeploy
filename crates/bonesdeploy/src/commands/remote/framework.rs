@@ -5,7 +5,7 @@ use anyhow::{Result, bail};
 use crate::infra::git;
 use crate::ui::output;
 use crate::ui::prompts;
-use shared::paths;
+use bonesdeploy_core::paths;
 
 pub fn run(yes: bool, show_next: bool) -> Result<()> {
     git::ensure_git_repository()?;

@@ -7,7 +7,7 @@ use anyhow::Result;
 use crate::config;
 use crate::infra::ssh;
 use crate::ui::output;
-use shared::{config::is_numbered_shell_script, paths};
+use bonesdeploy_core::{config::is_numbered_shell_script, paths};
 
 pub async fn run(local_only: bool, verbose: bool) -> Result<bool> {
     println!("{} Checking deployment...", console::style("bonesdeploy doctor").bold());
