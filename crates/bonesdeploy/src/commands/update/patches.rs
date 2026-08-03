@@ -57,7 +57,7 @@ fn local_patches() -> [Patch; 2] {
         Patch { id: "0001-config-repo", introduced_in: Version::new(0, 7, 3), script: LOCAL_CONFIG_REPO_PATCH },
         Patch {
             id: "0002-root-config-repo",
-            introduced_in: Version::new(0, 7, 4),
+            introduced_in: Version::new(0, 7, 3),
             script: LOCAL_ROOT_CONFIG_REPO_PATCH,
         },
     ]
@@ -68,7 +68,7 @@ fn remote_patches() -> [Patch; 2] {
         Patch { id: "0001-config-repo", introduced_in: Version::new(0, 7, 3), script: REMOTE_CONFIG_REPO_PATCH },
         Patch {
             id: "0002-root-config-repo",
-            introduced_in: Version::new(0, 7, 4),
+            introduced_in: Version::new(0, 7, 3),
             script: REMOTE_ROOT_CONFIG_REPO_PATCH,
         },
     ]
@@ -156,8 +156,8 @@ mod tests {
         assert!(Version::parse("0.7.3").is_ok_and(|version| patch.introduced_in <= version));
         assert!(Version::parse("0.7.2").is_ok_and(|version| patch.introduced_in > version));
         let migration = &local_patches()[1];
-        assert!(Version::parse("0.7.4").is_ok_and(|version| migration.introduced_in <= version));
-        assert!(Version::parse("0.7.3").is_ok_and(|version| migration.introduced_in > version));
+        assert!(Version::parse("0.7.3").is_ok_and(|version| migration.introduced_in <= version));
+        assert!(Version::parse("0.7.2").is_ok_and(|version| migration.introduced_in > version));
     }
 
     #[test]
