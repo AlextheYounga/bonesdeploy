@@ -18,7 +18,7 @@ pub async fn run(skip_confirm: bool) -> Result<()> {
     remote::services::run(true, false).with_context(|| setup_error("provisioning services"))?;
     push_state::run(false).with_context(|| setup_error("syncing .bones"))?;
     remote::framework::run(true, false).with_context(|| setup_error("applying framework"))?;
-    let pending_first_push = doctor::run(false).await.with_context(|| setup_error("checking deployment"))?;
+    let pending_first_push = doctor::run(false, false).await.with_context(|| setup_error("checking deployment"))?;
 
     println!();
     println!("{} Setup complete.", output::success_marker());

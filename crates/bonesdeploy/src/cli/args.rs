@@ -50,6 +50,9 @@ pub enum Command {
         /// Skip remote checks
         #[arg(long)]
         local: bool,
+        /// Show all successful remote checks
+        #[arg(long)]
+        verbose: bool,
     },
     /// Show the current deployment state and next steps
     Status,
@@ -104,6 +107,21 @@ pub enum Command {
     },
     /// Print the version
     Version,
+}
+
+#[cfg(test)]
+mod tests {
+    use clap::Parser;
+
+    use super::{Cli, Command};
+
+    #[test]
+    fn doctor_accepts_verbose_flag() {
+        assert!(matches!(
+            Cli::try_parse_from(["bonesdeploy", "doctor", "--verbose"]),
+            Ok(Cli { command: Command::Doctor { local: false, verbose: true } })
+        ));
+    }
 }
 
 #[derive(Subcommand)]

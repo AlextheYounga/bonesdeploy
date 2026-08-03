@@ -225,6 +225,12 @@ Check only the local side:
 bonesdeploy doctor --local
 ```
 
+Show the full successful remote report, including every remote security check:
+
+```sh
+bonesdeploy doctor --verbose
+```
+
 `doctor` reports three states: green checks are healthy, yellow pending items
 are expected next steps (such as the first Git push after setup), and red
 failures need attention. Pending first-push state exits successfully so setup

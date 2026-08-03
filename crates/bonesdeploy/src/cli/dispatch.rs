@@ -34,7 +34,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             Ok(())
         }
         Command::Setup { yes } => setup::run(*yes).await,
-        Command::Doctor { local } => doctor::run(*local).await.map(|_| ()),
+        Command::Doctor { local, verbose } => doctor::run(*local, *verbose).await.map(|_| ()),
         Command::Status => status::run().await,
         Command::Skill { command } => skill::dispatch(command.as_ref()).await,
         Command::Guide { format } => skill::run_next(*format).await,

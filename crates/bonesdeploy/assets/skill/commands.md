@@ -32,12 +32,12 @@ after fixing whatever made it fail.
 
 ## doctor
 
-`bonesdeploy doctor [--local]`
+`bonesdeploy doctor [--local] [--verbose]`
 
 Local and remote health. Pass = silent, exit 0. Warnings or errors = exit
 non-zero. A pending first git push is success, not failure — an empty bare
 repo before the first push is expected. `--local` skips the SSH round trip; the
-`pre-push` hook uses this.
+`pre-push` hook uses this. `--verbose` prints every successful remote check.
 
 ## status
 
