@@ -87,7 +87,7 @@ pub(super) struct ReleaseEvidence {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) enum PolicyDecision {
-    Allowed,
+    Allowed(String),
     Denied,
     Unverified(String),
 }

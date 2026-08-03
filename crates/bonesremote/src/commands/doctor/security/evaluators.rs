@@ -86,8 +86,8 @@ pub(super) fn evaluate_runtime_sudo(evidence: &SudoEvidence) -> Finding {
         PolicyDecision::Denied => {
             finding(Status::Pass, RUNTIME_SUDO_RULE, format!("sudo policy denied all authority for {}", evidence.user))
         }
-        PolicyDecision::Allowed => {
-            finding(Status::Fail, RUNTIME_SUDO_RULE, format!("sudo listed permitted commands for {}", evidence.user))
+        PolicyDecision::Allowed(output) => {
+            finding(Status::Fail, RUNTIME_SUDO_RULE, format!("sudo policy for {}:\n{}", evidence.user, output))
         }
         PolicyDecision::Unverified(error) => unverified(
             RUNTIME_SUDO_RULE.name,
