@@ -240,11 +240,34 @@ fn render_remote_doctor_output(output: &str, verbose: bool) -> bool {
         }
     } else if pending {
         for line in output.lines().filter(|line| line.contains("has not been pushed yet")) {
-            let line = line.trim().strip_prefix('•').map_or(line.trim(), str::trim_start);
-            println!("{} {}", output::pending_marker(), line);
+            let clean = strip_ansi(line);
+            let clean = clean.trim().strip_prefix('•').map_or(clean.trim(), str::trim_start);
+            println!("{} {}", output::pending_marker(), clean);
         }
     }
     pending
+}
+
+fn strip_ansi(input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '\x1b' {
+            i += 1;
+            if i < chars.len() && chars[i] == '[' {
+                i += 1;
+                while i < chars.len() && !('@'..='~').contains(&chars[i]) {
+                    i += 1;
+                }
+                i += 1;
+            }
+            continue;
+        }
+        out.push(chars[i]);
+        i += 1;
+    }
+    out
 }
 
 #[cfg(test)]
@@ -255,7 +278,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{check_deployment_scripts, render_remote_doctor_output};
+    use super::{check_deployment_scripts, render_remote_doctor_output, strip_ansi};
 
     #[test]
     fn deployment_script_check_accepts_nested_build_and_prepare_layout() -> Result<()> {
@@ -287,5 +310,14 @@ mod tests {
             true
         ));
         assert!(!render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
+    }
+
+    #[test]
+    fn strip_ansi_removes_sgr_color_sequences() {
+        assert_eq!(
+            strip_ansi("\x1b[1;33m•\x1b[0m deploy branch 'master' has not been pushed yet"),
+            "• deploy branch 'master' has not been pushed yet"
+        );
+        assert_eq!(strip_ansi("plain text"), "plain text");
     }
 }
