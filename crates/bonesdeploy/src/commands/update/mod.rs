@@ -150,15 +150,15 @@ mod tests {
 
     #[test]
     fn release_tag_accepts_semver_versions() -> Result<()> {
-        assert_eq!(parse_release_tag(Some("v0.7.4"))?, "0.7.4");
-        assert_eq!(parse_release_tag(Some("v0.7.4-rc.1+build"))?, "0.7.4-rc.1+build");
+        assert_eq!(parse_release_tag(Some("v0.7.3"))?, "0.7.3");
+        assert_eq!(parse_release_tag(Some("v0.7.3-rc.1+build"))?, "0.7.3-rc.1+build");
         Ok(())
     }
 
     #[test]
     fn release_tag_rejects_unexpected_values() {
-        assert!(parse_release_tag(Some("0.7.4")).is_err());
-        assert!(parse_release_tag(Some("v0.7.4/tag")).is_err());
+        assert!(parse_release_tag(Some("0.7.3")).is_err());
+        assert!(parse_release_tag(Some("v0.7.3/tag")).is_err());
         assert!(parse_release_tag(None).is_err());
     }
 }

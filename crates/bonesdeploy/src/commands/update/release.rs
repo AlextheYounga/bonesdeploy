@@ -94,13 +94,13 @@ mod tests {
 
     #[test]
     fn remote_update_downloads_versioned_release_and_checksum() {
-        let command = bonesremote_download_command("0.7.4", "/usr/local");
+        let command = bonesremote_download_command("0.7.3", "/usr/local");
 
-        assert!(command.contains("releases/download/v0.7.4"));
+        assert!(command.contains("releases/download/v0.7.3"));
         assert!(command.contains("bonesremote-x86_64-unknown-linux-musl.sha256"));
         assert!(command.contains("sha256sum --check"));
         assert!(command.contains("uname -m"));
-        assert!(command.contains("bonesremote 0.7.4"));
+        assert!(command.contains("bonesremote 0.7.3"));
         assert!(command.contains("install -o root -g root -m 0755"));
     }
 }

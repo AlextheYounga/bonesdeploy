@@ -165,13 +165,13 @@ def test_bonesremote_install_repairs_binary_permissions(monkeypatch):
 
     monkeypatch.setattr(bonesremote_plan, "server", types.SimpleNamespace(script_template=script_template))
 
-    bonesremote_plan.install("0.7.4")
+    bonesremote_plan.install("0.7.3")
 
     assert calls == [
         {
             "name": "Install bonesremote binary",
             "src": str(bonesremote_plan.SCRIPTS_DIR / "install-bonesremote.sh.j2"),
-            "bonesremote_version": "0.7.4",
+            "bonesremote_version": "0.7.3",
             "_sudo": True,
         }
     ]
@@ -182,7 +182,7 @@ def test_bonesremote_installer_verifies_and_installs_the_versioned_release(tmp_p
     release_dir = tmp_path / "release"
     release_dir.mkdir()
     release_binary = release_dir / artifact
-    release_binary.write_text("#!/usr/bin/env bash\nprintf 'bonesremote 0.7.4\\n'\n")
+    release_binary.write_text("#!/usr/bin/env bash\nprintf 'bonesremote 0.7.3\\n'\n")
     release_binary.chmod(0o755)
     checksum = subprocess.run(
         ["/usr/bin/sha256sum", release_binary], check=True, capture_output=True, text=True
@@ -208,7 +208,7 @@ def test_bonesremote_installer_verifies_and_installs_the_versioned_release(tmp_p
 
     binary = tmp_path / "bonesremote"
     template = (bonesremote_plan.SCRIPTS_DIR / "install-bonesremote.sh.j2").read_text()
-    script = template.replace("/usr/local/bin/bonesremote", str(binary)).replace("{{ bonesremote_version }}", "0.7.4")
+    script = template.replace("/usr/local/bin/bonesremote", str(binary)).replace("{{ bonesremote_version }}", "0.7.3")
     installer = tmp_path / "install-bonesremote.sh"
     installer.write_text(script)
     installer.chmod(0o755)
@@ -223,14 +223,14 @@ def test_bonesremote_installer_verifies_and_installs_the_versioned_release(tmp_p
 
     assert result.returncode == 0, result.stderr
     assert (
-        subprocess.run([binary, "version"], check=True, capture_output=True, text=True).stdout == "bonesremote 0.7.4\n"
+        subprocess.run([binary, "version"], check=True, capture_output=True, text=True).stdout == "bonesremote 0.7.3\n"
     )
 
 
 def test_bonesremote_installer_rejects_unsupported_architecture(tmp_path):
     template = (bonesremote_plan.SCRIPTS_DIR / "install-bonesremote.sh.j2").read_text()
     script = template.replace("/usr/local/bin/bonesremote", str(tmp_path / "bonesremote")).replace(
-        "{{ bonesremote_version }}", "0.7.4"
+        "{{ bonesremote_version }}", "0.7.3"
     )
     installer = tmp_path / "install-bonesremote.sh"
     installer.write_text(script)
