@@ -1,5 +1,6 @@
 from pyinfra.operations import server
 
+from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.pyinfra.operations import render
 
@@ -25,7 +26,7 @@ def render_profile(
         apparmor_exec_paths=apparmor_exec_paths,
         apparmor_writable_paths=apparmor_writable_paths,
         apparmor_network=apparmor_network,
-        paths=paths,
+        **template_data(ctx, paths=paths),
     )
     server.shell(
         name=f"Load {runtime} AppArmor profile",
