@@ -476,7 +476,7 @@ Responsibilities:
 - create shared directory
 - seed blank `shared/.env`
 - create trusted site registry parent directory
-- seed placeholder release
+- seed placeholder release (only repoints `current` at the placeholder when no release exists, so re-running setup never replaces the active release)
 - install deploy authorized key
 - install thin post-receive hook (delegates to `bonesremote hook post-receive`)
 - initialize the root-owned `.bones` config repository and install its pre-receive import hook

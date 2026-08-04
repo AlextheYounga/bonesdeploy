@@ -280,7 +280,8 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra setup apply --config <path>` against the configured host as root (or `BONES_BOOTSTRAP_SSH_USER`).
   - Passes `bones.toml` deployment values plus computed paths and variables as JSON on stdin.
   - Initializes bare git repository at `repo_path`.
-  - Creates initial placeholder release with default page.
+   - Creates initial placeholder release with default page.
+   - Only points the `current` symlink at the placeholder when no release exists yet, so re-running setup after a deploy never replaces the active release.
    - Downloads and checksum-verifies the matching static `x86_64` `bonesremote` Linux release binary from GitHub Releases.
    - Does not install Rust or Cargo on the remote host.
   - Installs the deploy-user sudoers policy through `bonesinfra` host provisioning, with anchored site and revision arguments so trailing or malformed arguments are denied.
