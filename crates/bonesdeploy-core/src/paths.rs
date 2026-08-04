@@ -47,6 +47,7 @@ pub const CURRENT_LINK: &str = "current";
 pub const STAGED_RELEASE_FILE: &str = "staged-release";
 pub const ACTIVE_DEPLOYMENT_FILE: &str = "active-deployment.json";
 pub const DEPLOYMENT_LOCK_FILE: &str = "deployment.lock";
+pub const RECOVERY_DIR: &str = "recovery";
 pub const TMP_BUILDS_DIR: &str = "tmp";
 pub const PLACEHOLDER_RELEASE_NAME: &str = "19700101_000000";
 pub const SUDOERS_FILE: &str = "bonesdeploy";

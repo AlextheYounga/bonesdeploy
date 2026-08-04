@@ -388,7 +388,7 @@ mod tests {
         let root = temporary_root("release-boundary");
         let release = root.join("releases/2026-08-03");
         let nested_file = release.join("nested/application-file");
-        fs::create_dir_all(nested_file.parent().expect("nested file has parent"))?;
+        fs::create_dir_all(nested_file.parent().ok_or("nested file has parent")?)?;
         fs::write(&nested_file, "x")?;
         symlink(&release, root.join("current"))?;
         let site = site(&root);

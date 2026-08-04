@@ -12,6 +12,10 @@ use serde::{Deserialize, Serialize};
 
 use bonesdeploy_core::paths;
 
+mod atomic;
+
+pub(crate) use atomic::atomic_write;
+
 thread_local! {
     static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
 }
@@ -47,8 +51,12 @@ pub fn staged_release_path(site: &str) -> PathBuf {
     resolved_site_root(site).join(paths::STAGED_RELEASE_FILE)
 }
 
-fn active_deployment_path(site: &str) -> PathBuf {
+pub(crate) fn active_deployment_path(site: &str) -> PathBuf {
     resolved_site_root(site).join(paths::ACTIVE_DEPLOYMENT_FILE)
+}
+
+pub(crate) fn recovery_dir(site: &str) -> PathBuf {
+    resolved_site_root(site).join(paths::RECOVERY_DIR)
 }
 
 fn deployment_lock_path(site: &str) -> PathBuf {
@@ -122,7 +130,8 @@ pub fn read_active_deployment(site: &str) -> Result<Option<ActiveDeployment>> {
 pub fn write_active_deployment(site: &str, deployment: &ActiveDeployment) -> Result<()> {
     let path = active_deployment_path(site);
     let content = serde_json::to_string(deployment).context("Failed to serialize active deployment state")?;
-    fs::write(&path, content).with_context(|| format!("Failed to write active deployment state at {}", path.display()))
+    atomic_write(&path, content.as_bytes())
+        .with_context(|| format!("Failed to write active deployment state at {}", path.display()))
 }
 
 pub fn clear_active_deployment(site: &str) -> Result<()> {
@@ -149,12 +158,7 @@ pub fn read_staged_release(site: &str) -> Result<String> {
 
 pub fn write_staged_release(site: &str, release: &str) -> Result<()> {
     let path = staged_release_path(site);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)
-            .with_context(|| format!("Failed to create staged release state dir: {}", parent.display()))?;
-    }
-
-    fs::write(&path, format!("{release}\n"))
+    atomic_write(&path, format!("{release}\n").as_bytes())
         .with_context(|| format!("Failed to write staged release state: {}", path.display()))
 }
 

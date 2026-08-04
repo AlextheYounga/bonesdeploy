@@ -31,7 +31,11 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
 #[expect(clippy::too_many_lines)]
 fn run_staged_deployment(site: &str, target_revision: &str) -> Result<()> {
     stage("Staging release");
-    if let Err(error) = lifecycle::stage::run(site) {
+    let revision_commit = match lifecycle::checkout::resolve_revision_commit(site, target_revision) {
+        Ok(commit) => commit,
+        Err(error) => return finish_abort(site, None, error),
+    };
+    if let Err(error) = lifecycle::stage::run(site, &revision_commit) {
         return finish_abort(site, None, error);
     }
 
@@ -207,6 +211,13 @@ fn abort_context_only(site: &str, context: Option<&Path>, mut error: Error) -> E
 
 pub fn rollback(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release rollback")?;
+    // Rollback mutates live site state, so it must be serialized with deploy,
+    // cancellation, pruning, and config receive like every other mutation. It
+    // also runs against an idle site so it never repoints `current` under an
+    // in-flight or interrupted deployment.
+    let _lock = release_state::DeploymentLock::acquire(site)?;
+    ensure_site_idle(site)?;
+
     let cfg = lifecycle::load_site_config(site)?;
 
     let releases = release_state::list_releases_sorted(&cfg.project_root)?;
@@ -225,12 +236,41 @@ pub fn rollback(site: &str) -> Result<()> {
     }
 
     let previous_name = releases[current_idx - 1].clone();
-    let previous_dir = release_state::release_dir(&cfg.project_root, &previous_name);
-    let current_link = PathBuf::from(&cfg.project_root).join(paths::CURRENT_LINK);
-    release_state::point_symlink_atomically(&current_link, &previous_dir)?;
-    service::run(site)?;
+    switch_and_verify(&cfg.project_root, &current_name, &previous_name, || service::run(site))?;
 
     println!("Rollback complete: {current_name} -> {previous_name}");
+    Ok(())
+}
+
+/// Repoints `current` to `previous_name`, restarts (via `restart`) and verifies
+/// the result, then restores `current_name` and restarts it again if
+/// verification fails. This keeps rollback reversible when service restart
+/// reports failure.
+fn switch_and_verify(
+    project_root: &str,
+    current_name: &str,
+    previous_name: &str,
+    restart: impl Fn() -> Result<()>,
+) -> Result<()> {
+    let current_link = PathBuf::from(project_root).join(paths::CURRENT_LINK);
+    let previous_dir = release_state::release_dir(project_root, previous_name);
+    let current_dir = release_state::release_dir(project_root, current_name);
+
+    release_state::point_symlink_atomically(&current_link, &previous_dir)?;
+
+    if let Err(error) = restart() {
+        let mut error = error;
+        if let Err(restore_error) = release_state::point_symlink_atomically(&current_link, &current_dir) {
+            error =
+                error.context(format!("Failed to restore the previous release '{current_name}': {restore_error:#}"));
+        } else if let Err(restart_error) = restart() {
+            error = error.context(format!("Failed to restart the restored release: {restart_error:#}"));
+        }
+        return Err(error.context(format!(
+            "Service restart failed after rolling back to '{previous_name}'; restored '{current_name}'"
+        )));
+    }
+
     Ok(())
 }
 
@@ -245,7 +285,7 @@ mod tests {
     use anyhow::Result;
     use bonesdeploy_core::paths;
 
-    use super::restore_previous_release;
+    use super::{restore_previous_release, switch_and_verify};
 
     #[test]
     fn failed_activation_restores_previous_release() -> Result<()> {
@@ -261,6 +301,49 @@ mod tests {
         restore_previous_release(&root, &previous)?;
 
         assert_eq!(fs::read_link(root.join(paths::CURRENT_LINK))?, previous);
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn rollback_points_current_to_previous_release_when_restart_succeeds() -> Result<()> {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let root = env::temp_dir().join(format!("bonesremote_rollback_ok_{}_{}", process::id(), nonce));
+        let releases = root.join(paths::RELEASES_DIR);
+        let newest = releases.join("20260102_000000");
+        let older = releases.join("20260101_000000");
+        fs::create_dir_all(&newest)?;
+        fs::create_dir_all(&older)?;
+        let current_link = root.join(paths::CURRENT_LINK);
+        symlink(&newest, &current_link)?;
+
+        let project_root = root.to_string_lossy().into_owned();
+        switch_and_verify(&project_root, "20260102_000000", "20260101_000000", || Ok(()))?;
+
+        assert_eq!(fs::read_link(&current_link)?, older);
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn rollback_restores_original_release_when_restart_fails() -> Result<()> {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
+        let root = env::temp_dir().join(format!("bonesremote_rollback_restore_{}_{}", process::id(), nonce));
+        let releases = root.join(paths::RELEASES_DIR);
+        let newest = releases.join("20260102_000000");
+        let older = releases.join("20260101_000000");
+        fs::create_dir_all(&newest)?;
+        fs::create_dir_all(&older)?;
+        let current_link = root.join(paths::CURRENT_LINK);
+        symlink(&newest, &current_link)?;
+
+        let project_root = root.to_string_lossy().into_owned();
+        let result = switch_and_verify(&project_root, "20260102_000000", "20260101_000000", || {
+            anyhow::bail!("simulated restart failure")
+        });
+
+        assert!(result.is_err());
+        assert_eq!(fs::read_link(&current_link)?, newest, "current must be restored after failed rollback");
         fs::remove_dir_all(root)?;
         Ok(())
     }

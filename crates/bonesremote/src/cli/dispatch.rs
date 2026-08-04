@@ -21,6 +21,7 @@ pub fn run(cli: &Cli) -> Result<()> {
             ReleaseCommand::Rollback { site: site_name } => deploy::rollback(site_name),
             ReleaseCommand::DropFailed { site: site_name } => drop_failed_release::run(site_name),
             ReleaseCommand::Prune { site: site_name } => release::prune::run(site_name),
+            ReleaseCommand::Recover { site: site_name } => release::recover::run(site_name),
         },
         Command::Service { command } => match command {
             ServiceCommand::Restart { site: site_name } => service::run(site_name),

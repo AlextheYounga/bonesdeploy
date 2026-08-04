@@ -62,6 +62,8 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 BonesRemote holds one OS-backed deployment lock per site. Deploys, cancellations, and site imports use the same stable lock, which lives outside the replaceable site dataset. A deploy or import must not stage or overwrite state while a release is building, preparing, or interrupted. Before staging, BonesRemote starts and verifies the build user's systemd manager and checks rootless Podman readiness. A damaged rootless Podman namespace is reported before any release state is created; deploy does not silently reset Podman because that operation stops the build user's containers.
 
+Deployment state files (`active-deployment.json` and `staged-release`) are written atomically (temp file, fsync, rename, directory fsync) so a crash or disk-full condition never leaves truncated state that status, cancellation, or idle checks cannot parse. If malformed state is ever found, `bonesremote release recover --site <site>` quarantines it after proving no deployment is running.
+
 ## Bones Scaffolding
 ```
 .bones
@@ -312,7 +314,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - Separate from `remote framework` to keep certificate management decoupled from app runtime concerns.
 
 - **rollback**
-  - SSHes into the configured host and runs `bonesremote release rollback --site <project>`, which repoints `current` to the previous release without rebuilding and restarts `<project>.target`.
+  - SSHes into the configured host and runs `bonesremote release rollback --site <project>`, which acquires the site lock and repoints `current` to the previous release without rebuilding, then restarts `<project>.target`. If the restart fails, the original release is restored and restarted.
 
 - **secrets**
   - Subcommands: `init`, `edit`, `push`.
@@ -350,15 +352,17 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - Host mode checks `bonesremote` in `PATH`, Podman, AppArmor support, and the deploy-user sudoers drop-in.
   - `--site <name>` also checks the imported site boundary: validated control-plane state, bare repo and thin hook, runtime identity constraints, `shared/` and `releases/` layout, and `<site>.target`.
 - **release stage**
-	- Creates a staged release tree under `releases/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout.
+	- Creates a staged release tree under `releases/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout. Release directories are created exclusively: the identity embeds the resolved source commit plus a random suffix (for example `20260804_190321-46a0b75c-a7f2`), and a second deployment staged within the same second retries with a fresh name instead of reusing or erasing an existing release directory.
 - **release wire**
 	- Wires shared paths into `build/workspace` after checkout, replacing any existing build workspace paths with symlinks to the shared directory.
 - **release activate**
-	- Atomically switches `current` to the staged release and clears staged release state.
+	- Atomically switches `current` to the staged release and clears staged release state. Activation refuses to promote into a nonempty release directory.
 - **release drop-failed**
 	- Deletes a failed staged release and clears staged release state.
+- **release recover**
+	- Quarantines malformed `active-deployment.json` state into the site's `recovery/` directory. It first acquires the site deployment lock, proving no deployment process is alive, so malformed state written by a crash can never wedge status, cancellation, or idle checks while a deploy runs.
 - **release rollback**
-	- Repoints `current` to the previous release.
+	- Acquires the site deployment lock and requires an idle site, then repoints `current` to the previous release. It is transactional: after switching `current`, it restarts and verifies the target, and if verification fails it restores the original release and restarts it before returning an error.
 - **service restart**
 	- Restarts the per-site systemd lifecycle target (`<project>.target`), which restarts all registered site services. This is the only `bonesremote` command that requires root privileges.
 

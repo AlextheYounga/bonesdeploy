@@ -72,7 +72,30 @@ pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn ensure_build_context(site: &str) -> Result<PathBuf> {
+/// Resolves a revision (branch name or commit-ish) to the full commit hash in
+/// the site's bare repo. The resolved hash feeds the release identity so every
+/// release records exactly which commit was exported.
+pub(crate) fn resolve_revision_commit(site: &str, revision: &str) -> Result<String> {
+    let cfg = super::load_site_config(site)?;
+    let output = Command::new("git")
+        .args(["--git-dir", &cfg.repo_path, "rev-parse", "--verify", &format!("{revision}^{{commit}}")])
+        .output()
+        .with_context(|| format!("Failed to resolve revision {revision} in {}", cfg.repo_path))?;
+    if !output.status.success() {
+        bail!(
+            "Failed to resolve source revision '{revision}' to a commit in {}\n{}",
+            cfg.repo_path,
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if sha.len() < 8 {
+        bail!("Resolved revision '{revision}' did not yield a valid commit hash");
+    }
+    Ok(sha)
+}
+
+pub fn ensure_build_context(site: &str) -> Result<PathBuf> {
     let root = resolved_tmp_root(site)?;
     fs::create_dir_all(&root).with_context(|| format!("Failed to create tmp builds root: {}", root.display()))?;
 

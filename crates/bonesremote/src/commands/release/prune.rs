@@ -29,22 +29,21 @@ pub fn run(site: &str) -> Result<()> {
 
 fn prune_old_releases(project_root: &str, keep: usize) -> Result<Vec<String>> {
     let active_release = release_state::current_release_name(project_root)?;
-    let mut releases = release_state::list_releases_sorted(project_root)?;
+    let releases = release_state::list_releases_sorted(project_root)?;
     let keep = keep.max(1);
 
-    let mut pruned = Vec::new();
-    while releases.len() > keep {
-        let oldest = releases.remove(0);
-        if oldest == active_release {
-            releases.push(oldest);
-            releases.sort();
-            continue;
-        }
+    // Compute the plan before touching the filesystem. The active release is
+    // never a candidate, so an active release that happens to be the oldest
+    // must not stall pruning (the old remove/push-back loop selected it forever).
+    let excess = releases.len().saturating_sub(keep);
+    let candidates = releases.into_iter().filter(|release| release != &active_release).take(excess);
 
-        let path = release_state::release_dir(project_root, &oldest);
+    let mut pruned = Vec::new();
+    for release in candidates {
+        let path = release_state::release_dir(project_root, &release);
         if path.exists() {
             fs::remove_dir_all(&path).with_context(|| format!("Failed to prune old release {}", path.display()))?;
-            pruned.push(oldest);
+            pruned.push(release);
         }
     }
 
@@ -125,6 +124,28 @@ mod tests {
         assert!(pruned.is_empty());
         assert!(root.join("project_root").join(paths::RELEASES_DIR).join("20260101_000000").exists());
         assert!(root.join("project_root").join(paths::RELEASES_DIR).join("20260102_000000").exists());
+
+        fs::remove_dir_all(root).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn prune_old_releases_terminates_when_active_is_the_oldest_release() -> Result<()> {
+        let root = temp_dir("bonesremote_post_deploy_prune_active_oldest")?;
+        let project_root = project_root_for(&root);
+
+        make_release(&root, "20260101_000000")?;
+        make_release(&root, "20260102_000000")?;
+        make_release(&root, "20260103_000000")?;
+        set_current_release(&root, "20260101_000000")?;
+
+        let pruned = prune_old_releases(&project_root, 2)?;
+        let releases = root.join("project_root").join(paths::RELEASES_DIR);
+
+        assert_eq!(pruned, vec!["20260102_000000"]);
+        assert!(releases.join("20260101_000000").exists());
+        assert!(!releases.join("20260102_000000").exists());
+        assert!(releases.join("20260103_000000").exists());
 
         fs::remove_dir_all(root).ok();
         Ok(())

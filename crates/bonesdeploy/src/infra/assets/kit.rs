@@ -23,7 +23,7 @@ pub fn scaffold(bones_dir: &Path) -> Result<()> {
 }
 
 pub fn scaffold_gitignore(bones_dir: &Path) -> Result<()> {
-    let path = ".gitignore";
+    let path = paths::GITIGNORE_FILE;
     let Some(asset) = Kit::get(path) else {
         return Ok(());
     };
