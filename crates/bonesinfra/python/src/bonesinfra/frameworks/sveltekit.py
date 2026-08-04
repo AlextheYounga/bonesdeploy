@@ -6,7 +6,7 @@ from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.base import ServerFramework
 from bonesinfra.frameworks.common import validation
-from bonesinfra.pyinfra.operations import render
+from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import NODE
 
 
@@ -36,10 +36,18 @@ class SvelteKitFramework(ServerFramework):
         )
 
     def seed_placeholder(self, ctx, paths):
+        build_dir = f"{paths['placeholder_release']}/build"
+        mkdir(
+            name="Ensure placeholder SvelteKit build directory exists",
+            path=build_dir,
+            user="root",
+            group=ctx.runtime.runtime_group,
+            mode="0750",
+        )
         render(
             "Seed placeholder SvelteKit build entrypoint",
             ASSETS_DIR / "sveltekit/placeholder-index.js.j2",
-            f"{paths['placeholder_release']}/build",
+            f"{build_dir}/index.js",
             user="root",
             group=ctx.runtime.runtime_group,
             mode="0750",
