@@ -94,6 +94,7 @@ fn annotate_sections(content: &str) -> String {
         ("(framework]", "# Framework settings."),
         ("[framework.permissions]", "# Release file permissions."),
         ("[framework.shared]", "# Paths persisted in the shared release directory."),
+        ("[build]", "# Per-site build limits."),
         ("[services]", "# Optional framework services."),
     ];
 

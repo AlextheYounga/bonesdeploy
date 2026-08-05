@@ -60,7 +60,8 @@ and non-login.
 Repository and site paths are derived from `project_name`: `repo_path` defaults to `/home/git/<project>.git`, `bones_repo` defaults to `/root/.config/bonesremote/repos/<project>.bones.git`, and `project_root` defaults to `/srv/sites/<project>`.
 
 Each build user's outer `user-<UID>.slice` is limited by root-owned systemd
-resource control at 80% CPU quota, 80% memory high, and 80% memory max.
+resource control at 80% CPU quota, 80% memory high, and 80% memory max, plus
+`MemorySwapMax=0` so a runaway build cannot thrash host swap.
 CPUQuota is that percentage of each online CPU; MemoryHigh is the soft
 reclaim/throttling threshold, while MemoryMax is the hard cgroup ceiling, so
 exceeding it fails the build rather than starving the host. These are

@@ -35,6 +35,7 @@ pub struct Bones {
     pub app: App,
     pub framework: Framework,
     pub services: Services,
+    pub build: Build,
 }
 
 impl Deref for Bones {
@@ -164,6 +165,34 @@ pub struct Services {
     pub services: Vec<String>,
 }
 
+pub const BUILD_TIMEOUT_SECONDS_DEFAULT: u64 = 300;
+
+/// Per-site build limits. Kept as its own nested section so build settings do
+/// not leak into `BONES_*` environment variables as unrelated scalars.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Build {
+    /// Maximum seconds each build script may run before systemd terminates it.
+    /// `0` disables the timeout.
+    #[serde(default = "default_build_timeout_seconds")]
+    pub timeout_seconds: u64,
+}
+
+impl Default for Build {
+    fn default() -> Self {
+        Self { timeout_seconds: BUILD_TIMEOUT_SECONDS_DEFAULT }
+    }
+}
+
+fn default_build_timeout_seconds() -> u64 {
+    BUILD_TIMEOUT_SECONDS_DEFAULT
+}
+
+#[must_use]
+pub fn build_timeout_seconds(config: &Bones) -> Option<u64> {
+    (config.build.timeout_seconds != 0).then_some(config.build.timeout_seconds)
+}
+
 pub const DATABASE_SERVICES: &[&str] = &["postgres", "mariadb", "mysql", "mongodb", "valkey", "redis"];
 
 /// # Errors
@@ -273,6 +302,26 @@ paths = [
         assert_eq!(framework.shared.paths[0].path_type, SharedPathType::File);
         assert_eq!(framework.shared.paths[1].path, "storage");
         assert_eq!(framework.shared.paths[1].path_type, SharedPathType::Dir);
+        Ok(())
+    }
+
+    #[test]
+    fn build_timeout_defaults_to_five_minutes() {
+        let config = Bones::default();
+        assert_eq!(config.build.timeout_seconds, BUILD_TIMEOUT_SECONDS_DEFAULT);
+        assert_eq!(build_timeout_seconds(&config), Some(BUILD_TIMEOUT_SECONDS_DEFAULT));
+    }
+
+    #[test]
+    fn build_timeout_of_zero_disables_the_timeout() {
+        let config = Bones { build: Build { timeout_seconds: 0 }, ..Bones::default() };
+        assert_eq!(build_timeout_seconds(&config), None);
+    }
+
+    #[test]
+    fn build_timeout_parses_from_toml() -> Result<()> {
+        let config: Bones = toml::from_str("[build]\ntimeout_seconds = 120\n")?;
+        assert_eq!(build_timeout_seconds(&config), Some(120));
         Ok(())
     }
 }

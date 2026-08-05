@@ -13,11 +13,24 @@ pub(super) struct BuildScriptEnv<'a> {
     pub(super) deployment_dir: &'a Path,
     pub(super) build_cache_dir: &'a Path,
     pub(super) build_env_vars: &'a [(String, String)],
+    /// Maximum seconds each build script may run before systemd terminates it.
+    /// `None` disables the timeout.
+    pub(super) script_timeout_seconds: Option<u64>,
 }
 
 pub(super) fn build_user_command(build_user: &str) -> Command {
     let mut command = Command::new("systemd-run");
     command.arg(format!("--machine={build_user}@")).args(["--quiet", "--user", "--collect", "--pipe", "--wait"]);
+    command
+}
+
+/// A `build_user_command` that systemd terminates after `timeout_seconds`.
+/// This bounds runaway build scripts without depending on Podman or the build
+/// user's manager to cooperate: systemd enforces the deadline and kills the
+/// script's whole process tree.
+pub(super) fn build_script_command(build_user: &str, timeout_seconds: u64) -> Command {
+    let mut command = build_user_command(build_user);
+    command.arg(format!("--property=RuntimeMaxSec={timeout_seconds}s"));
     command
 }
 
@@ -97,15 +110,16 @@ pub(crate) fn validate_build_cache(path: &Path, uid: u32, gid: u32) -> Result<()
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-    use std::fs;
-    use std::os::unix::fs::{MetadataExt, PermissionsExt};
-    use std::path::PathBuf;
-    use std::time::{SystemTime, UNIX_EPOCH};
+    use std::{
+        env, fs,
+        os::unix::fs::{MetadataExt, PermissionsExt},
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
 
     use anyhow::Result;
 
-    use super::validate_build_cache;
+    use super::*;
 
     fn temp_dir(prefix: &str) -> Result<PathBuf> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
@@ -127,5 +141,34 @@ mod tests {
         assert!(validate_build_cache(&cache, metadata.uid(), metadata.gid()).is_err());
         fs::remove_dir_all(root).ok();
         Ok(())
+    }
+
+    fn command_to_string(command: &Command) -> String {
+        Command::new("sh")
+            .arg("-c")
+            .arg("printf '%s\\n' \"$@\"")
+            .arg("dummy")
+            .args(command.get_args())
+            .output()
+            .map(|output| String::from_utf8_lossy(&output.stdout).into_owned())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn build_script_command_includes_runtime_max_sec() {
+        let command = build_script_command("demo-build", 300);
+        assert!(command_to_string(&command).contains("--property=RuntimeMaxSec=300s"));
+    }
+
+    #[test]
+    fn plain_build_user_command_has_no_runtime_max_sec() {
+        let command = build_user_command("demo-build");
+        assert!(!command_to_string(&command).contains("RuntimeMaxSec"));
+    }
+
+    #[test]
+    fn build_script_command_runs_as_the_build_user_machine() {
+        let command = build_script_command("demo-build", 300);
+        assert!(command_to_string(&command).contains("--machine=demo-build@"));
     }
 }

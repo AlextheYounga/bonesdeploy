@@ -4,7 +4,7 @@ use std::process::{Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, bail};
 
-use super::build_user::{BuildScriptEnv, build_user_command, build_user_control_command};
+use super::build_user::{BuildScriptEnv, build_script_command, build_user_command, build_user_control_command};
 use crate::release::output;
 
 const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
@@ -49,7 +49,10 @@ impl<'a> BuildContainer<'a> {
         let script_file =
             fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
         let description = format!("podman build script {}", script.display());
-        let mut command = build_user_command(self.env.build_user);
+        let mut command = match self.env.script_timeout_seconds {
+            Some(timeout) => build_script_command(self.env.build_user, timeout),
+            None => build_user_command(self.env.build_user),
+        };
         configure_exec(&mut command, self.source_root, &self.name);
         let mut child = command
             .stdin(Stdio::from(script_file))

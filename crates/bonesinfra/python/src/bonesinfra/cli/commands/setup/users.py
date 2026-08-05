@@ -13,6 +13,7 @@ from bonesinfra.pyinfra.operations import mkdir, render
 _BUILD_CPU_QUOTA_PERCENT = 80
 _BUILD_MEMORY_HIGH_PERCENT = 80
 _BUILD_MEMORY_MAX_PERCENT = 80
+_BUILD_MEMORY_SWAP_MAX = 0
 
 BUILD_USER_HOME_ROOT = "/var/lib/bonesdeploy/users"
 BUILD_SYSTEMD_STAGING_ROOT = "/run/bonesdeploy"
@@ -188,6 +189,7 @@ def ensure_users_and_groups(ctx):
         cpu_quota=cpu_quota,
         memory_high=f"{_BUILD_MEMORY_HIGH_PERCENT}%",
         memory_max=f"{_BUILD_MEMORY_MAX_PERCENT}%",
+        memory_swap_max=_BUILD_MEMORY_SWAP_MAX,
     )
     server.script_template(
         name=f"Install and apply resource limits for {build_user}",
@@ -197,6 +199,7 @@ def ensure_users_and_groups(ctx):
         cpu_quota=cpu_quota,
         memory_high=f"{_BUILD_MEMORY_HIGH_PERCENT}%",
         memory_max=f"{_BUILD_MEMORY_MAX_PERCENT}%",
+        memory_swap_max=_BUILD_MEMORY_SWAP_MAX,
         _sudo=True,
     )
     configure_build_user_storage(ctx.app.project_name)
