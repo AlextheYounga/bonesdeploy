@@ -20,9 +20,7 @@ svelte
 |   |-- lib
 |   |   |-- images
 |   |   |   |-- github.svg
-|   |   |   |-- svelte-logo.svg
-|   |   |   |-- svelte-welcome.png
-|   |   |   `-- svelte-welcome.webp
+|   |   |   `-- svelte-logo.svg
 |   |   `-- server
 |   |       `-- db
 |   |           |-- index.ts
@@ -4433,8 +4431,7 @@ export const task = sqliteTable('task', {
 
 ```svelte
 <script lang="ts">
-	import welcomeFallback from '$lib/images/svelte-welcome.png';
-	import welcome from '$lib/images/svelte-welcome.webp';
+	import logo from '$lib/images/svelte-logo.svg';
 
 	import Counter from './Counter.svelte';
 </script>
@@ -4447,10 +4444,7 @@ export const task = sqliteTable('task', {
 <section>
 	<h1>
 		<span class="welcome">
-			<picture>
-				<source srcset={welcome} type="image/webp" />
-				<img src={welcomeFallback} alt="Welcome" />
-			</picture>
+			<img src={logo} alt="Welcome" />
 		</span>
 
 		to your new<br />SvelteKit app
