@@ -1,12 +1,19 @@
 import pytest
+from jinja2 import Template
 
 from bonesinfra.cli.commands.setup.users import (
+    _BUILD_MEMORY_MAX_PERCENT,
+    _BUILD_MEMORY_SWAP_MAX,
     build_cache_for,
     build_group_for,
     build_home_for,
     build_user_for,
     cpu_quota_for,
 )
+
+from . import helpers
+
+SLICE_TEMPLATE = helpers.SRC_DIR / "bonesinfra/assets/systemd/bonesdeploy-build.slice.j2"
 
 
 def test_build_identity_is_derived_from_project_name():
@@ -31,3 +38,13 @@ def test_cpu_quota_rejects_missing_online_cpus():
 
 def test_cpu_quota_uses_configured_per_cpu_percentage():
     assert cpu_quota_for(4, 50) == "200%"
+
+
+def test_build_slice_renders_with_memory_swap_max():
+    rendered = Template(helpers.read(SLICE_TEMPLATE)).render(
+        cpu_quota="320%",
+        memory_high=f"{_BUILD_MEMORY_MAX_PERCENT}%",
+        memory_max=f"{_BUILD_MEMORY_MAX_PERCENT}%",
+        memory_swap_max=_BUILD_MEMORY_SWAP_MAX,
+    )
+    assert f"MemorySwapMax={_BUILD_MEMORY_SWAP_MAX}" in rendered

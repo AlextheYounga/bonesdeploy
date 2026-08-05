@@ -2,7 +2,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{self, build_group_for, build_user_for, is_numbered_shell_script, load_framework};
+use bonesdeploy_core::config::{
+    self, build_group_for, build_timeout_seconds, build_user_for, is_numbered_shell_script, load_framework,
+};
 use bonesdeploy_core::env_build;
 use bonesdeploy_core::paths;
 use serde_json::Value;
@@ -49,6 +51,7 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
         deployment_dir,
         build_cache_dir: &build_cache_dir,
         build_env_vars: &build_env_vars,
+        script_timeout_seconds: build_timeout_seconds(cfg),
     };
     let mut container = BuildContainer::start(context, &build_env)?;
 
@@ -93,6 +96,7 @@ const DERIVED_ENV_DENYLIST: &[&str] = &[
     "app.server.port",
     "app.dns",
     "app.ssl_enabled",
+    "build.timeout_seconds",
 ];
 
 fn derived_config_env(cfg: &config::Bones) -> Result<Vec<(String, String)>> {
@@ -272,6 +276,26 @@ mod tests {
         assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_FRAMEWORK_SHARED")), "shared should be denied");
         fs::remove_dir_all(site_root).ok();
         fs::remove_dir_all(source).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn build_timeout_setting_is_denied_in_build_env() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-env-build-timeout-{}", process::id()));
+        fs::create_dir_all(&root)?;
+        fs::write(
+            root.join("bones.toml"),
+            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[framework]\ntemplate = \"nuxt\"\n[build]\ntimeout_seconds = 300\n",
+        )?;
+        let cfg = load(&root.join("bones.toml"))?;
+
+        let env = derived_config_env(&cfg)?;
+
+        assert!(
+            !env.iter().any(|(key, _)| key == "BONES_BUILD_TIMEOUT_SECONDS"),
+            "build timeout should not leak into the build container env: {env:?}"
+        );
+        fs::remove_dir_all(root).ok();
         Ok(())
     }
 

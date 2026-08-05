@@ -19,6 +19,12 @@ branch = 'master'
 deploy_on_push = false
 releases = 5
 
+# Per-site build limits.
+# Maximum seconds each build script may run before systemd terminates it.
+# Set to 0 to disable the timeout.
+[build]
+timeout_seconds = 300
+
 
 [framework]
 node_version = "24.18.0"
