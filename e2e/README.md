@@ -60,7 +60,7 @@ cargo test -p e2e --test setup -- vue laravel --ignored --test-threads=1 --nocap
 ```
 
 Test names: `django`, `laravel`, `next_server`, `next_static`, `nuxt_server`,
-`nuxt_static`, `rails`, `svelte`, `vue`.
+`nuxt_static`, `rails`, `sveltekit`, `vue`.
 
 ## How it works
 

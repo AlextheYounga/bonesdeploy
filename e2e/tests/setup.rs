@@ -85,7 +85,7 @@ fn rails() -> Result<()> {
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
-fn svelte() -> Result<()> {
+fn sveltekit() -> Result<()> {
     let h = harness::shared_harness()?;
     let project = sveltekit::provision(&h)?;
     sveltekit::assert_running(&h)?;
