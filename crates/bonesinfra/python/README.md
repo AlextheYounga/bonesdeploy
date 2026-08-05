@@ -15,9 +15,9 @@ execution uses the embedded copy.
 - `bonesinfra runtime apply --config <bones.toml>`
 - `bonesinfra ssl apply --config <bones.toml>`
 
-Runtime questions are defined by the Rust CLI under
-`crates/bonesdeploy/src/runtimes/`. BonesInfra reads the resulting
-`bones.toml` and applies infrastructure; it does not prompt for runtime
+Framework template questions are defined by the Rust CLI under
+`crates/bonesdeploy/src/frameworks/`. BonesInfra reads the resulting
+`bones.toml` and applies infrastructure; it does not prompt for those
 settings.
 
 ## Notes

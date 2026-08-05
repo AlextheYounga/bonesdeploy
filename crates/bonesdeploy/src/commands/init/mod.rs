@@ -5,7 +5,7 @@ use anyhow::Result;
 use console::style;
 
 mod config;
-mod runtime;
+mod framework;
 mod scaffold;
 
 pub struct Args {
@@ -52,10 +52,10 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let mut cfg =
         if is_fresh { config::collect_fresh_config(args)? } else { config::load_or_collect_config(bones_toml, args)? };
-    let framework_selection = if is_fresh { Some(runtime::collect_framework_config(args)?) } else { None };
+    let framework_selection = if is_fresh { Some(framework::collect_framework_config(args)?) } else { None };
 
     if is_fresh {
-        cfg.services.services = runtime::collect_database_services(args)?;
+        cfg.services.services = framework::collect_database_services(args)?;
     }
 
     if let Some(framework) = framework_selection {

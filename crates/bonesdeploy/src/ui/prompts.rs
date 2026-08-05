@@ -224,8 +224,8 @@ pub fn confirm_remote_setup() -> Result<bool> {
     confirm_prompt("Bootstrap remote server?", "Remote bootstrap prepares the VPS for this project.")
 }
 
-pub fn confirm_remote_framework() -> Result<bool> {
-    confirm_prompt("Apply framework setup?", "Framework setup installs app services for this project.")
+pub fn confirm_remote_runtime() -> Result<bool> {
+    confirm_prompt("Apply runtime setup?", "Runtime setup installs app services for this project.")
 }
 
 pub fn confirm_remote_ssl() -> Result<bool> {

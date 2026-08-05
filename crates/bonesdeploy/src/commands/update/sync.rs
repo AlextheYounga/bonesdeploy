@@ -43,11 +43,7 @@ fn selected_framework_template(framework_toml: &Path) -> Result<Option<String>> 
         fs::read_to_string(framework_toml).with_context(|| format!("Failed to read {}", framework_toml.display()))?;
     let value: toml::Value =
         toml::from_str(&content).with_context(|| format!("Failed to parse {}", framework_toml.display()))?;
-    Ok(value
-        .get("framework")
-        .and_then(|framework| framework.get("template"))
-        .and_then(toml::Value::as_str)
-        .map(String::from))
+    Ok(value.get("runtime").and_then(|runtime| runtime.get("template")).and_then(toml::Value::as_str).map(String::from))
 }
 
 fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {
@@ -112,11 +108,11 @@ mod tests {
             "laravel deploy",
         )?;
 
-        write(&bones_dir.join("bones.toml"), "[framework]\ntemplate = 'laravel'\n")?;
+        write(&bones_dir.join("bones.toml"), "[runtime]\ntemplate = 'laravel'\n")?;
 
         refresh_local_bones_from_source(&source_dir, &bones_dir)?;
 
-        assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "[framework]\ntemplate = 'laravel'\n");
+        assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "[runtime]\ntemplate = 'laravel'\n");
         assert_eq!(fs::read_to_string(bones_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
         assert_eq!(fs::read_to_string(bones_dir.join("deployment/functions.sh"))?, "shared functions");
 

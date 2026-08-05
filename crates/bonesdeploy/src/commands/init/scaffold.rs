@@ -39,15 +39,15 @@ pub(super) fn materialize_fresh_bones(
 
     ensure_bones_git_repo(bones_dir, cfg)?;
 
-    cfg.framework = serde_json::from_value(serde_json::Value::Object(framework.config.clone()))?;
+    cfg.runtime = serde_json::from_value(serde_json::Value::Object(framework.config.clone()))?;
 
     if let Some(template_name) = framework.template {
-        framework_assets::scaffold_framework_env_build(&template_name, Path::new("."), &cfg.framework)?;
+        framework_assets::scaffold_framework_env_build(&template_name, Path::new("."), &cfg.runtime)?;
         framework_assets::scaffold_framework_deployment(&template_name, bones_dir)?;
         frameworks::configure(&template_name, cfg);
-        println!("Runtime template: {template_name}");
+        println!("Framework template: {template_name}");
     } else {
-        println!("Runtime template: custom");
+        println!("Framework template: custom");
     }
 
     Ok(())

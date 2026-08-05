@@ -24,8 +24,8 @@ template's variables. Unknown keys and bad choices are rejected.
 `bonesdeploy setup [--yes]`
 
 The full first-time remote provisioning, in order: `remote bootstrap` →
-`remote framework` → `push` → `doctor`. One command. `--yes` skips the
-runtime confirmation. Use `remote bootstrap` + `remote framework` separately
+`remote runtime` → `push` → `doctor`. One command. `--yes` skips the setup
+confirmation. Use `remote bootstrap` + `remote runtime` separately
 only when you want to control the steps or when you're changing the
 framework template on an already-provisioned box. Idempotent — re-run it
 after fixing whatever made it fail.
@@ -117,11 +117,11 @@ placeholder release, sudoers drop-in, and `bonesremote` itself. Delegates to
 the hidden `bonesinfra` checkout. Runs as root (or
 `BONES_BOOTSTRAP_SSH_USER`).
 
-## remote framework
+## remote runtime
 
-`bonesdeploy remote framework [--yes]`
+`bonesdeploy remote runtime [--yes]`
 
-Installs the framework runtime configured in `bones.toml`: AppArmor profile,
+Installs the runtime configured in `bones.toml`: AppArmor profile,
 nginx router + per-site config, and systemd service. Does not do TLS — that's
 `remote ssl`. It is already included in `bonesdeploy setup`; run it on its own
 to reapply the configured runtime after changing its existing configuration.
@@ -132,7 +132,7 @@ to reapply the configured runtime after changing its existing configuration.
 
 certbot webroot challenge for the configured domain. Re-renders the nginx
 router with TLS, listens on 443, redirects HTTP → HTTPS. Decoupled from
-`remote framework` because certificate concerns and runtime concerns are
+`remote runtime` because certificate concerns and runtime concerns are
 different concerns.
 
 ## remote helpers

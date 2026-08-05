@@ -240,7 +240,7 @@
 - omitted nested sections keep app defaults. (omitted_nested_sections_keep_app_defaults)
 
 ## `crates/shared/src/config.rs`
-- framework parses shared paths. (framework_parses_shared_paths)
+- runtime parses shared paths. (runtime_parses_shared_paths)
 - validate host accepts hostnames and ips. (validate_host_accepts_hostnames_and_ips)
 - validate host rejects shell metacharacters. (validate_host_rejects_shell_metacharacters)
 

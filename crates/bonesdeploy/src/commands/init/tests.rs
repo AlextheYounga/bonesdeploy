@@ -124,7 +124,7 @@ fn assert_bones_dir(bones_dir: &Path) -> Result<()> {
     assert!(deploy_dir.is_dir());
     assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
     let bones_toml = fs::read_to_string(bones_dir.join("bones.toml"))?;
-    assert!(bones_toml.contains("[framework]"));
+    assert!(bones_toml.contains("[runtime]"));
     Ok(())
 }
 

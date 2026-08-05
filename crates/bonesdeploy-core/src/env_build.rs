@@ -179,7 +179,7 @@ mod tests {
 
     #[test]
     fn derived_bones_values_cannot_be_overridden() {
-        let result = parse("BONES_FRAMEWORK_TEMPLATE=evil");
+        let result = parse("BONES_RUNTIME_TEMPLATE=evil");
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("reserved"), "error should mention reserved: {err}");

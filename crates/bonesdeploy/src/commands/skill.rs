@@ -130,7 +130,7 @@ fn initialized_report(cfg: config::Bones, setup_complete: bool) -> Report {
         state_label: String::from("initialized, setup not complete."),
         missing: vec![
             String::from("remote_bootstrap"),
-            String::from("framework"),
+            String::from("runtime"),
             String::from("bones_sync"),
             String::from("doctor_pass"),
         ],

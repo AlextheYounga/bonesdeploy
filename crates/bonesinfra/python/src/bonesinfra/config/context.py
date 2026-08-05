@@ -17,7 +17,7 @@ DEFAULT_WEB_ROOT = "public"
 @dataclass
 class DeployContext:
     app: AppConfig
-    runtime: FrameworkConfig
+    runtime: RuntimeConfig
     services: ServicesConfig
 
     @classmethod
@@ -28,7 +28,7 @@ class DeployContext:
         server_cfg = _table(app_cfg, "server")
         dns_cfg = _table(app_cfg, "dns")
         deploy_cfg = _table(app_cfg, "deploy")
-        runtime_cfg = _table(bones_cfg, "framework")
+        runtime_cfg = _table(bones_cfg, "runtime")
         services_cfg = _table(bones_cfg, "services")
         project_name = str(app_cfg.get("project_name", ""))
 
@@ -50,7 +50,7 @@ class DeployContext:
             deploy=DeployConfig(branch=str(deploy_cfg.get("branch", "master"))),
         )
 
-        runtime = FrameworkConfig(
+        runtime = RuntimeConfig(
             web_root=str(runtime_cfg.get("web_root") or DEFAULT_WEB_ROOT),
             runtime_user=project_name,
             runtime_group=project_name,
@@ -140,7 +140,7 @@ class DeployConfig:
 
 
 @dataclass
-class FrameworkConfig:
+class RuntimeConfig:
     web_root: str
     runtime_user: str
     runtime_group: str

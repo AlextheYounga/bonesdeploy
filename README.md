@@ -92,7 +92,7 @@ Framework templates set up the Linux pieces for a framework.
 | --- | --- | --- |
 | Laravel | Working | PHP / PHP-FPM setup |
 | Next.js | Working | Node runtime setup |
-| Nuxt | Working | Nuxt runtime setup |
+| Nuxt | Working | Nuxt (Node) runtime setup |
 | Vue | Working | Static frontend setup |
 | Django | Not tested | Python / Gunicorn not tested yet |
 | Rails | Not tested | Ruby not tested yet |
@@ -172,7 +172,7 @@ bonesdeploy remote setup
 Provision the site runtime:
 
 ```sh
-bonesdeploy remote framework
+bonesdeploy remote runtime
 ```
 
 Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
@@ -293,7 +293,7 @@ preview_domain = ""
 email = ""
 ssl_enabled = false
 
-[framework]
+[runtime]
 template = "custom"
 ```
 
@@ -315,9 +315,9 @@ The optional git push transport uses thin adapters: a local `pre-push` guard (in
 
 Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Bonesremote streams an ephemeral copy of the deployment bundle into the container at `/workspace/deployment`, so the build user never needs host access to bonesremote's control-plane files. BonesInfra provisions a private persistent cache for each build user; bonesremote mounts it at `/workspace/cache` and exposes `BUILD_CACHE_DIR`. The shared deployment functions use it for Node, Corepack, npm, pnpm, Yarn, Composer, and Bundler downloads. Installed dependency trees and build output remain disposable. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation. Bonesremote streams the shared functions into each prepare shell before the prepare script, so prepare scripts do not source the root-owned deployment bundle.
 
-Build scripts can set framework-specific runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool.
+Build scripts can set runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool.
 
-BonesRemote also exposes scalar values from `bones.toml` as transient `BONES_*` variables in the build container (for example, `BONES_FRAMEWORK_IS_STATIC` and `BONES_FRAMEWORK_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use `shared/.env` for runtime secrets.
+BonesRemote also exposes scalar values from `bones.toml` as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use `shared/.env` for runtime secrets.
 
 Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager, Podman, and the Infra-provisioned build cache before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 

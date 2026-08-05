@@ -59,7 +59,7 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     fs::write(
         &temp_path,
         frameworks::environment_example(
-            &effective_config.framework.template,
+            &effective_config.runtime.template,
             &effective_config.project_name,
             &effective_config.domain,
             &effective_config.preview_domain,

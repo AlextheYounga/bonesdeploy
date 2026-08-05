@@ -1,8 +1,8 @@
 # BonesDeploy framework templates
 
-Seven templates ship in the binary. Each one installs a framework-specific
-runtime on the server: nginx router, systemd service, AppArmor profile, and
-whatever language runtime the framework needs. You pick one at `init` time.
+Seven templates ship in the binary. Each one provisions the runtime on the
+server: nginx router, systemd service, AppArmor profile, and
+whichever language runtime the framework needs. You pick one at `init` time.
 
 ## Picking a template
 
@@ -22,7 +22,7 @@ bonesdeploy init --non-interactive --project-name atlas --host deploy.example.co
 ```
 
 `--template none` or omitting the flag means "build from scratch" — no
-framework runtime, you wire your own. Most projects pick a template.
+runtime is provisioned; you wire your own. Most projects pick a template.
 
 ## The templates
 
@@ -98,7 +98,7 @@ bonesdeploy init --non-interactive --project-name atlas --host deploy.example.co
 
 ### sveltekit
 
-SvelteKit. Node server. No runtime vars.
+SvelteKit. Node server. No framework vars.
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
@@ -107,7 +107,7 @@ bonesdeploy init --non-interactive --project-name atlas --host deploy.example.co
 
 ### vue
 
-Vue. Static export. No runtime vars.
+Vue. Static export. No framework vars.
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \

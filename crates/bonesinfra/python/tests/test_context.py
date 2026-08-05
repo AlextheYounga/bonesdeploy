@@ -28,7 +28,7 @@ ssl_enabled = true
 branch = "main"
 releases = 7
 
-[framework]
+[runtime]
 web_root = "dist"
 {extra}"""
     )
