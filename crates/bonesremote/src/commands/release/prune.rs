@@ -1,25 +1,21 @@
 use std::fs;
 
-use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config;
-use bonesdeploy_core::paths;
+use anyhow::{Context, Result};
 
 use crate::privileges;
+use crate::release::SiteMutation;
 use crate::release::state as release_state;
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release prune")?;
+    let mutation = SiteMutation::acquire(site)?;
+    run_locked(&mutation)
+}
 
-    let bones_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&bones_path)
-        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
+pub(crate) fn run_locked(mutation: &SiteMutation) -> Result<()> {
+    let project_root = &mutation.config().project_root;
 
-    if cfg.project_name != site {
-        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
-    }
-
-    let project_root = &cfg.project_root;
-    let pruned = prune_old_releases(project_root, cfg.releases_keep)?;
+    let pruned = prune_old_releases(project_root, mutation.config().releases_keep)?;
     if !pruned.is_empty() {
         println!("Pruned releases: {}", pruned.join(", "));
     }

@@ -46,6 +46,7 @@ pub const LOGS_DIR: &str = "logs";
 pub const CURRENT_LINK: &str = "current";
 pub const STAGED_RELEASE_FILE: &str = "staged-release";
 pub const ACTIVE_DEPLOYMENT_FILE: &str = "active-deployment.json";
+pub const DEPLOYMENT_STATE_FILE: &str = "deployment.json";
 pub const DEPLOYMENT_LOCK_FILE: &str = "deployment.lock";
 pub const RECOVERY_DIR: &str = "recovery";
 pub const TMP_BUILDS_DIR: &str = "tmp";

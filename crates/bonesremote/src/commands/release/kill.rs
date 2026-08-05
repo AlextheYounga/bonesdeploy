@@ -5,30 +5,31 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{self, build_user_for};
+use bonesdeploy_core::config::build_user_for;
 use bonesdeploy_core::paths;
 
 use crate::commands::{drop_failed_release, release::list};
 use crate::privileges;
-use crate::release::lifecycle::build::{ensure_build_user_ready, remove_build_container};
-use crate::release::lifecycle::checkout;
-use crate::release::state::{self as release_state, DeploymentPhase};
+use crate::release::SiteMutation;
+use crate::release::lifecycle::build::ensure_build_user_ready;
+use crate::release::lifecycle::{self, build::remove_build_container, checkout};
+use crate::release::state::{self as release_state, DeploymentLock, DeploymentRecord};
 
 const PROCESS_STOP_TIMEOUT: Duration = Duration::from_secs(5);
 
 pub fn run(site: &str, release: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release kill")?;
-    let cfg = config::load(&paths::bonesremote_bones_toml_path(site))
-        .context("Failed to load release cancellation site configuration")?;
-    if cfg.project_name != site {
-        bail!("Remote site state belongs to '{}', expected '{site}'", cfg.project_name);
-    }
+
+    // A live deployment holds the site's lock, so cancellation must verify the
+    // site identity and stop the process *before* the lock becomes available.
+    // Only then is the guard assembled and used for all file mutations.
+    let cfg = lifecycle::load_site_config(site)?;
     let active = release_state::read_active_deployment(site)?;
     if let Some(active) = &active {
         if active.release != release {
             bail!("Release {release} is not the active deployment. Run 'bonesdeploy releases' to inspect releases.");
         }
-        if active.phase == DeploymentPhase::Preparing && list::process_matches(active) {
+        if active.phase.may_have_mutated_runtime() && list::process_matches(active) {
             bail!(
                 "Release {release} is preparing and cannot be cancelled because prepare scripts may change runtime state."
             );
@@ -40,20 +41,21 @@ pub fn run(site: &str, release: &str) -> Result<()> {
         bail!("Release {release} is not building or interrupted. Run 'bonesdeploy releases' to inspect releases.");
     }
 
-    let _lock = release_state::DeploymentLock::acquire(site)?;
+    let lock = DeploymentLock::acquire(site)?;
+    let mutation = SiteMutation::adopt(site, cfg, lock);
     let current = release_state::read_active_deployment(site)?;
     if current.as_ref().is_some_and(|deployment| deployment.release != release) {
         bail!("Active deployment changed while cancelling {release}; no cleanup was performed.");
     }
 
-    let build_user = build_user_for(&cfg.project_name);
-    let working_dir = Path::new(&cfg.project_root);
+    let build_user = build_user_for(&mutation.config().project_name);
+    let working_dir = Path::new(&mutation.config().project_root);
     ensure_build_user_ready(&build_user, working_dir)?;
-    remove_build_container(&build_user, &cfg.project_name, working_dir)?;
+    remove_build_container(&build_user, &mutation.config().project_name, working_dir)?;
 
     if let Some(context) = current.as_ref().and_then(|deployment| deployment.context.as_deref()) {
         let context = Path::new(context);
-        let tmp_root = Path::new(&cfg.project_root).join(paths::TMP_BUILDS_DIR);
+        let tmp_root = Path::new(&mutation.config().project_root).join(paths::TMP_BUILDS_DIR);
         if !context.starts_with(&tmp_root)
             || !context.file_name().is_some_and(|name| name.to_string_lossy().starts_with(&format!("build-{site}-")))
         {
@@ -61,12 +63,12 @@ pub fn run(site: &str, release: &str) -> Result<()> {
         }
         checkout::cleanup_build_context(site, context)?;
     } else {
-        cleanup_stale_contexts(site, &cfg.project_root)?;
+        cleanup_stale_contexts(site, &mutation.config().project_root)?;
     }
 
     let staged = release_state::read_staged_release(site).ok();
     if staged.as_deref() == Some(release) {
-        drop_failed_release::run(site)?;
+        drop_failed_release::run_locked(&mutation)?;
     }
     release_state::clear_active_deployment(site)?;
     println!("Cancelled release: {release}");
@@ -89,7 +91,7 @@ fn cleanup_stale_contexts(site: &str, project_root: &str) -> Result<()> {
     Ok(())
 }
 
-fn terminate_deployment(active: &release_state::ActiveDeployment) -> Result<()> {
+fn terminate_deployment(active: &DeploymentRecord) -> Result<()> {
     signal(active.pid, "TERM")?;
     if wait_for_process_exit(active, PROCESS_STOP_TIMEOUT) {
         return Ok(());
@@ -114,7 +116,7 @@ fn signal(pid: u32, signal: &str) -> Result<()> {
     Ok(())
 }
 
-fn wait_for_process_exit(active: &release_state::ActiveDeployment, timeout: Duration) -> bool {
+fn wait_for_process_exit(active: &DeploymentRecord, timeout: Duration) -> bool {
     let attempts = timeout.as_millis() / 100;
     for _ in 0..attempts {
         if !list::process_matches(active) {
@@ -128,19 +130,19 @@ fn wait_for_process_exit(active: &release_state::ActiveDeployment, timeout: Dura
 #[cfg(test)]
 mod tests {
     use super::wait_for_process_exit;
-    use crate::release::state::{ActiveDeployment, DeploymentPhase};
+    use crate::release::state::{DeploymentPhase, DeploymentRecord};
     use std::time::Duration;
 
     #[test]
     fn wait_returns_when_process_is_already_gone() {
-        let deployment = ActiveDeployment {
-            release: String::from("20260715_225306"),
-            pid: u32::MAX,
-            process_start_ticks: 0,
-            phase: DeploymentPhase::Building,
-            started_at: String::new(),
-            context: None,
-        };
+        let deployment = DeploymentRecord::new(
+            String::from("20260715_225306"),
+            String::from("46a0b75c"),
+            DeploymentPhase::Created,
+            u32::MAX,
+            0,
+            String::new(),
+        );
         assert!(wait_for_process_exit(&deployment, Duration::from_millis(1)));
     }
 }

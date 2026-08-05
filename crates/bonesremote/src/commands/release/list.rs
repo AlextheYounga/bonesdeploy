@@ -7,7 +7,7 @@ use bonesdeploy_core::paths;
 use serde::Serialize;
 
 use crate::privileges;
-use crate::release::state::{self as release_state, ActiveDeployment, DeploymentPhase};
+use crate::release::state::{self as release_state, DeploymentPhase, DeploymentRecord};
 
 #[derive(Serialize)]
 struct Report {
@@ -44,7 +44,7 @@ pub fn run(site: &str) -> Result<()> {
     Ok(())
 }
 
-fn release(name: &str, current: Option<&str>, active: Option<&ActiveDeployment>, staged: Option<&str>) -> Release {
+fn release(name: &str, current: Option<&str>, active: Option<&DeploymentRecord>, staged: Option<&str>) -> Release {
     if current == Some(name) {
         return Release { name: name.to_string(), status: String::from("active"), phase: None, started_at: None };
     }
@@ -68,12 +68,21 @@ fn release(name: &str, current: Option<&str>, active: Option<&ActiveDeployment>,
 
 fn phase_status(phase: &DeploymentPhase) -> String {
     match phase {
-        DeploymentPhase::Building => String::from("building"),
-        DeploymentPhase::Preparing => String::from("preparing"),
+        DeploymentPhase::Created => String::from("created"),
+        DeploymentPhase::SourceExported => String::from("source_exported"),
+        DeploymentPhase::Built => String::from("built"),
+        DeploymentPhase::Promoted => String::from("promoted"),
+        DeploymentPhase::Prepared => String::from("prepared"),
+        DeploymentPhase::Sealed => String::from("sealed"),
+        DeploymentPhase::Activated => String::from("activated"),
+        DeploymentPhase::Verified => String::from("verified"),
+        DeploymentPhase::Completed => String::from("completed"),
+        DeploymentPhase::CleanupPending => String::from("cleanup_pending"),
+        DeploymentPhase::Failed => String::from("failed"),
     }
 }
 
-pub(crate) fn process_matches(active: &ActiveDeployment) -> bool {
+pub(crate) fn process_matches(active: &DeploymentRecord) -> bool {
     let stat = Path::new("/proc").join(active.pid.to_string()).join("stat");
     fs::read_to_string(stat)
         .ok()

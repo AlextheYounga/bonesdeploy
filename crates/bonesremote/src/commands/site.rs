@@ -10,7 +10,7 @@ use bonesdeploy_core::paths;
 
 use crate::commands::ensure_site_idle;
 use crate::privileges;
-use crate::release::state::DeploymentLock;
+use crate::release::SiteMutation;
 
 const POST_RECEIVE_SCRIPT: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/hooks/post-receive"));
 
@@ -103,7 +103,9 @@ fn receive_staged_site(site: &str, revision: &str, staging_dir: &Path) -> Result
 fn finalize_imported_site(site: &str, staging_dir: &Path) -> Result<()> {
     validate_site_dataset(site, staging_dir)?;
 
-    let _lock = DeploymentLock::acquire(site)?;
+    // Import/receive replaces live site state, so it is serialized with every
+    // other mutation and only runs after the site is proven idle.
+    let _mutation = SiteMutation::acquire(site)?;
     ensure_site_idle(site)?;
     write_post_receive_hook(staging_dir)?;
     replace_site_dir(site, staging_dir)
