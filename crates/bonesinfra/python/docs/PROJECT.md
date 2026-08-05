@@ -239,8 +239,8 @@ Domain code should not import pyinfra.
 `domain/context.py` mirrors the top-level `bones.toml` sections:
 
 - **`AppConfig`**: the `[app]`, `[app.server]`, `[app.dns]`, and `[app.deploy]` tables
-- **`FrameworkConfig`**: the typed `[framework]` identity fields, plus dynamic runtime settings
-- **`DeployContext`**: wraps `app`, `runtime`, and `dbs` and provides derived deployment paths
+- **`RuntimeConfig`**: the typed `[runtime]` identity fields, plus dynamic runtime settings
+- **`DeployContext`**: wraps `app`, `runtime`, and `services` and provides derived deployment paths
 
 No flat dict. No `host.data` side-channel.
 
@@ -342,7 +342,7 @@ def deploy(ctx) -> None: ...  # ctx: DeployContext
 
 A runtime may have a no-op deploy, but it should be explicit. Runtime modules
 are selected by the Python catalog for infrastructure application; user-facing
-runtime questions are defined in the Rust CLI.
+Framework template questions are defined in the Rust CLI.
 
 ______________________________________________________________________
 
@@ -357,8 +357,8 @@ It mirrors the top-level config sections:
 @dataclass
 class DeployContext:
     app: AppConfig
-    runtime: FrameworkConfig
-    dbs: DbsConfig
+    runtime: RuntimeConfig
+    services: ServicesConfig
 ```
 
 ## AppConfig
@@ -374,13 +374,13 @@ Typed fields read from nested `bones.toml` tables:
 `DeployContext`.
 ```
 
-## FrameworkConfig
+## RuntimeConfig
 
 ```text
 runtime_user       # process user for nginx/php-fpm (always project_name)
 runtime_group      # process group (always project_name)
 web_root           # release directory served by nginx (default: public)
-data               # dynamic runtime-specific settings from [framework]
+data               # dynamic runtime-specific settings from [runtime]
 ```
 
 ## template_data()

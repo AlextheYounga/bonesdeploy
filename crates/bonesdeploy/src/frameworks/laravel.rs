@@ -1,5 +1,5 @@
 use super::{Question, QuestionKind};
-use bonesdeploy_core::config::Framework;
+use bonesdeploy_core::config::Runtime;
 
 const PHP_DEFAULT_VERSION: &str = "8.5";
 
@@ -97,8 +97,7 @@ pub(crate) fn environment_example(project_name: &str, site_url: &str) -> String 
     ])
 }
 
-pub(crate) fn build_environment_example(framework: &Framework) -> String {
-    let php_version =
-        framework.extra.get("php_version").and_then(|value| value.as_str()).unwrap_or(PHP_DEFAULT_VERSION);
+pub(crate) fn build_environment_example(runtime: &Runtime) -> String {
+    let php_version = runtime.extra.get("php_version").and_then(|value| value.as_str()).unwrap_or(PHP_DEFAULT_VERSION);
     super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("PHP_VERSION={php_version}")])
 }

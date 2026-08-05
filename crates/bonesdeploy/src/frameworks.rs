@@ -1,5 +1,5 @@
 use anyhow::{Result, bail};
-use bonesdeploy_core::config::{Bones, Framework};
+use bonesdeploy_core::config::{Bones, Runtime};
 use serde_json::Value;
 
 /// Shared question keys used by more than one template.
@@ -105,10 +105,10 @@ pub(crate) fn environment_url(domain: &str, preview_domain: &str) -> String {
     if host.is_empty() { String::new() } else { format!("https://{host}") }
 }
 
-pub(crate) fn build_environment_example(template: &str, framework: &Framework) -> Option<String> {
+pub(crate) fn build_environment_example(template: &str, runtime: &Runtime) -> Option<String> {
     Some(match template {
-        "django" => django::build_environment_example(framework),
-        "laravel" => laravel::build_environment_example(framework),
+        "django" => django::build_environment_example(runtime),
+        "laravel" => laravel::build_environment_example(runtime),
         "next" => next::build_environment_example(),
         "nuxt" => nuxt::build_environment_example(),
         "rails" => rails::build_environment_example(),
@@ -129,18 +129,18 @@ mod tests {
     use bonesdeploy_core::config::Bones;
     use serde_json::{Map, Value, json};
 
-    use super::{Framework, build_environment_example, configure, environment_example, questions, validate_answers};
+    use super::{Runtime, build_environment_example, configure, environment_example, questions, validate_answers};
 
-    fn bones_with_framework(template: &str, extra: Map<String, Value>) -> Result<Bones> {
+    fn bones_with_runtime(template: &str, extra: Map<String, Value>) -> Result<Bones> {
         let mut config = Bones::default();
         config.project_name = String::from("atlas");
-        let mut framework = Map::new();
-        framework.insert("template".to_string(), Value::String(template.to_string()));
-        framework.insert("web_root".to_string(), Value::String("public".to_string()));
+        let mut runtime_vars = Map::new();
+        runtime_vars.insert("template".to_string(), Value::String(template.to_string()));
+        runtime_vars.insert("web_root".to_string(), Value::String("public".to_string()));
         for (k, v) in extra {
-            framework.insert(k, v);
+            runtime_vars.insert(k, v);
         }
-        config.framework = serde_json::from_value(json!(framework))?;
+        config.runtime = serde_json::from_value(json!(runtime_vars))?;
         Ok(config)
     }
 
@@ -180,18 +180,18 @@ mod tests {
 
     #[test]
     fn laravel_build_environment_uses_selected_php_version() {
-        let framework: Framework = serde_json::from_value(serde_json::json!({ "php_version": "8.3" })).unwrap();
+        let runtime: Runtime = serde_json::from_value(serde_json::json!({ "php_version": "8.3" })).unwrap();
 
-        let environment = build_environment_example("laravel", &framework).expect("Laravel build environment");
+        let environment = build_environment_example("laravel", &runtime).expect("Laravel build environment");
         assert!(environment.contains("PHP_VERSION=8.3"));
         assert!(!environment.contains("PHP_VERSION=8.5"));
     }
 
     #[test]
     fn django_build_environment_uses_selected_python_version() {
-        let framework: Framework = serde_json::from_value(serde_json::json!({ "python_version": "3.12" })).unwrap();
+        let runtime: Runtime = serde_json::from_value(serde_json::json!({ "python_version": "3.12" })).unwrap();
 
-        let environment = build_environment_example("django", &framework).expect("Django build environment");
+        let environment = build_environment_example("django", &runtime).expect("Django build environment");
         assert!(environment.contains("PYTHON_VERSION=3.12"));
         assert!(!environment.contains("PYTHON_VERSION=3.14"));
     }
@@ -247,27 +247,27 @@ mod tests {
     #[test]
     fn configure_static_next_overrides_web_root() -> Result<()> {
         let mut config =
-            bones_with_framework("next", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
+            bones_with_runtime("next", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
         configure("next", &mut config);
-        assert_eq!(config.framework.web_root, "out");
+        assert_eq!(config.runtime.web_root, "out");
         Ok(())
     }
 
     #[test]
     fn configure_static_nuxt_overrides_web_root() -> Result<()> {
         let mut config =
-            bones_with_framework("nuxt", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
+            bones_with_runtime("nuxt", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
         configure("nuxt", &mut config);
-        assert_eq!(config.framework.web_root, ".output/public");
+        assert_eq!(config.runtime.web_root, ".output/public");
         Ok(())
     }
 
     #[test]
     fn configure_server_next_keeps_web_root() -> Result<()> {
         let mut config =
-            bones_with_framework("next", [("is_static".to_string(), Value::Bool(false))].into_iter().collect())?;
+            bones_with_runtime("next", [("is_static".to_string(), Value::Bool(false))].into_iter().collect())?;
         configure("next", &mut config);
-        assert_eq!(config.framework.web_root, "public");
+        assert_eq!(config.runtime.web_root, "public");
         Ok(())
     }
 }

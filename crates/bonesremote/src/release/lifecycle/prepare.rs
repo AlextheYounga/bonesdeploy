@@ -5,7 +5,7 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{is_numbered_shell_script, load_framework, runtime_user_for};
+use bonesdeploy_core::config::{is_numbered_shell_script, load_runtime, runtime_user_for};
 use bonesdeploy_core::paths;
 
 use crate::privileges;
@@ -49,9 +49,9 @@ pub fn run(site: &str) -> Result<()> {
         bail!("Promoted release is missing: {}", release_dir.display());
     }
 
-    let framework = load_framework(&paths::bonesremote_site_root(site))
-        .with_context(|| format!("Failed to load framework configuration for {site}"))?;
-    let web_root = framework.web_root;
+    let runtime = load_runtime(&paths::bonesremote_site_root(site))
+        .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
+    let web_root = runtime.web_root;
     let runtime_user = runtime_user_for(&cfg.project_name);
     let logs_dir = paths::bonesremote_site_logs(site);
     fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;

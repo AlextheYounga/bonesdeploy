@@ -25,7 +25,7 @@ pub(crate) fn validate_ready(
 
 /// The configured web root for a release, i.e. `<root>/<release>/<web_root>`.
 fn release_web_root(mutation: &SiteMutation, release: &str) -> PathBuf {
-    release_dir(&mutation.config().project_root, release).join(&mutation.config().framework.web_root)
+    release_dir(&mutation.config().project_root, release).join(&mutation.config().runtime.web_root)
 }
 
 /// Runs `nginx -t` against the on-disk configuration. The site nginx config
@@ -72,7 +72,7 @@ mod tests {
         let lock = DeploymentLock::acquire("unitapp")?;
         let mut config = Bones::default();
         config.app.project_root = root.join("project").to_string_lossy().into_owned();
-        config.framework.web_root = String::from("public");
+        config.runtime.web_root = String::from("public");
         let release_dir = release_dir(&config.app.project_root, release);
         fs::create_dir_all(release_dir.join("public"))?;
         Ok(SiteMutation::adopt("unitapp", config, lock))

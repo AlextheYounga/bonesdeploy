@@ -29,7 +29,7 @@ pub enum Command {
         /// SSH port (default: 22)
         #[arg(long)]
         port: Option<String>,
-        /// Runtime template (laravel, django, next, nuxt, rails, sveltekit, vue, or none)
+        /// Framework template (laravel, django, next, nuxt, rails, sveltekit, vue, or none)
         #[arg(long)]
         template: Option<String>,
         /// Framework variable override, repeated (e.g. `--framework-var php_version=8.5`)
@@ -41,7 +41,7 @@ pub enum Command {
     },
     /// Run the full first-time deployment setup
     Setup {
-        /// Skip framework confirmation prompts
+        /// Skip setup confirmation prompts
         #[arg(long)]
         yes: bool,
     },
@@ -148,9 +148,9 @@ pub enum RemoteCommand {
     /// Run remote bootstrap against configured host
     #[command(alias = "setup")]
     Bootstrap,
-    /// Apply the configured framework against configured host
-    Framework {
-        /// Skip framework confirmation prompts
+    /// Apply the configured runtime against configured host
+    Runtime {
+        /// Skip runtime confirmation prompts
         #[arg(long)]
         yes: bool,
     },

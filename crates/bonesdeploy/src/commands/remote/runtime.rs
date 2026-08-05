@@ -15,20 +15,20 @@ pub fn run(yes: bool, show_next: bool) -> Result<()> {
         bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_TOML);
     }
 
-    if !yes && !prompts::confirm_remote_framework()? {
-        println!("Skipped framework setup.");
+    if !yes && !prompts::confirm_remote_runtime()? {
+        println!("Skipped runtime setup.");
         if show_next {
             println!();
-            println!("{}", output::next_step_with_detail("bonesdeploy remote framework", "when ready"));
+            println!("{}", output::next_step_with_detail("bonesdeploy remote runtime", "when ready"));
         }
         return Ok(());
     }
 
-    println!("Applying framework...");
+    println!("Applying runtime...");
 
     bonesinfra::run(&["runtime", "apply", "--config", paths::LOCAL_BONES_TOML])?;
 
-    println!("Framework applied.");
+    println!("Runtime applied.");
     if show_next {
         println!();
         println!("{}", output::next_step("bonesdeploy push"));

@@ -6,7 +6,7 @@ source /workspace/deployment/functions.sh
 node_enable_toolchain
 
 build_command() {
-	if [ "${BONES_FRAMEWORK_IS_STATIC:-false}" = "true" ]; then
+	if [ "${BONES_RUNTIME_IS_STATIC:-false}" = "true" ]; then
 		echo generate
 	else
 		echo build

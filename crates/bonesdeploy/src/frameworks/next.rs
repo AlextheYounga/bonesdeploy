@@ -5,9 +5,9 @@ pub fn questions() -> &'static [Question] {
 }
 
 pub(crate) fn configure(cfg: &mut Bones) {
-    let is_static = cfg.framework.extra.get(IS_STATIC_KEY).is_some_and(|value| value.to_string() == "true");
+    let is_static = cfg.runtime.extra.get(IS_STATIC_KEY).is_some_and(|value| value.to_string() == "true");
     if is_static {
-        cfg.framework.web_root = String::from("out");
+        cfg.runtime.web_root = String::from("out");
     }
 }
 

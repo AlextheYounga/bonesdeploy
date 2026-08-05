@@ -32,8 +32,8 @@ any bonesdeploy project without reading a single line of YAML.
 That's a deployment. In between, you repeat move five. Nothing else matters
 until move five works.
 
-Note: `bonesdeploy setup` already runs `remote framework` for you. You only run
-`bonesdeploy remote framework --yes` on its own when you're changing the
+Note: `bonesdeploy setup` already runs `remote runtime` for you. You only run
+`bonesdeploy remote runtime --yes` on its own when you're changing the
 framework template on an already-provisioned box.
 
 ## What you actually own

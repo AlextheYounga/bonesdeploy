@@ -7,7 +7,7 @@ use anyhow::{Context, Result, anyhow, bail};
 use rust_embed::Embed;
 use serde_json::{Map, Value};
 
-use bonesdeploy_core::config::Framework;
+use bonesdeploy_core::config::Runtime;
 use bonesdeploy_core::paths;
 
 use super::{kit, write_asset};
@@ -26,7 +26,7 @@ pub fn framework_names() -> Vec<String> {
 }
 
 pub fn base_framework_defaults() -> Result<Map<String, Value>> {
-    serde_json::to_value(Framework::default())
+    serde_json::to_value(Runtime::default())
         .ok()
         .and_then(|value| value.as_object().cloned())
         .ok_or_else(|| anyhow!("Failed to serialize base framework defaults"))
@@ -47,7 +47,7 @@ pub fn scaffold_framework_deployment(framework: &str, bones_dir: &Path) -> Resul
     scaffold_framework_assets(framework, bones_dir, paths::KIT_DEPLOYMENT_DIR)
 }
 
-pub fn scaffold_framework_env_build(framework: &str, project_root: &Path, framework_config: &Framework) -> Result<()> {
+pub fn scaffold_framework_env_build(framework: &str, project_root: &Path, framework_config: &Runtime) -> Result<()> {
     let Some(content) = frameworks::build_environment_example(framework, framework_config) else {
         return Ok(());
     };
@@ -93,9 +93,9 @@ fn framework_defaults_from_bytes(asset_path: &str, bytes: Option<impl AsRef<[u8]
     let toml_value: toml::Value = toml::from_str(content)
         .with_context(|| format!("Failed to parse embedded framework defaults at {asset_path}"))?;
     let framework = toml_value
-        .get("framework")
+        .get("runtime")
         .cloned()
-        .ok_or_else(|| anyhow!("Embedded framework defaults at {asset_path} are missing [framework]"))?;
+        .ok_or_else(|| anyhow!("Embedded framework defaults at {asset_path} are missing [runtime]"))?;
     let json_value = serde_json::to_value(framework)
         .with_context(|| format!("Failed to convert embedded framework defaults at {asset_path} to JSON"))?;
 
@@ -115,7 +115,7 @@ mod tests {
     use std::fs;
     use std::process;
 
-    use super::{Framework, FrameworkAssets, framework_defaults, framework_names, scaffold_framework_env_build};
+    use super::{FrameworkAssets, Runtime, framework_defaults, framework_names, scaffold_framework_env_build};
 
     #[test]
     fn next_framework_includes_the_build_script() {
@@ -127,7 +127,7 @@ mod tests {
         let script = FrameworkAssets::get("nuxt/deployment/build/02_run_build.sh")
             .map(|asset| String::from_utf8_lossy(asset.data.as_ref()).into_owned())
             .unwrap_or_default();
-        assert!(script.contains("BONES_FRAMEWORK_IS_STATIC"));
+        assert!(script.contains("BONES_RUNTIME_IS_STATIC"));
         assert!(script.contains("corepack pnpm \"$command\""));
         assert!(script.contains("npm run \"$command\""));
     }
@@ -135,7 +135,7 @@ mod tests {
     #[test]
     fn every_framework_has_a_build_environment_example() {
         for framework in framework_names() {
-            if let Some(content) = frameworks::build_environment_example(&framework, &Framework::default()) {
+            if let Some(content) = frameworks::build_environment_example(&framework, &Runtime::default()) {
                 assert!(content.contains("Committed, non-secret"), "{framework} must include build environment header");
             } else {
                 assert!(false, "{framework} is missing .env.build");
@@ -149,12 +149,12 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root)?;
 
-        scaffold_framework_env_build("next", &root, &Framework::default())?;
+        scaffold_framework_env_build("next", &root, &Runtime::default())?;
         let generated = fs::read_to_string(root.join(".env.build"))?;
         assert!(generated.contains("NEXT_PUBLIC_API_URL="));
 
         fs::write(root.join(".env.build"), "CUSTOM=value\n")?;
-        scaffold_framework_env_build("next", &root, &Framework::default())?;
+        scaffold_framework_env_build("next", &root, &Runtime::default())?;
         assert_eq!(fs::read_to_string(root.join(".env.build"))?, "CUSTOM=value\n");
 
         fs::remove_dir_all(root).ok();
@@ -206,7 +206,7 @@ mod tests {
         let migrate = script.find("manage.py migrate").expect("Django migration");
         assert!(check < migrate);
 
-        let config: Framework = serde_json::from_value(serde_json::Value::Object(framework_defaults("django")?))?;
+        let config: Runtime = serde_json::from_value(serde_json::Value::Object(framework_defaults("django")?))?;
         assert!(!config.shared.paths.iter().any(|path| path.path == "staticfiles"));
         Ok(())
     }
@@ -215,7 +215,7 @@ mod tests {
     fn framework_defaults_fit_the_single_file_schema() -> Result<()> {
         for framework in framework_names() {
             let defaults = framework_defaults(&framework)?;
-            let config: Framework = serde_json::from_value(serde_json::Value::Object(defaults))?;
+            let config: Runtime = serde_json::from_value(serde_json::Value::Object(defaults))?;
             assert_eq!(config.template, framework);
         }
         Ok(())
@@ -226,7 +226,7 @@ mod tests {
         let mut answers = framework_defaults("nuxt")?;
         answers.insert("static".into(), serde_json::Value::Bool(true));
 
-        let config: Framework = serde_json::from_value(serde_json::Value::Object(answers))?;
+        let config: Runtime = serde_json::from_value(serde_json::Value::Object(answers))?;
         assert_eq!(config.extra.get("static").map(ToString::to_string).as_deref(), Some("true"));
         assert!(toml::to_string(&config)?.contains("static = true"));
         Ok(())

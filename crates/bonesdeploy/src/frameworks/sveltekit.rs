@@ -1,6 +1,6 @@
 use super::Question;
 
-/// `SvelteKit` takes no runtime configuration today.
+/// `SvelteKit` takes no framework configuration.
 pub fn questions() -> &'static [Question] {
     &[]
 }

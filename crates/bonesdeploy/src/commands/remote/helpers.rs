@@ -20,13 +20,13 @@ pub fn run(yes: bool) -> Result<()> {
 
     let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
     let cfg = config::load(bones_toml)?;
-    let framework = shared_config::load_framework(Path::new(paths::LOCAL_BONES_DIR))?;
+    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
 
     let ssh_user = config::bootstrap_ssh_user(&cfg);
 
     println!("{}", style("Installing remote helper tools").cyan().bold());
 
-    let mut deploy_data = Value::Object(data::base(&cfg, &framework.web_root));
+    let mut deploy_data = Value::Object(data::base(&cfg, &runtime.web_root));
     let host = cfg.host.clone();
     if let Value::Object(ref mut map) = deploy_data {
         map.insert(String::from(shared_config::bonesinfra_input::SSH_USER), Value::String(ssh_user));

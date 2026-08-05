@@ -1,6 +1,6 @@
 use super::Question;
 
-/// `Vue` takes no runtime configuration today.
+/// `Vue` takes no framework configuration.
 pub fn questions() -> &'static [Question] {
     &[]
 }

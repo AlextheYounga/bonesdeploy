@@ -33,7 +33,7 @@ pub mod bonesinfra_input {
 #[serde(default)]
 pub struct Bones {
     pub app: App,
-    pub framework: Framework,
+    pub runtime: Runtime,
     pub services: Services,
     pub build: Build,
 }
@@ -126,7 +126,7 @@ fn sanitize_domain_label(value: &str) -> String {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Framework {
+pub struct Runtime {
     #[serde(default)]
     pub template: String,
     #[serde(default = "paths::default_web_root")]
@@ -141,7 +141,7 @@ pub struct Framework {
     pub extra: BTreeMap<String, toml::Value>,
 }
 
-impl Default for Framework {
+impl Default for Runtime {
     fn default() -> Self {
         Self {
             template: String::new(),
@@ -237,11 +237,11 @@ pub enum SharedPathType {
 
 /// # Errors
 /// Returns an error when the configuration cannot be read or parsed.
-pub fn load_framework(config_dir: &Path) -> Result<Framework> {
+pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
     let path = config_dir.join(paths::BONES_TOML);
     let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
     let bones: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(bones.framework)
+    Ok(bones.runtime)
 }
 
 pub fn apply_derived_defaults(config: &mut Bones) {
@@ -284,8 +284,8 @@ mod tests {
     }
 
     #[test]
-    fn framework_parses_shared_paths() -> Result<()> {
-        let framework: Framework = toml::from_str(
+    fn runtime_parses_shared_paths() -> Result<()> {
+        let runtime: Runtime = toml::from_str(
             r#"
 web_root = "public"
 
@@ -297,11 +297,11 @@ paths = [
 "#,
         )?;
 
-        assert_eq!(framework.shared.paths.len(), 2);
-        assert_eq!(framework.shared.paths[0].path, ".env");
-        assert_eq!(framework.shared.paths[0].path_type, SharedPathType::File);
-        assert_eq!(framework.shared.paths[1].path, "storage");
-        assert_eq!(framework.shared.paths[1].path_type, SharedPathType::Dir);
+        assert_eq!(runtime.shared.paths.len(), 2);
+        assert_eq!(runtime.shared.paths[0].path, ".env");
+        assert_eq!(runtime.shared.paths[0].path_type, SharedPathType::File);
+        assert_eq!(runtime.shared.paths[1].path, "storage");
+        assert_eq!(runtime.shared.paths[1].path_type, SharedPathType::Dir);
         Ok(())
     }
 
