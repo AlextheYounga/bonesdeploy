@@ -1,18 +1,38 @@
-# BonesDeploy
+# BonesDeploy ☠️
 
-A deployment CLI for plain Linux servers.
+Deploy a dozen modern, isolated web apps on a $5 Linux box, without ever touching the server. Docker not required.
 
 <div style="margin:0 auto; display: block;">
   <img width="600" height="600" src="docs/images/bonesdeploy.png" alt="BonesDeploy" />
 </div>
 
-> WARNING: BonesDeploy is still under active development. You probably shouldn't use this yet. There may be some cool bugs!
+BonesDeploy is a feature-rich, yet very lightweight deployment framework for developers and vibe-coders who want to run self-hosted sites, with an emphasis on tried and true, old-school security principles. Most modern deployment systems just wrap everything in Docker. Docker is incredible, one of the best technologies ever. But I, and many others, are getting tired of running complex machinery through YAML.
 
-BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, tracks `.bones/` in a root-owned Git repository, and runs the release lifecycle remotely from that control-plane state.
+> WARNING: BonesDeploy is still under active development, but is almost in a stable state. Expect sharp edges and perhaps some cool bugs.
 
-No platform.  
-No control plane.  
-No required Docker setup.  
+## Why BonesDeploy Exists
+
+Self-hosting should not require building your own miniature cloud platform.
+
+Coolify is impressive software, and it serves developers who want a flexible, Docker-first platform capable of running almost anything. BonesDeploy makes a different bet: most web applications do not need that much machinery.
+
+BonesDeploy is batteries included. It supports a deliberate set of modern web frameworks, makes the important decisions for you, and runs directly on the operating system wherever possible. There is less to configure, less to understand, and less sitting between your application and the machine you paid for.
+
+Docker is remarkable technology. It is also frequently overkill for deploying a small web application. You inherit a daemon, container networking, volumes, port mappings, Compose files, and another security model layered on top of Linux. Get one port binding wrong and a private database can become a public one. BonesDeploy avoids that entire class of mistake by refusing unsafe configurations and keeping private services private by default.
+
+Containers still have their place. BonesDeploy uses rootless Podman for isolated builds, where the boundary is genuinely useful. The build runs inside a constrained environment, produces a release, and then disappears.
+
+The application itself runs as an ordinary Linux service. Every site gets its own user, processes, permissions, and resource limits. Systemd, AppArmor, seccomp, cgroups, and the Unix permission model do the work they were designed to do.
+
+The result is not a general-purpose platform for every imaginable workload. It is a complete deployment system for the kind of web applications most developers actually run: automatic server setup, HTTPS, encrypted secrets, isolated builds, atomic releases, rollbacks, diagnostics, and strong defaults.
+
+All without turning a $5 Linux box into a tiny Kubernetes tribute act.
+
+BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, publishes the `.bones/` dataset into root-owned `bonesremote` site state, and runs the release lifecycle remotely without turning the bare Git repo into the control plane.
+
+No platform.
+No control plane.
+No required Docker setup.
 No pretending your VPS is a tiny Kubernetes cluster.
 
 It gives you versioned releases, rollback, shared runtime state, service restarts, and per-site Linux isolation using the tools already on the box.
@@ -25,6 +45,7 @@ BonesDeploy builds two binaries:
 - **`bonesremote`** — the remote release runner
 
 And embeds a Python provisioning runtime:
+
 - **`bonesinfra`** — `crates/bonesinfra/python/`, embedded by the Rust `bonesinfra` crate
 
 ## The Point
@@ -56,10 +77,10 @@ Each site can get its own:
 - systemd runtime services
 - nginx config
 - AppArmor policy
-- Seccomps configs
+- Seccomp configs
 
-The deploy user deploys.  
-The runtime user runs the app.  
+The deploy user deploys.
+The runtime user runs the app.
 Root provisions the machine.
 
 That is the whole model.
@@ -68,7 +89,7 @@ That is the whole model.
 
 Docker is useful. It gives you packaging, repeatability, and another layer of isolation.
 
-But Docker is heavy, and slow, and you see this when you try running multiple Docker sites on a machine with less than 8GB of RAM. 
+But Docker is heavy, and slow, and you see this when you try running multiple Docker sites on a machine with less than 8GB of RAM.
 
 Docker is also where a lot of people hide from Linux.
 
@@ -84,10 +105,11 @@ You can still use Docker with BonesDeploy. Put `docker compose` in your deploy s
 
 Docker just is not the foundation.
 
-## Framework Templates
+## Runtime Templates
 
-Framework templates set up the Linux pieces for a framework.
+Runtime templates set up the Linux pieces for a framework.
 
+<<<<<<< Updated upstream
 | Template | Status | Notes |
 | --- | --- | --- |
 | Laravel | Working | PHP / PHP-FPM setup |
@@ -96,6 +118,16 @@ Framework templates set up the Linux pieces for a framework.
 | Vue | Working | Static frontend setup |
 | Django | Not tested | Python / Gunicorn not tested yet |
 | Rails | Not tested | Ruby not tested yet |
+=======
+| Template | Status     | Notes                              |
+| -------- | ---------- | ---------------------------------- |
+| Laravel  | Working    | PHP / PHP-FPM setup                |
+| Next.js  | Working    | Node runtime setup                 |
+| Nuxt     | Working    | Nuxt runtime setup                 |
+| Vue      | Working    | Static frontend setup              |
+| Django   | Not tested | Python / Gunicorn not tested yet   |
+| Rails    | Not tested | Ruby not tested yet                |
+>>>>>>> Stashed changes
 
 Templates are not magic. They are shared server setup so every project does not become a custom snowflake.
 
@@ -107,17 +139,13 @@ Install the local CLI:
 cargo install --locked --git https://github.com/AlextheYounga/bonesdeploy.git bonesdeploy
 ```
 
-The remote runner is installed automatically during `bonesdeploy remote setup`.
-The embedded provisioning runtime downloads the matching `bonesremote` static
-Linux release binary from GitHub Releases and verifies its SHA-256 checksum.
-Remote updates use the same verified release artifacts; Rust and Cargo are not
-installed on the deployment host. Remote binaries currently support `x86_64`
-Debian and Ubuntu hosts only.
+Install the remote runner on the server:
 
-`bonesdeploy update` uses the latest published GitHub release as its source of
-truth. Publish `bonesdeploy` to crates.io, then push a matching `v<version>`
-tag; the release workflow builds and publishes the corresponding `bonesremote`
-asset before that version becomes available to updates.
+```sh
+sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
+```
+
+Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy init` remote setup.
 
 ## Start a Project
 
@@ -127,11 +155,11 @@ From your project repo:
 bonesdeploy init
 ```
 
-For CI or AI agents, pick a framework template and pass variables non-interactively:
+For CI or AI agents, pick a runtime template and pass variables non-interactively:
 
 ```sh
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --framework-var php_version=8.5 --service postgres --service valkey
+  --template laravel --runtime-var php_version=8.5 --db postgres --db valkey
 ```
 
 See `bonesdeploy skill doc templates` for every template and its variables.
@@ -146,11 +174,8 @@ This creates:
 ```
 
 The files are yours.
-
 Edit them.
-
 Commit them.
-
 Read them when something breaks.
 
 Deployment scripts run in filename order:
@@ -178,7 +203,7 @@ bonesdeploy remote runtime
 Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
 
 ```sh
-bonesdeploy remote services
+bonesdeploy remote dbs
 ```
 
 Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Generated credentials live in the protected remote `shared/.env`, never in `.bones/`. MariaDB and MySQL are alternatives and cannot share one host.
@@ -227,12 +252,6 @@ Check only the local side:
 
 ```sh
 bonesdeploy doctor --local
-```
-
-Show the full successful remote report, including every remote security check:
-
-```sh
-bonesdeploy doctor --verbose
 ```
 
 `doctor` reports three states: green checks are healthy, yellow pending items
@@ -301,7 +320,7 @@ Common defaults:
 
 ## Project Structure
 
-```
+```text
 .bones/
 ├── bones.toml           # project, build, and runtime configuration
 └── deployment/
@@ -311,7 +330,7 @@ Common defaults:
         └── 01_*.sh      # prepare scripts (run as the site user before activation)
 ```
 
-The optional git push transport uses thin adapters: a local `pre-push` guard (installed by `bonesdeploy init`) and a remote `post-receive` trigger (installed by provisioning). The root-owned config repository at `/root/.config/bonesremote/repos/<project>.bones.git` uses a `pre-receive` trigger that calls `bonesremote site receive` directly before accepting the push. You do not see or manage these hooks under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys; the default is `false`.
+The optional git push transport uses two thin internal adapters (local pre-push guard and remote post-receive trigger) that are embedded in the binaries. You do not see or manage them under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys; the default is `false`.
 
 Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Each build script is capped at `[build].timeout_seconds` (default 300; systemd terminates the script's whole process tree when exceeded). A value of `0` disables the per-script timeout. Bonesremote streams an ephemeral copy of the deployment bundle into the container at `/workspace/deployment`, so the build user never needs host access to bonesremote's control-plane files. BonesInfra provisions a private persistent cache for each build user; bonesremote mounts it at `/workspace/cache` and exposes `BUILD_CACHE_DIR`. The shared deployment functions use it for Node, Corepack, npm, pnpm, Yarn, Composer, and Bundler downloads. Installed dependency trees and build output remain disposable. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation. Bonesremote streams the shared functions into each prepare shell before the prepare script, so prepare scripts do not source the root-owned deployment bundle.
 
