@@ -11,12 +11,23 @@ pub(super) fn prepare_release_tree(source: &Path, destination: &Path, runtime_us
         bail!("Source tree is not a directory: {}", source.display());
     }
 
+    // Stage creates the release directory exclusively, so it is empty here.
+    // Categorically refuse to overwrite a release that already holds content:
+    // promotion must never reuse or erase an existing release, possibly the
+    // active one.
+    ensure_release_dir_empty(destination)?;
     fs::create_dir_all(destination)
         .with_context(|| format!("Failed to create release directory {}", destination.display()))?;
-    clear_directory_children(destination)?;
 
     copy_hardened(source, destination, source)?;
     set_release_tree_owner(destination, ownership::user_uid(runtime_user)?, group)?;
+    Ok(())
+}
+
+fn ensure_release_dir_empty(destination: &Path) -> Result<()> {
+    if destination.exists() && !is_dir_empty(destination)? {
+        bail!("Refusing to promote into nonempty release directory {}", destination.display());
+    }
     Ok(())
 }
 
@@ -133,17 +144,8 @@ fn site_group_gid(group: &str) -> Result<u32> {
     super::ownership::site_group_gid(group)
 }
 
-fn clear_directory_children(path: &Path) -> Result<()> {
-    for entry in fs::read_dir(path).with_context(|| format!("Failed to read release directory {}", path.display()))? {
-        let entry = entry?;
-        let entry_type = entry.file_type()?;
-        if entry_type.is_dir() {
-            fs::remove_dir_all(entry.path())?;
-        } else {
-            fs::remove_file(entry.path())?;
-        }
-    }
-    Ok(())
+fn is_dir_empty(path: &Path) -> Result<bool> {
+    Ok(fs::read_dir(path).with_context(|| format!("Failed to read {}", path.display()))?.next().is_none())
 }
 
 #[cfg(test)]
@@ -151,37 +153,77 @@ mod tests {
     use std::env;
     use std::fs;
     use std::os::unix::fs::{MetadataExt, PermissionsExt};
-    use std::path::Path;
+    use std::path::{Path, PathBuf};
     use std::process;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
 
     use super::{
-        clear_directory_children, normalize_relative_path, set_release_tree_identity, validate_symlink_target,
+        ensure_release_dir_empty, is_dir_empty, normalize_relative_path, prepare_release_tree,
+        set_release_tree_identity, validate_symlink_target,
     };
 
     #[test]
-    fn clear_directory_children_only_removes_entries() -> Result<()> {
-        let root = env::temp_dir().join(format!("bonesremote-promote-clear-{}", process::id()));
+    fn promote_refuses_nonempty_release_directory() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-promote-nonempty-{}", process::id()));
         if root.exists() {
             fs::remove_dir_all(&root)?;
         }
-        fs::create_dir_all(&root)?;
-        fs::write(root.join("file.txt"), "x")?;
-        fs::create_dir_all(root.join("nested"))?;
+        let source = root.join("source");
+        let destination = root.join("releases").join("20260804_190321-46a0b75c-0000");
+        fs::create_dir_all(source.join("index.html"))?;
+        fs::write(source.join("index.html").join("x"), "x")?;
+        fs::create_dir_all(&destination)?;
+        fs::write(destination.join("existing.txt"), "do-not-touch")?;
 
-        clear_directory_children(&root)?;
+        assert!(prepare_release_tree(&source, &destination, "root", "root").is_err());
+        assert_eq!(fs::read_to_string(destination.join("existing.txt"))?, "do-not-touch");
 
-        assert!(root.exists(), "clear must not remove the directory itself");
-        assert!(fs::read_dir(&root)?.next().is_none());
-
-        fs::remove_dir_all(&root).ok();
+        fs::remove_dir_all(root).ok();
         Ok(())
     }
 
     #[test]
+    fn empty_release_directory_passes_the_nonempty_guard() -> Result<()> {
+        let root = temp_root("bonesremote-promote-empty");
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        let destination = root.join("releases").join("candidate");
+        fs::create_dir_all(&destination)?;
+
+        assert!(is_dir_empty(&destination)?);
+        assert!(ensure_release_dir_empty(&destination).is_ok());
+
+        fs::remove_dir_all(root).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn nonempty_release_directory_fails_the_nonempty_guard() -> Result<()> {
+        let root = temp_root("bonesremote-promote-filled");
+        if root.exists() {
+            fs::remove_dir_all(&root)?;
+        }
+        let destination = root.join("releases").join("candidate");
+        fs::create_dir_all(&destination)?;
+        fs::write(destination.join("file"), "x")?;
+
+        assert!(ensure_release_dir_empty(&destination).is_err());
+
+        fs::remove_dir_all(root).ok();
+        Ok(())
+    }
+
+    fn temp_root(prefix: &str) -> PathBuf {
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
+        env::temp_dir().join(format!("{prefix}_{}_{}", process::id(), nanos))
+    }
+
+    #[test]
     fn candidate_tree_is_writable_by_its_temporary_owner() -> Result<()> {
-        let root = env::temp_dir().join(format!("bonesremote-promote-writable-{}", process::id()));
+        let root = temp_root("bonesremote-promote-writable");
         if root.exists() {
             fs::remove_dir_all(&root)?;
         }
@@ -195,7 +237,7 @@ mod tests {
         assert_eq!(fs::metadata(&public)?.permissions().mode() & 0o777, 0o750);
         assert_eq!(fs::metadata(public.join("index.php"))?.permissions().mode() & 0o777, 0o640);
 
-        fs::remove_dir_all(&root).ok();
+        fs::remove_dir_all(root).ok();
         Ok(())
     }
 

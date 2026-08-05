@@ -110,6 +110,11 @@ pub enum ReleaseCommand {
         #[arg(long)]
         site: String,
     },
+    /// Quarantine malformed deployment state after verifying no deployment is running
+    Recover {
+        #[arg(long)]
+        site: String,
+    },
 }
 
 #[derive(Subcommand)]

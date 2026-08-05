@@ -4,18 +4,16 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::{config, paths};
+use bonesdeploy_core::paths;
 
 use crate::privileges;
+use crate::release::SiteMutation;
 
-pub fn run(site: &str) -> Result<()> {
+pub fn run(mutation: &SiteMutation) -> Result<()> {
     privileges::ensure_root("bonesremote service restart")?;
-    config::validate_project_name(site)?;
 
-    let config_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&config_path)
-        .with_context(|| format!("Failed to load registered site state from {}", config_path.display()))?;
-    let target_name = target_name_for_registered_site(site, &cfg.project_name)?;
+    let cfg = mutation.config();
+    let target_name = target_name_for_registered_site(mutation.site(), &cfg.project_name)?;
     let services = target_services(&target_name)?;
     if services.is_empty() {
         bail!("Site target {target_name} has no registered services");

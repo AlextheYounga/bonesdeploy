@@ -1,16 +1,14 @@
 use std::io::{Read, stdin};
 
 use anyhow::{Context, Result};
-use bonesdeploy_core::config;
-use bonesdeploy_core::paths;
+
+use crate::release::lifecycle;
 
 pub fn post_receive(site: &str) -> Result<()> {
     let mut stdin_buf = String::new();
     stdin().read_to_string(&mut stdin_buf).context("Failed to read post-receive stdin")?;
 
-    let bones_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&bones_path)
-        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
+    let cfg = lifecycle::load_site_config(site)?;
 
     if !cfg.deploy_on_push {
         return Ok(());
