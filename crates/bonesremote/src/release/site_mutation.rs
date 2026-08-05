@@ -30,7 +30,20 @@ impl SiteMutation {
     pub(crate) fn acquire(site: &str) -> Result<Self> {
         let _lock = DeploymentLock::acquire(site)?;
         let config = lifecycle::load_site_config(site)?;
-        Ok(Self { site: site.to_string(), config, _lock })
+        Ok(Self::new(site, config, _lock))
+    }
+
+    /// Acquires the serialization lock and adopts an already-validated
+    /// configuration.
+    ///
+    /// Used when the live site config does not exist yet (first import): the
+    /// configuration comes from the staged dataset that import has just
+    /// validated, so it cannot be loaded from the control plane beforehand.
+    /// The staged dataset's `project_name == site` check is performed by the
+    /// caller before invoking this.
+    pub(crate) fn acquire_with_config(site: &str, config: Bones) -> Result<Self> {
+        let _lock = DeploymentLock::acquire(site)?;
+        Ok(Self::new(site, config, _lock))
     }
 
     /// Builds the guard from an already-loaded config and a held lock.
@@ -40,6 +53,10 @@ impl SiteMutation {
     /// site identity verified *before* terminating, then the lock is taken and
     /// the guard assembled for all subsequent file mutations.
     pub(crate) fn adopt(site: &str, config: Bones, lock: DeploymentLock) -> Self {
+        Self::new(site, config, lock)
+    }
+
+    fn new(site: &str, config: Bones, lock: DeploymentLock) -> Self {
         Self { site: site.to_string(), config, _lock: lock }
     }
 

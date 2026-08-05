@@ -6,10 +6,41 @@ use std::process;
 use anyhow::Result;
 
 use crate::commands::ensure_site_idle;
+use crate::release::SiteMutation;
 use crate::release::state::{self as release_state, DeploymentLock};
 
 use super::{reject_plaintext_env_files, validate_repo_path, write_hook_file};
-use bonesdeploy_core::paths;
+use bonesdeploy_core::{config, paths};
+
+#[test]
+fn first_import_acquires_mutation_without_live_site_config() -> Result<()> {
+    let root = env::temp_dir().join(format!("bonesremote-site-first-import-{}", process::id()));
+    if root.exists() {
+        fs::remove_dir_all(&root)?;
+    }
+    let _guard = release_state::set_sites_root_for_tests(root.clone());
+
+    let staging = root.join("staging");
+    fs::create_dir_all(&staging)?;
+    fs::write(
+        staging.join(paths::BONES_TOML),
+        "[app]\nproject_name = \"unitapp\"\n\n[app.server]\nhost = \"example.com\"\n",
+    )?;
+    let config = config::load(&staging.join(paths::BONES_TOML))?;
+
+    // The live site directory and its bones.toml do not exist yet, so the
+    // guard must be acquired from the just-validated staged configuration.
+    let mutation = SiteMutation::acquire_with_config("unitapp", config)?;
+    assert_eq!(mutation.site(), "unitapp");
+    assert_eq!(mutation.config().project_name, "unitapp");
+
+    // A fresh site has no deployment state, so the idle check passes on the
+    // first import path even though no live config has been written.
+    assert!(ensure_site_idle("unitapp").is_ok());
+
+    fs::remove_dir_all(&root)?;
+    Ok(())
+}
 
 #[test]
 fn imports_share_a_stable_lock_and_reject_staged_releases() -> Result<()> {

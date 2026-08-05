@@ -101,11 +101,14 @@ fn receive_staged_site(site: &str, revision: &str, staging_dir: &Path) -> Result
 }
 
 fn finalize_imported_site(site: &str, staging_dir: &Path) -> Result<()> {
-    validate_site_dataset(site, staging_dir)?;
+    let config = validate_site_dataset(site, staging_dir)?;
 
     // Import/receive replaces live site state, so it is serialized with every
-    // other mutation and only runs after the site is proven idle.
-    let _mutation = SiteMutation::acquire(site)?;
+    // other mutation and only runs after the site is proven idle. The live
+    // config may not exist yet (first import), so the guard is built from the
+    // just-validated staged configuration rather than loaded from the control
+    // plane.
+    let _mutation = SiteMutation::acquire_with_config(site, config)?;
     ensure_site_idle(site)?;
     write_post_receive_hook(staging_dir)?;
     replace_site_dir(site, staging_dir)
@@ -184,7 +187,7 @@ fn extract_stdin_archive(destination: &Path) -> Result<()> {
     bail!("Failed to extract remote site dataset")
 }
 
-fn validate_site_dataset(site: &str, root: &Path) -> Result<()> {
+fn validate_site_dataset(site: &str, root: &Path) -> Result<config::Bones> {
     reject_plaintext_env_files(root)?;
     reject_symlinks(root)?;
 
@@ -198,7 +201,7 @@ fn validate_site_dataset(site: &str, root: &Path) -> Result<()> {
         bail!("Imported site dataset is for '{}', expected '{}'", bones.project_name, site);
     }
 
-    Ok(())
+    Ok(bones)
 }
 
 fn reject_plaintext_env_files(root: &Path) -> Result<()> {
