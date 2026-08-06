@@ -109,16 +109,6 @@ Docker just is not the foundation.
 
 Runtime templates set up the Linux pieces for a framework.
 
-<<<<<<< Updated upstream
-| Template | Status | Notes |
-| --- | --- | --- |
-| Laravel | Working | PHP / PHP-FPM setup |
-| Next.js | Working | Node runtime setup |
-| Nuxt | Working | Nuxt runtime setup |
-| Vue | Working | Static frontend setup |
-| Django | Not tested | Python / Gunicorn not tested yet |
-| Rails | Not tested | Ruby not tested yet |
-=======
 | Template | Status     | Notes                              |
 | -------- | ---------- | ---------------------------------- |
 | Laravel  | Working    | PHP / PHP-FPM setup                |
@@ -127,7 +117,6 @@ Runtime templates set up the Linux pieces for a framework.
 | Vue      | Working    | Static frontend setup              |
 | Django   | Not tested | Python / Gunicorn not tested yet   |
 | Rails    | Not tested | Ruby not tested yet                |
->>>>>>> Stashed changes
 
 Templates are not magic. They are shared server setup so every project does not become a custom snowflake.
 
