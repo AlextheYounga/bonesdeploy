@@ -1,6 +1,6 @@
 # BonesDeploy ☠️
 
-Deploy a dozen modern, isolated web apps on a $5 Linux box, without ever touching the server. Docker not required.
+## Deploy a dozen modern, isolated web apps on a $5 Linux box, without ever touching the server. Docker not required.
 
 <div style="margin:0 auto; display: block;">
   <img width="600" height="600" src="docs/images/bonesdeploy.png" alt="BonesDeploy" />
