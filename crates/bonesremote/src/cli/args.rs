@@ -52,6 +52,11 @@ pub enum Command {
         #[command(subcommand)]
         command: ServiceCommand,
     },
+    /// Apply an ordered server migration (requires root)
+    Patch {
+        #[command(subcommand)]
+        command: PatchCommand,
+    },
     /// Print the version
     Version,
 }
@@ -126,6 +131,17 @@ pub enum ServiceCommand {
     },
 }
 
+#[derive(Subcommand)]
+pub enum PatchCommand {
+    /// Apply one named migration for a site
+    Apply {
+        #[arg(long)]
+        site: String,
+        #[arg(long)]
+        patch: String,
+    },
+}
+
 #[cfg(test)]
 mod tests {
     use clap::Parser;
@@ -140,5 +156,13 @@ mod tests {
     #[test]
     fn exhaustive_doctor_accepts_a_site() {
         assert!(Cli::try_parse_from(["bonesremote", "doctor", "--site", "atlas", "--exhaustive"]).is_ok());
+    }
+
+    #[test]
+    fn patch_apply_accepts_site_and_patch_identifiers() {
+        assert!(
+            Cli::try_parse_from(["bonesremote", "patch", "apply", "--site", "atlas", "--patch", "0001-config-repo"])
+                .is_ok()
+        );
     }
 }
