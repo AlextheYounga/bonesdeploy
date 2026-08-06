@@ -1,1 +1,0 @@
-- [ ] database.sqlite needs 0660. Currently getting 0664 by Laravel
