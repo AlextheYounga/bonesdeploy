@@ -95,8 +95,9 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
     Ok(Some(template_name))
 }
 
-pub fn choose_services(services: &[&str]) -> Result<Vec<String>> {
-    MultiSelect::new("Services:", services.to_vec())
+pub fn choose_services(services: &[String]) -> Result<Vec<String>> {
+    let items = services.iter().map(String::as_str).collect::<Vec<_>>();
+    MultiSelect::new("Services:", items)
         .with_help_message("All services listen on localhost; use SSH port forwarding for remote access.")
         .prompt()
         .map(|selected| selected.into_iter().map(str::to_string).collect())

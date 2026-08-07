@@ -22,7 +22,7 @@ pub fn run(show_next: bool) -> Result<()> {
 }
 
 pub(crate) fn sync_bones_directory() -> Result<()> {
-    let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
+    let bones_dir = Path::new(paths::local_bones_dir());
     if !bones_dir.exists() {
         bail!(".bones directory is missing; run 'bonesdeploy init' first")
     }

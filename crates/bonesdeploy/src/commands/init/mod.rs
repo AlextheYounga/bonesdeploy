@@ -42,14 +42,14 @@ pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() 
     println!("{} {}", style("Initializing").cyan().bold(), style("bonesdeploy").bold());
     prefetch_bonesinfra()?;
 
-    let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
+    let bones_dir = Path::new(paths::local_bones_dir());
     let had_bones_entry = fs::symlink_metadata(bones_dir).is_ok();
     let is_fresh = !bones_dir.exists();
     if !is_fresh {
         println!("Using existing .bones config.");
     }
 
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::local_bones_toml());
     let mut cfg =
         if is_fresh { config::collect_fresh_config(args)? } else { config::load_or_collect_config(bones_toml, args)? };
     let framework_selection = if is_fresh { Some(framework::collect_framework_config(args)?) } else { None };

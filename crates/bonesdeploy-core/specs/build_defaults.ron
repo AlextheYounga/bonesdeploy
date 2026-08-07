@@ -1,0 +1,5 @@
+// Default per-site build limits.
+
+BuildDefaults(
+    timeout_seconds: 300,
+)

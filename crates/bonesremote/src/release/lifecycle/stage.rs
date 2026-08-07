@@ -23,8 +23,8 @@ pub fn run(site: &str, revision_commit: &str) -> Result<()> {
     let cfg = super::load_site_config(site)?;
     let project_root = Path::new(&cfg.project_root);
     require_dir(project_root, "project_root directory")?;
-    require_dir(&Path::new(&cfg.project_root).join(paths::RELEASES_DIR), "releases")?;
-    require_dir(&Path::new(&cfg.project_root).join(paths::SHARED_DIR), "shared")?;
+    require_dir(&Path::new(&cfg.project_root).join(paths::releases_dir()), "releases")?;
+    require_dir(&Path::new(&cfg.project_root).join(paths::shared_dir()), "shared")?;
 
     let release_name = create_unique_release_dir(&cfg.project_root, revision_commit)?;
 

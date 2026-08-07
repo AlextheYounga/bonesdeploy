@@ -52,11 +52,11 @@ pub(crate) fn resolved_site_root(site: &str) -> PathBuf {
 }
 
 pub(crate) fn recovery_dir(site: &str) -> PathBuf {
-    resolved_site_root(site).join(paths::RECOVERY_DIR)
+    resolved_site_root(site).join(paths::recovery_dir())
 }
 
 fn deployment_lock_path(site: &str) -> PathBuf {
-    resolved_sites_root().join(format!(".{site}.{}", paths::DEPLOYMENT_LOCK_FILE))
+    resolved_sites_root().join(format!(".{site}.{}", paths::deployment_lock_file()))
 }
 
 pub struct DeploymentLock(File);

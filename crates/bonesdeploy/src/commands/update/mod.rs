@@ -49,11 +49,11 @@ pub async fn run(options: Options) -> Result<()> {
             updated = true;
         }
 
-        if Path::new(paths::LOCAL_BONES_TOML).exists() {
-            let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+        if Path::new(paths::local_bones_toml()).exists() {
+            let cfg = config::load(Path::new(paths::local_bones_toml()))?;
             patches::run_local(&cfg, &release_versions.bonesdeploy)?;
         }
-        sync::refresh_local_bones_from_source(&source_dir, Path::new(paths::LOCAL_BONES_DIR))?;
+        sync::refresh_local_bones_from_source(&source_dir, Path::new(paths::local_bones_dir()))?;
     }
 
     if !options.skip_remote {

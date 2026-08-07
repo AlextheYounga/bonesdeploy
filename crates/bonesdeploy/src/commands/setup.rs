@@ -9,7 +9,7 @@ use crate::config;
 use crate::ui::output;
 
 pub async fn run(skip_confirm: bool) -> Result<()> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::local_bones_toml());
     let cfg = config::load(bones_toml)?;
 
     println!("{} {}", style("Setting up").cyan().bold(), style(&cfg.host).bold());

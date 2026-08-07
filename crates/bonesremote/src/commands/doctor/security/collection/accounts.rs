@@ -7,10 +7,10 @@ use bonesdeploy_core::paths;
 use crate::commands::doctor::security::types::Account;
 
 pub(crate) fn collect_accounts() -> Result<BTreeMap<String, Account>, String> {
-    let passwd =
-        fs::read_to_string(paths::ETC_PASSWD).map_err(|error| format!("cannot read {}: {error}", paths::ETC_PASSWD))?;
-    let groups =
-        fs::read_to_string(paths::ETC_GROUP).map_err(|error| format!("cannot read {}: {error}", paths::ETC_GROUP))?;
+    let passwd = fs::read_to_string(paths::etc_passwd())
+        .map_err(|error| format!("cannot read {}: {error}", paths::etc_passwd()))?;
+    let groups = fs::read_to_string(paths::etc_group())
+        .map_err(|error| format!("cannot read {}: {error}", paths::etc_group()))?;
     let mut accounts = BTreeMap::new();
     for line in passwd.lines().filter(|line| !line.is_empty() && !line.starts_with('#')) {
         let fields: Vec<_> = line.split(':').collect();

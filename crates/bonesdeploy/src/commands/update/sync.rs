@@ -25,7 +25,7 @@ fn sync_kit_deployment_functions(source_dir: &Path, bones_dir: &Path) -> Result<
 }
 
 fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> Result<PathBuf> {
-    let bones_toml = bones_dir.join(paths::BONES_TOML);
+    let bones_toml = bones_dir.join(paths::bones_toml());
     let Some(template) = selected_framework_template(&bones_toml)? else {
         return Ok(source_dir.join("crates/bonesdeploy/kit/deployment"));
     };

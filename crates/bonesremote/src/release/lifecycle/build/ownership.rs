@@ -29,14 +29,14 @@ fn chown_tree(path: &Path, uid: u32, gid: u32) -> Result<()> {
 }
 
 pub(super) fn user_uid(user: &str) -> Result<u32> {
-    let passwd = fs::read_to_string(paths::ETC_PASSWD)
-        .with_context(|| format!("Failed to read {} while resolving uid for {user}", paths::ETC_PASSWD))?;
+    let passwd = fs::read_to_string(paths::etc_passwd())
+        .with_context(|| format!("Failed to read {} while resolving uid for {user}", paths::etc_passwd()))?;
     parse_user_uid(&passwd, user)
 }
 
 pub(super) fn site_group_gid(group: &str) -> Result<u32> {
-    let groupfile = fs::read_to_string(paths::ETC_GROUP)
-        .with_context(|| format!("Failed to read {} while sealing release", paths::ETC_GROUP))?;
+    let groupfile = fs::read_to_string(paths::etc_group())
+        .with_context(|| format!("Failed to read {} while sealing release", paths::etc_group()))?;
     let line = groupfile
         .lines()
         .find(|line| line.starts_with(&format!("{group}:")))
@@ -54,7 +54,7 @@ pub(super) fn parse_user_uid(passwd: &str, user: &str) -> Result<u32> {
     let line = passwd
         .lines()
         .find(|line| line.starts_with(&format!("{user}:")))
-        .with_context(|| format!("User '{user}' missing from {}", paths::ETC_PASSWD))?;
+        .with_context(|| format!("User '{user}' missing from {}", paths::etc_passwd()))?;
     let fields: Vec<&str> = line.split(':').collect();
     fields
         .get(2)

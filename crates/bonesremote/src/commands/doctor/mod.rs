@@ -11,7 +11,7 @@ mod system;
 
 pub fn run(site: Option<&str>, exhaustive: bool) -> Result<()> {
     privileges::ensure_root("bonesremote doctor")?;
-    println!("{} doctor", console::style(paths::BONESREMOTE_BINARY).bold());
+    println!("{} doctor", console::style(paths::bonesremote_binary()).bold());
 
     let mut issues: Vec<String> = Vec::new();
     let mut pending: Vec<String> = Vec::new();

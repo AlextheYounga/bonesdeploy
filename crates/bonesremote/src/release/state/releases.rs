@@ -9,19 +9,19 @@ use anyhow::{Context, Result, bail};
 use bonesdeploy_core::paths;
 
 pub fn release_dir(project_root: &str, release: &str) -> PathBuf {
-    PathBuf::from(project_root).join(paths::RELEASES_DIR).join(release)
+    PathBuf::from(project_root).join(paths::releases_dir()).join(release)
 }
 
 pub fn releases_dir(project_root: &str) -> PathBuf {
-    PathBuf::from(project_root).join(paths::RELEASES_DIR)
+    PathBuf::from(project_root).join(paths::releases_dir())
 }
 
 pub fn shared_dir(project_root: &str) -> PathBuf {
-    PathBuf::from(project_root).join(paths::SHARED_DIR)
+    PathBuf::from(project_root).join(paths::shared_dir())
 }
 
 pub fn current_release_dir(project_root: &str) -> Result<PathBuf> {
-    let current_link = PathBuf::from(project_root).join(paths::CURRENT_LINK);
+    let current_link = PathBuf::from(project_root).join(paths::current_link());
     let active_target =
         fs::read_link(&current_link).with_context(|| format!("Failed to read {}", current_link.display()))?;
 
@@ -56,7 +56,7 @@ pub fn list_releases_sorted(project_root: &str) -> Result<Vec<String>> {
         let entry = entry?;
         if entry.file_type()?.is_dir() {
             let name = entry.file_name().to_string_lossy().to_string();
-            if name != paths::PLACEHOLDER_RELEASE_NAME {
+            if name != paths::placeholder_release_name() {
                 names.push(name);
             }
         }
@@ -143,7 +143,7 @@ mod tests {
         fs::create_dir_all(&target_a)?;
         fs::create_dir_all(&target_b)?;
 
-        let link_path = root.join(paths::CURRENT_LINK);
+        let link_path = root.join(paths::current_link());
         point_symlink_atomically(&link_path, &target_a)?;
         point_symlink_atomically(&link_path, &target_b)?;
 
@@ -162,7 +162,7 @@ mod tests {
         let project_root = project_root_for(&root);
         let release_path = release_dir(&project_root, "20260507_151502");
         fs::create_dir_all(&release_path)?;
-        let current = Path::new(&project_root).join(paths::CURRENT_LINK);
+        let current = Path::new(&project_root).join(paths::current_link());
         if let Some(parent) = current.parent() {
             fs::create_dir_all(parent)?;
         }
@@ -181,7 +181,7 @@ mod tests {
 
         let project_root = project_root_for(&root);
         fs::create_dir_all(release_dir(&project_root, "20260507_151500"))?;
-        fs::create_dir_all(release_dir(&project_root, paths::PLACEHOLDER_RELEASE_NAME))?;
+        fs::create_dir_all(release_dir(&project_root, paths::placeholder_release_name()))?;
         fs::create_dir_all(release_dir(&project_root, "20260507_151501"))?;
 
         assert_eq!(list_releases_sorted(&project_root)?, vec!["20260507_151500", "20260507_151501"]);

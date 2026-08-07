@@ -1,6 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::paths;
+use crate::specs::application_defaults;
 
 #[derive(Clone, Debug)]
 pub struct App {
@@ -42,7 +43,8 @@ struct Server {
 
 impl Default for Server {
     fn default() -> Self {
-        Self { host: String::new(), ssh_user: String::from("root"), port: String::from("22") }
+        let defaults = application_defaults();
+        Self { host: String::new(), ssh_user: defaults.ssh_user.clone(), port: defaults.port.clone() }
     }
 }
 
@@ -68,7 +70,8 @@ struct Deploy {
 
 impl Default for Deploy {
     fn default() -> Self {
-        Self { branch: String::from("master"), on_push: false, releases: 5 }
+        let defaults = application_defaults();
+        Self { branch: defaults.branch.clone(), on_push: false, releases: defaults.releases_keep }
     }
 }
 
@@ -106,18 +109,20 @@ struct DeployDocument<'a> {
 
 impl Default for App {
     fn default() -> Self {
+        let defaults = application_defaults();
+
         Self {
             remote_name: String::new(),
             project_name: String::new(),
-            ssh_user: String::from("root"),
+            ssh_user: defaults.ssh_user.clone(),
             host: String::new(),
-            port: String::from("22"),
+            port: defaults.port.clone(),
             repo_path: String::new(),
             project_root: String::new(),
-            branch: String::from("master"),
+            branch: defaults.branch.clone(),
             preview_domain: String::new(),
             deploy_on_push: false,
-            releases_keep: 5,
+            releases_keep: defaults.releases_keep,
             ssl_enabled: false,
             domain: String::new(),
             email: String::new(),

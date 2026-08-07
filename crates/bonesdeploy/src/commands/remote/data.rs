@@ -30,7 +30,7 @@ pub fn base(cfg: &config::Bones, web_root: &str) -> Map<String, Value> {
         Value::String(
             Path::new(project_root)
                 .parent()
-                .unwrap_or(Path::new(paths::DEFAULT_PROJECT_ROOT_PARENT))
+                .unwrap_or(Path::new(paths::default_project_root_parent()))
                 .display()
                 .to_string(),
         ),
@@ -48,32 +48,32 @@ pub fn base(cfg: &config::Bones, web_root: &str) -> Map<String, Value> {
 }
 
 fn build_paths_map(cfg: &config::Bones, project_root: &str) -> Map<String, Value> {
-    let shared_root = Path::new(project_root).join(paths::SHARED_DIR).display().to_string();
-    let releases_root = Path::new(project_root).join(paths::RELEASES_DIR).display().to_string();
-    let current = Path::new(project_root).join(paths::CURRENT_LINK).display().to_string();
+    let shared_root = Path::new(project_root).join(paths::shared_dir()).display().to_string();
+    let releases_root = Path::new(project_root).join(paths::releases_dir()).display().to_string();
+    let current = Path::new(project_root).join(paths::current_link()).display().to_string();
     let nginx_site_available =
-        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", cfg.project_name)).display().to_string();
+        Path::new(paths::etc_nginx_sites_available()).join(format!("{}.conf", cfg.project_name)).display().to_string();
     let nginx_site_enabled =
-        Path::new(paths::ETC_NGINX_SITES_ENABLED).join(format!("{}.conf", cfg.project_name)).display().to_string();
+        Path::new(paths::etc_nginx_sites_enabled()).join(format!("{}.conf", cfg.project_name)).display().to_string();
 
     let mut m = Map::new();
     m.insert(String::from("repo"), Value::String(cfg.repo_path.clone()));
     m.insert(
         String::from("repo_parent"),
         Value::String(
-            Path::new(&cfg.repo_path).parent().unwrap_or(Path::new(paths::DEFAULT_REPO_PARENT)).display().to_string(),
+            Path::new(&cfg.repo_path).parent().unwrap_or(Path::new(paths::default_repo_parent())).display().to_string(),
         ),
     );
     m.insert(
         String::from("repo_head"),
-        Value::String(Path::new(&cfg.repo_path).join(paths::GIT_HEAD).display().to_string()),
+        Value::String(Path::new(&cfg.repo_path).join(paths::git_head()).display().to_string()),
     );
     m.insert(
         String::from("site_nginx_config"),
         Value::String(
-            Path::new(paths::DEFAULT_CONF_ROOT_PARENT)
+            Path::new(paths::default_conf_root_parent())
                 .join(&cfg.project_name)
-                .join(paths::NGINX_CONF)
+                .join(paths::nginx_conf())
                 .display()
                 .to_string(),
         ),
@@ -81,12 +81,12 @@ fn build_paths_map(cfg: &config::Bones, project_root: &str) -> Map<String, Value
     m.insert(
         String::from("repo_deployment"),
         Value::String(
-            Path::new(&cfg.repo_path).join(paths::BONES_DIR).join(paths::DEPLOYMENT_DIR).display().to_string(),
+            Path::new(&cfg.repo_path).join(paths::bones_dir()).join(paths::deployment_dir()).display().to_string(),
         ),
     );
     m.insert(
         String::from("conf_root"),
-        Value::String(Path::new(paths::DEFAULT_CONF_ROOT_PARENT).join(&cfg.project_name).display().to_string()),
+        Value::String(Path::new(paths::default_conf_root_parent()).join(&cfg.project_name).display().to_string()),
     );
     m.insert(String::from(shared_config::bonesinfra_input::PROJECT_ROOT), Value::String(project_root.to_string()));
     m.insert(
@@ -94,7 +94,7 @@ fn build_paths_map(cfg: &config::Bones, project_root: &str) -> Map<String, Value
         Value::String(
             Path::new(project_root)
                 .parent()
-                .unwrap_or(Path::new(paths::DEFAULT_PROJECT_ROOT_PARENT))
+                .unwrap_or(Path::new(paths::default_project_root_parent()))
                 .display()
                 .to_string(),
         ),

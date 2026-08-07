@@ -10,11 +10,11 @@ use crate::ui::output;
 use bonesdeploy_core::paths;
 
 pub fn local_bones_load_error() -> String {
-    format!("Failed to load {}", paths::LOCAL_BONES_TOML)
+    format!("Failed to load {}", paths::local_bones_toml())
 }
 
 pub async fn run() -> Result<()> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::local_bones_toml());
     let cfg = config::load(bones_toml).context(local_bones_load_error())?;
 
     println!(

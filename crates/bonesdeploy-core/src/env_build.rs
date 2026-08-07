@@ -29,7 +29,7 @@ pub fn default_content() -> &'static str {
 /// Returns an error when the file exists but cannot be read, contains
 /// invalid keys, duplicate keys, or reserved `BONES_*` keys.
 pub fn load(dir: &Path) -> Result<BTreeMap<String, String>> {
-    let path = dir.join(paths::ENV_BUILD_FILE);
+    let path = dir.join(paths::env_build_file());
     if !path.exists() {
         return Ok(BTreeMap::new());
     }

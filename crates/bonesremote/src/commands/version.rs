@@ -1,5 +1,5 @@
 use bonesdeploy_core::paths;
 
 pub fn run() {
-    println!("{} {}", paths::BONESREMOTE_BINARY, env!("CARGO_PKG_VERSION"));
+    println!("{} {}", paths::bonesremote_binary(), env!("CARGO_PKG_VERSION"));
 }

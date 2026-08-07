@@ -85,13 +85,13 @@ mod tests {
         let (_guard, root) = temp_root("malformed")?;
         let site_root = root.join("unitapp");
         fs::create_dir_all(&site_root)?;
-        fs::write(site_root.join(paths::DEPLOYMENT_STATE_FILE), "{ not valid json")?;
+        fs::write(site_root.join(paths::deployment_state_file()), "{ not valid json")?;
 
         recover_site("unitapp")?;
 
-        let quarantine = site_root.join(paths::RECOVERY_DIR);
+        let quarantine = site_root.join(paths::recovery_dir());
         assert!(fs::read_dir(&quarantine)?.next().is_some(), "malformed state must be quarantined");
-        assert!(!site_root.join(paths::DEPLOYMENT_STATE_FILE).exists());
+        assert!(!site_root.join(paths::deployment_state_file()).exists());
 
         fs::remove_dir_all(root).ok();
         Ok(())
@@ -113,7 +113,7 @@ mod tests {
         recover_site("unitapp")?;
 
         assert!(release_state::read_active_deployment("unitapp")?.is_some());
-        assert!(!root.join("unitapp").join(paths::RECOVERY_DIR).exists());
+        assert!(!root.join("unitapp").join(paths::recovery_dir()).exists());
 
         fs::remove_dir_all(root).ok();
         Ok(())
@@ -125,14 +125,14 @@ mod tests {
         let site_root = root.join("unitapp");
         fs::create_dir_all(&site_root)?;
         fs::write(
-            site_root.join(paths::ACTIVE_DEPLOYMENT_FILE),
+            site_root.join(paths::active_deployment_file()),
             r#"{"release":"20260101_000000","pid":1234,"phase":"preparing","started_at":"2026-08-04T19:03:21Z"}"#,
         )?;
 
         recover_site("unitapp")?;
 
-        assert!(site_root.join(paths::DEPLOYMENT_STATE_FILE).exists(), "previous state must migrate into the store");
-        assert!(!site_root.join(paths::ACTIVE_DEPLOYMENT_FILE).exists());
+        assert!(site_root.join(paths::deployment_state_file()).exists(), "previous state must migrate into the store");
+        assert!(!site_root.join(paths::active_deployment_file()).exists());
         let active = release_state::read_active_deployment("unitapp")?
             .ok_or_else(|| anyhow::anyhow!("migrated active deployment must be present"))?;
         assert_eq!(active.phase, DeploymentPhase::Prepared);

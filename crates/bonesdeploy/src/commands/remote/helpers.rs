@@ -18,9 +18,9 @@ pub fn run(yes: bool) -> Result<()> {
         return Ok(());
     }
 
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::local_bones_toml());
     let cfg = config::load(bones_toml)?;
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
+    let runtime = shared_config::load_runtime(Path::new(paths::local_bones_dir()))?;
 
     let ssh_user = config::bootstrap_ssh_user(&cfg);
 
@@ -34,7 +34,7 @@ pub fn run(yes: bool) -> Result<()> {
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    bonesinfra::run_with_stdin(&["helpers", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
+    bonesinfra::run_with_stdin(&["helpers", "apply", "--config", paths::local_bones_toml()], &json)?;
 
     println!("{} Helper tools installed.", output::success_marker());
     Ok(())

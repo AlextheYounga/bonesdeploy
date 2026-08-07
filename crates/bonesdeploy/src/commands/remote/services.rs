@@ -9,9 +9,9 @@ use crate::ui::{output, prompts};
 
 pub fn run(yes: bool, show_next: bool) -> Result<()> {
     git::ensure_git_repository()?;
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::local_bones_toml());
     if !bones_toml.exists() {
-        bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_TOML);
+        bail!("{} does not exist. Run `bonesdeploy init` first.", paths::local_bones_toml());
     }
     let cfg = config::load(bones_toml)?;
     if cfg.services.services.is_empty() {
@@ -22,7 +22,7 @@ pub fn run(yes: bool, show_next: bool) -> Result<()> {
         return Ok(());
     }
     println!("Provisioning services...");
-    bonesinfra::run(&["services", "apply", "--config", paths::LOCAL_BONES_TOML])?;
+    bonesinfra::run(&["services", "apply", "--config", paths::local_bones_toml()])?;
     println!("Services applied.");
     if show_next {
         println!();

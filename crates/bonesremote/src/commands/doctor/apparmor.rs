@@ -9,9 +9,9 @@ pub(super) fn check_support(issues: &mut Vec<String>) {
 }
 
 fn check_apparmor_kernel_enabled(issues: &mut Vec<String>) {
-    let enabled_file = fs::read_to_string(paths::APPARMOR_ENABLED_PARAM);
+    let enabled_file = fs::read_to_string(paths::apparmor_enabled_param());
     let Ok(enabled_value) = enabled_file else {
-        issues.push(format!("AppArmor check failed: could not read {}", paths::APPARMOR_ENABLED_PARAM));
+        issues.push(format!("AppArmor check failed: could not read {}", paths::apparmor_enabled_param()));
         return;
     };
 

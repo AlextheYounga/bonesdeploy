@@ -20,8 +20,8 @@ pub(crate) fn collect_path_tree(path: &Path, follow_symlink_targets: bool) -> Re
 }
 
 pub(crate) fn collect_release(site: &Site, exhaustive: bool) -> Result<ReleaseEvidence, String> {
-    let current_path = site.project_root.join(paths::CURRENT_LINK);
-    let releases_path = site.project_root.join(paths::RELEASES_DIR);
+    let current_path = site.project_root.join(paths::current_link());
+    let releases_path = site.project_root.join(paths::releases_dir());
     let releases_root = fs::canonicalize(&releases_path)
         .map_err(|error| format!("cannot resolve releases root {}: {error}", releases_path.display()))?;
     let current = match fs::symlink_metadata(&current_path) {

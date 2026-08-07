@@ -7,6 +7,7 @@ use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
 use crate::paths;
+use crate::specs;
 
 #[path = "app.rs"]
 mod app;
@@ -54,7 +55,7 @@ impl DerefMut for Bones {
 
 #[must_use]
 pub fn default_deploy_user() -> String {
-    paths::DEPLOY_USER.to_string()
+    paths::deploy_user().to_string()
 }
 
 /// # Errors
@@ -135,8 +136,8 @@ pub struct Runtime {
     pub node_version: String,
     #[serde(default)]
     pub shared: Shared,
-    #[serde(default)]
-    pub permissions: Option<toml::Value>,
+    #[serde(default = "default_runtime_permissions")]
+    pub permissions: Option<Permissions>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, toml::Value>,
 }
@@ -148,15 +149,45 @@ impl Default for Runtime {
             web_root: paths::default_web_root(),
             node_version: default_node_version(),
             shared: Shared::default(),
-            permissions: None,
+            permissions: default_runtime_permissions(),
             extra: BTreeMap::new(),
         }
     }
 }
 
+/// The default release permission rules applied when a project does not
+/// configure its own `[runtime.permissions]` section.
+#[must_use]
+pub fn default_runtime_permissions() -> Option<Permissions> {
+    Some(Permissions { paths: specs::runtime_defaults().release_permissions.clone() })
+}
+
 #[must_use]
 pub fn default_node_version() -> String {
-    String::from("24.18.0")
+    specs::runtime_defaults().node_version.clone()
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Permissions {
+    pub paths: Vec<PermissionRule>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PermissionRule {
+    pub path: String,
+    #[serde(rename = "type")]
+    pub permission_type: PermissionType,
+    pub mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recursive: Option<bool>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PermissionType {
+    Dir,
+    File,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -165,7 +196,11 @@ pub struct Services {
     pub services: Vec<String>,
 }
 
-pub const BUILD_TIMEOUT_SECONDS_DEFAULT: u64 = 300;
+/// The database services bonesdeploy knows how to provision.
+#[must_use]
+pub fn database_services() -> &'static [String] {
+    &specs::service_defaults().database_services
+}
 
 /// Per-site build limits. Kept as its own nested section so build settings do
 /// not leak into `BONES_*` environment variables as unrelated scalars.
@@ -180,12 +215,12 @@ pub struct Build {
 
 impl Default for Build {
     fn default() -> Self {
-        Self { timeout_seconds: BUILD_TIMEOUT_SECONDS_DEFAULT }
+        Self { timeout_seconds: default_build_timeout_seconds() }
     }
 }
 
 fn default_build_timeout_seconds() -> u64 {
-    BUILD_TIMEOUT_SECONDS_DEFAULT
+    specs::build_defaults().timeout_seconds
 }
 
 #[must_use]
@@ -193,13 +228,11 @@ pub fn build_timeout_seconds(config: &Bones) -> Option<u64> {
     (config.build.timeout_seconds != 0).then_some(config.build.timeout_seconds)
 }
 
-pub const DATABASE_SERVICES: &[&str] = &["postgres", "mariadb", "mysql", "mongodb", "valkey", "redis"];
-
 /// # Errors
 /// Returns an error when a configured database service is unsupported.
 pub fn validate_database_services(services: &[String]) -> Result<()> {
     for service in services {
-        if !DATABASE_SERVICES.contains(&service.as_str()) {
+        if !database_services().iter().any(|supported| supported == service) {
             bail!("unsupported database service: {service}");
         }
     }
@@ -238,7 +271,7 @@ pub enum SharedPathType {
 /// # Errors
 /// Returns an error when the configuration cannot be read or parsed.
 pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
-    let path = config_dir.join(paths::BONES_TOML);
+    let path = config_dir.join(paths::bones_toml());
     let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
     let bones: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
     Ok(bones.runtime)
@@ -248,7 +281,7 @@ pub fn apply_derived_defaults(config: &mut Bones) {
     let project_name = config.project_name.clone();
 
     if config.ssh_user.is_empty() {
-        config.ssh_user = String::from("root");
+        config.ssh_user = specs::application_defaults().ssh_user.clone();
     }
     if config.preview_domain.is_empty() {
         config.preview_domain = default_preview_domain_for(&project_name, &config.host);
@@ -308,8 +341,21 @@ paths = [
     #[test]
     fn build_timeout_defaults_to_five_minutes() {
         let config = Bones::default();
-        assert_eq!(config.build.timeout_seconds, BUILD_TIMEOUT_SECONDS_DEFAULT);
-        assert_eq!(build_timeout_seconds(&config), Some(BUILD_TIMEOUT_SECONDS_DEFAULT));
+        assert_eq!(config.build.timeout_seconds, specs::build_defaults().timeout_seconds);
+        assert_eq!(build_timeout_seconds(&config), Some(specs::build_defaults().timeout_seconds));
+    }
+
+    #[test]
+    fn default_runtime_includes_typed_release_permissions() {
+        let runtime = Runtime::default();
+        let permissions = runtime.permissions.unwrap_or_else(Permissions::default);
+        assert_eq!(permissions.paths.len(), 2);
+        assert_eq!(permissions.paths[0].path, "*");
+        assert_eq!(permissions.paths[0].permission_type, PermissionType::Dir);
+        assert_eq!(permissions.paths[0].mode, "750");
+        assert_eq!(permissions.paths[0].recursive, None);
+        assert_eq!(permissions.paths[1].permission_type, PermissionType::File);
+        assert_eq!(permissions.paths[1].mode, "640");
     }
 
     #[test]

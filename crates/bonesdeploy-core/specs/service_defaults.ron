@@ -1,0 +1,13 @@
+// Default service settings and the set of database services that bonesdeploy
+// knows how to provision.
+
+ServiceDefaults(
+    database_services: [
+        "postgres",
+        "mariadb",
+        "mysql",
+        "mongodb",
+        "valkey",
+        "redis",
+    ],
+)

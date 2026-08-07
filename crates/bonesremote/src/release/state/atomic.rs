@@ -66,7 +66,7 @@ mod tests {
     #[test]
     fn atomic_write_creates_parent_and_persists_content() -> Result<()> {
         let root = temp_dir("bonesremote_atomic_new")?;
-        let target = root.join("nested").join(paths::ACTIVE_DEPLOYMENT_FILE);
+        let target = root.join("nested").join(paths::active_deployment_file());
 
         atomic_write(&target, b"{\"phase\":\"building\"}")?;
 
@@ -81,7 +81,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let root = temp_dir("bonesremote_atomic_replace")?;
-        let target = root.join(paths::ACTIVE_DEPLOYMENT_FILE);
+        let target = root.join(paths::active_deployment_file());
         fs::write(&target, "old")?;
         fs::set_permissions(&target, fs::Permissions::from_mode(0o600))?;
 
@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn atomic_write_leaves_no_temporary_file_behind() -> Result<()> {
         let root = temp_dir("bonesremote_atomic_no_tmp")?;
-        let target = root.join(paths::STAGED_RELEASE_FILE);
+        let target = root.join(paths::staged_release_file());
         fs::write(&target, "stale")?;
 
         atomic_write(&target, b"20260804_190321-46a0b75c-a7f2\n")?;

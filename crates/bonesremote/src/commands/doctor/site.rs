@@ -17,8 +17,8 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
     };
 
     let project_root = &cfg.project_root;
-    let shared_root = Path::new(project_root).join(paths::SHARED_DIR);
-    let releases_root = Path::new(project_root).join(paths::RELEASES_DIR);
+    let shared_root = Path::new(project_root).join(paths::shared_dir());
+    let releases_root = Path::new(project_root).join(paths::releases_dir());
     let runtime_user = config::runtime_user_for(&cfg.project_name);
     let runtime_group = config::runtime_group_for(&cfg.project_name);
     let build_user = config::build_user_for(&cfg.project_name);
@@ -27,13 +27,13 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
     check_branch_ref(&cfg.repo_path, &cfg.branch, issues, pending);
     check_thin_hook(&cfg.repo_path, issues);
 
-    match fs::read_to_string(paths::ETC_PASSWD) {
+    match fs::read_to_string(paths::etc_passwd()) {
         Ok(passwd) => {
             check_runtime_identity(&runtime_user, &runtime_group, &passwd, issues);
             check_build_user(&build_user, &passwd, issues);
         }
         Err(error) => {
-            issues.push(format!("could not read {} to validate user accounts ({error})", paths::ETC_PASSWD));
+            issues.push(format!("could not read {} to validate user accounts ({error})", paths::etc_passwd()));
         }
     }
 
@@ -68,7 +68,7 @@ fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bone
         return None;
     }
 
-    let bones_path = site_root.join(paths::BONES_TOML);
+    let bones_path = site_root.join(paths::bones_toml());
     let cfg = match config::load(&bones_path) {
         Ok(cfg) => cfg,
         Err(error) => {
@@ -144,10 +144,10 @@ fn check_runtime_identity(runtime_user: &str, runtime_group: &str, passwd: &str,
         issues.push(format!("runtime user does not exist: {runtime_user}"));
     }
 
-    let groupfile = match fs::read_to_string(paths::ETC_GROUP) {
+    let groupfile = match fs::read_to_string(paths::etc_group()) {
         Ok(groupfile) => groupfile,
         Err(error) => {
-            issues.push(format!("could not read {} to validate runtime group ({error})", paths::ETC_GROUP));
+            issues.push(format!("could not read {} to validate runtime group ({error})", paths::etc_group()));
             return;
         }
     };
@@ -155,8 +155,8 @@ fn check_runtime_identity(runtime_user: &str, runtime_group: &str, passwd: &str,
         issues.push(format!("runtime group does not exist: {runtime_group}"));
         return;
     };
-    if members.iter().any(|member| member == paths::DEPLOY_USER) {
-        issues.push(format!("{} must not be a member of runtime group {}", paths::DEPLOY_USER, runtime_group));
+    if members.iter().any(|member| member == paths::deploy_user()) {
+        issues.push(format!("{} must not be a member of runtime group {}", paths::deploy_user(), runtime_group));
     }
 }
 
@@ -209,7 +209,11 @@ fn check_target_membership(target: &str, issues: &mut Vec<String>) {
 }
 
 fn required_services(output: &str) -> Vec<String> {
-    output.split_whitespace().filter(|name| name.ends_with(paths::SYSTEMD_SERVICE_SUFFIX)).map(str::to_owned).collect()
+    output
+        .split_whitespace()
+        .filter(|name| name.ends_with(paths::systemd_service_suffix()))
+        .map(str::to_owned)
+        .collect()
 }
 
 fn check_required_service_active(target: &str, service: &str, issues: &mut Vec<String>) {

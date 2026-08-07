@@ -23,7 +23,7 @@ pub fn scaffold(bones_dir: &Path) -> Result<()> {
 }
 
 pub fn scaffold_gitignore(bones_dir: &Path) -> Result<()> {
-    let path = paths::GITIGNORE_FILE;
+    let path = paths::gitignore_file();
     let Some(asset) = Kit::get(path) else {
         return Ok(());
     };
@@ -31,7 +31,7 @@ pub fn scaffold_gitignore(bones_dir: &Path) -> Result<()> {
 }
 
 pub(super) fn scaffold_deployment_functions(bones_dir: &Path) -> Result<()> {
-    let path = format!("{}functions.sh", paths::KIT_DEPLOYMENT_DIR);
+    let path = format!("{}functions.sh", paths::kit_deployment_dir());
     let Some(asset) = Kit::get(&path) else {
         return Ok(());
     };

@@ -14,7 +14,7 @@ pub(super) fn current_local_version() -> String {
 }
 
 pub(super) fn current_remote_version() -> String {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::local_bones_toml());
     if !bones_toml.exists() {
         return String::from("unknown");
     }
@@ -36,7 +36,7 @@ pub(super) fn current_remote_version() -> String {
 
 pub(super) fn update_local_from_crates_io(version: &str) -> Result<()> {
     let status = Command::new("cargo")
-        .args(["install", "--locked", paths::BONESDEPLOY_BINARY, "--version", version, "--force"])
+        .args(["install", "--locked", paths::bonesdeploy_binary(), "--version", version, "--force"])
         .status()
         .context("Failed to run cargo install for bonesdeploy from crates.io")?;
 
@@ -48,16 +48,16 @@ pub(super) fn update_local_from_crates_io(version: &str) -> Result<()> {
 }
 
 pub(super) async fn update_remote_from_release(current_version: &str, target_version: &str) -> Result<()> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::local_bones_toml());
     if !bones_toml.exists() {
-        bail!("No {} found. Run from a bonesdeploy project directory.", paths::LOCAL_BONES_TOML);
+        bail!("No {} found. Run from a bonesdeploy project directory.", paths::local_bones_toml());
     }
 
     let cfg = config::load(bones_toml)?;
     let port = parse_port(&cfg.port)?;
     let session = ssh::connect_as("root", &cfg.host, port).await?;
 
-    let install_root = paths::USR_LOCAL_BIN;
+    let install_root = paths::usr_local_bin();
     if current_version != target_version {
         ssh::stream_cmd(&session, &bonesremote_download_command(target_version, install_root)).await?;
     }
@@ -66,7 +66,7 @@ pub(super) async fn update_remote_from_release(current_version: &str, target_ver
         &session,
         &format!(
             "mkdir -p {root} && chown root:root {root} && chmod 711 {root}",
-            root = paths::DEFAULT_PROJECT_ROOT_PARENT
+            root = paths::default_project_root_parent()
         ),
     )
     .await?;
@@ -84,7 +84,7 @@ fn bonesremote_download_command(version: &str, install_root: &str) -> String {
     format!(
         "set -eu; case \"$(uname -m)\" in x86_64|amd64) ;; *) echo 'ERROR: bonesremote release binaries only support x86_64 hosts.' >&2; exit 1 ;; esac; tmp=$(mktemp -d); trap 'rm -rf \"$tmp\"' EXIT; curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 '{base_url}/{artifact}' --output \"$tmp/{artifact}\"; curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 '{base_url}/{artifact}.sha256' --output \"$tmp/{artifact}.sha256\"; (cd \"$tmp\" && sha256sum --check \"{artifact}.sha256\"); chmod 0755 \"$tmp/{artifact}\"; test \"$(\"$tmp/{artifact}\" version)\" = 'bonesremote {version}'; install -o root -g root -m 0755 \"$tmp/{artifact}\" '{install_root}/{binary}.tmp'; mv -f '{install_root}/{binary}.tmp' '{install_root}/{binary}'",
         artifact = artifact,
-        binary = paths::BONESREMOTE_BINARY,
+        binary = paths::bonesremote_binary(),
     )
 }
 

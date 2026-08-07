@@ -96,7 +96,7 @@ fn target_name_for_registered_site(site: &str, registered_site: &str) -> Result<
 fn parse_target_services(output: &str) -> Vec<String> {
     output
         .split_whitespace()
-        .filter(|name| name.ends_with(paths::SYSTEMD_SERVICE_SUFFIX))
+        .filter(|name| name.ends_with(paths::systemd_service_suffix()))
         .map(str::to_owned)
         .collect::<BTreeSet<_>>()
         .into_iter()

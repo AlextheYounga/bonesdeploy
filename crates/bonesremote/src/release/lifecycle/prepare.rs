@@ -24,8 +24,8 @@ pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release prepare")?;
 
     let cfg = super::load_site_config(site)?;
-    let deployment_dir = paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR);
-    let scripts_dir = deployment_dir.join(paths::DEPLOYMENT_PREPARE_DIR);
+    let deployment_dir = paths::bonesremote_site_root(site).join(paths::deployment_dir());
+    let scripts_dir = deployment_dir.join(paths::deployment_prepare_dir());
     if !scripts_dir.is_dir() {
         println!("No prepare scripts at {}; skipping prepare.", scripts_dir.display());
         return Ok(());
@@ -36,7 +36,7 @@ pub fn run(site: &str) -> Result<()> {
         println!("No prepare scripts found at {}; skipping prepare.", scripts_dir.display());
         return Ok(());
     }
-    let shared_functions = deployment_dir.join(paths::DEPLOYMENT_FUNCTIONS_FILE);
+    let shared_functions = deployment_dir.join(paths::deployment_functions_file());
     if !shared_functions.is_file() {
         bail!("Shared prepare functions are missing or not a regular file: {}", shared_functions.display());
     }

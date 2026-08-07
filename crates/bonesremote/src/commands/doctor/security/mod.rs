@@ -68,11 +68,11 @@ pub(super) fn audit(site_name: Option<&str>, exhaustive: bool) -> Report {
         Ok(sites) => sites,
         Err(error) => return Report { findings: vec![unverified("Site identity isolation", error)] },
     };
-    let Some(deploy) = accounts.get(paths::DEPLOY_USER).cloned() else {
+    let Some(deploy) = accounts.get(paths::deploy_user()).cloned() else {
         return Report {
             findings: vec![unverified(
                 "Site identity isolation",
-                format!("deploy user {} is absent", paths::DEPLOY_USER),
+                format!("deploy user {} is absent", paths::deploy_user()),
             )],
         };
     };
@@ -107,12 +107,12 @@ pub(super) fn audit(site_name: Option<&str>, exhaustive: bool) -> Report {
 fn protected_paths() -> Vec<PathBuf> {
     vec![
         paths::bonesremote_config_root(),
-        paths::ETC_SYSTEMD_SYSTEM.into(),
-        paths::ETC_SUDOERS_D.into(),
-        paths::ETC_NGINX_SITES_AVAILABLE.into(),
-        paths::ETC_NGINX_SITES_ENABLED.into(),
-        paths::ETC_APPARMOR_D.into(),
-        paths::SUDOERS_PATH.into(),
+        paths::etc_systemd_system().into(),
+        paths::etc_sudoers_d().into(),
+        paths::etc_nginx_sites_available().into(),
+        paths::etc_nginx_sites_enabled().into(),
+        paths::etc_apparmor_d().into(),
+        paths::sudoers_path().into(),
         paths::bonesremote_global_link(),
     ]
 }

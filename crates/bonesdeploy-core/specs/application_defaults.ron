@@ -1,0 +1,9 @@
+// Default application-level deployment settings used when no project
+// configuration overrides them.
+
+ApplicationDefaults(
+    ssh_user: "root",
+    port: "22",
+    branch: "master",
+    releases_keep: 5,
+)

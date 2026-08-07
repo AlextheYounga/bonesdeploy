@@ -23,10 +23,10 @@ fn first_import_acquires_mutation_without_live_site_config() -> Result<()> {
     let staging = root.join("staging");
     fs::create_dir_all(&staging)?;
     fs::write(
-        staging.join(paths::BONES_TOML),
+        staging.join(paths::bones_toml()),
         "[app]\nproject_name = \"unitapp\"\n\n[app.server]\nhost = \"example.com\"\n",
     )?;
-    let config = config::load(&staging.join(paths::BONES_TOML))?;
+    let config = config::load(&staging.join(paths::bones_toml()))?;
 
     // The live site directory and its bones.toml do not exist yet, so the
     // guard must be acquired from the just-validated staged configuration.
@@ -136,7 +136,7 @@ fn write_hook_file_installs_baked_trigger_with_executable_mode() -> Result<()> {
     }
 
     let repo_root = root.join("repos/unitapp.git");
-    let target = repo_root.join(paths::HOOKS_DIR).join("post-receive");
+    let target = repo_root.join(paths::hooks_dir()).join("post-receive");
 
     write_hook_file(&target)?;
 

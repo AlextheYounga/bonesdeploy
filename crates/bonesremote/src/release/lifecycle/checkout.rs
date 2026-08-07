@@ -20,10 +20,10 @@ fn resolved_sites_root() -> PathBuf {
 }
 
 fn resolved_tmp_root(site: &str) -> Result<PathBuf> {
-    let bones_path = resolved_sites_root().join(site).join(paths::BONES_TOML);
+    let bones_path = resolved_sites_root().join(site).join(paths::bones_toml());
     let cfg = config::load(&bones_path)
         .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
-    Ok(Path::new(&cfg.project_root).join(paths::TMP_BUILDS_DIR))
+    Ok(Path::new(&cfg.project_root).join(paths::tmp_builds_dir()))
 }
 
 pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {

@@ -23,7 +23,7 @@ const LOCAL_ENV_SECRET: &str = ".bones/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
 
 pub fn init() -> Result<()> {
-    let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
+    let bones_dir = Path::new(paths::local_bones_dir());
     if !bones_dir.is_dir() {
         bail!("Missing .bones config\n\n{}", output::next_step("bonesdeploy init"));
     }
@@ -33,7 +33,7 @@ pub fn init() -> Result<()> {
         bail!("Missing encrypted secrets\n\n{}", output::next_step("bonesdeploy secrets edit"));
     }
 
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let cfg = config::load(Path::new(paths::local_bones_toml()))?;
     initialize_defaults(&cfg)?;
 
     println!("{} Secrets initialized.", output::success_marker());
@@ -50,8 +50,8 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
 
     gpg::ensure_installed()?;
     let key_fingerprint = gpg::ensure_project_key(&cfg.project_name)?;
-    fs::create_dir_all(paths::LOCAL_BONES_SECRETS_DIR)
-        .with_context(|| format!("Failed to create {}", paths::LOCAL_BONES_SECRETS_DIR))?;
+    fs::create_dir_all(paths::local_bones_secrets_dir())
+        .with_context(|| format!("Failed to create {}", paths::local_bones_secrets_dir()))?;
 
     let temp_path = create_temp_edit_path()?;
     let mut effective_config = cfg.clone();
@@ -89,7 +89,7 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
 pub fn edit() -> Result<()> {
     gpg::ensure_installed()?;
 
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let cfg = config::load(Path::new(paths::local_bones_toml()))?;
     let key_fingerprint = gpg::ensure_project_key(&cfg.project_name)?;
 
     let encrypted_path = Path::new(LOCAL_ENV_SECRET);
@@ -146,7 +146,7 @@ pub fn edit() -> Result<()> {
 pub async fn push() -> Result<()> {
     gpg::ensure_installed()?;
 
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let cfg = config::load(Path::new(paths::local_bones_toml()))?;
     let runtime_group = shared_config::runtime_group_for(&cfg.project_name);
 
     let ssh_user = config::bootstrap_ssh_user(&cfg);
@@ -159,8 +159,8 @@ pub async fn push() -> Result<()> {
     }
 
     let plaintext = gpg::decrypt(encrypted_path)?;
-    let shared = Path::new(&cfg.project_root).join(paths::SHARED_DIR);
-    let target = shared.join(paths::DOT_ENV);
+    let shared = Path::new(&cfg.project_root).join(paths::shared_dir());
+    let target = shared.join(paths::dot_env());
     let parent = target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
     let parent_s = ssh::shell_quote(&parent.display().to_string());
     let target_s = ssh::shell_quote(&target.display().to_string());

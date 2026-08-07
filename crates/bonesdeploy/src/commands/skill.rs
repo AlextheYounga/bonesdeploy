@@ -71,7 +71,7 @@ pub async fn run_next(format: GuideFormat) -> Result<()> {
 
 pub async fn build_report() -> Result<Report> {
     let project = config::repo_directory_name()?;
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::local_bones_toml());
 
     if !bones_toml.exists() {
         return Ok(uninitialized_report(&project));
@@ -192,7 +192,7 @@ async fn remote_setup_complete(cfg: &config::Bones) -> Result<bool> {
             .await
             .is_ok();
 
-    let current = Path::new(&cfg.project_root).join(paths::CURRENT_LINK);
+    let current = Path::new(&cfg.project_root).join(paths::current_link());
     let current_ok =
         ssh::run_cmd(&session, &format!("test -e {}", ssh::shell_quote(&current.display().to_string()))).await.is_ok();
 
@@ -208,7 +208,7 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones) -> Result<bool> {
 
     let session = ssh::connect_privileged(cfg).await?;
     let nginx_site_available =
-        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", cfg.project_name)).display().to_string();
+        Path::new(paths::etc_nginx_sites_available()).join(format!("{}.conf", cfg.project_name)).display().to_string();
     let command = format!(
         "test -r {path} && grep -Fq {domain} {path} && grep -Fq 'listen 443 ssl;' {path}",
         path = ssh::shell_quote(&nginx_site_available),

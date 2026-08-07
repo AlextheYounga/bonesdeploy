@@ -278,6 +278,10 @@ bonesdeploy update
 
 `bonesdeploy init` creates `.bones/bones.toml`:
 
+Core embeds its shared paths and defaults as typed RON specifications. Init
+materializes those defaults into the project TOML; edit `.bones/bones.toml` for
+project-specific overrides.
+
 ```toml
 [app]
 remote_name = "production"

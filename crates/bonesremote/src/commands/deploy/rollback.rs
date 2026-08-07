@@ -51,7 +51,7 @@ fn switch_and_verify(
     previous_name: &str,
     restart: impl Fn() -> Result<()>,
 ) -> Result<()> {
-    let current_link = PathBuf::from(project_root).join(paths::CURRENT_LINK);
+    let current_link = PathBuf::from(project_root).join(paths::current_link());
     let previous_dir = release_state::release_dir(project_root, previous_name);
     let current_dir = release_state::release_dir(project_root, current_name);
 

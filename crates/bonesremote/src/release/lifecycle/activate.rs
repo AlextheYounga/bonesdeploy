@@ -12,7 +12,7 @@ pub fn run(site: &str) -> Result<()> {
     let cfg = super::load_site_config(site)?;
     let release_name = release_state::read_staged_release(site)?;
     let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
-    let current_link = PathBuf::from(&cfg.project_root).join(paths::CURRENT_LINK);
+    let current_link = PathBuf::from(&cfg.project_root).join(paths::current_link());
 
     if !release_dir.exists() {
         anyhow::bail!("Promoted release directory does not exist: {}", release_dir.display());

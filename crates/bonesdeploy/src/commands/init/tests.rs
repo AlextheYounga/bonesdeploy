@@ -125,6 +125,14 @@ fn assert_bones_dir(bones_dir: &Path) -> Result<()> {
     assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
     let bones_toml = fs::read_to_string(bones_dir.join("bones.toml"))?;
     assert!(bones_toml.contains("[runtime]"));
+    assert!(bones_toml.contains("node_version = \"24.18.0\""), "runtime defaults come from the Core specification");
+    assert!(
+        bones_toml.contains("[runtime.permissions]"),
+        "default release permissions are written to the project config"
+    );
+    assert!(bones_toml.contains("type = \"dir\""), "default permission rules are typed: {bones_toml}");
+    assert!(bones_toml.contains("mode = \"750\""));
+    assert!(bones_toml.contains("mode = \"640\""));
     Ok(())
 }
 

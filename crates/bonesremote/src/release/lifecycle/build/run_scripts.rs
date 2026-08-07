@@ -22,7 +22,8 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
     let build_group = build_group_for(&cfg.project_name);
     ownership::chown_tree_to_user(context, &build_user, &build_group)?;
 
-    let scripts_dir = paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR).join(paths::DEPLOYMENT_BUILD_DIR);
+    let scripts_dir =
+        paths::bonesremote_site_root(site).join(paths::deployment_dir()).join(paths::deployment_build_dir());
     if !scripts_dir.is_dir() {
         println!(
             "No deployment scripts at {}; running build steps directly on the exported source tree.",

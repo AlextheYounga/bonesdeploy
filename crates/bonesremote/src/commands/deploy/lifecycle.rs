@@ -246,7 +246,7 @@ fn finish_failed_activation(
 }
 
 fn restore_previous_release(project_root: &Path, previous_release: &Path) -> Result<()> {
-    let current_link = PathBuf::from(project_root).join(paths::CURRENT_LINK);
+    let current_link = PathBuf::from(project_root).join(paths::current_link());
     release_state::point_symlink_atomically(&current_link, previous_release)
 }
 
@@ -320,16 +320,16 @@ mod tests {
     fn failed_activation_restores_previous_release() -> Result<()> {
         let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
         let root = env::temp_dir().join(format!("bonesremote_restore_{}_{}", process::id(), nonce));
-        let releases = root.join(paths::RELEASES_DIR);
+        let releases = root.join(paths::releases_dir());
         let previous = releases.join("previous");
         let failed = releases.join("failed");
         fs::create_dir_all(&previous)?;
         fs::create_dir(&failed)?;
-        symlink(&failed, root.join(paths::CURRENT_LINK))?;
+        symlink(&failed, root.join(paths::current_link()))?;
 
         restore_previous_release(Path::new(&root), &previous)?;
 
-        assert_eq!(fs::read_link(root.join(paths::CURRENT_LINK))?, previous);
+        assert_eq!(fs::read_link(root.join(paths::current_link()))?, previous);
         fs::remove_dir_all(root)?;
         Ok(())
     }

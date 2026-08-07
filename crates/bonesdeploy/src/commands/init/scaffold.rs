@@ -54,8 +54,8 @@ pub(super) fn materialize_fresh_bones(
 }
 
 pub(super) fn update_gitignore() -> Result<()> {
-    let gitignore = Path::new(paths::GITIGNORE_FILE);
-    let entries = [paths::LOCAL_BONES_DIR, "!.env.build"];
+    let gitignore = Path::new(paths::gitignore_file());
+    let entries = [paths::local_bones_dir(), "!.env.build"];
 
     if gitignore.exists() {
         let content = fs::read_to_string(gitignore)?;
@@ -78,8 +78,8 @@ pub(super) fn update_gitignore() -> Result<()> {
 }
 
 pub(super) fn ensure_config_gitignore() -> Result<()> {
-    let gitignore = paths::bones_config_root().join(paths::GITIGNORE_FILE);
-    let project_entry = format!("{}/", paths::BONES_CONFIG_PROJECTS_DIR);
+    let gitignore = paths::bones_config_root().join(paths::gitignore_file());
+    let project_entry = format!("{}/", paths::bones_config_projects_dir());
 
     if gitignore.exists() {
         let content = fs::read_to_string(&gitignore)?;
@@ -108,10 +108,10 @@ pub(super) fn ensure_config_gitignore() -> Result<()> {
 }
 
 pub(super) fn install_pre_push_guard() -> Result<()> {
-    let hooks_dir = Path::new(paths::GIT_HOOKS_DIR);
+    let hooks_dir = Path::new(paths::git_hooks_dir());
     fs::create_dir_all(hooks_dir)?;
 
-    let guard = hooks_dir.join(paths::PRE_PUSH_HOOK_NAME);
+    let guard = hooks_dir.join(paths::pre_push_hook_name());
 
     if fs::symlink_metadata(&guard).is_ok() {
         fs::remove_file(&guard).with_context(|| format!("Failed to remove existing {}", guard.display()))?;
@@ -167,7 +167,7 @@ pub(super) fn ensure_bones_git_repo(bones_dir: &Path, cfg: &config::Bones) -> Re
 }
 
 pub(super) fn ensure_env_build() -> Result<()> {
-    let env_build_path = Path::new(paths::ENV_BUILD_FILE);
+    let env_build_path = Path::new(paths::env_build_file());
     if env_build_path.exists() {
         return Ok(());
     }

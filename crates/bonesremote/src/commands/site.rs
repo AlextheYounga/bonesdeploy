@@ -115,9 +115,9 @@ fn finalize_imported_site(site: &str, staging_dir: &Path) -> Result<()> {
 }
 
 fn write_post_receive_hook(site_root: &Path) -> Result<()> {
-    let cfg = config::load(&site_root.join(paths::BONES_TOML))?;
+    let cfg = config::load(&site_root.join(paths::bones_toml()))?;
     validate_repo_path(&cfg.repo_path, &cfg.project_name)?;
-    let target = Path::new(&cfg.repo_path).join(paths::HOOKS_DIR).join("post-receive");
+    let target = Path::new(&cfg.repo_path).join(paths::hooks_dir()).join("post-receive");
     write_hook_file(&target)
 }
 
@@ -191,9 +191,9 @@ fn validate_site_dataset(site: &str, root: &Path) -> Result<config::Bones> {
     reject_plaintext_env_files(root)?;
     reject_symlinks(root)?;
 
-    let bones_path = root.join(paths::BONES_TOML);
+    let bones_path = root.join(paths::bones_toml());
     if !bones_path.is_file() {
-        bail!("Missing {} in imported site dataset", paths::BONES_TOML);
+        bail!("Missing {} in imported site dataset", paths::bones_toml());
     }
 
     let bones = config::load(&bones_path)?;
@@ -207,7 +207,7 @@ fn validate_site_dataset(site: &str, root: &Path) -> Result<config::Bones> {
 fn reject_plaintext_env_files(root: &Path) -> Result<()> {
     for entry in fs::read_dir(root).with_context(|| format!("Failed to read {}", root.display()))? {
         let entry = entry?;
-        if entry.file_name() == paths::DOT_ENV {
+        if entry.file_name() == paths::dot_env() {
             bail!("Imported dataset contains plaintext .env: {}", entry.path().display());
         }
         if entry.file_type()?.is_dir() {

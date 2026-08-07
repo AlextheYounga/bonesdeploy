@@ -4,9 +4,9 @@ use std::process::Command;
 use bonesdeploy_core::paths;
 
 pub(super) fn check_supported_distribution(issues: &mut Vec<String>) {
-    let os_release = fs::read_to_string(paths::ETC_OS_RELEASE);
+    let os_release = fs::read_to_string(paths::etc_os_release());
     let Ok(os_release) = os_release else {
-        issues.push(format!("Failed to read {}; expected Debian or Ubuntu host", paths::ETC_OS_RELEASE));
+        issues.push(format!("Failed to read {}; expected Debian or Ubuntu host", paths::etc_os_release()));
         return;
     };
 

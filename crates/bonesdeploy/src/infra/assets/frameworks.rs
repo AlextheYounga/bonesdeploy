@@ -38,13 +38,13 @@ pub fn framework_defaults(framework: &str) -> Result<Map<String, Value>> {
 }
 
 pub fn scaffold_framework_deployment(framework: &str, bones_dir: &Path) -> Result<()> {
-    let deploy_dir = bones_dir.join(paths::DEPLOYMENT_DIR);
+    let deploy_dir = bones_dir.join(paths::deployment_dir());
     if deploy_dir.exists() {
         fs::remove_dir_all(&deploy_dir)
             .with_context(|| format!("Failed to clear deployment dir: {}", deploy_dir.display()))?;
     }
     kit::scaffold_deployment_functions(bones_dir)?;
-    scaffold_framework_assets(framework, bones_dir, paths::KIT_DEPLOYMENT_DIR)
+    scaffold_framework_assets(framework, bones_dir, paths::kit_deployment_dir())
 }
 
 pub fn scaffold_framework_env_build(framework: &str, project_root: &Path, framework_config: &Runtime) -> Result<()> {
@@ -52,7 +52,7 @@ pub fn scaffold_framework_env_build(framework: &str, project_root: &Path, framew
         return Ok(());
     };
 
-    let destination = project_root.join(paths::ENV_BUILD_FILE);
+    let destination = project_root.join(paths::env_build_file());
     if destination.exists() {
         return Ok(());
     }

@@ -18,7 +18,7 @@ pub(crate) fn collect_sites(accounts: &BTreeMap<String, Account>) -> Result<Vec<
             continue;
         }
         let name = entry.file_name().to_string_lossy().to_string();
-        let cfg = config::load(&entry.path().join(paths::BONES_TOML))
+        let cfg = config::load(&entry.path().join(paths::bones_toml()))
             .map_err(|error| format!("cannot load site {name}: {error}"))?;
         if cfg.project_name != name {
             return Err(format!("site directory {name} contains configuration for {}", cfg.project_name));

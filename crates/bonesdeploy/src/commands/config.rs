@@ -10,7 +10,7 @@ pub fn run(file: Option<&str>, key: Option<&str>) -> Result<()> {
 }
 
 pub fn render(file: Option<&str>, key: Option<&str>) -> Result<String> {
-    let path = file.unwrap_or(paths::LOCAL_BONES_TOML);
+    let path = file.unwrap_or(paths::local_bones_toml());
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read config file: {path}"))?;
     let value: toml::Value = toml::from_str(&content).with_context(|| format!("Failed to parse TOML: {path}"))?;
 

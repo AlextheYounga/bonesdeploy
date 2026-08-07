@@ -28,7 +28,7 @@ pub struct SiteState {
 const SCHEMA_VERSION: u32 = 1;
 
 pub(crate) fn state_path(site: &str) -> PathBuf {
-    resolved_site_root(site).join(paths::DEPLOYMENT_STATE_FILE)
+    resolved_site_root(site).join(paths::deployment_state_file())
 }
 
 /// Reads the per-site state, migrating previous `active-deployment.json` +
@@ -60,8 +60,8 @@ pub(crate) fn write_state(site: &str, state: &SiteState) -> Result<()> {
 /// when neither file exists.
 fn migrate_previous(site: &str) -> Result<SiteState> {
     let site_root = resolved_site_root(site);
-    let previous_active_path = site_root.join(paths::ACTIVE_DEPLOYMENT_FILE);
-    let previous_staged_path = site_root.join(paths::STAGED_RELEASE_FILE);
+    let previous_active_path = site_root.join(paths::active_deployment_file());
+    let previous_staged_path = site_root.join(paths::staged_release_file());
 
     let active = if previous_active_path.is_file() {
         let content = fs::read_to_string(&previous_active_path)
@@ -109,8 +109,8 @@ fn migrate_previous(site: &str) -> Result<SiteState> {
 pub(crate) fn quarantine_candidates(site: &str) -> Vec<PathBuf> {
     let site_root = resolved_site_root(site);
     let mut candidates = vec![state_path(site)];
-    candidates.push(site_root.join(paths::ACTIVE_DEPLOYMENT_FILE));
-    candidates.push(site_root.join(paths::STAGED_RELEASE_FILE));
+    candidates.push(site_root.join(paths::active_deployment_file()));
+    candidates.push(site_root.join(paths::staged_release_file()));
     candidates
 }
 
@@ -192,10 +192,10 @@ mod tests {
         let site_root = root.join("unitapp");
         fs::create_dir_all(&site_root)?;
         fs::write(
-            site_root.join(paths::ACTIVE_DEPLOYMENT_FILE),
+            site_root.join(paths::active_deployment_file()),
             r#"{"release":"20260101_000000","pid":1234,"phase":"building","started_at":"2026-08-04T19:03:21Z"}"#,
         )?;
-        fs::write(site_root.join(paths::STAGED_RELEASE_FILE), "20260101_000000\n")?;
+        fs::write(site_root.join(paths::staged_release_file()), "20260101_000000\n")?;
 
         let state = read_state("unitapp")?;
 
@@ -203,8 +203,8 @@ mod tests {
         assert_eq!(active.phase, DeploymentPhase::Created);
         assert_eq!(state.staged_release.as_deref(), Some("20260101_000000"));
         assert!(state_path("unitapp").exists(), "migration must persist the store");
-        assert!(!site_root.join(paths::ACTIVE_DEPLOYMENT_FILE).exists(), "previous active file must be removed");
-        assert!(!site_root.join(paths::STAGED_RELEASE_FILE).exists(), "previous staged file must be removed");
+        assert!(!site_root.join(paths::active_deployment_file()).exists(), "previous active file must be removed");
+        assert!(!site_root.join(paths::staged_release_file()).exists(), "previous staged file must be removed");
         fs::remove_dir_all(root).ok();
         Ok(())
     }

@@ -1,5 +1,5 @@
 use anyhow::{Context, Result, anyhow};
-use bonesdeploy_core::config::{DATABASE_SERVICES, validate_database_services};
+use bonesdeploy_core::config::{database_services, validate_database_services};
 use serde_json::Value;
 
 use super::{Args, FrameworkSelection};
@@ -30,7 +30,7 @@ pub(super) fn collect_database_services(args: &Args) -> Result<Vec<String>> {
         validate_database_services(&args.services)?;
         return Ok(args.services.clone());
     }
-    prompts::choose_services(DATABASE_SERVICES)
+    prompts::choose_services(database_services())
 }
 
 fn resolve_template(args: &Args) -> Result<Option<String>> {

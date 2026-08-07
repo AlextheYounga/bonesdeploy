@@ -38,9 +38,9 @@ pub fn run(site: &str) -> Result<()> {
 fn build_report(site: &str) -> Result<Report> {
     let config_path = paths::bonesremote_bones_toml_path(site);
     let cfg = config::load(&config_path).context("Failed to load remote bones.toml")?;
-    let current = Path::new(&cfg.project_root).join(paths::CURRENT_LINK);
+    let current = Path::new(&cfg.project_root).join(paths::current_link());
     let nginx_site_available =
-        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", cfg.project_name)).display().to_string();
+        Path::new(paths::etc_nginx_sites_available()).join(format!("{}.conf", cfg.project_name)).display().to_string();
 
     Ok(Report {
         current_release: current_release(&current),
@@ -116,7 +116,7 @@ fn systemctl_output<const N: usize>(args: [&str; N]) -> String {
 fn parse_target_units(output: &str) -> Vec<String> {
     output
         .split_whitespace()
-        .filter(|name| name.ends_with(paths::SYSTEMD_SERVICE_SUFFIX))
+        .filter(|name| name.ends_with(paths::systemd_service_suffix()))
         .map(str::to_owned)
         .collect::<BTreeSet<_>>()
         .into_iter()

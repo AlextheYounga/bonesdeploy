@@ -55,7 +55,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
 
     if let Some(context) = current.as_ref().and_then(|deployment| deployment.context.as_deref()) {
         let context = Path::new(context);
-        let tmp_root = Path::new(&mutation.config().project_root).join(paths::TMP_BUILDS_DIR);
+        let tmp_root = Path::new(&mutation.config().project_root).join(paths::tmp_builds_dir());
         if !context.starts_with(&tmp_root)
             || !context.file_name().is_some_and(|name| name.to_string_lossy().starts_with(&format!("build-{site}-")))
         {
@@ -76,7 +76,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
 }
 
 fn cleanup_stale_contexts(site: &str, project_root: &str) -> Result<()> {
-    let tmp_root = Path::new(project_root).join(paths::TMP_BUILDS_DIR);
+    let tmp_root = Path::new(project_root).join(paths::tmp_builds_dir());
     if !tmp_root.is_dir() {
         return Ok(());
     }

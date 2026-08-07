@@ -14,9 +14,9 @@ use crate::ui::output;
 use crate::ui::prompts;
 
 pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<()> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::local_bones_toml());
     let mut cfg = config::load(bones_toml)?;
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
+    let runtime = shared_config::load_runtime(Path::new(paths::local_bones_dir()))?;
 
     if let Some(value) = domain {
         cfg.domain = value.trim().to_string();
@@ -58,7 +58,7 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    bonesinfra::run_with_stdin(&["ssl", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
+    bonesinfra::run_with_stdin(&["ssl", "apply", "--config", paths::local_bones_toml()], &json)?;
 
     cfg.ssl_enabled = true;
     config::save(&cfg, bones_toml)?;

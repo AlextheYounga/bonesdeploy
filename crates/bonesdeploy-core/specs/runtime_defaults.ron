@@ -1,0 +1,15 @@
+// Default runtime settings applied to a project before framework or
+// project-specific values are merged in.
+//
+// `release_permissions` defines the default path rules applied to a release
+// when a project does not configure its own `[runtime.permissions]` section.
+
+RuntimeDefaults(
+    template: "",
+    web_root: "public",
+    node_version: "24.18.0",
+    release_permissions: [
+        PermissionRule(path: "*", type: dir, mode: "750"),
+        PermissionRule(path: "*", type: file, mode: "640"),
+    ],
+)

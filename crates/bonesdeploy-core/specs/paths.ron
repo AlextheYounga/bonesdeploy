@@ -1,0 +1,94 @@
+// Core filesystem and infrastructure paths.
+//
+// This file is the single source of truth for shared path decisions in
+// bonesdeploy. It is embedded at compile time and deserialized by
+// `bonesdeploy_core::specs`. Paths derived from project or site identifiers
+// are computed in Rust from these values.
+
+Paths(
+    // Default deployment locations.
+    repo_parent: "/home/git",
+    project_root_parent: "/srv/sites",
+    conf_root_parent: "/srv/conf",
+    web_root: "public",
+
+    // Accounts used during provisioning.
+    deploy_user: "git",
+    default_group: "www-data",
+
+    // System locations.
+    etc_nginx_sites_available: "/etc/nginx/sites-available",
+    etc_nginx_sites_enabled: "/etc/nginx/sites-enabled",
+    etc_systemd_system: "/etc/systemd/system",
+    etc_apparmor_d: "/etc/apparmor.d",
+    etc_letsencrypt_live: "/etc/letsencrypt/live",
+    etc_sudoers_d: "/etc/sudoers.d",
+    etc_os_release: "/etc/os-release",
+    etc_passwd: "/etc/passwd",
+    etc_group: "/etc/group",
+    apparmor_enabled_param: "/sys/module/apparmor/parameters/enabled",
+    apparmor_profiles: "/sys/kernel/security/apparmor/profiles",
+    usr_local_bin: "/usr/local/bin",
+
+    // Project-local configuration in a repository.
+    local_bones_dir: ".bones",
+    local_bones_toml: ".bones/bones.toml",
+    local_bones_deployment_dir: ".bones/deployment",
+    local_bones_secrets_dir: ".bones/secrets",
+    dot_env: ".env",
+    env_build_file: ".env.build",
+
+    // Layout on a remote site root.
+    bones_dir: "bones",
+    bones_toml: "bones.toml",
+    nginx_conf: "nginx.conf",
+    index_html: "index.html",
+    git_head: "HEAD",
+    deployment_dir: "deployment",
+    deployment_functions_file: "functions.sh",
+    deployment_build_dir: "build",
+    deployment_prepare_dir: "prepare",
+    releases_dir: "releases",
+    shared_dir: "shared",
+    build_dir: "build",
+    workspace_dir: "workspace",
+    logs_dir: "logs",
+    current_link: "current",
+    staged_release_file: "staged-release",
+    active_deployment_file: "active-deployment.json",
+    deployment_state_file: "deployment.json",
+    deployment_lock_file: "deployment.lock",
+    recovery_dir: "recovery",
+    tmp_builds_dir: "tmp",
+    placeholder_release_name: "19700101_000000",
+    sudoers_file: "bonesdeploy",
+    sudoers_path: "/etc/sudoers.d/bonesdeploy",
+    bonesdeploy_binary: "bonesdeploy",
+    bonesremote_binary: "bonesremote",
+    bonesremote_config_dir: "/root/.config/bonesremote",
+    bonesremote_sites_dir: "sites",
+    bonesremote_repos_dir: "repos",
+    bonesdeploy_users_root: "/var/lib/bonesdeploy/users",
+    build_cache_dir: "cache",
+    nginx_socket: "nginx.sock",
+    nginx_pid: "nginx.pid",
+    php_fpm_socket: "php-fpm.sock",
+    default_nginx_site: "default",
+    systemd_service_suffix: ".service",
+
+    // Git integration.
+    git_hooks_dir: ".git/hooks",
+    git_pre_push_hook: ".git/hooks/pre-push",
+    pre_push_hook_name: "pre-push",
+
+    // Static kit assets shipped to a project.
+    hooks_dir: "hooks",
+    confs_dir: "confs",
+    kit_deployment_dir: "deployment/",
+    kit_confs_dir: "confs/",
+
+    // bonesdeploy user configuration.
+    bones_config_projects_dir: "projects",
+    bonesdeploy_dir: "bonesdeploy",
+    gitignore_file: ".gitignore",
+)

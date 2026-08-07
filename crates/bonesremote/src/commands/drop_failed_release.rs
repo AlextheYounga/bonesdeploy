@@ -60,9 +60,9 @@ mod tests {
     fn active_release_cannot_be_dropped() -> Result<()> {
         let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
         let root = env::temp_dir().join(format!("bonesremote_drop_{}_{}", process::id(), nonce));
-        let release = root.join(paths::RELEASES_DIR).join("active-release");
+        let release = root.join(paths::releases_dir()).join("active-release");
         fs::create_dir_all(&release)?;
-        symlink(&release, root.join(paths::CURRENT_LINK))?;
+        symlink(&release, root.join(paths::current_link()))?;
 
         assert!(ensure_release_not_active(&root, "active-release").is_err());
 

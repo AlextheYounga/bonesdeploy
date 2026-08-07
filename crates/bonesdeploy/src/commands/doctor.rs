@@ -12,7 +12,7 @@ use bonesdeploy_core::{config::is_numbered_shell_script, paths};
 pub async fn run(local_only: bool, verbose: bool) -> Result<bool> {
     println!("{} Checking deployment...", console::style("bonesdeploy doctor").bold());
 
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML)).ok();
+    let cfg = config::load(Path::new(paths::local_bones_toml())).ok();
     let deploy_on_push = cfg.as_ref().is_some_and(|c| c.deploy_on_push);
 
     let mut issues = 0usize;
@@ -108,7 +108,7 @@ fn print_failure(label: &str, issue: &str, next: Option<String>) -> usize {
 }
 
 fn check_bones_config() -> Option<String> {
-    let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
+    let bones_dir = Path::new(paths::local_bones_dir());
 
     if !bones_dir.exists() {
         return Some(String::from("Missing .bones config"));
@@ -118,19 +118,19 @@ fn check_bones_config() -> Option<String> {
         return Some(String::from(".bones is not managed by bonesdeploy"));
     }
 
-    if !Path::new(paths::LOCAL_BONES_TOML).exists() {
-        return Some(format!("Missing {}", paths::LOCAL_BONES_TOML));
+    if !Path::new(paths::local_bones_toml()).exists() {
+        return Some(format!("Missing {}", paths::local_bones_toml()));
     }
 
-    if let Err(error) = config::load(Path::new(paths::LOCAL_BONES_TOML)) {
-        return Some(format!("Invalid {}: {error:#}", paths::LOCAL_BONES_TOML));
+    if let Err(error) = config::load(Path::new(paths::local_bones_toml())) {
+        return Some(format!("Invalid {}: {error:#}", paths::local_bones_toml()));
     }
 
     None
 }
 
 fn check_deployment_scripts() -> Option<String> {
-    let deployment_dir = Path::new(paths::LOCAL_BONES_DEPLOYMENT_DIR);
+    let deployment_dir = Path::new(paths::local_bones_deployment_dir());
     if !deployment_dir.exists() {
         return None;
     }
@@ -189,7 +189,7 @@ fn check_local_branch(cfg: &config::Bones) -> Option<String> {
 }
 
 fn check_pre_push_hook() -> Option<String> {
-    let guard = Path::new(paths::GIT_PRE_PUSH_HOOK);
+    let guard = Path::new(paths::git_pre_push_hook());
     let Ok(contents) = fs::read_to_string(guard) else {
         return Some(String::from("pre-push hook is not installed"));
     };
