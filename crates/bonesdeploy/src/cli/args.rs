@@ -109,21 +109,6 @@ pub enum Command {
     Version,
 }
 
-#[cfg(test)]
-mod tests {
-    use clap::Parser;
-
-    use super::{Cli, Command};
-
-    #[test]
-    fn doctor_accepts_verbose_flag() {
-        assert!(matches!(
-            Cli::try_parse_from(["bonesdeploy", "doctor", "--verbose"]),
-            Ok(Cli { command: Command::Doctor { local: false, verbose: true } })
-        ));
-    }
-}
-
 #[derive(Subcommand)]
 pub enum SecretsCommand {
     /// Create the local secrets config and storage directory

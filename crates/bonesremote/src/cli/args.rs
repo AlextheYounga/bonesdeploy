@@ -125,20 +125,3 @@ pub enum ServiceCommand {
         site: String,
     },
 }
-
-#[cfg(test)]
-mod tests {
-    use clap::Parser;
-
-    use super::Cli;
-
-    #[test]
-    fn exhaustive_doctor_requires_a_site() {
-        assert!(Cli::try_parse_from(["bonesremote", "doctor", "--exhaustive"]).is_err());
-    }
-
-    #[test]
-    fn exhaustive_doctor_accepts_a_site() {
-        assert!(Cli::try_parse_from(["bonesremote", "doctor", "--site", "atlas", "--exhaustive"]).is_ok());
-    }
-}

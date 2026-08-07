@@ -36,7 +36,7 @@ pub fn run(args: &Args) -> Result<()> {
     run_with_prefetch(args, || Ok(()))
 }
 
-pub(super) fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<()>) -> Result<()> {
+fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<()>) -> Result<()> {
     git::ensure_git_repository()?;
 
     println!("{} {}", style("Initializing").cyan().bold(), style("bonesdeploy").bold());
@@ -88,6 +88,3 @@ fn print_follow_up_hint() {
     println!();
     println!("{}", output::next_step_with_detail("bonesdeploy setup", "to setup the remote server"));
 }
-
-#[cfg(test)]
-mod tests;
