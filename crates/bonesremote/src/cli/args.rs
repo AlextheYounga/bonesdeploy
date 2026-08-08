@@ -130,11 +130,6 @@ pub enum ServiceCommand {
         site: String,
     },
 }
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> refactor/external-public-tests
-
 #[derive(Subcommand)]
 pub enum PatchCommand {
     /// Apply one named migration for a site
@@ -145,33 +140,3 @@ pub enum PatchCommand {
         patch: String,
     },
 }
-<<<<<<< HEAD
-
-#[cfg(test)]
-mod tests {
-    use clap::Parser;
-
-    use super::Cli;
-
-    #[test]
-    fn exhaustive_doctor_requires_a_site() {
-        assert!(Cli::try_parse_from(["bonesremote", "doctor", "--exhaustive"]).is_err());
-    }
-
-    #[test]
-    fn exhaustive_doctor_accepts_a_site() {
-        assert!(Cli::try_parse_from(["bonesremote", "doctor", "--site", "atlas", "--exhaustive"]).is_ok());
-    }
-
-    #[test]
-    fn patch_apply_accepts_site_and_patch_identifiers() {
-        assert!(
-            Cli::try_parse_from(["bonesremote", "patch", "apply", "--site", "atlas", "--patch", "0001-config-repo"])
-                .is_ok()
-        );
-    }
-}
-=======
->>>>>>> refactor/external-public-tests
-=======
->>>>>>> refactor/external-public-tests
