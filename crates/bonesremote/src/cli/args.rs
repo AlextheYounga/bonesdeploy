@@ -52,6 +52,11 @@ pub enum Command {
         #[command(subcommand)]
         command: ServiceCommand,
     },
+    /// Apply an ordered server migration (requires root)
+    Patch {
+        #[command(subcommand)]
+        command: PatchCommand,
+    },
     /// Print the version
     Version,
 }
@@ -123,5 +128,16 @@ pub enum ServiceCommand {
     Restart {
         #[arg(long)]
         site: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum PatchCommand {
+    /// Apply one named migration for a site
+    Apply {
+        #[arg(long)]
+        site: String,
+        #[arg(long)]
+        patch: String,
     },
 }

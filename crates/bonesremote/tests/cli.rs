@@ -17,3 +17,10 @@ fn exhaustive_doctor_accepts_a_site() -> Result<()> {
     assert_ne!(output.status.code(), Some(2), "accepted arguments must not be a usage error");
     Ok(())
 }
+
+#[test]
+fn patch_apply_accepts_site_and_patch_identifiers() -> Result<()> {
+    let output = common::run(&["patch", "apply", "--site", "atlas", "--patch", "0001-config-repo"])?;
+    assert_ne!(output.status.code(), Some(2), "accepted arguments must not be a usage error");
+    Ok(())
+}
