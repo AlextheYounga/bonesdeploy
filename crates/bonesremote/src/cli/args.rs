@@ -130,6 +130,7 @@ pub enum ServiceCommand {
         site: String,
     },
 }
+<<<<<<< HEAD
 
 #[derive(Subcommand)]
 pub enum PatchCommand {
@@ -166,3 +167,5 @@ mod tests {
         );
     }
 }
+=======
+>>>>>>> refactor/external-public-tests

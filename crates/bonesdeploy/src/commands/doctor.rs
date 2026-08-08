@@ -272,36 +272,7 @@ fn strip_ansi(input: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::env;
-    use std::fs;
-    use std::process;
-
-    use anyhow::Result;
-
-    use super::{check_deployment_scripts, render_remote_doctor_output, strip_ansi};
-
-    #[test]
-    fn deployment_script_check_accepts_nested_build_and_prepare_layout() -> Result<()> {
-        let cwd = env::current_dir()?;
-        let root = env::temp_dir().join(format!("bonesdeploy-doctor-nested-layout-{}", process::id()));
-        if root.exists() {
-            fs::remove_dir_all(&root)?;
-        }
-        fs::create_dir_all(root.join(".bones/deployment/build"))?;
-        fs::create_dir_all(root.join(".bones/deployment/prepare"))?;
-        fs::write(root.join(".bones/deployment/build/01_build.sh"), "")?;
-        fs::write(root.join(".bones/deployment/build/README.md"), "# Build Scripts")?;
-        fs::write(root.join(".bones/deployment/prepare/02_prepare.sh"), "")?;
-        fs::write(root.join(".bones/deployment/prepare/README.md"), "# Prepare Scripts")?;
-
-        env::set_current_dir(&root)?;
-        let result = check_deployment_scripts();
-        env::set_current_dir(cwd)?;
-
-        fs::remove_dir_all(&root).ok();
-        assert!(result.is_none(), "nested deployment layout should be accepted: {result:?}");
-        Ok(())
-    }
+    use super::{render_remote_doctor_output, strip_ansi};
 
     #[test]
     fn verbose_remote_report_preserves_pending_state() {
