@@ -131,6 +131,9 @@ pub enum ServiceCommand {
     },
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> refactor/external-public-tests
 
 #[derive(Subcommand)]
 pub enum PatchCommand {
@@ -142,6 +145,7 @@ pub enum PatchCommand {
         patch: String,
     },
 }
+<<<<<<< HEAD
 
 #[cfg(test)]
 mod tests {
@@ -167,5 +171,7 @@ mod tests {
         );
     }
 }
+=======
+>>>>>>> refactor/external-public-tests
 =======
 >>>>>>> refactor/external-public-tests

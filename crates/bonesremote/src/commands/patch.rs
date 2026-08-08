@@ -33,23 +33,23 @@ pub fn apply(site: &str, patch: &str) -> Result<()> {
 fn migrate_config_repo(site: &str) -> Result<()> {
     let paths = ConfigRepositoryPaths {
         repository: PathBuf::from(paths::default_bones_repo_path_for(site)),
-        legacy_repository: Path::new(paths::DEFAULT_REPO_PARENT).join(format!("{site}.bones.git")),
+        previous_repository: Path::new(paths::DEFAULT_REPO_PARENT).join(format!("{site}.bones.git")),
     };
     migrate_config_repo_at(&paths, true)
 }
 
 struct ConfigRepositoryPaths {
     repository: PathBuf,
-    legacy_repository: PathBuf,
+    previous_repository: PathBuf,
 }
 
 fn migrate_config_repo_at(paths: &ConfigRepositoryPaths, set_root_ownership: bool) -> Result<()> {
     let parent = paths.repository.parent().context("config repository has no parent")?;
     fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
 
-    if !paths.repository.exists() && paths.legacy_repository.exists() {
-        fs::rename(&paths.legacy_repository, &paths.repository).with_context(|| {
-            format!("Failed to migrate {} to {}", paths.legacy_repository.display(), paths.repository.display())
+    if !paths.repository.exists() && paths.previous_repository.exists() {
+        fs::rename(&paths.previous_repository, &paths.repository).with_context(|| {
+            format!("Failed to migrate {} to {}", paths.previous_repository.display(), paths.repository.display())
         })?;
     }
     let repository = paths.repository.to_str().context("config repository path is not UTF-8")?;
@@ -59,7 +59,7 @@ fn migrate_config_repo_at(paths: &ConfigRepositoryPaths, set_root_ownership: boo
     if set_root_ownership {
         run_command("chown", ["-R", "root:root", repository])?;
     }
-    run_git(["--git-dir", repository, "symbolic-ref", "HEAD", "refs/heads/master"])?;
+    run_git(["--git-dir", repository, "symbolic-ref", paths::GIT_HEAD, "refs/heads/master"])?;
     write_hook(&paths.repository.join(paths::HOOKS_DIR).join("pre-receive"))
 }
 
@@ -97,7 +97,8 @@ mod tests {
     use std::env;
     use std::fs;
     use std::os::unix::fs::PermissionsExt;
-    use std::process;
+    use std::path::PathBuf;
+    use std::process::{self, Command};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use anyhow::Result;
@@ -121,25 +122,25 @@ mod tests {
     }
 
     #[test]
-    fn migration_moves_legacy_repository_and_installs_the_config_hook() -> Result<()> {
+    fn migration_moves_previous_repository_and_installs_the_config_hook() -> Result<()> {
         let directory = temp_directory("migration")?;
-        let legacy_repository = directory.join("atlas.bones.git");
+        let previous_repository = directory.join("atlas.bones.git");
         let repository = directory.join("repos").join("atlas.bones.git");
-        let status = std::process::Command::new("git").args(["init", "--bare"]).arg(&legacy_repository).status()?;
+        let status = Command::new("git").args(["init", "--bare"]).arg(&previous_repository).status()?;
         assert!(status.success());
         let paths =
-            ConfigRepositoryPaths { repository: repository.clone(), legacy_repository: legacy_repository.clone() };
+            ConfigRepositoryPaths { repository: repository.clone(), previous_repository: previous_repository.clone() };
 
         migrate_config_repo_at(&paths, false)?;
 
         assert!(repository.is_dir());
-        assert!(!legacy_repository.exists());
+        assert!(!previous_repository.exists());
         assert!(repository.join("hooks/pre-receive").is_file());
         fs::remove_dir_all(directory)?;
         Ok(())
     }
 
-    fn temp_directory(name: &str) -> Result<std::path::PathBuf> {
+    fn temp_directory(name: &str) -> Result<PathBuf> {
         let stamp = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
         let directory = env::temp_dir().join(format!("bonesremote_patch_{}_{}_{}", process::id(), stamp, name));
         fs::create_dir(&directory)?;

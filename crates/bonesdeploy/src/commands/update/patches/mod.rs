@@ -97,14 +97,17 @@ fn write_marker(marker_dir: &Path, marker: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use std::fs;
+    use std::process::Command;
 
     use anyhow::Result;
     use tempfile::TempDir;
 
+    use crate::config::Bones;
+
     use super::{LocalPatchContext, Version, local, patches, run_local_patches};
 
-    fn config() -> crate::config::Bones {
-        let mut cfg = crate::config::Bones::default();
+    fn config() -> Bones {
+        let mut cfg = Bones::default();
         cfg.project_name = String::from("atlas");
         cfg.host = String::from("example.test");
         cfg.port = String::from("22");
@@ -141,11 +144,7 @@ mod tests {
 
         run_local_patches(&patches(), Version::new(0, 7, 3), &context)?;
 
-        let origin = std::process::Command::new("git")
-            .args(["-C"])
-            .arg(&bones_dir)
-            .args(["remote", "get-url", "origin"])
-            .output()?;
+        let origin = Command::new("git").args(["-C"]).arg(&bones_dir).args(["remote", "get-url", "origin"]).output()?;
         assert_eq!(String::from_utf8(origin.stdout)?.trim(), local::config_repo_url(&cfg));
         assert!(markers.join(local::CONFIG_REPO_ID).exists());
         assert!(markers.join(local::ROOT_CONFIG_REPO_ID).exists());
