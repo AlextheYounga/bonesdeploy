@@ -13,3 +13,14 @@ fn doctor_accepts_verbose_flag() -> Result<()> {
     assert!(stderr.contains("Doctor found 1 issue."), "missing config should fail doctor: {stderr}");
     Ok(())
 }
+
+#[test]
+fn manifest_accepts_json_format_and_reports_missing_config() -> Result<()> {
+    let env = common::TestEnv::new()?;
+    let output = env.run(&["manifest", "--format", "json"])?;
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains(".bones/bones.toml does not exist"), "unexpected stderr: {stderr}");
+    Ok(())
+}

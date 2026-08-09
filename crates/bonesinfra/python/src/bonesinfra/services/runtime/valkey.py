@@ -10,6 +10,19 @@ class ValKeyService(RuntimeService):
     package_user = "valkey"
     default_port = 16379
 
+    def manifest_artifacts(self, ctx) -> list[tuple[str, str, str, str]]:
+        project = self._identifier(ctx.app.project_name)
+        service_name = f"{project}-{self.service}"
+        return [
+            (f"{self.service} configuration", f"/etc/bonesinfra/services/{service_name}.conf", "file", "service"),
+            (f"{self.service} data directory", f"/var/lib/{self.service}/{project}", "directory", "service"),
+            (f"{self.service} systemd service", f"/etc/systemd/system/{service_name}.service", "file", "service"),
+        ]
+
+    def manifest_services(self, ctx) -> list[tuple[str, str, str]]:
+        project = self._identifier(ctx.app.project_name)
+        return [(f"{self.service} service", f"{project}-{self.service}.service", "service")]
+
     def provision(self, ctx):
         apt.packages(
             name=f"Install {self.unit}",

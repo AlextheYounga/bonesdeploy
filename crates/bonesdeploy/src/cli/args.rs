@@ -56,6 +56,12 @@ pub enum Command {
     },
     /// Show the current deployment state and next steps
     Status,
+    /// Inspect project-owned remote deployment artifacts
+    Manifest {
+        /// Output format
+        #[arg(long, value_enum, default_value_t = ManifestFormat::Text)]
+        format: ManifestFormat,
+    },
     /// Embedded documentation and next-step guidance for AI agents
     Skill {
         /// Optional subcommand: `next`, `list`, or `doc <name>`
@@ -180,6 +186,12 @@ pub enum SkillCommand {
         /// Doc name (see `bonesdeploy skill list`)
         name: String,
     },
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum ManifestFormat {
+    Text,
+    Json,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]

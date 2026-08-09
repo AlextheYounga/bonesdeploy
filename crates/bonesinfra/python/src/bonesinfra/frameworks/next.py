@@ -13,6 +13,17 @@ class NextFramework(ServerFramework):
     default_port = 3100
     static_root = "out"
 
+    def manifest_artifacts(self, ctx):
+        artifacts = super().manifest_artifacts(ctx)
+        if ctx.runtime.data.get("is_static", True):
+            return artifacts
+        placeholder = ctx.paths.placeholder_release
+        return [
+            *artifacts,
+            ("Next.js placeholder standalone directory", f"{placeholder}/.next/standalone", "directory", "framework"),
+            ("Next.js placeholder standalone server", f"{placeholder}/.next/standalone/server.js", "file", "framework"),
+        ]
+
     def install_packages(self, ctx):
         self.node_binary = NODE.install(ctx)
 

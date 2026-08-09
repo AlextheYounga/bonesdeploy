@@ -14,9 +14,31 @@ class Framework:
     def deploy(self, ctx):
         raise NotImplementedError
 
+    def manifest_artifacts(self, _ctx) -> list[tuple[str, str, str, str]]:
+        """Return framework artifact specs as (name, path, kind, owner)."""
+        return []
+
+    def manifest_services(self, _ctx) -> list[tuple[str, str, str]]:
+        return []
+
+    def manifest_mode(self, _ctx) -> str:
+        return "none"
+
 
 class StaticFramework(Framework):
     static_root: str
+
+    def manifest_artifacts(self, ctx) -> list[tuple[str, str, str, str]]:
+        static_root = f"{ctx.paths.placeholder_release}/{self.static_root}"
+        current_root = f"{ctx.paths.current}/{self.static_root}"
+        return [
+            ("static placeholder web root", static_root, "directory", "framework"),
+            ("static placeholder index", f"{static_root}/index.html", "file", "framework"),
+            ("current static web root", current_root, "directory", "framework"),
+        ]
+
+    def manifest_mode(self, _ctx) -> str:
+        return "static"
 
     def deploy(self, ctx):
         paths = service.runtime_paths(ctx)
@@ -80,6 +102,53 @@ class ServerFramework(Framework):
             self._deploy_as_static(ctx)
         else:
             self._deploy_as_server(ctx)
+
+    def manifest_artifacts(self, ctx) -> list[tuple[str, str, str, str]]:
+        paths = ctx.paths
+        artifacts = []
+        if self.static_root and ctx.runtime.data.get("is_static", True):
+            static_root = f"{paths.placeholder_release}/{self.static_root}"
+            current_root = f"{paths.current}/{self.static_root}"
+            artifacts.append(("static placeholder web root", static_root, "directory", "framework"))
+            artifacts.append(("static placeholder index", f"{static_root}/index.html", "file", "framework"))
+            artifacts.append(("current static web root", current_root, "directory", "framework"))
+        else:
+            artifacts.extend(
+                [
+                    ("application AppArmor profile", paths.apparmor_profile(self.service_name), "file", "framework"),
+                    ("application systemd service", paths.systemd_service(self.service_name), "file", "framework"),
+                    (
+                        "application systemd requirement",
+                        paths.systemd_service_requirement(self.service_name),
+                        "link",
+                        "framework",
+                    ),
+                    (
+                        "application runtime directory",
+                        paths.runtime_service_dir(self.service_name),
+                        "directory",
+                        "framework",
+                    ),
+                    (
+                        "application runtime socket",
+                        paths.runtime_service_socket(self.service_name),
+                        "file",
+                        "framework",
+                    ),
+                    ("application log directory", paths.site_log_dir, "directory", "framework"),
+                ]
+            )
+        return artifacts
+
+    def manifest_services(self, ctx) -> list[tuple[str, str, str]]:
+        if self.static_root and ctx.runtime.data.get("is_static", True):
+            return []
+        return [("application service", f"{ctx.app.project_name}-{self.service_name}.service", "framework")]
+
+    def manifest_mode(self, ctx) -> str:
+        if self.static_root and ctx.runtime.data.get("is_static", True):
+            return "static"
+        return "server"
 
     def _deploy_as_static(self, ctx):
         paths = service.runtime_paths(ctx)
@@ -146,6 +215,19 @@ class ServerFramework(Framework):
 
 class PHPFramework(Framework):
     nginx_template: str
+
+    def manifest_artifacts(self, ctx) -> list[tuple[str, str, str, str]]:
+        version = str(ctx.runtime.data.get(PHP.config_key, PHP.default_version))
+        project = ctx.app.project_name
+        return [
+            ("PHP-FPM pool configuration", f"/etc/php/{version}/fpm/pool.d/{project}.conf", "file", "framework"),
+            ("PHP-FPM socket", f"/run/php/php{version}-fpm-{project}.sock", "file", "framework"),
+            ("PHP log directory", ctx.paths.site_log_dir, "directory", "framework"),
+            ("current PHP web root", ctx.paths.current_web_root, "directory", "framework"),
+        ]
+
+    def manifest_mode(self, _ctx) -> str:
+        return "php"
 
     def deploy(self, ctx):
         paths = ctx.paths_dict

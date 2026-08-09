@@ -2,7 +2,7 @@
 
 ## Request
 
-Add a `manifest` command that shows the files associated with a project's deployment strategy. Define the manifest in RON files under BonesInfra so the deployment strategy and the manifest use one readable declaration.
+Add a `manifest` command that shows the files associated with a project's deployment strategy. Define the manifest as typed Python declarations inside BonesInfra so the deployment strategy and the manifest share the same code boundary.
 
 ## Problem
 
@@ -10,47 +10,48 @@ Deployment files are currently created by several BonesInfra modules, but no sin
 
 ## Definitions
 
-**Manifest:** A declarative list of project-related remote paths expected by BonesInfra for the configured deployment strategy. It describes paths and their kinds; it does not contain file contents, secrets, or a filesystem snapshot.
+**Manifest:** A declarative inventory of every site-specific remote filesystem artifact and managed service that BonesInfra installs or manages for the configured deployment strategy. It describes paths, service identities, and their expected kinds or states; it does not contain file contents, secrets, or a filesystem snapshot.
 
-**Manifest entry:** One named declaration in a manifest RON document. An entry identifies a path value, its filesystem kind, and the provisioning scope that owns it. A path value is resolved through `DeploymentPaths`, not repeated as a literal path in the manifest.
+**Manifest entry:** One typed Python declaration of a site-specific filesystem artifact or managed service, its expected kind or state, and the provisioning scope that owns it. A path value is resolved through `DeploymentPaths` or a project-derived runtime name, not repeated as an unrelated literal path in the declaration.
+
+**Site-specific artifact:** A file, directory, link, AppArmor profile, systemd unit, systemd target membership link, runtime path, or managed service created or managed exclusively for the configured project. Shared host packages, global daemon state, and artifacts not attributable to one project are not site-specific artifacts.
 
 **Deployment strategy:** The effective combination of the selected framework runtime, static or server mode, configured services, and SSL configuration.
 
 **Manifest inspection:** A read-only remote check that resolves manifest entries, checks their actual filesystem state, and renders present, missing, or mismatched entries. Inspection never creates, changes, or deletes files.
 
-**RON manifest source:** A versioned RON document shipped inside the embedded BonesInfra Python package. It is an internal strategy specification, not a user-editable project configuration file.
+**Manifest output:** The rendered result of inspecting declared manifest entries. Text is intended for people and JSON is intended for automation; JSON is not the internal manifest source.
 
 ## Desired outcome
 
-`bonesdeploy manifest` loads the configured project, determines its deployment strategy, and displays a tree of the declared project-related remote files. The output identifies expected paths and reports missing or wrong filesystem types instead of silently omitting them. The command has a machine-readable JSON form for automated checks.
+`bonesdeploy manifest` loads the configured project, determines its deployment strategy, and displays every site-specific artifact and managed service that BonesInfra installs or manages. The output identifies expected paths and service state, reports missing or wrong filesystem types instead of silently omitting them, and has a machine-readable JSON form for automated checks.
 
-BonesInfra parses the RON manifest source and performs the remote inspection. Rust exposes the public command and passes its format selection to BonesInfra; Rust and Python do not maintain separate manifest schemas.
+BonesInfra collects typed manifest declarations and performs the remote inspection. Rust exposes the public command and passes its format selection to BonesInfra; Rust and Python do not maintain separate manifest schemas.
 
 ## Scope
 
 This change includes:
 
-- A BonesInfra RON manifest schema and common manifest declarations.
-- Strategy-specific manifest declarations for framework, services, and SSL artifacts.
+- A typed BonesInfra manifest entry model and common declarations.
+- Strategy-specific manifest declarations for every framework, service, and SSL artifact installed for the site, including project-derived systemd units, target membership links, AppArmor profiles, and runtime paths.
+- Managed-service declarations and read-only status inspection for every site-specific systemd service.
 - Resolution of manifest path references through `DeploymentPaths`.
 - A read-only BonesInfra inspection command with tree and JSON output.
 - A Rust `bonesdeploy manifest` command that delegates to BonesInfra.
-- Tests proving the shipped RON documents parse and representative strategy manifests resolve to the expected paths.
+- Tests proving typed declarations and representative strategy manifests resolve to the expected paths.
 
 ## Constraints
 
-RON manifest files remain internal embedded BonesInfra assets and do not replace `.bones/bones.toml`, which remains the user-editable project configuration.
+Manifest declarations remain internal BonesInfra Python code and do not replace `.bones/bones.toml`, which remains the user-editable project configuration.
 
-The manifest must use existing `DeploymentPaths` values and existing PyInfra remote inspection mechanisms. It must not infer ownership by scanning all of `/etc`.
-
-`pyron` is used as an experimental dependency pinned to the tested release while its licensing and distribution status are evaluated. The experiment must not be represented as a production release guarantee.
+The manifest must use existing `DeploymentPaths` values, project-derived names, and existing PyInfra remote inspection mechanisms. It must not infer ownership by scanning all of `/etc`.
 
 The change must leave behind runnable tests and must pass the repository's Rust and Python formatting and lint checks. End-to-end tests are excluded from local validation.
 
 ## Exclusions
 
-This change does not replace project TOML with RON, migrate the existing Core default specifications, add persistent server-side manifest registry files, or report arbitrary unregistered files on the host.
+This change does not replace project TOML with another configuration format, migrate the existing Core default specifications, add persistent server-side manifest registry files, or report arbitrary unregistered files on the host.
 
-It does not print file contents or secret values, repair missing files, or change provisioning behavior beyond making the declared manifest paths the source used by inspection.
+It does not print file contents or secret values, repair missing files, change provisioning behavior, or inventory shared host packages and daemons that are not specific to one site.
 
-It does not publish or release `pyron` as a BonesDeploy dependency until its license and supported wheel coverage are resolved.
+It does not create a cross-language manifest schema or require Rust to interpret individual manifest entries.

@@ -253,6 +253,19 @@ machine-readable next-step guide:
 bonesdeploy skill next --format json
 ```
 
+Inspect every project-specific remote artifact and managed systemd service
+expected by the configured runtime, services, and SSL strategy without changing
+the server:
+
+```sh
+bonesdeploy manifest
+bonesdeploy manifest --format json
+```
+
+The manifest reports present, missing, and wrong-kind paths, plus active and
+enabled state for project-managed services. JSON is intended for automation;
+neither format prints file contents or secrets.
+
 Embedded documentation for AI agents lives under the `skill` command:
 
 ```sh

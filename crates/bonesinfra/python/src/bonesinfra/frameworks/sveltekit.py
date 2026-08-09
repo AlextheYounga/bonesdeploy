@@ -14,6 +14,15 @@ class SvelteKitFramework(ServerFramework):
     service_name = "sveltekit"
     runtime_label = "SvelteKit app server"
 
+    def manifest_artifacts(self, ctx):
+        placeholder = ctx.paths.placeholder_release
+        return [
+            *super().manifest_artifacts(ctx),
+            ("SvelteKit placeholder build directory", f"{placeholder}/build", "directory", "framework"),
+            ("SvelteKit placeholder entrypoint", f"{placeholder}/build/index.js", "file", "framework"),
+            ("SvelteKit placeholder environment", f"{placeholder}/.env", "file", "framework"),
+        ]
+
     def install_packages(self, ctx):
         self.node_binary = NODE.install(ctx)
 

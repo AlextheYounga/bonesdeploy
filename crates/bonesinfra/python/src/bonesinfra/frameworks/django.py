@@ -14,6 +14,15 @@ class DjangoFramework(ServerFramework):
     service_name = "gunicorn"
     runtime_label = "Gunicorn"
 
+    def manifest_artifacts(self, ctx):
+        placeholder = ctx.paths.placeholder_release
+        return [
+            *super().manifest_artifacts(ctx),
+            ("Django placeholder virtual environment", f"{placeholder}/.venv", "directory", "framework"),
+            ("Django placeholder configuration", f"{placeholder}/config", "directory", "framework"),
+            ("Django placeholder WSGI application", f"{placeholder}/config/wsgi.py", "file", "framework"),
+        ]
+
     def install_packages(self, _ctx):
         self.python_binary = PYTHON.install(_ctx)
 

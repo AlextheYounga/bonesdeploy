@@ -2,6 +2,12 @@ class RuntimeService:
     def provision(self, ctx):
         raise NotImplementedError
 
+    def manifest_artifacts(self, _ctx) -> list[tuple[str, str, str, str]]:
+        return []
+
+    def manifest_services(self, _ctx) -> list[tuple[str, str, str]]:
+        return []
+
     @staticmethod
     def _identifier(project_name):
         name = project_name.replace("-", "_")

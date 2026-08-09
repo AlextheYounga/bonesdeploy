@@ -10,6 +10,17 @@ class NuxtFramework(ServerFramework):
     runtime_label = "Nuxt app server"
     static_root = ".output/public"
 
+    def manifest_artifacts(self, ctx):
+        artifacts = super().manifest_artifacts(ctx)
+        if ctx.runtime.data.get("is_static", True):
+            return artifacts
+        placeholder = ctx.paths.placeholder_release
+        return [
+            *artifacts,
+            ("Nuxt placeholder server directory", f"{placeholder}/.output/server", "directory", "framework"),
+            ("Nuxt placeholder server", f"{placeholder}/.output/server/index.mjs", "file", "framework"),
+        ]
+
     def install_packages(self, ctx):
         self.node_binary = NODE.install(ctx)
 

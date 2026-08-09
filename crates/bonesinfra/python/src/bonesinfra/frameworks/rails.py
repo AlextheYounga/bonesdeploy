@@ -14,6 +14,14 @@ class RailsFramework(ServerFramework):
     service_name = "puma"
     runtime_label = "Puma"
 
+    def manifest_artifacts(self, ctx):
+        placeholder = ctx.paths.placeholder_release
+        return [
+            *super().manifest_artifacts(ctx),
+            ("Rails placeholder Gemfile", f"{placeholder}/Gemfile", "file", "framework"),
+            ("Rails placeholder Rack configuration", f"{placeholder}/config.ru", "file", "framework"),
+        ]
+
     def install_packages(self, _ctx):
         self.ruby_binary = RUBY.install(_ctx)
 
