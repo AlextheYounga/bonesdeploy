@@ -5,6 +5,7 @@ use std::process::Command;
 use bonesdeploy_core::{config, paths};
 
 use crate::release::lifecycle::build::validate_build_cache;
+use crate::runtime::docker;
 
 pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if let Err(error) = config::validate_site_name(site) {
@@ -39,6 +40,37 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
 
     check_site_layout(&shared_root, &releases_root, issues);
     check_site_target_exists(&cfg.project_name, issues);
+    if cfg.runtime.backend == config::RuntimeBackend::Docker {
+        check_docker_runtime(&cfg, issues);
+    }
+}
+
+fn check_docker_runtime(cfg: &config::Bones, issues: &mut Vec<String>) {
+    match Command::new("docker").arg("info").output() {
+        Ok(output) if output.status.success() => {}
+        Ok(output) => {
+            issues.push(format!("Docker daemon is unavailable: {}", String::from_utf8_lossy(&output.stderr).trim()));
+        }
+        Err(error) => issues.push(format!("Docker is unavailable: {error}")),
+    }
+
+    let image = match docker::command::image_name(&cfg.project_name) {
+        Ok(image) => image,
+        Err(error) => {
+            issues.push(format!("Docker runtime image name is invalid: {error}"));
+            return;
+        }
+    };
+    match Command::new("docker").args(["image", "inspect", &image]).status() {
+        Ok(status) if status.success() => {}
+        Ok(_) => issues.push(format!("Docker runtime image is missing: {image}")),
+        Err(error) => issues.push(format!("could not inspect Docker runtime image {image}: {error}")),
+    }
+
+    let socket_dir = Path::new("/run").join(&cfg.project_name);
+    if !socket_dir.is_dir() {
+        issues.push(format!("Docker runtime socket directory is missing: {}", socket_dir.display()));
+    }
 }
 
 fn check_build_user(build_user: &str, passwd: &str, issues: &mut Vec<String>) {

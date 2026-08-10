@@ -1,7 +1,10 @@
 use std::path::Path;
 
 use anyhow::{Result, anyhow};
-use bonesdeploy_core::{config::validate_host, paths};
+use bonesdeploy_core::{
+    config::{RuntimeBackend, validate_host},
+    paths,
+};
 
 use crate::config;
 use crate::infra::git;
@@ -75,6 +78,11 @@ fn collect_from_existing(
     cfg.branch = branch;
     cfg.repo_path = repo_path;
     cfg.project_root = project_root;
+    cfg.runtime.backend = match (args.runtime_backend.as_deref(), existing_config) {
+        (Some(value), _) => parse_runtime_backend(value)?,
+        (None, Some(existing)) => existing.runtime.backend,
+        (None, None) => parse_runtime_backend(&prompts::prompt_runtime_backend(None)?)?,
+    };
     apply_existing_fields(&mut cfg, existing_config);
     Ok(cfg)
 }
@@ -119,6 +127,7 @@ pub(super) fn collect_non_interactive(
     cfg.branch = branch;
     cfg.repo_path = repo_path;
     cfg.project_root = project_root;
+    cfg.runtime.backend = resolve_runtime_backend(args, existing_config)?;
     apply_existing_fields(&mut cfg, existing_config);
     Ok(cfg)
 }
@@ -199,6 +208,29 @@ fn resolve_port(
         .unwrap_or_else(|| String::from("22"))
 }
 
+fn resolve_runtime_backend(args: &super::Args, existing_config: Option<&config::Bones>) -> Result<RuntimeBackend> {
+    let value = args
+        .runtime_backend
+        .as_deref()
+        .or_else(|| {
+            existing_config.map(|cfg| match cfg.runtime.backend {
+                RuntimeBackend::Native => "native",
+                RuntimeBackend::Docker => "docker",
+            })
+        })
+        .unwrap_or("native");
+
+    parse_runtime_backend(value)
+}
+
+fn parse_runtime_backend(value: &str) -> Result<RuntimeBackend> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "native" => Ok(RuntimeBackend::Native),
+        "docker" => Ok(RuntimeBackend::Docker),
+        _ => anyhow::bail!("unsupported runtime backend: {value}"),
+    }
+}
+
 pub fn non_empty(value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| value.to_string())
@@ -251,6 +283,7 @@ mod tests {
     use anyhow::{Result, bail};
     use bonesdeploy_core::paths;
 
+    use super::RuntimeBackend;
     use super::collect_non_interactive;
     use crate::config::Bones;
 
@@ -275,6 +308,7 @@ mod tests {
             host: Some(String::from("deploy.example.com")),
             port: None,
             template: None,
+            runtime_backend: None,
             framework_vars: Vec::new(),
             services: Vec::new(),
         };
@@ -291,6 +325,29 @@ mod tests {
     }
 
     #[test]
+    fn non_interactive_docker_backend_is_recorded() -> Result<()> {
+        let mut args = super::super::Args {
+            non_interactive: true,
+            project_name: Some(String::from("atlas")),
+            branch: None,
+            remote: None,
+            host: Some(String::from("deploy.example.com")),
+            port: None,
+            template: None,
+            runtime_backend: Some(String::from("docker")),
+            framework_vars: Vec::new(),
+            services: Vec::new(),
+        };
+
+        let config = collect_non_interactive("workspace", None, &args)?;
+        assert_eq!(config.runtime.backend, RuntimeBackend::Docker);
+
+        args.runtime_backend = Some(String::from("compose"));
+        assert!(collect_non_interactive("workspace", None, &args).is_err());
+        Ok(())
+    }
+
+    #[test]
     fn requires_host_when_existing_and_cli_are_missing_it() -> Result<()> {
         let existing = incomplete_existing("atlas");
         let args = super::super::Args {
@@ -301,6 +358,7 @@ mod tests {
             host: None,
             port: None,
             template: None,
+            runtime_backend: None,
             framework_vars: Vec::new(),
             services: Vec::new(),
         };

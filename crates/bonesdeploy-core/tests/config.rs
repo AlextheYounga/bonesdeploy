@@ -2,7 +2,9 @@
 
 use anyhow::Result;
 use bonesdeploy_core::config::BUILD_TIMEOUT_SECONDS_DEFAULT;
-use bonesdeploy_core::config::{App, Bones, Build, Runtime, SharedPathType, build_timeout_seconds, validate_host};
+use bonesdeploy_core::config::{
+    App, Bones, Build, Runtime, RuntimeBackend, SharedPathType, build_timeout_seconds, validate_host,
+};
 use toml::de::Error;
 
 #[test]
@@ -47,6 +49,24 @@ paths = [
     assert_eq!(runtime.shared.paths[0].path_type, SharedPathType::File);
     assert_eq!(runtime.shared.paths[1].path, "storage");
     assert_eq!(runtime.shared.paths[1].path_type, SharedPathType::Dir);
+    Ok(())
+}
+
+#[test]
+fn runtime_backend_defaults_to_native() -> Result<(), Error> {
+    let runtime: Runtime = toml::from_str("")?;
+
+    assert_eq!(runtime.backend, RuntimeBackend::Native);
+    Ok(())
+}
+
+#[test]
+fn runtime_backend_serializes_as_lowercase_toml() -> Result<()> {
+    let runtime = Runtime { backend: RuntimeBackend::Docker, ..Runtime::default() };
+
+    let value = toml::to_string(&runtime)?;
+
+    assert!(value.lines().any(|line| line == "backend = \"docker\""));
     Ok(())
 }
 

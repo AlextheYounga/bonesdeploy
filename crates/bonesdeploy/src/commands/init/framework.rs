@@ -107,6 +107,7 @@ mod tests {
             host: Some(String::from("deploy.example.com")),
             port: None,
             template: template.map(String::from),
+            runtime_backend: None,
             framework_vars: framework_vars.iter().map(|value| String::from(*value)).collect(),
             services: Vec::new(),
         }

@@ -2,6 +2,7 @@ mod cli;
 mod commands;
 mod privileges;
 mod release;
+mod runtime;
 mod ui;
 
 use std::process::ExitCode;

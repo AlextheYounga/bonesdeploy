@@ -52,6 +52,11 @@ pub enum Command {
         #[command(subcommand)]
         command: ServiceCommand,
     },
+    /// Manage a BonesDeploy-generated application runtime (requires root)
+    Runtime {
+        #[command(subcommand)]
+        command: RuntimeCommand,
+    },
     /// Apply an ordered server migration (requires root)
     Patch {
         #[command(subcommand)]
@@ -59,6 +64,20 @@ pub enum Command {
     },
     /// Print the version
     Version,
+}
+
+#[derive(Subcommand)]
+pub enum RuntimeCommand {
+    /// Start the configured Docker application runtime
+    Start {
+        #[arg(long)]
+        site: String,
+    },
+    /// Stop the configured Docker application runtime
+    Stop {
+        #[arg(long)]
+        site: String,
+    },
 }
 
 #[derive(Subcommand)]

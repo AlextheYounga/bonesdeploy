@@ -5,6 +5,7 @@ from bonesinfra.cli.hooks import call_hook
 from bonesinfra.frameworks import get_framework
 from bonesinfra.services.linux.apparmor import nginx as apparmor
 from bonesinfra.services.linux.nginx import router as nginx
+from bonesinfra.services.runtime import docker
 
 
 def deploy_runtime(ctx, custom: ModuleType | None = None):
@@ -18,6 +19,11 @@ def deploy_runtime(ctx, custom: ModuleType | None = None):
 
     nginx_apparmor_network = "network inet stream," if uses_tcp else "network unix stream,"
     nginx_address_families = "AF_UNIX AF_INET" if uses_tcp else "AF_UNIX"
+
+    if ctx.runtime.backend == "docker" and template == "laravel":
+        docker.deploy(ctx)
+        call_hook(custom, "after_runtime", ctx)
+        return
 
     apparmor.setup(ctx, paths, nginx_apparmor_network=nginx_apparmor_network)
     nginx.setup(ctx, paths, nginx_address_families=nginx_address_families, nginx_ip_loopback_only=uses_tcp)

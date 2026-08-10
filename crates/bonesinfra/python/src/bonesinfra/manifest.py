@@ -98,6 +98,8 @@ def collect_artifacts(ctx: DeployContext) -> tuple[Artifact, ...]:
     if template:
         framework = get_framework(str(template))
         artifacts.extend(Artifact.at_path(*spec) for spec in framework.manifest_artifacts(ctx))
+    if ctx.runtime.backend == "docker":
+        artifacts.append(Artifact("Docker runtime socket", "runtime_php_fpm_socket", "file", "docker"))
 
     for name in ctx.services.services:
         artifacts.extend(Artifact.at_path(*spec) for spec in get_service(name).manifest_artifacts(ctx))
@@ -122,6 +124,8 @@ def collect_services(ctx: DeployContext) -> tuple[ManagedService, ...]:
     template = ctx.runtime.data.get("template")
     if template:
         services.extend(ManagedService(*spec) for spec in get_framework(str(template)).manifest_services(ctx))
+    if ctx.runtime.backend == "docker":
+        services.append(ManagedService("Docker application", f"{ctx.app.project_name}-docker.service", "docker"))
     for name in ctx.services.services:
         services.extend(ManagedService(*spec) for spec in get_service(name).manifest_services(ctx))
     return _deduplicate_services(services)
@@ -155,6 +159,7 @@ def report(ctx: DeployContext, entries: list[ResolvedArtifact], services: list[R
 
     return {
         "strategy": {
+            "backend": ctx.runtime.backend,
             "framework": template or "none",
             "mode": mode,
             "services": list(ctx.services.services),
@@ -169,6 +174,7 @@ def render_text(data: dict[str, Any]) -> str:
     strategy = data["strategy"]
     lines = [
         f"Framework: {strategy['framework']} ({strategy['mode']})",
+        f"Runtime backend: {strategy['backend']}",
         f"Services: {', '.join(strategy['services']) or 'none'}",
         f"SSL: {'enabled' if strategy['ssl'] else 'disabled'}",
         "",

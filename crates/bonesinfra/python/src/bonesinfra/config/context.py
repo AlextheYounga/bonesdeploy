@@ -51,10 +51,15 @@ class DeployContext:
         )
 
         runtime = RuntimeConfig(
+            backend=_runtime_backend(runtime_cfg.get("backend", "native")),
             web_root=str(runtime_cfg.get("web_root") or DEFAULT_WEB_ROOT),
             runtime_user=project_name,
             runtime_group=project_name,
-            data={key: value for key, value in runtime_cfg.items() if key not in {"web_root", "permissions", "shared"}},
+            data={
+                key: value
+                for key, value in runtime_cfg.items()
+                if key not in {"backend", "web_root", "permissions", "shared"}
+            },
         )
 
         services = ServicesConfig(services=_database_services(services_cfg.get("services", [])))
@@ -93,6 +98,7 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
         "deploy_user": DEPLOY_USER,
         "runtime_user": ctx.runtime.runtime_user,
         "runtime_group": ctx.runtime.runtime_group,
+        "runtime_backend": ctx.runtime.backend,
         "project_root_parent": paths["project_root_parent"],
         "ssh_port": int(ctx.app.server.port),
         "paths": paths,
@@ -141,6 +147,7 @@ class DeployConfig:
 
 @dataclass
 class RuntimeConfig:
+    backend: str
     web_root: str
     runtime_user: str
     runtime_group: str
@@ -172,3 +179,9 @@ def _database_services(value: Any) -> tuple[str, ...]:
     if len(set(services)) != len(services):
         raise ValueError("database services must not contain duplicates")
     return services
+
+
+def _runtime_backend(value: Any) -> str:
+    if not isinstance(value, str) or value not in {"native", "docker"}:
+        raise ValueError("bones.toml [runtime].backend must be 'native' or 'docker'")
+    return value

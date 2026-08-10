@@ -105,6 +105,31 @@ You can still use Docker with BonesDeploy. Put `docker compose` in your deploy s
 
 Docker just is not the foundation.
 
+## Runtime Backends
+
+BonesDeploy can run applications directly on Linux or inside Docker. Native is
+the default, so existing `bones.toml` files do not change behavior. Select the
+backend during initialization or set it explicitly:
+
+```toml
+[runtime]
+backend = "docker"
+```
+
+Docker mode keeps the existing release lifecycle and rootless Podman build
+pipeline. Docker is used only for the application runtime: BonesDeploy owns
+the container command and mounts, the active release is read-only, shared
+paths remain writable, and host Nginx and TLS remain the public ingress.
+
+Docker runtime mode uses the conventional privileged Docker daemon. It does
+not grant Docker access to the deploy, build, runtime, or git users, does not
+execute project Compose files, and does not mount the Docker socket into an
+application. This is a different security tradeoff from native mode because a
+privileged daemon is part of the runtime control plane.
+
+Laravel Docker runtime selection is currently the supported containerized
+runtime. Other frameworks continue to use the native backend.
+
 ## Runtime Templates
 
 Runtime templates set up the Linux pieces for a framework.
@@ -148,7 +173,8 @@ For CI or AI agents, pick a runtime template and pass variables non-interactivel
 
 ```sh
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --runtime-var php_version=8.5 --db postgres --db valkey
+  --template laravel --runtime-backend docker --runtime-var php_version=8.5 \
+  --service postgres --service valkey
 ```
 
 See `bonesdeploy skill doc templates` for every template and its variables.

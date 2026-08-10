@@ -56,6 +56,19 @@ def test_template_data_contains_runtime_values(tmp_path):
     td = template_data(DeployContext.from_files(str(_write_config(tmp_path))))
     assert td["runtime_user"] == "lawsnipe"
     assert td["runtime_group"] == "lawsnipe"
+    assert td["runtime_backend"] == "native"
+
+
+def test_docker_runtime_backend_is_preserved(tmp_path):
+    ctx = DeployContext.from_files(_write_config(tmp_path, 'backend = "docker"\n'))
+
+    assert ctx.runtime.backend == "docker"
+    assert "backend" not in ctx.runtime.data
+
+
+def test_unknown_runtime_backend_is_rejected(tmp_path):
+    with pytest.raises(ValueError, match="backend"):
+        DeployContext.from_files(_write_config(tmp_path, 'backend = "compose"\n'))
 
 
 def test_missing_nested_tables_use_defaults(tmp_path):

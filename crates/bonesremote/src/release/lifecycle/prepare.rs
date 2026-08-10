@@ -5,12 +5,13 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{is_numbered_shell_script, load_runtime, runtime_user_for};
+use bonesdeploy_core::config::{RuntimeBackend, is_numbered_shell_script, load_runtime, runtime_user_for};
 use bonesdeploy_core::paths;
 
 use crate::privileges;
 use crate::release::output;
 use crate::release::state as release_state;
+use crate::runtime::docker;
 
 struct PrepareScriptEnv<'a> {
     project_name: &'a str,
@@ -63,6 +64,21 @@ pub fn run(site: &str) -> Result<()> {
         web_root: &web_root,
         shared_functions: &shared_functions,
     };
+
+    if runtime.backend == RuntimeBackend::Docker {
+        let image = docker::command::image_name(&cfg.project_name)?;
+        docker::prepare::run_scripts(&docker::prepare::PrepareRequest {
+            project: &cfg.project_name,
+            project_root: Path::new(&cfg.project_root),
+            release: &release_dir,
+            runtime_user: &runtime_user,
+            image: &image,
+            scripts: &scripts,
+            functions: &shared_functions,
+            logs_dir: &logs_dir,
+        })?;
+        return Ok(());
+    }
 
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");

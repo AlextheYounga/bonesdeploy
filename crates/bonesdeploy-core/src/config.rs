@@ -128,6 +128,8 @@ fn sanitize_domain_label(value: &str) -> String {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Runtime {
     #[serde(default)]
+    pub backend: RuntimeBackend,
+    #[serde(default)]
     pub template: String,
     #[serde(default = "paths::default_web_root")]
     pub web_root: String,
@@ -144,6 +146,7 @@ pub struct Runtime {
 impl Default for Runtime {
     fn default() -> Self {
         Self {
+            backend: RuntimeBackend::Native,
             template: String::new(),
             web_root: paths::default_web_root(),
             node_version: default_node_version(),
@@ -152,6 +155,14 @@ impl Default for Runtime {
             extra: BTreeMap::new(),
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RuntimeBackend {
+    #[default]
+    Native,
+    Docker,
 }
 
 #[must_use]

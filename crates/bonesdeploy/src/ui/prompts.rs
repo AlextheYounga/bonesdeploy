@@ -6,6 +6,7 @@ use serde_json::Value;
 use crate::config::Bones;
 use crate::frameworks::{Question, QuestionKind};
 use crate::infra::git;
+use bonesdeploy_core::config::RuntimeBackend;
 
 fn config_default<'a>(
     existing_config: Option<&'a Bones>,
@@ -109,6 +110,19 @@ pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bon
         .with_default(default_project_name)
         .prompt()
         .map(|value| value.trim().to_string())
+        .map_err(|err| anyhow!(err))
+}
+
+pub fn prompt_runtime_backend(existing_config: Option<&Bones>) -> Result<String> {
+    let options = vec![String::from("Native"), String::from("Docker")];
+    let default = existing_config.map_or(0, |cfg| match cfg.runtime.backend {
+        RuntimeBackend::Native => 0,
+        RuntimeBackend::Docker => 1,
+    });
+
+    Select::new("How should the application run?", options)
+        .with_starting_cursor(default)
+        .prompt()
         .map_err(|err| anyhow!(err))
 }
 

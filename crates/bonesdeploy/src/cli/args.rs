@@ -32,6 +32,9 @@ pub enum Command {
         /// Framework template (laravel, django, next, nuxt, rails, sveltekit, vue, or none)
         #[arg(long)]
         template: Option<String>,
+        /// Application runtime backend (native or docker; default: native)
+        #[arg(long, value_parser = ["native", "docker"])]
+        runtime_backend: Option<String>,
         /// Framework variable override, repeated (e.g. `--framework-var php_version=8.5`)
         #[arg(long = "framework-var", value_name = "KEY=VALUE")]
         framework_vars: Vec<String>,

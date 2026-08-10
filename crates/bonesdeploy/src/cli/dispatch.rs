@@ -17,6 +17,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             host,
             port,
             template,
+            runtime_backend,
             framework_vars,
             services,
         } => {
@@ -28,6 +29,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 host: host.clone(),
                 port: port.clone(),
                 template: template.clone(),
+                runtime_backend: runtime_backend.clone(),
                 framework_vars: framework_vars.clone(),
                 services: services.clone(),
             })?;

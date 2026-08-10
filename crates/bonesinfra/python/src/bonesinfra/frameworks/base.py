@@ -219,6 +219,13 @@ class PHPFramework(Framework):
     def manifest_artifacts(self, ctx) -> list[tuple[str, str, str, str]]:
         version = str(ctx.runtime.data.get(PHP.config_key, PHP.default_version))
         project = ctx.app.project_name
+        if ctx.runtime.backend == "docker":
+            return [
+                ("Docker application systemd service", ctx.paths.systemd_service("docker"), "file", "framework"),
+                ("Docker PHP-FPM socket", ctx.paths.runtime_php_fpm_socket, "file", "framework"),
+                ("Docker PHP runtime socket directory", ctx.paths.runtime_socket_dir, "directory", "framework"),
+                ("current PHP web root", ctx.paths.current_web_root, "directory", "framework"),
+            ]
         return [
             ("PHP-FPM pool configuration", f"/etc/php/{version}/fpm/pool.d/{project}.conf", "file", "framework"),
             ("PHP-FPM socket", f"/run/php/php{version}-fpm-{project}.sock", "file", "framework"),

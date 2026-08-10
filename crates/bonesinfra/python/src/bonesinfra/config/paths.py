@@ -93,6 +93,7 @@ class DeploymentPaths:
     runtime_nginx_socket: str
     runtime_nginx_pid: str
     runtime_php_fpm_socket: str
+    systemd_service: str
     site_log_dir: str
     acme_webroot: str
     sudoers_path: str
@@ -163,6 +164,7 @@ class DeploymentPaths:
             runtime_nginx_socket=str(runtime_nginx_dir / NGINX_SOCKET),
             runtime_nginx_pid=str(runtime_nginx_dir / NGINX_PID),
             runtime_php_fpm_socket=str(runtime_socket_dir / PHP_FPM_SOCKET),
+            systemd_service=str(Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}-docker.service"),
             site_log_dir=f"/var/log/bonesdeploy/{project_name}",
             acme_webroot=f"/var/www/{project_name}",
             sudoers_path=str(Path(ETC_SUDOERS_D) / "bonesdeploy"),
