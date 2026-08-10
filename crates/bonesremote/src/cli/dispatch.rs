@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::cli::args::{Cli, Command, HookCommand, PatchCommand, ReleaseCommand, ServiceCommand, SiteCommand};
-use crate::commands::{deploy, doctor, drop_failed_release, hook, patch, release, service, site, status, version};
+use crate::cli::args::{Cli, Command, HookCommand, ReleaseCommand, ServiceCommand, SiteCommand};
+use crate::commands::{deploy, doctor, drop_failed_release, hook, release, service, site, status, version};
 use crate::release::SiteMutation;
 
 pub fn run(cli: &Cli) -> Result<()> {
@@ -29,9 +29,6 @@ pub fn run(cli: &Cli) -> Result<()> {
                 let mutation = SiteMutation::acquire(site_name)?;
                 service::run(&mutation)
             }
-        },
-        Command::Patch { command } => match command {
-            PatchCommand::Apply { site: site_name, patch: patch_name } => patch::apply(site_name, patch_name),
         },
         Command::Version => {
             version::run();

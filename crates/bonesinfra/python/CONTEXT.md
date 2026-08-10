@@ -676,6 +676,12 @@ bonesinfra runs pyinfra provisioning
 bonesremote owns release deployment
 ```
 
+Update migrations are also defined here under `src/bonesinfra/patches/`.
+`bonesdeploy` invokes the private `bonesinfra patches apply` command for local
+Git migrations and remote pyinfra migrations. The command preserves the
+`0001-config-repo` and `0002-root-config-repo` markers and uses an update-only
+root SSH override for remote plans.
+
 ______________________________________________________________________
 
 # Current Target

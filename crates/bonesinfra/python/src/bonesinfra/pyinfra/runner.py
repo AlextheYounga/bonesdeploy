@@ -31,6 +31,7 @@ def run(
     config_path: str,
     deploy: Callable[[DeployContext, ModuleType | None], object | None],
     ssh_key: str | None = None,
+    ssh_user_override: str | None = None,
     quiet: bool = False,
 ) -> object | None:
     if not quiet:
@@ -40,7 +41,7 @@ def run(
     custom = load_custom_module(config_path)
 
     hostname = ctx.app.server.host
-    ssh_user = ctx.app.server.ssh_user
+    ssh_user = ssh_user_override or ctx.app.server.ssh_user
     ssh_port = int(ctx.app.server.port)
 
     host_data: dict[str, object] = {

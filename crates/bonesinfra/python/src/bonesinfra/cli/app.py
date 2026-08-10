@@ -11,6 +11,7 @@ from bonesinfra.cli.commands.ssl import deploy_ssl
 from bonesinfra.config.context import DeployContext
 from bonesinfra.frameworks import list_frameworks
 from bonesinfra.manifest import inspect_for_runner, render
+from bonesinfra.patches import apply_local, apply_remote
 from bonesinfra.pyinfra.runner import run
 
 app = typer.Typer()
@@ -20,12 +21,14 @@ ssl_app = typer.Typer()
 helpers_app = typer.Typer()
 services_app = typer.Typer()
 manifest_app = typer.Typer()
+patches_app = typer.Typer()
 app.add_typer(runtime_app, name="runtime", help="Runtime operations")
 app.add_typer(setup_app, name="setup", help="Setup operations")
 app.add_typer(ssl_app, name="ssl", help="SSL operations")
 app.add_typer(helpers_app, name="helpers", help="Helper tool operations")
 app.add_typer(services_app, name="services", help="Service operations")
 app.add_typer(manifest_app, name="manifest", help="Manifest inspection")
+app.add_typer(patches_app, name="patches", help="Update migrations")
 
 
 def _validate_host(ctx: DeployContext) -> None:
@@ -105,3 +108,24 @@ def manifest_show_cmd(
     if not isinstance(data, dict):
         raise TypeError("manifest inspection returned no report")
     print(render(data, output_format))
+
+
+@patches_app.command("apply")
+def patches_apply_cmd(
+    config: str = typer.Option(..., "--config", help="Path to bones.toml"),
+    target_version: str = typer.Option(..., "--target-version", help="Version being updated to"),
+    scope: str = typer.Option(..., "--scope", help="Patch scope: local or remote"),
+):
+    if scope not in {"local", "remote"}:
+        raise typer.BadParameter("must be local or remote", param_hint="--scope")
+    ctx = DeployContext.from_files(config)
+    if scope == "local":
+        apply_local(ctx, target_version, config)
+        return
+    _validate_host(ctx)
+    run(
+        ctx=ctx,
+        config_path=config,
+        deploy=lambda patch_ctx, _custom: apply_remote(patch_ctx, target_version),
+        ssh_user_override="root",
+    )
