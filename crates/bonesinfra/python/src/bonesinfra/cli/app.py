@@ -1,17 +1,15 @@
-import json
 import sys
 
 import typer
 
 from bonesinfra.cli.commands.helpers import deploy_helpers
-from bonesinfra.cli.commands.runtime import deploy_runtime
 from bonesinfra.cli.commands.services import deploy_services
 from bonesinfra.cli.commands.setup import deploy_setup
 from bonesinfra.cli.commands.ssl import deploy_ssl
 from bonesinfra.config.context import DeployContext
-from bonesinfra.frameworks import list_frameworks
 from bonesinfra.manifest import inspect_for_runner, render
 from bonesinfra.patches import apply_local, apply_remote
+from bonesinfra.project import load_manifest, load_runtime
 from bonesinfra.pyinfra.runner import run
 
 app = typer.Typer()
@@ -37,18 +35,14 @@ def _validate_host(ctx: DeployContext) -> None:
         sys.exit(3)
 
 
-@runtime_app.command("list")
-def runtime_list():
-    print(json.dumps(list_frameworks()))
-
-
 @runtime_app.command("apply")
 def runtime_apply_cmd(
     config: str = typer.Option(..., "--config", help="Path to bones.toml"),
 ):
     ctx = DeployContext.from_files(config)
     _validate_host(ctx)
-    run(ctx=ctx, config_path=config, deploy=deploy_runtime)
+    project_runtime = load_runtime(config)
+    run(ctx=ctx, deploy=project_runtime.deploy)
 
 
 @setup_app.command("apply")
@@ -60,8 +54,7 @@ def setup_apply_cmd(
     _validate_host(ctx)
     run(
         ctx=ctx,
-        config_path=config,
-        deploy=lambda ctx, custom: deploy_setup(ctx, custom, bonesremote_version),
+        deploy=lambda ctx: deploy_setup(ctx, bonesremote_version),
     )
 
 
@@ -74,7 +67,7 @@ def ssl_apply_cmd(
         print("Error: ssl.domain and ssl.email are required in bones.toml", file=sys.stderr)
         sys.exit(3)
     _validate_host(ctx)
-    run(ctx=ctx, config_path=config, deploy=deploy_ssl)
+    run(ctx=ctx, deploy=deploy_ssl)
 
 
 @helpers_app.command("apply")
@@ -83,7 +76,7 @@ def helpers_apply_cmd(
 ):
     ctx = DeployContext.from_files(config)
     _validate_host(ctx)
-    run(ctx=ctx, config_path=config, deploy=deploy_helpers)
+    run(ctx=ctx, deploy=deploy_helpers)
 
 
 @services_app.command("apply")
@@ -92,7 +85,7 @@ def services_apply_cmd(
 ):
     ctx = DeployContext.from_files(config)
     _validate_host(ctx)
-    run(ctx=ctx, config_path=config, deploy=deploy_services)
+    run(ctx=ctx, deploy=deploy_services)
 
 
 @manifest_app.command("show")
@@ -104,7 +97,8 @@ def manifest_show_cmd(
         raise typer.BadParameter("must be text or json", param_hint="--format")
     ctx = DeployContext.from_files(config)
     _validate_host(ctx)
-    data = run(ctx=ctx, config_path=config, deploy=inspect_for_runner, quiet=True)
+    project_manifest = load_manifest(config)
+    data = run(ctx=ctx, deploy=lambda current_ctx: inspect_for_runner(current_ctx, project_manifest), quiet=True)
     if not isinstance(data, dict):
         raise TypeError("manifest inspection returned no report")
     print(render(data, output_format))
@@ -125,7 +119,6 @@ def patches_apply_cmd(
     _validate_host(ctx)
     run(
         ctx=ctx,
-        config_path=config,
-        deploy=lambda patch_ctx, _custom: apply_remote(patch_ctx, target_version),
+        deploy=lambda patch_ctx: apply_remote(patch_ctx, target_version),
         ssh_user_override="root",
     )

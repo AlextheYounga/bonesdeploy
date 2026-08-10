@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from bonesinfra.config.context import DeployContext
@@ -93,6 +95,6 @@ def test_static_nginx_validation_runs_as_runtime_user(tmp_path, monkeypatch):
     monkeypatch.setattr(nginx_site.files, "directory", _noop)
     monkeypatch.setattr(nginx_site.validation.server, "shell", lambda **kwargs: calls.append(kwargs))
 
-    nginx_site.render_static(ctx, paths=ctx.paths_dict)
+    nginx_site.render_static(ctx, paths=ctx.paths_dict, template_src=Path("static-site-nginx.conf.j2"))
 
     assert calls[0]["_sudo_user"] == "lawsnipe"

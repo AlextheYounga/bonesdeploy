@@ -51,6 +51,7 @@ Never cut corners on trust-boundary validation, clarity, terminology, security, 
 
 Prefer code that reads as a vocabulary of the system, not a sequence of implementation details.
 
+**YOU DO NOT COMMIT ANY CHANGES**
 
 When you are done working, please run and address all warnings/errors:
 - `cargo clippy`

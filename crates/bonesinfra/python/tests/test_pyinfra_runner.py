@@ -65,7 +65,7 @@ port = 2222
 
     monkeypatch.setattr(runner, "connect_all", fake_connect_all)
 
-    runner.run(ctx=ctx, config_path=str(config_path), ssh_key="~/.ssh/id_ed25519", deploy=_noop_deploy)
+    runner.run(ctx=ctx, ssh_key="~/.ssh/id_ed25519", deploy=_noop_deploy)
 
     assert seen["kwargs"]["username"] == "root"
     assert seen["kwargs"]["port"] == 2222
@@ -89,7 +89,6 @@ port = 2222
     ctx = DeployContext.from_files(str(config_path))
     seen = {}
 
-    monkeypatch.setattr(runner, "load_custom_module", lambda _path: None)
     monkeypatch.setattr(
         runner,
         "connect_all",
@@ -99,7 +98,6 @@ port = 2222
 
     runner.run(
         ctx=ctx,
-        config_path=str(config_path),
         deploy=_noop_deploy,
         ssh_user_override="root",
         quiet=True,

@@ -1,5 +1,3 @@
-from types import ModuleType
-
 from bonesinfra.cli.commands.setup import (
     bonesremote,
     directories,
@@ -11,11 +9,10 @@ from bonesinfra.cli.commands.setup import (
     users,
 )
 from bonesinfra.cli.commands.setup.packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
-from bonesinfra.cli.hooks import call_hook
 from bonesinfra.services.linux import fail2ban, firewall, unattended_upgrades
 
 
-def deploy_setup(ctx, custom: ModuleType | None = None, bonesremote_version: str = ""):
+def deploy_setup(ctx, bonesremote_version: str = ""):
     paths = ctx.paths_dict
     all_pkgs = BASE_SYSTEM_PACKAGES + SUPPLEMENTARY_PACKAGES
 
@@ -32,5 +29,3 @@ def deploy_setup(ctx, custom: ModuleType | None = None, bonesremote_version: str
     users.install_authorized_key(ctx)
     bonesremote.install(bonesremote_version)
     sudoers.install(paths)
-
-    call_hook(custom, "after_setup", ctx)

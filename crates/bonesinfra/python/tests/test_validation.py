@@ -1,4 +1,4 @@
-from bonesinfra.frameworks.common import validation
+from bonesinfra.services.linux import validation
 
 
 def test_verify_profile_attached_retries_before_diagnostics(monkeypatch):

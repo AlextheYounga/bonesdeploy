@@ -4,7 +4,7 @@ use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use common::TestEnv;
 
 const INIT_ARGS: &[&str] = &["init", "--non-interactive", "--project-name", "atlas", "--host", "deploy.example.com"];
@@ -17,8 +17,12 @@ fn init_success(env: &TestEnv) -> Result<()> {
 
 fn assert_bones_dir(bones_dir: &Path) -> Result<()> {
     assert!(bones_dir.join("bones.toml").is_file());
-    let custom = fs::read_to_string(bones_dir.join("custom.py")).context("read custom.py")?;
-    assert!(custom.contains("Local-only BonesInfra extension hooks"));
+    assert!(bones_dir.join("infra/__init__.py").is_file());
+    assert!(bones_dir.join("infra/runtime.py").is_file());
+    assert!(bones_dir.join("infra/manifest.py").is_file());
+    assert!(bones_dir.join("infra/custom.py").is_file());
+    assert!(!bones_dir.join("custom.py").exists());
+    assert!(!bones_dir.join("confs").exists());
     assert!(!bones_dir.join("hooks").exists(), ".bones should not contain a hooks/ directory");
     let deploy_dir = bones_dir.join("deployment");
     assert!(deploy_dir.is_dir());
@@ -64,6 +68,33 @@ fn materializes_base_bones_assets() -> Result<()> {
     let gitignore_content = fs::read_to_string(config_gitignore)?;
     assert!(gitignore_content.contains("projects/"));
 
+    Ok(())
+}
+
+#[test]
+fn named_frameworks_materialize_project_infrastructure_snapshots() -> Result<()> {
+    for framework in ["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"] {
+        let env = TestEnv::new()?;
+        let output = env.run(&[
+            "init",
+            "--non-interactive",
+            "--project-name",
+            "atlas",
+            "--host",
+            "deploy.example.com",
+            "--template",
+            framework,
+        ])?;
+        assert!(output.status.success(), "{framework} init failed: {}", String::from_utf8_lossy(&output.stderr));
+        let bones = env.repo().join(".bones");
+        for entrypoint in ["__init__.py", "runtime.py", "manifest.py", "custom.py"] {
+            assert!(bones.join("infra").join(entrypoint).is_file(), "{framework} is missing infra/{entrypoint}");
+        }
+        assert!(bones.join("deployment/functions.sh").is_file(), "{framework} is missing kit deployment functions");
+        assert!(!bones.join("custom.py").exists());
+        assert!(!bones.join("confs").exists());
+        assert!(bones.join("infra/templates").is_dir(), "{framework} is missing infra templates");
+    }
     Ok(())
 }
 

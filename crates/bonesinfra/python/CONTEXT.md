@@ -45,8 +45,8 @@ BonesInfra owns:
 - setup disables and unloads `algif_aead` to prevent Copy Fail (CVE-2026-31431) exploitation
 - runtime provisioning
 - SSL provisioning
-- runtime catalog
-- framework-specific infrastructure
+- loading and running the project's `.bones/infra` infrastructure
+- framework-specific infrastructure (generated per project, not installed)
 - Jinja2 templates used by provisioning
 - runtime package installation
 - runtime services
@@ -98,11 +98,12 @@ bonesinfra = "bonesinfra.__main__:main"
 The private command shapes currently used by the Rust CLI are:
 
 ```sh
-bonesinfra runtime list
 bonesinfra helpers apply --config <bones.toml>
 bonesinfra setup apply --config <bones.toml>
 bonesinfra runtime apply --config <bones.toml>
 bonesinfra ssl apply --config <bones.toml>
+bonesinfra services apply --config <bones.toml>
+bonesinfra manifest show --config <bones.toml>
 ```
 
 `ssh_user` is read from `bones.toml` (`app.server.ssh_user` key, default `"root"`) instead of a CLI flag.
@@ -136,12 +137,12 @@ crates/bonesinfra/
     └── src/bonesinfra/        # importable Python package
         ├── __init__.py
         ├── __main__.py
-        ├── cli/
-        ├── domain/
-        ├── infra/
-        ├── deploys/
-        ├── frameworks/
-        └── assets/
+        ├── cli/               # Typer command definitions
+        ├── config/            # DeployContext, paths, template_data
+        ├── manifest.py        # artifact/service inspection and reporting
+        ├── project.py         # project `.bones/infra` loader
+        ├── pyinfra/           # runner + small operation helpers
+        └── services/          # languages, linux, runtime services
 ```
 
 The monorepo root is the repository. `crates/bonesinfra/python` is the
@@ -190,7 +191,7 @@ Not allowed:
 - TOML parsing details
 - path derivation
 - direct deploy plan logic
-- runtime module loading internals
+- project infrastructure loading internals
 - server provisioning logic
 
 CLI should stay thin.
@@ -200,30 +201,29 @@ Example shape:
 ```python
 def setup_apply_cmd(config: str):
     ctx = DeployContext.from_files(config)
-    run(ctx=ctx, config_path=config, deploy=deploy_setup)
+    run(ctx=ctx, deploy=deploy_setup)
 ```
 
-## `cli/` and `infra/`
+## `cli/` and `pyinfra/`
 
-The current package keeps command orchestration in `cli/app.py` and the
-pyinfra bridge in `infra/pyinfra_runner.py`; there is no separate Python
-`app/` layer.
+Command orchestration lives in `cli/app.py` and the pyinfra bridge in
+`pyinfra/runner.py`.
 
 The CLI commands load `DeployContext.from_files()`, validate command-specific
-requirements, select a deploy plan, and pass it to `infra.pyinfra_runner.run()`.
+requirements, select a deploy plan, and pass it to `pyinfra.runner.run()`.
 The runner owns pyinfra connection and execution concerns. CLI code should
 not contain raw pyinfra operations, and the runner should not contain
 framework-specific provisioning logic.
 
-## `domain/`
+## `config/`
 
 Owns stable data concepts.
 
 Examples:
 
 ```text
-domain/context.py
-domain/paths.py
+config/context.py
+config/paths.py
 ```
 
 Responsibilities:
@@ -234,9 +234,9 @@ Responsibilities:
 - provide `template_data()` helper for Jinja2 rendering
 - keep data-shaping logic testable
 
-Domain code should not import pyinfra.
+Config code should not import pyinfra.
 
-`domain/context.py` mirrors the top-level `bones.toml` sections:
+`config/context.py` mirrors the top-level `bones.toml` sections:
 
 - **`AppConfig`**: the `[app]`, `[app.server]`, `[app.dns]`, and `[app.deploy]` tables
 - **`RuntimeConfig`**: the typed `[runtime]` identity fields, plus dynamic runtime settings
@@ -244,14 +244,15 @@ Domain code should not import pyinfra.
 
 No flat dict. No `host.data` side-channel.
 
-## `infra/`
+## `pyinfra/`
 
 Owns external machinery.
 
 Current examples:
 
 ```text
-infra/pyinfra_runner.py
+pyinfra/runner.py
+pyinfra/operations.py
 ```
 
 Responsibilities:
@@ -261,36 +262,32 @@ Responsibilities:
 - read stdin JSON overrides if supported
 - bridge CLI-selected deploy plans to pyinfra
 
-Infra code may import pyinfra.
+Pyinfra code may import pyinfra.
 
-Domain code should avoid direct pyinfra dependency; the runner and deploy
+Config code should avoid direct pyinfra dependency; the runner and deploy
 plans are the pyinfra boundary.
 
-## `deploys/`
+## `project.py` and `manifest.py`
 
-Owns pyinfra deploy plans.
+`project.py` owns loading the project's own infrastructure: it resolves
+`.bones/infra` relative to `bones.toml`, imports `runtime.py` / `manifest.py`
+as a package (supporting relative imports such as `from . import custom`),
+and validates entrypoints before SSH.
 
-Expected shape:
+`manifest.py` combines core declarations and the loaded project manifest to
+inspect artifacts and services, and renders reports for `manifest show`.
+Framework-owned runtime artifacts are declared by the project manifest, not
+embedded core constants.
+
+## `services/`
+
+Owns pyinfra deploy operations, grouped by concern:
 
 ```text
-deploys/
-├── setup/
-│   ├── plan.py
-│   ├── packages.py
-│   ├── users.py
-│   ├── directories.py
-│   ├── firewall.py
-│   └── bonesremote.py
-├── runtime/
-│   ├── plan.py
-│   ├── packages.py
-│   ├── apparmor.py
-│   ├── nginx.py
-│   ├── template_runtime.py
-└── ssl/
-    ├── plan.py
-    ├── nginx.py
-    └── certbot.py
+services/
+├── languages/    # Python, Node, Ruby, PHP runtime installs
+├── linux/        # systemd, nginx, apparmor, firewall, validation, application
+└── runtime/      # database/data services (mysql, redis, valkey, ...)
 ```
 
 Deploy plan files should read like stories.
@@ -315,34 +312,24 @@ Raw pyinfra operations should live in focused modules.
 
 ## `frameworks/`
 
-Owns runtime-specific infrastructure.
+No longer exists as an installed registry.
 
-Examples:
+Runtime-specific infrastructure now lives with each project: `bonesdeploy init`
+materializes `.bones/infra/` into the project (next to `bones.toml`), containing
+`__init__.py`, `runtime.py`, `manifest.py`, an ordinary `custom.py`, and local
+`infra/templates/`. The generated `infra/runtime.py` orchestrates the framework's
+services using the neutral core helpers in `services/`.
 
-```text
-frameworks/
-├── __init__.py
-├── common/
-├── laravel/
-├── django/
-├── rails/
-├── next/
-├── nuxt/
-├── sveltekit/
-└── vue/
-```
-
-Each runtime should expose a consistent interface.
-
-Current interface:
+Each generated runtime must expose a consistent interface:
 
 ```python
 def deploy(ctx) -> None: ...  # ctx: DeployContext
 ```
 
-A runtime may have a no-op deploy, but it should be explicit. Runtime modules
-are selected by the Python catalog for infrastructure application; user-facing
-Framework template questions are defined in the Rust CLI.
+The project manifest must expose `artifacts(ctx)`, `services(ctx)`, and
+`mode(ctx)`. User-facing Framework template questions are defined in the Rust
+CLI under `crates/bonesdeploy/src/frameworks/`; the matching snapshot under
+`crates/bonesdeploy/assets/frameworks/<fw>/` is scaffolded into the project.
 
 ______________________________________________________________________
 
@@ -394,46 +381,18 @@ Plan files receive `ctx` directly as a function parameter.
 
 # Runtime Catalog
 
-The runtime catalog should be explicit.
+The installed runtime catalog no longer exists.
 
-Avoid silent import failure.
+Runtimes are selected by the user-facing Rust CLI during `bonesdeploy init`,
+which writes the chosen values into `.bones/bones.toml` and scaffolds the
+project's `.bones/infra/` snapshot. BonesInfra then loads that project source
+at deploy time via `project.load_runtime(config)` / `load_manifest(config)`,
+resolving `infra/runtime.py` and `infra/manifest.py` relative to `bones.toml`
+as an importable package.
 
-Bad:
-
-```python
-try:
-    import runtime
-except ImportError:
-    pass
-```
-
-Good:
-
-```python
-RUNTIMES = {
-    "django": django,
-    "laravel": laravel,
-    "next": next_runtime,
-    "nuxt": nuxt,
-    "rails": rails,
-    "sveltekit": svelte,
-    "vue": vue,
-}
-```
-
-If a declared runtime is broken, tests should fail.
-
-Runtime query commands should return stable JSON:
-
-```sh
-bonesinfra runtime list
-```
-
-Expected `runtime list` response:
-
-```json
-["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"]
-```
+Broken project infrastructure surfaces before SSH: missing entrypoints raise
+`FileNotFoundError`, import failures raise `ImportError` with the file path,
+and missing callables raise `TypeError`.
 
 Rust does not depend on a Python question endpoint. It owns the prompt schema
 and writes the selected values into `bones.toml` before invoking BonesInfra.
@@ -453,7 +412,7 @@ It should:
 - run operations
 - return nonzero exit on pyinfra failure
 
-It should not know about Laravel, SSL, nginx, config files, or runtime selection.
+It should not know about Laravel, SSL, nginx, config files, or project infrastructure selection.
 
 The runner no longer attaches a flat data dict to `host.data`. It calls `deploy(ctx)` directly, passing the typed `DeployContext`. Plan files receive the context as a parameter and pass it to sub-modules.
 
@@ -575,26 +534,23 @@ ______________________________________________________________________
 
 # Runtime-Specific Infrastructure
 
-Runtime modules should be small and grouped by concern.
+Per-framework logic is generated into each project's `.bones/infra/runtime.py`
+by `bonesdeploy init` (snapshots under `crates/bonesdeploy/assets/frameworks/`),
+not installed in this package. The generated files orchestrate the framework's
+services using the neutral core helpers in `services/`:
 
-Example Laravel layout:
+- `services/linux/application.py` — `deploy_server` / `deploy_static` building
+  blocks shared by generated runtimes (AppArmor, systemd, nginx wiring)
+- `services/linux/systemd.py`, `nginx/`, `apparmor/` — service lifecycle,
+  per-site nginx, AppArmor profiles
+- `services/linux/runtime_paths.py`, `runtime_logs.py`, `validation.py` — shared
+  provisioning helpers
+- `services/languages/` — Python, Node, Ruby, PHP runtime installs
 
-```text
-frameworks/laravel/
-├── __init__.py
-├── metadata.py
-├── deploy.py
-├── php_repo.py
-├── php_packages.py
-├── php_fpm.py
-└── nginx.py
-```
-
-Laravel should not be one giant file.
-
-Shared runtime helpers live under `frameworks/common/`, including common AppArmor, nginx, service, Node, path, validation, logging, and PHP-FPM pool helpers.
-
-Django, Rails, Node, Vue, etc. can stay small, but they should still follow the same interface.
+Each generated runtime stays small and reads like a story against those
+primitives. Django, Rails, Node, Vue, etc. all follow the same `deploy(ctx)`
+interface, and each framework's templates live beside it in
+`infra/templates/`.
 
 ______________________________________________________________________
 
@@ -628,9 +584,9 @@ Suggested tests:
 
 ```text
 - cli/ files do not import pyinfra.operations
-- domain/ files do not import pyinfra
-- runtime registry imports every declared runtime
-- every runtime exposes `deploy(ctx)` or an explicit no-op deploy
+- config/ files do not import pyinfra
+- project loader tests cover relative imports and entrypoint validation
+- every generated framework runtime exposes `deploy(ctx)`
 - deploy context parses typed dataclasses correctly
 - `template_data()` produces expected flat dict keys
 - no sys.path mutation
