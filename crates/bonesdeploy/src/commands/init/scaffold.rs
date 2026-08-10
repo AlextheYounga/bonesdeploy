@@ -43,7 +43,7 @@ pub(super) fn materialize_fresh_bones(
 
     if let Some(template_name) = framework.template {
         framework_assets::scaffold_framework_env_build(&template_name, Path::new("."), &cfg.runtime)?;
-        framework_assets::scaffold_framework_deployment(&template_name, bones_dir)?;
+        framework_assets::scaffold_framework_project(&template_name, bones_dir)?;
         frameworks::configure(&template_name, cfg);
         println!("Framework template: {template_name}");
     } else {

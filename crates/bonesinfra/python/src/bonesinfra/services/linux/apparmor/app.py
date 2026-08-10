@@ -1,7 +1,6 @@
 from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
-from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.pyinfra.operations import render
 
 
@@ -12,6 +11,7 @@ def render_profile(
     runtime,
     apparmor_exec_paths,
     apparmor_writable_paths,
+    template_src,
     apparmor_network="network unix stream,",
 ):
     profile_name = f"bonesdeploy-{ctx.app.project_name}-{runtime}"
@@ -19,7 +19,7 @@ def render_profile(
 
     render(
         f"Deploy {runtime} AppArmor profile",
-        ASSETS_DIR / "apparmor/app-profile.j2",
+        template_src,
         profile_path,
         apparmor_profile_name=profile_name,
         apparmor_runtime=runtime,

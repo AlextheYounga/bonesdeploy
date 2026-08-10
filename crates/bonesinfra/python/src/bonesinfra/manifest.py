@@ -9,7 +9,6 @@ from pyinfra.facts.files import Directory, File, Link
 from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra.config.context import DeployContext
-from bonesinfra.frameworks import get_framework
 from bonesinfra.pyinfra.operations import letsencrypt_cert_paths
 from bonesinfra.services.runtime import get_service
 
@@ -73,33 +72,15 @@ COMMON_ARTIFACTS = (
     Artifact("placeholder web root", "placeholder_web_root", "directory", "setup"),
     Artifact("placeholder index", "placeholder_index", "file", "setup"),
     Artifact("project configuration directory", "conf_root", "directory", "runtime"),
-    Artifact("nginx site configuration", "site_nginx_config", "file", "runtime"),
-    Artifact("nginx site", "nginx_site_available", "file", "runtime"),
-    Artifact("enabled nginx site", "nginx_site_enabled", "link", "runtime"),
-    Artifact("site systemd target", "systemd_site_target", "file", "runtime"),
-    Artifact("site systemd requirements", "systemd_site_target_requires", "directory", "runtime"),
-    Artifact("site nginx systemd service", "systemd_site_nginx_service", "file", "runtime"),
-    Artifact("site nginx systemd requirement", "systemd_site_nginx_requirement", "link", "runtime"),
-    Artifact("site nginx AppArmor profile", "nginx_apparmor_profile", "file", "runtime"),
-    Artifact("runtime socket directory", "runtime_socket_dir", "directory", "runtime"),
-    Artifact("runtime nginx directory", "runtime_nginx_dir", "directory", "runtime"),
-    Artifact("runtime nginx socket", "runtime_nginx_socket", "file", "runtime"),
-    Artifact("runtime nginx PID", "runtime_nginx_pid", "file", "runtime"),
-    Artifact("site log directory", "site_log_dir", "directory", "runtime"),
 )
 
 COMMON_SERVICES = (ManagedService("site nginx", "{project}-nginx.service", "runtime"),)
 
 
-def collect_artifacts(ctx: DeployContext) -> tuple[Artifact, ...]:
+def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifact, ...]:
     """Return the artifacts expected for the context's deployment strategy."""
     artifacts = list(COMMON_ARTIFACTS)
-    template = ctx.runtime.data.get("template")
-    if template:
-        framework = get_framework(str(template))
-        artifacts.extend(Artifact.at_path(*spec) for spec in framework.manifest_artifacts(ctx))
-    if ctx.runtime.backend == "docker":
-        artifacts.append(Artifact("Docker runtime socket", "runtime_php_fpm_socket", "file", "docker"))
+    artifacts.extend(Artifact.at_path(*spec) for spec in project_manifest.artifacts(ctx))
 
     for name in ctx.services.services:
         artifacts.extend(Artifact.at_path(*spec) for spec in get_service(name).manifest_artifacts(ctx))
@@ -115,53 +96,54 @@ def collect_artifacts(ctx: DeployContext) -> tuple[Artifact, ...]:
     return _deduplicate(artifacts)
 
 
-def collect_services(ctx: DeployContext) -> tuple[ManagedService, ...]:
+def collect_services(ctx: DeployContext, project_manifest: Any) -> tuple[ManagedService, ...]:
     """Return the project-specific systemd services managed by BonesInfra."""
     services = [
         ManagedService(entry.name, entry.unit.format(project=ctx.app.project_name), entry.owner)
         for entry in COMMON_SERVICES
     ]
-    template = ctx.runtime.data.get("template")
-    if template:
-        services.extend(ManagedService(*spec) for spec in get_framework(str(template)).manifest_services(ctx))
-    if ctx.runtime.backend == "docker":
-        services.append(ManagedService("Docker application", f"{ctx.app.project_name}-docker.service", "docker"))
+    services.extend(
+        ManagedService(name, unit.format(project=ctx.app.project_name), owner)
+        for name, unit, owner in project_manifest.services(ctx)
+    )
     for name in ctx.services.services:
         services.extend(ManagedService(*spec) for spec in get_service(name).manifest_services(ctx))
     return _deduplicate_services(services)
 
 
-def resolve_artifacts(ctx: DeployContext) -> tuple[Artifact, ...]:
+def resolve_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifact, ...]:
     """Validate and return declarations whose keys resolve through DeploymentPaths."""
     paths = ctx.paths
-    for artifact in collect_artifacts(ctx):
+    for artifact in collect_artifacts(ctx, project_manifest):
         _artifact_path(paths, artifact)
-    return collect_artifacts(ctx)
+    return collect_artifacts(ctx, project_manifest)
 
 
-def inspect_artifacts(ctx: DeployContext, host: Any) -> list[ResolvedArtifact]:
+def inspect_artifacts(ctx: DeployContext, host: Any, project_manifest: Any) -> list[ResolvedArtifact]:
     """Inspect declared paths using read-only PyInfra file facts."""
     paths = ctx.paths
-    resolved = resolve_artifacts(ctx)
+    resolved = resolve_artifacts(ctx, project_manifest)
     return [_inspect_one(host, artifact, _artifact_path(paths, artifact)) for artifact in resolved]
 
 
-def inspect_services(ctx: DeployContext, host: Any) -> list[ResolvedService]:
+def inspect_services(ctx: DeployContext, host: Any, project_manifest: Any) -> list[ResolvedService]:
     """Inspect declared project-specific systemd services without changing them."""
-    return [_inspect_service(host, service) for service in collect_services(ctx)]
+    return [_inspect_service(host, service) for service in collect_services(ctx, project_manifest)]
 
 
-def report(ctx: DeployContext, entries: list[ResolvedArtifact], services: list[ResolvedService]) -> dict[str, Any]:
+def report(
+    ctx: DeployContext,
+    entries: list[ResolvedArtifact],
+    services: list[ResolvedService],
+    project_manifest: Any,
+) -> dict[str, Any]:
     template = ctx.runtime.data.get("template")
-    mode = "none"
-    if template:
-        mode = get_framework(str(template)).manifest_mode(ctx)
 
     return {
         "strategy": {
             "backend": ctx.runtime.backend,
             "framework": template or "none",
-            "mode": mode,
+            "mode": project_manifest.mode(ctx),
             "services": list(ctx.services.services),
             "ssl": ctx.app.dns.ssl_enabled,
         },
@@ -199,8 +181,13 @@ def render(data: dict[str, Any], output_format: str) -> str:
     raise ValueError(f"unsupported manifest format: {output_format}")
 
 
-def inspect_for_runner(ctx: DeployContext, _custom: Any) -> dict[str, Any]:
-    return report(ctx, inspect_artifacts(ctx, ctx_host), inspect_services(ctx, ctx_host))
+def inspect_for_runner(ctx: DeployContext, project_manifest: Any) -> dict[str, Any]:
+    return report(
+        ctx,
+        inspect_artifacts(ctx, ctx_host, project_manifest),
+        inspect_services(ctx, ctx_host, project_manifest),
+        project_manifest,
+    )
 
 
 def _inspect_one(host: Any, artifact: Artifact, path: str) -> ResolvedArtifact:

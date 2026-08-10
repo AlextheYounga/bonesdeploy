@@ -7,8 +7,8 @@ from pyinfra.operations import apt, files, server, systemd
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
-from bonesinfra.frameworks.common import logs
 from bonesinfra.services.languages.base import LanguageRuntime
+from bonesinfra.services.linux import runtime_logs as logs
 
 PHP_SURY_KEYRING_URL = "https://packages.sury.org/debsuryorg-archive-keyring.deb"
 PHP_SURY_KEYRING_DEST = "/usr/share/keyrings/deb.sury.org-php.gpg"

@@ -217,24 +217,26 @@ bonesdeploy/
 │   │       ├── release_state.rs
 │   │       └── main.rs
 │   ├── bonesinfra/
-│   │   ├── python/             # Python package (pyinfra operations, frameworks, Jinja2 templates)
+│   │   ├── python/             # Python package (pyinfra operations, core services, Jinja2 templates)
 │   │   └── src/                # embeds python/, materializes it, runs `python -m bonesinfra`
 │   └── shared/                 # config schema + central paths
 └── docs/
 ```
 
 ### Per-Framework Templates
-Framework templates ship starter overlays that `bonesdeploy remote runtime` uses when scaffolding infrastructure for a matching framework. Each template lives in the embedded `bonesinfra` package (`crates/bonesinfra/python/src/bonesinfra/frameworks/`) — framework assets and Jinja2 templates stay together:
+Framework templates ship starter overlays that `bonesdeploy remote runtime` uses when scaffolding infrastructure for a matching framework. Each named framework has a snapshot under `crates/bonesdeploy/assets/frameworks/<fw>/` — `bones.toml` defaults, `deployment/` scripts, and generated `.bones/infra/` source with its local `templates/` stay together:
 
-- `frameworks/laravel/`        → Laravel (PHP + PHP-FPM)
-- `frameworks/django/`         → Django (Python + Gunicorn)
-- `frameworks/next/`           → Next.js (Node)
-- `frameworks/nuxt/`           → Nuxt (Node)
-- `frameworks/sveltekit/`     → SvelteKit (Node)
-- `frameworks/vue/`           → Vue (Node)
-- `frameworks/rails/`         → Rails (Ruby)
+- `frameworks/laravel/`    → Laravel (PHP + PHP-FPM)
+- `frameworks/django/`     → Django (Python + Gunicorn)
+- `frameworks/next/`       → Next.js (Node)
+- `frameworks/nuxt/`       → Nuxt (Node)
+- `frameworks/sveltekit/`  → SvelteKit (Node)
+- `frameworks/vue/`        → Vue (Node)
+- `frameworks/rails/`      → Rails (Ruby)
 
-Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the `bonesinfra` crate.
+Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
+
+Projects materialize project-owned infrastructure: `.bones/infra/__init__.py`, `.bones/infra/runtime.py` (orchestrates the framework's services), `.bones/infra/manifest.py` (declares framework-owned artifacts, services, and mode), and an ordinary `.bones/infra/custom.py` project hook plus local `infra/templates/`. `bonesinfra runtime apply` imports and runs the project's `runtime.py`; it no longer ships an installed framework registry or root `custom.py`/`confs/` dispatch. Laravel's infra package also ships `.bones/infra/docker.py` with its `templates/docker/` assets, used when the project selects the `docker` runtime backend.
 
 Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves (e.g. Next's `out/`). A static site only works if the app is configured to emit that directory: for `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
 
@@ -246,7 +248,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy remote setup` and `bonesdeploy remote runtime` before first deploy.
   - Saves config to `.bones/bones.toml`.
-  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). `init` no longer calls `bonesinfra runtime list` or prefetches `bonesinfra`.
+  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). The matching framework snapshot under `crates/bonesdeploy/assets/frameworks/<fw>/` is materialized into `.bones/` (`deployment/` scripts, `infra/` source, `infra/templates/`).
   - `--template <name>` selects a framework template non-interactively. `--framework-var <key=value>` (repeated) overrides template variables; answers are validated against the template's question schema before writing `bones.toml`.
 
 - **doctor**
