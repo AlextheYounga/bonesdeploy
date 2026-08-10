@@ -80,18 +80,8 @@ combine-as-imports = true
   "T20",     # CLI tool uses print for output/errors
   "PLC0415", # intentional lazy imports for CLI commands
 ]
-"src/bonesinfra/cli/hooks.py" = [
-  "T20",     # fail-fast errors print the offending path to stderr before SSH
-  "BLE001",  # surface any load failure with the file path visible
-]
 "src/bonesinfra/app/*.py" = [
   "T20",     # app services print errors to stderr
-]
-"src/bonesinfra/frameworks/__init__.py" = [
-  "T20",     # intentional stderr print on unknown framework before sys.exit
-]
-"src/bonesinfra/frameworks/laravel/php_repo.py" = [
-  "PLC0415", # pyinfra imports are deferred to deploy time
 ]
 "src/bonesinfra/pyinfra/runner.py" = [
   "T20",     # print to stderr on failure
@@ -105,13 +95,6 @@ combine-as-imports = true
   "PLR0913", # render_router_config() accepts many keyword-only args naturally
 ]
 "src/bonesinfra/services/runtime/__init__.py" = ["T20"]
-"src/bonesinfra/services/runtime/**/*.py" = [
-  "PLC0415", # pyinfra imports are deferred to deploy time
-]
-"src/bonesinfra/cli/commands/runtime/template_runtime.py" = [
-  "PLC0415", # lazy import to avoid circular dependency
-  "BLE001",  # blind except on ImportError/KeyError
-]
 "src/bonesinfra/cli/commands/setup/bonesremote.py" = [
   "S604",    # pyinfra.server.user with shell=True is standard
 ]

@@ -1,13 +1,10 @@
-from types import ModuleType
-
 from pyinfra.operations import server
 
-from bonesinfra.cli.hooks import call_hook
 from bonesinfra.pyinfra.operations import mkdir
 from bonesinfra.services.linux.nginx import router as nginx_router
 
 
-def deploy_ssl(ctx, custom: ModuleType | None = None):
+def deploy_ssl(ctx):
     paths = ctx.paths_dict
 
     mkdir(
@@ -22,8 +19,6 @@ def deploy_ssl(ctx, custom: ModuleType | None = None):
     )
     obtain_certificate(ctx, paths)
     nginx_router.render_router_config(ctx, paths, ssl_enabled=True, stage="SSL enable", validate=True, reload=True)
-
-    call_hook(custom, "after_ssl", ctx)
 
 
 def obtain_certificate(ctx, paths):

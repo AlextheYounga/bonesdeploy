@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 from collections.abc import Callable
 from contextlib import nullcontext
-from types import ModuleType
 
 from pyinfra.api import Config, Inventory, State
 from pyinfra.api.connect import connect_all
@@ -11,7 +10,6 @@ from pyinfra.api.exceptions import PyinfraError
 from pyinfra.api.operations import run_ops
 from pyinfra.context import ctx_config, ctx_host, ctx_inventory, ctx_state
 
-from bonesinfra.cli.hooks import load_custom_module
 from bonesinfra.cli.output import (
     BonesDeployCallback,
     activity,
@@ -28,16 +26,12 @@ from bonesinfra.config.context import DeployContext
 def run(
     *,
     ctx: DeployContext,
-    config_path: str,
-    deploy: Callable[[DeployContext, ModuleType | None], object | None],
+    deploy: Callable[[DeployContext], object | None],
     ssh_key: str | None = None,
     quiet: bool = False,
 ) -> object | None:
     if not quiet:
         setup_output()
-
-    # Fail fast on custom.py syntax/import/shape errors before opening SSH.
-    custom = load_custom_module(config_path)
 
     hostname = ctx.app.server.host
     ssh_user = ctx.app.server.ssh_user
@@ -58,7 +52,7 @@ def run(
 
     _show_target(hostname, ssh_user, quiet)
     _connect(state, quiet)
-    result = _plan(ctx, custom, deploy, state, config, inventory, target_host, quiet)
+    result = _plan(ctx, deploy, state, config, inventory, target_host, quiet)
 
     state.add_callback_handler(BonesDeployCallback())
 
@@ -86,7 +80,7 @@ def _connect(state: State, quiet: bool) -> None:
         print_connected()
 
 
-def _plan(ctx, custom, deploy, state, config, inventory, target_host, quiet):
+def _plan(ctx, deploy, state, config, inventory, target_host, quiet):
     with (
         ctx_state.use(state),
         ctx_config.use(config),
@@ -94,7 +88,7 @@ def _plan(ctx, custom, deploy, state, config, inventory, target_host, quiet):
         ctx_host.use(target_host),
         activity("planning deploy operations") if not quiet else nullcontext(),
     ):
-        return deploy(ctx, custom)
+        return deploy(ctx)
 
 
 def _run_operations(state: State, quiet: bool) -> None:

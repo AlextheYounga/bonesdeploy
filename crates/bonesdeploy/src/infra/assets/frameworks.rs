@@ -37,14 +37,20 @@ pub fn framework_defaults(framework: &str) -> Result<Map<String, Value>> {
     framework_defaults_from_bytes(&asset_path, FrameworkAssets::get(&asset_path).map(|asset| asset.data))
 }
 
-pub fn scaffold_framework_deployment(framework: &str, bones_dir: &Path) -> Result<()> {
+pub fn scaffold_framework_project(framework: &str, bones_dir: &Path) -> Result<()> {
     let deploy_dir = bones_dir.join(paths::DEPLOYMENT_DIR);
     if deploy_dir.exists() {
         fs::remove_dir_all(&deploy_dir)
             .with_context(|| format!("Failed to clear deployment dir: {}", deploy_dir.display()))?;
     }
+    let infra_dir = bones_dir.join("infra");
+    if infra_dir.exists() {
+        fs::remove_dir_all(&infra_dir)
+            .with_context(|| format!("Failed to clear infra dir: {}", infra_dir.display()))?;
+    }
     kit::scaffold_deployment_functions(bones_dir)?;
-    scaffold_framework_assets(framework, bones_dir, paths::KIT_DEPLOYMENT_DIR)
+    scaffold_framework_assets(framework, bones_dir, paths::KIT_DEPLOYMENT_DIR)?;
+    scaffold_framework_assets(framework, bones_dir, "infra/")
 }
 
 pub fn scaffold_framework_env_build(framework: &str, project_root: &Path, framework_config: &Runtime) -> Result<()> {

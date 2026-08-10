@@ -17,7 +17,7 @@ pub(super) fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Pat
 }
 
 fn sync_kit_deployment_functions(source_dir: &Path, bones_dir: &Path) -> Result<()> {
-    let source = source_dir.join("crates/bonesdeploy/kit/deployment/functions.sh");
+    let source = source_dir.join("crates/bonesdeploy/assets/kit/deployment/functions.sh");
     if source.is_file() {
         copy_file(&source, &bones_dir.join("deployment/functions.sh"), true)?;
     }
@@ -27,14 +27,15 @@ fn sync_kit_deployment_functions(source_dir: &Path, bones_dir: &Path) -> Result<
 fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> Result<PathBuf> {
     let bones_toml = bones_dir.join(paths::BONES_TOML);
     let Some(template) = selected_framework_template(&bones_toml)? else {
-        return Ok(source_dir.join("crates/bonesdeploy/kit/deployment"));
+        return Ok(source_dir.join("crates/bonesdeploy/assets/kit/deployment"));
     };
 
-    let framework_deployment = source_dir.join("crates/bonesdeploy/frameworks").join(template).join("deployment");
+    let framework_deployment =
+        source_dir.join("crates/bonesdeploy/assets/frameworks").join(template).join("deployment");
     Ok(if framework_deployment.is_dir() {
         framework_deployment
     } else {
-        source_dir.join("crates/bonesdeploy/kit/deployment")
+        source_dir.join("crates/bonesdeploy/assets/kit/deployment")
     })
 }
 
@@ -101,10 +102,10 @@ mod tests {
         let source_dir = temp.path().join("source");
         let bones_dir = temp.path().join(".bones");
 
-        write(&source_dir.join("crates/bonesdeploy/kit/deployment/build/01_build.sh"), "generic deploy")?;
-        write(&source_dir.join("crates/bonesdeploy/kit/deployment/functions.sh"), "shared functions")?;
+        write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/build/01_build.sh"), "generic deploy")?;
+        write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/functions.sh"), "shared functions")?;
         write(
-            &source_dir.join("crates/bonesdeploy/frameworks/laravel/deployment/build/01_build.sh"),
+            &source_dir.join("crates/bonesdeploy/assets/frameworks/laravel/deployment/build/01_build.sh"),
             "laravel deploy",
         )?;
 
