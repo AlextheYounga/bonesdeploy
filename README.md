@@ -158,14 +158,24 @@ This creates:
 ```text
 .bones/
 ├── bones.toml
-└── deployment/
-    └── 01_*.sh
+├── deployment/
+│   └── 01_*.sh
+└── infra/                  # project-owned provisioning source
+    ├── __init__.py
+    ├── runtime.py          # orchestrates the framework's services
+    ├── manifest.py         # declares artifacts, services, and mode
+    ├── custom.py           # your project hook, called by runtime.py
+    └── templates/          # local Jinja2 templates for this project
 ```
 
 The files are yours.
 Edit them.
 Commit them.
 Read them when something breaks.
+
+`infra/runtime.py` is imported and run by BonesInfra when you invoke
+`bonesdeploy remote runtime`; give it a `deploy(ctx)` and call your own
+`custom.deploy(ctx)` from it for project-specific provisioning.
 
 Deployment scripts run in filename order:
 
@@ -188,6 +198,11 @@ Provision the site runtime:
 ```sh
 bonesdeploy remote runtime
 ```
+
+This runs the provisioning in your project's `.bones/infra/runtime.py`:
+framework services, per-site nginx, AppArmor, and your `infra/custom.py`
+project hook. Templates rendered by the generated infrastructure come from
+`.bones/infra/templates/`.
 
 Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
 
@@ -254,8 +269,8 @@ bonesdeploy skill next --format json
 ```
 
 Inspect every project-specific remote artifact and managed systemd service
-expected by the configured runtime, services, and SSL strategy without changing
-the server:
+declared by `.bones/infra/manifest.py`, the configured services, and the SSL
+strategy without changing the server:
 
 ```sh
 bonesdeploy manifest

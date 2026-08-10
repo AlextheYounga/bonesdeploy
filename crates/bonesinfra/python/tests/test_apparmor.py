@@ -43,6 +43,7 @@ def test_render_profile_forwards_template_context(tmp_path, monkeypatch):
         ctx,
         paths=paths,
         runtime="next",
+        template_src=ASSETS_DIR / "apparmor/app-profile.j2",
         apparmor_exec_paths=["/usr/bin/node"],
         apparmor_writable_paths=[paths["shared"]],
     )

@@ -1,18 +1,7 @@
-from pathlib import Path
-
 from pyinfra.operations import files
 
 from bonesinfra.config.context import template_data
-from bonesinfra.config.paths import ASSETS_DIR
-from bonesinfra.frameworks.common import validation
-
-
-def _resolve_template(_ctx, *, paths, name):
-    """Return the path to a nginx site template, preferring a confs override."""
-    confs_path = Path(paths["site_root"]) / "confs" / "nginx" / name
-    if confs_path.is_file():
-        return str(confs_path)
-    return str(ASSETS_DIR / "nginx" / name)
+from bonesinfra.services.linux import validation
 
 
 def _ensure_runtime_socket_dir(ctx, paths):
@@ -35,11 +24,11 @@ def _ensure_runtime_socket_dir(ctx, paths):
     )
 
 
-def render_proxy(ctx, *, paths, socket_path=None, port=None):
+def render_proxy(ctx, *, paths, template_src, socket_path=None, port=None):
     app_proxy_target = f"http://unix:{socket_path}:" if socket_path else f"http://127.0.0.1:{port}"
     files.template(
         name="Deploy per-site app nginx config",
-        src=_resolve_template(ctx, paths=paths, name="app-site-nginx.conf.j2"),
+        src=str(template_src),
         dest=paths["site_nginx_config"],
         user="root",
         group=ctx.runtime.runtime_group,
@@ -56,10 +45,10 @@ def render_proxy(ctx, *, paths, socket_path=None, port=None):
     )
 
 
-def render_static(ctx, *, paths, root="dist"):
+def render_static(ctx, *, paths, template_src, root="dist"):
     files.template(
         name="Deploy per-site static nginx config",
-        src=_resolve_template(ctx, paths=paths, name="static-site-nginx.conf.j2"),
+        src=str(template_src),
         dest=paths["site_nginx_config"],
         user="root",
         group=ctx.runtime.runtime_group,

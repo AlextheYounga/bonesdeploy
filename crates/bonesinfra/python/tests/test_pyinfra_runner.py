@@ -65,7 +65,7 @@ port = 2222
 
     monkeypatch.setattr(runner, "connect_all", fake_connect_all)
 
-    runner.run(ctx=ctx, config_path=str(config_path), ssh_key="~/.ssh/id_ed25519", deploy=_noop_deploy)
+    runner.run(ctx=ctx, ssh_key="~/.ssh/id_ed25519", deploy=_noop_deploy)
 
     assert seen["kwargs"]["username"] == "root"
     assert seen["kwargs"]["port"] == 2222

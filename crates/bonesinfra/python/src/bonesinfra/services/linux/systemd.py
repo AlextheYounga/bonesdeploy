@@ -6,7 +6,7 @@ from pyinfra.operations import files, server, systemd
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR, ETC_SYSTEMD_SYSTEM
-from bonesinfra.frameworks.common import validation
+from bonesinfra.services.linux import validation
 
 SERVICE_NAME_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")
 
