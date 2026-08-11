@@ -4,7 +4,6 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::paths;
 
-use super::patches;
 use crate::config;
 use crate::infra::ssh;
 use bonesdeploy_core::config::{default_deploy_user, parse_port};
@@ -71,9 +70,18 @@ pub(super) async fn update_remote_from_release(current_version: &str, target_ver
     )
     .await?;
 
-    patches::run_remote(&session, &cfg, target_version).await?;
-
     session.close().await?;
+
+    bonesinfra::run(&[
+        "patches",
+        "apply",
+        "--config",
+        paths::LOCAL_BONES_TOML,
+        "--target-version",
+        target_version,
+        "--scope",
+        "remote",
+    ])?;
 
     Ok(())
 }

@@ -73,3 +73,34 @@ port = 2222
     assert seen["kwargs"]["allow_agent"] is False
     assert seen["kwargs"]["look_for_keys"] is False
     assert seen["done"] is True
+
+
+def test_run_can_override_ssh_user_for_update_patches(monkeypatch, tmp_path):
+    config_path = tmp_path / "bones.toml"
+    config_path.write_text(
+        """[app]
+project_name = "lawsnipe"
+[app.server]
+host = "example.com"
+ssh_user = "deploy"
+port = 2222
+"""
+    )
+    ctx = DeployContext.from_files(str(config_path))
+    seen = {}
+
+    monkeypatch.setattr(
+        runner,
+        "connect_all",
+        lambda state: seen.update(user=next(iter(state.inventory)).data.ssh_user),
+    )
+    monkeypatch.setattr(runner, "run_ops", _noop_run_ops)
+
+    runner.run(
+        ctx=ctx,
+        deploy=_noop_deploy,
+        ssh_user_override="root",
+        quiet=True,
+    )
+
+    assert seen["user"] == "root"

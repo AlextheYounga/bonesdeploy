@@ -85,11 +85,6 @@
 - release tag accepts semver versions. (release_tag_accepts_semver_versions)
 - release tag rejects unexpected values. (release_tag_rejects_unexpected_values)
 
-## `crates/bonesdeploy/src/commands/update/patches.rs`
-- patches are ordered by registry. (patches_are_ordered_by_registry)
-- target version controls patch selection. (target_version_controls_patch_selection)
-- versions ignore prerelease suffixes. (versions_ignore_prerelease_suffixes)
-
 ## `crates/bonesdeploy/src/commands/update/release.rs`
 - remote update downloads versioned release and checksum. (remote_update_downloads_versioned_release_and_checksum)
 
@@ -155,7 +150,6 @@
 ## `crates/bonesremote/tests/cli.rs`
 - exhaustive doctor accepts a site. (exhaustive_doctor_accepts_a_site)
 - exhaustive doctor requires a site. (exhaustive_doctor_requires_a_site)
-- patch apply accepts site and patch identifiers. (patch_apply_accepts_site_and_patch_identifiers)
 
 ## `crates/bonesremote/src/commands/deploy/lifecycle.rs`
 - failed activation restores previous release. (failed_activation_restores_previous_release)

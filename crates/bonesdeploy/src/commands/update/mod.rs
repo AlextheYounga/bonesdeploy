@@ -7,10 +7,8 @@ use tempfile::TempDir;
 
 use bonesdeploy_core::paths;
 
-use crate::config;
 use crate::ui::output;
 
-mod patches;
 mod release;
 mod sync;
 mod version;
@@ -50,8 +48,16 @@ pub async fn run(options: Options) -> Result<()> {
         }
 
         if Path::new(paths::LOCAL_BONES_TOML).exists() {
-            let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
-            patches::run_local(&cfg, &release_versions.bonesdeploy)?;
+            bonesinfra::run(&[
+                "patches",
+                "apply",
+                "--config",
+                paths::LOCAL_BONES_TOML,
+                "--target-version",
+                &release_versions.bonesdeploy,
+                "--scope",
+                "local",
+            ])?;
         }
         sync::refresh_local_bones_from_source(&source_dir, Path::new(paths::LOCAL_BONES_DIR))?;
     }

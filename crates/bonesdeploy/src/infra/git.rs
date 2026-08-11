@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::Command;
 
 use anyhow::{Context, Result, bail};
 
@@ -25,23 +25,6 @@ pub fn ensure_git_repository() -> Result<()> {
     }
 
     Ok(())
-}
-
-pub(crate) fn is_repository_at(repo: &Path) -> Result<bool> {
-    Ok(output_at(repo, ["rev-parse", "--git-dir"])?.status.success())
-}
-
-pub(crate) fn output_at<const N: usize>(repo: &Path, args: [&str; N]) -> Result<Output> {
-    Command::new("git").args(["-C"]).arg(repo).args(args).output().context("Failed to run git")
-}
-
-pub(crate) fn run_at<const N: usize>(repo: &Path, args: [&str; N]) -> Result<()> {
-    let output = output_at(repo, args)?;
-    if output.status.success() {
-        return Ok(());
-    }
-
-    bail!("git command failed: {}", String::from_utf8_lossy(&output.stderr).trim())
 }
 
 pub fn remote_exists(remote_name: &str) -> Result<bool> {

@@ -28,13 +28,14 @@ def run(
     ctx: DeployContext,
     deploy: Callable[[DeployContext], object | None],
     ssh_key: str | None = None,
+    ssh_user_override: str | None = None,
     quiet: bool = False,
 ) -> object | None:
     if not quiet:
         setup_output()
 
     hostname = ctx.app.server.host
-    ssh_user = ctx.app.server.ssh_user
+    ssh_user = ssh_user_override or ctx.app.server.ssh_user
     ssh_port = int(ctx.app.server.port)
 
     host_data: dict[str, object] = {
