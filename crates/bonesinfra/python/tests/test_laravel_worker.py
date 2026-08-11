@@ -51,6 +51,15 @@ def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypa
         module.systemd, "enable_and_start", lambda *args, **kwargs: calls.append(("start", args, kwargs))
     )
 
+    original_is_file = Path.is_file
+
+    def mock_is_file(self):
+        if self.name == "artisan":
+            return True
+        return original_is_file(self)
+
+    monkeypatch.setattr(Path, "is_file", mock_is_file)
+
     module.deploy(ctx)
 
     worker_render = next(
@@ -66,6 +75,34 @@ def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypa
     assert "{{ paths.shared }}/storage" in template
     assert "{{ paths.current }}/bootstrap/cache" in template
     assert "ProtectSystem=strict" in template
+
+
+def test_laravel_runtime_skips_worker_registration_without_release(tmp_path, monkeypatch):
+    config = _config(tmp_path, worker=True)
+    (tmp_path / "infra").symlink_to(INFRA, target_is_directory=True)
+    module = load_runtime(config)
+    ctx = _runtime_context(config)
+    calls = []
+
+    monkeypatch.setattr(module.PHP, "install", lambda _ctx: "/usr/bin/php8.5")
+    monkeypatch.setattr(module.PHP, "configure_fpm_pool", lambda _ctx, **_kwargs: "/run/php/php8.5-fpm-atlas.sock")
+    monkeypatch.setattr(module.site, "render_php_fpm", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module.custom, "deploy", lambda _ctx: None)
+    monkeypatch.setattr(module.runtime, "setup", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module.runtime, "start_services", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module, "render", lambda *args, **kwargs: calls.append((args, kwargs)))
+    monkeypatch.setattr(
+        module.systemd, "register_service", lambda *args, **kwargs: calls.append(("register", args, kwargs))
+    )
+    monkeypatch.setattr(
+        module.systemd, "enable_and_start", lambda *args, **kwargs: calls.append(("start", args, kwargs))
+    )
+
+    module.deploy(ctx)
+
+    assert any(args and args[0] == "Deploy Laravel queue worker service" for args, _kwargs in calls)
+    assert not any(call[0] == "register" for call in calls)
+    assert not any(call[0] == "start" for call in calls)
 
 
 def test_laravel_runtime_skips_queue_worker_when_disabled(tmp_path, monkeypatch):
