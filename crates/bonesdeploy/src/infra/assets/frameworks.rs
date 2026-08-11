@@ -43,14 +43,9 @@ pub fn scaffold_framework_project(framework: &str, bones_dir: &Path) -> Result<(
         fs::remove_dir_all(&deploy_dir)
             .with_context(|| format!("Failed to clear deployment dir: {}", deploy_dir.display()))?;
     }
-    let infra_dir = bones_dir.join("infra");
-    if infra_dir.exists() {
-        fs::remove_dir_all(&infra_dir)
-            .with_context(|| format!("Failed to clear infra dir: {}", infra_dir.display()))?;
-    }
     kit::scaffold_deployment_functions(bones_dir)?;
     scaffold_framework_assets(framework, bones_dir, paths::KIT_DEPLOYMENT_DIR)?;
-    scaffold_framework_assets(framework, bones_dir, "infra/")
+    Ok(())
 }
 
 pub fn scaffold_framework_env_build(framework: &str, project_root: &Path, framework_config: &Runtime) -> Result<()> {
@@ -126,6 +121,11 @@ mod tests {
     #[test]
     fn next_framework_includes_the_build_script() {
         assert!(FrameworkAssets::get("next/deployment/build/02_run_build.sh").is_some());
+    }
+
+    #[test]
+    fn framework_assets_do_not_duplicate_canonical_infrastructure() {
+        assert!(FrameworkAssets::iter().all(|path| !path.split('/').any(|part| part == "infra")));
     }
 
     #[test]

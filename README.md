@@ -190,7 +190,7 @@ This creates:
     ├── __init__.py
     ├── runtime.py          # orchestrates the framework's services
     ├── manifest.py         # declares artifacts, services, and mode
-    ├── custom.py           # your project hook, called by runtime.py
+    ├── custom.py           # ordinary project infrastructure module
     └── templates/          # local Jinja2 templates for this project
 ```
 
@@ -200,8 +200,9 @@ Commit them.
 Read them when something breaks.
 
 `infra/runtime.py` is imported and run by BonesInfra when you invoke
-`bonesdeploy remote runtime`; give it a `deploy(ctx)` and call your own
-`custom.deploy(ctx)` from it for project-specific provisioning.
+`bonesdeploy remote runtime`. It is a vendored snapshot of the selected canonical
+framework implementation; edit it, its supporting modules, and its local
+templates as project infrastructure.
 
 Deployment scripts run in filename order:
 

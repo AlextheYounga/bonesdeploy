@@ -28,9 +28,10 @@ settings.
 relative to `bones.toml`), imports it as a package alongside
 `infra/__init__.py` and `infra/manifest.py`, and calls its `deploy(ctx)`.
 The manifest declares framework-owned artifacts, services, and mode for
-`manifest show`. `.bones/infra/` and its local `templates/` are generated
-by `bonesdeploy init` from the kit and named-framework snapshots embedded
-in the Rust binary.
+`manifest show`. `.bones/infra/` and its local `templates/` are copied by
+`bonesdeploy init` from the canonical framework package maintained and embedded
+by BonesInfra. A local package takes precedence as a whole; when it is absent,
+BonesInfra loads the selected built-in package.
 
 ## Notes
 

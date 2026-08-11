@@ -67,6 +67,9 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     scaffold::ensure_config_gitignore()?;
     scaffold::ensure_env_build()?;
     bones_config::save(&cfg, bones_toml)?;
+    if is_fresh {
+        bonesinfra::run(&["project", "materialize", "--config", paths::LOCAL_BONES_TOML])?;
+    }
     secrets::initialize_defaults(&cfg)?;
     if !is_fresh {
         scaffold::ensure_bones_git_repo(bones_dir, &cfg)?;

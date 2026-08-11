@@ -1,25 +1,65 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import importlib.util
 import sys
+import tomllib
 from pathlib import Path
+from shutil import copyfile
 from types import ModuleType
 from typing import Any
 
+BUILTIN_FRAMEWORKS = frozenset({"custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"})
+
 
 def load_runtime(config_path: str | Path) -> ModuleType:
-    return _load_entrypoint(config_path, "runtime.py", "deploy")
+    return _load_selected(config_path, "runtime.py", "deploy")
 
 
 def load_manifest(config_path: str | Path) -> ModuleType:
-    module = _load_entrypoint(config_path, "manifest.py", "artifacts")
-    _require_callable(module, "services", _entrypoint_path(config_path, "manifest.py"))
-    _require_callable(module, "mode", _entrypoint_path(config_path, "manifest.py"))
+    module = _load_selected(config_path, "manifest.py", "artifacts")
+    path = _module_path(config_path, module, "manifest.py")
+    _require_callable(module, "services", path)
+    _require_callable(module, "mode", path)
     return module
 
 
-def _load_entrypoint(config_path: str | Path, filename: str, callable_name: str) -> ModuleType:
+def materialize(config_path: str | Path, framework: str | None = None) -> Path:
+    destination = _entrypoint_path(config_path, "runtime.py").parent
+    if destination.exists():
+        raise FileExistsError(f"project infrastructure directory already exists: {destination}")
+
+    selected = framework or _selected_framework(config_path)
+    if selected not in BUILTIN_FRAMEWORKS:
+        raise ValueError(f"unknown framework infrastructure: {selected}")
+    source = Path(__file__).parent / "frameworks" / selected
+    if not source.is_dir():
+        raise ValueError(f"unknown framework infrastructure: {selected}")
+
+    for source_file in source.rglob("*"):
+        if source_file.is_file():
+            target = destination / source_file.relative_to(source)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            copyfile(source_file, target)
+    return destination
+
+
+def _load_selected(config_path: str | Path, filename: str, callable_name: str) -> ModuleType:
+    infrastructure = _entrypoint_path(config_path, filename).parent
+    if infrastructure.exists():
+        return _load_local_entrypoint(config_path, filename, callable_name)
+
+    framework = _selected_framework(config_path)
+    try:
+        module = importlib.import_module(f"bonesinfra.frameworks.{framework}.{filename[:-3]}")
+    except Exception as error:
+        raise ImportError(f"failed to import built-in infrastructure for {framework}: {error}") from error
+    _require_callable(module, callable_name, Path(module.__file__ or filename))
+    return module
+
+
+def _load_local_entrypoint(config_path: str | Path, filename: str, callable_name: str) -> ModuleType:
     path = _entrypoint_path(config_path, filename)
     if not path.is_file():
         raise FileNotFoundError(f"project infrastructure file does not exist: {path}")
@@ -33,6 +73,19 @@ def _load_entrypoint(config_path: str | Path, filename: str, callable_name: str)
     module = _import_module(f"{package_name}.{path.stem}", path, package_name)
     _require_callable(module, callable_name, path)
     return module
+
+
+def _selected_framework(config_path: str | Path) -> str:
+    with Path(config_path).open("rb") as config_file:
+        data = tomllib.load(config_file)
+    selected = str(data.get("runtime", {}).get("template") or "custom")
+    if selected not in BUILTIN_FRAMEWORKS:
+        raise ValueError(f"unknown framework infrastructure: {selected}")
+    return selected
+
+
+def _module_path(config_path: str | Path, module: ModuleType, filename: str) -> Path:
+    return Path(module.__file__) if module.__file__ else _entrypoint_path(config_path, filename)
 
 
 def _entrypoint_path(config_path: str | Path, filename: str) -> Path:

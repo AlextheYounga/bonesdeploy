@@ -4,7 +4,7 @@ from bonesinfra.config.context import DeployContext
 from bonesinfra.manifest import collect_services, resolve_artifacts
 from bonesinfra.project import load_manifest, load_runtime
 
-INFRA = Path(__file__).parents[4] / "crates/bonesdeploy/assets/frameworks/laravel/infra"
+INFRA = Path(__file__).parents[1] / "src/bonesinfra/frameworks/laravel"
 
 
 def _config(tmp_path: Path, *, worker: bool | None = None) -> Path:

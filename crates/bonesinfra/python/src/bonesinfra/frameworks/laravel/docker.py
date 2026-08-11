@@ -5,8 +5,7 @@ from shlex import quote
 from pyinfra.operations import apt, files, server, systemd
 
 from bonesinfra.config.context import template_data
-from bonesinfra.services.linux import runtime_logs
-from bonesinfra.services.linux import systemd as service
+from bonesinfra.services.linux import runtime_logs, systemd as service
 from bonesinfra.services.linux.nginx import site as nginx_site
 
 TEMPLATES = Path(__file__).parent / "templates"
@@ -110,7 +109,5 @@ def _build_runtime_image(ctx) -> str:
         f"podman save --format docker-archive --output {quote(archive)} {quote(image)} {quote(runtime_tag)} && "
         f"docker load --input {quote(archive)}"
     )
-    server.shell(
-        name="Build and load Laravel runtime image", commands=[podman], _sudo=True
-    )
+    server.shell(name="Build and load Laravel runtime image", commands=[podman], _sudo=True)
     return image

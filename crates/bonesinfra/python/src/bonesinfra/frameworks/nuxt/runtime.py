@@ -13,12 +13,32 @@ TEMPLATES = Path(__file__).parent / "templates"
 def deploy(ctx):
     runtime.setup(ctx)
     if ctx.runtime.data.get("is_static", True):
-        application.deploy_static(ctx, static_root=".output/public", nginx_template=TEMPLATES / "nginx/static-site-nginx.conf.j2", placeholder_template=TEMPLATES / "nginx/index.html.j2")
+        application.deploy_static(
+            ctx,
+            static_root=".output/public",
+            nginx_template=TEMPLATES / "nginx/static-site-nginx.conf.j2",
+            placeholder_template=TEMPLATES / "nginx/index.html.j2",
+        )
     else:
+
         def seed_placeholder(current_ctx, paths, _node_binary):
             server_dir = f"{paths['placeholder_release']}/.output/server"
-            mkdir(name="Ensure placeholder .output/server directory exists", path=server_dir, user="root", group=current_ctx.runtime.runtime_group, mode="0750")
-            render("Seed placeholder Nuxt nitro server", TEMPLATES / "nuxt/placeholder-server.mjs.j2", f"{server_dir}/index.mjs", user="root", group=current_ctx.runtime.runtime_group, mode="0750", **template_data(current_ctx, paths=paths))
+            mkdir(
+                name="Ensure placeholder .output/server directory exists",
+                path=server_dir,
+                user="root",
+                group=current_ctx.runtime.runtime_group,
+                mode="0750",
+            )
+            render(
+                "Seed placeholder Nuxt nitro server",
+                TEMPLATES / "nuxt/placeholder-server.mjs.j2",
+                f"{server_dir}/index.mjs",
+                user="root",
+                group=current_ctx.runtime.runtime_group,
+                mode="0750",
+                **template_data(current_ctx, paths=paths),
+            )
 
         def command(_current_ctx, paths, node_binary):
             socket = f"{paths['runtime_socket_dir']}/nuxt/nuxt.sock"

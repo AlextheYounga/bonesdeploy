@@ -3,8 +3,7 @@ from pathlib import Path
 from bonesinfra.config.context import template_data
 from bonesinfra.pyinfra.operations import render
 from bonesinfra.services.languages import PHP
-from bonesinfra.services.linux import systemd
-from bonesinfra.services.linux import runtime
+from bonesinfra.services.linux import runtime, systemd
 from bonesinfra.services.linux.nginx import site
 
 from . import custom, docker

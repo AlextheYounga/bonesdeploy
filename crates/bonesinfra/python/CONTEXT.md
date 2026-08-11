@@ -46,7 +46,7 @@ BonesInfra owns:
 - runtime provisioning
 - SSL provisioning
 - loading and running the project's `.bones/infra` infrastructure
-- framework-specific infrastructure (generated per project, not installed)
+- canonical framework infrastructure and scaffold resources
 - Jinja2 templates used by provisioning
 - runtime package installation
 - runtime services
@@ -537,10 +537,10 @@ ______________________________________________________________________
 
 # Runtime-Specific Infrastructure
 
-Per-framework logic is generated into each project's `.bones/infra/runtime.py`
-by `bonesdeploy init` (snapshots under `crates/bonesdeploy/assets/frameworks/`),
-not installed in this package. The generated files orchestrate the framework's
-services using the neutral core helpers in `services/`:
+Per-framework logic is maintained canonically in this package and copied into
+each project's `.bones/infra/runtime.py` by `bonesdeploy init`. The copied files
+are project-owned snapshots and orchestrate framework services using neutral core
+helpers in `services/`:
 
 - `services/linux/application.py` — `deploy_server` / `deploy_static` building
   blocks shared by generated runtimes (AppArmor, systemd, nginx wiring)

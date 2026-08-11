@@ -23,6 +23,7 @@ bonesinfra = "bonesinfra.__main__:main"
 [tool.setuptools.package-data]
 bonesinfra = [
     "assets/**/*",
+    "frameworks/**/*",
 ]
 
 [dependency-groups]

@@ -14,19 +14,46 @@ def deploy(ctx):
     is_static = ctx.runtime.data.get("is_static", True)
     runtime.setup(ctx, uses_tcp=not is_static)
     if is_static:
-        application.deploy_static(ctx, static_root="out", nginx_template=TEMPLATES / "nginx/static-site-nginx.conf.j2", placeholder_template=TEMPLATES / "nginx/index.html.j2")
+        application.deploy_static(
+            ctx,
+            static_root="out",
+            nginx_template=TEMPLATES / "nginx/static-site-nginx.conf.j2",
+            placeholder_template=TEMPLATES / "nginx/index.html.j2",
+        )
     else:
+
         def seed_placeholder(current_ctx, paths, _node_binary):
             server_dir = f"{paths['placeholder_release']}/.next/standalone"
-            mkdir(name="Ensure placeholder .next/standalone directory exists", path=server_dir, user="root", group=current_ctx.runtime.runtime_group, mode="0750")
-            render("Seed placeholder Next.js standalone server", TEMPLATES / "next/placeholder-server.js.j2", f"{server_dir}/server.js", user="root", group=current_ctx.runtime.runtime_group, mode="0750", **template_data(current_ctx, paths=paths))
+            mkdir(
+                name="Ensure placeholder .next/standalone directory exists",
+                path=server_dir,
+                user="root",
+                group=current_ctx.runtime.runtime_group,
+                mode="0750",
+            )
+            render(
+                "Seed placeholder Next.js standalone server",
+                TEMPLATES / "next/placeholder-server.js.j2",
+                f"{server_dir}/server.js",
+                user="root",
+                group=current_ctx.runtime.runtime_group,
+                mode="0750",
+                **template_data(current_ctx, paths=paths),
+            )
 
         def validate(current_ctx, paths, _node_binary):
-            validation.run_as_runtime_user(current_ctx, "Validate Next.js standalone server exists as runtime user", f"test -f {paths['current']}/.next/standalone/server.js")
+            validation.run_as_runtime_user(
+                current_ctx,
+                "Validate Next.js standalone server exists as runtime user",
+                f"test -f {paths['current']}/.next/standalone/server.js",
+            )
 
         def command(current_ctx, _paths, node_binary):
             port = current_ctx.runtime.data.get("internal_port", 3100)
-            return f"/usr/bin/env NODE_ENV=production PORT={port} HOSTNAME=127.0.0.1 {node_binary} .next/standalone/server.js"
+            return (
+                f"/usr/bin/env NODE_ENV=production PORT={port} HOSTNAME=127.0.0.1 "
+                f"{node_binary} .next/standalone/server.js"
+            )
 
         application.deploy_server(
             ctx,
