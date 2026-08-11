@@ -1,5 +1,5 @@
 use super::{Question, QuestionKind};
-use bonesdeploy_core::config::Runtime;
+use bonesdeploy_core::config::{LARAVEL_INSTALL_QUEUE_WORKER, Runtime};
 
 const PHP_DEFAULT_VERSION: &str = "8.5";
 
@@ -12,7 +12,7 @@ pub fn questions() -> &'static [Question] {
         },
         // TODO: Set up queue worker.
         Question {
-            key: "install_queue_worker",
+            key: LARAVEL_INSTALL_QUEUE_WORKER,
             label: "Install Laravel queue worker?",
             kind: QuestionKind::Bool { default: false },
         },

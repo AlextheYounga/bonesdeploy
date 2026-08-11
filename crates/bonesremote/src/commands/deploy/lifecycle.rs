@@ -142,11 +142,6 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
         return finish_abort(mutation, Some(&context_dir), error);
     }
 
-    stage("Registering deferred services");
-    if let Err(error) = service::register_deferred(site, "worker") {
-        return finish_failed_activation(mutation, &previous_release, Some(&context_dir), error);
-    }
-
     stage("Restarting services");
     if let Err(error) = service::run(mutation) {
         return finish_failed_activation(mutation, &previous_release, Some(&context_dir), error);

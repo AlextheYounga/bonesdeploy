@@ -34,9 +34,7 @@ def deploy(ctx):
             ctx.paths.systemd_service("worker"),
             **template_data(ctx, paths=paths, php_executable=php_executable),
         )
-        current_artisan = Path(paths["current"]) / "artisan"
-        if current_artisan.is_file():
-            systemd.register_service(ctx, paths=paths, name="worker")
-            systemd.enable_and_start(ctx, "worker")
+        systemd.register_service(ctx, paths=paths, name="worker")
+        systemd.enable_and_start(ctx, "worker")
     custom.deploy(ctx)
     runtime.start_services(ctx)

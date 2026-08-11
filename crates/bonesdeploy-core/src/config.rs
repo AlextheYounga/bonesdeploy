@@ -177,6 +177,7 @@ pub struct Services {
 }
 
 pub const BUILD_TIMEOUT_SECONDS_DEFAULT: u64 = 300;
+pub const LARAVEL_INSTALL_QUEUE_WORKER: &str = "install_queue_worker";
 
 /// Per-site build limits. Kept as its own nested section so build settings do
 /// not leak into `BONES_*` environment variables as unrelated scalars.

@@ -132,6 +132,13 @@ impl Harness {
         Ok(())
     }
 
+    pub fn assert_service_condition_skipped(&self, service: &str) -> Result<()> {
+        self.exec(&format!(
+            "test \"$(systemctl show --property=ConditionResult --value -- {service})\" = no && ! systemctl is-active --quiet {service}"
+        ))?;
+        Ok(())
+    }
+
     pub fn write_laravel_probe(&self, site: &str, marker: &str) -> Result<()> {
         self.exec(&format!(
             "printf '%s\\n' '<?php error_log(\"{marker}\"); header(\"Content-Type: text/plain\"); echo \"{marker}\";' > /srv/sites/{site}/current/public/index.php"

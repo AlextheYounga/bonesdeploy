@@ -6,6 +6,7 @@ use crate::ui;
 
 mod apparmor;
 mod security;
+mod services;
 mod site;
 mod system;
 

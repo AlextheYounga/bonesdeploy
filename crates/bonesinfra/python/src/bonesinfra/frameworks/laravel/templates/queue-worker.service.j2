@@ -3,6 +3,7 @@ Description={{ project_name }} Laravel queue worker
 After=network.target
 PartOf={{ project_name }}.target
 Before={{ project_name }}.target
+ConditionPathExists={{ paths.current }}/artisan
 
 [Service]
 Type=simple

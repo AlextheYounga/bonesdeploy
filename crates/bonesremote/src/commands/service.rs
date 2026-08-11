@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::path::Path;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
@@ -32,53 +31,6 @@ pub fn run(mutation: &SiteMutation) -> Result<()> {
     verify_units_active(&target_name, &services)?;
 
     println!("Restarted {target_name}: {}", services.join(", "));
-    Ok(())
-}
-
-pub fn register_deferred(site: &str, name: &str) -> Result<()> {
-    privileges::ensure_root("bonesremote register deferred service")?;
-
-    let unit_file = format!("/etc/systemd/system/{site}-{name}.service");
-    let requires_dir = format!("/etc/systemd/system/{site}.target.requires");
-    let link_path = format!("{requires_dir}/{site}-{name}.service");
-
-    if !Path::new(&unit_file).is_file() {
-        return Ok(());
-    }
-    if Path::new(&link_path).exists() {
-        return Ok(());
-    }
-
-    let status = Command::new("install")
-        .args(["-d", "-o", "root", "-g", "root", "-m", "0755", "--", &requires_dir])
-        .status()
-        .with_context(|| format!("Failed to create {requires_dir}"))?;
-    if !status.success() {
-        bail!("Failed to create {requires_dir}");
-    }
-
-    let status = Command::new("ln")
-        .args(["-sfn", "--", &unit_file, &link_path])
-        .status()
-        .with_context(|| format!("Failed to link {unit_file} -> {link_path}"))?;
-    if !status.success() {
-        bail!("Failed to link {unit_file} -> {link_path}");
-    }
-
-    let status = Command::new("systemctl").args(["daemon-reload"]).status().context("Failed to reload systemd")?;
-    if !status.success() {
-        bail!("Failed to reload systemd");
-    }
-
-    let service_name = format!("{site}-{name}.service");
-    let status = Command::new("systemctl")
-        .args(["enable", "--now", "--", &service_name])
-        .status()
-        .with_context(|| format!("Failed to enable {service_name}"))?;
-    if !status.success() {
-        bail!("Failed to enable {service_name}");
-    }
-
     Ok(())
 }
 

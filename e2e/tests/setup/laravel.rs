@@ -16,6 +16,7 @@ pub fn provision(harness: &Harness) -> Result<SampleProject> {
 pub fn assert_running(harness: &Harness) -> Result<()> {
     harness.assert_site(SITE)?;
     harness.assert_service(&format!("php{PHP_VERSION}-fpm.service"))?;
+    harness.assert_service_condition_skipped(&format!("{SITE}-worker.service"))?;
     harness.assert_route(SITE, MARKER)?;
     harness.assert_owner(&format!("/var/log/bonesdeploy/{SITE}/php-worker-error.log"), &format!("{SITE}:{SITE}"))
 }
