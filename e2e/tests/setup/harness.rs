@@ -96,6 +96,7 @@ impl Harness {
         if template == "laravel" {
             project.generate_laravel_app_key(&self.session, &self.artifacts.bonesdeploy)?;
         }
+        project.assert_infrastructure(template)?;
         project.commit(&self.session, "bonesdeploy init")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["setup", "--yes"])?;
         self.assert_site(site)?;
@@ -119,6 +120,9 @@ impl Harness {
         ))?;
         self.exec(&format!(
             "test \"$(stat -c '%U:%G:%a' /usr/local/bin/bonesremote)\" = 'root:root:755' && test -f /root/.config/bonesremote/sites/{site}/bones.toml"
+        ))?;
+        self.exec(&format!(
+            "test -f /root/.config/bonesremote/sites/{site}/infra/__init__.py && test -f /root/.config/bonesremote/sites/{site}/infra/runtime.py && test -f /root/.config/bonesremote/sites/{site}/infra/manifest.py && test -f /root/.config/bonesremote/sites/{site}/infra/custom.py && test ! -e /root/.config/bonesremote/sites/{site}/custom.py && test ! -e /root/.config/bonesremote/sites/{site}/confs"
         ))?;
         Ok(())
     }

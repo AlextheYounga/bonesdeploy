@@ -33,6 +33,27 @@ impl SampleProject {
         &self.dir
     }
 
+    pub fn assert_infrastructure(&self, template: &str) -> Result<()> {
+        let bones = self.dir.join(".bones");
+        for entrypoint in ["__init__.py", "runtime.py", "manifest.py", "custom.py"] {
+            let path = bones.join("infra").join(entrypoint);
+            if !path.is_file() {
+                bail!("{template} fixture is missing generated {}", path.display());
+            }
+        }
+
+        if !bones.join("infra/templates").is_dir() {
+            bail!("{template} fixture is missing generated infra/templates");
+        }
+        if bones.join("custom.py").exists() {
+            bail!("{template} fixture contains obsolete .bones/custom.py");
+        }
+        if bones.join("confs").exists() {
+            bail!("{template} fixture contains obsolete .bones/confs/");
+        }
+        Ok(())
+    }
+
     pub fn configure_next_static(&self) -> Result<()> {
         let path = self.dir.join("next.config.ts");
         let source = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
