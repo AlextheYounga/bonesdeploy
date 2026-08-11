@@ -6,7 +6,7 @@ from pyinfra.operations import server
 from bonesinfra.config.context import template_data
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import PYTHON
-from bonesinfra.services.linux import application, validation
+from bonesinfra.services.linux import application, runtime, validation
 
 from . import custom
 
@@ -14,6 +14,7 @@ TEMPLATES = Path(__file__).parent / "templates"
 
 
 def deploy(ctx):
+    runtime.setup(ctx)
     def seed_placeholder(current_ctx, paths, python_binary):
         placeholder = paths["placeholder_release"]
         server.shell(
@@ -47,3 +48,4 @@ def deploy(ctx):
         writable_paths=lambda _ctx, paths: [f"{paths['shared']}/media"],
     )
     custom.deploy(ctx)
+    runtime.start_services(ctx)

@@ -6,7 +6,7 @@ from pyinfra.operations import server
 from bonesinfra.config.context import template_data
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import NODE
-from bonesinfra.services.linux import application, validation
+from bonesinfra.services.linux import application, runtime, validation
 
 from . import custom
 
@@ -14,6 +14,7 @@ TEMPLATES = Path(__file__).parent / "templates"
 
 
 def deploy(ctx):
+    runtime.setup(ctx)
     def seed_placeholder(current_ctx, paths, _node_binary):
         build_dir = f"{paths['placeholder_release']}/build"
         mkdir(name="Ensure placeholder SvelteKit build directory exists", path=build_dir, user="root", group=current_ctx.runtime.runtime_group, mode="0750")
@@ -42,3 +43,4 @@ def deploy(ctx):
         writable_paths=application.empty_writable,
     )
     custom.deploy(ctx)
+    runtime.start_services(ctx)

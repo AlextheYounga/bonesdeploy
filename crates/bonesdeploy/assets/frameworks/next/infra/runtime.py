@@ -3,7 +3,7 @@ from pathlib import Path
 from bonesinfra.config.context import template_data
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import NODE
-from bonesinfra.services.linux import application, validation
+from bonesinfra.services.linux import application, runtime, validation
 
 from . import custom
 
@@ -11,7 +11,9 @@ TEMPLATES = Path(__file__).parent / "templates"
 
 
 def deploy(ctx):
-    if ctx.runtime.data.get("is_static", True):
+    is_static = ctx.runtime.data.get("is_static", True)
+    runtime.setup(ctx, uses_tcp=not is_static)
+    if is_static:
         application.deploy_static(ctx, static_root="out", nginx_template=TEMPLATES / "nginx/static-site-nginx.conf.j2", placeholder_template=TEMPLATES / "nginx/index.html.j2")
     else:
         def seed_placeholder(current_ctx, paths, _node_binary):
@@ -43,3 +45,4 @@ def deploy(ctx):
             apparmor_network="network inet stream,",
         )
     custom.deploy(ctx)
+    runtime.start_services(ctx)

@@ -6,7 +6,7 @@ from pyinfra.operations import server
 from bonesinfra.config.context import template_data
 from bonesinfra.pyinfra.operations import render
 from bonesinfra.services.languages import RUBY
-from bonesinfra.services.linux import application, validation
+from bonesinfra.services.linux import application, runtime, validation
 
 from . import custom
 
@@ -14,6 +14,7 @@ TEMPLATES = Path(__file__).parent / "templates"
 
 
 def deploy(ctx):
+    runtime.setup(ctx)
     def seed_placeholder(current_ctx, paths, ruby_binary):
         placeholder = paths["placeholder_release"]
         render("Seed placeholder Gemfile", TEMPLATES / "rails/placeholder-Gemfile.j2", f"{placeholder}/Gemfile", user="root", group=current_ctx.runtime.runtime_group, mode="0640", **template_data(current_ctx, paths=paths))
@@ -45,3 +46,4 @@ def deploy(ctx):
         writable_paths=lambda _ctx, paths: [f"{paths['shared']}/tmp", f"{paths['shared']}/log", f"{paths['shared']}/storage"],
     )
     custom.deploy(ctx)
+    runtime.start_services(ctx)

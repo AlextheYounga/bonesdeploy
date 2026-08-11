@@ -3,7 +3,7 @@ from pathlib import Path
 from bonesinfra.config.context import template_data
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import NODE
-from bonesinfra.services.linux import application
+from bonesinfra.services.linux import application, runtime
 
 from . import custom
 
@@ -11,6 +11,7 @@ TEMPLATES = Path(__file__).parent / "templates"
 
 
 def deploy(ctx):
+    runtime.setup(ctx)
     if ctx.runtime.data.get("is_static", True):
         application.deploy_static(ctx, static_root=".output/public", nginx_template=TEMPLATES / "nginx/static-site-nginx.conf.j2", placeholder_template=TEMPLATES / "nginx/index.html.j2")
     else:
@@ -37,3 +38,4 @@ def deploy(ctx):
             writable_paths=application.empty_writable,
         )
     custom.deploy(ctx)
+    runtime.start_services(ctx)

@@ -41,6 +41,8 @@ def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypa
     monkeypatch.setattr(module.PHP, "configure_fpm_pool", lambda _ctx, **_kwargs: "/run/php/php8.5-fpm-atlas.sock")
     monkeypatch.setattr(module.site, "render_php_fpm", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.custom, "deploy", lambda _ctx: None)
+    monkeypatch.setattr(module.runtime, "setup", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module.runtime, "start_services", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "render", lambda *args, **kwargs: calls.append((args, kwargs)))
     monkeypatch.setattr(
         module.systemd, "register_service", lambda *args, **kwargs: calls.append(("register", args, kwargs))
@@ -77,6 +79,8 @@ def test_laravel_runtime_skips_queue_worker_when_disabled(tmp_path, monkeypatch)
     monkeypatch.setattr(module.PHP, "configure_fpm_pool", lambda _ctx, **_kwargs: "/run/php/php8.5-fpm-atlas.sock")
     monkeypatch.setattr(module.site, "render_php_fpm", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.custom, "deploy", lambda _ctx: None)
+    monkeypatch.setattr(module.runtime, "setup", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module.runtime, "start_services", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "render", lambda *args, **_kwargs: renders.append(args[0]))
 
     module.deploy(ctx)
