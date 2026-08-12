@@ -196,7 +196,7 @@ The `pid` + `process_start_ticks` pair survives PID reuse for crash detection: i
 Serializes all site mutations (deployments, rollbacks, imports, cancellations) across concurrent processes. Uses POSIX `flock()` with `try_lock()` — if another process holds the lock, the operation fails immediately with a clear error directing the user to check `bonesdeploy releases`.
 
 **Lives in:**
-`crates/bonesremote/src/release/state/mod.rs` (lines 58-95)
+`crates/bonesremote/src/release/state/mod.rs` (lines 62-95)
 
 **Crash safety:**
 The lock is tied to a file descriptor. If the process crashes, the kernel releases the lock.
@@ -255,19 +255,28 @@ Declares what artifacts and services a framework owns (manifest) and how to prov
 **Lives in:**
 `crates/bonesinfra/python/src/bonesinfra/frameworks/<name>/`
 
-**3-file contract per framework:**
+**Package structure per framework:**
 
 | File | Exports | Purpose |
 |------|---------|---------|
+| `__init__.py` | (empty) | Makes the directory an importable Python package |
 | `manifest.py` | `artifacts(ctx)`, `services(ctx)`, `mode(ctx)` | Declares all paths and systemd services the framework owns |
 | `runtime.py` | `deploy(ctx)` | Orchestrates framework provisioning (language install, render configs, start services) |
-| `custom.py` | `deploy(ctx)` | User extension point (no-op default; materialized into project's `infra/` for editing) |
+| `custom.py` | `deploy(ctx)` | User extension point (no-op default; materialized into project's `.bones/infra/` for editing) |
+| `templates/` | Jinja2 templates | Nginx, AppArmor, and other framework configuration templates |
 
 **Framework discovery:**
-`project.py` reads `[runtime].template` from `bones.toml`. It first checks for a user-local `infra/runtime.py` in the config directory. If absent, imports the built-in at `bonesinfra.frameworks.<name>.runtime`. Users materialize a framework's files into their `infra/` directory via `bonesinfra project materialize`, after which the local copy takes priority.
+`project.py` reads `[runtime].template` from `bones.toml`. It first checks for a
+project-local `.bones/infra/` package. If present, the local package takes strict
+precedence and the built-in is never consulted. If absent, it imports the
+canonical built-in at `bonesinfra.frameworks.<name>`. Users materialize a
+framework's package into their `.bones/infra/` directory via `bonesinfra project
+materialize`, after which the local copy is authoritative.
 
 **Extension model:**
-Add a new directory under `frameworks/<name>/` with the three files. Register the name in `project.py`'s `BUILTIN_FRAMEWORKS` set. Add corresponding Rust-side framework module. Add framework-specific assets to `crates/bonesdeploy/assets/frameworks/<name>/`.
+Add a new package under `frameworks/<name>/` with all five components above.
+Register the name in `project.py`'s `BUILTIN_FRAMEWORKS` allowlist. Add
+corresponding Rust-side framework module and deployment assets.
 
 ---
 
@@ -283,7 +292,7 @@ The Python-side equivalent of `Bones`. Created from `bones.toml` and passed to a
 ```python
 @dataclass
 class DeployContext:
-    app: AppConfig            # project_name, repo_path, project_root, host, ssh_user, port
+    app: AppConfig            # project_name, repo_path, project_root, server (host, ssh_user, port)
     runtime: RuntimeConfig    # backend, web_root, runtime_user, runtime_group, data (extra keys)
     services: ServicesConfig  # tuple of service names
 ```
@@ -384,7 +393,7 @@ Provisions database engines (PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, Redis)
 `provision(ctx)` — installs, creates user/database, seeds connection values to `shared/.env`.
 `manifest_artifacts(ctx)` / `manifest_services(ctx)` — declares paths and systemd units for manifest inspection.
 
-Registered in the `SERVICE` dict in `__init__.py`. Activated via `[services].services = ["postgres", "redis"]` in `bones.toml`.
+Registered in the `SERVICES` dict in `__init__.py`. Activated via `[services].services = ["postgres", "redis"]` in `bones.toml`.
 
 ---
 
@@ -549,8 +558,8 @@ Cli::Remote::Runtime
 
 | Need | Extend / reuse | Existing example | Location |
 |------|---------------|-----------------|----------|
-| Add a web framework | Rust: `frameworks/<fw>.rs`, Python: `frameworks/<fw>/` (3 files) | `laravel`, `django` | `crates/bonesdeploy/src/frameworks/` and `crates/bonesinfra/python/src/bonesinfra/frameworks/` |
-| Add a database service | Python: `services/runtime/<name>.py` + register in `SERVICE` dict | `postgres.py`, `redis.py` | `crates/bonesinfra/python/src/bonesinfra/services/runtime/` |
+| Add a web framework | Rust: `frameworks/<fw>.rs`, Python: `frameworks/<fw>/` (`__init__.py`, `manifest.py`, `runtime.py`, `custom.py`, `templates/`) | `laravel`, `django` | `crates/bonesdeploy/src/frameworks/` and `crates/bonesinfra/python/src/bonesinfra/frameworks/` |
+| Add a database service | Python: `services/runtime/<name>.py` + register in `SERVICES` dict | `postgres.py`, `redis.py` | `crates/bonesinfra/python/src/bonesinfra/services/runtime/` |
 | Add a language runtime | Python: `services/languages/<name>.py`, extend `LanguageRuntime` ABC | `php.py`, `python.py` | `crates/bonesinfra/python/src/bonesinfra/services/languages/` |
 | Add a CLI command (bonesdeploy) | `commands/<name>.rs` + variant in `cli/args.rs::Command` enum | `commands/status.rs` | `crates/bonesdeploy/src/commands/` |
 | Add a CLI command (bonesremote) | `commands/<name>.rs` + variant in `cli/args.rs::Command` enum | `commands/status.rs` | `crates/bonesremote/src/commands/` |
@@ -560,7 +569,7 @@ Cli::Remote::Runtime
 | Add a new config field | `Runtime.extra` (TOML map) for framework-specific; add to struct for global | `php_version` in laravel | `crates/bonesdeploy-core/src/config.rs` |
 | Add a new shared constant/path | `paths` module in bonesdeploy-core | `DEFAULT_WEB_ROOT` | `crates/bonesdeploy-core/src/paths.rs` |
 | Embed new static assets | `rust-embed` derive in appropriate asset module | `KitAssets`, `FrameworkAssets` | `crates/bonesdeploy/src/infra/assets/` |
-| Override framework provisioning | Materialize framework, edit `infra/runtime.py` + `infra/custom.py` | User-local `infra/` | `.bones/infra/` |
+| Override framework provisioning | Materialize framework, edit `.bones/infra/runtime.py` + `.bones/infra/custom.py` | User-local `.bones/infra/` | `.bones/infra/` |
 | Add a deployment script | `NN_name.sh` in `.bones/deployment/build/` or `prepare/` | `01_install_deps.sh` | `.bones/deployment/{build,prepare}/` |
 
 ---
@@ -624,9 +633,9 @@ Cli::Remote::Runtime
 - If a deploy fails pre-activation, it leaves no live-state mutations.
 
 ### Framework convention
-- Every framework has a 3-file Python contract and a Rust question module.
+- Every framework has an importable Python package (`__init__.py`, `manifest.py`, `runtime.py`, `custom.py`, `templates/`) and a Rust question module.
 - Framework-specific TOML overrides go through `Runtime.extra` (serde flatten).
-- User-local `infra/` overrides built-in framework implementations when present.
+- Project-local `.bones/infra/` takes strict precedence over built-in framework implementations. When the local package exists it is authoritative; the built-in is never consulted as fallback.
 
 ### Binary communication
 - `bonesdeploy` communicates with `bonesremote` via SSH command execution (not an API).

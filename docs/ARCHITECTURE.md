@@ -60,7 +60,7 @@ owner is canonical. Bypassing it creates a competing abstraction.
 | Deployment configuration | `Bones` (`bonesdeploy-core`) | Extend the canonical config model via `Runtime.extra` | Invent parallel config structs in either binary or Python |
 | Product filesystem layout | `paths` / `DeploymentPaths` | Add path constants here | Scatter path literals in commands, templates, or scripts |
 | Framework-specific config questions | Framework Rust module (`frameworks/<fw>.rs`) | Add sibling module + register in `frameworks.rs` | Inline prompt logic in init command |
-| Framework provisioning | Framework Python contract (`frameworks/<fw>/`) | Add sibling framework dir (3-file contract) | Special-case framework behavior in setup/runtime commands |
+| Framework provisioning | Framework Python contract (`frameworks/<fw>/`) | Add sibling framework package (`__init__.py`, `manifest.py`, `runtime.py`, `custom.py`, `templates/`) | Special-case framework behavior in setup/runtime commands |
 | Language runtime installation | `LanguageRuntime` ABC | Add subclass in `services/languages/` | Install runtimes directly from framework `runtime.py` |
 | Database / server service provisioning | `RuntimeService` ABC + `SERVICE` registry | Add subclass + register in `SERVICE` dict | Put DB provisioning in framework code |
 | Remote site mutation | `SiteMutation` | Acquire it before any site state change | Create independent locking or config-validation paths |
@@ -85,7 +85,7 @@ Need another database / server service?
   → RuntimeService
 
 Need another supported application framework?
-  → Framework contract (Rust questions + Python 3-file)
+  → Framework contract (Rust questions + Python package in bonesinfra/frameworks/<fw>/)
 
 Need another filesystem location owned by BonesDeploy?
   → paths / DeploymentPaths
@@ -237,29 +237,41 @@ Rust side (crates/bonesdeploy/src/frameworks/<fw>.rs):
 └── environment_example(...) -> String
 
 Python side (crates/bonesinfra/python/.../frameworks/<fw>/):
-├── manifest.py   → artifacts(ctx), services(ctx), mode(ctx)
-├── runtime.py    → deploy(ctx)
-└── custom.py     → deploy(ctx)   # user hook, no-op default
+├── __init__.py    → makes the directory an importable Python package
+├── manifest.py    → artifacts(ctx), services(ctx), mode(ctx)
+├── runtime.py     → deploy(ctx)   # canonical provisioning orchestration
+├── custom.py      → deploy(ctx)   # user hook, no-op default
+└── templates/     → Jinja2 templates for nginx, AppArmor, etc.
 
-Users can materialize a framework's Python files into their project's infra/
-directory; the local copy then overrides the built-in.
+BonesDeploy owns framework selection (questions, validation, configuration) and
+deployment assets (build/prepare scripts, bones.toml defaults).
+BonesInfra owns canonical framework source (runtime.py, manifest.py, templates,
+custom.py) and materializes a vendored copy into the project's .bones/infra/
+at init time.
+
+Users can materialize a framework's Python files into their project's .bones/infra/
+directory. When the local .bones/infra/ package exists, it takes strict
+precedence over the built-in — the built-in is never consulted as fallback.
 
 Existing implementations:
 - django, laravel, next, nuxt, rails, sveltekit, vue
 
 To add another:
 1. Add Rust module under src/frameworks/<name>.rs; register in frameworks.rs.
-2. Add Python dir under frameworks/<name>/ with the 3-file contract.
-3. Add scaffold assets under crates/bonesdeploy/assets/frameworks/<name>/.
-4. Add the name to BUILTIN_FRAMEWORKS in project.py.
+2. Add Python package under bonesinfra/frameworks/<name>/ with __init__.py,
+   manifest.py, runtime.py, custom.py, and templates/.
+3. Add deployment assets under crates/bonesdeploy/assets/frameworks/<name>/
+   (build/prepare scripts, bones.toml defaults).
+4. Add the name to BUILTIN_FRAMEWORKS in project.py (the allowlist, not a dispatch registry).
 
 Canonical example:
-frameworks/laravel/ (both sides)
+frameworks/laravel/ (both Rust and Python sides)
 
 Do not:
 - Special-case framework behavior in setup, runtime, or init commands
-- Bypass the framework registry in frameworks.rs
+- Bypass the Rust framework dispatch in frameworks.rs
 - Put framework provisioning logic anywhere other than the framework's runtime.py
+- Place canonical Python framework source under BonesDeploy assets
 ```
 
 ```text
@@ -309,14 +321,14 @@ RuntimeService ABC (services/runtime/base.py)
 ├── manifest_artifacts(ctx)       # declare paths for manifest inspection
 └── manifest_services(ctx)        # declare systemd units for manifest inspection
 
-Registered in the SERVICE dict in services/runtime/__init__.py.
+Registered in the SERVICES dict in services/runtime/__init__.py.
 Activated via [services].services = ["postgres", "redis"] in bones.toml.
 
 Existing implementations:
 - PostgresService, RedisService, MariaDBService, MysqlService, MongodbService, ValkeyService
 
 To add another:
-Subclass RuntimeService in services/runtime/<name>.py; add entry to SERVICE dict.
+Subclass RuntimeService in services/runtime/<name>.py; add entry to SERVICES dict.
 
 Canonical example:
 services/runtime/postgres.py
@@ -339,7 +351,10 @@ Contract:
 Patch (patches/registry.py)
 ├── identifier            # e.g. "0001-config-repo"
 ├── introduced_in         # semver
-└── local_apply / remote_apply functions
+└── local_apply           # runs on the workstation
+
+Remote application is handled by a separate apply_remote() function that
+delegates to a remote pyinfra operation per patch identifier — not a Patch field.
 
 Completion is tracked per-project, per-scope via marker files.
 Local markers: ~/.local/share/bonesdeploy/patches/<project>/<id>
@@ -520,9 +535,12 @@ these constants. No hardcoded path strings elsewhere.
 Live state is touched only at activation. Permission hardening happens after
 successful activation. A failed pre-activation deploy leaves no live mutations.
 
-**Framework 3-file contract.** Every framework has `manifest.py`, `runtime.py`,
-and `custom.py`. Framework-specific config goes through `Runtime.extra`. Users
-override framework behavior by materializing into their `infra/` directory.
+**Framework contract.** Every framework has an importable Python package
+(`__init__.py`, `manifest.py`, `runtime.py`, `custom.py`, plus a `templates/`
+directory). Framework-specific config goes through `Runtime.extra`. Users
+override framework behavior by materializing into their `.bones/infra/`
+directory, which takes strict precedence — when the local package exists, it
+is authoritative and the built-in is never consulted as fallback.
 
 **Binary communication.** `bonesdeploy` ↔ `bonesremote` via SSH command execution.
 `bonesdeploy` ↔ `bonesinfra` via subprocess (`bonesinfra::run()` / `run_with_stdin()`).

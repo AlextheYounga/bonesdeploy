@@ -185,12 +185,12 @@ This Cargo workspace has four crates under `crates/`:
 - `bonesdeploy` for the local CLI binary
 - `bonesremote` for the server-side binary
 - `bonesinfra` for the embedded Python provisioning runtime (pyinfra operations, framework templates) and the Rust wrapper that materializes and runs it
-- `shared` for code that must be common to both binaries
+- `bonesdeploy-core` for code that must be common to both binaries
 
 ### Path Centralization
-All product-owned paths must live in `crates/shared/src/paths.rs`.
+All product-owned paths must live in `crates/bonesdeploy-core/src/paths.rs`.
 
-Other modules may derive subpaths by joining values from `shared::paths`, but they must not introduce their own independent path roots, filenames, or install locations.
+Other modules may derive subpaths by joining values from `bonesdeploy-core::paths`, but they must not introduce their own independent path roots, filenames, or install locations.
 
 This applies to Rust code, bonesinfra's internal operations/templates, and docs examples that describe the system layout.
 
@@ -219,7 +219,7 @@ bonesdeploy/
 │   ├── bonesinfra/
 │   │   ├── python/             # Python package (pyinfra operations, core services, Jinja2 templates)
 │   │   └── src/                # embeds python/, materializes it, runs `python -m bonesinfra`
-│   └── shared/                 # config schema + central paths
+│   └── bonesdeploy-core/  # config schema + central paths
 └── docs/
 ```
 
@@ -306,7 +306,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 - **remote runtime**:
   - Reapplies the configured `[runtime]` settings from `.bones/bones.toml` to the host and provisions the selected framework's runtime.
   - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra runtime apply --config <path>` against the configured host as the configured `ssh_user`.
-  - Loads the template's `operations.py` to install framework-specific packages and services.
+  - Imports and runs the project's `infra/runtime.py` (local vendored package) or the selected canonical BonesInfra framework package, which installs framework-specific packages and services.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
   - Does not handle SSL; use `remote ssl` for TLS configuration.
 
@@ -341,7 +341,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - `bonesdeploy skill list` prints the names of every embedded topic doc.
   - `bonesdeploy skill doc <name>` prints a specific topic doc (`commands`, `workflows`, `methodology`).
   - `bonesdeploy skill next [--format text|json]` supersedes `guide` and inspects `.bones/bones.toml` and the remote host, then suggests the next prompt-free command. `--format json` returns the same `Report` struct `status` consumes. The hidden `guide` command remains as a compatibility alias.
-  - Topic docs are markdown files under `crates/bonesdeploy/skill/` and are embedded with `rust-embed` alongside `kit/` and `frameworks/`.
+  - Topic docs are markdown files under `crates/bonesdeploy/assets/skill/` and are embedded with `rust-embed` alongside `kit/` and `frameworks/`.
 - **version**:
   - Echoes the installed `bonesdeploy` version.
 
