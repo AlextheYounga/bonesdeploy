@@ -66,4 +66,6 @@ And finally, please update any related documentation **if necessary, use your be
 Please DO NOT run the e2e tests yourself. They are way too long. 
 
 Useful documents
-`docs/agents/conventions/*.md`
+`docs/ARCHITECTURE.md`
+`docs/architecture/*.md`
+`docs/conventions/*.md`
