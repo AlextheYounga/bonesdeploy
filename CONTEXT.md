@@ -351,7 +351,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 - **deploy**:
   - Runs the full deployment lifecycle as a single command (the primary entrypoint used by both `post-receive` hook and `bonesdeploy deploy`).
   - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → runtime-writable candidate release → shared wiring → prepare scripts as the site user → seal release → activate → restart `<site>.target` → post-deploy pruning.
-  - On failure before activation, automatically drops the staged release. If the service restart fails after activation,
+  - Before activation, validates the site's nginx configuration with `nginx -t -c /srv/conf/<site>/nginx.conf`. On failure before activation, automatically drops the staged release. If the service restart fails after activation,
     restores and restarts the previous release before dropping the failed release.
   - `--site <name>`: imported site identifier used to load root-owned registry state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch

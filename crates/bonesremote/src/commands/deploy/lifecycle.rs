@@ -120,7 +120,7 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
     // Perfect-before-cut-over gate: last check while the old release still
     // serves. `nginx -t` runs before any reload; a failure aborts.
     stage("Verifying before cut-over");
-    if let Err(error) = preflight::validate_ready(mutation, &release_name, preflight::run_nginx_test) {
+    if let Err(error) = preflight::validate_ready(mutation, &release_name, || preflight::run_nginx_test(site)) {
         return finish_abort(mutation, Some(&context_dir), error);
     }
 

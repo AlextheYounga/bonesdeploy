@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::paths;
 
 use crate::release::SiteMutation;
 use crate::release::state::release_dir;
@@ -28,17 +29,26 @@ fn release_web_root(mutation: &SiteMutation, release: &str) -> PathBuf {
     release_dir(&mutation.config().project_root, release).join(&mutation.config().runtime.web_root)
 }
 
-/// Runs `nginx -t` against the on-disk configuration. The site nginx config
-/// resolves its root through the `current` symlink, so a syntax/config failure
+/// Runs `nginx -t` against the configuration used by the site's nginx service.
+/// Its root resolves through the `current` symlink, so a syntax/config failure
 /// is caught here before the cut-over restart re-loads nginx.
-pub(crate) fn run_nginx_test() -> Result<()> {
-    let output = Command::new("nginx").arg("-t").output().with_context(|| "Failed to run `nginx -t`")?;
+pub(crate) fn run_nginx_test(site: &str) -> Result<()> {
+    let config_path = site_nginx_config(site);
+    let output = Command::new("nginx")
+        .args(["-t", "-c"])
+        .arg(&config_path)
+        .output()
+        .with_context(|| format!("Failed to run `nginx -t -c {}`", config_path.display()))?;
     if output.status.success() {
-        println!("nginx -t passed");
+        println!("nginx -t passed: {}", config_path.display());
         return Ok(());
     }
     let detail = String::from_utf8_lossy(&output.stderr);
-    bail!("nginx -t failed before reload:\n{}", detail.trim())
+    bail!("nginx -t failed before reload for {}:\n{}", config_path.display(), detail.trim())
+}
+
+fn site_nginx_config(site: &str) -> PathBuf {
+    PathBuf::from(paths::DEFAULT_CONF_ROOT_PARENT).join(site).join(paths::NGINX_CONF)
 }
 
 #[cfg(test)]
@@ -53,7 +63,7 @@ mod tests {
     use anyhow::Result;
     use bonesdeploy_core::config::Bones;
 
-    use super::validate_ready;
+    use super::{site_nginx_config, validate_ready};
     use crate::release::SiteMutation;
     use crate::release::state::release_dir;
     use crate::release::state::{DeploymentLock, set_sites_root_for_tests};
@@ -119,5 +129,10 @@ mod tests {
         assert!(message.contains("config broken"));
         fs::remove_dir_all(root).ok();
         Ok(())
+    }
+
+    #[test]
+    fn site_nginx_config_uses_the_registered_sites_configuration() {
+        assert_eq!(site_nginx_config("unitapp"), PathBuf::from("/srv/conf/unitapp/nginx.conf"));
     }
 }
