@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from pyinfra.context import ctx_host
 from pyinfra.facts.files import Directory, Link
 from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
@@ -10,6 +11,7 @@ from bonesinfra.manifest import (
     Artifact,
     collect_services,
     inspect_artifacts,
+    inspect_for_runner,
     inspect_services,
     render,
     report,
@@ -121,3 +123,23 @@ def test_services_are_inspected_without_mutations(tmp_path: Path):
     by_unit = {service.unit: service for service in inspect_services(ctx, FakeHost(), ProjectManifest())}
     assert by_unit["example-app.service"].running is False
     assert by_unit["example-app.service"].enabled is True
+
+
+def test_runner_inspection_uses_the_host_installed_by_pyinfra(tmp_path: Path):
+    ctx = _context(tmp_path)
+
+    class FakeHost:
+        def get_fact(self, fact, path=None, *, services=None):
+            if fact is Directory and path == ctx.paths.repo:
+                return {"mode": 755}
+            if fact is SystemdStatus:
+                return {services: True}
+            if fact is SystemdEnabled:
+                return {services: True}
+            return None
+
+    with ctx_host.use(FakeHost()):
+        result = inspect_for_runner(ctx, ProjectManifest())
+
+    assert next(entry for entry in result["entries"] if entry["name"] == "bare repository")["state"] == "present"
+    assert all(service["running"] and service["enabled"] for service in result["managed_services"])

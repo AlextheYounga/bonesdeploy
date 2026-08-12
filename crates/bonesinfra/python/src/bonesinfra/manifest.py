@@ -182,10 +182,11 @@ def render(data: dict[str, Any], output_format: str) -> str:
 
 
 def inspect_for_runner(ctx: DeployContext, project_manifest: Any) -> dict[str, Any]:
+    host = ctx_host.get()
     return report(
         ctx,
-        inspect_artifacts(ctx, ctx_host, project_manifest),
-        inspect_services(ctx, ctx_host, project_manifest),
+        inspect_artifacts(ctx, host, project_manifest),
+        inspect_services(ctx, host, project_manifest),
         project_manifest,
     )
 
