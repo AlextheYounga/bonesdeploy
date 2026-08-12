@@ -119,6 +119,18 @@ impl SampleProject {
         status_ok(status, &format!("bonesdeploy {}", args.join(" ")))
     }
 
+    /// Runs the given bonesdeploy binary and captures stdout.
+    pub fn bonesdeploy_output(&self, session: &Session, binary: &Path, args: &[&str]) -> Result<String> {
+        let output = session
+            .command(binary)
+            .current_dir(&self.dir)
+            .args(args)
+            .output()
+            .with_context(|| format!("Failed to run bonesdeploy {}", args.join(" ")))?;
+        status_ok(output.status, &format!("bonesdeploy {}", args.join(" ")))?;
+        Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+    }
+
     fn git(&self, session: &Session, args: &[&str]) -> Result<()> {
         let status = session
             .command("git")
