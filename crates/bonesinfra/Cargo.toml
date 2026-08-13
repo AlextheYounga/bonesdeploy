@@ -10,7 +10,7 @@ repository="https://github.com/AlextheYounga/bonesdeploy"
 [dependencies]
 anyhow = "1.0.103"
 rust-embed = { version = "8.11.0", features = ["include-exclude"] }
-bonesdeploy-core = { version = "0.7.7", path = "../bonesdeploy-core" }
+bonesdeploy-core = { version = "0.7.9", path = "../bonesdeploy-core" }
 
 [dev-dependencies]
 anyhow = "1.0.103"
