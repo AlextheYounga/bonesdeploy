@@ -91,6 +91,7 @@ dependencies = [
  "bonesinfra",
  "clap",
  "console",
+ "easy-tree",
  "inquire",
  "openssh",
  "rust-embed",
@@ -390,6 +391,12 @@ dependencies = [
  "mdpack",
  "serde_json",
 ]
+
+[[package]]
+name = "easy-tree"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fe19fbb9a76b6acd96ed1ff3ab680675158b88a6b16f5eb988c475f2d584c84"
 
 [[package]]
 name = "encode_unicode"

@@ -5,14 +5,14 @@ from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
 from pyinfra.context import ctx_host
-from pyinfra.facts.files import Directory, File, Link
+from pyinfra.facts.files import Directory, File, Link, Socket
 from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra.config.context import DeployContext
 from bonesinfra.pyinfra.operations import letsencrypt_cert_paths
 from bonesinfra.services.runtime import get_service
 
-ArtifactKind = Literal["file", "directory", "link"]
+ArtifactKind = Literal["file", "directory", "link", "socket"]
 ArtifactState = Literal["present", "missing", "wrong-kind"]
 
 
@@ -90,8 +90,8 @@ def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifa
         domain = ctx.app.dns.domain or ctx.app.dns.preview_domain
         if domain:
             certificate, key = letsencrypt_cert_paths(domain)
-            artifacts.append(Artifact.at_path("ACME certificate", certificate, "file", "ssl"))
-            artifacts.append(Artifact.at_path("ACME certificate key", key, "file", "ssl"))
+            artifacts.append(Artifact.at_path("ACME certificate", certificate, "link", "ssl"))
+            artifacts.append(Artifact.at_path("ACME certificate key", key, "link", "ssl"))
 
     return _deduplicate(artifacts)
 
@@ -192,7 +192,7 @@ def inspect_for_runner(ctx: DeployContext, project_manifest: Any) -> dict[str, A
 
 
 def _inspect_one(host: Any, artifact: Artifact, path: str) -> ResolvedArtifact:
-    facts = {"file": File, "directory": Directory, "link": Link}
+    facts = {"file": File, "directory": Directory, "link": Link, "socket": Socket}
     expected_fact = facts[artifact.kind]
     if host.get_fact(expected_fact, path) not in (None, False):
         return ResolvedArtifact(artifact.name, path, artifact.kind, artifact.owner, "present")

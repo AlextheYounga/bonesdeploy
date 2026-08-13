@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 from pyinfra.context import ctx_host
-from pyinfra.facts.files import Directory, Link
+from pyinfra.facts.files import Directory, Link, Socket
 from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra import manifest
@@ -107,6 +107,32 @@ def test_link_fact_is_reported_as_present(tmp_path: Path):
     project = ProjectManifest()
     entry = next(entry for entry in inspect_artifacts(ctx, FakeHost(), project) if entry.name == "current release link")
     assert entry.state == "present"
+
+
+def test_socket_fact_is_reported_as_present(tmp_path: Path):
+    ctx = _context(tmp_path)
+
+    class SocketManifest(ProjectManifest):
+        def artifacts(self, _ctx):
+            return [("application socket", "/run/example.sock", "socket", "framework")]
+
+    class FakeHost:
+        def get_fact(self, fact, path):
+            if fact is Socket and path == "/run/example.sock":
+                return {"mode": 660}
+            return None
+
+    entries = inspect_artifacts(ctx, FakeHost(), SocketManifest())
+    entry = next(entry for entry in entries if entry.name == "application socket")
+    assert entry.state == "present"
+
+
+def test_acme_certificate_links_are_declared_as_links(tmp_path: Path):
+    artifacts = resolve_artifacts(_context(tmp_path, ssl=True), ProjectManifest())
+    certificates = {artifact.name: artifact for artifact in artifacts if artifact.owner == "ssl"}
+
+    assert certificates["ACME certificate"].kind == "link"
+    assert certificates["ACME certificate key"].kind == "link"
 
 
 def test_services_are_inspected_without_mutations(tmp_path: Path):
