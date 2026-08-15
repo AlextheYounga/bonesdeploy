@@ -1,9 +1,9 @@
 from shlex import quote
 
-from pyinfra.operations import files, server
+from pyinfra.operations import server
 
 from bonesinfra.config.context import DEPLOY_USER
-from bonesinfra.config.paths import ASSETS_DIR, SCRIPTS_DIR
+from bonesinfra.config.paths import SCRIPTS_DIR
 from bonesinfra.pyinfra.operations import mkdir
 
 
@@ -35,18 +35,6 @@ def setup_repo_and_project(ctx, paths):
         _sudo=True,
         _sudo_user=DEPLOY_USER,
     )
-
-    files.put(
-        name="Install bare repo post-receive hook",
-        src=str(ASSETS_DIR / "hooks/post-receive"),
-        dest=f"{paths['repo']}/hooks/post-receive",
-        user=DEPLOY_USER,
-        group=DEPLOY_USER,
-        mode="0755",
-        _sudo=True,
-    )
-
-    _setup_bones_repo(paths)
 
     mkdir(
         name="Ensure project root parent directory is traversable",
@@ -94,41 +82,4 @@ def setup_repo_and_project(ctx, paths):
         user="root",
         group=ctx.runtime.runtime_group,
         mode="0750",
-    )
-
-
-def _setup_bones_repo(paths):
-    bones_repo = quote(paths["bones_repo"])
-    bones_repo_parent = quote(str(paths["bones_repo"].rsplit("/", 1)[0]))
-    server.shell(
-        name="Ensure root-owned .bones repository parent exists",
-        commands=[f"mkdir -p {bones_repo_parent}"],
-        _sudo=True,
-    )
-    server.shell(
-        name="Initialize bare .bones repository",
-        commands=[f"git init --bare {bones_repo}"],
-        _sudo=True,
-    )
-
-    server.shell(
-        name="Set .bones repo default branch to master",
-        commands=[f"git --git-dir {bones_repo} symbolic-ref HEAD refs/heads/master"],
-        _sudo=True,
-    )
-
-    server.shell(
-        name="Remove legacy .bones repo post-receive hook",
-        commands=[f"rm -f {bones_repo}/hooks/post-receive"],
-        _sudo=True,
-    )
-
-    files.put(
-        name="Install .bones repo pre-receive hook",
-        src=str(ASSETS_DIR / "hooks/config-pre-receive"),
-        dest=f"{paths['bones_repo']}/hooks/pre-receive",
-        user="root",
-        group="root",
-        mode="0755",
-        _sudo=True,
     )

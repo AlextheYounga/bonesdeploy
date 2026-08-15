@@ -34,14 +34,12 @@ def _noop_deploy(*args, **kwargs):
 
 def test_run_passes_ssh_auth_through_inventory(monkeypatch):
     with TemporaryDirectory() as tmp:
-        config_path = Path(tmp) / "bones.toml"
+        config_path = Path(tmp) / ".env"
         config_path.write_text(
-            """[app]
-project_name = "lawsnipe"
-[app.server]
-host = "example.com"
-ssh_user = "root"
-port = 2222
+            """PROJECT_NAME=lawsnipe
+HOST=example.com
+SSH_USER=root
+PORT=2222
 """
         )
 
@@ -76,14 +74,12 @@ port = 2222
 
 
 def test_run_can_override_ssh_user_for_update_patches(monkeypatch, tmp_path):
-    config_path = tmp_path / "bones.toml"
+    config_path = tmp_path / ".env"
     config_path.write_text(
-        """[app]
-project_name = "lawsnipe"
-[app.server]
-host = "example.com"
-ssh_user = "deploy"
-port = 2222
+        """PROJECT_NAME=lawsnipe
+HOST=example.com
+SSH_USER=deploy
+PORT=2222
 """
     )
     ctx = DeployContext.from_files(str(config_path))

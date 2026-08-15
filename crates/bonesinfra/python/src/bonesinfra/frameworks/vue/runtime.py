@@ -1,15 +1,17 @@
 from pathlib import Path
 
-from bonesinfra.services.linux import runtime
+from bonesinfra.services.linux import runtime, shared
 from bonesinfra.services.linux.application import deploy_static
 
 from . import custom
 
 TEMPLATES = Path(__file__).parent / "templates"
+SHARED_DIRECTORIES = ()
 
 
 def deploy(ctx):
     runtime.setup(ctx)
+    shared.ensure_directories(ctx, ctx.paths_dict, SHARED_DIRECTORIES)
     deploy_static(
         ctx,
         static_root="dist",

@@ -31,19 +31,14 @@ class ProjectManifest:
 
 
 def _context(tmp_path: Path, *, ssl: bool = False):
-    config = tmp_path / "bones.toml"
+    config = tmp_path / ".env"
     config.write_text(
-        f"""[app]
-project_name = "example"
-[app.server]
-host = "example.test"
-[app.dns]
-ssl_enabled = {str(ssl).lower()}
-domain = "example.test"
-[runtime]
-template = "custom"
-[services]
-services = []
+        f"""PROJECT_NAME=example
+HOST=example.test
+SSL_ENABLED={str(ssl).lower()}
+DOMAIN=example.test
+TEMPLATE=custom
+SERVICES=
 """
     )
     return DeployContext.from_files(str(config))

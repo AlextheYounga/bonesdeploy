@@ -8,18 +8,14 @@ INFRA = Path(__file__).parents[1] / "src/bonesinfra/frameworks/laravel"
 
 
 def _config(tmp_path: Path, *, worker: bool | None = None) -> Path:
-    value = "" if worker is None else f"install_queue_worker = {str(worker).lower()}\n"
-    config = tmp_path / "bones.toml"
+    value = "" if worker is None else f"install_queue_worker={'true' if worker else ''}\n"
+    config = tmp_path / ".env"
     config.write_text(
-        f"""[app]
-project_name = "atlas"
-[app.server]
-host = "example.test"
-[runtime]
-template = "laravel"
-php_version = "8.5"
-{value}[services]
-services = []
+        f"""PROJECT_NAME=atlas
+HOST=example.test
+TEMPLATE=laravel
+php_version=8.5
+{value}SERVICES=
 """
     )
     return config
@@ -30,9 +26,14 @@ def _runtime_context(config: Path):
     return ctx
 
 
+def _link_core(tmp_path: Path):
+    (tmp_path / "infra/provision").mkdir(parents=True)
+    (tmp_path / "infra/provision/core").symlink_to(INFRA, target_is_directory=True)
+
+
 def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypatch):
     config = _config(tmp_path, worker=True)
-    (tmp_path / "infra").symlink_to(INFRA, target_is_directory=True)
+    _link_core(tmp_path)
     module = load_runtime(config)
     ctx = _runtime_context(config)
     calls = []
@@ -41,6 +42,7 @@ def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypa
     monkeypatch.setattr(module.PHP, "configure_fpm_pool", lambda _ctx, **_kwargs: "/run/php/php8.5-fpm-atlas.sock")
     monkeypatch.setattr(module.site, "render_php_fpm", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.custom, "deploy", lambda _ctx: None)
+    monkeypatch.setattr(module.shared, "ensure_directories", lambda *_args: None)
     monkeypatch.setattr(module.runtime, "setup", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.runtime, "start_services", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "render", lambda *args, **kwargs: calls.append((args, kwargs)))
@@ -71,7 +73,7 @@ def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypa
 
 def test_laravel_runtime_skips_queue_worker_when_disabled(tmp_path, monkeypatch):
     config = _config(tmp_path, worker=False)
-    (tmp_path / "infra").symlink_to(INFRA, target_is_directory=True)
+    _link_core(tmp_path)
     module = load_runtime(config)
     ctx = _runtime_context(config)
     renders = []
@@ -80,6 +82,7 @@ def test_laravel_runtime_skips_queue_worker_when_disabled(tmp_path, monkeypatch)
     monkeypatch.setattr(module.PHP, "configure_fpm_pool", lambda _ctx, **_kwargs: "/run/php/php8.5-fpm-atlas.sock")
     monkeypatch.setattr(module.site, "render_php_fpm", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.custom, "deploy", lambda _ctx: None)
+    monkeypatch.setattr(module.shared, "ensure_directories", lambda *_args: None)
     monkeypatch.setattr(module.runtime, "setup", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.runtime, "start_services", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "render", lambda *args, **_kwargs: renders.append(args[0]))
@@ -91,7 +94,7 @@ def test_laravel_runtime_skips_queue_worker_when_disabled(tmp_path, monkeypatch)
 
 def test_laravel_manifest_declares_worker_only_when_enabled(tmp_path):
     config = _config(tmp_path, worker=True)
-    (tmp_path / "infra").symlink_to(INFRA, target_is_directory=True)
+    _link_core(tmp_path)
     ctx = _runtime_context(config)
     project_manifest = load_manifest(config)
 
@@ -104,7 +107,7 @@ def test_laravel_manifest_declares_worker_only_when_enabled(tmp_path):
 
 def test_laravel_manifest_omits_worker_when_disabled(tmp_path):
     config = _config(tmp_path, worker=False)
-    (tmp_path / "infra").symlink_to(INFRA, target_is_directory=True)
+    _link_core(tmp_path)
     ctx = _runtime_context(config)
     project_manifest = load_manifest(config)
 

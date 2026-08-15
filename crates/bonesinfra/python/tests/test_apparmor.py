@@ -13,14 +13,11 @@ from bonesinfra.services.linux.apparmor import app as apparmor_app
 
 
 def _ctx(tmp_path: Path) -> DeployContext:
-    config_path = tmp_path / "bones.toml"
+    config_path = tmp_path / ".env"
     config_path.write_text(
-        """[app]
-project_name = "lawsnipe"
-
-[app.server]
-host = "example.com"
-port = "22"
+        """PROJECT_NAME=lawsnipe
+HOST=example.com
+PORT=22
 """
     )
     return DeployContext.from_files(str(config_path))
