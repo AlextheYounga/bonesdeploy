@@ -2,7 +2,7 @@ use anyhow::Result;
 
 use crate::cli::args::{Cli, Command, ManifestFormat, ReleasesCommand, RemoteCommand, SecretsCommand};
 use crate::commands::{
-    deploy, doctor, init, manifest, migrate, releases, remote, rollback, secrets, setup, skill, status, update, version,
+    deploy, doctor, init, manifest, releases, remote, rollback, secrets, setup, skill, status, update, version,
 };
 // ponytail: direct command dispatch keeps CLI routing visible; split only if commands need shared dispatch state.
 #[expect(clippy::cognitive_complexity)]
@@ -41,7 +41,6 @@ pub async fn run(cli: &Cli) -> Result<()> {
             ManifestFormat::Text => "text",
             ManifestFormat::Json => "json",
         }),
-        Command::Migrate => migrate::run(),
         Command::Skill { command } => skill::dispatch(command.as_ref()).await,
         Command::Guide { format } => skill::run_next(*format).await,
         Command::Secrets { command } => match command {

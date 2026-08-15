@@ -65,8 +65,6 @@ pub enum Command {
         #[arg(long, value_enum, default_value_t = ManifestFormat::Text)]
         format: ManifestFormat,
     },
-    /// One-shot migration from the old .bones workspace into infra/
-    Migrate,
     /// Embedded documentation and next-step guidance for AI agents
     Skill {
         /// Optional subcommand: `next`, `list`, or `doc <name>`
@@ -90,7 +88,7 @@ pub enum Command {
         #[command(subcommand)]
         command: Option<ReleasesCommand>,
     },
-    /// Update bonesdeploy and bonesremote to the latest version
+    /// Update BonesDeploy, BonesRemote, and project infrastructure to the latest version
     Update {
         /// Skip local update
         #[arg(long)]

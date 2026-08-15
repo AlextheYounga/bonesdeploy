@@ -98,7 +98,7 @@ GPG keyrings untouched, and leaves Git commit creation to the user.
 2. Replace `.bones` path constants and local config loading with project-root
    paths for `infra/`, `.env`, `.env.build`, and encrypted secrets. Commands
    that encounter the old `.bones` layout must fail with a clear message
-   directing the user to the migration tool, not attempt auto-detection or
+    directing the user to `bonesdeploy update`, not attempt auto-detection or
    dual-mode adaptation. Keep the explicit project identity in the local
    provisioning environment/command boundary, not in a replacement project
    TOML file. Preserve the machine-local data/configuration roots used for the
@@ -116,9 +116,10 @@ GPG keyrings untouched, and leaves Git commit creation to the user.
 5. Update BonesInfra's context and project-infrastructure loading so setup
    consumes local `.env` plus committed `infra/` code/assets, while remote
    deployment does not require a persisted project configuration dataset.
-6. Add migration handling and remove obsolete transport paths, hooks, tests,
-   templates, and documentation. The migration tool is the single deliberate
-    bridge from old to new layout; no other command detects, adapts to, or
+6. Restore the versioned update-patch mechanism, add the `0.8.0` local layout
+   transition, and remove obsolete transport paths, hooks, tests, templates,
+   and documentation. `bonesdeploy update` is the single deliberate bridge
+   from old to new layout; no other command detects, adapts to, or
     silently supports old `.bones`-based workspaces. Preserve encrypted secret
     bytes, leave local key material untouched, and fail closed when a migration
     encounters unsafe plaintext or ambiguous paths.
@@ -162,9 +163,10 @@ GPG keyrings untouched, and leaves Git commit creation to the user.
 - Shared directory provisioning: create `shared/` and `shared/.env` for every
   framework, wire `.env` into releases, and create only framework-declared
   directories. Application-owned files are not created by BonesDeploy.
-- Migration command/path: perform an explicit, reviewable filesystem
-  transformation as the single bridge from old to new layout. No other
-  command reads, adapts to, or silently supports the old `.bones` structure.
+- Update patches: perform the explicit, reviewable filesystem transformation
+  from old to new layout. The ordered Python registry owns version gates and
+  per-project completion markers; only the `0.8.0` local patch copies the old
+  layout. No ordinary command reads, adapts to, or silently supports `.bones`.
 
 ## Affected areas
 
@@ -184,8 +186,8 @@ GPG keyrings untouched, and leaves Git commit creation to the user.
   the managed-core/custom provisioning boundary.
 - Embedded scaffolding, framework assets, shell hooks, tests, `CONTEXT.md`,
   `README.md`, and relevant skill documentation.
-- Migration tests and focused Rust/Python tests at each changed public
-  command or parser boundary.
+- Update-patch migration tests and focused Rust/Python tests at each changed
+  public command or parser boundary.
 
 ## Decisions
 
