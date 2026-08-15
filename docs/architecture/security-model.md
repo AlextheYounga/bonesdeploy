@@ -210,7 +210,7 @@ write_file(path="...", content="...")
 restart_service(name_from_user_input)
 ```
 
-This is why BonesRemote is one of the most security-sensitive components in the system. Its job is not to "run deployments." Its job is to constrain the deployer to a finite set of safe state transitions. Git hooks trigger BonesRemote; they do not check out source, build releases, write live files, or restart services.
+This is why BonesRemote is one of the most security-sensitive components in the system. Its job is not to accept arbitrary remote instructions. It constrains an explicit deployment request to a finite set of safe state transitions. There is no Git-hook deployment trigger; the local CLI requests deployment explicitly.
 
 ### 10. Writable configuration executed by a privileged process is privilege
 
@@ -224,7 +224,7 @@ This covers systemd units, sudoers files, cron definitions, shell hooks, nginx i
 
 > **Derived rule:** anything read as executable instructions by a privileged component must be owned and writable only by a more trusted identity.
 
-This is also why unrestricted user-provided Docker Compose files undermine a controlled deployment model. Compose fields are instructions to the daemon about mounts, namespaces, devices, capabilities, and networking.
+This is also why unrestricted user-provided Docker Compose files undermine a controlled deployment model. Compose fields are instructions to the daemon about mounts, namespaces, devices, capabilities, and networking. Runtime definitions are generated from project-local infrastructure instead.
 
 ### 11. `no_new_privs` closes the exec-based escalation path
 
