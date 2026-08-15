@@ -224,7 +224,7 @@ bonesdeploy/
 ```
 
 ### Per-Framework Templates
-Framework templates ship starter overlays that `bonesdeploy init` uses when scaffolding a matching framework. BonesDeploy keeps framework defaults and deployment scripts under `crates/bonesdeploy/assets/frameworks/<fw>/`; canonical infrastructure source and templates live in BonesInfra and are materialized into `.bones/infra/`:
+Framework templates ship starter overlays that `bonesdeploy init` uses when scaffolding a matching framework. BonesDeploy keeps framework defaults and deployment scripts under `crates/bonesdeploy/assets/frameworks/<fw>/`; canonical infrastructure source and templates live in BonesInfra and are materialized into `infra/provision/core/`:
 
 - `frameworks/laravel/`    → Laravel (PHP + PHP-FPM)
 - `frameworks/django/`     → Django (Python + Gunicorn)
@@ -236,7 +236,7 @@ Framework templates ship starter overlays that `bonesdeploy init` uses when scaf
 
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
 
-Projects materialize project-owned infrastructure: `.bones/infra/__init__.py`, `.bones/infra/runtime.py` (orchestrates the framework's services), `.bones/infra/manifest.py` (declares framework-owned artifacts, services, and mode), and an ordinary `.bones/infra/custom.py` project hook plus local `infra/templates/`. `bonesinfra runtime apply` imports and runs the project's `runtime.py`; it no longer ships an installed framework registry or root `custom.py`/`confs/` dispatch. Laravel's infra package also ships `.bones/infra/docker.py` with its `templates/docker/` assets, used when the project selects the `docker` runtime backend.
+Projects materialize BonesDeploy-managed infrastructure under `infra/provision/core/` and preserve project-owned hooks under `infra/provision/custom/`. The core `runtime.py` orchestrates framework services and `manifest.py` declares framework-owned artifacts, services, and mode. `bonesinfra runtime apply` imports and runs the composed project runtime; it no longer ships an installed framework registry or root `custom.py`/`confs/` dispatch. Laravel's core package also ships `docker.py` with its `templates/docker/` assets, used when the project selects the `docker` runtime backend.
 
 Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves (e.g. Next's `out/`). A static site only works if the app is configured to emit that directory: for `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
 
@@ -248,7 +248,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy remote setup` and `bonesdeploy remote runtime` before first deploy.
   - Saves config to `.bones/bones.toml`.
-  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/`, then asks BonesInfra to copy its canonical framework package into `.bones/infra/`.
+  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/`, then asks BonesInfra to copy its canonical framework package into `infra/provision/core/`.
   - `--template <name>` selects a framework template non-interactively. `--framework-var <key=value>` (repeated) overrides template variables; answers are validated against the template's question schema before writing `bones.toml`.
 
 - **doctor**

@@ -12,7 +12,7 @@ def artifacts(ctx):
         (
             "PHP-FPM socket",
             f"/run/php/php{version}-fpm-{project}.sock",
-            "file",
+            "socket",
             "framework",
         ),
         ("PHP log directory", paths.site_log_dir, "directory", "framework"),
@@ -27,7 +27,7 @@ def artifacts(ctx):
                 (
                     "Docker runtime socket",
                     paths.runtime_php_fpm_socket,
-                    "file",
+                    "socket",
                     "docker",
                 ),
                 (

@@ -5,14 +5,12 @@ from bonesinfra.config.context import DeployContext
 
 
 def _ctx(tmp: Path) -> DeployContext:
-    config = tmp / "bones.toml"
+    config = tmp / ".env"
     config.write_text(
-        """[app]
-project_name = "lawsnipe"
-[app.server]
-host = "example.com"
-ssh_user = "root"
-port = 2222
+        """PROJECT_NAME=lawsnipe
+HOST=example.com
+SSH_USER=root
+PORT=2222
 """
     )
     return DeployContext.from_files(str(config))

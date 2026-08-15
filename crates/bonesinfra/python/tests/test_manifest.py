@@ -1,7 +1,8 @@
 from pathlib import Path
 
 import pytest
-from pyinfra.facts.files import Directory, Link
+from pyinfra.context import ctx_host
+from pyinfra.facts.files import Directory, Link, Socket
 from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra import manifest
@@ -10,6 +11,7 @@ from bonesinfra.manifest import (
     Artifact,
     collect_services,
     inspect_artifacts,
+    inspect_for_runner,
     inspect_services,
     render,
     report,
@@ -29,19 +31,14 @@ class ProjectManifest:
 
 
 def _context(tmp_path: Path, *, ssl: bool = False):
-    config = tmp_path / "bones.toml"
+    config = tmp_path / ".env"
     config.write_text(
-        f"""[app]
-project_name = "example"
-[app.server]
-host = "example.test"
-[app.dns]
-ssl_enabled = {str(ssl).lower()}
-domain = "example.test"
-[runtime]
-template = "custom"
-[services]
-services = []
+        f"""PROJECT_NAME=example
+HOST=example.test
+SSL_ENABLED={str(ssl).lower()}
+DOMAIN=example.test
+TEMPLATE=custom
+SERVICES=
 """
     )
     return DeployContext.from_files(str(config))
@@ -107,6 +104,32 @@ def test_link_fact_is_reported_as_present(tmp_path: Path):
     assert entry.state == "present"
 
 
+def test_socket_fact_is_reported_as_present(tmp_path: Path):
+    ctx = _context(tmp_path)
+
+    class SocketManifest(ProjectManifest):
+        def artifacts(self, _ctx):
+            return [("application socket", "/run/example.sock", "socket", "framework")]
+
+    class FakeHost:
+        def get_fact(self, fact, path):
+            if fact is Socket and path == "/run/example.sock":
+                return {"mode": 660}
+            return None
+
+    entries = inspect_artifacts(ctx, FakeHost(), SocketManifest())
+    entry = next(entry for entry in entries if entry.name == "application socket")
+    assert entry.state == "present"
+
+
+def test_acme_certificate_links_are_declared_as_links(tmp_path: Path):
+    artifacts = resolve_artifacts(_context(tmp_path, ssl=True), ProjectManifest())
+    certificates = {artifact.name: artifact for artifact in artifacts if artifact.owner == "ssl"}
+
+    assert certificates["ACME certificate"].kind == "link"
+    assert certificates["ACME certificate key"].kind == "link"
+
+
 def test_services_are_inspected_without_mutations(tmp_path: Path):
     ctx = _context(tmp_path)
 
@@ -121,3 +144,23 @@ def test_services_are_inspected_without_mutations(tmp_path: Path):
     by_unit = {service.unit: service for service in inspect_services(ctx, FakeHost(), ProjectManifest())}
     assert by_unit["example-app.service"].running is False
     assert by_unit["example-app.service"].enabled is True
+
+
+def test_runner_inspection_uses_the_host_installed_by_pyinfra(tmp_path: Path):
+    ctx = _context(tmp_path)
+
+    class FakeHost:
+        def get_fact(self, fact, path=None, *, services=None):
+            if fact is Directory and path == ctx.paths.repo:
+                return {"mode": 755}
+            if fact is SystemdStatus:
+                return {services: True}
+            if fact is SystemdEnabled:
+                return {services: True}
+            return None
+
+    with ctx_host.use(FakeHost()):
+        result = inspect_for_runner(ctx, ProjectManifest())
+
+    assert next(entry for entry in result["entries"] if entry["name"] == "bare repository")["state"] == "present"
+    assert all(service["running"] and service["enabled"] for service in result["managed_services"])

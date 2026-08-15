@@ -10,7 +10,7 @@ bonesdeploy remote ssl --yes --domain app.example.com --email ops@example.com
 bonesdeploy deploy
 ```
 
-`setup --yes` does bootstrap + runtime + push + doctor in one shot. You do
+`setup --yes` does bootstrap + runtime + doctor in one shot. You do
 not need `remote runtime` separately — it's already inside `setup`. After
 setup, push your source to the bare repo once (so `bonesremote` has
 something to build), then `deploy`. That's the whole dance.
@@ -24,7 +24,6 @@ time, you probably do, because you'll want to see where it breaks.
 bonesdeploy init
 bonesdeploy remote bootstrap
 bonesdeploy remote runtime --yes
-bonesdeploy push
 git push production master
 bonesdeploy remote ssl --yes --domain app.example.com --email ops@example.com
 bonesdeploy deploy
@@ -39,27 +38,8 @@ being explicit while you're learning the shape of the thing.
 bonesdeploy deploy
 ```
 
-That's it. It pushes `.bones/` and runs the remote pipeline. If you have
-`deploy_on_push = true` in `bones.toml`, `git push production <branch>` does
-the same thing via the `post-receive` hook. Pick one. Don't use both.
-
-## Git-triggered deploy
-
-Set `deploy_on_push = true` in `bones.toml`. `bonesdeploy init` installs a
-`pre-push` guard locally; `bonesdeploy push` installs the `post-receive`
-trigger on the bare repo. Then:
-
-```
-git push production master
-```
-
-The `pre-push` guard runs `bonesdeploy doctor --local` and aborts on
-warnings or errors. Git updates refs. `post-receive` runs `bonesremote
-deploy --site <project> --revision <newrev>`. Done.
-
-The hook is optional plumbing, not the primary model. `bonesdeploy deploy`
-is the primary model. Don't let anyone tell you git hooks are the
-deployment. They're a convenience on top of it.
+The application source is pushed separately with `git push production master`,
+then `bonesdeploy deploy` runs the explicit remote pipeline.
 
 ## Secrets, end to end
 

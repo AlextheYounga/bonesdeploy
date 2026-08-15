@@ -1,55 +1,109 @@
 from __future__ import annotations
 
-import subprocess
+import filecmp
+import shutil
+import tempfile
 from pathlib import Path
 
-from bonesinfra.config.context import DeployContext
+OWNED_ENTRIES = frozenset(("deployment", "infra", "secrets"))
+CONTROL_ENTRIES = frozenset((".git", ".gitignore", "bones.toml"))
 
 
-def apply_config_repo(bones_dir: Path, ctx: DeployContext) -> None:
-    if not _is_repository(bones_dir):
-        _run_git(bones_dir, "init", "--initial-branch", "master")
-
-    remote_url = config_repo_url(ctx)
-    origin = _git_output(bones_dir, "remote", "get-url", "origin")
-    if origin.returncode == 0:
-        actual_url = origin.stdout.strip()
-        if actual_url != remote_url:
-            raise RuntimeError(f"origin points to {actual_url}, expected {remote_url}")
+def migrate_to_project_infra(project_root: Path) -> None:
+    old_path = project_root / ".bones"
+    if not old_path.exists() and not old_path.is_symlink():
         return
-    _run_git(bones_dir, "remote", "add", "origin", remote_url)
 
+    source = old_path.resolve() if old_path.is_symlink() else old_path
+    if not source.is_dir():
+        raise RuntimeError(".bones is neither a directory nor a symlink; migration refused")
 
-def apply_root_config_repo(bones_dir: Path, ctx: DeployContext) -> None:
-    remote_url = config_repo_url(ctx)
-    if _git_output(bones_dir, "remote", "get-url", "origin").returncode == 0:
-        _run_git(bones_dir, "remote", "set-url", "origin", remote_url)
+    destination = project_root / "infra"
+    if destination.exists() or destination.is_symlink():
+        raise RuntimeError(f"{destination} already exists; migration will not merge or overwrite it")
+
+    _validate_source(source)
+    staging = Path(tempfile.mkdtemp(prefix=".infra.migrate-", dir=project_root))
+    try:
+        _copy_owned_content(source, staging)
+        _verify_owned_content(source, staging)
+        staging.replace(destination)
+        _verify_owned_content(source, destination)
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
+    if old_path.is_symlink():
+        old_path.unlink()
     else:
-        _run_git(bones_dir, "remote", "add", "origin", remote_url)
+        shutil.rmtree(old_path)
 
 
-def config_repo_url(ctx: DeployContext) -> str:
-    repository = ctx.paths.bones_repo
-    if ctx.app.server.port == "22":
-        return f"root@{ctx.app.server.host}:{repository}"
-    return f"ssh://root@{ctx.app.server.host}:{ctx.app.server.port}{repository}"
+def _validate_source(source: Path) -> None:
+    for entry in source.iterdir():
+        if entry.name not in OWNED_ENTRIES | CONTROL_ENTRIES:
+            raise RuntimeError(f"Unexpected entry {entry} in old .bones; migration is ambiguous")
+        if entry.name in CONTROL_ENTRIES:
+            if entry.is_symlink():
+                raise RuntimeError(f"Old control entry {entry} is a symlink; migration refused")
+        else:
+            _validate_tree(entry)
+
+    old_infra = source / "infra"
+    if old_infra.is_dir():
+        for name in ("deployment", "secrets"):
+            if (old_infra / name).exists() or (old_infra / name).is_symlink():
+                raise RuntimeError(f"Both .bones/infra/{name} and .bones/{name} exist; migration is ambiguous")
 
 
-def _is_repository(path: Path) -> bool:
-    return _git_output(path, "rev-parse", "--git-dir").returncode == 0
+def _validate_tree(path: Path) -> None:
+    if path.is_symlink() or not (path.is_dir() or path.is_file()):
+        raise RuntimeError(f"Unsafe entry {path} in old .bones; migration refused")
+    if path.is_dir():
+        for child in path.iterdir():
+            _validate_tree(child)
 
 
-def _git_output(path: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(  # noqa: S603
-        ["git", "-C", str(path), *args],  # noqa: S607
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+def _copy_owned_content(source: Path, destination: Path) -> None:
+    old_infra = source / "infra"
+    if old_infra.is_dir():
+        for entry in old_infra.iterdir():
+            _copy_tree(entry, destination / entry.name)
+    for name in ("deployment", "secrets"):
+        entry = source / name
+        if entry.exists() or entry.is_symlink():
+            _copy_tree(entry, destination / name)
 
 
-def _run_git(path: Path, *args: str) -> None:
-    result = _git_output(path, *args)
-    if result.returncode:
-        detail = result.stderr.strip()
-        raise RuntimeError(f"git command failed: {detail}")
+def _copy_tree(source: Path, destination: Path) -> None:
+    if source.is_dir():
+        destination.mkdir()
+        shutil.copystat(source, destination)
+        for entry in source.iterdir():
+            _copy_tree(entry, destination / entry.name)
+    elif source.is_file():
+        shutil.copy2(source, destination)
+    else:
+        raise RuntimeError(f"Unsafe entry {source} in old .bones; migration refused")
+
+
+def _verify_owned_content(source: Path, destination: Path) -> None:
+    old_infra = source / "infra"
+    if old_infra.is_dir():
+        for entry in old_infra.iterdir():
+            _verify_tree(entry, destination / entry.name)
+    for name in ("deployment", "secrets"):
+        entry = source / name
+        if entry.exists() or entry.is_symlink():
+            _verify_tree(entry, destination / name)
+
+
+def _verify_tree(source: Path, destination: Path) -> None:
+    if source.is_dir() != destination.is_dir() or source.is_file() != destination.is_file():
+        raise RuntimeError(f"Migration destination has an unsafe type for {destination}")
+    if source.is_file():
+        if not filecmp.cmp(source, destination, shallow=False):
+            raise RuntimeError(f"Migration verification failed for {destination}")
+        return
+    for entry in source.iterdir():
+        _verify_tree(entry, destination / entry.name)

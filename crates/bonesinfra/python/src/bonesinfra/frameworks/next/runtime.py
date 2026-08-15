@@ -3,16 +3,18 @@ from pathlib import Path
 from bonesinfra.config.context import template_data
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import NODE
-from bonesinfra.services.linux import application, runtime, validation
+from bonesinfra.services.linux import application, runtime, shared, validation
 
 from . import custom
 
 TEMPLATES = Path(__file__).parent / "templates"
+SHARED_DIRECTORIES = ()
 
 
 def deploy(ctx):
     is_static = ctx.runtime.data.get("is_static", True)
     runtime.setup(ctx, uses_tcp=not is_static)
+    shared.ensure_directories(ctx, ctx.paths_dict, SHARED_DIRECTORIES)
     if is_static:
         application.deploy_static(
             ctx,

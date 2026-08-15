@@ -50,6 +50,24 @@ pub fn run(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
+/// Runs `python -m bonesinfra` with the given arguments and returns stdout.
+///
+/// # Errors
+/// Fails when the runtime cannot be materialized or the command exits non-zero.
+pub fn run_capture(args: &[&str]) -> Result<String> {
+    let executable = ensure_available()?;
+    let output = base_command(&executable, args)
+        .stdin(Stdio::null())
+        .output()
+        .with_context(|| format!("Failed to run bonesinfra {} from {}", args.join(" "), executable.display()))?;
+
+    if !output.status.success() {
+        bail!("bonesinfra failed");
+    }
+
+    String::from_utf8(output.stdout).context("bonesinfra produced invalid UTF-8 output")
+}
+
 /// Runs `python -m bonesinfra` with the given arguments, writing `stdin_json` to stdin.
 ///
 /// # Errors

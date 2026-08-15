@@ -15,9 +15,11 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
         return;
     }
 
-    let Some(cfg) = check_site_state(site, issues) else {
+    let cfg = config::Bones::for_site(site);
+    if !paths::bonesremote_site_root(site).is_dir() {
+        issues.push(format!("control-plane site state is missing: {}", paths::bonesremote_site_root(site).display()));
         return;
-    };
+    }
 
     let project_root = &cfg.project_root;
     let shared_root = Path::new(project_root).join(paths::SHARED_DIR);
@@ -28,7 +30,6 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
 
     check_repo_exists(&cfg.repo_path, issues);
     check_branch_ref(&cfg.repo_path, &cfg.branch, issues, pending);
-    check_thin_hook(&cfg.repo_path, issues);
 
     match fs::read_to_string(paths::ETC_PASSWD) {
         Ok(passwd) => {
@@ -95,30 +96,6 @@ fn check_build_user(build_user: &str, passwd: &str, issues: &mut Vec<String>) {
     }
 }
 
-fn check_site_state(site: &str, issues: &mut Vec<String>) -> Option<config::Bones> {
-    let site_root = paths::bonesremote_site_root(site);
-    if !site_root.is_dir() {
-        issues.push(format!("control-plane site state is missing: {}", site_root.display()));
-        return None;
-    }
-
-    let bones_path = site_root.join(paths::BONES_TOML);
-    let cfg = match config::load(&bones_path) {
-        Ok(cfg) => cfg,
-        Err(error) => {
-            issues.push(format!("control-plane bones.toml is invalid: {error}"));
-            return None;
-        }
-    };
-
-    if cfg.project_name != site {
-        issues.push(format!("control-plane bones.toml belongs to '{}', expected '{}'", cfg.project_name, site));
-        return None;
-    }
-
-    Some(cfg)
-}
-
 fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {
     let repo_path = Path::new(repo_path);
     if !repo_path.is_dir() {
@@ -159,17 +136,6 @@ fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pen
             "deploy branch '{branch}' has not been pushed to {repo_path}. Run 'git push <remote> {branch}' first."
         )),
         Err(error) => issues.push(format!("could not run git while checking branch '{branch}': {error}")),
-    }
-}
-
-fn check_thin_hook(repo_path: &str, issues: &mut Vec<String>) {
-    let hook_path = Path::new(repo_path).join("hooks").join("post-receive");
-    let hook = fs::read_to_string(&hook_path);
-
-    match hook {
-        Ok(contents) if hook_uses_thin_trigger(&contents) => {}
-        Ok(_) => issues.push(format!("thin post-receive hook is missing or stale: {}", hook_path.display())),
-        Err(error) => issues.push(format!("thin post-receive hook is missing: {} ({error})", hook_path.display())),
     }
 }
 
@@ -232,15 +198,11 @@ fn group_members(groupfile: &str, group: &str) -> Option<Vec<String>> {
     Some(members.split(',').map(str::to_string).collect())
 }
 
-fn hook_uses_thin_trigger(contents: &str) -> bool {
-    contents.contains("sudo bonesremote hook post-receive --site")
-}
-
 #[cfg(test)]
 mod tests {
     use std::{env, fs, process, process::Command};
 
-    use super::{account_exists, account_home, account_identity, group_members, hook_uses_thin_trigger};
+    use super::{account_exists, account_home, account_identity, group_members};
 
     #[test]
     fn empty_bare_repo_is_pending_before_first_push() {
@@ -256,11 +218,6 @@ mod tests {
         let _ = fs::remove_dir_all(root);
         assert!(issues.is_empty());
         assert_eq!(pending.len(), 1);
-    }
-
-    #[test]
-    fn hook_uses_thin_trigger_accepts_bonesremote_post_receive_delegate() {
-        assert!(hook_uses_thin_trigger("exec sudo bonesremote hook post-receive --site \"$SITE\"\n"));
     }
 
     #[test]

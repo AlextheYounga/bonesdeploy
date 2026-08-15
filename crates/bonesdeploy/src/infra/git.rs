@@ -60,21 +60,6 @@ pub fn add_remote_at(repo: &Path, remote_name: &str, remote_url: &str) -> Result
     Ok(())
 }
 
-pub fn set_remote_url_at(repo: &Path, remote_name: &str, remote_url: &str) -> Result<()> {
-    let status = Command::new("git")
-        .args(["-C"])
-        .arg(repo)
-        .args(["remote", "set-url", remote_name, remote_url])
-        .status()
-        .with_context(|| format!("Failed to update git remote '{remote_name}'"))?;
-
-    if !status.success() {
-        bail!("Failed to update git remote '{remote_name}'");
-    }
-
-    Ok(())
-}
-
 pub fn list_remotes_with_urls() -> Result<Vec<RemoteInfo>> {
     let output = Command::new("git").args(["remote", "-v"]).output().context("Failed to run git")?;
 

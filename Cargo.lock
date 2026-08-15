@@ -84,13 +84,14 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy"
-version = "0.7.7"
+version = "0.7.9"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
  "bonesinfra",
  "clap",
  "console",
+ "easy-tree",
  "inquire",
  "openssh",
  "rust-embed",
@@ -104,7 +105,7 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy-core"
-version = "0.7.7"
+version = "0.7.9"
 dependencies = [
  "anyhow",
  "serde",
@@ -114,7 +115,7 @@ dependencies = [
 
 [[package]]
 name = "bonesinfra"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
@@ -123,7 +124,7 @@ dependencies = [
 
 [[package]]
 name = "bonesremote"
-version = "0.7.7"
+version = "0.7.9"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
@@ -390,6 +391,12 @@ dependencies = [
  "mdpack",
  "serde_json",
 ]
+
+[[package]]
+name = "easy-tree"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0fe19fbb9a76b6acd96ed1ff3ab680675158b88a6b16f5eb988c475f2d584c84"
 
 [[package]]
 name = "encode_unicode"

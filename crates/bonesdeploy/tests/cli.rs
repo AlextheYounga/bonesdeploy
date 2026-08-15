@@ -21,6 +21,6 @@ fn manifest_accepts_json_format_and_reports_missing_config() -> Result<()> {
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(stderr.contains(".bones/bones.toml does not exist"), "unexpected stderr: {stderr}");
+    assert!(stderr.contains("root .env and infra/ are required"), "unexpected stderr: {stderr}");
     Ok(())
 }

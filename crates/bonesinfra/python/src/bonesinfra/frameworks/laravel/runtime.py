@@ -3,22 +3,24 @@ from pathlib import Path
 from bonesinfra.config.context import template_data
 from bonesinfra.pyinfra.operations import render
 from bonesinfra.services.languages import PHP
-from bonesinfra.services.linux import runtime, systemd
+from bonesinfra.services.linux import runtime, shared, systemd
 from bonesinfra.services.linux.nginx import site
 
 from . import custom, docker
 
 TEMPLATES = Path(__file__).parent / "templates"
+SHARED_DIRECTORIES = ("storage", "storage/framework/views", "cache", "uploads")
 
 
 def deploy(ctx):
     runtime.setup(ctx)
+    paths = ctx.paths_dict
+    shared.ensure_directories(ctx, paths, SHARED_DIRECTORIES)
     if ctx.runtime.backend == "docker":
         docker.deploy(ctx)
         custom.deploy(ctx)
         runtime.start_services(ctx)
         return
-    paths = ctx.paths_dict
     php_executable = PHP.install(ctx)
     socket = PHP.configure_fpm_pool(ctx, paths=paths)
     site.render_php_fpm(

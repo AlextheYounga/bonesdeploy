@@ -1,14 +1,33 @@
-use super::{Question, QuestionKind};
+use super::{FrameworkDefaults, PermissionDefault, Question, QuestionKind, directory, file, non_recursive_file};
 use bonesdeploy_core::config::{LARAVEL_INSTALL_QUEUE_WORKER, Runtime};
 
-const PHP_DEFAULT_VERSION: &str = "8.5";
+const PHP_VERSION_KEY: &str = "php_version";
+const DEFAULT_PHP_VERSION: &str = "8.5";
+
+const PERMISSIONS: [PermissionDefault; 6] = [
+    directory("*", 750, false),
+    file("*", 640),
+    directory("storage", 770, true),
+    directory("bootstrap/cache", 770, true),
+    directory("database", 770, false),
+    non_recursive_file("database/database.sqlite", 660),
+];
+
+pub(crate) fn defaults() -> FrameworkDefaults {
+    FrameworkDefaults {
+        template: "laravel",
+        web_root: "public",
+        language: Some((PHP_VERSION_KEY, DEFAULT_PHP_VERSION)),
+        permissions: &PERMISSIONS,
+    }
+}
 
 pub fn questions() -> &'static [Question] {
     &[
         Question {
-            key: "php_version",
+            key: PHP_VERSION_KEY,
             label: "PHP version",
-            kind: QuestionKind::Choice { choices: &["8.2", "8.3", "8.4", "8.5"], default: PHP_DEFAULT_VERSION },
+            kind: QuestionKind::Choice { choices: &["8.2", "8.3", "8.4", "8.5"], default: DEFAULT_PHP_VERSION },
         },
         // TODO: Set up queue worker.
         Question {
@@ -98,6 +117,7 @@ pub(crate) fn environment_example(project_name: &str, site_url: &str) -> String 
 }
 
 pub(crate) fn build_environment_example(runtime: &Runtime) -> String {
-    let php_version = runtime.extra.get("php_version").and_then(|value| value.as_str()).unwrap_or(PHP_DEFAULT_VERSION);
+    let php_version =
+        runtime.extra.get(PHP_VERSION_KEY).and_then(|value| value.as_str()).unwrap_or(DEFAULT_PHP_VERSION);
     super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("PHP_VERSION={php_version}")])
 }

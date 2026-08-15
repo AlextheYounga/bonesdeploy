@@ -22,25 +22,26 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     let mutation = SiteMutation::acquire(site)?;
     ensure_site_idle(site)?;
 
-    let build_user = build_user_for(&mutation.config().project_name);
-    ensure_build_user_ready(&build_user, Path::new(&mutation.config().project_root))?;
+    let build_user = build_user_for(mutation.site());
+    let project_root = PathBuf::from(paths::default_project_root_for(mutation.site()));
+    ensure_build_user_ready(&build_user, &project_root)?;
 
     let target_revision = revision.map_or_else(|| mutation.config().branch.clone(), ToOwned::to_owned);
-    run_staged_deployment(&mutation, &target_revision)
+    let repo_path = PathBuf::from(paths::default_repo_path_for(mutation.site()));
+    let revision_commit = lifecycle::checkout::resolve_revision_commit(&repo_path, &target_revision)?;
+    let snapshot =
+        lifecycle::DeploymentSnapshot::new(mutation.site(), mutation.config(), revision_commit, PathBuf::new());
+    run_staged_deployment(&mutation, snapshot)
 }
 
 #[expect(clippy::too_many_lines)]
-fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Result<()> {
+fn run_staged_deployment(mutation: &SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Result<()> {
     let site = mutation.site();
 
     // Phase A: prepare and validate the new release while the old release still
     // serves. Any failure here aborts and returns the site to idle.
     stage("Staging release");
-    let revision_commit = match lifecycle::checkout::resolve_revision_commit(site, target_revision) {
-        Ok(commit) => commit,
-        Err(error) => return finish_abort(mutation, None, error),
-    };
-    if let Err(error) = lifecycle::stage::run(site, &revision_commit) {
+    if let Err(error) = lifecycle::stage::run(&snapshot) {
         return finish_abort(mutation, None, error);
     }
 
@@ -50,7 +51,7 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
     };
     let mut deployment = release_state::DeploymentRecord::new(
         release_name.clone(),
-        revision_commit,
+        snapshot.revision.clone(),
         release_state::DeploymentPhase::Created,
         process::id(),
         process_start_ticks()?,
@@ -61,7 +62,7 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
     }
 
     stage("Exporting source");
-    let context_dir = match lifecycle::checkout::ensure_build_context(site) {
+    let context_dir = match lifecycle::checkout::ensure_build_context(&snapshot) {
         Ok(context) => context,
         Err(error) => return finish_abort(mutation, None, error),
     };
@@ -69,7 +70,8 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
     if let Err(error) = advance_phase(mutation, &deployment, None, Some(&context_dir)) {
         return finish_abort(mutation, Some(&context_dir), error);
     }
-    if let Err(error) = lifecycle::checkout::run(site, target_revision, &context_dir) {
+    let snapshot = snapshot.with_deployment_dir(context_dir.join(paths::LOCAL_INFRA_DIR).join(paths::DEPLOYMENT_DIR));
+    if let Err(error) = lifecycle::checkout::run(&snapshot, &context_dir) {
         return finish_abort(mutation, Some(&context_dir), error);
     }
     if let Err(error) =
@@ -79,7 +81,7 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
     }
 
     stage("Building release");
-    if let Err(error) = lifecycle::build::run(site, &context_dir) {
+    if let Err(error) = lifecycle::build::run(&snapshot, &context_dir) {
         return finish_abort(mutation, Some(&context_dir), error);
     }
     if let Err(error) =
@@ -89,7 +91,7 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
     }
 
     stage("Preparing release");
-    if let Err(error) = lifecycle::build::promote(site, &context_dir) {
+    if let Err(error) = lifecycle::build::promote(&snapshot, &context_dir) {
         return finish_abort(mutation, Some(&context_dir), error);
     }
     if let Err(error) =
@@ -97,10 +99,10 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
     {
         return finish_abort(mutation, Some(&context_dir), error);
     }
-    if let Err(error) = lifecycle::wire_shared::run(site) {
+    if let Err(error) = lifecycle::wire_shared::run(&snapshot) {
         return finish_abort(mutation, Some(&context_dir), error);
     }
-    if let Err(error) = lifecycle::prepare::run(site) {
+    if let Err(error) = lifecycle::prepare::run(&snapshot) {
         return finish_abort(mutation, Some(&context_dir), error);
     }
     if let Err(error) =
@@ -108,7 +110,7 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
     {
         return finish_abort(mutation, Some(&context_dir), error);
     }
-    if let Err(error) = lifecycle::build::finalize(site) {
+    if let Err(error) = lifecycle::build::finalize(&snapshot) {
         return finish_abort(mutation, Some(&context_dir), error);
     }
     if let Err(error) =
@@ -133,7 +135,7 @@ fn run_staged_deployment(mutation: &SiteMutation, target_revision: &str) -> Resu
     // Phase B: cut-over — the commit point. Failure restores the previous
     // release (transactional rollback), leaving the site idle.
     stage("Activating release");
-    if let Err(error) = lifecycle::activate::run(site) {
+    if let Err(error) = lifecycle::activate::run(&snapshot) {
         return finish_abort(mutation, Some(&context_dir), error);
     }
     if let Err(error) =

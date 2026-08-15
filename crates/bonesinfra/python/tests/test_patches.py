@@ -3,76 +3,64 @@ from pathlib import Path
 import pytest
 
 from bonesinfra.config.context import DeployContext
-from bonesinfra.patches import local, remote
+from bonesinfra.patches import remote
 from bonesinfra.patches.registry import Version, apply_local, select_patches
 
 
 def _context(tmp_path: Path) -> tuple[DeployContext, Path]:
-    bones_dir = tmp_path / ".bones"
-    bones_dir.mkdir()
-    config_path = bones_dir / "bones.toml"
-    config_path.write_text(
-        """[app]
-project_name = "atlas"
-
-[app.server]
-host = "example.test"
-port = 2222
-"""
-    )
-    return DeployContext.from_files(str(config_path)), config_path
+    env_file = tmp_path / ".env"
+    env_file.write_text("PROJECT_NAME=atlas\n")
+    return DeployContext.from_files(str(env_file)), env_file
 
 
-def test_patch_selection_preserves_order_and_prerelease_normalization():
-    assert select_patches("0.7.2") == ()
-    assert [patch.identifier for patch in select_patches("0.7.3-rc1")] == [
-        "0001-config-repo",
-        "0002-root-config-repo",
-    ]
-    assert Version.parse("0.7.3+build") == Version(0, 7, 3)
+def test_project_infra_patch_selects_only_080_and_later():
+    assert select_patches("0.7.7") == ()
+    assert [patch.identifier for patch in select_patches("0.8.0-rc.1")] == ["0003-project-infra"]
+    assert Version.parse("0.8.0+build") == Version(0, 8, 0)
 
 
-def test_local_patches_migrate_config_repository_and_write_markers(tmp_path, monkeypatch):
-    ctx, config_path = _context(tmp_path)
+def test_local_patch_migrates_owned_content_and_preserves_ciphertext(tmp_path, monkeypatch):
+    ctx, env_file = _context(tmp_path)
+    old = tmp_path / ".bones"
+    (old / "infra/templates").mkdir(parents=True)
+    (old / "deployment/build").mkdir(parents=True)
+    (old / "secrets").mkdir(parents=True)
+    (old / "infra/templates/site.conf").write_text("template")
+    (old / "deployment/build/01_build.sh").write_text("build")
+    ciphertext = bytes((0, 159, 42, 255))
+    (old / "secrets/.env.gpg").write_bytes(ciphertext)
+    (old / "bones.toml").write_text("must not be copied")
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
 
-    apply_local(ctx, "0.7.3", str(config_path))
+    apply_local(ctx, "0.8.0", str(env_file))
 
-    assert local._git_output(config_path.parent, "remote", "get-url", "origin").stdout.strip() == (
-        "ssh://root@example.test:2222/root/.config/bonesremote/repos/atlas.bones.git"
-    )
-    marker_dir = tmp_path / "data/bonesdeploy/patches/atlas"
-    assert (marker_dir / "0001-config-repo").is_file()
-    assert (marker_dir / "0002-root-config-repo").is_file()
+    assert (tmp_path / "infra/secrets/.env.gpg").read_bytes() == ciphertext
+    assert (tmp_path / "infra/templates/site.conf").is_file()
+    assert (tmp_path / "infra/deployment/build/01_build.sh").is_file()
+    assert not old.exists()
+    assert not (tmp_path / "infra/bones.toml").exists()
+    assert (tmp_path / "data/bonesdeploy/patches/atlas/0003-project-infra").is_file()
 
 
-def test_first_local_patch_rejects_unexpected_origin(tmp_path, monkeypatch):
-    ctx, config_path = _context(tmp_path)
+def test_local_patch_refuses_existing_destination_without_writing_marker(tmp_path, monkeypatch):
+    ctx, env_file = _context(tmp_path)
+    (tmp_path / ".bones").mkdir()
+    (tmp_path / "infra").mkdir()
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
-    local._run_git(config_path.parent, "init", "--initial-branch", "master")
-    local._run_git(config_path.parent, "remote", "add", "origin", "ssh://wrong.example/repo.git")
 
-    with pytest.raises(RuntimeError, match="origin points to"):
-        apply_local(ctx, "0.7.3", str(config_path))
+    with pytest.raises(RuntimeError, match="will not merge or overwrite"):
+        apply_local(ctx, "0.8.0", str(env_file))
 
-    assert not (tmp_path / "data/bonesdeploy/patches/atlas/0001-config-repo").exists()
+    assert (tmp_path / ".bones").is_dir()
+    assert not (tmp_path / "data/bonesdeploy/patches/atlas/0003-project-infra").exists()
 
 
-def test_remote_plan_repeats_migration_for_legacy_markers(monkeypatch, tmp_path):
+def test_remote_patch_writes_a_per_project_completion_marker(tmp_path, monkeypatch):
     ctx, _ = _context(tmp_path)
     operations = []
-    monkeypatch.setattr(remote.server, "shell", lambda **kwargs: operations.append(("shell", kwargs)))
-    monkeypatch.setattr(remote.server, "script_template", lambda **kwargs: operations.append(("script", kwargs)))
-    monkeypatch.setattr(remote.files, "put", lambda **kwargs: operations.append(("put", kwargs)))
+    monkeypatch.setattr(remote.server, "shell", lambda **kwargs: operations.append(kwargs))
 
-    remote.apply(ctx, "0001-config-repo")
-    remote.apply(ctx, "0002-root-config-repo")
+    remote.write_marker(ctx, "0003-project-infra")
 
-    assert len([kind for kind, _ in operations if kind == "put"]) == 2
-    scripts = [kwargs for kind, kwargs in operations if kind == "script"]
-    assert len(scripts) == 2
-    assert scripts[0]["legacy_repository"] == "/home/git/atlas.bones.git"
-    markers = [kwargs for kind, kwargs in operations if kind == "shell"]
-    assert any("0002-root-config-repo" in kwargs["commands"][0] for kwargs in markers)
-    hook = next(kwargs for kind, kwargs in operations if kind == "put")
-    assert hook["dest"].endswith("hooks/pre-receive")
+    assert operations[0]["_sudo"] is True
+    assert "/var/lib/bonesdeploy/patches/atlas/0003-project-infra" in operations[0]["commands"][0]

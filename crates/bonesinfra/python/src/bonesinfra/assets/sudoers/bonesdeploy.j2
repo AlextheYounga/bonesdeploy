@@ -4,7 +4,7 @@
 # host. The shared `deploy_user` account (default: git) is granted passwordless
 # sudo to invoke bonesremote for any site via `--site *`. Any compromise of that
 # account, or of any SSH key authorized for it, can restart, roll back, prune,
-# or trigger hooks for every project on the host.
+# or manage releases for every project on the host.
 #
 # This rule is NOT a tenant-isolation boundary. Replacing `*` with literal site
 # names is insufficient while all projects still share the same Unix account and
@@ -12,6 +12,5 @@
 # target any project's repository path. To support multiple operators or
 # tenants on one host, provision a separate deploy identity (Unix account +
 # authorized_keys) per project, scope each sudoers rule to that identity and a
-# literal site name, and review the hook/post-receive path derivation before
-# relying on the per-site split.
-{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} ^hook post-receive --site [a-z0-9-]+$, {{ bonesremote_path }} ^service restart --site [a-z0-9-]+$, {{ bonesremote_path }} ^release rollback --site [a-z0-9-]+$, {{ bonesremote_path }} ^release drop-failed --site [a-z0-9-]+$, {{ bonesremote_path }} ^release prune --site [a-z0-9-]+$
+# literal site name before relying on the per-site split.
+{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} ^service restart --site [a-z0-9-]+$, {{ bonesremote_path }} ^release rollback --site [a-z0-9-]+$, {{ bonesremote_path }} ^release drop-failed --site [a-z0-9-]+$, {{ bonesremote_path }} ^release prune --site [a-z0-9-]+$

@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config;
+use anyhow::Result;
+use bonesdeploy_core::config::validate_site_name;
 use bonesdeploy_core::paths;
 use serde::Serialize;
 
@@ -26,15 +26,12 @@ struct Release {
 
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release list")?;
-    let cfg =
-        config::load(&paths::bonesremote_bones_toml_path(site)).context("Failed to load release site configuration")?;
-    if cfg.project_name != site {
-        bail!("Remote site state belongs to '{}', expected '{site}'", cfg.project_name);
-    }
-    let current = release_state::current_release_name(&cfg.project_root).ok();
+    validate_site_name(site)?;
+    let project_root = paths::default_project_root_for(site);
+    let current = release_state::current_release_name(&project_root).ok();
     let active = release_state::read_active_deployment(site)?;
     let staged = release_state::read_staged_release(site).ok();
-    let mut releases = release_state::list_releases_sorted(&cfg.project_root)?
+    let mut releases = release_state::list_releases_sorted(&project_root)?
         .into_iter()
         .map(|name| release(&name, current.as_deref(), active.as_ref(), staged.as_deref()))
         .collect::<Vec<_>>();

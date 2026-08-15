@@ -15,28 +15,25 @@ pub(crate) use container::remove_build_container;
 use crate::privileges;
 use crate::release::state as release_state;
 
-pub fn run(site: &str, context: &Path) -> Result<()> {
+pub fn run(snapshot: &super::DeploymentSnapshot, context: &Path) -> Result<()> {
     privileges::ensure_root("bonesremote release build")?;
-    let cfg = super::load_site_config(site)?;
-    run_scripts::run(site, context, &cfg)
+    run_scripts::run(snapshot, context)
 }
 
-pub fn promote(site: &str, context: &Path) -> Result<PathBuf> {
+pub fn promote(snapshot: &super::DeploymentSnapshot, context: &Path) -> Result<PathBuf> {
     privileges::ensure_root("bonesremote release promote")?;
-    let cfg = super::load_site_config(site)?;
-    promote::run(site, context, &cfg)
+    promote::run(snapshot, context)
 }
 
-pub fn finalize(site: &str) -> Result<()> {
+pub fn finalize(snapshot: &super::DeploymentSnapshot) -> Result<()> {
     privileges::ensure_root("bonesremote release finalize")?;
-    let cfg = super::load_site_config(site)?;
-    promote::finalize(site, &cfg)
+    promote::finalize(snapshot)
 }
 
 pub(super) fn staged_release_name(site: &str) -> Result<String> {
     release_state::read_staged_release(site)
 }
 
-pub(super) fn release_directory(project_root: &str, release_name: &str) -> PathBuf {
-    release_state::release_dir(project_root, release_name)
+pub(super) fn release_directory(project_root: &Path, release_name: &str) -> PathBuf {
+    release_state::release_dir(&project_root.to_string_lossy(), release_name)
 }

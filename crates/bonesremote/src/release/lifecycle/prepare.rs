@@ -5,7 +5,7 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{RuntimeBackend, is_numbered_shell_script, load_runtime, runtime_user_for};
+use bonesdeploy_core::config::{RuntimeBackend, is_numbered_shell_script, project_env, runtime_user_for};
 use bonesdeploy_core::paths;
 
 use crate::privileges;
@@ -21,11 +21,11 @@ struct PrepareScriptEnv<'a> {
     shared_functions: &'a Path,
 }
 
-pub fn run(site: &str) -> Result<()> {
+pub fn run(snapshot: &super::DeploymentSnapshot) -> Result<()> {
     privileges::ensure_root("bonesremote release prepare")?;
 
-    let cfg = super::load_site_config(site)?;
-    let deployment_dir = paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR);
+    let cfg = &snapshot.config;
+    let deployment_dir = &snapshot.deployment_dir;
     let scripts_dir = deployment_dir.join(paths::DEPLOYMENT_PREPARE_DIR);
     if !scripts_dir.is_dir() {
         println!("No prepare scripts at {}; skipping prepare.", scripts_dir.display());
@@ -44,17 +44,15 @@ pub fn run(site: &str) -> Result<()> {
     fs::File::open(&shared_functions)
         .with_context(|| format!("Shared prepare functions are unreadable: {}", shared_functions.display()))?;
 
-    let release_name = release_state::read_staged_release(site)?;
-    let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
+    let release_name = release_state::read_staged_release(&snapshot.site)?;
+    let release_dir = release_state::release_dir(&snapshot.project_root.to_string_lossy(), &release_name);
     if !release_dir.is_dir() {
         bail!("Promoted release is missing: {}", release_dir.display());
     }
 
-    let runtime = load_runtime(&paths::bonesremote_site_root(site))
-        .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
-    let web_root = runtime.web_root;
+    let web_root = cfg.runtime.web_root.clone();
     let runtime_user = runtime_user_for(&cfg.project_name);
-    let logs_dir = paths::bonesremote_site_logs(site);
+    let logs_dir = paths::bonesremote_site_logs(&snapshot.site);
     fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;
 
     let env = PrepareScriptEnv {
@@ -65,11 +63,11 @@ pub fn run(site: &str) -> Result<()> {
         shared_functions: &shared_functions,
     };
 
-    if runtime.backend == RuntimeBackend::Docker {
+    if cfg.runtime.backend == RuntimeBackend::Docker {
         let image = docker::command::image_name(&cfg.project_name)?;
         docker::prepare::run_scripts(&docker::prepare::PrepareRequest {
             project: &cfg.project_name,
-            project_root: Path::new(&cfg.project_root),
+            project_root: &snapshot.project_root,
             release: &release_dir,
             runtime_user: &runtime_user,
             image: &image,
@@ -155,10 +153,10 @@ fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &P
     command
         .args(["-u", env.runtime_user, "--", "bash", "-c", "umask 0002; exec bash -s"])
         .current_dir(release_root)
-        .env("PROJECT_NAME", env.project_name)
+        .env(project_env::PROJECT_NAME, env.project_name)
         .env("PROJECT_ROOT", env.project_root)
         .env("REPO_PATH", "")
-        .env("WEB_ROOT", env.web_root)
+        .env(project_env::WEB_ROOT, env.web_root)
         .env("SERVICE_USER", env.runtime_user);
 }
 

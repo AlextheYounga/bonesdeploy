@@ -1,4 +1,10 @@
-use super::{Bones, IS_STATIC_KEY, Question, QuestionKind};
+use super::{Bones, FrameworkDefaults, IS_STATIC_KEY, PermissionDefault, Question, QuestionKind, directory, file};
+
+const PERMISSIONS: [PermissionDefault; 3] = [directory("*", 750, false), file("*", 640), directory(".next", 770, true)];
+
+pub(crate) fn defaults() -> FrameworkDefaults {
+    FrameworkDefaults { template: "next", web_root: "public", language: None, permissions: &PERMISSIONS }
+}
 
 pub fn questions() -> &'static [Question] {
     &[Question { key: IS_STATIC_KEY, label: "Is this Next site static?", kind: QuestionKind::Bool { default: true } }]

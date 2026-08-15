@@ -3,8 +3,8 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use anyhow::{Context, Result};
-use bonesdeploy_core::config;
+use anyhow::Result;
+use bonesdeploy_core::config::validate_site_name;
 use bonesdeploy_core::paths;
 use serde::Serialize;
 
@@ -30,23 +30,23 @@ struct ServiceStatus {
 }
 
 pub fn run(site: &str) -> Result<()> {
-    let report = build_report(site)?;
+    validate_site_name(site)?;
+    let report = build_report(site);
     println!("{}", serde_json::to_string(&report)?);
     Ok(())
 }
 
-fn build_report(site: &str) -> Result<Report> {
-    let config_path = paths::bonesremote_bones_toml_path(site);
-    let cfg = config::load(&config_path).context("Failed to load remote bones.toml")?;
-    let current = Path::new(&cfg.project_root).join(paths::CURRENT_LINK);
+fn build_report(site: &str) -> Report {
+    let project_root = paths::default_project_root_for(site);
+    let current = Path::new(&project_root).join(paths::CURRENT_LINK);
     let nginx_site_available =
-        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", cfg.project_name)).display().to_string();
+        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{site}.conf")).display().to_string();
 
-    Ok(Report {
+    Report {
         current_release: current_release(&current),
-        ssl: ssl_status(&cfg, &nginx_site_available),
-        services: services(&cfg.project_name),
-    })
+        ssl: ssl_status(&nginx_site_available),
+        services: services(site),
+    }
 }
 
 fn current_release(current_path: &Path) -> String {
@@ -56,13 +56,17 @@ fn current_release(current_path: &Path) -> String {
     )
 }
 
-fn ssl_status(cfg: &config::Bones, nginx_config_path: &str) -> SslStatus {
-    let enabled = !cfg.domain.is_empty()
-        && fs::read_to_string(nginx_config_path).is_ok_and(|content| {
-            content.contains(&format!("server_name {};", cfg.domain)) && content.contains("listen 443 ssl;")
-        });
+fn ssl_status(nginx_config_path: &str) -> SslStatus {
+    let content = fs::read_to_string(nginx_config_path).unwrap_or_default();
+    let domain = content
+        .lines()
+        .find_map(|line| line.trim().strip_prefix("server_name "))
+        .and_then(|value| value.strip_suffix(';'))
+        .unwrap_or_default()
+        .to_string();
+    let enabled = !domain.is_empty() && content.contains("listen 443 ssl;");
 
-    SslStatus { enabled, domain: cfg.domain.clone() }
+    SslStatus { enabled, domain }
 }
 
 fn services(project_name: &str) -> Vec<ServiceStatus> {
@@ -125,12 +129,28 @@ fn parse_target_units(output: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_target_units;
+    use std::{env, fs, process};
+
+    use anyhow::Result;
+
+    use super::{parse_target_units, ssl_status};
 
     #[test]
     fn parses_registered_units_from_target_properties() {
         let output = "atlas-nginx.service atlas-worker.service\natlas-worker.service";
 
         assert_eq!(parse_target_units(output), vec!["atlas-nginx.service", "atlas-worker.service"]);
+    }
+
+    #[test]
+    fn reads_ssl_domain_from_conventionally_named_nginx_config() -> Result<()> {
+        let path = env::temp_dir().join(format!("bonesremote-status-{}.conf", process::id()));
+        fs::write(&path, "server_name example.test;\nlisten 443 ssl;\n")?;
+        let path = path.display().to_string();
+
+        assert_eq!(ssl_status(&path).domain, "example.test");
+        assert!(ssl_status(&path).enabled);
+        fs::remove_file(path)?;
+        Ok(())
     }
 }

@@ -76,8 +76,6 @@ pub enum Command {
         #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
         format: GuideFormat,
     },
-    /// Publish .bones/ into bonesremote's remote control-plane state
-    Push,
     /// Manage encrypted local secrets and push them to remote shared/
     Secrets {
         #[command(subcommand)]
@@ -90,7 +88,7 @@ pub enum Command {
         #[command(subcommand)]
         command: Option<ReleasesCommand>,
     },
-    /// Update bonesdeploy and bonesremote to the latest version
+    /// Update BonesDeploy, BonesRemote, and project infrastructure to the latest version
     Update {
         /// Skip local update
         #[arg(long)]
@@ -106,14 +104,6 @@ pub enum Command {
     },
     /// Roll back current release to the previous one
     Rollback,
-    /// Read a value from .bones/bones.toml, or dump the whole file when no key is given
-    Config {
-        /// Path to TOML config file (default: .bones/bones.toml)
-        #[arg(long)]
-        file: Option<String>,
-        /// Key to read; omit to dump the whole file
-        key: Option<String>,
-    },
     /// Print the version
     Version,
 }

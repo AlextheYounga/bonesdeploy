@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use anyhow::{Result, anyhow};
 use bonesdeploy_core::{
     config::{RuntimeBackend, validate_host},
@@ -11,30 +9,6 @@ use crate::infra::git;
 use crate::ui::{output, prompts};
 
 pub(super) fn collect_fresh_config(args: &super::Args) -> Result<config::Bones> {
-    let project_name = config::repo_directory_name()?;
-
-    if args.non_interactive {
-        return collect_non_interactive(&project_name, None, args);
-    }
-
-    collect_from_existing(&project_name, None, args)
-}
-
-pub(super) fn load_or_collect_config(bones_toml: &Path, args: &super::Args) -> Result<config::Bones> {
-    if bones_toml.exists() {
-        let existing = config::load(bones_toml)?;
-        if config::is_configured(&existing) {
-            return Ok(existing);
-        }
-
-        let project_name = config::repo_directory_name()?;
-        if args.non_interactive {
-            return collect_non_interactive(&project_name, Some(&existing), args);
-        }
-
-        return collect_from_existing(&project_name, Some(&existing), args);
-    }
-
     let project_name = config::repo_directory_name()?;
 
     if args.non_interactive {
@@ -271,7 +245,6 @@ pub fn existing_path_override(
 }
 
 fn apply_existing_fields(config: &mut config::Bones, existing_config: Option<&config::Bones>) {
-    config.deploy_on_push = existing_config.map_or(false, |cfg| cfg.deploy_on_push);
     config.releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
     config.ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
     config.domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
@@ -293,7 +266,6 @@ mod tests {
         config.project_name = String::from(project_name);
         config.port = String::from("22");
         config.branch = String::from("main");
-        config.deploy_on_push = true;
         config
     }
 
@@ -354,7 +326,7 @@ mod tests {
             non_interactive: true,
             project_name: None,
             branch: None,
-            remote: None,
+            remote: Some(String::from("missing-test-remote")),
             host: None,
             port: None,
             template: None,

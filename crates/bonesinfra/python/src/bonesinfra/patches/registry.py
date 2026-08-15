@@ -30,34 +30,31 @@ class Version:
 class Patch:
     identifier: str
     introduced_in: Version
-    local_apply: Callable[[Path, DeployContext], None]
+    local_apply: Callable[[Path], None]
 
 
-PATCHES = (
-    Patch("0001-config-repo", Version(0, 7, 3), local.apply_config_repo),
-    Patch("0002-root-config-repo", Version(0, 7, 3), local.apply_root_config_repo),
-)
+PATCHES = (Patch("0003-project-infra", Version(0, 8, 0), local.migrate_to_project_infra),)
 
 
-def select_patches(target_version: str) -> tuple[Patch, ...]:
-    target = Version.parse(target_version)
-    return tuple(patch for patch in PATCHES if patch.introduced_in <= target)
-
-
-def apply_local(ctx: DeployContext, target_version: str, config_path: str) -> None:
+def apply_local(ctx: DeployContext, target_version: str, env_file: str) -> None:
     marker_dir = _local_marker_dir(ctx)
-    bones_dir = Path(config_path).resolve().parent
+    project_root = Path(env_file).resolve().parent
     for patch in select_patches(target_version):
         marker = marker_dir / patch.identifier
         if marker.exists():
             continue
-        patch.local_apply(bones_dir, ctx)
+        patch.local_apply(project_root)
         _write_marker(marker)
 
 
 def apply_remote(ctx: DeployContext, target_version: str) -> None:
     for patch in select_patches(target_version):
-        remote.apply(ctx, patch.identifier)
+        remote.write_marker(ctx, patch.identifier)
+
+
+def select_patches(target_version: str) -> tuple[Patch, ...]:
+    target = Version.parse(target_version)
+    return tuple(patch for patch in PATCHES if patch.introduced_in <= target)
 
 
 def _local_marker_dir(ctx: DeployContext) -> Path:
