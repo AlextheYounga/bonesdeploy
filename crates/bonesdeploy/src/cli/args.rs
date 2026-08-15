@@ -65,6 +65,8 @@ pub enum Command {
         #[arg(long, value_enum, default_value_t = ManifestFormat::Text)]
         format: ManifestFormat,
     },
+    /// One-shot migration from the old .bones workspace into infra/
+    Migrate,
     /// Embedded documentation and next-step guidance for AI agents
     Skill {
         /// Optional subcommand: `next`, `list`, or `doc <name>`
@@ -76,8 +78,6 @@ pub enum Command {
         #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
         format: GuideFormat,
     },
-    /// Publish .bones/ into bonesremote's remote control-plane state
-    Push,
     /// Manage encrypted local secrets and push them to remote shared/
     Secrets {
         #[command(subcommand)]
@@ -106,14 +106,6 @@ pub enum Command {
     },
     /// Roll back current release to the previous one
     Rollback,
-    /// Read a value from .bones/bones.toml, or dump the whole file when no key is given
-    Config {
-        /// Path to TOML config file (default: .bones/bones.toml)
-        #[arg(long)]
-        file: Option<String>,
-        /// Key to read; omit to dump the whole file
-        key: Option<String>,
-    },
     /// Print the version
     Version,
 }

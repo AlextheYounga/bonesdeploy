@@ -1,4 +1,10 @@
-use super::Question;
+use super::{FrameworkDefaults, PermissionDefault, Question, directory, file};
+
+const PERMISSIONS: [PermissionDefault; 3] = [directory("*", 750, false), file("*", 640), directory("build", 770, true)];
+
+pub(crate) fn defaults() -> FrameworkDefaults {
+    FrameworkDefaults { template: "sveltekit", web_root: "build", language: None, permissions: &PERMISSIONS }
+}
 
 /// `SvelteKit` takes no framework configuration.
 pub fn questions() -> &'static [Question] {
