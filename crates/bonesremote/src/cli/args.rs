@@ -32,16 +32,6 @@ pub enum Command {
         #[arg(long)]
         site: String,
     },
-    /// Thin git-hook entrypoints
-    Hook {
-        #[command(subcommand)]
-        command: HookCommand,
-    },
-    /// Import or export root-owned remote site state
-    Site {
-        #[command(subcommand)]
-        command: SiteCommand,
-    },
     /// Release lifecycle operations
     Release {
         #[command(subcommand)]
@@ -72,31 +62,6 @@ pub enum RuntimeCommand {
     Stop {
         #[arg(long)]
         site: String,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum HookCommand {
-    /// Resolve a post-receive push and delegate deployment
-    PostReceive {
-        #[arg(long)]
-        site: String,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum SiteCommand {
-    /// Import a deployment dataset from stdin
-    Import {
-        #[arg(long)]
-        site: String,
-    },
-    /// Receive a pushed .bones config revision
-    Receive {
-        #[arg(long)]
-        site: String,
-        #[arg(long)]
-        revision: String,
     },
 }
 

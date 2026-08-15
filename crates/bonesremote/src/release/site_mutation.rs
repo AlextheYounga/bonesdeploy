@@ -36,16 +36,6 @@ impl SiteMutation {
     /// Acquires the serialization lock and adopts an already-validated
     /// configuration.
     ///
-    /// Used when the live site config does not exist yet (first import): the
-    /// configuration comes from the staged dataset that import has just
-    /// validated, so it cannot be loaded from the control plane beforehand.
-    /// The staged dataset's `project_name == site` check is performed by the
-    /// caller before invoking this.
-    pub(crate) fn acquire_with_config(site: &str, config: Bones) -> Result<Self> {
-        let _lock = DeploymentLock::acquire(site)?;
-        Ok(Self::new(site, config, _lock))
-    }
-
     /// Builds the guard from an already-loaded config and a held lock.
     ///
     /// Used by cancellation, which must stop a live deployment process before

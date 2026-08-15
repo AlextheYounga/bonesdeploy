@@ -3,41 +3,34 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{cell::RefCell, thread_local};
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config;
 use bonesdeploy_core::paths;
 
 use crate::privileges;
 
-thread_local! {
-    static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+fn resolved_tmp_root(site: &str) -> PathBuf {
+    PathBuf::from(paths::default_project_root_for(site)).join(paths::TMP_BUILDS_DIR)
 }
 
-fn resolved_sites_root() -> PathBuf {
-    SITES_ROOT_OVERRIDE.with(|slot| slot.borrow().clone()).unwrap_or_else(paths::bonesremote_sites_root)
-}
-
-fn resolved_tmp_root(site: &str) -> Result<PathBuf> {
-    let bones_path = resolved_sites_root().join(site).join(paths::BONES_TOML);
-    let cfg = config::load(&bones_path)
-        .with_context(|| format!("Failed to load remote site state from {}", bones_path.display()))?;
-    Ok(Path::new(&cfg.project_root).join(paths::TMP_BUILDS_DIR))
-}
-
-pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
+pub fn run(snapshot: &super::DeploymentSnapshot, context_dir: &Path) -> Result<()> {
     privileges::ensure_root("bonesremote release checkout")?;
 
-    let cfg = super::load_site_config(site)?;
+    let repo_path = snapshot.repo_path.to_str().context("Application repository path is not valid UTF-8")?;
     let archive_output = Command::new("git")
-        .args(["--git-dir", &cfg.repo_path, "archive", "--format=tar", revision])
+        .args(["--git-dir", repo_path, "archive", "--format=tar", &snapshot.revision])
         .output()
-        .with_context(|| format!("Failed to run git archive for revision {revision} in {}", cfg.repo_path))?;
+        .with_context(|| {
+            format!("Failed to run git archive for revision {} in {}", snapshot.revision, snapshot.repo_path.display())
+        })?;
     let git_stderr = String::from_utf8_lossy(&archive_output.stderr).into_owned();
 
     if !archive_output.status.success() {
-        bail!("Failed to export source revision '{revision}' from {}\n{git_stderr}", cfg.repo_path);
+        bail!(
+            "Failed to export source revision '{}' from {}\n{git_stderr}",
+            snapshot.revision,
+            snapshot.repo_path.display()
+        );
     }
 
     if !git_stderr.is_empty() {
@@ -68,23 +61,27 @@ pub fn run(site: &str, revision: &str, context_dir: &Path) -> Result<()> {
         );
     }
 
-    println!("Exported source for {revision} into {}", context_dir.display());
+    let deployment_dir = context_dir.join(paths::LOCAL_INFRA_DIR).join(paths::DEPLOYMENT_DIR);
+    if deployment_dir.is_dir() {
+        println!("Using deployment files from {}", deployment_dir.display());
+    }
+    println!("Exported source for {} into {}", snapshot.revision, context_dir.display());
     Ok(())
 }
 
 /// Resolves a revision (branch name or commit-ish) to the full commit hash in
 /// the site's bare repo. The resolved hash feeds the release identity so every
 /// release records exactly which commit was exported.
-pub(crate) fn resolve_revision_commit(site: &str, revision: &str) -> Result<String> {
-    let cfg = super::load_site_config(site)?;
+pub(crate) fn resolve_revision_commit(repo_path: &Path, revision: &str) -> Result<String> {
+    let repo_path_string = repo_path.to_str().context("Application repository path is not valid UTF-8")?;
     let output = Command::new("git")
-        .args(["--git-dir", &cfg.repo_path, "rev-parse", "--verify", &format!("{revision}^{{commit}}")])
+        .args(["--git-dir", repo_path_string, "rev-parse", "--verify", &format!("{revision}^{{commit}}")])
         .output()
-        .with_context(|| format!("Failed to resolve revision {revision} in {}", cfg.repo_path))?;
+        .with_context(|| format!("Failed to resolve revision {revision} in {}", repo_path.display()))?;
     if !output.status.success() {
         bail!(
             "Failed to resolve source revision '{revision}' to a commit in {}\n{}",
-            cfg.repo_path,
+            repo_path.display(),
             String::from_utf8_lossy(&output.stderr)
         );
     }
@@ -95,12 +92,12 @@ pub(crate) fn resolve_revision_commit(site: &str, revision: &str) -> Result<Stri
     Ok(sha)
 }
 
-pub fn ensure_build_context(site: &str) -> Result<PathBuf> {
-    let root = resolved_tmp_root(site)?;
+pub fn ensure_build_context(snapshot: &super::DeploymentSnapshot) -> Result<PathBuf> {
+    let root = resolved_tmp_root(&snapshot.site);
     fs::create_dir_all(&root).with_context(|| format!("Failed to create tmp builds root: {}", root.display()))?;
 
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
-    let context = root.join(format!("build-{site}-{nanos}"));
+    let context = root.join(format!("build-{}-{nanos}", snapshot.site));
     fs::create_dir_all(&context).with_context(|| format!("Failed to create build context {}", context.display()))?;
     Ok(context)
 }
@@ -109,7 +106,7 @@ pub fn cleanup_build_context(site: &str, context: &Path) -> Result<()> {
     if context.exists() {
         fs::remove_dir_all(context).with_context(|| format!("Failed to remove build context {}", context.display()))?;
     }
-    let root = if let Some(parent) = context.parent() { parent.to_path_buf() } else { resolved_tmp_root(site)? };
+    let root = if let Some(parent) = context.parent() { parent.to_path_buf() } else { resolved_tmp_root(site) };
     if root.exists() && fs::read_dir(&root)?.next().is_none() {
         fs::remove_dir(&root).ok();
     }

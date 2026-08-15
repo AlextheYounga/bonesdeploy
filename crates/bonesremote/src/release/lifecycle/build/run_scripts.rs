@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::config::{
-    self, build_group_for, build_timeout_seconds, build_user_for, is_numbered_shell_script, load_runtime,
+    self, build_group_for, build_timeout_seconds, build_user_for, is_numbered_shell_script,
 };
 use bonesdeploy_core::env_build;
 use bonesdeploy_core::paths;
@@ -13,16 +13,17 @@ use super::build_user::BuildScriptEnv;
 use super::container::BuildContainer;
 use super::ownership;
 
-pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()> {
+pub(super) fn run(snapshot: &super::super::DeploymentSnapshot, context: &Path) -> Result<()> {
     if !context.is_dir() {
         bail!("Build context does not exist: {}", context.display());
     }
 
+    let cfg = &snapshot.config;
     let build_user = build_user_for(&cfg.project_name);
     let build_group = build_group_for(&cfg.project_name);
     ownership::chown_tree_to_user(context, &build_user, &build_group)?;
 
-    let scripts_dir = paths::bonesremote_site_root(site).join(paths::DEPLOYMENT_DIR).join(paths::DEPLOYMENT_BUILD_DIR);
+    let scripts_dir = snapshot.deployment_dir.join(paths::DEPLOYMENT_BUILD_DIR);
     if !scripts_dir.is_dir() {
         println!(
             "No deployment scripts at {}; running build steps directly on the exported source tree.",
@@ -37,9 +38,6 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
         return Ok(());
     }
 
-    let runtime = load_runtime(&paths::bonesremote_site_root(site))
-        .with_context(|| format!("Failed to load runtime configuration for {site}"))?;
-
     let build_env_vars = resolve_build_env(cfg, context)?;
     let deployment_dir = scripts_dir.parent().context("Build scripts directory has no deployment parent")?;
     let build_cache_dir = paths::bonesdeploy_user_cache(&build_user);
@@ -47,7 +45,7 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
     let build_env = BuildScriptEnv {
         project_name: &cfg.project_name,
         build_user: &build_user,
-        web_root: &runtime.web_root,
+        web_root: &cfg.runtime.web_root,
         deployment_dir,
         build_cache_dir: &build_cache_dir,
         build_env_vars: &build_env_vars,
@@ -55,7 +53,7 @@ pub(super) fn run(site: &str, context: &Path, cfg: &config::Bones) -> Result<()>
     };
     let mut container = BuildContainer::start(context, &build_env)?;
 
-    let logs_dir = paths::bonesremote_site_logs(site);
+    let logs_dir = paths::bonesremote_site_logs(&snapshot.site);
     fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;
 
     for script in scripts {
@@ -89,7 +87,6 @@ fn resolve_build_env(cfg: &config::Bones, source_context: &Path) -> Result<Vec<(
 
 const DERIVED_ENV_DENYLIST: &[&str] = &[
     "runtime.permissions",
-    "runtime.shared",
     "runtime.runtime_user",
     "runtime.runtime_group",
     "app.server.host",
@@ -188,15 +185,14 @@ mod tests {
         let root = env::temp_dir().join(format!("bonesremote-derived-env-{}", process::id()));
         fs::create_dir_all(&root)?;
         fs::write(
-            root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"nuxt\"\nweb_root = \".output/public\"\nis_static = true\n",
+            root.join(".env"),
+            "PROJECT_NAME=demo\nHOST=deploy.example.com\nTEMPLATE=nuxt\nWEB_ROOT=.output/public\n",
         )?;
-        let cfg = load(&root.join("bones.toml"))?;
+        let cfg = load(&root.join(".env"))?;
 
         let env = derived_config_env(&cfg)?;
 
         assert!(env.contains(&("BONES_RUNTIME_TEMPLATE".to_string(), "nuxt".to_string())));
-        assert!(env.contains(&("BONES_RUNTIME_IS_STATIC".to_string(), "true".to_string())));
         assert!(env.contains(&("BONES_APP_PROJECT_NAME".to_string(), "demo".to_string())), "{env:?}");
         assert!(!env.iter().any(|(key, _)| key == "BONES_APP_SERVER_HOST"));
         assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_APP_DNS_")));
@@ -213,12 +209,9 @@ mod tests {
         let _ = fs::remove_dir_all(&source);
         fs::create_dir_all(&site_root)?;
         fs::create_dir_all(&source)?;
-        fs::write(
-            site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"nuxt\"\n",
-        )?;
+        fs::write(site_root.join(".env"), "PROJECT_NAME=demo\nHOST=deploy.example.com\nTEMPLATE=nuxt\n")?;
         fs::write(source.join(".env.build"), "NEXT_PUBLIC_API_URL=https://api.example.com\n")?;
-        let cfg = load(&site_root.join("bones.toml"))?;
+        let cfg = load(&site_root.join(".env"))?;
 
         let env = resolve_build_env(&cfg, &source)?;
 
@@ -239,11 +232,8 @@ mod tests {
         let _ = fs::remove_dir_all(&source);
         fs::create_dir_all(&site_root)?;
         fs::create_dir_all(&source)?;
-        fs::write(
-            site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"next\"\n",
-        )?;
-        let cfg = load(&site_root.join("bones.toml"))?;
+        fs::write(site_root.join(".env"), "PROJECT_NAME=demo\nHOST=deploy.example.com\nTEMPLATE=next\n")?;
+        let cfg = load(&site_root.join(".env"))?;
 
         let env = resolve_build_env(&cfg, &source)?;
 
@@ -263,10 +253,10 @@ mod tests {
         fs::create_dir_all(&site_root)?;
         fs::create_dir_all(&source)?;
         fs::write(
-            site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\nport = \"22\"\n[app.dns]\ndomain = \"app.example.com\"\n[runtime]\ntemplate = \"nuxt\"\n",
+            site_root.join(".env"),
+            "PROJECT_NAME=demo\nHOST=deploy.example.com\nPORT=22\nDOMAIN=app.example.com\nTEMPLATE=nuxt\n",
         )?;
-        let cfg = load(&site_root.join("bones.toml"))?;
+        let cfg = load(&site_root.join(".env"))?;
 
         let env = resolve_build_env(&cfg, &source)?;
 
@@ -283,11 +273,8 @@ mod tests {
     fn build_timeout_setting_is_denied_in_build_env() -> Result<()> {
         let root = env::temp_dir().join(format!("bonesremote-env-build-timeout-{}", process::id()));
         fs::create_dir_all(&root)?;
-        fs::write(
-            root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[framework]\ntemplate = \"nuxt\"\n[build]\ntimeout_seconds = 300\n",
-        )?;
-        let cfg = load(&root.join("bones.toml"))?;
+        fs::write(root.join(".env"), "PROJECT_NAME=demo\nHOST=deploy.example.com\nTEMPLATE=nuxt\n")?;
+        let cfg = load(&root.join(".env"))?;
 
         let env = derived_config_env(&cfg)?;
 
@@ -307,12 +294,9 @@ mod tests {
         let _ = fs::remove_dir_all(&source);
         fs::create_dir_all(&site_root)?;
         fs::create_dir_all(&source)?;
-        fs::write(
-            site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"next\"\n",
-        )?;
+        fs::write(site_root.join(".env"), "PROJECT_NAME=demo\nHOST=deploy.example.com\nTEMPLATE=next\n")?;
         fs::write(source.join(".env.build"), "BONES_RUNTIME_TEMPLATE=evil\n")?;
-        let cfg = load(&site_root.join("bones.toml"))?;
+        let cfg = load(&site_root.join(".env"))?;
 
         let result = resolve_build_env(&cfg, &source);
 
@@ -335,11 +319,8 @@ mod tests {
         let _ = fs::remove_dir_all(&source);
         fs::create_dir_all(&site_root)?;
         fs::create_dir_all(&source)?;
-        fs::write(
-            site_root.join("bones.toml"),
-            "[app]\nproject_name = \"demo\"\n[app.server]\nhost = \"deploy.example.com\"\n[runtime]\ntemplate = \"nuxt\"\n",
-        )?;
-        let cfg = load(&site_root.join("bones.toml"))?;
+        fs::write(site_root.join(".env"), "PROJECT_NAME=demo\nHOST=deploy.example.com\nTEMPLATE=nuxt\n")?;
+        let cfg = load(&site_root.join(".env"))?;
 
         let env = resolve_build_env(&cfg, &source)?;
 

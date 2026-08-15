@@ -1,7 +1,7 @@
 use anyhow::Result;
 
-use crate::cli::args::{Cli, Command, HookCommand, ReleaseCommand, RuntimeCommand, ServiceCommand, SiteCommand};
-use crate::commands::{deploy, doctor, drop_failed_release, hook, release, service, site, status, version};
+use crate::cli::args::{Cli, Command, ReleaseCommand, RuntimeCommand, ServiceCommand};
+use crate::commands::{deploy, doctor, drop_failed_release, release, service, status, version};
 use crate::release::SiteMutation;
 use crate::runtime::docker;
 
@@ -10,13 +10,6 @@ pub fn run(cli: &Cli) -> Result<()> {
         Command::Doctor { site, exhaustive } => doctor::run(site.as_deref(), *exhaustive),
         Command::Deploy { site, revision } => deploy::run_full(site, revision.as_deref()),
         Command::Status { site } => status::run(site),
-        Command::Hook { command } => match command {
-            HookCommand::PostReceive { site: site_name } => hook::post_receive(site_name),
-        },
-        Command::Site { command } => match command {
-            SiteCommand::Import { site: site_name } => site::import(site_name),
-            SiteCommand::Receive { site: site_name, revision } => site::receive(site_name, revision),
-        },
         Command::Release { command } => match command {
             ReleaseCommand::List { site: site_name } => release::list::run(site_name),
             ReleaseCommand::Kill { site: site_name, release } => release::kill::run(site_name, release),

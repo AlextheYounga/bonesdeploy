@@ -17,18 +17,17 @@ const MAX_RELEASE_NAME_ATTEMPTS: u32 = 10;
 
 static RANDOM_FALLBACK_SEQUENCE: AtomicU32 = AtomicU32::new(0);
 
-pub fn run(site: &str, revision_commit: &str) -> Result<()> {
+pub fn run(snapshot: &super::DeploymentSnapshot) -> Result<()> {
     privileges::ensure_root("bonesremote release stage")?;
 
-    let cfg = super::load_site_config(site)?;
-    let project_root = Path::new(&cfg.project_root);
+    let project_root = &snapshot.project_root;
     require_dir(project_root, "project_root directory")?;
-    require_dir(&Path::new(&cfg.project_root).join(paths::RELEASES_DIR), "releases")?;
-    require_dir(&Path::new(&cfg.project_root).join(paths::SHARED_DIR), "shared")?;
+    require_dir(&snapshot.project_root.join(paths::RELEASES_DIR), "releases")?;
+    require_dir(&snapshot.project_root.join(paths::SHARED_DIR), "shared")?;
 
-    let release_name = create_unique_release_dir(&cfg.project_root, revision_commit)?;
+    let release_name = create_unique_release_dir(&snapshot.project_root.to_string_lossy(), &snapshot.revision)?;
 
-    release_state::write_staged_release(site, &release_name)?;
+    release_state::write_staged_release(&snapshot.site, &release_name)?;
 
     println!("Staged release: {release_name}");
     Ok(())

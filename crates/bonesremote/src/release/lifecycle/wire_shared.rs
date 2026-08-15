@@ -1,27 +1,23 @@
 use std::fs;
 use std::os::unix::fs::symlink;
-use std::path::{Component, Path};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{self, SharedPath};
 use bonesdeploy_core::paths;
 
 use crate::privileges;
 use crate::release::state as release_state;
 
-pub fn run(site: &str) -> Result<()> {
+pub fn run(snapshot: &super::DeploymentSnapshot) -> Result<()> {
     privileges::ensure_root("bonesremote release wire")?;
 
-    let cfg = super::load_site_config(site)?;
-    let runtime =
-        config::load_runtime(&paths::bonesremote_site_root(site)).context("Failed to load remote runtime state")?;
-    let release_name = release_state::read_staged_release(site)?;
-    let release_dir = release_state::release_dir(&cfg.project_root, &release_name);
+    let release_name = release_state::read_staged_release(&snapshot.site)?;
+    let release_dir = release_state::release_dir(&snapshot.project_root.to_string_lossy(), &release_name);
     if !release_dir.is_dir() {
         bail!("Promoted release is missing: {}", release_dir.display());
     }
 
-    let shared_dir = release_state::shared_dir(&cfg.project_root);
+    let shared_dir = release_state::shared_dir(&snapshot.project_root.to_string_lossy());
     if !shared_dir.is_dir() {
         bail!(
             "Shared root is missing: {}. Run 'bonesdeploy remote setup' or runtime provisioning first.",
@@ -29,24 +25,15 @@ pub fn run(site: &str) -> Result<()> {
         );
     }
 
-    for shared_path in &runtime.shared.paths {
-        validate_shared_path(shared_path)?;
-        let target = shared_dir.join(&shared_path.path);
-        link_relative(&release_dir, &shared_path.path, &target)?;
+    let shared_env = shared_dir.join(paths::DOT_ENV);
+    if !shared_env.is_file() {
+        bail!(
+            "Shared environment file is missing: {}. Run 'bonesdeploy remote setup' or secrets provisioning first.",
+            shared_env.display()
+        );
     }
 
-    Ok(())
-}
-
-fn validate_shared_path(shared_path: &SharedPath) -> Result<()> {
-    let path = Path::new(&shared_path.path);
-    if shared_path.path.is_empty() || path.is_absolute() {
-        bail!("Invalid shared path in [runtime].shared: {}", shared_path.path);
-    }
-
-    if !path.components().all(|component| matches!(component, Component::Normal(_))) {
-        bail!("Invalid shared path in [runtime].shared: {}", shared_path.path);
-    }
+    link_relative(&release_dir, paths::DOT_ENV, &shared_env)?;
 
     Ok(())
 }
@@ -82,9 +69,9 @@ mod tests {
 
     use anyhow::Result;
 
-    use bonesdeploy_core::config::{SharedPath, SharedPathType};
+    use bonesdeploy_core::paths;
 
-    use super::{link_relative, remove_if_present, validate_shared_path};
+    use super::{link_relative, remove_if_present};
 
     fn temp_dir(label: &str) -> Result<PathBuf> {
         let dir = env::temp_dir().join(format!("bonesremote-wire-{label}-{}", process::id()));
@@ -93,15 +80,6 @@ mod tests {
         }
         fs::create_dir_all(&dir)?;
         Ok(dir)
-    }
-
-    #[test]
-    fn validate_shared_path_rejects_absolute_and_parent_paths() {
-        assert!(validate_shared_path(&shared_path("storage", SharedPathType::Dir)).is_ok());
-        assert!(validate_shared_path(&shared_path("/srv/storage", SharedPathType::Dir)).is_err());
-        assert!(validate_shared_path(&shared_path("../storage", SharedPathType::Dir)).is_err());
-        assert!(validate_shared_path(&shared_path(".", SharedPathType::Dir)).is_err());
-        assert!(validate_shared_path(&shared_path("", SharedPathType::Dir)).is_err());
     }
 
     #[test]
@@ -115,7 +93,7 @@ mod tests {
 
         let release = root.join("releases/now");
         fs::create_dir_all(&release)?;
-        link_relative(&release, ".env", &shared)?;
+        link_relative(&release, paths::DOT_ENV, &shared)?;
 
         let link = release.join(".env");
         assert!(link.is_symlink());
@@ -145,9 +123,5 @@ mod tests {
 
         fs::remove_dir_all(&root).ok();
         Ok(())
-    }
-
-    fn shared_path(path: &str, path_type: SharedPathType) -> SharedPath {
-        SharedPath { path: path.to_string(), path_type }
     }
 }
