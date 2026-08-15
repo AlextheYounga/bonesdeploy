@@ -23,7 +23,7 @@ struct Release {
 }
 
 pub async fn list() -> Result<()> {
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let cfg = config::load(Path::new(paths::DOT_ENV))?;
     let report = remote_report(&cfg).await?;
 
     if report.releases.is_empty() {
@@ -62,7 +62,7 @@ fn format_status(release: &Release) -> String {
 }
 
 pub async fn kill(release: &str) -> Result<()> {
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let cfg = config::load(Path::new(paths::DOT_ENV))?;
     let session = ssh::connect_privileged(&cfg).await?;
     let command = format!(
         "bonesremote release kill --site {} --release {}",

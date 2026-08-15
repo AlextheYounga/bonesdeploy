@@ -13,12 +13,12 @@ pub(super) fn current_local_version() -> String {
 }
 
 pub(super) fn current_remote_version() -> String {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    if !bones_toml.exists() {
+    let env_file = Path::new(paths::DOT_ENV);
+    if !env_file.exists() {
         return String::from("unknown");
     }
 
-    let Ok(cfg) = config::load(bones_toml) else {
+    let Ok(cfg) = config::load(env_file) else {
         return String::from("unknown");
     };
 
@@ -47,12 +47,12 @@ pub(super) fn update_local_from_crates_io(version: &str) -> Result<()> {
 }
 
 pub(super) async fn update_remote_from_release(current_version: &str, target_version: &str) -> Result<()> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    if !bones_toml.exists() {
-        bail!("No {} found. Run from a bonesdeploy project directory.", paths::LOCAL_BONES_TOML);
+    let env_file = Path::new(paths::DOT_ENV);
+    if !env_file.exists() {
+        bail!("No {} found. Run from a bonesdeploy project directory.", paths::DOT_ENV);
     }
 
-    let cfg = config::load(bones_toml)?;
+    let cfg = config::load(env_file)?;
     let port = parse_port(&cfg.port)?;
     let session = ssh::connect_as("root", &cfg.host, port).await?;
 
@@ -75,8 +75,8 @@ pub(super) async fn update_remote_from_release(current_version: &str, target_ver
     bonesinfra::run(&[
         "patches",
         "apply",
-        "--config",
-        paths::LOCAL_BONES_TOML,
+        "--env-file",
+        paths::DOT_ENV,
         "--target-version",
         target_version,
         "--scope",

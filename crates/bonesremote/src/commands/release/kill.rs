@@ -5,14 +5,14 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::build_user_for;
+use bonesdeploy_core::config::{Bones, build_user_for, validate_site_name};
 use bonesdeploy_core::paths;
 
 use crate::commands::{drop_failed_release, release::list};
 use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::lifecycle::build::ensure_build_user_ready;
-use crate::release::lifecycle::{self, build::remove_build_container, checkout};
+use crate::release::lifecycle::{build::remove_build_container, checkout};
 use crate::release::state::{self as release_state, DeploymentLock, DeploymentRecord};
 
 const PROCESS_STOP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -23,7 +23,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     // A live deployment holds the site's lock, so cancellation must verify the
     // site identity and stop the process *before* the lock becomes available.
     // Only then is the guard assembled and used for all file mutations.
-    let cfg = lifecycle::load_site_config(site)?;
+    validate_site_name(site)?;
     let active = release_state::read_active_deployment(site)?;
     if let Some(active) = &active {
         if active.release != release {
@@ -42,7 +42,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     }
 
     let lock = DeploymentLock::acquire(site)?;
-    let mutation = SiteMutation::adopt(site, cfg, lock);
+    let mutation = SiteMutation::adopt(site, Bones::for_site(site), lock);
     let current = release_state::read_active_deployment(site)?;
     if current.as_ref().is_some_and(|deployment| deployment.release != release) {
         bail!("Active deployment changed while cancelling {release}; no cleanup was performed.");

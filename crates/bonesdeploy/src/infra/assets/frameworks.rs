@@ -1,13 +1,12 @@
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
-use std::str;
 
 use anyhow::{Context, Result, anyhow, bail};
 use rust_embed::Embed;
 use serde_json::{Map, Value};
 
-use bonesdeploy_core::config::Runtime;
+use bonesdeploy_core::config::{Runtime, default_node_version, project_env};
 use bonesdeploy_core::paths;
 
 use super::{kit, write_asset};
@@ -33,8 +32,26 @@ pub fn base_framework_defaults() -> Result<Map<String, Value>> {
 }
 
 pub fn framework_defaults(framework: &str) -> Result<Map<String, Value>> {
-    let asset_path = format!("{framework}/bones.toml");
-    framework_defaults_from_bytes(&asset_path, FrameworkAssets::get(&asset_path).map(|asset| asset.data))
+    let defaults = match framework {
+        "django" => frameworks::django::defaults(),
+        "laravel" => frameworks::laravel::defaults(),
+        "next" => frameworks::next::defaults(),
+        "nuxt" => frameworks::nuxt::defaults(),
+        "rails" => frameworks::rails::defaults(),
+        "sveltekit" => frameworks::sveltekit::defaults(),
+        "vue" => frameworks::vue::defaults(),
+        other => bail!("unknown framework template: {other}"),
+    };
+
+    let mut values = Map::new();
+    values.insert("template".into(), Value::String(defaults.template.into()));
+    values.insert(project_env::WEB_ROOT.into(), Value::String(defaults.web_root.into()));
+    values.insert("node_version".into(), Value::String(default_node_version()));
+    if let Some((name, version)) = defaults.language {
+        values.insert(name.into(), Value::String(version.into()));
+    }
+    values.insert("permissions".into(), serde_json::to_value(defaults.permissions)?);
+    Ok(values)
 }
 
 pub fn scaffold_framework_project(framework: &str, bones_dir: &Path) -> Result<()> {
@@ -82,28 +99,6 @@ fn scaffold_framework_assets(framework: &str, bones_dir: &Path, asset_prefix: &s
     }
 
     Ok(())
-}
-
-fn framework_defaults_from_bytes(asset_path: &str, bytes: Option<impl AsRef<[u8]>>) -> Result<Map<String, Value>> {
-    let Some(bytes) = bytes else {
-        bail!("Missing embedded framework defaults at {asset_path}");
-    };
-
-    let content =
-        str::from_utf8(bytes.as_ref()).with_context(|| format!("Embedded asset {asset_path} is not valid UTF-8"))?;
-    let toml_value: toml::Value = toml::from_str(content)
-        .with_context(|| format!("Failed to parse embedded framework defaults at {asset_path}"))?;
-    let framework = toml_value
-        .get("runtime")
-        .cloned()
-        .ok_or_else(|| anyhow!("Embedded framework defaults at {asset_path} are missing [runtime]"))?;
-    let json_value = serde_json::to_value(framework)
-        .with_context(|| format!("Failed to convert embedded framework defaults at {asset_path} to JSON"))?;
-
-    json_value
-        .as_object()
-        .cloned()
-        .ok_or_else(|| anyhow!("Embedded framework defaults at {asset_path} are not a TOML table"))
 }
 
 #[cfg(test)]
@@ -204,21 +199,17 @@ mod tests {
     }
 
     #[test]
-    fn django_validates_before_mutating_framework_state() -> Result<()> {
+    fn django_validates_before_mutating_framework_state() {
         let script = FrameworkAssets::get("django/deployment/prepare/01_prepare_django.sh")
             .map(|asset| String::from_utf8_lossy(asset.data.as_ref()).into_owned())
             .unwrap_or_default();
         let check = script.find("manage.py check --deploy").expect("Django deployment check");
         let migrate = script.find("manage.py migrate").expect("Django migration");
         assert!(check < migrate);
-
-        let config: Runtime = serde_json::from_value(serde_json::Value::Object(framework_defaults("django")?))?;
-        assert!(!config.shared.paths.iter().any(|path| path.path == "staticfiles"));
-        Ok(())
     }
 
     #[test]
-    fn framework_defaults_fit_the_single_file_schema() -> Result<()> {
+    fn framework_defaults_fit_runtime_schema() -> Result<()> {
         for framework in framework_names() {
             let defaults = framework_defaults(&framework)?;
             let config: Runtime = serde_json::from_value(serde_json::Value::Object(defaults))?;

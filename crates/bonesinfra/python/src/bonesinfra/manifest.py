@@ -60,9 +60,6 @@ class ResolvedService:
 COMMON_ARTIFACTS = (
     Artifact("bare repository", "repo", "directory", "setup"),
     Artifact("bare repository HEAD", "repo_head", "file", "setup"),
-    Artifact("bare repository post-receive hook", "repo_post_receive", "file", "setup"),
-    Artifact("Bones configuration repository", "bones_repo", "directory", "setup"),
-    Artifact("Bones configuration pre-receive hook", "bones_repo_pre_receive", "file", "setup"),
     Artifact("project root", "project_root", "directory", "setup"),
     Artifact("releases directory", "releases", "directory", "setup"),
     Artifact("shared directory", "shared", "directory", "setup"),

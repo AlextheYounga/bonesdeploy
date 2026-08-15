@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use anyhow::{Result, bail};
+use bonesdeploy_core::config::PROJECT_SETUP_ERROR;
 
 use crate::infra::git;
 use crate::ui::output;
@@ -10,9 +11,9 @@ use bonesdeploy_core::paths;
 pub fn run(yes: bool, show_next: bool) -> Result<()> {
     git::ensure_git_repository()?;
 
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    if !bones_toml.exists() {
-        bail!("{} does not exist. Run `bonesdeploy init` first.", paths::LOCAL_BONES_TOML);
+    let env_file = Path::new(paths::DOT_ENV);
+    if !env_file.exists() || !Path::new(paths::LOCAL_INFRA_DIR).is_dir() {
+        bail!(PROJECT_SETUP_ERROR);
     }
 
     if !yes && !prompts::confirm_remote_runtime()? {
@@ -26,12 +27,9 @@ pub fn run(yes: bool, show_next: bool) -> Result<()> {
 
     println!("Applying runtime...");
 
-    bonesinfra::run(&["runtime", "apply", "--config", paths::LOCAL_BONES_TOML])?;
+    bonesinfra::run(&["runtime", "apply", "--env-file", paths::DOT_ENV])?;
 
     println!("Runtime applied.");
-    if show_next {
-        println!();
-        println!("{}", output::next_step("bonesdeploy push"));
-    }
+
     Ok(())
 }

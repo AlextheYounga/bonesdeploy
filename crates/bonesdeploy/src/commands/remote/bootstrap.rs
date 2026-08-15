@@ -16,9 +16,9 @@ pub fn run(skip_confirm: bool, show_next: bool) -> Result<()> {
         println!("Skipped.");
         return Ok(());
     }
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::DOT_ENV);
     let cfg = config::load(bones_toml)?;
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
+    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_INFRA_DIR))?;
 
     let ssh_user = config::bootstrap_ssh_user(&cfg);
 
@@ -33,7 +33,7 @@ pub fn run(skip_confirm: bool, show_next: bool) -> Result<()> {
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
     bonesinfra::run_with_stdin(
-        &["setup", "apply", "--config", paths::LOCAL_BONES_TOML, "--bonesremote-version", env!("CARGO_PKG_VERSION")],
+        &["setup", "apply", "--env-file", paths::DOT_ENV, "--bonesremote-version", env!("CARGO_PKG_VERSION")],
         &json,
     )?;
 

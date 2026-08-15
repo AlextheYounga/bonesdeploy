@@ -13,7 +13,6 @@ pub struct App {
     pub project_root: String,
     pub branch: String,
     pub preview_domain: String,
-    pub deploy_on_push: bool,
     pub releases_keep: usize,
     pub ssl_enabled: bool,
     pub domain: String,
@@ -61,14 +60,12 @@ struct Dns {
 #[serde(deny_unknown_fields)]
 struct Deploy {
     branch: String,
-    #[serde(rename = "deploy_on_push")]
-    on_push: bool,
     releases: usize,
 }
 
 impl Default for Deploy {
     fn default() -> Self {
-        Self { branch: String::from("master"), on_push: false, releases: 5 }
+        Self { branch: String::from("master"), releases: 5 }
     }
 }
 
@@ -99,8 +96,6 @@ struct DnsDocument<'a> {
 #[derive(Serialize)]
 struct DeployDocument<'a> {
     branch: &'a str,
-    #[serde(rename = "deploy_on_push")]
-    on_push: bool,
     releases: usize,
 }
 
@@ -116,7 +111,6 @@ impl Default for App {
             project_root: String::new(),
             branch: String::from("master"),
             preview_domain: String::new(),
-            deploy_on_push: false,
             releases_keep: 5,
             ssl_enabled: false,
             domain: String::new(),
@@ -141,7 +135,6 @@ impl<'de> Deserialize<'de> for App {
             port: file.server.port,
             branch: file.deploy.branch,
             preview_domain: file.dns.preview_domain,
-            deploy_on_push: file.deploy.on_push,
             releases_keep: file.deploy.releases,
             ssl_enabled: file.dns.ssl_enabled,
             domain: file.dns.domain,
@@ -165,7 +158,7 @@ impl Serialize for App {
                 email: &self.email,
                 ssl_enabled: self.ssl_enabled,
             },
-            deploy: DeployDocument { branch: &self.branch, on_push: self.deploy_on_push, releases: self.releases_keep },
+            deploy: DeployDocument { branch: &self.branch, releases: self.releases_keep },
         }
         .serialize(serializer)
     }

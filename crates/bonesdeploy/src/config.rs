@@ -1,16 +1,12 @@
 use std::env;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result};
-use bonesdeploy_core::config as shared_config;
+use bonesdeploy_core::config::RuntimeBackend;
 use bonesdeploy_core::paths;
 
 pub use bonesdeploy_core::config::{Bones, load};
-
-pub fn is_configured(config: &Bones) -> bool {
-    !config.remote_name.is_empty() && !config.project_name.is_empty() && !config.host.is_empty()
-}
 
 /// Resolves the SSH user for provisioning commands: `BONES_BOOTSTRAP_SSH_USER`
 /// overrides the configured `ssh_user`; blank values fall back to `root`.
@@ -30,84 +26,34 @@ pub fn default_project_root_for(project_name: &str) -> String {
     paths::default_project_root_for(project_name)
 }
 
-pub fn bones_config_dir(project_name: &str) -> PathBuf {
-    paths::bones_projects_root().join(format!("{project_name}.bones"))
-}
-
 pub fn repo_directory_name() -> Result<String> {
     let cwd = env::current_dir()?;
     Ok(cwd.file_name().map_or_else(|| String::from("project"), |n| n.to_string_lossy().to_string()))
 }
 
 pub fn save(config: &Bones, path: &Path) -> Result<()> {
-    let mut to_serialize = config.clone();
-    shared_config::apply_derived_defaults(&mut to_serialize);
-
-    let serialized = toml::to_string_pretty(&to_serialize).context("Failed to serialize bones.toml")?;
-    let body = annotate_sections(&compact_inline_table_arrays(&serialized)?);
-    let content = format!("{}\n\n{}", file_header(config), body);
+    let content = format!(
+        "PROJECT_NAME={}\nREMOTE_NAME={}\nHOST={}\nPORT={}\nSSH_USER={}\nBRANCH={}\nDOMAIN={}\nPREVIEW_DOMAIN={}\nEMAIL={}\nSSL_ENABLED={}\nTEMPLATE={}\nRUNTIME_BACKEND={}\nWEB_ROOT={}\nSERVICES={}\n",
+        config.project_name,
+        config.remote_name,
+        config.host,
+        config.port,
+        config.ssh_user,
+        config.branch,
+        config.domain,
+        config.preview_domain,
+        config.email,
+        config.ssl_enabled,
+        config.runtime.template,
+        match config.runtime.backend {
+            RuntimeBackend::Native => "native",
+            RuntimeBackend::Docker => "docker",
+        },
+        config.runtime.web_root,
+        config.services.services.join(","),
+    );
     fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
-}
-
-fn file_header(config: &Bones) -> String {
-    let name = &config.project_name;
-    format!(
-        "# bonesdeploy configuration for {name}\n\
-         #\n\
-         # The following values are always derived from project_name:\n\
-         #   repo_path     = \"{repo_path}\"\n\
-         #   project_root  = \"{project_root}\"\n\
-         #   runtime_user  = \"{runtime_user}\"\n\
-         #   runtime_group = \"{runtime_group}\"",
-        repo_path = paths::default_repo_path_for(name),
-        project_root = paths::default_project_root_for(name),
-        runtime_user = shared_config::runtime_user_for(name),
-        runtime_group = shared_config::runtime_group_for(name),
-    )
-}
-
-fn compact_inline_table_arrays(content: &str) -> Result<String> {
-    let mut document = content.parse::<toml_edit::DocumentMut>().context("Failed to parse serialized bones.toml")?;
-
-    let Some(runtime) = document.get_mut("runtime").and_then(toml_edit::Item::as_table_mut) else {
-        return Ok(document.to_string());
-    };
-    for key in ["permissions", "shared"] {
-        let Some(item) =
-            runtime.get_mut(key).and_then(toml_edit::Item::as_table_mut).and_then(|table| table.get_mut("paths"))
-        else {
-            continue;
-        };
-        item.make_value();
-    }
-
-    Ok(document.to_string())
-}
-
-fn annotate_sections(content: &str) -> String {
-    let comments = [
-        ("[app]", "# Project identity and deployment settings."),
-        ("[app.server]", "# Remote server connection."),
-        ("[app.dns]", "# Domains, email, and TLS."),
-        ("[app.deploy]", "# Branch and deployment behavior."),
-        ("[runtime]", "# Runtime settings."),
-        ("[runtime.permissions]", "# Release file permissions."),
-        ("[runtime.shared]", "# Paths persisted in the shared release directory."),
-        ("[build]", "# Per-site build limits."),
-        ("[services]", "# Optional services."),
-    ];
-
-    let mut output = String::new();
-    for line in content.lines() {
-        if let Some((_, comment)) = comments.iter().find(|(section, _)| *section == line) {
-            output.push_str(comment);
-            output.push('\n');
-        }
-        output.push_str(line);
-        output.push('\n');
-    }
-    output
 }
 
 #[cfg(test)]
@@ -135,7 +81,6 @@ mod tests {
         config.host = String::from("deploy.example.com");
         config.port = String::from("22");
         config.branch = String::from("master");
-        config.deploy_on_push = true;
         config
     }
 
@@ -164,73 +109,33 @@ mod tests {
     }
 
     #[test]
-    fn save_persists_ssl_settings() -> Result<()> {
+    fn save_round_trips_dotenv_values() -> Result<()> {
         let mut config = sample_config("phoenix");
         config.ssl_enabled = true;
         config.domain = String::from("app.example.com");
         config.email = String::from("ops@example.com");
 
-        let path = temp_path("save_ssl_settings.toml");
+        let path = temp_path("save.env");
         save(&config, &path)?;
         let content = fs::read_to_string(&path)?;
 
-        assert!(content.contains("ssl_enabled = true"));
-        assert!(content.contains("domain = \"app.example.com\""));
-        assert!(content.contains("email = \"ops@example.com\""));
+        assert!(content.contains("SSL_ENABLED=true"));
+        assert!(content.contains("DOMAIN=app.example.com"));
+        assert!(content.contains("EMAIL=ops@example.com"));
+        let loaded = load(&path)?;
+        assert_eq!(loaded.project_name, "phoenix");
+        assert!(loaded.ssl_enabled);
 
         fs::remove_file(path)?;
         Ok(())
     }
 
     #[test]
-    fn save_writes_file_header() -> Result<()> {
-        let path = temp_path("file_header.toml");
+    fn save_writes_flat_local_input_file() -> Result<()> {
+        let path = temp_path("flat.env");
         save(&sample_config("phoenix"), &path)?;
         let content = fs::read_to_string(&path)?;
-        assert!(content.starts_with("# bonesdeploy configuration for phoenix"), "{content}");
-        assert!(content.contains("#   repo_path     = \"/home/git/phoenix.git\""), "{content}");
-        assert!(content.contains("#   runtime_group = \"phoenix\""), "{content}");
-        fs::remove_file(path)?;
-        Ok(())
-    }
-
-    #[test]
-    fn save_adds_comments_to_nested_sections() -> Result<()> {
-        let path = temp_path("section_comments.toml");
-        save(&sample_config("phoenix"), &path)?;
-        let content = fs::read_to_string(&path)?;
-        assert!(content.contains("# Remote server connection.\n[app.server]"));
-        assert!(content.contains("# Branch and deployment behavior.\n[app.deploy]"));
-        fs::remove_file(path)?;
-        Ok(())
-    }
-
-    #[test]
-    fn save_formats_permission_entries_as_inline_tables() -> Result<()> {
-        let mut config = sample_config("phoenix");
-        config.runtime.permissions = Some(toml::from_str(
-            r#"paths = [
-                { path = "*", type = "dir", mode = "750" },
-                { path = "storage", type = "dir", mode = "770", recursive = true },
-            ]"#,
-        )?);
-
-        let path = temp_path("inline_permissions.toml");
-        save(&config, &path)?;
-        let content = fs::read_to_string(&path)?;
-
-        let document = content.parse::<toml_edit::DocumentMut>()?;
-        let paths = document
-            .get("runtime")
-            .and_then(toml_edit::Item::as_table)
-            .and_then(|runtime| runtime.get("permissions"))
-            .and_then(toml_edit::Item::as_table)
-            .and_then(|permissions| permissions.get("paths"))
-            .and_then(toml_edit::Item::as_array);
-
-        assert!(paths.is_some_and(|paths| paths.iter().all(toml_edit::Value::is_inline_table)), "{content}");
-        assert!(!content.contains("[[runtime.permissions.paths]]"), "{content}");
-        load(&path)?;
+        assert!(content.lines().all(|line| !line.starts_with('[')));
 
         fs::remove_file(path)?;
         Ok(())

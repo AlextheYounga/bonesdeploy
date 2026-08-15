@@ -118,9 +118,6 @@ impl Harness {
             "systemctl is-active --quiet {site}.target && systemctl is-active --quiet {site}-nginx.service && test -d /srv/sites/{site}"
         ))?;
         self.exec(&format!(
-            "test -d /root/.config/bonesremote/repos/{site}.bones.git && test -x /root/.config/bonesremote/repos/{site}.bones.git/hooks/pre-receive && test ! -e /root/.config/bonesremote/repos/{site}.bones.git/hooks/post-receive && test \"$(git --git-dir /root/.config/bonesremote/repos/{site}.bones.git symbolic-ref --short HEAD)\" = master"
-        ))?;
-        self.exec(&format!(
             "test \"$(stat -c '%U:%G:%a' /usr/local/bin/bonesremote)\" = 'root:root:755' && test -f /root/.config/bonesremote/sites/{site}/bones.toml"
         ))?;
         self.exec(&format!(

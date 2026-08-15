@@ -57,26 +57,11 @@ anything.
 `bonesdeploy skill list` — names of every embedded skill doc.
 `bonesdeploy skill doc <name>` — print a specific skill doc by name.
 
-## push
-
-`bonesdeploy push`
-
-Archives `.bones/` (secrets excluded) and streams it to `bonesremote site
-import`. Atomically replaces remote site state. Does not deploy. Does not
-push git refs.
-
-## pull
-
-`bonesdeploy pull`
-
-Streams the current remote site dataset back into local `.bones/` and
-reinstalls the `pre-push` guard. Recovery primitive.
-
 ## deploy
 
 `bonesdeploy deploy`
 
-`push` then SSH `bonesremote deploy --site <project>`. The whole pipeline:
+SSH `bonesremote deploy --site <project>`. The whole pipeline:
 stage → checkout → build → promote → wire → prepare → seal → activate →
 restart → prune. On failure before activation, drops the staged release. On
 failure after activation, restores and restarts the previous release.

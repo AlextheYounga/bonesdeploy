@@ -6,15 +6,17 @@ from pyinfra.operations import server
 from bonesinfra.config.context import template_data
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import NODE
-from bonesinfra.services.linux import application, runtime, validation
+from bonesinfra.services.linux import application, runtime, shared, validation
 
 from . import custom
 
 TEMPLATES = Path(__file__).parent / "templates"
+SHARED_DIRECTORIES = ()
 
 
 def deploy(ctx):
     runtime.setup(ctx)
+    shared.ensure_directories(ctx, ctx.paths_dict, SHARED_DIRECTORIES)
 
     def seed_placeholder(current_ctx, paths, _node_binary):
         build_dir = f"{paths['placeholder_release']}/build"

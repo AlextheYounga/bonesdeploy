@@ -7,16 +7,13 @@ from bonesinfra.services.linux.nginx import router as nginx_router, site as ngin
 
 
 def _make_ctx(tmp_path, *, domain: str = "", preview_domain: str = "preview.example.com"):
-    config_path = tmp_path / "bones.toml"
+    config_path = tmp_path / ".env"
     config_path.write_text(
-        f"""[app]
-project_name = "lawsnipe"
-[app.server]
-host = "example.com"
-[app.dns]
-domain = "{domain}"
-preview_domain = "{preview_domain}"
-email = "ops@example.com"
+        f"""PROJECT_NAME=lawsnipe
+HOST=example.com
+DOMAIN={domain}
+PREVIEW_DOMAIN={preview_domain}
+EMAIL=ops@example.com
 """
     )
     return DeployContext.from_files(str(config_path))

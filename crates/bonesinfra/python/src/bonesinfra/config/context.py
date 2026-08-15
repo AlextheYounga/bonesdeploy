@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -22,47 +21,56 @@ class DeployContext:
 
     @classmethod
     def from_files(cls, config_path: str) -> DeployContext:
-        with Path(config_path).open("rb") as f:
-            bones_cfg = tomllib.load(f)
-        app_cfg = _table(bones_cfg, "app")
-        server_cfg = _table(app_cfg, "server")
-        dns_cfg = _table(app_cfg, "dns")
-        deploy_cfg = _table(app_cfg, "deploy")
-        runtime_cfg = _table(bones_cfg, "runtime")
-        services_cfg = _table(bones_cfg, "services")
-        project_name = str(app_cfg.get("project_name", ""))
+        values = _dotenv(Path(config_path).read_text())
+        project_name = values.get("PROJECT_NAME", "")
 
         app = AppConfig(
             project_name=project_name,
             repo_path=f"{DEFAULT_REPO_PARENT}/{project_name}.git",
             project_root=f"{DEFAULT_PROJECT_ROOT_PARENT}/{project_name}",
             server=ServerConfig(
-                host=str(server_cfg.get("host", "")),
-                ssh_user=str(server_cfg.get("ssh_user", DEFAULT_SSH_USER)),
-                port=str(int(server_cfg.get("port", DEFAULT_SSH_PORT))),
+                host=values.get("HOST", ""),
+                ssh_user=values.get("SSH_USER", DEFAULT_SSH_USER),
+                port=values.get("PORT", DEFAULT_SSH_PORT),
             ),
             dns=DnsConfig(
-                domain=str(dns_cfg.get("domain", "")),
-                preview_domain=str(dns_cfg.get("preview_domain", "")),
-                email=str(dns_cfg.get("email", "")),
-                ssl_enabled=bool(dns_cfg.get("ssl_enabled", False)),
+                domain=values.get("DOMAIN", ""),
+                preview_domain=values.get("PREVIEW_DOMAIN", ""),
+                email=values.get("EMAIL", ""),
+                ssl_enabled=values.get("SSL_ENABLED", "false").lower() == "true",
             ),
-            deploy=DeployConfig(branch=str(deploy_cfg.get("branch", "master"))),
+            deploy=DeployConfig(branch=values.get("BRANCH", "main")),
         )
 
         runtime = RuntimeConfig(
-            backend=_runtime_backend(runtime_cfg.get("backend", "native")),
-            web_root=str(runtime_cfg.get("web_root") or DEFAULT_WEB_ROOT),
+            backend=_runtime_backend(values.get("RUNTIME_BACKEND", "native")),
+            web_root=values.get("WEB_ROOT") or DEFAULT_WEB_ROOT,
             runtime_user=project_name,
             runtime_group=project_name,
             data={
                 key: value
-                for key, value in runtime_cfg.items()
-                if key not in {"backend", "web_root", "permissions", "shared"}
+                for key, value in values.items()
+                if key
+                not in {
+                    "PROJECT_NAME",
+                    "HOST",
+                    "SSH_USER",
+                    "PORT",
+                    "DOMAIN",
+                    "PREVIEW_DOMAIN",
+                    "EMAIL",
+                    "SSL_ENABLED",
+                    "BRANCH",
+                    "RUNTIME_BACKEND",
+                    "WEB_ROOT",
+                    "SERVICES",
+                    "TEMPLATE",
+                }
             },
         )
 
-        services = ServicesConfig(services=_database_services(services_cfg.get("services", [])))
+        services_value = values.get("SERVICES", "")
+        services = ServicesConfig(services=_database_services(services_value.split(",") if services_value else []))
         return cls(app=app, runtime=runtime, services=services)
 
     @property
@@ -159,16 +167,22 @@ class ServicesConfig:
     services: tuple[str, ...] = ()
 
 
-def _table(parent: dict[str, Any], name: str) -> dict[str, Any]:
-    value = parent.get(name, {})
-    if not isinstance(value, dict):
-        raise TypeError(f"bones.toml [{name}] must be a table")
-    return value
+def _dotenv(content: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line_number, raw_line in enumerate(content.splitlines(), 1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.partition("=")
+        if not separator or not key.strip():
+            raise ValueError(f"invalid .env entry on line {line_number}")
+        values[key.strip()] = value.strip().strip('"')
+    return values
 
 
 def _database_services(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(service, str) for service in value):
-        raise TypeError("bones.toml [services].services must be an array of strings")
+        raise TypeError("SERVICES must be a comma-separated list")
     supported = {"postgres", "mariadb", "mysql", "mongodb", "valkey", "redis"}
     services = tuple(value)
     unsupported = set(services) - supported
@@ -183,5 +197,5 @@ def _database_services(value: Any) -> tuple[str, ...]:
 
 def _runtime_backend(value: Any) -> str:
     if not isinstance(value, str) or value not in {"native", "docker"}:
-        raise ValueError("bones.toml [runtime].backend must be 'native' or 'docker'")
+        raise ValueError("RUNTIME_BACKEND must be 'native' or 'docker'")
     return value

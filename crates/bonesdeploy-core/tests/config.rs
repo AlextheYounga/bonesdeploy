@@ -3,9 +3,11 @@
 use anyhow::Result;
 use bonesdeploy_core::config::BUILD_TIMEOUT_SECONDS_DEFAULT;
 use bonesdeploy_core::config::{
-    App, Bones, Build, Runtime, RuntimeBackend, SharedPathType, build_timeout_seconds, validate_host,
+    App, Bones, Build, Runtime, RuntimeBackend, build_timeout_seconds, validate_host, validate_runtime,
 };
+use std::collections::BTreeMap;
 use toml::de::Error;
+use toml::map::Map;
 
 #[test]
 fn omitted_nested_sections_keep_app_defaults() -> Result<(), Error> {
@@ -31,28 +33,6 @@ fn validate_host_rejects_shell_metacharacters() {
 }
 
 #[test]
-fn runtime_parses_shared_paths() -> Result<()> {
-    let runtime: Runtime = toml::from_str(
-        r#"
-web_root = "public"
-
-[shared]
-paths = [
-    { path = ".env", type = "file" },
-    { path = "storage", type = "dir" },
-]
-"#,
-    )?;
-
-    assert_eq!(runtime.shared.paths.len(), 2);
-    assert_eq!(runtime.shared.paths[0].path, ".env");
-    assert_eq!(runtime.shared.paths[0].path_type, SharedPathType::File);
-    assert_eq!(runtime.shared.paths[1].path, "storage");
-    assert_eq!(runtime.shared.paths[1].path_type, SharedPathType::Dir);
-    Ok(())
-}
-
-#[test]
 fn runtime_backend_defaults_to_native() -> Result<(), Error> {
     let runtime: Runtime = toml::from_str("")?;
 
@@ -68,6 +48,16 @@ fn runtime_backend_serializes_as_lowercase_toml() -> Result<()> {
 
     assert!(value.lines().any(|line| line == "backend = \"docker\""));
     Ok(())
+}
+
+#[test]
+fn removed_runtime_shared_configuration_is_rejected() {
+    let runtime = Runtime {
+        extra: BTreeMap::from([(String::from("shared"), toml::Value::Table(Map::new()))]),
+        ..Runtime::default()
+    };
+
+    assert!(validate_runtime(&runtime).is_err());
 }
 
 #[test]

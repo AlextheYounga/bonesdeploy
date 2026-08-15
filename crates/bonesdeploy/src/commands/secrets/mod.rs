@@ -19,21 +19,15 @@ use bonesdeploy_core::paths;
 
 mod gpg;
 
-const LOCAL_ENV_SECRET: &str = ".bones/secrets/.env.gpg";
+const LOCAL_ENV_SECRET: &str = "infra/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
 
 pub fn init() -> Result<()> {
-    let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
-    if !bones_dir.is_dir() {
-        bail!("Missing .bones config\n\n{}", output::next_step("bonesdeploy init"));
+    if !Path::new(paths::LOCAL_INFRA_DIR).is_dir() {
+        bail!("Missing infra/ directory\n\n{}", output::next_step("bonesdeploy init"));
     }
 
-    let secrets_toml = Path::new(".bones/secrets.toml");
-    if secrets_toml.exists() {
-        bail!("Missing encrypted secrets\n\n{}", output::next_step("bonesdeploy secrets edit"));
-    }
-
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let cfg = config::load(Path::new(paths::DOT_ENV))?;
     initialize_defaults(&cfg)?;
 
     println!("{} Secrets initialized.", output::success_marker());
@@ -50,8 +44,8 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
 
     gpg::ensure_installed()?;
     let key_fingerprint = gpg::ensure_project_key(&cfg.project_name)?;
-    fs::create_dir_all(paths::LOCAL_BONES_SECRETS_DIR)
-        .with_context(|| format!("Failed to create {}", paths::LOCAL_BONES_SECRETS_DIR))?;
+    fs::create_dir_all(paths::LOCAL_INFRA_SECRETS_DIR)
+        .with_context(|| format!("Failed to create {}", paths::LOCAL_INFRA_SECRETS_DIR))?;
 
     let temp_path = create_temp_edit_path()?;
     let mut effective_config = cfg.clone();
@@ -89,7 +83,7 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
 pub fn edit() -> Result<()> {
     gpg::ensure_installed()?;
 
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let cfg = config::load(Path::new(paths::DOT_ENV))?;
     let key_fingerprint = gpg::ensure_project_key(&cfg.project_name)?;
 
     let encrypted_path = Path::new(LOCAL_ENV_SECRET);
@@ -146,7 +140,7 @@ pub fn edit() -> Result<()> {
 pub async fn push() -> Result<()> {
     gpg::ensure_installed()?;
 
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML))?;
+    let cfg = config::load(Path::new(paths::DOT_ENV))?;
     let runtime_group = shared_config::runtime_group_for(&cfg.project_name);
 
     let ssh_user = config::bootstrap_ssh_user(&cfg);

@@ -61,14 +61,19 @@ No shared groups with `660`/`770` everywhere — that pattern is a tangle of log
 14. Site names and release IDs are validated before path construction.
 15. All generated paths are constrained beneath canonical site roots.
 16. Symlinks are rejected or safely resolved in privileged write operations.
-17. Git hooks may trigger deployment but cannot perform deployment work.
+17. Deployment is requested explicitly; no Git hook performs deployment work.
 18. User-controlled deployment input is never executed as root.
 19. Runtime users cannot modify configuration later consumed as code by root.
 ```
 
 BonesRemote is the privileged mediator. Its job is not to "run deployments" — its job is to constrain the deployer to a finite set of safe state transitions. It accepts narrow, typed operations like `activate_release(site="atlas", release="20260727_143200")`, never `run_as_root(command="...")` or `write_file(path="...", content="...")`.
 
-Git hooks trigger BonesRemote. They do not check out source, run builds, write releases, or restart services. The `pre-push` guard runs `bonesdeploy doctor --local` and aborts on warnings. The remote `post-receive` trigger derives `<site>` from `GIT_DIR` and calls `sudo bonesremote hook post-receive --site <site>` — nothing more. The config repo's `pre-receive` trigger calls `bonesremote site receive` directly as root and atomically replaces control-plane state. The sudoers policy is rendered and validated by `bonesinfra` at provisioning time with anchored site and revision arguments, so trailing or malformed arguments are denied.
+Deployment is requested explicitly with `bonesdeploy deploy`. The application
+revision supplies the source and its `infra/deployment` scripts; there is no
+application Git hook, configuration repository, site import/export path, or
+deploy-on-push trigger. The sudoers policy is rendered and validated by
+BonesInfra at provisioning time with anchored site and revision arguments, so
+trailing or malformed arguments are denied.
 
 ## Process confinement
 
@@ -112,7 +117,7 @@ An open descriptor is already-granted authority. Permissions changed to `000` do
 40. Sites do not automatically share one unrestricted internal network.
 ```
 
-Supported databases are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. Every listener binds to localhost. Redis and Valkey use separate per-project instances; the SQL and Mongo services use database-scoped accounts. Generated credentials live in the protected remote `shared/.env`, never in `.bones/`. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations. Internal reachability is never a substitute for authentication — both must hold.
+Supported databases are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. Every listener binds to localhost. Redis and Valkey use separate per-project instances; the SQL and Mongo services use database-scoped accounts. Generated credentials live in the protected remote `shared/.env`, never in the local project or its committed infrastructure. `shared/.env` is the only BonesDeploy-managed shared file; other shared paths are explicit directories. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations. Internal reachability is never a substitute for authentication — both must hold.
 
 ## Containers
 
@@ -167,7 +172,7 @@ If a mutation can be delayed safely, it is delayed. If a mutation affects live s
 
 ## The lock
 
-`bonesremote` holds one OS-backed deployment lock per site. Deploys, cancellations, and site imports all take it. Nothing stages or overwrites state while a release is building, preparing, or interrupted. The lock lives outside the replaceable site dataset, so replacing the dataset doesn't replace the lock. Before staging, BonesRemote starts and verifies the build user's systemd manager and checks rootless Podman readiness. A damaged rootless Podman namespace is reported before any release state is created — deploy does not silently reset Podman, because that operation stops the build user's containers.
+`bonesremote` holds one OS-backed deployment lock per site. Deploys, cancellations, rollbacks, and recovery all take it. Nothing stages or overwrites state while a release is building, preparing, or interrupted. The lock lives outside replaceable site data. Before staging, BonesRemote starts and verifies the build user's systemd manager and checks rootless Podman readiness. A damaged rootless Podman namespace is reported before any release state is created — deploy does not silently reset Podman, because that operation stops the build user's containers.
 
 ## Service restart
 
@@ -186,7 +191,7 @@ Site doctor verifies:
 
 `bonesremote doctor --site <project> --exhaustive` additionally inspects every entry in the active release for permission drift. It can take time on large releases. POSIX ACLs on protected paths are detected through extended attributes and reported as `UNVERIFIED`. Supplementary groups are collected through `id -G`.
 
-Doctor reports three states: green checks are healthy, yellow pending items are expected next steps (such as the first Git push after setup), and red failures need attention. Pending first-push state exits successfully so setup can finish without looking broken. For agents and scripts, the stable machine-readable next-step guide is `bonesdeploy skill next --format json`.
+Doctor reports healthy, pending, and failed checks. Pending checks describe non-destructive next steps, not an implicit push or hook installation. For agents and scripts, the stable machine-readable next-step guide is `bonesdeploy skill next --format json`.
 
 ## The security-proof checklist
 

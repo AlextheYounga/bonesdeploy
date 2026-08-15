@@ -18,19 +18,15 @@ pub(crate) fn collect_sites(accounts: &BTreeMap<String, Account>) -> Result<Vec<
             continue;
         }
         let name = entry.file_name().to_string_lossy().to_string();
-        let cfg = config::load(&entry.path().join(paths::BONES_TOML))
-            .map_err(|error| format!("cannot load site {name}: {error}"))?;
-        if cfg.project_name != name {
-            return Err(format!("site directory {name} contains configuration for {}", cfg.project_name));
-        }
         let runtime_name = config::runtime_user_for(&name);
         let build_name = config::build_user_for(&name);
         let runtime =
             accounts.get(&runtime_name).cloned().ok_or_else(|| format!("runtime user {runtime_name} is absent"))?;
         let build = accounts.get(&build_name).cloned().ok_or_else(|| format!("build user {build_name} is absent"))?;
+        let project_root = PathBuf::from(paths::default_project_root_for(&name));
         sites.push(Site {
             name,
-            project_root: PathBuf::from(&cfg.project_root),
+            project_root,
             runtime: collect_identity_groups(runtime)?,
             build: collect_identity_groups(build)?,
         });

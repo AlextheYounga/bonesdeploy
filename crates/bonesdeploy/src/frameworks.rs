@@ -1,18 +1,49 @@
 use anyhow::{Result, bail};
 use bonesdeploy_core::config::{Bones, Runtime};
+use serde::Serialize;
 use serde_json::Value;
 
 /// Shared question keys used by more than one template.
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
 const BUILD_ENV_HEADER: &str = "# Committed, non-secret values used while building this project.";
 
-mod django;
-mod laravel;
-mod next;
-mod nuxt;
-mod rails;
-mod sveltekit;
-mod vue;
+pub(crate) mod django;
+pub(crate) mod laravel;
+pub(crate) mod next;
+pub(crate) mod nuxt;
+pub(crate) mod rails;
+pub(crate) mod sveltekit;
+pub(crate) mod vue;
+
+#[derive(Clone, Copy)]
+pub(crate) struct FrameworkDefaults {
+    pub template: &'static str,
+    pub web_root: &'static str,
+    pub language: Option<(&'static str, &'static str)>,
+    pub permissions: &'static [PermissionDefault],
+}
+
+#[derive(Serialize)]
+pub(crate) struct PermissionDefault {
+    pub path: &'static str,
+    #[serde(rename = "type")]
+    pub permission_type: &'static str,
+    pub mode: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recursive: Option<bool>,
+}
+
+pub(crate) const fn directory(path: &'static str, mode: u16, recursive: bool) -> PermissionDefault {
+    PermissionDefault { path, permission_type: "dir", mode, recursive: Some(recursive) }
+}
+
+pub(crate) const fn file(path: &'static str, mode: u16) -> PermissionDefault {
+    PermissionDefault { path, permission_type: "file", mode, recursive: None }
+}
+
+pub(crate) const fn non_recursive_file(path: &'static str, mode: u16) -> PermissionDefault {
+    PermissionDefault { path, permission_type: "file", mode, recursive: Some(false) }
+}
 
 /// A promptable framework question, lifted verbatim from bonesinfra's old
 /// `framework questions <fw>` output so agents and humans see the same shape
@@ -57,7 +88,7 @@ pub fn questions(template: &str) -> Result<&'static [Question]> {
 
 /// Validate non-interactive `--framework-var` answers against a template's
 /// question schema. Catches agent typos and bad values before they reach
-/// `bones.toml`.
+/// the project's root `.env` and infrastructure files.
 pub fn validate_answers(template: &str, answers: &serde_json::Map<String, Value>) -> Result<()> {
     let schema = questions(template)?;
     for (key, value) in answers {

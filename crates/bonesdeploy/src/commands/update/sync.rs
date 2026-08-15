@@ -2,31 +2,33 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
+use bonesdeploy_core::config::project_env;
 use bonesdeploy_core::paths;
 
-pub(super) fn refresh_local_bones_from_source(source_dir: &Path, bones_dir: &Path) -> Result<()> {
-    if !bones_dir.exists() {
+pub(super) fn refresh_local_infrastructure(source_dir: &Path, project_root: &Path) -> Result<()> {
+    let infra_dir = project_root.join(paths::LOCAL_INFRA_DIR);
+    if !infra_dir.exists() {
         return Ok(());
     }
 
-    sync_kit_deployment_functions(source_dir, bones_dir)?;
-    sync_tree(&deployment_source_root(source_dir, bones_dir)?, &bones_dir.join("deployment"), true)?;
+    sync_kit_deployment_functions(source_dir, &infra_dir)?;
+    sync_tree(&deployment_source_root(source_dir, project_root)?, &infra_dir.join("deployment"), true)?;
+    sync_managed_core(source_dir, project_root)?;
 
     Ok(())
 }
 
-fn sync_kit_deployment_functions(source_dir: &Path, bones_dir: &Path) -> Result<()> {
+fn sync_kit_deployment_functions(source_dir: &Path, infra_dir: &Path) -> Result<()> {
     let source = source_dir.join("crates/bonesdeploy/assets/kit/deployment/functions.sh");
     if source.is_file() {
-        copy_file(&source, &bones_dir.join("deployment/functions.sh"), true)?;
+        copy_file(&source, &infra_dir.join("deployment/functions.sh"), true)?;
     }
     Ok(())
 }
 
-fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> Result<PathBuf> {
-    let bones_toml = bones_dir.join(paths::BONES_TOML);
-    let Some(template) = selected_framework_template(&bones_toml)? else {
+fn deployment_source_root(source_dir: &Path, project_root: &Path) -> Result<PathBuf> {
+    let Some(template) = selected_framework_template(&project_root.join(paths::DOT_ENV))? else {
         return Ok(source_dir.join("crates/bonesdeploy/assets/kit/deployment"));
     };
 
@@ -39,12 +41,43 @@ fn deployment_source_root(source_dir: &Path, bones_dir: &Path) -> Result<PathBuf
     })
 }
 
+fn sync_managed_core(source_dir: &Path, project_root: &Path) -> Result<()> {
+    let template =
+        selected_framework_template(&project_root.join(paths::DOT_ENV))?.unwrap_or_else(|| String::from("custom"));
+    let source = source_dir.join("crates/bonesinfra/python/src/bonesinfra/frameworks").join(&template);
+    if !source.is_dir() {
+        return Ok(());
+    }
+
+    let destination = project_root.join(paths::LOCAL_INFRA_DIR).join("provision/core");
+    check_tree_conflicts(&source, &destination)?;
+    sync_tree(&source, &destination, false)
+}
+
+fn check_tree_conflicts(source_root: &Path, dest_root: &Path) -> Result<()> {
+    if !dest_root.exists() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(source_root).with_context(|| format!("Failed to read {}", source_root.display()))? {
+        let entry = entry.with_context(|| format!("Failed to read entry in {}", source_root.display()))?;
+        let source_path = entry.path();
+        let dest_path = dest_root.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            check_tree_conflicts(&source_path, &dest_path)?;
+        } else if dest_path.is_file() && fs::read(&source_path)? != fs::read(&dest_path)? {
+            bail!("Managed infrastructure conflict at {}; refusing to overwrite it", dest_path.display());
+        }
+    }
+    Ok(())
+}
+
 fn selected_framework_template(framework_toml: &Path) -> Result<Option<String>> {
     let content =
         fs::read_to_string(framework_toml).with_context(|| format!("Failed to read {}", framework_toml.display()))?;
-    let value: toml::Value =
-        toml::from_str(&content).with_context(|| format!("Failed to parse {}", framework_toml.display()))?;
-    Ok(value.get("runtime").and_then(|runtime| runtime.get("template")).and_then(toml::Value::as_str).map(String::from))
+    Ok(content.lines().find_map(|line| {
+        let (key, value) = line.split_once('=')?;
+        (key.trim() == project_env::TEMPLATE).then(|| value.trim().trim_matches(['"', '\'']).to_string())
+    }))
 }
 
 fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {
@@ -92,15 +125,17 @@ mod tests {
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
 
-    use super::refresh_local_bones_from_source;
+    use super::refresh_local_infrastructure;
     use anyhow::Result;
     use tempfile::TempDir;
 
     #[test]
-    fn refresh_local_bones_updates_scaffold_without_touching_configs() -> Result<()> {
+    fn refresh_local_infrastructure_updates_managed_files_without_touching_custom() -> Result<()> {
         let temp = TempDir::new()?;
         let source_dir = temp.path().join("source");
-        let bones_dir = temp.path().join(".bones");
+        let project_root = temp.path().join("project");
+        let infra_dir = project_root.join("infra");
+        fs::create_dir_all(&infra_dir)?;
 
         write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/build/01_build.sh"), "generic deploy")?;
         write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/functions.sh"), "shared functions")?;
@@ -109,17 +144,41 @@ mod tests {
             "laravel deploy",
         )?;
 
-        write(&bones_dir.join("bones.toml"), "[runtime]\ntemplate = 'laravel'\n")?;
+        write(&project_root.join(".env"), "TEMPLATE=laravel\n")?;
+        write(&infra_dir.join("provision/custom/runtime.py"), "def deploy(ctx):\n    custom(ctx)\n")?;
 
-        refresh_local_bones_from_source(&source_dir, &bones_dir)?;
+        refresh_local_infrastructure(&source_dir, &project_root)?;
 
-        assert_eq!(fs::read_to_string(bones_dir.join("bones.toml"))?, "[runtime]\ntemplate = 'laravel'\n");
-        assert_eq!(fs::read_to_string(bones_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
-        assert_eq!(fs::read_to_string(bones_dir.join("deployment/functions.sh"))?, "shared functions");
+        assert_eq!(fs::read_to_string(project_root.join(".env"))?, "TEMPLATE=laravel\n");
+        assert_eq!(fs::read_to_string(infra_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
+        assert_eq!(fs::read_to_string(infra_dir.join("deployment/functions.sh"))?, "shared functions");
+        assert_eq!(
+            fs::read_to_string(infra_dir.join("provision/custom/runtime.py"))?,
+            "def deploy(ctx):\n    custom(ctx)\n"
+        );
 
-        let deploy_mode = fs::metadata(bones_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
+        let deploy_mode = fs::metadata(infra_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
         assert_eq!(deploy_mode, 0o755);
 
+        Ok(())
+    }
+
+    #[test]
+    fn refresh_local_infrastructure_refuses_managed_conflicts() -> Result<()> {
+        let temp = TempDir::new()?;
+        let source_dir = temp.path().join("source");
+        let project_root = temp.path().join("project");
+        let core_file = project_root.join("infra/provision/core/runtime.py");
+        write(&source_dir.join("crates/bonesinfra/python/src/bonesinfra/frameworks/custom/runtime.py"), "managed")?;
+        write(&project_root.join(".env"), "TEMPLATE=custom\n")?;
+        write(&core_file, "locally changed")?;
+
+        let error = match refresh_local_infrastructure(&source_dir, &project_root) {
+            Ok(()) => anyhow::bail!("conflict should be rejected"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("Managed infrastructure conflict"));
+        assert_eq!(fs::read_to_string(core_file)?, "locally changed");
         Ok(())
     }
 

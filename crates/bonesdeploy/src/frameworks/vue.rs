@@ -1,4 +1,10 @@
-use super::Question;
+use super::{FrameworkDefaults, PermissionDefault, Question, directory, file};
+
+const PERMISSIONS: [PermissionDefault; 3] = [directory("*", 750, false), file("*", 640), directory("dist", 755, true)];
+
+pub(crate) fn defaults() -> FrameworkDefaults {
+    FrameworkDefaults { template: "vue", web_root: "dist", language: None, permissions: &PERMISSIONS }
+}
 
 /// `Vue` takes no framework configuration.
 pub fn questions() -> &'static [Question] {

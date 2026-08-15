@@ -34,7 +34,7 @@ markers.
 
 ## Intended behavior
 
-The private `bonesinfra patches apply` command receives a config path, target
+The private `bonesinfra patches apply` command receives the root env-file path, target
 version, and scope. Its Python patch registry selects the two existing patches
 in their existing order. For the local scope, Python applies the local Git
 migrations and atomically writes the existing local marker only after each
