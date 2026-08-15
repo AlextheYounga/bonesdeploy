@@ -134,7 +134,7 @@ fn rejects_old_bones_layout() -> Result<()> {
 
     let output = env.run(INIT_ARGS)?;
     assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("bonesdeploy migrate"));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("bonesdeploy update"));
 
     Ok(())
 }

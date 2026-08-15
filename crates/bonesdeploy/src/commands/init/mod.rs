@@ -44,7 +44,7 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     prefetch_bonesinfra()?;
 
     if fs::symlink_metadata(paths::OLD_BONES_DIR).is_ok() {
-        anyhow::bail!("Old .bones layout detected. Run `bonesdeploy migrate` first.");
+        anyhow::bail!("Old .bones layout detected. Run `bonesdeploy update` first.");
     }
 
     let infra_dir = Path::new(paths::LOCAL_INFRA_DIR);

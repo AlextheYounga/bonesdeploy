@@ -102,7 +102,7 @@ fn print_failure(label: &str, issue: &str, next: Option<String>) -> usize {
 fn check_local_layout() -> Option<String> {
     let old_layout = Path::new(paths::OLD_BONES_DIR);
     if fs::symlink_metadata(old_layout).is_ok() {
-        return Some(String::from("Old .bones layout detected; run `bonesdeploy migrate` before using this project"));
+        return Some(String::from("Old .bones layout detected; run `bonesdeploy update` before using this project"));
     }
 
     let infra = Path::new(paths::LOCAL_INFRA_DIR);

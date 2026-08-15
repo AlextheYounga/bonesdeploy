@@ -165,8 +165,8 @@ this refactor changes its project path only where required by `infra/`.
   separate follow-up.
 - Do not run e2e tests during ordinary implementation validation.
 - No backwards compatibility with old `.bones`-based project layouts. Commands
-  fail with a clear message if they encounter the old structure; the explicit
-  migration tool is the single bridge.
+  fail with a clear message if they encounter the old structure; `bonesdeploy
+  update` is the single versioned bridge.
 - BonesDeploy creates only framework-declared shared directories from local
   environment values. It does not infer or create arbitrary shared files;
   application data files remain application-owned.

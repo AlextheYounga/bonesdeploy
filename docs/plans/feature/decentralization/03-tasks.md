@@ -17,8 +17,9 @@
       BonesDeploy-managed, and compose core before custom through explicit
       Python execution.
 - [x] Make all commands that depend on project loading fail clearly when they
-      encounter an old `.bones` layout, directing the user to the migration
-      tool. No command detects, adapts to, or silently supports the old layout.
+       encounter an old `.bones` layout, directing the user to `bonesdeploy
+       update`. No ordinary command detects, adapts to, or silently supports
+       the old layout.
 - [x] Refactor local provisioning, doctor, manifest, runtime, services, SSL,
       helpers, status, rollback, update, and CLI config/help flows to consume
       the new local inputs and machine conventions.
@@ -46,10 +47,12 @@
       refresh unmodified `infra/provision/core/` files, preserve all custom
       files, and report modified-core conflicts without silently overwriting
       them or performing a three-way merge.
-- [x] Implement an explicit one-shot safe migration from `.bones` to `infra/`
-      that preserves files and encrypted secret bytes, leaves machine-local GPG
-      state untouched, refuses unsafe layouts, and does not create Git commits.
-      This is the single bridge; no other command supports the old layout.
+- [x] Restore the versioned Python update-patch registry and implement the
+       `0.8.0` local patch that safely transitions `.bones` to `infra/`,
+       preserves files and encrypted secret bytes, leaves machine-local GPG
+       state untouched, refuses unsafe layouts, and does not create Git
+       commits. `bonesdeploy update` is the single bridge; no ordinary command
+       supports the old layout.
 - [ ] Remove obsolete templates, fixtures, hooks, and code exposed by the
       refactor, keeping unrelated runtime permission behavior unchanged.
 
@@ -100,8 +103,16 @@
 - The general-purpose `Bones` type remains as an internal compatibility-shaped
   value object for remote machine inputs; project-local persistence is now the
   flat root `.env`, and no command writes or loads a project `bones.toml`.
-- The old `.bones` layout is supported only by the explicit `migrate` command;
-  ordinary commands reject it. E2E fixtures and historical plan references
-  retain explanatory legacy examples and are not runtime compatibility paths.
+- The old `.bones` layout is transitioned only by the version-gated `0.8.0`
+  update patch; ordinary commands reject it. E2E fixtures and historical plan
+  references retain explanatory legacy examples and are not runtime
+  compatibility paths.
+- Restored the Python patch registry with the local `0003-project-infra` patch
+  and marker-only remote completion. The patch's focused tests cover version
+  selection, ciphertext-preserving migration, refusal without a marker, and
+  remote marker creation.
+- Validation passed: `uv run pytest` (379 tests), `cargo test -p bonesdeploy
+  -p bonesinfra`, `cargo clippy`, `cargo fmt --check`, `ruff check .`, and
+  `shfmt -d .`. E2E tests were not run.
 - Full Python and Rust validation is recorded in the implementation session;
   e2e tests were intentionally not run.
