@@ -10,9 +10,3 @@ paths = [
   { path = "*", type = "file", mode = "640" },
   { path = "media", type = "dir", mode = "770", recursive = true },
 ]
-
-[runtime.shared]
-paths = [
-  { path = ".env", type = "file" },
-  { path = "media", type = "dir" },
-]

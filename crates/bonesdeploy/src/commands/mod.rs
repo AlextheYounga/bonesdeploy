@@ -1,10 +1,8 @@
-pub(crate) mod config;
-
 pub mod deploy;
 pub mod doctor;
 pub mod init;
 pub mod manifest;
-pub mod push_state;
+pub mod migrate;
 pub mod releases;
 pub mod remote;
 pub mod rollback;

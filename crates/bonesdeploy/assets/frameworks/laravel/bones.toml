@@ -13,9 +13,3 @@ paths = [
   { path = "database", type = "dir", mode = "770", recursive = false },
   { path = "database/database.sqlite", type = "file", mode = "660", recursive = false },
 ]
-
-[runtime.shared]
-paths = [
-  { path = "storage", type = "dir" },
-  { path = ".env", type = "file" },
-]

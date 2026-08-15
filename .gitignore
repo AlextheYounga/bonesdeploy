@@ -42,3 +42,5 @@ __trash__
 bin
 !tests/**/bin
 __trash__
+.env
+!.env.build

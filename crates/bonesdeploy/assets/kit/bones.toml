@@ -16,7 +16,6 @@ ssl_enabled = false
 
 [app.deploy]
 branch = 'master'
-deploy_on_push = false
 releases = 5
 
 # Per-site build limits.
