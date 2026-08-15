@@ -2,7 +2,6 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
-use bonesdeploy_core::paths::bonesremote_bones_toml_path;
 use serde::Serialize;
 
 use crate::cli::args::{GuideFormat, SkillCommand};
@@ -71,7 +70,7 @@ pub async fn run_next(format: GuideFormat) -> Result<()> {
 
 pub async fn build_report() -> Result<Report> {
     let project = config::repo_directory_name()?;
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::DOT_ENV);
 
     if !bones_toml.exists() {
         return Ok(uninitialized_report(&project));
@@ -186,7 +185,7 @@ async fn remote_setup_complete(cfg: &config::Bones) -> Result<bool> {
         return Ok(false);
     }
 
-    let registry_path = bonesremote_bones_toml_path(&cfg.project_name);
+    let registry_path = Path::new(&cfg.project_root).join(paths::SHARED_DIR).join(paths::DOT_ENV);
     let sync_ok =
         ssh::run_cmd(&session, &format!("test -r {}", ssh::shell_quote(&registry_path.display().to_string())))
             .await

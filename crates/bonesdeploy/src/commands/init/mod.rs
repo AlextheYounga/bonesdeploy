@@ -43,37 +43,29 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     println!("{} {}", style("Initializing").cyan().bold(), style("bonesdeploy").bold());
     prefetch_bonesinfra()?;
 
-    let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
-    let had_bones_entry = fs::symlink_metadata(bones_dir).is_ok();
-    let is_fresh = !bones_dir.exists();
-    if !is_fresh {
-        println!("Using existing .bones config.");
+    if fs::symlink_metadata(paths::OLD_BONES_DIR).is_ok() {
+        anyhow::bail!("Old .bones layout detected. Run `bonesdeploy migrate` first.");
     }
 
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    let mut cfg =
-        if is_fresh { config::collect_fresh_config(args)? } else { config::load_or_collect_config(bones_toml, args)? };
-    let framework_selection = if is_fresh { Some(framework::collect_framework_config(args)?) } else { None };
+    let infra_dir = Path::new(paths::LOCAL_INFRA_DIR);
+    let is_fresh = !infra_dir.exists();
+    if !is_fresh {
+        println!("Using existing infra/ configuration.");
+    }
 
+    let mut cfg = config::collect_fresh_config(args)?;
+    let framework_selection = if is_fresh { Some(framework::collect_framework_config(args)?) } else { None };
     if is_fresh {
         cfg.services.services = framework::collect_database_services(args)?;
-    }
-
-    if let Some(framework) = framework_selection {
-        scaffold::materialize_fresh_bones(bones_dir, had_bones_entry, &mut cfg, framework)?;
+        if let Some(framework) = framework_selection {
+            scaffold::materialize_project(&mut cfg, framework)?;
+        }
     }
 
     scaffold::update_gitignore()?;
-    scaffold::ensure_config_gitignore()?;
     scaffold::ensure_env_build()?;
-    bones_config::save(&cfg, bones_toml)?;
-    if is_fresh {
-        bonesinfra::run(&["project", "materialize", "--config", paths::LOCAL_BONES_TOML])?;
-    }
+    bones_config::save(&cfg, Path::new(paths::DOT_ENV))?;
     secrets::initialize_defaults(&cfg)?;
-    if !is_fresh {
-        scaffold::ensure_bones_git_repo(bones_dir, &cfg)?;
-    }
 
     if is_fresh {
         println!("{} bonesdeploy initialized.", output::success_marker());
@@ -82,9 +74,7 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     }
 
     scaffold::ensure_local_remote(&cfg)?;
-    scaffold::install_pre_push_guard()?;
     print_follow_up_hint();
-
     Ok(())
 }
 

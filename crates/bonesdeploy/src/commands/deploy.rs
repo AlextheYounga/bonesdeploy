@@ -3,18 +3,18 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use console::style;
 
-use crate::commands::{push_state, secrets};
+use crate::commands::secrets;
 use crate::config;
 use crate::infra::ssh;
 use crate::ui::output;
 use bonesdeploy_core::paths;
 
 pub fn local_bones_load_error() -> String {
-    format!("Failed to load {}", paths::LOCAL_BONES_TOML)
+    format!("Failed to load root {}", paths::DOT_ENV)
 }
 
 pub async fn run() -> Result<()> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::DOT_ENV);
     let cfg = config::load(bones_toml).context(local_bones_load_error())?;
 
     println!(
@@ -25,7 +25,6 @@ pub async fn run() -> Result<()> {
         style(&cfg.host).dim(),
     );
 
-    push_state::sync_bones_directory().context("Failed to publish .bones to bonesremote.")?;
     secrets::push().await.context("Failed to push environment secrets.")?;
 
     let session = ssh::connect_privileged(&cfg).await?;

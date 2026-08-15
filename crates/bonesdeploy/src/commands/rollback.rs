@@ -9,7 +9,7 @@ use crate::ui::output;
 use bonesdeploy_core::paths;
 
 pub async fn run() -> Result<()> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
+    let bones_toml = Path::new(paths::DOT_ENV);
     let cfg = config::load(bones_toml).context(super::deploy::local_bones_load_error())?;
 
     println!(

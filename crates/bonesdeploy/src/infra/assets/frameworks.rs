@@ -204,17 +204,13 @@ mod tests {
     }
 
     #[test]
-    fn django_validates_before_mutating_framework_state() -> Result<()> {
+    fn django_validates_before_mutating_framework_state() {
         let script = FrameworkAssets::get("django/deployment/prepare/01_prepare_django.sh")
             .map(|asset| String::from_utf8_lossy(asset.data.as_ref()).into_owned())
             .unwrap_or_default();
         let check = script.find("manage.py check --deploy").expect("Django deployment check");
         let migrate = script.find("manage.py migrate").expect("Django migration");
         assert!(check < migrate);
-
-        let config: Runtime = serde_json::from_value(serde_json::Value::Object(framework_defaults("django")?))?;
-        assert!(!config.shared.paths.iter().any(|path| path.path == "staticfiles"));
-        Ok(())
     }
 
     #[test]

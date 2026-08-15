@@ -57,7 +57,7 @@ pub fn questions(template: &str) -> Result<&'static [Question]> {
 
 /// Validate non-interactive `--framework-var` answers against a template's
 /// question schema. Catches agent typos and bad values before they reach
-/// `bones.toml`.
+/// the project's root `.env` and infrastructure files.
 pub fn validate_answers(template: &str, answers: &serde_json::Map<String, Value>) -> Result<()> {
     let schema = questions(template)?;
     for (key, value) in answers {

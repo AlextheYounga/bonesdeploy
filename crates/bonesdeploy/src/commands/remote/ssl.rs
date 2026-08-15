@@ -8,15 +8,14 @@ use bonesdeploy_core::config as shared_config;
 use bonesdeploy_core::paths;
 
 use super::data;
-use crate::commands::push_state;
 use crate::config;
 use crate::ui::output;
 use crate::ui::prompts;
 
 pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<()> {
-    let bones_toml = Path::new(paths::LOCAL_BONES_TOML);
-    let mut cfg = config::load(bones_toml)?;
-    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_BONES_DIR))?;
+    let env_file = Path::new(paths::DOT_ENV);
+    let mut cfg = config::load(env_file)?;
+    let runtime = shared_config::load_runtime(Path::new(paths::LOCAL_INFRA_DIR))?;
 
     if let Some(value) = domain {
         cfg.domain = value.trim().to_string();
@@ -31,14 +30,14 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     }
 
     if cfg.domain.is_empty() {
-        bail!("SSL domain is missing. Pass --domain or set domain in .bones/bones.toml");
+        bail!("SSL domain is missing. Pass --domain or set DOMAIN in root .env");
     }
 
     if cfg.email.is_empty() {
-        bail!("SSL email is missing. Pass --email or set email in .bones/bones.toml");
+        bail!("SSL email is missing. Pass --email or set EMAIL in root .env");
     }
 
-    config::save(&cfg, bones_toml)?;
+    config::save(&cfg, env_file)?;
 
     if !yes && !prompts::confirm_remote_ssl()? {
         println!("Skipped HTTPS setup.");
@@ -58,12 +57,10 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     }
 
     let json = serde_json::to_string(&deploy_data).context("Failed to serialize deploy data")?;
-    bonesinfra::run_with_stdin(&["ssl", "apply", "--config", paths::LOCAL_BONES_TOML], &json)?;
+    bonesinfra::run_with_stdin(&["ssl", "apply", "--env-file", paths::DOT_ENV], &json)?;
 
     cfg.ssl_enabled = true;
-    config::save(&cfg, bones_toml)?;
-    push_state::sync_bones_directory()?;
-
+    config::save(&cfg, env_file)?;
     println!("{} HTTPS configured.", output::success_marker());
     println!();
     println!("{}", output::next_step("bonesdeploy deploy"));

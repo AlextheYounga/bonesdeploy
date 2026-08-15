@@ -12,13 +12,11 @@ use bonesdeploy_core::{config::is_numbered_shell_script, paths};
 pub async fn run(local_only: bool, verbose: bool) -> Result<bool> {
     println!("{} Checking deployment...", console::style("bonesdeploy doctor").bold());
 
-    let cfg = config::load(Path::new(paths::LOCAL_BONES_TOML)).ok();
-    let deploy_on_push = cfg.as_ref().is_some_and(|c| c.deploy_on_push);
-
+    let cfg = config::load(Path::new(paths::DOT_ENV)).ok();
     let mut issues = 0usize;
     let mut pending = false;
 
-    issues += print_check(".bones config", check_bones_config(), Some(output::run_command("bonesdeploy init")));
+    issues += print_check("local project layout", check_local_layout(), Some(output::run_command("bonesdeploy init")));
     issues += print_check(
         "deployment scripts",
         check_deployment_scripts(),
@@ -31,10 +29,6 @@ pub async fn run(local_only: bool, verbose: bool) -> Result<bool> {
         local_branch_issue,
         cfg.as_ref().map(|c| format!("git checkout -b {} && git push {} {}", c.branch, c.remote_name, c.branch)),
     );
-
-    if deploy_on_push {
-        issues += print_check("pre-push hook", check_pre_push_hook(), Some(output::run_command("bonesdeploy init")));
-    }
 
     if !local_only {
         let (remote_issues, remote_pending) = check_remote(cfg.as_ref(), verbose).await;
@@ -68,22 +62,20 @@ async fn check_remote(cfg: Option<&config::Bones>, verbose: bool) -> (usize, boo
             );
             if remote_ssh_issue.is_none() {
                 let (remote_issue, pending) = check_remote_doctor(cfg, verbose).await;
-                issues += print_check(
-                    "remote doctor",
-                    remote_issue,
-                    Some(format!(
-                        "{} or {}",
-                        output::run_command("bonesdeploy push"),
-                        output::run_command("bonesdeploy remote setup")
-                    )),
-                );
+                issues +=
+                    print_check("remote doctor", remote_issue, Some(output::run_command("bonesdeploy remote setup")));
                 return (issues, pending);
             }
             (issues, false)
         }
-        None => {
-            (print_failure("remote SSH", "Missing .bones config", Some(output::run_command("bonesdeploy init"))), false)
-        }
+        None => (
+            print_failure(
+                "remote SSH",
+                "Missing root .env configuration",
+                Some(output::run_command("bonesdeploy init")),
+            ),
+            false,
+        ),
     }
 }
 
@@ -107,30 +99,31 @@ fn print_failure(label: &str, issue: &str, next: Option<String>) -> usize {
     1
 }
 
-fn check_bones_config() -> Option<String> {
-    let bones_dir = Path::new(paths::LOCAL_BONES_DIR);
-
-    if !bones_dir.exists() {
-        return Some(String::from("Missing .bones config"));
+fn check_local_layout() -> Option<String> {
+    let old_layout = Path::new(paths::OLD_BONES_DIR);
+    if fs::symlink_metadata(old_layout).is_ok() {
+        return Some(String::from("Old .bones layout detected; run `bonesdeploy migrate` before using this project"));
     }
 
-    if !bones_dir.is_symlink() {
-        return Some(String::from(".bones is not managed by bonesdeploy"));
+    let infra = Path::new(paths::LOCAL_INFRA_DIR);
+    if !infra.is_dir() {
+        return Some(String::from("Missing infra/ directory; run `bonesdeploy init`"));
     }
 
-    if !Path::new(paths::LOCAL_BONES_TOML).exists() {
-        return Some(format!("Missing {}", paths::LOCAL_BONES_TOML));
+    let env_file = Path::new(paths::DOT_ENV);
+    if !env_file.is_file() {
+        return Some(String::from("Missing root .env; run `bonesdeploy init`"));
     }
 
-    if let Err(error) = config::load(Path::new(paths::LOCAL_BONES_TOML)) {
-        return Some(format!("Invalid {}: {error:#}", paths::LOCAL_BONES_TOML));
+    if let Err(error) = config::load(env_file) {
+        return Some(format!("Invalid root .env: {error:#}"));
     }
 
     None
 }
 
 fn check_deployment_scripts() -> Option<String> {
-    let deployment_dir = Path::new(paths::LOCAL_BONES_DEPLOYMENT_DIR);
+    let deployment_dir = Path::new(paths::LOCAL_INFRA_DEPLOYMENT_DIR);
     if !deployment_dir.exists() {
         return None;
     }
@@ -186,19 +179,6 @@ fn check_local_branch(cfg: &config::Bones) -> Option<String> {
     } else {
         Some(format!("Local branch '{}' does not exist: {}", cfg.branch, stderr))
     }
-}
-
-fn check_pre_push_hook() -> Option<String> {
-    let guard = Path::new(paths::GIT_PRE_PUSH_HOOK);
-    let Ok(contents) = fs::read_to_string(guard) else {
-        return Some(String::from("pre-push hook is not installed"));
-    };
-
-    if contents.contains("bonesdeploy-pre-push-v1") {
-        return None;
-    }
-
-    Some(String::from("pre-push hook is missing or stale"))
 }
 
 async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {

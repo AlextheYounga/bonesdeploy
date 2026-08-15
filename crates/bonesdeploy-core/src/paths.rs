@@ -22,15 +22,14 @@ pub const APPARMOR_ENABLED_PARAM: &str = "/sys/module/apparmor/parameters/enable
 pub const APPARMOR_PROFILES: &str = "/sys/kernel/security/apparmor/profiles";
 pub const USR_LOCAL_BIN: &str = "/usr/local/bin";
 
-pub const LOCAL_BONES_DIR: &str = ".bones";
-pub const LOCAL_BONES_TOML: &str = ".bones/bones.toml";
-pub const LOCAL_BONES_DEPLOYMENT_DIR: &str = ".bones/deployment";
-pub const LOCAL_BONES_SECRETS_DIR: &str = ".bones/secrets";
+pub const OLD_BONES_DIR: &str = ".bones";
+pub const LOCAL_INFRA_DIR: &str = "infra";
+pub const LOCAL_INFRA_DEPLOYMENT_DIR: &str = "infra/deployment";
+pub const LOCAL_INFRA_SECRETS_DIR: &str = "infra/secrets";
 pub const DOT_ENV: &str = ".env";
 pub const ENV_BUILD_FILE: &str = ".env.build";
 
 pub const BONES_DIR: &str = "bones";
-pub const BONES_TOML: &str = "bones.toml";
 pub const NGINX_CONF: &str = "nginx.conf";
 pub const INDEX_HTML: &str = "index.html";
 pub const GIT_HEAD: &str = "HEAD";
@@ -57,7 +56,6 @@ pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
 pub const BONESREMOTE_BINARY: &str = "bonesremote";
 pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
 pub const BONESREMOTE_SITES_DIR: &str = "sites";
-pub const BONESREMOTE_REPOS_DIR: &str = "repos";
 pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
 pub const BUILD_CACHE_DIR: &str = "cache";
 pub const NGINX_SOCKET: &str = "nginx.sock";
@@ -66,9 +64,6 @@ pub const PHP_FPM_SOCKET: &str = "php-fpm.sock";
 pub const DEFAULT_NGINX_SITE: &str = "default";
 pub const SYSTEMD_SERVICE_SUFFIX: &str = ".service";
 
-pub const GIT_HOOKS_DIR: &str = ".git/hooks";
-pub const GIT_PRE_PUSH_HOOK: &str = ".git/hooks/pre-push";
-pub const PRE_PUSH_HOOK_NAME: &str = "pre-push";
 pub const HOOKS_DIR: &str = "hooks";
 pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";
 pub const BONES_CONFIG_PROJECTS_DIR: &str = "projects";
@@ -78,15 +73,6 @@ pub const GITIGNORE_FILE: &str = ".gitignore";
 #[must_use]
 pub fn default_repo_path_for(project_name: &str) -> String {
     Path::new(DEFAULT_REPO_PARENT).join(format!("{project_name}.git")).display().to_string()
-}
-
-#[must_use]
-pub fn default_bones_repo_path_for(project_name: &str) -> String {
-    bonesremote_config_root()
-        .join(BONESREMOTE_REPOS_DIR)
-        .join(format!("{project_name}.bones.git"))
-        .display()
-        .to_string()
 }
 
 #[must_use]
@@ -115,11 +101,6 @@ pub fn site_target_name(project_name: &str) -> String {
 }
 
 #[must_use]
-pub fn bonesremote_config_root() -> PathBuf {
-    PathBuf::from(BONESREMOTE_CONFIG_DIR)
-}
-
-#[must_use]
 pub fn bonesremote_sites_root() -> PathBuf {
     bonesremote_config_root().join(BONESREMOTE_SITES_DIR)
 }
@@ -127,11 +108,6 @@ pub fn bonesremote_sites_root() -> PathBuf {
 #[must_use]
 pub fn bonesremote_site_root(site: &str) -> PathBuf {
     bonesremote_sites_root().join(site)
-}
-
-#[must_use]
-pub fn bonesremote_bones_toml_path(site: &str) -> PathBuf {
-    bonesremote_site_root(site).join(BONES_TOML)
 }
 
 #[must_use]
@@ -216,4 +192,8 @@ pub fn bones_state_root() -> PathBuf {
     } else {
         home_dir().join(".local/state/bonesdeploy")
     }
+}
+#[must_use]
+pub fn bonesremote_config_root() -> PathBuf {
+    PathBuf::from(BONESREMOTE_CONFIG_DIR)
 }

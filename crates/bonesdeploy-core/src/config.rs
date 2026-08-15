@@ -29,6 +29,14 @@ pub mod bonesinfra_input {
     pub const RUNTIME_GROUP: &str = "runtime_group";
 }
 
+pub mod project_env {
+    pub const PROJECT_NAME: &str = "PROJECT_NAME";
+    pub const TEMPLATE: &str = "TEMPLATE";
+    pub const WEB_ROOT: &str = "WEB_ROOT";
+}
+
+pub const PROJECT_SETUP_ERROR: &str = "root .env and infra/ are required. Run `bonesdeploy init` first.";
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Bones {
@@ -36,6 +44,20 @@ pub struct Bones {
     pub runtime: Runtime,
     pub services: Services,
     pub build: Build,
+}
+
+impl Bones {
+    /// Builds the remote-side identity and convention-derived paths for a site.
+    /// Runtime settings remain at their defaults until a lifecycle operation
+    /// loads the deployed shared environment.
+    #[must_use]
+    pub fn for_site(site: &str) -> Self {
+        let mut config = Self::default();
+        config.project_name = site.to_string();
+        config.repo_path = default_repo_path_for(site);
+        config.project_root = paths::default_project_root_for(site);
+        config
+    }
 }
 
 impl Deref for Bones {
@@ -136,8 +158,6 @@ pub struct Runtime {
     #[serde(default = "default_node_version")]
     pub node_version: String,
     #[serde(default)]
-    pub shared: Shared,
-    #[serde(default)]
     pub permissions: Option<toml::Value>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, toml::Value>,
@@ -150,7 +170,6 @@ impl Default for Runtime {
             template: String::new(),
             web_root: paths::default_web_root(),
             node_version: default_node_version(),
-            shared: Shared::default(),
             permissions: None,
             extra: BTreeMap::new(),
         }
@@ -227,33 +246,24 @@ pub fn validate_database_services(services: &[String]) -> Result<()> {
     Ok(())
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Shared {
-    pub paths: Vec<SharedPath>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SharedPath {
-    pub path: String,
-    #[serde(rename = "type")]
-    pub path_type: SharedPathType,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum SharedPathType {
-    File,
-    Dir,
+/// Reject the removed shared-path configuration instead of silently ignoring it.
+///
+/// Frameworks own their shared directory declarations now; the only managed
+/// shared file is always `shared/.env`.
+pub fn validate_runtime(runtime: &Runtime) -> Result<()> {
+    if runtime.extra.contains_key("shared") {
+        bail!(
+            "runtime.shared is no longer supported; shared/.env and framework directories are provisioned automatically"
+        );
+    }
+    Ok(())
 }
 
 /// # Errors
-/// Returns an error when the configuration cannot be read or parsed.
+/// Returns an error when the local environment file cannot be read or parsed.
 pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
-    let path = config_dir.join(paths::BONES_TOML);
-    let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let bones: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    Ok(bones.runtime)
+    let path = config_dir.join(paths::DOT_ENV);
+    Ok(load(&path)?.runtime)
 }
 
 pub fn apply_derived_defaults(config: &mut Bones) {
@@ -267,14 +277,68 @@ pub fn apply_derived_defaults(config: &mut Bones) {
     }
 }
 
-/// Loads and parses a `bones.toml` configuration file, applying derived defaults.
+/// Loads project-local provisioning values from a dotenv file.
+///
+/// The file is intentionally flat. Deployment paths and identities are derived
+/// from the project name rather than persisted as a second configuration model.
 /// # Errors
-/// Returns an error if the file cannot be read or the TOML is invalid.
+/// Returns an error if the file cannot be read or contains an invalid value.
 pub fn load(path: &Path) -> Result<Bones> {
     let content = fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
-    let mut config: Bones = toml::from_str(&content).with_context(|| format!("Failed to parse {}", path.display()))?;
-    apply_derived_defaults(&mut config);
+    let values = parse_dotenv(&content)?;
+    let project_name = values.get(project_env::PROJECT_NAME).cloned().unwrap_or_default();
+    let mut config = Bones::default();
+    config.project_name = project_name.clone();
+    config.remote_name = values.get("REMOTE_NAME").cloned().unwrap_or_else(|| String::from("production"));
+    config.ssh_user = values.get("SSH_USER").cloned().unwrap_or_else(|| String::from("root"));
+    config.host = values.get("HOST").cloned().unwrap_or_default();
+    config.port = values.get("PORT").cloned().unwrap_or_else(|| String::from("22"));
+    config.branch = values.get("BRANCH").cloned().unwrap_or_else(|| String::from("main"));
+    config.domain = values.get("DOMAIN").cloned().unwrap_or_default();
+    config.preview_domain = values.get("PREVIEW_DOMAIN").cloned().unwrap_or_default();
+    config.email = values.get("EMAIL").cloned().unwrap_or_default();
+    config.ssl_enabled = values.get("SSL_ENABLED").is_some_and(|value| value == "true");
+    config.runtime.template = values.get(project_env::TEMPLATE).cloned().unwrap_or_default();
+    config.runtime.web_root = values.get(project_env::WEB_ROOT).cloned().unwrap_or_else(|| paths::default_web_root());
+    config.runtime.backend = match values.get("RUNTIME_BACKEND").map_or("native", String::as_str) {
+        "native" => RuntimeBackend::Native,
+        "docker" => RuntimeBackend::Docker,
+        value => bail!("Invalid RUNTIME_BACKEND: {value}"),
+    };
+    config.services.services = values
+        .get("SERVICES")
+        .map(|value| {
+            value.split(',').filter(|item| !item.trim().is_empty()).map(|item| item.trim().to_string()).collect()
+        })
+        .unwrap_or_default();
+    config.repo_path = default_repo_path_for(&project_name);
+    config.project_root = paths::default_project_root_for(&project_name);
+    config.preview_domain = if config.preview_domain.is_empty() {
+        default_preview_domain_for(&project_name, &config.host)
+    } else {
+        config.preview_domain.clone()
+    };
     validate_host(&config.host)?;
+    validate_runtime(&config.runtime)?;
     validate_database_services(&config.services.services)?;
     Ok(config)
+}
+
+fn parse_dotenv(content: &str) -> Result<BTreeMap<String, String>> {
+    let mut values = BTreeMap::new();
+    for (line_number, raw_line) in content.lines().enumerate() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            bail!("Invalid .env entry on line {}", line_number + 1);
+        };
+        let key = key.trim();
+        if key.is_empty() {
+            bail!("Invalid .env key on line {}", line_number + 1);
+        }
+        values.insert(key.to_string(), value.trim().trim_matches('"').to_string());
+    }
+    Ok(values)
 }

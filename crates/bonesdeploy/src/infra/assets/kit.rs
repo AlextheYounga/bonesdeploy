@@ -11,25 +11,6 @@ use super::write_asset;
 #[folder = "./assets/kit/"]
 pub(super) struct Kit;
 
-pub fn scaffold(bones_dir: &Path) -> Result<()> {
-    for file_path in Kit::iter() {
-        let Some(asset) = Kit::get(&file_path) else {
-            continue;
-        };
-        write_asset(bones_dir, file_path.as_ref(), asset.data.as_ref())?;
-    }
-
-    Ok(())
-}
-
-pub fn scaffold_gitignore(bones_dir: &Path) -> Result<()> {
-    let path = paths::GITIGNORE_FILE;
-    let Some(asset) = Kit::get(path) else {
-        return Ok(());
-    };
-    write_asset(bones_dir, path, asset.data.as_ref())
-}
-
 pub(super) fn scaffold_deployment_functions(bones_dir: &Path) -> Result<()> {
     let path = format!("{}functions.sh", paths::KIT_DEPLOYMENT_DIR);
     let Some(asset) = Kit::get(&path) else {

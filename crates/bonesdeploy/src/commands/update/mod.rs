@@ -47,19 +47,19 @@ pub async fn run(options: Options) -> Result<()> {
             updated = true;
         }
 
-        if Path::new(paths::LOCAL_BONES_TOML).exists() {
+        if Path::new(paths::DOT_ENV).exists() {
             bonesinfra::run(&[
                 "patches",
                 "apply",
-                "--config",
-                paths::LOCAL_BONES_TOML,
+                "--env-file",
+                paths::DOT_ENV,
                 "--target-version",
                 &release_versions.bonesdeploy,
                 "--scope",
                 "local",
             ])?;
         }
-        sync::refresh_local_bones_from_source(&source_dir, Path::new(paths::LOCAL_BONES_DIR))?;
+        sync::refresh_local_infrastructure(&source_dir, Path::new("."))?;
     }
 
     if !options.skip_remote {
