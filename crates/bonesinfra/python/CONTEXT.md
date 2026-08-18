@@ -98,15 +98,15 @@ bonesinfra = "bonesinfra.__main__:main"
 The private command shapes currently used by the Rust CLI are:
 
 ```sh
-bonesinfra helpers apply --config <bones.toml>
-bonesinfra setup apply --config <bones.toml>
-bonesinfra runtime apply --config <bones.toml>
-bonesinfra ssl apply --config <bones.toml>
-bonesinfra services apply --config <bones.toml>
-bonesinfra manifest show --config <bones.toml>
+bonesinfra helpers apply --env-file <.env>
+bonesinfra setup apply --env-file <.env>
+bonesinfra runtime apply --env-file <.env>
+bonesinfra ssl apply --env-file <.env>
+bonesinfra services apply --env-file <.env>
+bonesinfra manifest show --env-file <.env>
 ```
 
-`ssh_user` is read from `bones.toml` (`app.server.ssh_user` key, default `"root"`) instead of a CLI flag.
+`ssh_user` is read from the root `.env` (`SSH_USER` key, default `"root"`) instead of a CLI flag.
 
 This command surface is an internal contract with `bonesdeploy`. Runtime
 questions are owned by the Rust runtime definitions under
@@ -259,7 +259,7 @@ Responsibilities:
 
 - run pyinfra programmatically
 - load TOML files
-- read stdin JSON overrides if supported
+- receive the explicit `.env` path from the Rust subprocess boundary
 - bridge CLI-selected deploy plans to pyinfra
 
 Pyinfra code may import pyinfra.

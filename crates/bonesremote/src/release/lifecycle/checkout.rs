@@ -92,6 +92,28 @@ pub(crate) fn resolve_revision_commit(repo_path: &Path, revision: &str) -> Resul
     Ok(sha)
 }
 
+pub(crate) fn repository_has_refs(repo_path: &Path) -> Result<bool> {
+    let repo_path = repo_path.to_str().context("Bare repository path is not valid UTF-8")?;
+    let output = Command::new("git")
+        .args(["--git-dir", repo_path, "for-each-ref", "--format=%(refname)"])
+        .output()
+        .with_context(|| format!("Failed to inspect refs in {repo_path}"))?;
+    if !output.status.success() {
+        bail!("Failed to inspect refs in {repo_path}\n{}", String::from_utf8_lossy(&output.stderr));
+    }
+    Ok(!output.stdout.is_empty())
+}
+
+pub(crate) fn branch_exists(repo_path: &Path, branch: &str) -> Result<bool> {
+    let repo_path = repo_path.to_str().context("Bare repository path is not valid UTF-8")?;
+    let ref_name = format!("refs/heads/{branch}");
+    let output = Command::new("git")
+        .args(["--git-dir", repo_path, "rev-parse", "--verify", &ref_name])
+        .output()
+        .with_context(|| format!("Failed to inspect branch {branch} in {repo_path}"))?;
+    Ok(output.status.success())
+}
+
 pub fn ensure_build_context(snapshot: &super::DeploymentSnapshot) -> Result<PathBuf> {
     let root = resolved_tmp_root(&snapshot.site);
     fs::create_dir_all(&root).with_context(|| format!("Failed to create tmp builds root: {}", root.display()))?;

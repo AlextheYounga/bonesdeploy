@@ -495,7 +495,7 @@ Cli::Init
 ```
 Cli::Remote::Bootstrap
   └─ commands/remote/bootstrap.rs::run()
-       ├─ bonesinfra::run_with_stdin("setup", "apply", stdin_json)
+        ├─ bonesinfra::run("setup", "apply", "--env-file", ".env")
        │    └─ Python: cli/commands/setup/__init__.py::deploy_setup()
        │         ├─ packages.py       # apt install base + supplementary packages
        │         ├─ users.py          # create deploy user, runtime users, groups
@@ -658,7 +658,7 @@ Cli::Remote::Runtime
 
 ### Binary communication
 - `bonesdeploy` communicates with `bonesremote` via SSH command execution (not an API).
-- `bonesdeploy` communicates with `bonesinfra` via subprocess calls (`bonesinfra::run()` / `run_with_stdin()`).
+- `bonesdeploy` communicates with `bonesinfra` via the `bonesinfra::run()` subprocess boundary. Configuration is read from the root `.env` by BonesInfra.
 - `bonesremote` communicates with `bonesinfra` only indirectly — `bonesdeploy` runs `bonesinfra` against the server during provisioning; `bonesremote` never calls `bonesinfra`.
 
 ### Error handling
@@ -687,11 +687,10 @@ Cli::Remote::Runtime
 Older versions stored deployment state in separate files (`active-deployment.json`, `staged-release`). The `store` module migrates these to the unified `SiteState` format on first read. The migration path is one-way and the old files are deleted after migration.
 
 ### Cross-layer configuration and integration side doors
-Rust and Python still have separate dotenv readers (`parse_dotenv` and `_dotenv`).
-`remote/data.rs` still constructs a `bonesinfra_input` stdin JSON payload that
-Python does not consume. Local doctor and release-update code also bypass the
-existing Git and SSH boundaries. These are tracked for the configuration and
-integration child changes.
+Rust and Python have separate dotenv readers with the same root `.env` contract.
+BonesInfra owns provisioning configuration and receives only the explicit
+`--env-file` path. Local Git and SSH callers use their existing integration
+boundaries.
 
 ### Framework and deployment side doors
 Framework identity, defaults, and assets cross Rust and Python boundaries, while

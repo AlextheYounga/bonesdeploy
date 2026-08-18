@@ -8,7 +8,6 @@
 
 use std::fs;
 use std::hash::{DefaultHasher, Hasher};
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -66,34 +65,6 @@ pub fn run_capture(args: &[&str]) -> Result<String> {
     }
 
     String::from_utf8(output.stdout).context("bonesinfra produced invalid UTF-8 output")
-}
-
-/// Runs `python -m bonesinfra` with the given arguments, writing `stdin_json` to stdin.
-///
-/// # Errors
-/// Fails when the runtime cannot be materialized or the command exits non-zero.
-pub fn run_with_stdin(args: &[&str], stdin_json: &str) -> Result<()> {
-    let executable = ensure_available()?;
-    let mut command = base_command(&executable, args);
-    command.stdin(Stdio::piped());
-
-    let mut child = command
-        .spawn()
-        .with_context(|| format!("Failed to run bonesinfra {} from {}", args.join(" "), executable.display()))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        stdin.write_all(stdin_json.as_bytes()).context("Failed to write JSON data to bonesinfra stdin")?;
-    }
-
-    let status = child
-        .wait()
-        .with_context(|| format!("Failed to wait on bonesinfra {} from {}", args.join(" "), executable.display()))?;
-
-    if !status.success() {
-        bail!("bonesinfra failed");
-    }
-
-    Ok(())
 }
 
 fn base_command(executable: &Path, args: &[&str]) -> Command {

@@ -543,7 +543,8 @@ provisioning uses managed `infra/provision/core` and project-owned
 goes through `Runtime.extra`.
 
 **Binary communication.** `bonesdeploy` ↔ `bonesremote` via SSH command execution.
-`bonesdeploy` ↔ `bonesinfra` via subprocess (`bonesinfra::run()` / `run_with_stdin()`).
+`bonesdeploy` ↔ `bonesinfra` via the `bonesinfra::run()` subprocess boundary;
+BonesInfra reads the explicit root `.env` path.
 `bonesremote` never calls `bonesinfra`.
 
 **Script naming.** Deployment scripts use `NN_name.sh` and run in lexical order.
@@ -586,12 +587,10 @@ both systems by design.
 files. The `store` module migrates these to unified `SiteState` on first read
 and deletes the old files. The migration is one-way.
 
-**Cross-layer configuration and integration side doors.** Rust and Python still
-have separate dotenv readers (`parse_dotenv` and `_dotenv`). `remote/data.rs`
-still constructs a `bonesinfra_input` stdin JSON payload that Python does not
-consume. Local doctor and release-update code also bypass the existing Git and
-SSH boundaries, respectively. These are tracked for the configuration and
-integration child changes.
+**Cross-layer configuration and integration side doors.** Rust and Python have
+separate readers for the same root `.env` contract. BonesInfra provisioning
+receives the explicit `--env-file` path, while Git and SSH callers use their
+existing integration boundaries.
 
 **Framework and deployment side doors.** Framework identity, defaults, and
 assets cross Rust and Python boundaries, while release commands can reach state

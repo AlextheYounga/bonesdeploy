@@ -5,6 +5,7 @@ use std::process::Command;
 use bonesdeploy_core::{config, paths};
 
 use crate::release::lifecycle::build::validate_build_cache;
+use crate::release::lifecycle::checkout::{branch_exists, repository_has_refs};
 use crate::runtime::docker;
 
 use super::services;
@@ -107,35 +108,25 @@ fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pen
     if branch.is_empty() {
         return;
     }
-    let ref_name = format!("refs/heads/{branch}");
-    let refs = match Command::new("git").args(["--git-dir", repo_path, "for-each-ref", "--format=%(refname)"]).output()
-    {
-        Ok(output) if output.status.success() => output,
-        Ok(output) => {
-            issues.push(format!(
-                "could not inspect branches in {repo_path}: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
+    match repository_has_refs(Path::new(repo_path)) {
+        Ok(true) => {}
+        Ok(false) => {
+            pending.push(format!(
+                "deploy branch '{branch}' has not been pushed yet. Run 'git push <remote> {branch}' before the first deploy."
             ));
             return;
         }
         Err(error) => {
-            issues.push(format!("could not run git while inspecting {repo_path}: {error}"));
+            issues.push(format!("could not inspect branches in {repo_path}: {error}"));
             return;
         }
-    };
-    if refs.stdout.is_empty() {
-        pending.push(format!(
-            "deploy branch '{branch}' has not been pushed yet. Run 'git push <remote> {branch}' before the first deploy."
-        ));
-        return;
     }
-    let branch_output = Command::new("git").args(["--git-dir", repo_path, "rev-parse", "--verify", &ref_name]).output();
-    match branch_output {
-        Ok(output) if output.status.success() => {}
-        Ok(_) => issues.push(format!(
+    match branch_exists(Path::new(repo_path), branch) {
+        Ok(true) => {}
+        Ok(false) => issues.push(format!(
             "deploy branch '{branch}' has not been pushed to {repo_path}. Run 'git push <remote> {branch}' first."
         )),
-        Err(error) => issues.push(format!("could not run git while checking branch '{branch}': {error}")),
+        Err(error) => issues.push(format!("could not check branch '{branch}': {error}")),
     }
 }
 
