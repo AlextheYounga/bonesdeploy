@@ -59,6 +59,15 @@ def test_missing_local_package_uses_selected_builtin_framework(tmp_path: Path):
     assert module.__name__ == "bonesinfra.frameworks.next.runtime"
 
 
+def test_selected_builtin_framework_accepts_quoted_template(tmp_path: Path):
+    config = tmp_path / ".env"
+    config.write_text('TEMPLATE="next"\n')
+
+    module = load_runtime(config)
+
+    assert module.__name__ == "bonesinfra.frameworks.next.runtime"
+
+
 def test_materialize_copies_canonical_framework_package(tmp_path: Path):
     config = tmp_path / ".env"
     config.write_text("TEMPLATE=django\n")

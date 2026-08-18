@@ -1,12 +1,8 @@
-use std::env;
-use std::fs;
-use std::path::Path;
-
-use anyhow::{Context, Result};
-use bonesdeploy_core::config::RuntimeBackend;
+use anyhow::Result;
 use bonesdeploy_core::paths;
+use std::env;
 
-pub use bonesdeploy_core::config::{Bones, load};
+pub use bonesdeploy_core::config::{Bones, load, save};
 
 /// Resolves the SSH user for provisioning commands: `BONES_BOOTSTRAP_SSH_USER`
 /// overrides the configured `ssh_user`; blank values fall back to `root`.
@@ -31,31 +27,6 @@ pub fn repo_directory_name() -> Result<String> {
     Ok(cwd.file_name().map_or_else(|| String::from("project"), |n| n.to_string_lossy().to_string()))
 }
 
-pub fn save(config: &Bones, path: &Path) -> Result<()> {
-    let content = format!(
-        "PROJECT_NAME={}\nREMOTE_NAME={}\nHOST={}\nPORT={}\nSSH_USER={}\nBRANCH={}\nDOMAIN={}\nPREVIEW_DOMAIN={}\nEMAIL={}\nSSL_ENABLED={}\nTEMPLATE={}\nRUNTIME_BACKEND={}\nWEB_ROOT={}\nSERVICES={}\n",
-        config.project_name,
-        config.remote_name,
-        config.host,
-        config.port,
-        config.ssh_user,
-        config.branch,
-        config.domain,
-        config.preview_domain,
-        config.email,
-        config.ssl_enabled,
-        config.runtime.template,
-        match config.runtime.backend {
-            RuntimeBackend::Native => "native",
-            RuntimeBackend::Docker => "docker",
-        },
-        config.runtime.web_root,
-        config.services.services.join(","),
-    );
-    fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::env::temp_dir;
@@ -67,7 +38,7 @@ mod tests {
     use anyhow::Result;
 
     use super::{Bones, bootstrap_ssh_user, save};
-    use bonesdeploy_core::config::load;
+    use bonesdeploy_core::config::{RuntimeBackend, load};
 
     fn temp_path(file_name: &str) -> PathBuf {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -113,7 +84,12 @@ mod tests {
         let mut config = sample_config("phoenix");
         config.ssl_enabled = true;
         config.domain = String::from("app.example.com");
+        config.preview_domain = String::from("preview.example.com");
         config.email = String::from("ops@example.com");
+        config.runtime.template = String::from("next");
+        config.runtime.backend = RuntimeBackend::Docker;
+        config.runtime.web_root = String::from("dist");
+        config.services.services = vec![String::from("postgres"), String::from("redis")];
 
         let path = temp_path("save.env");
         save(&config, &path)?;
@@ -124,7 +100,17 @@ mod tests {
         assert!(content.contains("EMAIL=ops@example.com"));
         let loaded = load(&path)?;
         assert_eq!(loaded.project_name, "phoenix");
+        assert_eq!(loaded.remote_name, "production");
+        assert_eq!(loaded.ssh_user, "root");
+        assert_eq!(loaded.host, "deploy.example.com");
+        assert_eq!(loaded.port, "22");
+        assert_eq!(loaded.branch, "master");
         assert!(loaded.ssl_enabled);
+        assert_eq!(loaded.preview_domain, "preview.example.com");
+        assert_eq!(loaded.runtime.template, "next");
+        assert_eq!(loaded.runtime.backend, RuntimeBackend::Docker);
+        assert_eq!(loaded.runtime.web_root, "dist");
+        assert_eq!(loaded.services.services, ["postgres", "redis"]);
 
         fs::remove_file(path)?;
         Ok(())

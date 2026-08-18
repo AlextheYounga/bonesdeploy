@@ -9,6 +9,9 @@ from shutil import copyfile
 from types import ModuleType
 from typing import Any
 
+from bonesinfra.config.context import read_dotenv
+from bonesinfra.config.keys import TEMPLATE
+
 BUILTIN_FRAMEWORKS = frozenset({"custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"})
 
 
@@ -144,12 +147,7 @@ def _combined_entries(core: ModuleType, custom: ModuleType | None, name: str, ct
 
 
 def _selected_framework(config_path: str | Path) -> str:
-    selected = "custom"
-    for line in Path(config_path).read_text().splitlines():
-        key, separator, value = line.partition("=")
-        if separator and key.strip() == "TEMPLATE":
-            selected = value.strip().strip('"') or "custom"
-            break
+    selected = read_dotenv(Path(config_path).read_text()).get(TEMPLATE) or "custom"
     if selected not in BUILTIN_FRAMEWORKS:
         raise ValueError(f"unknown framework infrastructure: {selected}")
     return selected

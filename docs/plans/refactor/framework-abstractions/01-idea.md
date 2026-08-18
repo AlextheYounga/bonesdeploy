@@ -104,12 +104,15 @@ This parent change includes:
 - defining the dependency order for child implementation changes;
 - creating separate Acta planning records for each child change;
 - the authorized initial bootstrap/documentation/Framework implementation slice.
+- the authorized project configuration implementation slice.
 
 ## Constraints
 
 - The initial slice may modify the manifest command and Rust Framework callers as
   recorded in clarification 11; remaining child changes are implemented separately.
 - Child changes are implemented separately and reviewed independently.
+- The project configuration slice preserves the flat `.env` wire format and does
+  not consume the deferred `bonesinfra_input` or nested `App` serde contracts.
 - Existing concepts are strengthened before new abstractions are introduced.
 - `bonesdeploy-core` remains a leaf crate; `bonesremote` does not depend on
   `bonesinfra`.

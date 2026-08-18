@@ -4,6 +4,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from bonesinfra.config.keys import (
+    APP_KEYS,
+    BRANCH,
+    DOMAIN,
+    EMAIL,
+    HOST,
+    PORT,
+    PREVIEW_DOMAIN,
+    PROJECT_NAME,
+    RUNTIME_BACKEND,
+    SERVICES,
+    SSH_USER,
+    SSL_ENABLED,
+    WEB_ROOT,
+)
 from bonesinfra.config.paths import DEFAULT_PROJECT_ROOT_PARENT, DEFAULT_REPO_PARENT, DeploymentPaths
 
 DEPLOY_USER = "git"
@@ -21,55 +36,36 @@ class DeployContext:
 
     @classmethod
     def from_files(cls, config_path: str) -> DeployContext:
-        values = _dotenv(Path(config_path).read_text())
-        project_name = values.get("PROJECT_NAME", "")
+        values = read_dotenv(Path(config_path).read_text())
+        project_name = values.get(PROJECT_NAME, "")
 
         app = AppConfig(
             project_name=project_name,
             repo_path=f"{DEFAULT_REPO_PARENT}/{project_name}.git",
             project_root=f"{DEFAULT_PROJECT_ROOT_PARENT}/{project_name}",
             server=ServerConfig(
-                host=values.get("HOST", ""),
-                ssh_user=values.get("SSH_USER", DEFAULT_SSH_USER),
-                port=values.get("PORT", DEFAULT_SSH_PORT),
+                host=values.get(HOST, ""),
+                ssh_user=values.get(SSH_USER, DEFAULT_SSH_USER),
+                port=values.get(PORT, DEFAULT_SSH_PORT),
             ),
             dns=DnsConfig(
-                domain=values.get("DOMAIN", ""),
-                preview_domain=values.get("PREVIEW_DOMAIN", ""),
-                email=values.get("EMAIL", ""),
-                ssl_enabled=values.get("SSL_ENABLED", "false").lower() == "true",
+                domain=values.get(DOMAIN, ""),
+                preview_domain=values.get(PREVIEW_DOMAIN, ""),
+                email=values.get(EMAIL, ""),
+                ssl_enabled=values.get(SSL_ENABLED, "false").lower() == "true",
             ),
-            deploy=DeployConfig(branch=values.get("BRANCH", "main")),
+            deploy=DeployConfig(branch=values.get(BRANCH, "main")),
         )
 
         runtime = RuntimeConfig(
-            backend=_runtime_backend(values.get("RUNTIME_BACKEND", "native")),
-            web_root=values.get("WEB_ROOT") or DEFAULT_WEB_ROOT,
+            backend=_runtime_backend(values.get(RUNTIME_BACKEND, "native")),
+            web_root=values.get(WEB_ROOT) or DEFAULT_WEB_ROOT,
             runtime_user=project_name,
             runtime_group=project_name,
-            data={
-                key: value
-                for key, value in values.items()
-                if key
-                not in {
-                    "PROJECT_NAME",
-                    "HOST",
-                    "SSH_USER",
-                    "PORT",
-                    "DOMAIN",
-                    "PREVIEW_DOMAIN",
-                    "EMAIL",
-                    "SSL_ENABLED",
-                    "BRANCH",
-                    "RUNTIME_BACKEND",
-                    "WEB_ROOT",
-                    "SERVICES",
-                    "TEMPLATE",
-                }
-            },
+            data={key: value for key, value in values.items() if key not in APP_KEYS},
         )
 
-        services_value = values.get("SERVICES", "")
+        services_value = values.get(SERVICES, "")
         services = ServicesConfig(services=_database_services(services_value.split(",") if services_value else []))
         return cls(app=app, runtime=runtime, services=services)
 
@@ -167,7 +163,7 @@ class ServicesConfig:
     services: tuple[str, ...] = ()
 
 
-def _dotenv(content: str) -> dict[str, str]:
+def read_dotenv(content: str) -> dict[str, str]:
     values: dict[str, str] = {}
     for line_number, raw_line in enumerate(content.splitlines(), 1):
         line = raw_line.strip()

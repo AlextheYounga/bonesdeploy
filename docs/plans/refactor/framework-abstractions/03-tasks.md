@@ -35,6 +35,19 @@
 - [x] Add focused regression tests for custom persistence, invalid templates, Rails
   versions, asset identity, and unchanged trees after update conflicts.
 
+## Project Configuration Slice
+
+- [x] Centralize the complete flat `.env` key vocabulary in the core configuration
+  module and use it for loading and writing.
+- [x] Move the Rust `.env` writer beside the core loader and preserve the CLI
+  re-export used by existing callers.
+- [x] Add Python configuration-key constants and use the shared dotenv parser for
+  framework selection.
+- [x] Add round-trip coverage for all persisted configuration fields and quoted
+  Python framework selection.
+- [x] Leave the dead `bonesinfra_input` contract and nested `App` serde coupling for
+  their dependency-ordered child boundaries.
+
 ## Child Plan Decomposition
 
 - [ ] Create and review a child Acta plan for the project configuration boundary,
@@ -85,3 +98,5 @@
   `cargo fmt --all -- --check`, `shfmt -d .`, 70 `bonesdeploy` binary unit tests,
   `bonesdeploy-core` tests, and `bonesdeploy` CLI/init integration tests.
 - E2E tests were not run by design.
+- Project configuration validation passed: the focused Rust round-trip test, all
+  `bonesdeploy-core` tests, `ruff check .`, and 20 focused Python tests.

@@ -81,6 +81,21 @@ Each child plan must identify its exact owner, affected callers, chosen public A
 private implementation boundary, tests, and completion condition. Later child
 plans may depend on earlier concepts but may not silently redefine them.
 
+## Project Configuration Slice
+
+The Rust configuration module remains the owner of the flat `.env` contract. Its
+`project_env` constants define every persisted key, and its `load()` and `save()`
+functions form the parse/write pair. The CLI configuration module re-exports that
+writer while retaining only local CLI helpers.
+
+Python retains its existing dotenv parser in `config/context.py`, but the parser is
+the single reader used by both `DeployContext` and framework selection. Python's
+`config/keys.py` owns the corresponding exclusion vocabulary so unknown framework
+values continue to flow into runtime data without duplicating key literals.
+
+The slice deliberately does not remove `bonesinfra_input`, change `DeploymentPaths`,
+or flatten the nested `App` serialization used by build environment derivation.
+
 ## Responsibilities And Boundaries
 
 The parent ownership rules are:
@@ -182,3 +197,5 @@ The authorized initial slice is complete:
 - update synchronization preflights managed conflicts before mutation;
 - focused tests cover framework parsing, defaults, custom behavior, Rails runtime
   selection, asset identity, secrets validation, and update conflict safety.
+- project configuration validation covers the Rust `.env` round trip, all core
+  configuration tests, Python key/parser reuse, and quoted framework selection.
