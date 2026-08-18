@@ -1,3 +1,5 @@
+use bonesdeploy_core::config::Runtime;
+
 use super::{FrameworkDefaults, PermissionDefault, Question, QuestionKind, directory, file};
 
 const RUBY_VERSION_KEY: &str = "ruby_version";
@@ -11,7 +13,7 @@ const PERMISSIONS: [PermissionDefault; 6] = [
     directory("public/assets", 750, true),
 ];
 
-pub(crate) fn defaults() -> FrameworkDefaults {
+pub(super) fn defaults() -> FrameworkDefaults {
     FrameworkDefaults {
         template: "rails",
         web_root: "public",
@@ -20,7 +22,7 @@ pub(crate) fn defaults() -> FrameworkDefaults {
     }
 }
 
-pub fn questions() -> &'static [Question] {
+pub(super) fn questions() -> &'static [Question] {
     &[
         Question {
             key: RUBY_VERSION_KEY,
@@ -31,7 +33,7 @@ pub fn questions() -> &'static [Question] {
     ]
 }
 
-pub(crate) fn environment_example(project_name: &str, _site_url: &str) -> String {
+pub(super) fn environment_example(project_name: &str, _site_url: &str) -> String {
     super::join_env_lines(&[
         "RAILS_ENV=production",
         "SECRET_KEY_BASE=",
@@ -39,6 +41,8 @@ pub(crate) fn environment_example(project_name: &str, _site_url: &str) -> String
     ])
 }
 
-pub(crate) fn build_environment_example() -> String {
-    super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("RUBY_VERSION={DEFAULT_RUBY_VERSION}")])
+pub(super) fn build_environment_example(runtime: &Runtime) -> String {
+    let ruby_version =
+        runtime.extra.get(RUBY_VERSION_KEY).and_then(|value| value.as_str()).unwrap_or(DEFAULT_RUBY_VERSION);
+    super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("RUBY_VERSION={ruby_version}")])
 }

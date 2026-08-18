@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow};
 use rust_embed::Embed;
 use serde_json::{Map, Value};
 
@@ -17,11 +17,15 @@ use crate::frameworks;
 struct FrameworkAssets;
 
 pub fn framework_names() -> Vec<String> {
-    FrameworkAssets::iter()
+    let names = FrameworkAssets::iter()
         .filter_map(|path| path.split('/').next().map(str::to_string))
         .collect::<BTreeSet<_>>()
         .into_iter()
-        .collect()
+        .collect::<Vec<_>>();
+    for name in &names {
+        assert!(frameworks::Framework::ALL.iter().any(|framework| framework.to_string() == *name));
+    }
+    names
 }
 
 pub fn base_framework_defaults() -> Result<Map<String, Value>> {
@@ -32,15 +36,11 @@ pub fn base_framework_defaults() -> Result<Map<String, Value>> {
 }
 
 pub fn framework_defaults(framework: &str) -> Result<Map<String, Value>> {
-    let defaults = match framework {
-        "django" => frameworks::django::defaults(),
-        "laravel" => frameworks::laravel::defaults(),
-        "next" => frameworks::next::defaults(),
-        "nuxt" => frameworks::nuxt::defaults(),
-        "rails" => frameworks::rails::defaults(),
-        "sveltekit" => frameworks::sveltekit::defaults(),
-        "vue" => frameworks::vue::defaults(),
-        other => bail!("unknown framework template: {other}"),
+    let selected = frameworks::Framework::parse(framework)?;
+    let Some(defaults) = selected.defaults() else {
+        let mut values = base_framework_defaults()?;
+        values.insert("template".into(), Value::String(selected.to_string()));
+        return Ok(values);
     };
 
     let mut values = Map::new();
@@ -55,18 +55,22 @@ pub fn framework_defaults(framework: &str) -> Result<Map<String, Value>> {
 }
 
 pub fn scaffold_framework_project(framework: &str, bones_dir: &Path) -> Result<()> {
+    let framework = frameworks::Framework::parse(framework)?;
     let deploy_dir = bones_dir.join(paths::DEPLOYMENT_DIR);
     if deploy_dir.exists() {
         fs::remove_dir_all(&deploy_dir)
             .with_context(|| format!("Failed to clear deployment dir: {}", deploy_dir.display()))?;
     }
     kit::scaffold_deployment_functions(bones_dir)?;
-    scaffold_framework_assets(framework, bones_dir, paths::KIT_DEPLOYMENT_DIR)?;
+    if framework != frameworks::Framework::Custom {
+        scaffold_framework_assets(&framework.to_string(), bones_dir, paths::KIT_DEPLOYMENT_DIR)?;
+    }
     Ok(())
 }
 
 pub fn scaffold_framework_env_build(framework: &str, project_root: &Path, framework_config: &Runtime) -> Result<()> {
-    let Some(content) = frameworks::build_environment_example(framework, framework_config) else {
+    let framework = frameworks::Framework::parse(framework)?;
+    let Some(content) = framework.build_environment_example(framework_config) else {
         return Ok(());
     };
 
@@ -111,7 +115,10 @@ mod tests {
     use std::fs;
     use std::process;
 
-    use super::{FrameworkAssets, Runtime, framework_defaults, framework_names, scaffold_framework_env_build};
+    use super::{
+        FrameworkAssets, Runtime, base_framework_defaults, framework_defaults, framework_names,
+        scaffold_framework_env_build,
+    };
 
     #[test]
     fn next_framework_includes_the_build_script() {
@@ -136,7 +143,9 @@ mod tests {
     #[test]
     fn every_framework_has_a_build_environment_example() {
         for framework in framework_names() {
-            if let Some(content) = frameworks::build_environment_example(&framework, &Runtime::default()) {
+            if let Ok(selected) = frameworks::Framework::parse(&framework)
+                && let Some(content) = selected.build_environment_example(&Runtime::default())
+            {
                 assert!(content.contains("Committed, non-secret"), "{framework} must include build environment header");
             } else {
                 assert!(false, "{framework} is missing .env.build");
@@ -214,6 +223,33 @@ mod tests {
             let defaults = framework_defaults(&framework)?;
             let config: Runtime = serde_json::from_value(serde_json::Value::Object(defaults))?;
             assert_eq!(config.template, framework);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn custom_defaults_persist_the_custom_template() -> Result<()> {
+        let defaults = framework_defaults("custom")?;
+        assert_eq!(defaults.get("template"), Some(&serde_json::Value::String("custom".into())));
+        assert_eq!(defaults.get("web_root"), base_framework_defaults()?.get("web_root"));
+        Ok(())
+    }
+
+    #[test]
+    fn framework_assets_match_the_canonical_framework_list() -> Result<()> {
+        for framework in frameworks::Framework::ALL {
+            let name = framework.to_string();
+            let has_assets = framework_names().contains(&name);
+            if *framework == frameworks::Framework::Custom {
+                assert!(!has_assets, "custom must not have embedded framework assets");
+            } else {
+                assert!(has_assets, "{name} must have embedded framework assets");
+                frameworks::Framework::parse(&name)?;
+            }
+        }
+
+        for name in framework_names() {
+            frameworks::Framework::parse(&name)?;
         }
         Ok(())
     }

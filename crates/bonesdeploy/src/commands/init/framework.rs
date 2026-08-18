@@ -15,12 +15,13 @@ pub(super) fn collect_framework_config(args: &Args) -> Result<FrameworkSelection
         return Ok(FrameworkSelection { template: None, config: vars });
     };
 
+    let framework = frameworks::Framework::parse(&template_name)?;
     let defaults = framework_assets::framework_defaults(&template_name)
         .with_context(|| format!("Failed to load embedded defaults for template {template_name}"))?;
     let map = if args.non_interactive {
-        collect_non_interactive_answers(&template_name, args, &defaults)?
+        collect_non_interactive_answers(framework, args, &defaults)?
     } else {
-        collect_interactive_answers(&template_name, &defaults)?
+        collect_interactive_answers(framework, &defaults)?
     };
     Ok(FrameworkSelection { template: Some(template_name), config: map })
 }
@@ -46,7 +47,7 @@ fn resolve_template(args: &Args) -> Result<Option<String>> {
 }
 
 fn collect_non_interactive_answers(
-    template_name: &str,
+    framework: frameworks::Framework,
     args: &Args,
     defaults: &serde_json::Map<String, Value>,
 ) -> Result<serde_json::Map<String, Value>> {
@@ -55,8 +56,9 @@ fn collect_non_interactive_answers(
         let parsed = parse_framework_var(raw)?;
         user_vars.insert(parsed.0, parsed.1);
     }
-    frameworks::validate_answers(template_name, &user_vars)
-        .with_context(|| format!("Invalid --framework-var answers for {template_name}"))?;
+    framework
+        .validate_answers(&user_vars)
+        .with_context(|| format!("Invalid --framework-var answers for {framework}"))?;
     let mut merged = defaults.clone();
     for (key, value) in user_vars {
         merged.insert(key, value);
@@ -65,11 +67,10 @@ fn collect_non_interactive_answers(
 }
 
 fn collect_interactive_answers(
-    template_name: &str,
+    framework: frameworks::Framework,
     defaults: &serde_json::Map<String, Value>,
 ) -> Result<serde_json::Map<String, Value>> {
-    let questions = frameworks::questions(template_name)?;
-    prompts::prompt_framework_questions(questions, defaults)
+    prompts::prompt_framework_questions(framework.questions(), defaults)
 }
 
 fn parse_framework_var(raw: &str) -> Result<(String, Value)> {
@@ -183,6 +184,15 @@ mod tests {
         let selection = collect_framework_config(&args)?;
         assert!(selection.template.is_none());
         assert!(selection.config.contains_key("web_root") || selection.config.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_custom_template_is_persisted_in_selection() -> Result<()> {
+        let args = args_non_interactive(Some("custom"), &[]);
+        let selection = collect_framework_config(&args)?;
+        assert_eq!(selection.template.as_deref(), Some("custom"));
+        assert_eq!(selection.config.get("template"), Some(&Value::String("custom".into())));
         Ok(())
     }
 

@@ -35,7 +35,7 @@ no workspace dependencies. Both binaries and the Python provisioning layer
 depend on it.
 
 **`bonesdeploy`** — the local CLI binary the developer runs. Owns interactive
-initialization, configuration authoring, SSH/Git/GPG integration, and delegation
+initialization, root `.env` authoring, SSH/Git/GPG integration, and delegation
 to the other two pieces. It does not execute deployments itself; it either
 provisions via `bonesinfra` or triggers `bonesremote` over SSH.
 
@@ -57,16 +57,16 @@ owner is canonical. Bypassing it creates a competing abstraction.
 
 | Responsibility | Owner | Reuse / extend | Do not |
 | --- | --- | --- | --- |
-| Deployment configuration | `Bones` (`bonesdeploy-core`) | Extend the canonical config model via `Runtime.extra` | Invent parallel config structs in either binary or Python |
+| Deployment configuration | `Bones` (`bonesdeploy-core`), loaded from root `.env` | Extend the canonical config model via `Runtime.extra` | Invent parallel config structs in either binary or Python |
 | Product filesystem layout | `paths` / `DeploymentPaths` | Add path constants here | Scatter path literals in commands, templates, or scripts |
 | Framework-specific config questions | Framework Rust module (`frameworks/<fw>.rs`) | Add sibling module + register in `frameworks.rs` | Inline prompt logic in init command |
-| Framework provisioning | Framework Python contract (`frameworks/<fw>/`) | Add sibling framework package (`__init__.py`, `manifest.py`, `runtime.py`, `custom.py`, `templates/`) | Special-case framework behavior in setup/runtime commands |
+| Framework provisioning | Materialized `infra/provision/core` + `infra/provision/custom` packages, loaded by `bonesinfra.project` | Extend managed core or project-owned custom content | Special-case framework behavior in setup/runtime commands |
 | Language runtime installation | `LanguageRuntime` ABC | Add subclass in `services/languages/` | Install runtimes directly from framework `runtime.py` |
 | Database / server service provisioning | `RuntimeService` ABC + `SERVICE` registry | Add subclass + register in `SERVICE` dict | Put DB provisioning in framework code |
 | Remote site mutation | `SiteMutation` | Acquire it before any site state change | Create independent locking or config-validation paths |
 | Deployment lifecycle stages | Lifecycle modules (`release/lifecycle/`) | Add behavior to existing stage | Create a separate deployment flow |
 | Per-site persisted state | `SiteState` + `state/` store | Read/write through the store API | Touch state files directly |
-| Infrastructure migrations | `Patch` (`patches/registry.py`) | Add a registered, version-gated patch | Scatter one-off version checks throughout code |
+| Infrastructure migrations | Python `Patch` registry (`patches/registry.py`) | Add a registered, version-gated patch | Scatter one-off version checks throughout code |
 | SSH connectivity | `infra/ssh.rs` (Rust), `pyinfra/runner.py` (Python) | Use existing session helpers | Open raw SSH channels |
 | Git operations | `infra/git.rs` | Use existing git wrappers | Shell out to git ad hoc |
 | GPG / secrets | `commands/secrets/gpg.rs` | Use the isolated keyring + helpers | Import GPG state from elsewhere |
@@ -144,8 +144,8 @@ Bones (bonesdeploy-core/src/config.rs)
 Runtime.extra is a serde-flattened BTreeMap for framework-specific keys.
 
 Existing implementations:
-- Loaded from .bones/bones.toml via config::load()
-- Loaded remotely via config::load_runtime()
+- Loaded from the project root `.env` via config::load()
+- Loaded remotely from the site root `.env` via config::load_runtime()
 
 To add another:
 Add a field to the struct (global) or use Runtime.extra (framework-specific).
@@ -155,8 +155,8 @@ crates/bonesdeploy-core/src/config.rs
 
 Do not:
 - Invent a parallel config struct in bonesdeploy, bonesremote, or bonesinfra
-- Parse bones.toml with ad-hoc TOML readers bypassing config::load
-- Duplicate the config schema in Python (use DeployContext, which is built from the same TOML)
+- Parse `.env` with ad-hoc readers bypassing config::load
+- Duplicate the config schema in Python (use DeployContext, which is built from the same `.env`)
 ```
 
 ```text
@@ -176,7 +176,7 @@ DeployContext (bonesinfra/python/.../config/context.py)
 template_data(ctx) flattens it for Jinja2 rendering.
 
 Existing implementations:
-- Built from bones.toml by DeployContext.from_files()
+- Built from the root `.env` by DeployContext.from_files()
 
 To add another:
 Extend AppConfig / RuntimeConfig dataclasses. Framework-specific values go in RuntimeConfig.data.
@@ -185,7 +185,7 @@ Canonical example:
 crates/bonesinfra/python/src/bonesinfra/config/context.py
 
 Do not:
-- Re-parse bones.toml inside framework or service code
+- Re-parse `.env` inside framework or service code
 - Construct DeployContext manually outside the CLI entry points
 ```
 
@@ -199,8 +199,9 @@ Referencing any server-side path in Python templates, framework code, or service
 
 Contract:
 DeploymentPaths (bonesinfra/python/.../config/paths.py)
-- 107 frozen fields covering git repos, project dirs, config dirs, sockets, logs
-- Helpers: systemd_service(name), apparmor_profile(name), runtime_service_socket(name)
+- 41 frozen fields covering git repos, project dirs, config dirs, sockets, and logs
+- Helpers include systemd_service(name), systemd_service_requirement(name),
+  apparmor_profile(name), runtime_service_socket(name), and runtime_service_dir(name)
 
 Existing implementations:
 - Single frozen dataclass, computed from project_name + repo_path + root + web_root
@@ -230,39 +231,40 @@ Adding or modifying support for an application framework.
 Contract:
 Two halves that must stay in sync.
 
-Rust side (crates/bonesdeploy/src/frameworks/<fw>.rs):
+Rust side (crates/bonesdeploy/src/frameworks/<fw>.rs), selected through
+`frameworks.rs`:
 ├── questions() -> &'static [Question]
-├── validate_answers(answers) -> Result<()>
-├── configure(cfg: &mut Bones)              # optional
-└── environment_example(...) -> String
+├── centralized validate_answers(answers) -> Result<()>
+├── configure(cfg: &mut Bones)              # defaults/configuration
+├── environment_example(...) -> String
+├── build_environment_example(...) -> String
+└── defaults() -> FrameworkDefaults        # web root, language, permissions
 
-Python side (crates/bonesinfra/python/.../frameworks/<fw>/):
-├── __init__.py    → makes the directory an importable Python package
-├── manifest.py    → artifacts(ctx), services(ctx), mode(ctx)
-├── runtime.py     → deploy(ctx)   # canonical provisioning orchestration
-├── custom.py      → deploy(ctx)   # user hook, no-op default
-└── templates/     → Jinja2 templates for nginx, AppArmor, etc.
+Python side (materialized under `infra/provision/`):
+├── core/   → managed framework package (`manifest.py`, `runtime.py`, templates/)
+└── custom/ → project-owned package composed after core
+    (`manifest.py`, `runtime.py`)
 
-BonesDeploy owns framework selection (questions, validation, configuration) and
-deployment assets (build/prepare scripts, bones.toml defaults).
-BonesInfra owns canonical framework source (runtime.py, manifest.py, templates,
-custom.py) and materializes a vendored copy into the project's .bones/infra/
-at init time.
+BonesDeploy owns framework selection, centralized validation, defaults,
+permission defaults, environment generation, and deployment assets. BonesInfra
+owns the managed framework source and materializes it into
+`infra/provision/core/`. Project-owned extensions live in
+`infra/provision/custom/` and are composed after the core package.
 
-Users can materialize a framework's Python files into their project's .bones/infra/
-directory. When the local .bones/infra/ package exists, it takes strict
-precedence over the built-in — the built-in is never consulted as fallback.
+The materialized core/custom packages are used together. Managed core content is
+updated by infrastructure synchronization; custom content is preserved and runs
+as the project-owned extension.
 
 Existing implementations:
-- django, laravel, next, nuxt, rails, sveltekit, vue
+- custom, django, laravel, next, nuxt, rails, sveltekit, vue
 
 To add another:
 1. Add Rust module under src/frameworks/<name>.rs; register in frameworks.rs.
-2. Add Python package under bonesinfra/frameworks/<name>/ with __init__.py,
-   manifest.py, runtime.py, custom.py, and templates/.
-3. Add deployment assets under crates/bonesdeploy/assets/frameworks/<name>/
-   (build/prepare scripts, bones.toml defaults).
-4. Add the name to BUILTIN_FRAMEWORKS in project.py (the allowlist, not a dispatch registry).
+2. Add the built-in Python package under bonesinfra/frameworks/<name>/ with
+   `__init__.py`, `manifest.py`, `runtime.py`, and templates.
+3. Add deployment assets and `.env.build` defaults under the embedded framework assets.
+4. Add the name to `BUILTIN_FRAMEWORKS` in `project.py` and preserve
+   materialization into `infra/provision/core` plus `infra/provision/custom`.
 
 Canonical example:
 frameworks/laravel/ (both Rust and Python sides)
@@ -271,7 +273,7 @@ Do not:
 - Special-case framework behavior in setup, runtime, or init commands
 - Bypass the Rust framework dispatch in frameworks.rs
 - Put framework provisioning logic anywhere other than the framework's runtime.py
-- Place canonical Python framework source under BonesDeploy assets
+- Treat project custom content as managed core content
 ```
 
 ```text
@@ -284,11 +286,11 @@ Adding support for a new language (e.g. Go, Elixir).
 
 Contract:
 LanguageRuntime ABC (services/languages/base.py)
-├── config_key          # TOML key for version selection
+├── config_key          # .env key for version selection
 ├── default_version
 ├── version_pattern
 ├── install(ctx)
-└── install_version(ctx, version)
+└── install_version(ctx) -> str
 
 Framework runtime.py modules select and invoke the appropriate language runtime.
 
@@ -322,7 +324,7 @@ RuntimeService ABC (services/runtime/base.py)
 └── manifest_services(ctx)        # declare systemd units for manifest inspection
 
 Registered in the SERVICES dict in services/runtime/__init__.py.
-Activated via [services].services = ["postgres", "redis"] in bones.toml.
+Activated by the service names parsed from the root `.env`.
 
 Existing implementations:
 - PostgresService, RedisService, MariaDBService, MysqlService, MongodbService, ValkeyService
@@ -349,20 +351,20 @@ Adding a migration that must run during `bonesdeploy update` for a specific vers
 
 Contract:
 Patch (patches/registry.py)
-├── identifier            # e.g. "0001-config-repo"
+├── identifier            # e.g. "0003-project-infra"
 ├── introduced_in         # semver
 └── local_apply           # runs on the workstation
 
-Remote application is handled by a separate apply_remote() function that
-delegates to a remote pyinfra operation per patch identifier — not a Patch field.
+The current registry contains only `0003-project-infra`, introduced in `0.8.0`.
+Its remote scope writes the remote completion marker; it does not perform a
+second remote migration.
 
 Completion is tracked per-project, per-scope via marker files.
 Local markers: ~/.local/share/bonesdeploy/patches/<project>/<id>
 Remote markers: /var/lib/bonesdeploy/patches/<site>/<id>
 
 Existing implementations:
-- 0001-config-repo (local: git init + add remote)
-- 0002-root-config-repo (remote: migrate .bones.git location)
+- 0003-project-infra (local project layout migration; remote marker handling)
 
 To add another:
 Add a Patch to registry.py with an introduced_in version; implement apply functions.
@@ -394,11 +396,10 @@ SiteMutation (crates/bonesremote/src/release/site_mutation.rs)
 
 Constructors:
 - acquire(site)                  # standard: lock, then load config
-- acquire_with_config(site, cfg) # first-import: lock, adopt pre-validated config
 - adopt(site, cfg, lock)         # cancellation: adopt config loaded before terminating a deployment
 
 Existing implementations:
-- Single implementation; consumed by deploy, rollback, kill, drop-failed, prune, site import/receive, service restart
+- Single implementation; consumed by deploy, rollback, kill, drop-failed, prune, and service restart
 
 To add another:
 Do not. Use the existing constructor that matches your context.
@@ -481,7 +482,7 @@ Malformed state triggers quarantine via `release recover`.
 Legacy files (active-deployment.json, staged-release) are migrated on first read.
 
 Existing implementations:
-- Single store per site at <sites_root>/<site>/deployment-state.json
+- Single store per site at `<sites_root>/<site>/deployment.json`
 
 To add another:
 Do not. Extend the SiteState struct if new state is needed.
@@ -513,7 +514,7 @@ pyinfra/runner.py — connect_all, run_ops; operations.py — mkdir, render
 
 ### Git
 infra/git.rs — ensure_git_repository, remotes, URL parsing
-  Used by: init, push, deploy, doctor
+  Used by: init, deploy, doctor
   Do not: shell out to git directly
 
 ### GPG
@@ -531,16 +532,15 @@ directory fsync. Never truncate in place.
 (Rust) and `DeploymentPaths` (Python). Other code derives subpaths by joining
 these constants. No hardcoded path strings elsewhere.
 
-**Just-in-time mutation.** Pre-deploy stages validate and prepare isolated state.
-Live state is touched only at activation. Permission hardening happens after
-successful activation. A failed pre-activation deploy leaves no live mutations.
+**Just-in-time mutation.** Pre-deploy stages validate and prepare isolated
+candidate state. Activation is the live release cut-over; shared links and
+candidate preparation must not be described as mutations of the active release.
 
-**Framework contract.** Every framework has an importable Python package
-(`__init__.py`, `manifest.py`, `runtime.py`, `custom.py`, plus a `templates/`
-directory). Framework-specific config goes through `Runtime.extra`. Users
-override framework behavior by materializing into their `.bones/infra/`
-directory, which takes strict precedence — when the local package exists, it
-is authoritative and the built-in is never consulted as fallback.
+**Framework contract.** Rust owns framework questions, centralized validation,
+defaults, permission defaults, and build-environment generation. Python
+provisioning uses managed `infra/provision/core` and project-owned
+`infra/provision/custom` packages composed together. Framework-specific config
+goes through `Runtime.extra`.
 
 **Binary communication.** `bonesdeploy` ↔ `bonesremote` via SSH command execution.
 `bonesdeploy` ↔ `bonesinfra` via subprocess (`bonesinfra::run()` / `run_with_stdin()`).
@@ -562,8 +562,8 @@ the deployment record.
   `bonesinfra`.
 - **`bonesinfra`** depends on `bonesdeploy-core` (minimally, for cache path
   resolution).
-- Config is authored by `bonesdeploy`, read by both binaries and the Python
-  layer. The schema is owned by `bonesdeploy-core`.
+- Config is authored by `bonesdeploy` in the root `.env`, then read by both
+  binaries and the Python layer. The schema is owned by `bonesdeploy-core`.
 - Path constants are owned by `bonesdeploy-core::paths` (Rust) and mirrored by
   `DeploymentPaths` (Python). The two must agree.
 - Remote site state is owned exclusively by `bonesremote`. `bonesdeploy` never
@@ -586,9 +586,17 @@ both systems by design.
 files. The `store` module migrates these to unified `SiteState` on first read
 and deletes the old files. The migration is one-way.
 
-**`CONTEXT.md` naming.** `CONTEXT.md` refers to `crates/shared/` for what is now
-`crates/bonesdeploy-core`. The path centralization rule in that document refers
-to `crates/bonesdeploy-core/src/paths.rs`.
+**Cross-layer configuration and integration side doors.** Rust and Python still
+have separate dotenv readers (`parse_dotenv` and `_dotenv`). `remote/data.rs`
+still constructs a `bonesinfra_input` stdin JSON payload that Python does not
+consume. Local doctor and release-update code also bypass the existing Git and
+SSH boundaries, respectively. These are tracked for the configuration and
+integration child changes.
+
+**Framework and deployment side doors.** Framework identity, defaults, and
+assets cross Rust and Python boundaries, while release commands can reach state
+and mutation details directly. These are tracked for the Framework and
+Deployment child changes.
 
 **Thread-local test overrides.** `bonesremote` uses a `thread_local!` for
 `SITES_ROOT_OVERRIDE` in tests rather than dependency injection. Tests using the

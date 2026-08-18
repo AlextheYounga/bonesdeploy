@@ -1,299 +1,184 @@
 # Plan
 
-## Current behavior
+## Current Behavior
 
-### Framework identity
+The repository already has named concepts, but the current boundaries are not
+consistently enforced.
 
-`crates/bonesdeploy/src/frameworks.rs` defines `Question`, `QuestionKind`, and
-shared helper functions. It declares seven private submodules: `laravel`,
-`django`, `next`, `nuxt`, `rails`, `sveltekit`, `vue`.
+### Existing concepts and observed defects
 
-Five public dispatch functions each contain a full `match` on `&str` template
-name:
+| Concept | Current implementation | Boundary defect |
+| --- | --- | --- |
+| Project configuration | Rust `config.rs`, Rust save code, Python `DeployContext` | Multiple dotenv parsers and stale TOML-shaped structures |
+| Framework | Rust dispatch module plus per-framework modules and Python packages | String dispatch, asset/defaults reach-through, duplicate registries |
+| Git | `infra/git.rs` | `doctor.rs` and update code shell out directly |
+| SSH | `infra/ssh.rs` and Python pyinfra runner | Update release code directly invokes `ssh` |
+| Secrets | GPG module and secrets commands | Command layer still assembles remote shell details |
+| Updates/migrations | Rust update modules and Python `Patch` registry | Responsibilities split; dead Rust migration duplicates Python migration |
+| Provisioning | Python command plans and framework runtimes | Repeated workflow and overlapping custom-hook paths |
+| Deployment state | `SiteState`, state store, `DeploymentLock`, `SiteMutation` | Crate-wide state access and mutation-guard bypasses |
+| Lifecycle | Lifecycle stage modules and `run_staged_deployment()` | Phase advancement and failure handling concentrated in a command |
+| Doctor/inspection | Local/remote doctor, status, service, lifecycle helpers | Repeated account, process, systemd, script, and path inspection |
 
-- `questions(template: &str) -> Result<&'static [Question]>`
-- `validate_answers(template: &str, answers: &Map<String, Value>) -> Result<()>`
-- `configure(template: &str, cfg: &mut Bones)`
-- `environment_example(template: &str, project_name: &str, domain: &str, preview_domain: &str) -> Option<String>`
-- `build_environment_example(template: &str, runtime: &Runtime) -> Option<String>` (pub(crate))
+The repository investigation identified the following concrete side doors:
 
-The 7 template name strings (`"laravel"`, `"django"`, `"next"`, `"nuxt"`,
-`"rails"`, `"sveltekit"`, `"vue"`) are duplicated across these 5 match
-expressions plus 2 test functions.
+- direct `git` in `crates/bonesdeploy/src/commands/doctor.rs`;
+- direct `ssh` in `crates/bonesdeploy/src/commands/update/release.rs`;
+- multiple `.env` and `TEMPLATE` parsers;
+- direct per-framework defaults access from `infra/assets/frameworks.rs`;
+- direct state-store access from release commands;
+- `SiteMutation` bypasses in `release/kill.rs` and configuration bypasses in
+  `commands/doctor/site.rs`;
+- duplicated process, systemd, account, script, and path inspectors;
+- dead `commands/migrate.rs` beside the live Python `0003-project-infra` patch.
 
-### Per-framework modules
+The detailed settled findings are recorded in the numbered clarification documents
+in this directory:
 
-Each of the 7 modules exports a subset of these functions:
+- `06-framework-boundary-findings-clarity.md`
+- `07-integration-boundary-findings-clarity.md`
+- `08-deployment-boundary-findings-clarity.md`
+- `09-provisioning-update-findings-clarity.md`
+- `10-architecture-document-drift-clarity.md`
 
-| Function | Visibility | Laravel | Django | Next | Nuxt | Rails | SvelteKit | Vue |
-|---|---|---|---|---|---|---|---|---|
-| `questions()` | `pub` | Y | Y | Y | Y | Y | Y | Y |
-| `environment_example(project, url)` | `pub(crate)` | Y | Y | Y | Y | Y | Y | Y |
-| `build_environment_example()` | `pub(crate)` | Y (w/ `&Runtime`) | Y (w/ `&Runtime`) | Y (no params) | Y (no params) | Y (no params + bug) | Y (no params) | Y (no params) |
-| `configure(cfg)` | `pub(crate)` | N | N | Y | Y | N | N | N |
+Those clarifications are part of the current record, not alternative plans.
 
-`build_environment_example` has two incompatible signatures:
-- Laravel and Django accept `runtime: &Runtime` and read a language version from `runtime.extra`.
-- Next, Nuxt, Rails, SvelteKit, and Vue take no parameters.
+### Documentation state
 
-Rails asks for `ruby_version` (Choice: 3.2/3.3/3.4) but `build_environment_example()` hardcodes `DEFAULT_RUBY_VERSION` (3.3) instead of reading `runtime.extra["ruby_version"]`.
+The architecture documents still contain pre-decentralization references to
+`bones.toml`, `.bones/infra/`, removed config-repository commands, and the old
+framework dispatch contract. This parent change must correct those references
+before child plans are treated as authoritative.
 
-### Callers
+## Chosen Approach
 
-All callers are within `crates/bonesdeploy/src/`:
+This is a parent planning change. It establishes one architecture map and creates
+one child Acta change per implementation boundary. It does not combine all code
+refactors into one branch or one implementation task.
 
-| File | Functions called |
-|---|---|
-| `commands/init/framework.rs:58` | `frameworks::validate_answers(template_name, &user_vars)` |
-| `commands/init/framework.rs:71` | `frameworks::questions(template_name)` |
-| `commands/init/scaffold.rs:47` | `frameworks::configure(&template_name, cfg)` |
-| `commands/secrets/mod.rs:61` | `frameworks::environment_example(template, project_name, domain, preview_domain)` |
-| `infra/assets/frameworks.rs:52` | `frameworks::build_environment_example(framework, framework_config)` |
-| `infra/assets/frameworks.rs:144` | `frameworks::build_environment_example(&framework, &Runtime::default())` (test) |
+The child changes are ordered as follows:
 
-`commands/init/framework.rs` resolves template names from CLI flags or
-interactive prompts and holds framework identity as `Option<String>` in a
-`FrameworkSelection` struct.
+1. **Architecture documentation and ownership map** — correct the current docs and
+   record the public concepts and side-door rules used by all later plans.
+2. **Project configuration boundary** — settle the `.env` parser/writer and project
+   identity boundary used by Rust and Python.
+3. **Git, SSH, and secrets boundaries** — migrate callers through existing external
+   integration wrappers.
+4. **Infrastructure updates and migrations** — unify release synchronization and
+   the Python patch registry; remove the dead migration path.
+5. **Provisioning composition** — strengthen project infrastructure, provisioning,
+   language runtime, service, manifest, and framework-runtime boundaries.
+6. **Framework concept** — implement the typed Rust framework front door and its
+   private implementation contract.
+7. **Deployment and lifecycle** — close mutation/state side doors and place phase,
+   failure, rollback, and cleanup behavior behind the deployment boundary.
+8. **Doctor and shared inspection** — centralize reusable inspectors and make
+   doctor/reporting consume them.
+9. **Final boundary audit** — verify visibility, callers, documentation, and static
+   side-door checks across the completed child changes.
 
-`ui/prompts.rs` imports `Question` and `QuestionKind` types directly from
-`crate::frameworks`.
+Each child plan must identify its exact owner, affected callers, chosen public API,
+private implementation boundary, tests, and completion condition. Later child
+plans may depend on earlier concepts but may not silently redefine them.
 
-### Framework name discovery
+## Responsibilities And Boundaries
 
-`infra/assets/frameworks.rs::framework_names()` derives framework names by
-scanning the top-level directories of the embedded `assets/frameworks/`
-filesystem at runtime. This is decoupled from the Rust source modules and has
-no compile-time check for consistency.
+The parent ownership rules are:
 
-### Tests
+| Responsibility | Owner | Required caller behavior |
+| --- | --- | --- |
+| `.env` loading and writing | Project configuration boundary | Use the owner; do not parse independently |
+| Rust framework selection | `Framework` | Parse once, call methods, do not match strings or import modules |
+| Python framework provisioning | Framework package/project infrastructure | Use `LanguageRuntime` and `RuntimeService` |
+| Language installation | `LanguageRuntime` | Select and install through the runtime contract |
+| Service provisioning | `RuntimeService` registry | Resolve and provision through the registry |
+| Git | `infra/git.rs` | Do not spawn `git` from commands |
+| SSH | `infra/ssh.rs` / pyinfra runner | Do not spawn `ssh` outside the wrapper |
+| Infrastructure migration | Python `Patch` registry | Do not maintain a parallel migration path |
+| Site mutation | `SiteMutation` | Do not assemble locks/configuration independently |
+| Site state | `SiteState` store | Do not touch state files directly |
+| Lifecycle | Deployment/release lifecycle | Do not advance phases or implement rollback in commands |
+| Inspection | Doctor/shared inspectors | Do not duplicate probes in unrelated commands |
 
-Tests live inline in `frameworks.rs` (`#[cfg(test)] mod tests`) and in
-`infra/assets/frameworks.rs`. They cover: every template has questions and
-environment examples, validation rejects bad input, configure overrides web_root
-for static sites, build environment includes correct language versions, and
-framework defaults fit the Runtime schema.
+## Child Plan Contracts
 
-## Intended behavior
+Every child Acta plan must contain:
 
-### Framework enum
+- a settled request and problem;
+- definitions for any new domain term or boundary;
+- an observable desired outcome;
+- positive scope, constraints, and exclusions;
+- repository-grounded current behavior;
+- one chosen implementation approach;
+- explicit responsibilities and affected callers;
+- decisions, risks, and validation;
+- concrete tasks with completion conditions.
 
-A `pub enum Framework` with seven variants replaces the `&str` template name
-as the canonical framework identity:
+Child implementation must not begin until its plan is reviewed and approved.
 
-```rust
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Framework {
-    Laravel,
-    Django,
-    Next,
-    Nuxt,
-    Rails,
-    SvelteKit,
-    Vue,
-}
-```
+## Affected Documentation
 
-It provides: a `parse()` / `from_str()` constructor for converting user input
-to a `Framework` variant; an `ALL` constant for iteration; and a `name()`
-method returning the lowercase string representation.
+The first child change updates:
 
-### Framework methods
+- `docs/ARCHITECTURE.md` ownership map, reusable concepts, extension points, and
+  post-decentralization paths;
+- `docs/architecture/reference.md` framework, configuration, patch, update,
+  provisioning, doctor, and deployment descriptions;
+- this parent Acta record's references to the settled architecture.
 
-All current dispatch functions become methods on `Framework`:
-
-```rust
-impl Framework {
-    pub fn questions(&self) -> &'static [Question];
-    pub fn validate_answers(&self, answers: &Map<String, Value>) -> Result<()>;
-    pub fn configure(&self, cfg: &mut Bones);
-    pub fn environment_example(&self, project_name: &str, domain: &str, preview_domain: &str) -> Option<String>;
-}
-
-// pub(crate)
-impl Framework {
-    pub(crate) fn build_environment_example(&self, runtime: &Runtime) -> Option<String>;
-}
-```
-
-`configure()` remains `pub` but every variant dispatches through the method.
-Five variants that previously had no `configure()` (Laravel, Django, Rails,
-SvelteKit, Vue) return immediately — no-op, not special-cased in match.
-
-`build_environment_example()` accepts `&Runtime` uniformly. Frameworks that
-don't need it (Next, Nuxt, SvelteKit, Vue) ignore the parameter. Rails reads
-`runtime.extra["ruby_version"]` instead of hardcoding `DEFAULT_RUBY_VERSION`.
-
-### Caller changes
-
-Callers convert the template string to `Framework` once at the user input
-boundary, then pass the `Framework` value:
-
-- `frameworks::questions(name)` → `framework.questions()`
-- `frameworks::validate_answers(name, answers)` → `framework.validate_answers(answers)`
-- `frameworks::configure(name, cfg)` → `framework.configure(cfg)`
-- `frameworks::environment_example(name, ...)` → `framework.environment_example(...)`
-- `frameworks::build_environment_example(name, runtime)` → `framework.build_environment_example(runtime)`
-
-`FrameworkSelection.template` changes from `Option<String>` to
-`Option<Framework>`.
-
-### Per-framework module changes
-
-Per-framework module functions become `pub(super)` — callable only from
-`frameworks.rs` method bodies. Callers outside the `frameworks` directory only
-interact with `Framework` enum methods.
-
-The `rust-embed`-based `framework_names()` in `infra/assets/frameworks.rs` is
-replaced by `Framework::ALL` or an equivalent constant/list method.
-
-### Rail bug fix
-
-Rails `build_environment_example` reads `runtime.extra.get("ruby_version")`
-and falls back to a `DEFAULT_RUBY_VERSION` constant when absent, matching the
-pattern already used by Laravel (PHP) and Django (Python).
-
-## Approach
-
-1. Introduce the `Framework` enum with seven variants above the existing
-   submodule declarations in `frameworks.rs`. Add `ALL`, `name()`, and `parse()`.
-
-2. Implement the five methods on `Framework`. Each method body contains a match
-   on `self` that dispatches to the corresponding `pub(super)` function in the
-   per-framework module. This is the same match pattern as today, but it's a
-   single match per method instead of five separate match expressions on `&str`.
-
-3. Change per-framework module function visibility from `pub`/`pub(crate)` to
-   `pub(super)` so they are only accessible from `frameworks.rs`.
-
-4. Unify `build_environment_example` signatures: all modules accept
-   `runtime: &Runtime`. Next, Nuxt, Rails, SvelteKit, Vue modules gain a
-   `_runtime: &Runtime` parameter that they ignore (Rails reads
-   `extra["ruby_version"]` instead of hardcoding).
-
-5. Convert callers:
-   - `commands/init/framework.rs`: parse the template string into `Framework`
-     once in `resolve_template()`. Store `Framework` in `FrameworkSelection`.
-   - `commands/init/scaffold.rs`: pass `Framework` to configure.
-   - `commands/secrets/mod.rs`: pass `Framework` to environment_example.
-   - `infra/assets/frameworks.rs`: accept `Framework` in
-     `scaffold_framework_env_build` and `build_environment_example` calls.
-   - `ui/prompts.rs`: already only imports `Question`/`QuestionKind` types —
-     no change needed.
-
-6. Replace `framework_names()` in `infra/assets/frameworks.rs` with a call to
-   `Framework::ALL` that maps through `.name()`. This removes the filesystem-based
-   name derivation.
-
-7. Update tests:
-   - Adapt the 7 existing tests in `frameworks.rs` to use `Framework` enum
-     instead of string template names.
-   - Adapt the 9 tests in `infra/assets/frameworks.rs` to use `Framework`
-     instead of loop over `framework_names()`.
-   - Add a test that `Framework::ALL` contains all 7 variants.
-   - Add a test that `Framework::parse(name)` round-trips through
-     `Framework::name()` for every variant.
-   - Add a test that Rails `build_environment_example` reads
-     `runtime.extra["ruby_version"]` from the Runtime.
-
-8. Pass `cargo clippy`, `cargo fmt`, `cargo test` for affected crates.
-
-## Responsibilities and boundaries
-
-**`frameworks.rs`** — owns the `Framework` enum, the `Question`/`QuestionKind`
-types, the public method implementations, and the submodule declarations. It is
-the single public front door for all framework-related behavior.
-
-**Per-framework modules** (`frameworks/<name>.rs`) — own the concrete
-implementation details: question arrays, environment example content, and
-framework-specific configuration logic. These are implementation details behind
-the `Framework` enum.
-
-**`commands/init/framework.rs`** — owns the CLI-to-Framework conversion: parsing
-`--template` flags, prompting for template selection, and collecting answers.
-It converts the user's string choice to `Framework` once, then delegates.
-
-**`commands/init/scaffold.rs`** — calls `Framework::configure()` and passes
-`Framework` to asset scaffolding functions. It does not know which framework is
-selected beyond having the enum value.
-
-**`commands/secrets/mod.rs`** — calls `Framework::environment_example()`. It
-does not dispatch on framework identity.
-
-**`infra/assets/frameworks.rs`** — owns embedded framework asset scaffolding.
-Receives a `Framework` from callers instead of a `&str`. Derives names from
-`Framework::ALL` instead of filesystem scanning.
-
-**`ui/prompts.rs`** — unchanged. Continues to import `Question`/`QuestionKind`
-types and render interactive prompts. It is framework-agnostic.
-
-## Affected areas
-
-- `crates/bonesdeploy/src/frameworks.rs` — add `Framework` enum and methods
-- `crates/bonesdeploy/src/frameworks/laravel.rs` — change visibility to `pub(super)`
-- `crates/bonesdeploy/src/frameworks/django.rs` — change visibility to `pub(super)`
-- `crates/bonesdeploy/src/frameworks/next.rs` — change visibility to `pub(super)`, add `_runtime` param
-- `crates/bonesdeploy/src/frameworks/nuxt.rs` — change visibility to `pub(super)`, add `_runtime` param
-- `crates/bonesdeploy/src/frameworks/rails.rs` — change visibility to `pub(super)`, add `_runtime` param, fix Ruby version
-- `crates/bonesdeploy/src/frameworks/sveltekit.rs` — change visibility to `pub(super)`, add `_runtime` param
-- `crates/bonesdeploy/src/frameworks/vue.rs` — change visibility to `pub(super)`, add `_runtime` param
-- `crates/bonesdeploy/src/commands/init/framework.rs` — parse to `Framework`, change `FrameworkSelection`
-- `crates/bonesdeploy/src/commands/init/scaffold.rs` — pass `Framework` instead of `&str`
-- `crates/bonesdeploy/src/commands/init/mod.rs` — adapt to `FrameworkSelection` type change
-- `crates/bonesdeploy/src/commands/secrets/mod.rs` — pass `Framework` to `environment_example`
-- `crates/bonesdeploy/src/infra/assets/frameworks.rs` — accept `Framework`, replace `framework_names()`
+The initial implementation slice updates the manifest command, architecture
+documentation, and Rust Framework callers. Later child changes remain separate and
+must not silently redefine these boundaries.
 
 ## Decisions
 
-1. **Enum, not trait.** A closed-set enum is simpler than a trait with 7 unit
-   structs. We have 7 known frameworks; extensibility does not require an open
-   set. Exhaustiveness checks catch missing dispatch arms at compile time. No
-   trait object indirection or `dyn Framework` conversions needed.
-
-2. **`pub(super)` visibility for per-framework module functions.** `pub(super)`
-   restricts access to `frameworks.rs` only, which is the desired boundary —
-   the enum methods are the public API, the per-module functions are
-   implementation details. `pub(crate)` would allow direct bypass from other
-   files within the crate.
-
-3. **`build_environment_example` always takes `&Runtime`.** Consistent
-   signature avoids the current two-signature awkwardness. Frameworks that
-   don't use it (Next, Nuxt, SvelteKit, Vue) prefix the param with `_`. This
-   is the minimal change that unifies the contract.
-
-4. **`FrameworkSelection.template` changes from `Option<String>` to
-   `Option<Framework>`.** This propagates the typed framework identity through
-   the init command path instead of carrying a loose string. The `None` case
-   (custom/no template) remains.
-
-5. **`Framework::ALL` replaces `framework_names()`.** A const slice on the enum
-   is the single source of truth. No filesystem dependency.
+1. **Parent plus child changes.** The repository-wide direction is recorded here;
+   implementation is split into independently reviewable child changes.
+2. **Existing concepts first.** Git, SSH, `LanguageRuntime`, `RuntimeService`,
+   `Patch`, `SiteMutation`, `SiteState`, and lifecycle phases are strengthened
+   before new concepts are introduced.
+3. **Concrete boundaries over abstraction count.** A module, enum, struct, or
+   function set is acceptable when it gives ownership and hides details. Traits
+   are not required by this plan.
+4. **Commands delegate.** Commands remain thin entry points that validate, select a
+   concept, delegate, and report.
+5. **Documentation is a prerequisite.** The ownership map must match the current
+   `.env`/`infra/` system before child implementation plans become authoritative.
 
 ## Risks
 
-- **Rail build_environment_example behavioral change.** Rails currently
-  hardcodes `RUBY_VERSION=3.3`. The fix reads `runtime.extra["ruby_version"]`
-  and falls back to the same `DEFAULT_RUBY_VERSION` (3.3). Existing projects
-  with a `ruby_version` configured will now see it reflected in `.env.build`
-  for the first time. This is a bug fix, not a regression, but the behavior
-  change should be noted.
-
-- **Missed callers.** The `Framework` enum replaces `&str` template names in
-  function signatures, so the compiler will catch all missed call sites. No
-  silent behavioral drift is possible.
+- The parent may become a second general architecture document if it records code
+  details instead of child-change boundaries; its scope is limited to program
+  definition and decomposition.
+- A child plan may accidentally recreate a side door unless it identifies all
+  callers and reduces internal visibility after migration.
+- Cross-layer contracts can drift across Rust, Python, and repository revisions;
+  child validation must test those boundaries explicitly.
+- Deployment and migration children can cause data loss; their plans must preserve
+  atomic writes, markers, revision consistency, and lifecycle gates.
 
 ## Validation
 
-- `cargo test -p bonesdeploy` — the full bonesdeploy crate test suite, which
-  includes all framework tests (`frameworks.rs` tests + `infra/assets/frameworks.rs`
-  tests + `commands/init/framework.rs` tests + integration tests in `tests/`).
-- Assert that `Framework::ALL` has 7 variants.
-- Assert that `Framework::name()` round-trips through `Framework::parse()` for
-  all 7 variants.
-- Assert that `Framework::name()` matches the expected lowercase string for
-  all 7 variants (used by TOML and CLI).
-- Assert that Rails `build_environment_example` reads `ruby_version` from runtime.
-- `cargo clippy --all-targets --all-features -- -D warnings` — no warnings.
-- `cargo fmt` — no formatting changes.
-- `shfmt -w .` — no formatting changes.
-- Manual inspection of the final diff for boundary cleanliness: no direct
-  `use crate::frameworks::laravel` or similar bypass outside `frameworks.rs`.
+- Verify `01-idea.md`, `02-plan.md`, and `03-tasks.md` describe the same parent
+  change and use the same defined terms.
+- Verify the parent contains no open questions, alternatives, placeholder
+  decisions, or speculative implementation APIs.
+- Verify every child boundary has one owner, one dependency position, and a stated
+  child-plan deliverable.
+- Verify architecture-document corrections are listed as concrete first-child work.
+- Run `git diff --check` and review the final planning diff.
+- Do not run e2e tests for this documentation-only parent change.
+
+## Initial Implementation Result
+
+The authorized initial slice is complete:
+
+- the committed `commands/manifest.rs` conflict was resolved in favor of the
+  post-decentralization `.env` implementation;
+- both architecture documents now describe the current `.env`/`infra/` system;
+- Rust framework identity is represented by `Framework` with eight wire values,
+  centralized dispatch, private per-framework modules, explicit custom fallback,
+  and migrated callers;
+- update synchronization preflights managed conflicts before mutation;
+- focused tests cover framework parsing, defaults, custom behavior, Rails runtime
+  selection, asset identity, secrets validation, and update conflict safety.

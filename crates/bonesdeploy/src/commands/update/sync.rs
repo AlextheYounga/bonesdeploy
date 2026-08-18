@@ -3,18 +3,22 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::project_env;
 use bonesdeploy_core::paths;
 
-pub(super) fn refresh_local_infrastructure(source_dir: &Path, project_root: &Path) -> Result<()> {
+pub(super) fn refresh_local_infrastructure(
+    source_dir: &Path,
+    project_root: &Path,
+    template: Option<&str>,
+) -> Result<()> {
     let infra_dir = project_root.join(paths::LOCAL_INFRA_DIR);
     if !infra_dir.exists() {
         return Ok(());
     }
 
+    check_managed_core_conflicts(source_dir, project_root, template)?;
     sync_kit_deployment_functions(source_dir, &infra_dir)?;
-    sync_tree(&deployment_source_root(source_dir, project_root)?, &infra_dir.join("deployment"), true)?;
-    sync_managed_core(source_dir, project_root)?;
+    sync_tree(&deployment_source_root(source_dir, template), &infra_dir.join("deployment"), true)?;
+    sync_managed_core(source_dir, project_root, template)?;
 
     Ok(())
 }
@@ -27,24 +31,23 @@ fn sync_kit_deployment_functions(source_dir: &Path, infra_dir: &Path) -> Result<
     Ok(())
 }
 
-fn deployment_source_root(source_dir: &Path, project_root: &Path) -> Result<PathBuf> {
-    let Some(template) = selected_framework_template(&project_root.join(paths::DOT_ENV))? else {
-        return Ok(source_dir.join("crates/bonesdeploy/assets/kit/deployment"));
+fn deployment_source_root(source_dir: &Path, template: Option<&str>) -> PathBuf {
+    let Some(template) = template else {
+        return source_dir.join("crates/bonesdeploy/assets/kit/deployment");
     };
 
     let framework_deployment =
         source_dir.join("crates/bonesdeploy/assets/frameworks").join(template).join("deployment");
-    Ok(if framework_deployment.is_dir() {
+    if framework_deployment.is_dir() {
         framework_deployment
     } else {
         source_dir.join("crates/bonesdeploy/assets/kit/deployment")
-    })
+    }
 }
 
-fn sync_managed_core(source_dir: &Path, project_root: &Path) -> Result<()> {
-    let template =
-        selected_framework_template(&project_root.join(paths::DOT_ENV))?.unwrap_or_else(|| String::from("custom"));
-    let source = source_dir.join("crates/bonesinfra/python/src/bonesinfra/frameworks").join(&template);
+fn sync_managed_core(source_dir: &Path, project_root: &Path, template: Option<&str>) -> Result<()> {
+    let template = template.unwrap_or("custom");
+    let source = source_dir.join("crates/bonesinfra/python/src/bonesinfra/frameworks").join(template);
     if !source.is_dir() {
         return Ok(());
     }
@@ -52,6 +55,17 @@ fn sync_managed_core(source_dir: &Path, project_root: &Path) -> Result<()> {
     let destination = project_root.join(paths::LOCAL_INFRA_DIR).join("provision/core");
     check_tree_conflicts(&source, &destination)?;
     sync_tree(&source, &destination, false)
+}
+
+fn check_managed_core_conflicts(source_dir: &Path, project_root: &Path, template: Option<&str>) -> Result<()> {
+    let template = template.unwrap_or("custom");
+    let source = source_dir.join("crates/bonesinfra/python/src/bonesinfra/frameworks").join(template);
+    if !source.is_dir() {
+        return Ok(());
+    }
+
+    let destination = project_root.join(paths::LOCAL_INFRA_DIR).join("provision/core");
+    check_tree_conflicts(&source, &destination)
 }
 
 fn check_tree_conflicts(source_root: &Path, dest_root: &Path) -> Result<()> {
@@ -69,15 +83,6 @@ fn check_tree_conflicts(source_root: &Path, dest_root: &Path) -> Result<()> {
         }
     }
     Ok(())
-}
-
-fn selected_framework_template(framework_toml: &Path) -> Result<Option<String>> {
-    let content =
-        fs::read_to_string(framework_toml).with_context(|| format!("Failed to read {}", framework_toml.display()))?;
-    Ok(content.lines().find_map(|line| {
-        let (key, value) = line.split_once('=')?;
-        (key.trim() == project_env::TEMPLATE).then(|| value.trim().trim_matches(['"', '\'']).to_string())
-    }))
 }
 
 fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {
@@ -147,7 +152,7 @@ mod tests {
         write(&project_root.join(".env"), "TEMPLATE=laravel\n")?;
         write(&infra_dir.join("provision/custom/runtime.py"), "def deploy(ctx):\n    custom(ctx)\n")?;
 
-        refresh_local_infrastructure(&source_dir, &project_root)?;
+        refresh_local_infrastructure(&source_dir, &project_root, Some("laravel"))?;
 
         assert_eq!(fs::read_to_string(project_root.join(".env"))?, "TEMPLATE=laravel\n");
         assert_eq!(fs::read_to_string(infra_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
@@ -169,16 +174,21 @@ mod tests {
         let source_dir = temp.path().join("source");
         let project_root = temp.path().join("project");
         let core_file = project_root.join("infra/provision/core/runtime.py");
+        let deployment_file = project_root.join("infra/deployment/build/01_build.sh");
         write(&source_dir.join("crates/bonesinfra/python/src/bonesinfra/frameworks/custom/runtime.py"), "managed")?;
+        write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/functions.sh"), "new functions")?;
+        write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/build/01_build.sh"), "new deployment")?;
         write(&project_root.join(".env"), "TEMPLATE=custom\n")?;
         write(&core_file, "locally changed")?;
+        write(&deployment_file, "locally preserved")?;
 
-        let error = match refresh_local_infrastructure(&source_dir, &project_root) {
+        let error = match refresh_local_infrastructure(&source_dir, &project_root, Some("custom")) {
             Ok(()) => anyhow::bail!("conflict should be rejected"),
             Err(error) => error,
         };
         assert!(error.to_string().contains("Managed infrastructure conflict"));
         assert_eq!(fs::read_to_string(core_file)?, "locally changed");
+        assert_eq!(fs::read_to_string(deployment_file)?, "locally preserved");
         Ok(())
     }
 

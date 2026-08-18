@@ -6,7 +6,7 @@ const DEFAULT_PYTHON_VERSION: &str = "3.14";
 
 const PERMISSIONS: [PermissionDefault; 3] = [directory("*", 750, false), file("*", 640), directory("media", 770, true)];
 
-pub(crate) fn defaults() -> FrameworkDefaults {
+pub(super) fn defaults() -> FrameworkDefaults {
     FrameworkDefaults {
         template: "django",
         web_root: "public",
@@ -15,7 +15,7 @@ pub(crate) fn defaults() -> FrameworkDefaults {
     }
 }
 
-pub fn questions() -> &'static [Question] {
+pub(super) fn questions() -> &'static [Question] {
     &[
         Question {
             key: PYTHON_VERSION_KEY,
@@ -30,7 +30,7 @@ pub fn questions() -> &'static [Question] {
     ]
 }
 
-pub(crate) fn environment_example(project_name: &str, _site_url: &str) -> String {
+pub(super) fn environment_example(project_name: &str, _site_url: &str) -> String {
     super::join_env_lines(&[
         &format!("DJANGO_SETTINGS_MODULE={project_name}.settings.production"),
         "SECRET_KEY=",
@@ -38,7 +38,7 @@ pub(crate) fn environment_example(project_name: &str, _site_url: &str) -> String
     ])
 }
 
-pub(crate) fn build_environment_example(runtime: &Runtime) -> String {
+pub(super) fn build_environment_example(runtime: &Runtime) -> String {
     let python_version =
         runtime.extra.get(PYTHON_VERSION_KEY).and_then(|value| value.as_str()).unwrap_or(DEFAULT_PYTHON_VERSION);
     super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("PYTHON_VERSION={python_version}")])

@@ -2,153 +2,130 @@
 
 ## Request
 
-Consolidate the Rust-side framework system into a single architectural concept
-with a clear public front door. The desired shape is:
+Define a durable architectural refactor program for BonesDeploy. The program will
+move important responsibilities into clear, reusable building blocks with small
+public APIs, private implementation details, explicit collaborators, and one
+extension mechanism per family of variations.
 
-> One enum or trait representing "a supported application framework," with each
-> concrete framework as an implementation. Callers use the concept through its
-> public API; they do not dispatch to per-framework modules themselves.
+This Acta record defines the target architecture and the order of the child
+changes. The initial implementation slice is limited to restoring the branch
+build, correcting architecture documentation, and implementing the Rust Framework
+boundary; it does not implement every child refactor in one change.
 
 ## Problem
 
-The current Rust framework system lacks a single architectural front door. Seven
-framework modules (laravel, django, next, nuxt, rails, sveltekit, vue) exist as
-sibling modules behind a dispatch module (`frameworks.rs`) that routes `&str`
-template names to per-module functions through repeated `match` expressions.
+The repository has several useful concepts, but their boundaries are inconsistent.
+Commands and sibling modules can bypass existing wrappers and coordinate internal
+details directly.
 
-Specific problems:
+The current problems are concrete:
 
-1. **No canonical framework identity.** The seven template names are string
-   literals repeated across five `match` expressions and multiple test functions.
-   There is no `enum`, `const` array, or macro that collects them. Adding an
-   eighth framework requires touching five match expressions and hoping all call
-   sites stay in sync.
+- framework behavior uses string dispatch, duplicate registries, and public module
+  internals;
+- direct Git and SSH processes bypass existing Rust wrappers;
+- dotenv parsing and project configuration are implemented in multiple places;
+- update and migration behavior is split across Rust and Python, including a dead
+  Rust migration alongside the live Python patch;
+- Python framework runtimes repeat common provisioning orchestration;
+- deployment lifecycle coordination is concentrated in a large command function;
+- state storage and mutation guards are reachable through side doors;
+- doctor, status, service, lifecycle, and build code duplicate inspectors and path
+  derivation;
+- architecture documentation describes the pre-decentralization system.
 
-2. **Duplicate dispatch across every public function.** `questions()`,
-   `validate_answers()`, `configure()`, `environment_example()`, and
-   `build_environment_example()` each contain their own full `match` on template
-   name, routing to per-module functions. This is the same dispatch pattern
-   implemented five times.
-
-3. **Inconsistent signatures for the same concept.**
-   `build_environment_example()` takes `&Runtime` for Laravel and Django but
-   nothing for the other five frameworks. The dispatch function accommodates both
-   by hardcoding which match arm passes which arguments.
-
-4. **Inconsistent visibility.** `questions()` is `pub` from framework modules
-   while `environment_example()` and `build_environment_example()` are
-   `pub(crate)`. The `Question` and `QuestionKind` types are `pub` and leak
-   through to the `ui/prompts` module directly from the dispatch module.
-
-5. **Framework names derived from the filesystem.**
-   `framework_assets::framework_names()` discovers template names by listing
-   top-level directories in the embedded `assets/frameworks/` filesystem. This
-   is decoupled from the Rust source modules — a directory without a
-   corresponding module (or vice versa) would cause a runtime error.
-
-6. **Rails ignores its own question.** Rails asks for `ruby_version` (Choice:
-   3.2/3.3/3.4) but `build_environment_example()` hardcodes
-   `DEFAULT_RUBY_VERSION` (3.3) instead of reading `runtime.extra["ruby_version"]`.
-
-7. **`configure()` is special-cased.** Only Next and Nuxt have a `configure()`
-   hook. Five frameworks lack it. The dispatch function has a partial `match`
-   that silently no-ops for the other five.
+These are ownership and boundary problems, not merely duplication problems.
 
 ## Definitions
 
-**Framework:** A supported web application framework (Django, Laravel, Next,
-Nuxt, Rails, SvelteKit, Vue). Each framework provides prompt questions,
-answer validation, environment example generation, build environment generation,
-and optional post-scaffold configuration.
+**Building block:** A named responsibility with a small public API, private
+implementation, explicit collaborators, and a documented extension mechanism.
 
-**Framework identity:** A single canonical representation of which framework is
-selected — an `enum Framework` variant — replacing the current `&str` template
-name as the dispatch key.
+**Public concept:** The API that callers in another responsibility may use. It may
+be a concrete Rust type, module, function set, Python class, or registry.
 
-**Public front door:** The `Framework` enum and its methods. Callers convert a
-user-provided string to a `Framework` once, then call methods on it. They never
-match on framework identity themselves.
+**Side door:** A caller path that bypasses an established public concept, such as a
+direct `git` process outside `infra/git.rs`, a direct state-file write outside the
+state store, or a direct import of a framework implementation module.
 
-**Per-framework module:** A private (`pub(crate)`) module under
-`crates/bonesdeploy/src/frameworks/<name>.rs` containing the implementation
-details of that framework. Implementation functions become `pub(super)` or
-`pub(crate)` — not directly importable by callers outside the `frameworks`
-directory.
+**Child change:** A separately planned and reviewed implementation change that
+implements one architectural boundary from this program. A child change must have
+its own settled Acta `01-idea.md`, `02-plan.md`, and `03-tasks.md` before code is
+modified.
 
-**Framework contract:** The set of methods available on the `Framework` enum.
-Every variant implements every method. Methods that are irrelevant for a given
-framework (e.g. `configure()` for Django) have a default no-op.
+**Canonical owner:** The one existing layer, module, process, or concept that owns
+a responsibility. Callers delegate to the canonical owner and do not reproduce
+its implementation details.
 
-## Desired outcome
+## Target Architecture
 
-1. `Framework` is an enum with seven variants, each matching one supported
-   framework. It is the single canonical source of framework identity.
+The program establishes these canonical ownership groups. The names identify
+responsibilities already present in the repository; they do not require a new type
+when an existing module already provides the correct boundary.
 
-2. All current public dispatch functions (`questions`, `validate_answers`,
-   `configure`, `environment_example`, `build_environment_example`) become
-   methods on `Framework`.
+| Responsibility | Canonical concept or boundary | Existing anchor |
+| --- | --- | --- |
+| Project configuration and `.env` | Project configuration boundary | `bonesdeploy-core/src/config.rs`, `bonesdeploy/src/config.rs`, Python `config/context.py` |
+| Framework selection behavior | Rust `Framework` concept | `bonesdeploy/src/frameworks.rs` |
+| Framework provisioning | Python framework package and project infrastructure | `bonesinfra/project.py`, `frameworks/<name>/` |
+| Language installation | `LanguageRuntime` | `bonesinfra/services/languages/` |
+| Database/cache services | `RuntimeService` registry | `bonesinfra/services/runtime/` |
+| Git operations | Git boundary | `bonesdeploy/src/infra/git.rs` |
+| SSH operations | SSH boundary | `bonesdeploy/src/infra/ssh.rs`, Python `pyinfra/runner.py` |
+| Secrets | GPG/secrets boundary | `bonesdeploy/src/commands/secrets/` |
+| Infrastructure updates | Update flow plus `Patch` registry | `commands/update/`, Python `patches/registry.py` |
+| Provisioning execution | BonesInfra command plans and runner | `bonesinfra/cli/`, `pyinfra/runner.py` |
+| Deployment mutation authorization | `SiteMutation` | `bonesremote/src/release/site_mutation.rs` |
+| Deployment state | `SiteState` store | `bonesremote/src/release/state/` |
+| Deployment lifecycle | Lifecycle stages and phase model | `bonesremote/src/release/lifecycle/`, `DeploymentPhase` |
+| Health inspection | Doctor and shared inspectors | `bonesdeploy/commands/doctor.rs`, `bonesremote/commands/doctor/` |
 
-3. Callers convert `&str` template names to `Framework` once at the CLI / user
-   input boundary, then pass the `Framework` value to the rest of the system.
-   No code outside `frameworks.rs` matches on framework identity.
+## Desired Outcome
 
-4. Per-framework module functions become `pub(super)` — only callable from
-   `frameworks.rs`'s method bodies. The `Question` and `QuestionKind` types
-   remain `pub` and accessible through the `Framework` API.
+When this program is decomposed into approved child changes:
 
-5. `framework_assets::framework_names()` is replaced by `Framework::ALL` or an
-   equivalent constant, removing the filesystem-based name derivation.
-
-6. `build_environment_example()` has a unified signature: all framework variants
-   accept `&Runtime`. Frameworks that don't need it ignore it.
-
-7. `configure()` is a method on `Framework` with a default no-op implementation
-   in the enum method body, not in each variant.
-
-8. Rails' `build_environment_example()` reads `runtime.extra["ruby_version"]`
-   instead of hardcoding `DEFAULT_RUBY_VERSION`.
-
-9. Existing behavior is preserved: CLI commands, config formats, output content,
-   error messages, and test coverage remain unchanged.
+1. `docs/ARCHITECTURE.md` and `docs/architecture/reference.md` identify each
+   canonical owner and match the post-decentralization code.
+2. Each child change has one settled responsibility, one chosen boundary, concrete
+   callers to migrate, and focused validation.
+3. Commands delegate through public concepts instead of reaching into internals.
+4. Existing variation mechanisms are extended instead of parallel registries being
+   created.
+5. Side-door searches and visibility checks verify important boundaries.
+6. No child change introduces speculative managers, containers, generic service
+   layers, or traits without a concrete substitution requirement.
 
 ## Scope
 
-The change includes:
+This parent change includes:
 
-- Introducing a `pub enum Framework` with seven variants.
-- Moving all dispatch logic into methods on `Framework`.
-- Reducing per-framework module function visibility to `pub(super)`.
-- Replacing `frameworks::questions(template_name)` and similar free-function
-  calls with `framework.questions()` calls at all call sites.
-- Removing the five duplicate match expressions.
-- Unifying `build_environment_example()` to accept `&Runtime` uniformly.
-- Fixing Rails to consume `runtime.extra["ruby_version"]` instead of hardcoding.
-- Replacing `framework_names()` filesystem derivation with a method on
-  `Framework`.
-- Adding or updating tests that verify the Framework enum contract.
+- settling the architecture vocabulary and canonical ownership map;
+- correcting architecture documentation for the current `.env`/`infra/` system;
+- identifying existing side doors and the child change that closes each one;
+- defining the dependency order for child implementation changes;
+- creating separate Acta planning records for each child change;
+- the authorized initial bootstrap/documentation/Framework implementation slice.
 
 ## Constraints
 
-- The `Question` and `QuestionKind` types must remain `pub` — they are consumed
-  by `ui/prompts.rs` and `commands/init/framework.rs` to build interactive
-  prompts.
-- Per-framework module files must stay under 400 lines. Most are already under
-  100 lines; moving implementation into the enum file must not violate this.
-- `Framework` enum `impl` blocks may be split across the file or dispatch to
-  per-module functions — the enum file must not exceed 400 lines.
-- CLI behavior, config output, error messages, and test coverage must not
-  regress.
-- `cargo clippy`, `cargo fmt`, and `cargo test` for affected crates must pass.
+- The initial slice may modify the manifest command and Rust Framework callers as
+  recorded in clarification 11; remaining child changes are implemented separately.
+- Child changes are implemented separately and reviewed independently.
+- Existing concepts are strengthened before new abstractions are introduced.
+- `bonesdeploy-core` remains a leaf crate; `bonesremote` does not depend on
+  `bonesinfra`.
+- Provisioning remains owned by BonesInfra and deployment execution remains owned
+  by BonesRemote.
+- The repository revision remains the deployment unit.
+- Child plans must preserve security, atomic state writes, lifecycle gates, and
+  observable CLI behavior unless they explicitly record a bug fix.
+- E2E tests are not part of ordinary child-change validation.
 
 ## Exclusions
 
-- This change does not touch the Python-side framework system (`bonesinfra`).
-- It does not introduce a trait or trait objects. The enum is the chosen Rust
-  mechanism for a closed set of known framework implementations.
-- It does not add or remove framework support.
-- It does not refactor the Git, SSH, or deployment orchestration boundaries.
-- It does not change framework question content, environment example output, or
-  build environment content beyond the Rails bug fix.
-- It does not change `ui/prompts.rs` beyond adapting imports and call signatures.
-- It does not touch `infra/assets/frameworks.rs` beyond replacing
-  `framework_names()`.
+- Implementing the child refactors is excluded from this parent documentation
+  change.
+- Replacing every function with an object is excluded.
+- Speculative dependency injection, service containers, generic managers, and
+  open-ended trait hierarchies are excluded.
+- Merging the Rust CLI, BonesInfra, and BonesRemote into one layer is excluded.
+- Changing product behavior without a child plan and explicit decision is excluded.

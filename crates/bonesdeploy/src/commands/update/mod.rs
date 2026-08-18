@@ -7,6 +7,7 @@ use tempfile::TempDir;
 
 use bonesdeploy_core::paths;
 
+use crate::config;
 use crate::ui::output;
 
 mod release;
@@ -59,7 +60,13 @@ pub async fn run(options: Options) -> Result<()> {
                 "local",
             ])?;
         }
-        sync::refresh_local_infrastructure(&source_dir, Path::new("."))?;
+        let template = if Path::new(paths::DOT_ENV).exists() {
+            let template = config::load(Path::new(paths::DOT_ENV))?.runtime.template;
+            (!template.is_empty()).then_some(template)
+        } else {
+            None
+        };
+        sync::refresh_local_infrastructure(&source_dir, Path::new("."), template.as_deref())?;
     }
 
     if !options.skip_remote {

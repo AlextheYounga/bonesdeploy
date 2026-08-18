@@ -17,17 +17,27 @@ pub(super) fn materialize_project(cfg: &mut config::Bones, framework: FrameworkS
     let infra_dir = Path::new(paths::LOCAL_INFRA_DIR);
     fs::create_dir_all(infra_dir)?;
 
-    let framework_name = framework.template.as_deref().unwrap_or("custom");
-    if let Some(template_name) = framework.template.as_deref() {
-        framework_assets::scaffold_framework_env_build(template_name, Path::new("."), &cfg.runtime)?;
-        frameworks::configure(template_name, cfg);
-        println!("Framework template: {template_name}");
-    } else {
-        println!("Framework template: custom");
+    let selected_framework = framework
+        .template
+        .as_deref()
+        .map(frameworks::Framework::parse)
+        .transpose()?
+        .unwrap_or(frameworks::Framework::Custom);
+    if selected_framework != frameworks::Framework::Custom {
+        framework_assets::scaffold_framework_env_build(&selected_framework.to_string(), Path::new("."), &cfg.runtime)?;
+        selected_framework.configure(cfg);
     }
+    println!("Framework template: {selected_framework}");
 
-    framework_assets::scaffold_framework_project(framework_name, infra_dir)?;
-    bonesinfra::run(&["project", "materialize", "--env-file", paths::DOT_ENV, "--framework", framework_name])?;
+    framework_assets::scaffold_framework_project(&selected_framework.to_string(), infra_dir)?;
+    bonesinfra::run(&[
+        "project",
+        "materialize",
+        "--env-file",
+        paths::DOT_ENV,
+        "--framework",
+        &selected_framework.to_string(),
+    ])?;
     fs::create_dir_all(paths::LOCAL_INFRA_SECRETS_DIR)
         .with_context(|| format!("Failed to create {}", paths::LOCAL_INFRA_SECRETS_DIR))?;
     Ok(())

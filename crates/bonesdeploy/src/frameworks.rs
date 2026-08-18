@@ -1,3 +1,6 @@
+use std::fmt;
+use std::str::FromStr;
+
 use anyhow::{Result, bail};
 use bonesdeploy_core::config::{Bones, Runtime};
 use serde::Serialize;
@@ -7,13 +10,147 @@ use serde_json::Value;
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
 const BUILD_ENV_HEADER: &str = "# Committed, non-secret values used while building this project.";
 
-pub(crate) mod django;
-pub(crate) mod laravel;
-pub(crate) mod next;
-pub(crate) mod nuxt;
-pub(crate) mod rails;
-pub(crate) mod sveltekit;
-pub(crate) mod vue;
+mod django;
+mod laravel;
+mod next;
+mod nuxt;
+mod rails;
+mod sveltekit;
+mod vue;
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum Framework {
+    Django,
+    Laravel,
+    Next,
+    Nuxt,
+    Rails,
+    SvelteKit,
+    Vue,
+    Custom,
+}
+
+impl Framework {
+    pub(crate) const ALL: &'static [Self] =
+        &[Self::Django, Self::Laravel, Self::Next, Self::Nuxt, Self::Rails, Self::SvelteKit, Self::Vue, Self::Custom];
+
+    pub fn parse(template: &str) -> Result<Self> {
+        template.parse()
+    }
+
+    pub fn questions(self) -> &'static [Question] {
+        match self {
+            Self::Django => django::questions(),
+            Self::Laravel => laravel::questions(),
+            Self::Next => next::questions(),
+            Self::Nuxt => nuxt::questions(),
+            Self::Rails => rails::questions(),
+            Self::SvelteKit => sveltekit::questions(),
+            Self::Vue => vue::questions(),
+            Self::Custom => &[],
+        }
+    }
+
+    pub fn validate_answers(self, answers: &serde_json::Map<String, Value>) -> Result<()> {
+        let schema = self.questions();
+        for (key, value) in answers {
+            let Some(question) = schema.iter().find(|q| q.key == key.as_str()) else {
+                bail!("unknown framework var for {self}: {key}");
+            };
+            match (question.kind, value) {
+                (QuestionKind::Text { .. }, Value::String(_)) | (QuestionKind::Bool { .. }, Value::Bool(_)) => {}
+                (QuestionKind::Choice { choices, .. }, Value::String(s)) => {
+                    if !choices.contains(&s.as_str()) {
+                        bail!("framework var {key}={s} is not one of {choices:?} for {self}");
+                    }
+                }
+                _ => bail!("framework var {key} has wrong type for {self}: {value}"),
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn defaults(self) -> Option<FrameworkDefaults> {
+        match self {
+            Self::Django => Some(django::defaults()),
+            Self::Laravel => Some(laravel::defaults()),
+            Self::Next => Some(next::defaults()),
+            Self::Nuxt => Some(nuxt::defaults()),
+            Self::Rails => Some(rails::defaults()),
+            Self::SvelteKit => Some(sveltekit::defaults()),
+            Self::Vue => Some(vue::defaults()),
+            Self::Custom => None,
+        }
+    }
+
+    pub fn configure(self, cfg: &mut Bones) {
+        match self {
+            Self::Next => next::configure(cfg),
+            Self::Nuxt => nuxt::configure(cfg),
+            _ => {}
+        }
+    }
+
+    pub fn environment_example(self, project_name: &str, domain: &str, preview_domain: &str) -> Option<String> {
+        let site_url = environment_url(domain, preview_domain);
+        Some(match self {
+            Self::Django => django::environment_example(project_name, &site_url),
+            Self::Laravel => laravel::environment_example(project_name, &site_url),
+            Self::Next => next::environment_example(project_name, &site_url),
+            Self::Nuxt => nuxt::environment_example(project_name, &site_url),
+            Self::Rails => rails::environment_example(project_name, &site_url),
+            Self::SvelteKit => sveltekit::environment_example(project_name, &site_url),
+            Self::Vue => vue::environment_example(project_name, &site_url),
+            Self::Custom => return None,
+        })
+    }
+
+    pub(crate) fn build_environment_example(self, runtime: &Runtime) -> Option<String> {
+        Some(match self {
+            Self::Django => django::build_environment_example(runtime),
+            Self::Laravel => laravel::build_environment_example(runtime),
+            Self::Next => next::build_environment_example(),
+            Self::Nuxt => nuxt::build_environment_example(),
+            Self::Rails => rails::build_environment_example(runtime),
+            Self::SvelteKit => sveltekit::build_environment_example(),
+            Self::Vue => vue::build_environment_example(),
+            Self::Custom => return None,
+        })
+    }
+}
+
+impl fmt::Display for Framework {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Django => "django",
+            Self::Laravel => "laravel",
+            Self::Next => "next",
+            Self::Nuxt => "nuxt",
+            Self::Rails => "rails",
+            Self::SvelteKit => "sveltekit",
+            Self::Vue => "vue",
+            Self::Custom => "custom",
+        })
+    }
+}
+
+impl FromStr for Framework {
+    type Err = anyhow::Error;
+
+    fn from_str(template: &str) -> Result<Self, Self::Err> {
+        match template {
+            "django" => Ok(Self::Django),
+            "laravel" => Ok(Self::Laravel),
+            "next" => Ok(Self::Next),
+            "nuxt" => Ok(Self::Nuxt),
+            "rails" => Ok(Self::Rails),
+            "sveltekit" => Ok(Self::SvelteKit),
+            "vue" => Ok(Self::Vue),
+            "custom" => Ok(Self::Custom),
+            other => bail!("unknown framework template: {other}"),
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 pub(crate) struct FrameworkDefaults {
@@ -73,80 +210,9 @@ impl Question {
 
 /// Every promptable question for a framework template. Empty for templates
 /// that take no configuration (sveltekit, vue).
-pub fn questions(template: &str) -> Result<&'static [Question]> {
-    Ok(match template {
-        "laravel" => laravel::questions(),
-        "django" => django::questions(),
-        "next" => next::questions(),
-        "nuxt" => nuxt::questions(),
-        "rails" => rails::questions(),
-        "sveltekit" => sveltekit::questions(),
-        "vue" => vue::questions(),
-        other => bail!("unknown framework template: {other}"),
-    })
-}
-
-/// Validate non-interactive `--framework-var` answers against a template's
-/// question schema. Catches agent typos and bad values before they reach
-/// the project's root `.env` and infrastructure files.
-pub fn validate_answers(template: &str, answers: &serde_json::Map<String, Value>) -> Result<()> {
-    let schema = questions(template)?;
-    for (key, value) in answers {
-        let Some(question) = schema.iter().find(|q| q.key == key.as_str()) else {
-            bail!("unknown framework var for {template}: {key}");
-        };
-        match (question.kind, value) {
-            (QuestionKind::Text { .. }, Value::String(_)) | (QuestionKind::Bool { .. }, Value::Bool(_)) => {}
-            (QuestionKind::Choice { choices, .. }, Value::String(s)) => {
-                if !choices.contains(&s.as_str()) {
-                    bail!("framework var {key}={s} is not one of {choices:?} for {template}");
-                }
-            }
-            _ => bail!("framework var {key} has wrong type for {template}: {value}"),
-        }
-    }
-    Ok(())
-}
-
-/// Apply template-specific post-scaffold framework configuration.
-pub fn configure(template: &str, cfg: &mut Bones) {
-    match template {
-        "next" => next::configure(cfg),
-        "nuxt" => nuxt::configure(cfg),
-        _ => {}
-    }
-}
-
-pub fn environment_example(template: &str, project_name: &str, domain: &str, preview_domain: &str) -> Option<String> {
-    let site_url = environment_url(domain, preview_domain);
-    Some(match template {
-        "django" => django::environment_example(project_name, &site_url),
-        "laravel" => laravel::environment_example(project_name, &site_url),
-        "next" => next::environment_example(project_name, &site_url),
-        "nuxt" => nuxt::environment_example(project_name, &site_url),
-        "rails" => rails::environment_example(project_name, &site_url),
-        "sveltekit" => sveltekit::environment_example(project_name, &site_url),
-        "vue" => vue::environment_example(project_name, &site_url),
-        _ => return None,
-    })
-}
-
 pub(crate) fn environment_url(domain: &str, preview_domain: &str) -> String {
     let host = if domain.is_empty() { preview_domain } else { domain };
     if host.is_empty() { String::new() } else { format!("https://{host}") }
-}
-
-pub(crate) fn build_environment_example(template: &str, runtime: &Runtime) -> Option<String> {
-    Some(match template {
-        "django" => django::build_environment_example(runtime),
-        "laravel" => laravel::build_environment_example(runtime),
-        "next" => next::build_environment_example(),
-        "nuxt" => nuxt::build_environment_example(),
-        "rails" => rails::build_environment_example(),
-        "sveltekit" => sveltekit::build_environment_example(),
-        "vue" => vue::build_environment_example(),
-        _ => return None,
-    })
 }
 
 pub(crate) fn join_env_lines(lines: &[&str]) -> String {
@@ -160,7 +226,7 @@ mod tests {
     use bonesdeploy_core::config::Bones;
     use serde_json::{Map, Value, json};
 
-    use super::{Runtime, build_environment_example, configure, environment_example, questions, validate_answers};
+    use super::{Framework, Runtime};
 
     fn bones_with_runtime(template: &str, extra: Map<String, Value>) -> Result<Bones> {
         let mut config = Bones::default();
@@ -178,16 +244,38 @@ mod tests {
     #[test]
     fn every_template_has_a_questions_function() -> Result<()> {
         for template in ["laravel", "django", "next", "nuxt", "rails", "sveltekit", "vue"] {
-            questions(template)?;
+            Framework::parse(template)?.questions();
         }
         Ok(())
+    }
+
+    #[test]
+    fn framework_wire_values_parse_and_display() -> Result<()> {
+        for wire in ["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue", "custom"] {
+            assert_eq!(Framework::parse(wire)?.to_string(), wire);
+        }
+        assert!(Framework::parse("unknown").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn custom_is_the_empty_framework_fallback() {
+        let answers = serde_json::Map::new();
+        assert!(Framework::Custom.questions().is_empty());
+        assert!(Framework::Custom.validate_answers(&answers).is_ok());
+        assert!(Framework::Custom.environment_example("atlas", "", "").is_none());
+        assert!(Framework::Custom.build_environment_example(&Runtime::default()).is_none());
+        assert!(Framework::Custom.defaults().is_none());
     }
 
     #[test]
     fn every_template_has_an_environment_example() {
         for template in ["laravel", "django", "next", "nuxt", "rails", "sveltekit", "vue"] {
             assert!(
-                environment_example(template, "atlas", "", "atlas.example.com").is_some(),
+                Framework::parse(template)
+                    .expect("known framework")
+                    .environment_example("atlas", "", "atlas.example.com")
+                    .is_some(),
                 "missing environment example for {template}"
             );
         }
@@ -195,17 +283,20 @@ mod tests {
 
     #[test]
     fn environment_examples_use_project_name_in_shared_paths() {
-        let laravel = environment_example("laravel", "atlas", "example.com", "atlas.example.com")
+        let laravel = Framework::Laravel
+            .environment_example("atlas", "example.com", "atlas.example.com")
             .expect("Laravel environment defaults");
         assert!(laravel.contains("/srv/sites/atlas/shared/storage"));
         assert!(laravel.contains("APP_URL=https://example.com"));
         assert!(!laravel.contains("<project>"));
 
-        let django =
-            environment_example("django", "atlas", "", "atlas.example.com").expect("Django environment defaults");
+        let django = Framework::Django
+            .environment_example("atlas", "", "atlas.example.com")
+            .expect("Django environment defaults");
         assert!(django.contains("/srv/sites/atlas/shared/database.sqlite"));
 
-        let rails = environment_example("rails", "atlas", "", "atlas.example.com").expect("Rails environment defaults");
+        let rails =
+            Framework::Rails.environment_example("atlas", "", "atlas.example.com").expect("Rails environment defaults");
         assert!(rails.contains("/srv/sites/atlas/shared/storage/production.sqlite3"));
     }
 
@@ -213,7 +304,7 @@ mod tests {
     fn laravel_build_environment_uses_selected_php_version() {
         let runtime: Runtime = serde_json::from_value(serde_json::json!({ "php_version": "8.3" })).unwrap();
 
-        let environment = build_environment_example("laravel", &runtime).expect("Laravel build environment");
+        let environment = Framework::Laravel.build_environment_example(&runtime).expect("Laravel build environment");
         assert!(environment.contains("PHP_VERSION=8.3"));
         assert!(!environment.contains("PHP_VERSION=8.5"));
     }
@@ -222,16 +313,25 @@ mod tests {
     fn django_build_environment_uses_selected_python_version() {
         let runtime: Runtime = serde_json::from_value(serde_json::json!({ "python_version": "3.12" })).unwrap();
 
-        let environment = build_environment_example("django", &runtime).expect("Django build environment");
+        let environment = Framework::Django.build_environment_example(&runtime).expect("Django build environment");
         assert!(environment.contains("PYTHON_VERSION=3.12"));
         assert!(!environment.contains("PYTHON_VERSION=3.14"));
+    }
+
+    #[test]
+    fn rails_build_environment_uses_selected_ruby_version() {
+        let runtime: Runtime = serde_json::from_value(serde_json::json!({ "ruby_version": "3.4" })).unwrap();
+
+        let environment = Framework::Rails.build_environment_example(&runtime).expect("Rails build environment");
+        assert!(environment.contains("RUBY_VERSION=3.4"));
+        assert!(!environment.contains("RUBY_VERSION=3.3"));
     }
 
     #[test]
     fn validate_rejects_unknown_key() -> Result<()> {
         let mut answers = Map::new();
         answers.insert("php_verison".to_string(), Value::String("8.5".to_string()));
-        match validate_answers("laravel", &answers) {
+        match Framework::Laravel.validate_answers(&answers) {
             Ok(()) => bail!("expected error for unknown key"),
             Err(err) => {
                 let msg = format!("{err:#}");
@@ -246,7 +346,7 @@ mod tests {
     fn validate_rejects_bad_choice() -> Result<()> {
         let mut answers = Map::new();
         answers.insert("php_version".to_string(), Value::String("8.6".to_string()));
-        match validate_answers("laravel", &answers) {
+        match Framework::Laravel.validate_answers(&answers) {
             Ok(()) => bail!("expected error for bad choice"),
             Err(err) => assert!(format!("{err:#}").contains("not one of"), "got: {err:#}"),
         }
@@ -257,7 +357,7 @@ mod tests {
     fn validate_rejects_wrong_type() -> Result<()> {
         let mut answers = Map::new();
         answers.insert("php_version".to_string(), Value::Bool(true));
-        match validate_answers("laravel", &answers) {
+        match Framework::Laravel.validate_answers(&answers) {
             Ok(()) => bail!("expected error for wrong type"),
             Err(err) => assert!(format!("{err:#}").contains("wrong type"), "got: {err:#}"),
         }
@@ -266,12 +366,12 @@ mod tests {
 
     #[test]
     fn validate_accepts_defaults() -> Result<()> {
-        let schema = questions("laravel")?;
+        let schema = Framework::Laravel.questions();
         let mut answers = Map::new();
         for q in schema {
             answers.insert(q.key.to_string(), q.default_value());
         }
-        validate_answers("laravel", &answers)?;
+        Framework::Laravel.validate_answers(&answers)?;
         Ok(())
     }
 
@@ -279,7 +379,7 @@ mod tests {
     fn configure_static_next_overrides_web_root() -> Result<()> {
         let mut config =
             bones_with_runtime("next", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
-        configure("next", &mut config);
+        Framework::Next.configure(&mut config);
         assert_eq!(config.runtime.web_root, "out");
         Ok(())
     }
@@ -288,7 +388,7 @@ mod tests {
     fn configure_static_nuxt_overrides_web_root() -> Result<()> {
         let mut config =
             bones_with_runtime("nuxt", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
-        configure("nuxt", &mut config);
+        Framework::Nuxt.configure(&mut config);
         assert_eq!(config.runtime.web_root, ".output/public");
         Ok(())
     }
@@ -297,7 +397,7 @@ mod tests {
     fn configure_server_next_keeps_web_root() -> Result<()> {
         let mut config =
             bones_with_runtime("next", [("is_static".to_string(), Value::Bool(false))].into_iter().collect())?;
-        configure("next", &mut config);
+        Framework::Next.configure(&mut config);
         assert_eq!(config.runtime.web_root, "public");
         Ok(())
     }

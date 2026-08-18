@@ -42,23 +42,25 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
         return Ok(());
     }
 
+    let mut effective_config = cfg.clone();
+    shared_config::apply_derived_defaults(&mut effective_config);
+    let framework = framework_for_secrets(&effective_config.runtime.template)?;
+
     gpg::ensure_installed()?;
     let key_fingerprint = gpg::ensure_project_key(&cfg.project_name)?;
     fs::create_dir_all(paths::LOCAL_INFRA_SECRETS_DIR)
         .with_context(|| format!("Failed to create {}", paths::LOCAL_INFRA_SECRETS_DIR))?;
 
     let temp_path = create_temp_edit_path()?;
-    let mut effective_config = cfg.clone();
-    shared_config::apply_derived_defaults(&mut effective_config);
     fs::write(
         &temp_path,
-        frameworks::environment_example(
-            &effective_config.runtime.template,
-            &effective_config.project_name,
-            &effective_config.domain,
-            &effective_config.preview_domain,
-        )
-        .unwrap_or_default(),
+        framework
+            .environment_example(
+                &effective_config.project_name,
+                &effective_config.domain,
+                &effective_config.preview_domain,
+            )
+            .unwrap_or_default(),
     )
     .with_context(|| format!("Failed to write default secrets to {}", temp_path.display()))?;
     fs::set_permissions(&temp_path, Permissions::from_mode(0o600))?;
@@ -78,6 +80,14 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     cleanup_result.with_context(|| format!("Failed to remove temporary secrets file {}", temp_path.display()))?;
     fs::set_permissions(encrypted_path, Permissions::from_mode(0o640))?;
     Ok(())
+}
+
+fn framework_for_secrets(template: &str) -> Result<frameworks::Framework> {
+    if template.trim().is_empty() {
+        return Ok(frameworks::Framework::Custom);
+    }
+
+    frameworks::Framework::parse(template).with_context(|| format!("Invalid TEMPLATE value: {template}"))
 }
 
 pub fn edit() -> Result<()> {
@@ -202,4 +212,24 @@ fn create_temp_edit_path() -> Result<PathBuf> {
         .with_context(|| format!("Failed to create temp file {}", path.display()))?;
 
     Ok(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::framework_for_secrets;
+    use crate::frameworks::Framework;
+
+    #[test]
+    fn invalid_template_is_an_error() {
+        let result = framework_for_secrets("not-a-framework");
+        assert!(result.as_ref().is_err());
+        if let Err(error) = result {
+            assert!(error.to_string().contains("Invalid TEMPLATE value"));
+        }
+    }
+
+    #[test]
+    fn blank_template_uses_custom_defaults() {
+        assert!(framework_for_secrets("  ").is_ok_and(|framework| framework == Framework::Custom));
+    }
 }

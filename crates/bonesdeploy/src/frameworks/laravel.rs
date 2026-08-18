@@ -13,7 +13,7 @@ const PERMISSIONS: [PermissionDefault; 6] = [
     non_recursive_file("database/database.sqlite", 660),
 ];
 
-pub(crate) fn defaults() -> FrameworkDefaults {
+pub(super) fn defaults() -> FrameworkDefaults {
     FrameworkDefaults {
         template: "laravel",
         web_root: "public",
@@ -22,7 +22,7 @@ pub(crate) fn defaults() -> FrameworkDefaults {
     }
 }
 
-pub fn questions() -> &'static [Question] {
+pub(super) fn questions() -> &'static [Question] {
     &[
         Question {
             key: PHP_VERSION_KEY,
@@ -39,7 +39,7 @@ pub fn questions() -> &'static [Question] {
 }
 
 #[expect(clippy::too_many_lines)]
-pub(crate) fn environment_example(project_name: &str, site_url: &str) -> String {
+pub(super) fn environment_example(project_name: &str, site_url: &str) -> String {
     super::join_env_lines(&[
         "APP_NAME=Laravel",
         "APP_ENV=production",
@@ -116,7 +116,7 @@ pub(crate) fn environment_example(project_name: &str, site_url: &str) -> String 
     ])
 }
 
-pub(crate) fn build_environment_example(runtime: &Runtime) -> String {
+pub(super) fn build_environment_example(runtime: &Runtime) -> String {
     let php_version =
         runtime.extra.get(PHP_VERSION_KEY).and_then(|value| value.as_str()).unwrap_or(DEFAULT_PHP_VERSION);
     super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("PHP_VERSION={php_version}")])
