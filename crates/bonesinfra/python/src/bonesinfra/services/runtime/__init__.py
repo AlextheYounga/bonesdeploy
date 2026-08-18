@@ -1,5 +1,3 @@
-import sys
-
 from bonesinfra.services.runtime.mariadb import MARIADB_SERVICE
 from bonesinfra.services.runtime.mongodb import MONGODB_SERVICE
 from bonesinfra.services.runtime.mysql import MYSQL_SERVICE
@@ -22,6 +20,6 @@ __all__ = ["get_service"]
 def get_service(name):
     svc = SERVICES.get(name)
     if svc is None:
-        print(f"Unknown service: {name}. Available: {', '.join(sorted(SERVICES))}", file=sys.stderr)
-        sys.exit(1)
+        available = ", ".join(sorted(SERVICES))
+        raise ValueError(f"Unknown service: {name}. Available: {available}")
     return svc

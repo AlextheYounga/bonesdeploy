@@ -1,6 +1,6 @@
 from shlex import quote
 
-from pyinfra import host
+from pyinfra.context import ctx_host
 from pyinfra.facts.hardware import Cpus
 from pyinfra.facts.server import Users
 from pyinfra.operations import server
@@ -102,6 +102,7 @@ def ensure_users_and_groups(ctx):
     build_user = build_user_for(ctx.app.project_name)
     build_group = build_group_for(ctx.app.project_name)
     build_home = build_home_for(ctx.app.project_name)
+    host = ctx_host.get()
     cpu_quota = cpu_quota_for(host.get_fact(Cpus))
     staged_dropin = f"{BUILD_SYSTEMD_STAGING_ROOT}/{build_user}.slice.conf"
 

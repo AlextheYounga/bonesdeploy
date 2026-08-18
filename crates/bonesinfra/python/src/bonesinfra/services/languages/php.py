@@ -1,7 +1,7 @@
 import re
 from tempfile import NamedTemporaryFile
 
-from pyinfra import host
+from pyinfra.context import ctx_host
 from pyinfra.facts.server import LinuxDistribution
 from pyinfra.operations import apt, files, server, systemd
 
@@ -71,7 +71,7 @@ class PHPRuntime(LanguageRuntime):
             _sudo=True,
         )
 
-        deb = host.get_fact(LinuxDistribution)
+        deb = ctx_host.get().get_fact(LinuxDistribution)
         release_meta = deb.get("release_meta", {}) if deb else {}
         codename = (
             release_meta.get("VERSION_CODENAME")

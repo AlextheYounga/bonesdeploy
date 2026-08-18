@@ -1,6 +1,8 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 import bonesinfra.services.runtime.mongodb as mongodb_mod
 import bonesinfra.services.runtime.postgres as postgres_mod
 import bonesinfra.services.runtime.valkey as valkey_mod
@@ -24,6 +26,11 @@ def test_all_expected_services_are_registered():
     for name in ("postgres", "mysql", "mariadb", "mongodb", "valkey", "redis"):
         svc = get_service(name)
         assert callable(getattr(svc, "provision", None)), f"{name}: missing provision()"
+
+
+def test_unknown_service_raises_without_exiting_process():
+    with pytest.raises(ValueError, match="Unknown service: missing"):
+        get_service("missing")
 
 
 def test_postgres_installs_postgresql(monkeypatch):
