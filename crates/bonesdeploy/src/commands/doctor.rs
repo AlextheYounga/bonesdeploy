@@ -1,11 +1,10 @@
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::Result;
 
 use crate::config;
-use crate::infra::ssh;
+use crate::infra::{git, ssh};
 use crate::ui::output;
 use bonesdeploy_core::{config::is_numbered_shell_script, paths};
 
@@ -165,19 +164,10 @@ fn check_local_branch(cfg: &config::Bones) -> Option<String> {
     if cfg.branch.is_empty() {
         return None;
     }
-    let ref_name = format!("refs/heads/{}", cfg.branch);
-    let output = match Command::new("git").args(["rev-parse", "--verify", &ref_name]).output() {
-        Ok(output) => output,
-        Err(error) => return Some(format!("Unable to run git: {error}")),
-    };
-    if output.status.success() {
-        return None;
-    }
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    if stderr.is_empty() {
-        Some(format!("Local branch '{}' does not exist", cfg.branch))
-    } else {
-        Some(format!("Local branch '{}' does not exist: {}", cfg.branch, stderr))
+    match git::branch_exists(&cfg.branch) {
+        Ok(true) => None,
+        Ok(false) => Some(format!("Local branch '{}' does not exist", cfg.branch)),
+        Err(error) => Some(format!("Unable to inspect git branch '{}': {error}", cfg.branch)),
     }
 }
 

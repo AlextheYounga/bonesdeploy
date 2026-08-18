@@ -105,6 +105,7 @@ This parent change includes:
 - creating separate Acta planning records for each child change;
 - the authorized initial bootstrap/documentation/Framework implementation slice.
 - the authorized project configuration implementation slice.
+- the authorized Rust Git and SSH integration implementation slice.
 
 ## Constraints
 

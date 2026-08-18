@@ -199,3 +199,13 @@ The authorized initial slice is complete:
   selection, asset identity, secrets validation, and update conflict safety.
 - project configuration validation covers the Rust `.env` round trip, all core
   configuration tests, Python key/parser reuse, and quoted framework selection.
+
+## Integration Slice
+
+The existing Rust integration modules remain the owners of external Git and SSH
+processes. `infra::git` exposes branch inspection and repository cloning for local
+callers, while `infra::ssh` remains the owner of remote command execution. Doctor
+uses the Git boundary for branch checks, update uses it for release-source cloning,
+and remote version discovery uses the SSH connection and command boundary. Python
+bare-repository setup, secrets shell composition, and the dead `bonesinfra_input`
+contract remain deferred.

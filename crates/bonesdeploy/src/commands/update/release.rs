@@ -6,13 +6,13 @@ use bonesdeploy_core::paths;
 
 use crate::config;
 use crate::infra::ssh;
-use bonesdeploy_core::config::{default_deploy_user, parse_port};
+use bonesdeploy_core::config::parse_port;
 
 pub(super) fn current_local_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
-pub(super) fn current_remote_version() -> String {
+pub(super) async fn current_remote_version() -> String {
     let env_file = Path::new(paths::DOT_ENV);
     if !env_file.exists() {
         return String::from("unknown");
@@ -22,15 +22,18 @@ pub(super) fn current_remote_version() -> String {
         return String::from("unknown");
     };
 
-    let host = format!("{}@{}", default_deploy_user(), cfg.host);
-    let output = Command::new("ssh").args(["-p", &cfg.port]).args([&host, "bonesremote", "version"]).output();
+    let Ok(session) = ssh::connect(&cfg).await else {
+        return String::from("unknown");
+    };
+    let version = ssh::run_cmd(&session, "bonesremote version").await.ok();
+    let _ = session.close().await;
 
-    match output {
-        Ok(output) if output.status.success() => {
-            String::from_utf8_lossy(&output.stdout).trim().strip_prefix("bonesremote ").unwrap_or("unknown").to_string()
-        }
-        _ => String::from("unknown"),
-    }
+    version
+        .as_deref()
+        .map(str::trim)
+        .and_then(|output| output.strip_prefix("bonesremote "))
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 pub(super) fn update_local_from_crates_io(version: &str) -> Result<()> {

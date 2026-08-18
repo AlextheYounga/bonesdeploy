@@ -60,6 +60,33 @@ pub fn add_remote_at(repo: &Path, remote_name: &str, remote_url: &str) -> Result
     Ok(())
 }
 
+pub fn branch_exists(branch: &str) -> Result<bool> {
+    branch_exists_at(Path::new("."), branch)
+}
+
+pub fn branch_exists_at(repo: &Path, branch: &str) -> Result<bool> {
+    let ref_name = format!("refs/heads/{branch}");
+    let output = Command::new("git")
+        .args(["-C"])
+        .arg(repo)
+        .args(["rev-parse", "--verify", &ref_name])
+        .output()
+        .context("Failed to run git")?;
+    Ok(output.status.success())
+}
+
+pub fn clone_repository(url: &str, branch: &str, destination: &Path) -> Result<()> {
+    let status = Command::new("git")
+        .args(["clone", "--depth", "1", "--branch", branch, url])
+        .arg(destination)
+        .status()
+        .with_context(|| format!("Failed to clone {url}"))?;
+    if !status.success() {
+        bail!("Failed to clone {url} release tag {branch}");
+    }
+    Ok(())
+}
+
 pub fn list_remotes_with_urls() -> Result<Vec<RemoteInfo>> {
     let output = Command::new("git").args(["remote", "-v"]).output().context("Failed to run git")?;
 
@@ -157,7 +184,14 @@ fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_remote_url, parse_scp_style_url, parse_ssh_style_url};
+    use std::path::Path;
+
+    use super::{branch_exists_at, parse_remote_url, parse_scp_style_url, parse_ssh_style_url};
+
+    #[test]
+    fn branch_exists_reports_missing_branch_without_error() {
+        assert_eq!(branch_exists_at(Path::new("/path/that/does/not/exist"), "main").ok(), Some(false));
+    }
 
     #[test]
     fn parse_ssh_style_url_parses_host_port_and_repo_path() {

@@ -8,6 +8,7 @@ use tempfile::TempDir;
 use bonesdeploy_core::paths;
 
 use crate::config;
+use crate::infra::git;
 use crate::ui::output;
 
 mod release;
@@ -25,7 +26,7 @@ pub struct Options {
 pub async fn run(options: Options) -> Result<()> {
     println!("{}", style("Checking for updates").cyan().bold());
     let current_local = release::current_local_version();
-    let current_remote = release::current_remote_version();
+    let current_remote = release::current_remote_version().await;
 
     if options.skip_local && options.skip_remote {
         println!("{} Already up to date.", output::success_marker());
@@ -126,15 +127,7 @@ fn clone_release_source(temp_path: &Path, version: &str) -> Result<PathBuf> {
     let source_dir = temp_path.join("source");
     let tag = format!("v{version}");
 
-    let clone_status = Command::new("git")
-        .args(["clone", "--depth", "1", "--branch", &tag, SOURCE_REPO_URL])
-        .arg(&source_dir)
-        .status()
-        .context("Failed to clone bonesdeploy repository")?;
-
-    if !clone_status.success() {
-        bail!("Failed to clone {SOURCE_REPO_URL} release tag {tag}");
-    }
+    git::clone_repository(SOURCE_REPO_URL, &tag, &source_dir)?;
 
     Ok(source_dir)
 }

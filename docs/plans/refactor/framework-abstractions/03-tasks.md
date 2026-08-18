@@ -48,6 +48,17 @@
 - [x] Leave the dead `bonesinfra_input` contract and nested `App` serde coupling for
   their dependency-ordered child boundaries.
 
+## Integration Slice
+
+- [x] Add Git-boundary operations for local branch inspection and release-source
+  cloning.
+- [x] Route doctor branch checks and update source cloning through the Git boundary.
+- [x] Route remote version discovery through the SSH connection and command
+  boundary.
+- [x] Preserve Python bare-repository setup, secrets shell composition, and the
+  dead `bonesinfra_input` contract for later child boundaries.
+- [x] Add focused wrapper and caller regression coverage.
+
 ## Child Plan Decomposition
 
 - [ ] Create and review a child Acta plan for the project configuration boundary,
@@ -95,8 +106,11 @@
 - Initial implementation is complete; remaining child boundaries are deliberately
   unfinished and remain in the dependency order above.
 - Validation passed: `cargo clippy --all-targets --all-features -- -D warnings`,
-  `cargo fmt --all -- --check`, `shfmt -d .`, 70 `bonesdeploy` binary unit tests,
+  `cargo fmt --all -- --check`, `shfmt -d .`, 71 `bonesdeploy` binary unit tests,
   `bonesdeploy-core` tests, and `bonesdeploy` CLI/init integration tests.
 - E2E tests were not run by design.
 - Project configuration validation passed: the focused Rust round-trip test, all
   `bonesdeploy-core` tests, `ruff check .`, and 20 focused Python tests.
+- Integration validation passed: Git/SSH wrapper tests, targeted `bonesdeploy`
+  tests, and static review found no direct `git` or `ssh` process calls in the
+  migrated callers. E2E tests remain intentionally unrun.
