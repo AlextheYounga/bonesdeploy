@@ -42,7 +42,6 @@ logs
 .env
 .env.*
 !.env.example
-.bones
 ```
 
 `README.md`:
@@ -10676,4 +10675,3 @@ Disallow:
   ]
 }
 ```
-

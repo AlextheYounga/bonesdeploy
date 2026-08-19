@@ -69,7 +69,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-.bones
 ```
 
 `AGENTS.md`:
@@ -7136,4 +7135,3 @@ export default config;
   "exclude": ["node_modules"]
 }
 ```
-

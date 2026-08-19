@@ -121,7 +121,7 @@ impl Harness {
             "test \"$(stat -c '%U:%G:%a' /usr/local/bin/bonesremote)\" = 'root:root:755' && test -f /root/.config/bonesremote/sites/{site}/bones.toml"
         ))?;
         self.exec(&format!(
-            "test -f /root/.config/bonesremote/sites/{site}/infra/__init__.py && test -f /root/.config/bonesremote/sites/{site}/infra/runtime.py && test -f /root/.config/bonesremote/sites/{site}/infra/manifest.py && test -f /root/.config/bonesremote/sites/{site}/infra/custom.py && test ! -e /root/.config/bonesremote/sites/{site}/custom.py && test ! -e /root/.config/bonesremote/sites/{site}/confs"
+            "test -f /srv/sites/{site}/shared/.env && test -d /srv/sites/{site}/releases/19700101_000000"
         ))?;
         Ok(())
     }

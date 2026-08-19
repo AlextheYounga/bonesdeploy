@@ -89,7 +89,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
-.bones
 ```
 
 `.oxfmtrc.json`:
@@ -6261,4 +6260,3 @@ export default mergeConfig(
   }),
 )
 ```
-

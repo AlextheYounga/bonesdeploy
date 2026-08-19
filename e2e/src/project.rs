@@ -34,22 +34,48 @@ impl SampleProject {
     }
 
     pub fn assert_infrastructure(&self, template: &str) -> Result<()> {
-        let bones = self.dir.join(".bones");
-        for entrypoint in ["__init__.py", "runtime.py", "manifest.py", "custom.py"] {
-            let path = bones.join("infra").join(entrypoint);
+        for path in [".env", ".env.build", "infra/secrets/.env.gpg"] {
+            if !self.dir.join(path).is_file() {
+                bail!("{template} fixture is missing generated {path}");
+            }
+        }
+
+        let framework = self.dir.join("infra/.framework");
+        for entrypoint in ["pyproject.toml", "uv.lock", "src/bonesinfra/__main__.py", "README.md"] {
+            let path = framework.join(entrypoint);
             if !path.is_file() {
                 bail!("{template} fixture is missing generated {}", path.display());
             }
         }
 
-        if !bones.join("infra/templates").is_dir() {
-            bail!("{template} fixture is missing generated infra/templates");
+        Self::assert_only_readme_markdown(&framework, template)?;
+
+        for entrypoint in ["__init__.py", "runtime.py", "manifest.py"] {
+            let path = self.dir.join("infra/custom").join(entrypoint);
+            if !path.is_file() {
+                bail!("{template} fixture is missing generated {}", path.display());
+            }
         }
-        if bones.join("custom.py").exists() {
-            bail!("{template} fixture contains obsolete .bones/custom.py");
+
+        if !self.dir.join("infra/deployment").is_dir() {
+            bail!("{template} fixture is missing generated infra/deployment");
         }
-        if bones.join("confs").exists() {
-            bail!("{template} fixture contains obsolete .bones/confs/");
+        if self.dir.join(".bones").exists() {
+            bail!("{template} fixture contains obsolete .bones/");
+        }
+        Ok(())
+    }
+
+    fn assert_only_readme_markdown(root: &Path, template: &str) -> Result<()> {
+        for entry in fs::read_dir(root).with_context(|| format!("Failed to read {}", root.display()))? {
+            let path = entry?.path();
+            if path.is_dir() {
+                Self::assert_only_readme_markdown(&path, template)?;
+            } else if path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+                && path.file_name().is_some_and(|name| name != "README.md")
+            {
+                bail!("{template} fixture materialized unexpected Markdown file {}", path.display());
+            }
         }
         Ok(())
     }

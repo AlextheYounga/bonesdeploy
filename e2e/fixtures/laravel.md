@@ -578,7 +578,6 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
-.bones
 ```
 
 `.npmrc`:
@@ -31540,4 +31539,3 @@ export default defineConfig({
     ],
 });
 ```
-
