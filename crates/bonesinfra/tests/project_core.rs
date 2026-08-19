@@ -8,6 +8,9 @@ fn materialized_framework_contains_complete_distribution_and_preserves_custom() 
     let framework = bonesinfra::materialize_project_framework(project.path())?;
     assert!(framework.join("pyproject.toml").is_file());
     assert!(framework.join("uv.lock").is_file());
+    assert!(framework.join("README.md").is_file());
+    assert!(!framework.join("AGENTS.md").exists());
+    assert!(!framework.join("CONTEXT.md").exists());
     assert!(framework.join("src/bonesinfra/__main__.py").is_file());
 
     let custom = project.path().join("infra/custom/runtime.py");

@@ -139,6 +139,9 @@ fn base_command(executable: &Path, project_root: &Path, args: &[&str]) -> Comman
 
 fn write_embedded_source(destination: &Path) -> Result<()> {
     for file_path in embedded_source_paths() {
+        if should_skip_materialization(&file_path) {
+            continue;
+        }
         let Some(asset) = PythonSource::get(&file_path) else {
             continue;
         };
@@ -149,6 +152,12 @@ fn write_embedded_source(destination: &Path) -> Result<()> {
         fs::write(&target, asset.data.as_ref()).with_context(|| format!("Failed to write {}", target.display()))?;
     }
     Ok(())
+}
+
+fn should_skip_materialization(file_path: &str) -> bool {
+    let path = Path::new(file_path);
+    path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+        && path.file_name().is_some_and(|name| name != "README.md")
 }
 
 fn setup_venv(environment: &Path, core: &Path) -> Result<()> {
