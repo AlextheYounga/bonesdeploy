@@ -275,15 +275,14 @@ Declares what artifacts and services a framework owns (manifest) and how to prov
 | `__init__.py` | (empty) | Makes the directory an importable Python package |
 | `manifest.py` | `artifacts(ctx)`, `services(ctx)`, `mode(ctx)` | Declares all paths and systemd services the framework owns |
 | `runtime.py` | `deploy(ctx)` | Orchestrates framework provisioning (language install, render configs, start services) |
-| `custom/` | composed `deploy(ctx)` | Project-owned extension package materialized under `infra/provision/custom/` |
+| `custom/` | composed `deploy(ctx)` | Project-owned extension package materialized under `infra/custom/` |
 | `templates/` | Jinja2 templates | Nginx, AppArmor, and other framework configuration templates |
 
 **Framework discovery:**
 `project.py` reads `TEMPLATE` from the root `.env`. It loads the managed package
-from `infra/provision/core/` and composes the project-owned package from
-`infra/provision/custom/`. If the materialized packages are absent, it imports
-the canonical built-in at `bonesinfra.frameworks.<name>`. Materialization keeps
-managed core content separate from custom content.
+from `infra/.framework/` and composes the project-owned package from
+`infra/custom/`. If the materialized packages are absent, it fails clearly.
+Materialization keeps managed framework content separate from custom content.
 
 **Extension model:**
 Add a built-in package under `frameworks/<name>/` with the core components above
@@ -484,7 +483,7 @@ Cli::Init
         │    ├─ infra/assets/kit.rs # scaffold deployment functions, .gitignore
         │    ├─ infra/assets/frameworks.rs  # scaffold per-framework .env defaults + scripts
         │    ├─ config.rs::save()   # write the root .env
-        │    └─ bonesinfra::run()   # materialize infra/provision/core + custom
+        │    └─ bonesinfra::run()   # execute infra/.framework + custom
        ├─ secrets/gpg.rs           # generate GPG key pair
        ├─ secrets/mod.rs           # create default .env.gpg
         └─ infra/git.rs             # inspect application Git remotes
@@ -561,7 +560,7 @@ Cli::Remote::Runtime
   └─ commands/remote/runtime.rs::run()
        ├─ bonesinfra::run("runtime", "apply", "--config", "...")
        │    └─ Python: project.load_runtime(config)
-        │         └─ loads materialized infra/provision/core + custom packages
+        │         └─ loads materialized infra/.framework + custom packages
        │              └─ runtime.deploy(ctx)
        │                   ├─ linux/runtime.setup(ctx)     # AppArmor + nginx router
        │                   ├─ languages/<lang>.install()   # install language runtime
@@ -577,7 +576,7 @@ Cli::Remote::Runtime
 
 | Need | Extend / reuse | Existing example | Location |
 |------|---------------|-----------------|----------|
-| Add a web framework | Rust framework contract plus built-in Python package materialized as `infra/provision/core` and `infra/provision/custom` | `laravel`, `django` | `crates/bonesdeploy/src/frameworks/` and `crates/bonesinfra/python/src/bonesinfra/frameworks/` |
+| Add a web framework | Rust framework contract plus built-in Python package materialized as `infra/.framework` and `infra/custom` | `laravel`, `django` | `crates/bonesdeploy/src/frameworks/` and `crates/bonesinfra/python/src/bonesinfra/frameworks/` |
 | Add a database service | Python: `services/runtime/<name>.py` + register in `SERVICES` dict | `postgres.py`, `redis.py` | `crates/bonesinfra/python/src/bonesinfra/services/runtime/` |
 | Add a language runtime | Python: `services/languages/<name>.py`, extend `LanguageRuntime` ABC | `php.py`, `python.py` | `crates/bonesinfra/python/src/bonesinfra/services/languages/` |
 | Add a CLI command (bonesdeploy) | `commands/<name>.rs` + variant in `cli/args.rs::Command` enum | `commands/status.rs` | `crates/bonesdeploy/src/commands/` |
@@ -588,7 +587,7 @@ Cli::Remote::Runtime
 | Add a new config field | `Runtime.extra` for framework-specific values; add to `Bones` for global values | `php_version` in laravel | `crates/bonesdeploy-core/src/config.rs` |
 | Add a new shared constant/path | `paths` module in bonesdeploy-core | `DEFAULT_WEB_ROOT` | `crates/bonesdeploy-core/src/paths.rs` |
 | Embed new static assets | `rust-embed` derive in appropriate asset module | `KitAssets`, `FrameworkAssets` | `crates/bonesdeploy/src/infra/assets/` |
-| Override framework provisioning | Edit project-owned `infra/provision/custom/{runtime,manifest}.py` | `infra/provision/custom/` | `infra/provision/custom/` |
+| Override framework provisioning | Edit project-owned `infra/custom/{runtime,manifest}.py` | `infra/custom/` | `infra/custom/` |
 | Add a deployment script | `NN_name.sh` in `deployment/build/` or `deployment/prepare/` | `01_install_deps.sh` | `deployment/{build,prepare}/` |
 
 ---
@@ -655,7 +654,7 @@ Cli::Remote::Runtime
 ### Framework convention
 - Rust owns framework questions, centralized validation, defaults, permission defaults, and build-environment generation.
 - Framework-specific values go through `Runtime.extra` (serde flatten).
-- Python provisioning uses managed `infra/provision/core` and project-owned `infra/provision/custom` packages composed together.
+- Python provisioning uses managed `infra/.framework` and project-owned `infra/custom` packages composed together.
 
 ### Binary communication
 - `bonesdeploy` communicates with `bonesremote` via SSH command execution (not an API).

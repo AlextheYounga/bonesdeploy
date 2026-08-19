@@ -19,7 +19,7 @@
   removed-command, patch, and framework-contract references in
   `docs/ARCHITECTURE.md` and `docs/architecture/reference.md`.
 - [x] In that child plan, document the current `.env`, `infra/`, committed revision,
-  `infra/provision/core`, and `infra/provision/custom` boundaries.
+  `infra/.framework`, and `infra/custom` boundaries.
 - [ ] Complete the child plan review before creating implementation tasks for later
   slices.
 

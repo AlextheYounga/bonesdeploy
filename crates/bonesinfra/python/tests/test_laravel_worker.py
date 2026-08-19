@@ -27,7 +27,7 @@ def _runtime_context(config: Path):
 
 
 def _link_core(tmp_path: Path):
-    core = tmp_path / "infra/provision/core/src/bonesinfra"
+    core = tmp_path / "infra/.framework/src/bonesinfra"
     core.mkdir(parents=True)
     (core / "__main__.py").write_text("")
 

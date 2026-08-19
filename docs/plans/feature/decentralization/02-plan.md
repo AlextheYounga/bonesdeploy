@@ -50,7 +50,7 @@ application repository ignore rules so generated infrastructure and encrypted
 secret paths are handled deliberately. Local `.env` supplies connection and
 provisioning-only values. Existing machine-local BonesDeploy data, including
 the GPG keyring under the data root, is preserved. Project-facing provisioning
-is scaffolded under `infra/provision/core/` and `infra/provision/custom/`.
+is scaffolded under `infra/.framework/` and `infra/custom/`.
 Core runs first and custom runs second through explicit composition.
 
 Local provisioning commands load explicit project identity and `.env`, derive
@@ -123,8 +123,8 @@ GPG keyrings untouched, and leaves Git commit creation to the user.
     silently supports old `.bones`-based workspaces. Preserve encrypted secret
     bytes, leave local key material untouched, and fail closed when a migration
     encounters unsafe plaintext or ambiguous paths.
-7. Separate project-facing provisioning into managed `infra/provision/core/`
-   and project-owned `infra/provision/custom/`. Scaffold both, compose them
+7. Separate project-facing provisioning into managed `infra/.framework/`
+   and project-owned `infra/custom/`. Scaffold both, compose them
    explicitly in that order, and make update refresh only unmodified managed
    files. If a managed file was modified, update reports the conflict and
    refuses to overwrite it; it does not perform a three-way merge.
@@ -145,9 +145,9 @@ GPG keyrings untouched, and leaves Git commit creation to the user.
   loading. It owns host setup inputs and templates, not remote release state.
   It loads managed core provisioning before project custom provisioning through
   explicit composition.
-- Update flow: refreshes BonesDeploy-managed `infra/provision/core/` files only
+- Update flow: refreshes BonesDeploy-managed `infra/.framework/` files only
   when their project copies remain unmodified. It preserves
-  `infra/provision/custom/` and reports modified-core conflicts without
+  `infra/custom/` and reports modified-framework conflicts without
   overwriting files.
 - `bonesremote` revision boundary: resolve and validate the immutable Git
   revision, load revision-owned deployment behavior, and pass one snapshot
@@ -194,7 +194,7 @@ GPG keyrings untouched, and leaves Git commit creation to the user.
 - `infra/` is the sole project-owned infrastructure directory and is ordinary
   application Git content.
 - Project-facing provisioning is split into visible managed
-  `infra/provision/core/` and project-owned `infra/provision/custom/`.
+  `infra/.framework/` and project-owned `infra/custom/`.
   Managed core is updateable; custom provisioning is never silently replaced.
 - `runtime.shared` is removed. The only universally managed shared file is
   `shared/.env`; other shared directories are framework-declared and
@@ -253,7 +253,7 @@ GPG keyrings untouched, and leaves Git commit creation to the user.
   revision consistently.
 - Test that encrypted secret material and runtime plaintext are absent from
   build inputs and that secret delivery still writes protected shared state.
-- Test that initialization creates core and custom provisioning directories,
+- Test that initialization creates the managed framework and custom directories,
   core executes before custom, updates preserve custom files, and modified
   managed files produce a conflict without being overwritten.
 - Test that setup creates `shared/.env`, deployment wires it into releases, and

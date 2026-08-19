@@ -1,14 +1,14 @@
 # BonesInfra Project Notes
 
 BonesInfra is the Python provisioning engine embedded in the BonesDeploy
-monorepo and materialized as project-local managed core.
+monorepo and materialized as the project-local managed framework.
 
 It is not the public product interface. It is called by `bonesdeploy` to run pyinfra-based provisioning, runtime setup, SSL setup, and runtime-specific infrastructure tasks.
 
 The user should normally never call `bonesinfra` directly, except for dev
 testing. The Rust `bonesinfra` crate embeds this Python tree into the
 `bonesdeploy` binary, materializes the complete distribution into
-`infra/provision/core/`, creates a project-scoped dependency virtualenv, and
+`infra/.framework/`, creates a project-scoped dependency virtualenv, and
 invokes that project-local package with `python -m bonesinfra`.
 
 ______________________________________________________________________
@@ -316,7 +316,7 @@ Raw pyinfra operations should live in focused modules.
 Framework packages are part of the complete distribution materialized at
 `infra/provision/core/src/bonesinfra/frameworks/`. The project-local package
 selects its framework from the root `.env` and composes it with optional
-project-owned `infra/provision/custom/` code. It never falls back to a cached
+project-owned `infra/custom/` code. It never falls back to a cached
 or globally installed framework implementation.
 
 Each generated runtime must expose a consistent interface:

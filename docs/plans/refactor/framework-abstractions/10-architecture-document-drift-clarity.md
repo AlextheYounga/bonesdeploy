@@ -11,7 +11,7 @@ The architecture documentation child change will correct these documented facts:
 
 - project configuration is root `.env`, not `.bones/bones.toml`;
 - project infrastructure is `infra/`, including
-  `infra/provision/{core,custom}` and `infra/secrets/`;
+  `infra/.framework/`, `infra/custom/`, and `infra/secrets/`;
 - the deployment unit is a committed repository revision;
 - removed config-repository, import/receive, push, pull, and deploy-on-push flows
   are not current architecture;

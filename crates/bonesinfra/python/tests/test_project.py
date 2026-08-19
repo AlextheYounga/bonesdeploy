@@ -7,7 +7,7 @@ from bonesinfra.project import load_manifest, load_runtime
 
 
 def _project(tmp_path: Path, *, template: str = "custom") -> Path:
-    core = tmp_path / "infra/provision/core/src/bonesinfra"
+    core = tmp_path / "infra/.framework/src/bonesinfra"
     core.mkdir(parents=True)
     (core / "__main__.py").write_text("")
     config = tmp_path / ".env"
@@ -16,7 +16,7 @@ def _project(tmp_path: Path, *, template: str = "custom") -> Path:
 
 
 def _custom(tmp_path: Path, filename: str, content: str) -> None:
-    custom = tmp_path / "infra/provision/custom"
+    custom = tmp_path / "infra/custom"
     custom.mkdir(parents=True, exist_ok=True)
     (custom / "__init__.py").write_text("")
     (custom / filename).write_text(content)
@@ -34,7 +34,7 @@ def test_missing_project_local_core_is_rejected(tmp_path: Path):
     config = tmp_path / ".env"
     config.write_text("TEMPLATE=next\n")
 
-    with pytest.raises(FileNotFoundError, match="project-local BonesInfra core"):
+    with pytest.raises(FileNotFoundError, match="project-local BonesInfra framework"):
         load_runtime(config)
 
 
@@ -42,7 +42,7 @@ def test_runtime_loader_reports_custom_syntax_error_with_path(tmp_path: Path):
     config = _project(tmp_path)
     _custom(tmp_path, "runtime.py", "def deploy(:\n")
 
-    with pytest.raises(ImportError, match=r"infra/provision/custom/runtime\.py"):
+    with pytest.raises(ImportError, match=r"infra/custom/runtime\.py"):
         load_runtime(config)
 
 

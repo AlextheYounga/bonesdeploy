@@ -32,10 +32,9 @@ def load_manifest(config_path: str | Path) -> ModuleType:
 
 
 def _load_selected(config_path: str | Path, filename: str, callable_name: str) -> tuple[ModuleType, ModuleType | None]:
-    provision = _provision_path(config_path)
-    core = provision / "core"
+    core = _framework_path(config_path)
     if not (core / "src/bonesinfra/__main__.py").is_file():
-        raise FileNotFoundError(f"project-local BonesInfra core does not exist: {core}")
+        raise FileNotFoundError(f"project-local BonesInfra framework does not exist: {core}")
 
     framework = _selected_framework(config_path)
     try:
@@ -43,7 +42,7 @@ def _load_selected(config_path: str | Path, filename: str, callable_name: str) -
     except Exception as error:
         raise ImportError(f"failed to import project framework infrastructure for {framework}: {error}") from error
     _require_callable(module, callable_name, Path(module.__file__ or filename))
-    custom = _load_local_entrypoint(provision / "custom", filename, callable_name, required=False)
+    custom = _load_local_entrypoint(_custom_path(config_path), filename, callable_name, required=False)
     return module, custom
 
 
@@ -112,11 +111,15 @@ def _selected_framework(config_path: str | Path) -> str:
 
 
 def _module_path(config_path: str | Path, module: ModuleType, filename: str) -> Path:
-    return Path(module.__file__) if module.__file__ else _provision_path(config_path) / "core" / filename
+    return Path(module.__file__) if module.__file__ else _framework_path(config_path) / filename
 
 
-def _provision_path(config_path: str | Path) -> Path:
-    return Path(config_path).resolve().parent / "infra" / "provision"
+def _framework_path(config_path: str | Path) -> Path:
+    return Path(config_path).resolve().parent / "infra" / ".framework"
+
+
+def _custom_path(config_path: str | Path) -> Path:
+    return Path(config_path).resolve().parent / "infra" / "custom"
 
 
 def _import_module(name: str, path: Path, package_name: str, *, is_package: bool = False) -> ModuleType:

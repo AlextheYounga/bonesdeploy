@@ -49,8 +49,8 @@ And embeds a Python provisioning runtime:
 - **`bonesinfra`** — `crates/bonesinfra/python/`, embedded by the Rust `bonesinfra` crate
 
 Each initialized project receives the complete BonesInfra distribution in
-`infra/provision/core/`. Commands execute that committed managed core through a
-project-scoped dependency environment; `infra/provision/custom/` remains
+`infra/.framework/`. Commands execute that committed managed framework through a
+project-scoped dependency environment; `infra/custom/` remains
 project-owned and is preserved by updates.
 
 ## The Point
@@ -231,10 +231,10 @@ Provision the site runtime:
 bonesdeploy remote runtime
 ```
 
-This runs the provisioning in your project's `.bones/infra/runtime.py`:
-framework services, per-site nginx, AppArmor, and your `infra/custom.py`
-project hook. Templates rendered by the generated infrastructure come from
-`.bones/infra/templates/`.
+This runs the provisioning in your project's `infra/.framework/` package:
+framework services, per-site nginx, AppArmor, and your `infra/custom/` project
+hooks. Templates rendered by the managed framework come from
+`infra/.framework/src/bonesinfra/frameworks/<name>/templates/`.
 
 Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
 
@@ -301,7 +301,7 @@ bonesdeploy skill next --format json
 ```
 
 Inspect every project-specific remote artifact and managed systemd service
-declared by `.bones/infra/manifest.py`, the configured services, and the SSL
+declared by the managed framework manifest, the configured services, and the SSL
 strategy without changing the server:
 
 ```sh

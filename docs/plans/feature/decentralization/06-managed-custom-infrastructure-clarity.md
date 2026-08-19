@@ -44,10 +44,10 @@ without permanently forking BonesDeploy-managed behavior.
 
 Project-facing provisioning is split into two committed directories:
 
-- `infra/provision/core/` contains BonesDeploy-supplied, managed provisioning
+- `infra/.framework/` contains BonesDeploy-supplied, managed framework code
   code. It remains visible to users and may be refreshed by an explicit
   BonesDeploy update.
-- `infra/provision/custom/` contains project-owned provisioning code. Updates
+- `infra/custom/` contains project-owned provisioning code. Updates
   preserve it and never silently overwrite it.
 
 Core provisioning runs before custom provisioning through ordinary explicit

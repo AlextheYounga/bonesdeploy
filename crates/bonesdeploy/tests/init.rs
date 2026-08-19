@@ -16,13 +16,13 @@ fn init_success(env: &TestEnv) -> Result<()> {
 
 fn assert_project_infra(repo: &Path) -> Result<()> {
     let infra = repo.join("infra");
-    assert!(infra.join("provision/core/pyproject.toml").is_file());
-    assert!(infra.join("provision/core/uv.lock").is_file());
-    assert!(infra.join("provision/core/src/bonesinfra/__main__.py").is_file());
-    assert!(infra.join("provision/core/src/bonesinfra/frameworks/custom/runtime.py").is_file());
-    assert!(infra.join("provision/custom/__init__.py").is_file());
-    assert!(infra.join("provision/custom/runtime.py").is_file());
-    assert!(infra.join("provision/custom/manifest.py").is_file());
+    assert!(infra.join(".framework/pyproject.toml").is_file());
+    assert!(infra.join(".framework/uv.lock").is_file());
+    assert!(infra.join(".framework/src/bonesinfra/__main__.py").is_file());
+    assert!(infra.join(".framework/src/bonesinfra/frameworks/custom/runtime.py").is_file());
+    assert!(infra.join("custom/__init__.py").is_file());
+    assert!(infra.join("custom/runtime.py").is_file());
+    assert!(infra.join("custom/manifest.py").is_file());
     assert!(infra.join("secrets").is_dir());
     let deploy_dir = infra.join("deployment");
     assert!(deploy_dir.is_dir());
@@ -76,13 +76,13 @@ fn named_framework_materializes_project_infrastructure_snapshot() -> Result<()> 
     assert!(output.status.success(), "{framework} init failed: {}", String::from_utf8_lossy(&output.stderr));
     let infra = env.repo().join("infra");
     assert!(
-        infra.join("provision/core/src/bonesinfra/frameworks/laravel/runtime.py").is_file(),
-        "{framework} is missing core runtime"
+        infra.join(".framework/src/bonesinfra/frameworks/laravel/runtime.py").is_file(),
+        "{framework} is missing framework runtime"
     );
-    assert!(infra.join("provision/custom/runtime.py").is_file(), "{framework} is missing custom runtime");
+    assert!(infra.join("custom/runtime.py").is_file(), "{framework} is missing custom runtime");
     assert!(infra.join("deployment/functions.sh").is_file(), "{framework} is missing kit deployment functions");
     assert!(
-        infra.join("provision/core/src/bonesinfra/frameworks/laravel/templates").is_dir(),
+        infra.join(".framework/src/bonesinfra/frameworks/laravel/templates").is_dir(),
         "{framework} is missing infra templates"
     );
     assert!(!env.repo().join(".bones").exists());
@@ -92,7 +92,7 @@ fn named_framework_materializes_project_infrastructure_snapshot() -> Result<()> 
 #[test]
 fn rerun_preserves_existing_bones_assets() -> Result<()> {
     let env = TestEnv::new()?;
-    let sentinel = env.repo().join("infra/provision/core/src/bonesinfra/project.py");
+    let sentinel = env.repo().join("infra/.framework/src/bonesinfra/project.py");
 
     init_success(&env)?;
     let original = fs::read_to_string(&sentinel)?;

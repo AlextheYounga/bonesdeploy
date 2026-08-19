@@ -18,7 +18,7 @@ Concrete findings are:
 
 - Python framework `runtime.py` files repeat the same setup, shared-directory,
   application, custom-hook, and service-start workflow;
-- built-in `custom.py` hooks overlap with materialized `infra/provision/custom`
+- built-in `custom.py` hooks overlap with materialized `infra/custom`
   composition;
 - direct pyinfra global `host` access escapes the runner boundary;
 - infrastructure paths are scattered as module constants instead of consistently
@@ -28,7 +28,7 @@ Concrete findings are:
   remote scope writes markers only;
 - `crates/bonesdeploy/src/commands/migrate.rs` is a dead Rust duplicate of the
   live Python migration;
-- update synchronization copies managed `infra/provision/core` and deployment
+- update synchronization copies managed `infra/.framework` and deployment
   content, refuses modified-core conflicts, and preserves custom content.
 
 The child plans must preserve language/service extension points, managed-core versus

@@ -54,7 +54,7 @@ pub async fn run(options: Options) -> Result<()> {
         }
 
         if Path::new(paths::DOT_ENV).exists() {
-            bonesinfra::materialize_project_core(Path::new("."))?;
+            bonesinfra::materialize_project_framework(Path::new("."))?;
             bonesinfra::run(&[
                 "patches",
                 "apply",

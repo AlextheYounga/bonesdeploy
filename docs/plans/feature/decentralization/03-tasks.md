@@ -13,7 +13,7 @@
       per-project copies, while preserving `.env.build`, framework asset
       behavior, and machine-local BonesDeploy data including the GPG keyring.
 - [x] Scaffold project-facing provisioning under
-      `infra/provision/core/` and `infra/provision/custom/`, mark core as
+      `infra/.framework/` and `infra/custom/`, mark the framework as
       BonesDeploy-managed, and compose core before custom through explicit
       Python execution.
 - [x] Make all commands that depend on project loading fail clearly when they
@@ -44,7 +44,7 @@
       create only those directories during provisioning. Do not create
       application data files such as SQLite databases.
 - [x] Implement the explicit BonesDeploy update path for managed provisioning:
-      refresh unmodified `infra/provision/core/` files, preserve all custom
+      refresh unmodified `infra/.framework/` files, preserve all custom
       files, and report modified-core conflicts without silently overwriting
       them or performing a three-way merge.
 - [x] Restore the versioned Python update-patch registry and implement the

@@ -27,35 +27,32 @@ fn refresh_local_infrastructure_updates_managed_files_without_touching_custom() 
         "laravel deploy",
     )?;
     write(&project_root.join(".env"), "TEMPLATE=laravel\n")?;
-    write(&infra_dir.join("provision/custom/runtime.py"), "def deploy(ctx):\n    custom(ctx)\n")?;
+    write(&infra_dir.join("custom/runtime.py"), "def deploy(ctx):\n    custom(ctx)\n")?;
 
     refresh_local_infrastructure(&source_dir, &project_root, Some("laravel"))?;
     assert_eq!(fs::read_to_string(project_root.join(".env"))?, "TEMPLATE=laravel\n");
     assert_eq!(fs::read_to_string(infra_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
     assert_eq!(fs::read_to_string(infra_dir.join("deployment/functions.sh"))?, "shared functions");
-    assert_eq!(
-        fs::read_to_string(infra_dir.join("provision/custom/runtime.py"))?,
-        "def deploy(ctx):\n    custom(ctx)\n"
-    );
+    assert_eq!(fs::read_to_string(infra_dir.join("custom/runtime.py"))?, "def deploy(ctx):\n    custom(ctx)\n");
     let mode = fs::metadata(infra_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
     assert_eq!(mode, 0o755);
     Ok(())
 }
 
 #[test]
-fn refresh_local_infrastructure_leaves_managed_core_untouched() -> Result<()> {
+fn refresh_local_infrastructure_leaves_managed_framework_untouched() -> Result<()> {
     let temp = tempfile::tempdir()?;
     let source_dir = temp.path().join("source");
     let project_root = temp.path().join("project");
-    let core_file = project_root.join("infra/provision/core/runtime.py");
+    let framework_file = project_root.join("infra/.framework/runtime.py");
     let deployment_file = project_root.join("infra/deployment/build/01_build.sh");
     write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/functions.sh"), "new functions")?;
     write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/build/01_build.sh"), "new deployment")?;
     write(&project_root.join(".env"), "TEMPLATE=custom\n")?;
-    write(&core_file, "locally changed")?;
+    write(&framework_file, "locally changed")?;
     write(&deployment_file, "locally preserved")?;
     refresh_local_infrastructure(&source_dir, &project_root, Some("custom"))?;
-    assert_eq!(fs::read_to_string(core_file)?, "locally changed");
+    assert_eq!(fs::read_to_string(framework_file)?, "locally changed");
     assert_eq!(fs::read_to_string(deployment_file)?, "new deployment");
     Ok(())
 }

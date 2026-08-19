@@ -25,7 +25,7 @@ The current framework boundary includes:
   embedded asset directories, and Python `BUILTIN_FRAMEWORKS` as separate identity
   sources;
 - eight wire identities, including `custom`;
-- Python materialization into `infra/provision/core` and `infra/provision/custom`,
+- Python materialization into `infra/.framework` and `infra/custom`,
   with managed core and user-owned custom content.
 
 The child plan must close the defaults/asset reach-through, define the typed Rust

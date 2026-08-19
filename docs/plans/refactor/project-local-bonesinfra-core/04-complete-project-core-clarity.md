@@ -9,14 +9,14 @@ run its committed provisioning implementation independently.
 ## Decision
 
 Managed core is the complete BonesInfra distribution under
-`infra/provision/core/`. The project-local distribution is the sole executable
+`infra/.framework/`. The project-local distribution is the sole executable
 source for normal provisioning and patches. Cache directories hold only
 project-specific dependency environments and editable-install metadata.
 
 `bonesdeploy update` installs a new binary, continues with that binary,
-atomically replaces managed core, applies patches from that core, and then
+atomically replaces the managed framework, applies patches from that framework, and then
 refreshes deployment assets. Legacy `.bones/infra` content is project-owned and
-moves to `infra/provision/custom/`; the new core is preserved.
+moves to `infra/custom/`; the new framework is preserved.
 
 ## Supersedes
 
@@ -27,7 +27,7 @@ This supersedes the framework-only materialization, installed fallback, and
 
 ## Effect on the record
 
-- `01-idea.md` defines complete managed core and cache-only dependency
+- `01-idea.md` defines the complete managed framework and cache-only dependency
   environments.
 - `02-plan.md` assigns atomic materialization and project-local execution to
   the Rust embedding boundary and records update ordering.

@@ -63,7 +63,7 @@ def _validate_tree(path: Path) -> None:
 def _copy_owned_content(source: Path, destination: Path) -> None:
     old_infra = source / "infra"
     if old_infra.is_dir():
-        custom = destination / "provision" / "custom"
+        custom = destination / "custom"
         custom.mkdir(parents=True)
         for entry in old_infra.iterdir():
             _copy_tree(entry, custom / entry.name)
@@ -90,7 +90,7 @@ def _verify_owned_content(source: Path, destination: Path) -> None:
     old_infra = source / "infra"
     if old_infra.is_dir():
         for entry in old_infra.iterdir():
-            _verify_tree(entry, destination / "provision" / "custom" / entry.name)
+            _verify_tree(entry, destination / "custom" / entry.name)
     for name in ("deployment", "secrets"):
         entry = source / name
         if entry.exists() or entry.is_symlink():
@@ -98,14 +98,14 @@ def _verify_owned_content(source: Path, destination: Path) -> None:
 
 
 def _move_owned_content(staging: Path, destination: Path) -> None:
-    for name in ("deployment", "secrets", "provision/custom"):
+    for name in ("deployment", "secrets", "custom"):
         source = staging / name
         if not source.exists():
             continue
         target = destination / name
         if target.exists() or target.is_symlink():
             raise RuntimeError(f"{target} already exists; migration will not merge or overwrite it")
-    for name in ("deployment", "secrets", "provision/custom"):
+    for name in ("deployment", "secrets", "custom"):
         source = staging / name
         if not source.exists():
             continue

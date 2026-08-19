@@ -35,19 +35,19 @@ def test_local_patch_migrates_owned_content_and_preserves_ciphertext(tmp_path, m
     apply_local(ctx, "0.8.0", str(env_file))
 
     assert (tmp_path / "infra/secrets/.env.gpg").read_bytes() == ciphertext
-    assert (tmp_path / "infra/provision/custom/templates/site.conf").is_file()
-    assert (tmp_path / "infra/provision/custom/__init__.py").is_file()
+    assert (tmp_path / "infra/custom/templates/site.conf").is_file()
+    assert (tmp_path / "infra/custom/__init__.py").is_file()
     assert (tmp_path / "infra/deployment/build/01_build.sh").is_file()
     assert not old.exists()
-    assert not (tmp_path / "infra/provision/custom/bones.toml").exists()
+    assert not (tmp_path / "infra/custom/bones.toml").exists()
     assert (tmp_path / "data/bonesdeploy/patches/atlas/0003-project-infra").is_file()
 
 
-def test_local_patch_preserves_pre_materialized_core(tmp_path, monkeypatch):
+def test_local_patch_preserves_pre_materialized_framework(tmp_path, monkeypatch):
     ctx, env_file = _context(tmp_path)
     (tmp_path / ".bones/infra").mkdir(parents=True)
     (tmp_path / ".bones/infra/runtime.py").write_text("def deploy(_ctx):\n    pass\n")
-    core = tmp_path / "infra/provision/core"
+    core = tmp_path / "infra/.framework"
     core.mkdir(parents=True)
     (core / "managed.py").write_text("managed")
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
@@ -55,7 +55,7 @@ def test_local_patch_preserves_pre_materialized_core(tmp_path, monkeypatch):
     apply_local(ctx, "0.8.0", str(env_file))
 
     assert (core / "managed.py").read_text() == "managed"
-    assert (tmp_path / "infra/provision/custom/runtime.py").is_file()
+    assert (tmp_path / "infra/custom/runtime.py").is_file()
     assert not (tmp_path / ".bones").exists()
     assert (tmp_path / "data/bonesdeploy/patches/atlas/0003-project-infra").is_file()
 
@@ -64,7 +64,7 @@ def test_local_patch_refuses_custom_collision_without_writing_marker(tmp_path, m
     ctx, env_file = _context(tmp_path)
     (tmp_path / ".bones/infra").mkdir(parents=True)
     (tmp_path / ".bones/infra/runtime.py").write_text("def deploy(_ctx):\n    pass\n")
-    (tmp_path / "infra/provision/custom").mkdir(parents=True)
+    (tmp_path / "infra/custom").mkdir(parents=True)
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
 
     with pytest.raises(RuntimeError, match="will not merge or overwrite"):

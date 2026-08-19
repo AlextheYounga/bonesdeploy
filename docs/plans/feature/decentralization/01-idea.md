@@ -45,12 +45,12 @@ assets under `infra/`, including deployment scripts, templates, and project
 infrastructure Python modules. It is part of normal application Git history.
 
 **Managed provisioning** is the project-facing provisioning implementation
-under `infra/provision/core/`. BonesDeploy supplies and maintains it, and an
+under `infra/.framework/`. BonesDeploy supplies and maintains it, and an
 explicit BonesDeploy update may refresh it. It is visible and committed in the
 application repository, but users should customize `custom/` instead.
 
 **Custom provisioning** is project-owned provisioning code under
-`infra/provision/custom/`. BonesDeploy updates preserve it and never silently
+`infra/custom/`. BonesDeploy updates preserve it and never silently
 overwrite it. Core provisioning runs before custom provisioning through
 ordinary explicit Python composition; no general plugin registry is required.
 
@@ -127,8 +127,8 @@ this refactor changes its project path only where required by `infra/`.
   machine state.
 - Make `init`, setup, doctor, manifest, runtime provisioning, services,
   SSL, secrets, deploy, rollback, status, and update use the new boundaries.
-- Make project-facing provisioning visible in `infra/provision/core/` and
-  `infra/provision/custom/`, with explicit ownership and update behavior.
+  - Make project-facing provisioning visible in `infra/.framework/` and
+  `infra/custom/`, with explicit ownership and update behavior.
 - Make BonesRemote obtain deployment-specific instructions from the requested
   application Git revision while preserving the existing release safety,
   locking, cancellation, and activation behavior.
@@ -155,9 +155,9 @@ this refactor changes its project path only where required by `infra/`.
   delete or relocate the local BonesDeploy data/configuration roots solely
   because the old per-project configuration repository is removed.
 - Project identity remains explicit and is validated at trust boundaries.
-- `infra/provision/core/` is BonesDeploy-managed and updateable. An update must
+- `infra/.framework/` is BonesDeploy-managed and updateable. An update must
   detect modified managed files and refuse to overwrite them silently.
-- `infra/provision/custom/` is project-owned and preserved by every
+- `infra/custom/` is project-owned and preserved by every
   BonesDeploy update.
 - Existing rollback behavior remains conceptually unchanged and gains no new
   metadata unless an existing feature demonstrably requires it.

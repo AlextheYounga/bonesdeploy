@@ -19,41 +19,41 @@ use rust_embed::Embed;
 #[exclude = "tests/**"]
 struct PythonSource;
 
-const CORE_PATH: &str = "infra/provision/core";
+const FRAMEWORK_PATH: &str = "infra/.framework";
 const STAMP_FILE: &str = ".stamp";
 
 /// Materializes the complete embedded BonesInfra distribution into a project.
 ///
 /// # Errors
-/// Fails when the managed core cannot be atomically replaced.
-pub fn materialize_project_core(project_root: &Path) -> Result<PathBuf> {
-    let core = project_root.join(CORE_PATH);
-    let provision = core.parent().context("BonesInfra core has no provision directory")?;
-    fs::create_dir_all(provision).with_context(|| format!("Failed to create {}", provision.display()))?;
+/// Fails when the managed framework cannot be atomically replaced.
+pub fn materialize_project_framework(project_root: &Path) -> Result<PathBuf> {
+    let framework = project_root.join(FRAMEWORK_PATH);
+    let infra = framework.parent().context("BonesInfra framework has no parent directory")?;
+    fs::create_dir_all(infra).with_context(|| format!("Failed to create {}", infra.display()))?;
 
     let staging = tempfile::Builder::new()
         .prefix(".core.")
-        .tempdir_in(provision)
-        .with_context(|| format!("Failed to create managed core staging directory in {}", provision.display()))?;
+        .tempdir_in(infra)
+        .with_context(|| format!("Failed to create managed framework staging directory in {}", infra.display()))?;
     write_embedded_source(staging.path())?;
 
-    let previous = provision.join(".core.previous");
+    let previous = infra.join(".framework.previous");
     remove_path(&previous)?;
-    if core.exists() || core.is_symlink() {
-        fs::rename(&core, &previous)
-            .with_context(|| format!("Failed to stage existing managed core at {}", core.display()))?;
+    if framework.exists() || framework.is_symlink() {
+        fs::rename(&framework, &previous)
+            .with_context(|| format!("Failed to stage existing managed framework at {}", framework.display()))?;
     }
-    if let Err(error) = fs::rename(staging.path(), &core) {
+    if let Err(error) = fs::rename(staging.path(), &framework) {
         if previous.exists() {
-            let _ = fs::rename(&previous, &core);
+            let _ = fs::rename(&previous, &framework);
         }
-        return Err(error).with_context(|| format!("Failed to replace managed core at {}", core.display()));
+        return Err(error).with_context(|| format!("Failed to replace managed framework at {}", framework.display()));
     }
     remove_path(&previous)?;
-    Ok(core)
+    Ok(framework)
 }
 
-/// Runs `python -m bonesinfra` from the current project's managed core.
+/// Runs `python -m bonesinfra` from the current project's managed framework.
 ///
 /// # Errors
 /// Fails when the project core or dependency environment cannot be prepared or
@@ -93,9 +93,12 @@ fn ensure_available(project_root: &Path) -> Result<PathBuf> {
     let project_root = project_root
         .canonicalize()
         .with_context(|| format!("Failed to resolve project root {}", project_root.display()))?;
-    let core = project_root.join(CORE_PATH);
-    if !core.join("pyproject.toml").is_file() || !core.join("src/bonesinfra/__main__.py").is_file() {
-        bail!("Project-local BonesInfra core is missing at {}. Run bonesdeploy init or update.", core.display());
+    let framework = project_root.join(FRAMEWORK_PATH);
+    if !framework.join("pyproject.toml").is_file() || !framework.join("src/bonesinfra/__main__.py").is_file() {
+        bail!(
+            "Project-local BonesInfra framework is missing at {}. Run bonesdeploy init or update.",
+            framework.display()
+        );
     }
 
     let environment = environment_dir(&project_root);
@@ -111,12 +114,12 @@ fn ensure_available(project_root: &Path) -> Result<PathBuf> {
     lock.lock().with_context(|| format!("Failed to lock BonesInfra environment at {}", lock_path.display()))?;
 
     let python = environment.join(".venv/bin/python");
-    let stamp = package_version(&core)?;
+    let stamp = package_version(&framework)?;
     if python.is_file() && materialized_stamp(&environment).as_deref() == Some(stamp.as_str()) {
         return Ok(python);
     }
 
-    setup_venv(&environment, &core)?;
+    setup_venv(&environment, &framework)?;
     if !python.is_file() {
         bail!("BonesInfra setup finished at {}, but {} is missing.", environment.display(), python.display());
     }
@@ -126,9 +129,9 @@ fn ensure_available(project_root: &Path) -> Result<PathBuf> {
 }
 
 fn base_command(executable: &Path, project_root: &Path, args: &[&str]) -> Command {
-    let core = project_root.join(CORE_PATH);
+    let framework = project_root.join(FRAMEWORK_PATH);
     let mut command = Command::new(executable);
-    command.current_dir(project_root).env("PYTHONPATH", core.join("src"));
+    command.current_dir(project_root).env("PYTHONPATH", framework.join("src"));
     command.args(["-m", "bonesinfra"]);
     command.args(args);
     command

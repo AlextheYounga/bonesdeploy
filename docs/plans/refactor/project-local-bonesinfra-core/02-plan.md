@@ -5,7 +5,7 @@
 `crates/bonesinfra/src/lib.rs` embeds the full Python distribution, extracts it
 to `~/.cache/bonesdeploy/bonesinfra`, creates its venv there, and runs
 `python -m bonesinfra`. `project.materialize()` copies only a selected
-framework package into `infra/provision/core/` and creates custom stubs.
+framework package into `infra/.framework/` and creates custom stubs.
 `project.py` loads that snapshot when present but otherwise imports framework
 modules from the installed package.
 
@@ -17,7 +17,7 @@ this layout and moves legacy `.bones/infra` content to the wrong project path.
 ## Intended behavior
 
 The embedded distribution is atomically copied as the complete managed core.
-Every Python command runs the package at `infra/provision/core/src/bonesinfra`
+Every Python command runs the package at `infra/.framework/src/bonesinfra`
 through a cached project-specific virtual environment. The local package is
 mandatory; no installed-source or selected-framework fallback exists. Core and
 custom provisioning retain their explicit composition order.
