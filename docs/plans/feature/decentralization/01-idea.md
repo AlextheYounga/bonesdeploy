@@ -175,8 +175,8 @@ this refactor changes its project path only where required by `infra/`.
 
 - Redesigning GPG encryption or introducing git-crypt, SOPS, age, or another
   secret system.
-- Copying the entire BonesInfra execution engine or its packaging/runtime
-  machinery into every project.
+- Leaving the BonesInfra execution engine or its authoritative source outside
+  the project's managed core.
 - Introducing a general plugin framework or broad ownership subdivisions where
   no managed/project-owned boundary exists.
 - Automatically pushing application changes from `bonesdeploy deploy`.

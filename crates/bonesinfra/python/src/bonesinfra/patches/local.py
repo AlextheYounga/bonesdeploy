@@ -18,17 +18,13 @@ def migrate_to_project_infra(project_root: Path) -> None:
     if not source.is_dir():
         raise RuntimeError(".bones is neither a directory nor a symlink; migration refused")
 
-    destination = project_root / "infra"
-    if destination.exists() or destination.is_symlink():
-        raise RuntimeError(f"{destination} already exists; migration will not merge or overwrite it")
-
     _validate_source(source)
     staging = Path(tempfile.mkdtemp(prefix=".infra.migrate-", dir=project_root))
     try:
         _copy_owned_content(source, staging)
         _verify_owned_content(source, staging)
-        staging.replace(destination)
-        _verify_owned_content(source, destination)
+        _move_owned_content(staging, project_root / "infra")
+        _verify_owned_content(source, project_root / "infra")
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
@@ -67,8 +63,11 @@ def _validate_tree(path: Path) -> None:
 def _copy_owned_content(source: Path, destination: Path) -> None:
     old_infra = source / "infra"
     if old_infra.is_dir():
+        custom = destination / "provision" / "custom"
+        custom.mkdir(parents=True)
         for entry in old_infra.iterdir():
-            _copy_tree(entry, destination / entry.name)
+            _copy_tree(entry, custom / entry.name)
+        (custom / "__init__.py").touch(exist_ok=True)
     for name in ("deployment", "secrets"):
         entry = source / name
         if entry.exists() or entry.is_symlink():
@@ -91,11 +90,28 @@ def _verify_owned_content(source: Path, destination: Path) -> None:
     old_infra = source / "infra"
     if old_infra.is_dir():
         for entry in old_infra.iterdir():
-            _verify_tree(entry, destination / entry.name)
+            _verify_tree(entry, destination / "provision" / "custom" / entry.name)
     for name in ("deployment", "secrets"):
         entry = source / name
         if entry.exists() or entry.is_symlink():
             _verify_tree(entry, destination / name)
+
+
+def _move_owned_content(staging: Path, destination: Path) -> None:
+    for name in ("deployment", "secrets", "provision/custom"):
+        source = staging / name
+        if not source.exists():
+            continue
+        target = destination / name
+        if target.exists() or target.is_symlink():
+            raise RuntimeError(f"{target} already exists; migration will not merge or overwrite it")
+    for name in ("deployment", "secrets", "provision/custom"):
+        source = staging / name
+        if not source.exists():
+            continue
+        target = destination / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        source.replace(target)
 
 
 def _verify_tree(source: Path, destination: Path) -> None:

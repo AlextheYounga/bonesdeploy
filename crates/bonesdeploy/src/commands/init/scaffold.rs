@@ -30,16 +30,22 @@ pub(super) fn materialize_project(cfg: &mut config::Bones, framework: FrameworkS
     println!("Framework template: {selected_framework}");
 
     framework_assets::scaffold_framework_project(&selected_framework.to_string(), infra_dir)?;
-    bonesinfra::run(&[
-        "project",
-        "materialize",
-        "--env-file",
-        paths::DOT_ENV,
-        "--framework",
-        &selected_framework.to_string(),
-    ])?;
+    bonesinfra::materialize_project_core(Path::new("."))?;
+    scaffold_custom_provisioning(infra_dir)?;
     fs::create_dir_all(paths::LOCAL_INFRA_SECRETS_DIR)
         .with_context(|| format!("Failed to create {}", paths::LOCAL_INFRA_SECRETS_DIR))?;
+    Ok(())
+}
+
+fn scaffold_custom_provisioning(infra_dir: &Path) -> Result<()> {
+    let custom = infra_dir.join("provision/custom");
+    fs::create_dir_all(&custom).with_context(|| format!("Failed to create {}", custom.display()))?;
+    fs::write(custom.join("__init__.py"), "\"\"\"Project-owned provisioning.\"\"\"\n")?;
+    fs::write(custom.join("runtime.py"), "def deploy(_ctx):\n    pass\n")?;
+    fs::write(
+        custom.join("manifest.py"),
+        "def artifacts(_ctx):\n    return []\n\n\ndef services(_ctx):\n    return []\n\n\ndef mode(_ctx):\n    return None\n",
+    )?;
     Ok(())
 }
 

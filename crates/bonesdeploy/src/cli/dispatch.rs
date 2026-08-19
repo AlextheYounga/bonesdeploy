@@ -44,8 +44,13 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Secrets { command } => dispatch_secrets(command).await,
         Command::Deploy => deploy::run().await,
         Command::Releases { command } => dispatch_releases(command).await,
-        Command::Update { skip_local, skip_remote } => {
-            update::run(update::Options { skip_local: *skip_local, skip_remote: *skip_remote }).await
+        Command::Update { skip_local, skip_remote, continue_update } => {
+            update::run(update::Options {
+                skip_local: *skip_local,
+                skip_remote: *skip_remote,
+                continue_update: *continue_update,
+            })
+            .await
         }
         Command::Remote { command } => dispatch_remote(command),
         Command::Rollback => rollback::run().await,

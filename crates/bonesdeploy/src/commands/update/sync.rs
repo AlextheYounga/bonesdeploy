@@ -2,7 +2,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
 
 pub fn refresh_local_infrastructure(source_dir: &Path, project_root: &Path, template: Option<&str>) -> Result<()> {
@@ -11,10 +11,8 @@ pub fn refresh_local_infrastructure(source_dir: &Path, project_root: &Path, temp
         return Ok(());
     }
 
-    check_managed_core_conflicts(source_dir, project_root, template)?;
     sync_kit_deployment_functions(source_dir, &infra_dir)?;
     sync_tree(&deployment_source_root(source_dir, template), &infra_dir.join("deployment"), true)?;
-    sync_managed_core(source_dir, project_root, template)?;
 
     Ok(())
 }
@@ -39,46 +37,6 @@ fn deployment_source_root(source_dir: &Path, template: Option<&str>) -> PathBuf 
     } else {
         source_dir.join("crates/bonesdeploy/assets/kit/deployment")
     }
-}
-
-fn sync_managed_core(source_dir: &Path, project_root: &Path, template: Option<&str>) -> Result<()> {
-    let template = template.unwrap_or("custom");
-    let source = source_dir.join("crates/bonesinfra/python/src/bonesinfra/frameworks").join(template);
-    if !source.is_dir() {
-        return Ok(());
-    }
-
-    let destination = project_root.join(paths::LOCAL_INFRA_DIR).join("provision/core");
-    check_tree_conflicts(&source, &destination)?;
-    sync_tree(&source, &destination, false)
-}
-
-fn check_managed_core_conflicts(source_dir: &Path, project_root: &Path, template: Option<&str>) -> Result<()> {
-    let template = template.unwrap_or("custom");
-    let source = source_dir.join("crates/bonesinfra/python/src/bonesinfra/frameworks").join(template);
-    if !source.is_dir() {
-        return Ok(());
-    }
-
-    let destination = project_root.join(paths::LOCAL_INFRA_DIR).join("provision/core");
-    check_tree_conflicts(&source, &destination)
-}
-
-fn check_tree_conflicts(source_root: &Path, dest_root: &Path) -> Result<()> {
-    if !dest_root.exists() {
-        return Ok(());
-    }
-    for entry in fs::read_dir(source_root).with_context(|| format!("Failed to read {}", source_root.display()))? {
-        let entry = entry.with_context(|| format!("Failed to read entry in {}", source_root.display()))?;
-        let source_path = entry.path();
-        let dest_path = dest_root.join(entry.file_name());
-        if entry.file_type()?.is_dir() {
-            check_tree_conflicts(&source_path, &dest_path)?;
-        } else if dest_path.is_file() && fs::read(&source_path)? != fs::read(&dest_path)? {
-            bail!("Managed infrastructure conflict at {}; refusing to overwrite it", dest_path.display());
-        }
-    }
-    Ok(())
 }
 
 fn sync_tree(source_root: &Path, dest_root: &Path, executable: bool) -> Result<()> {

@@ -1,15 +1,9 @@
-//! Embedded bonesinfra Python framework.
-//!
-//! The Python package under `python/` is embedded into the binary and
-//! materialized on demand into `~/.cache/bonesdeploy/bonesinfra`,
-//! where a venv is created and the package installed. A content-hash stamp
-//! keeps the materialized copy in sync with the embedded source: any change
-//! to the embedded tree triggers a fresh extraction and reinstall.
+//! Embedded BonesInfra distribution materialized into project infrastructure.
 
 use std::borrow::Cow;
+use std::env;
 use std::fs::{self, OpenOptions};
-use std::hash::{DefaultHasher, Hasher};
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
@@ -25,100 +19,69 @@ use rust_embed::Embed;
 #[exclude = "tests/**"]
 struct PythonSource;
 
-const CHECKOUT_DIR: &str = "bonesinfra";
+const CORE_PATH: &str = "infra/provision/core";
 const STAMP_FILE: &str = ".stamp";
 
-/// Runs `python -m bonesinfra` with the given arguments and no stdin.
+/// Materializes the complete embedded BonesInfra distribution into a project.
 ///
 /// # Errors
-/// Fails when the runtime cannot be materialized or the command exits non-zero.
+/// Fails when the managed core cannot be atomically replaced.
+pub fn materialize_project_core(project_root: &Path) -> Result<PathBuf> {
+    let core = project_root.join(CORE_PATH);
+    let provision = core.parent().context("BonesInfra core has no provision directory")?;
+    fs::create_dir_all(provision).with_context(|| format!("Failed to create {}", provision.display()))?;
+
+    let staging = tempfile::Builder::new()
+        .prefix(".core.")
+        .tempdir_in(provision)
+        .with_context(|| format!("Failed to create managed core staging directory in {}", provision.display()))?;
+    write_embedded_source(staging.path())?;
+
+    let previous = provision.join(".core.previous");
+    remove_path(&previous)?;
+    if core.exists() || core.is_symlink() {
+        fs::rename(&core, &previous)
+            .with_context(|| format!("Failed to stage existing managed core at {}", core.display()))?;
+    }
+    if let Err(error) = fs::rename(staging.path(), &core) {
+        if previous.exists() {
+            let _ = fs::rename(&previous, &core);
+        }
+        return Err(error).with_context(|| format!("Failed to replace managed core at {}", core.display()));
+    }
+    remove_path(&previous)?;
+    Ok(core)
+}
+
+/// Runs `python -m bonesinfra` from the current project's managed core.
+///
+/// # Errors
+/// Fails when the project core or dependency environment cannot be prepared or
+/// when the command exits non-zero.
 pub fn run(args: &[&str]) -> Result<()> {
-    let executable = ensure_available()?;
-    let mut command = base_command(&executable, args);
+    let project_root = env::current_dir().context("Failed to determine project directory")?;
+    let executable = ensure_available(&project_root)?;
+    let mut command = base_command(&executable, &project_root, args);
     command.stdin(Stdio::null());
 
     let status = command
         .spawn()
-        .with_context(|| format!("Failed to run bonesinfra {} from {}", args.join(" "), executable.display()))?
+        .with_context(|| format!("Failed to run bonesinfra {}", args.join(" ")))?
         .wait()
-        .with_context(|| format!("Failed to wait on bonesinfra {} from {}", args.join(" "), executable.display()))?;
-
+        .with_context(|| format!("Failed to wait on bonesinfra {}", args.join(" ")))?;
     if !status.success() {
-        bail!("bonesinfra failed");
+        bail!("bonesinfra {} failed", args.join(" "));
     }
-
     Ok(())
 }
 
-/// Runs `python -m bonesinfra` with the given arguments and returns stdout.
+/// Prepares the dependency environment for a project. This is intended for
+/// command-test setup and does not materialize source.
 ///
 /// # Errors
-/// Fails when the runtime cannot be materialized or the command exits non-zero.
-pub fn run_capture(args: &[&str]) -> Result<String> {
-    let executable = ensure_available()?;
-    let output = base_command(&executable, args)
-        .stdin(Stdio::null())
-        .output()
-        .with_context(|| format!("Failed to run bonesinfra {} from {}", args.join(" "), executable.display()))?;
-
-    if !output.status.success() {
-        bail!("bonesinfra failed");
-    }
-
-    String::from_utf8(output.stdout).context("bonesinfra produced invalid UTF-8 output")
-}
-
-fn base_command(executable: &Path, args: &[&str]) -> Command {
-    let mut cmd = Command::new(executable);
-    cmd.args(["-m", "bonesinfra"]);
-    cmd.args(args);
-    cmd
-}
-
-fn ensure_available() -> Result<PathBuf> {
-    ensure_available_in(&checkout_dir())
-}
-
-/// Materializes and installs the embedded Python runtime below `cache_root`.
-///
-/// # Errors
-/// Fails when the runtime cannot be materialized or installed.
-pub fn prepare_in(cache_root: &Path) -> Result<()> {
-    ensure_available_in(&cache_root.join(CHECKOUT_DIR)).map(|_| ())
-}
-
-fn ensure_available_in(checkout: &Path) -> Result<PathBuf> {
-    let cache_root = checkout.parent().context("bonesinfra checkout has no cache root")?;
-    fs::create_dir_all(cache_root).with_context(|| format!("Failed to create {}", cache_root.display()))?;
-    let lock_path = cache_root.join(".bonesinfra.lock");
-    let lock = OpenOptions::new()
-        .create(true)
-        .truncate(false)
-        .read(true)
-        .write(true)
-        .open(&lock_path)
-        .with_context(|| format!("Failed to open bonesinfra lock at {}", lock_path.display()))?;
-    lock.lock().with_context(|| format!("Failed to lock bonesinfra runtime at {}", lock_path.display()))?;
-
-    let venv_python = checkout.join(".venv").join("bin").join("python");
-    let stamp = embedded_source_version();
-
-    if venv_python.is_file() && materialized_stamp(&checkout).as_deref() == Some(stamp.as_str()) {
-        return Ok(venv_python);
-    }
-
-    materialize(checkout)?;
-    setup_venv(checkout)?;
-
-    if !venv_python.is_file() {
-        bail!("bonesinfra setup finished at {}, but {} is missing.", checkout.display(), venv_python.display());
-    }
-
-    // Written last so an interrupted setup re-materializes on the next run.
-    fs::write(checkout.join(STAMP_FILE), &stamp)
-        .with_context(|| format!("Failed to write bonesinfra stamp in {}", checkout.display()))?;
-
-    Ok(venv_python)
+/// Fails when the project-local core is missing or dependencies cannot install.
+pub fn prepare_in(project_root: &Path) -> Result<()> {
+    ensure_available(project_root).map(|_| ())
 }
 
 /// Returns the paths packaged in the embedded Python distribution.
@@ -126,91 +89,119 @@ pub fn embedded_source_paths() -> impl Iterator<Item = Cow<'static, str>> {
     PythonSource::iter()
 }
 
-/// Returns the deterministic version identifier for the embedded Python distribution.
-pub fn embedded_source_version() -> String {
-    let mut files: Vec<_> = PythonSource::iter().collect();
-    files.sort();
-
-    let mut hasher = DefaultHasher::new();
-    for file_path in files {
-        hasher.write(file_path.as_bytes());
-        if let Some(asset) = PythonSource::get(&file_path) {
-            hasher.write(asset.data.as_ref());
-        }
+fn ensure_available(project_root: &Path) -> Result<PathBuf> {
+    let project_root = project_root
+        .canonicalize()
+        .with_context(|| format!("Failed to resolve project root {}", project_root.display()))?;
+    let core = project_root.join(CORE_PATH);
+    if !core.join("pyproject.toml").is_file() || !core.join("src/bonesinfra/__main__.py").is_file() {
+        bail!("Project-local BonesInfra core is missing at {}. Run bonesdeploy init or update.", core.display());
     }
 
-    format!("{:016x}", hasher.finish())
-}
+    let environment = environment_dir(&project_root);
+    fs::create_dir_all(&environment).with_context(|| format!("Failed to create {}", environment.display()))?;
+    let lock_path = environment.join(".lock");
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&lock_path)
+        .with_context(|| format!("Failed to open BonesInfra lock at {}", lock_path.display()))?;
+    lock.lock().with_context(|| format!("Failed to lock BonesInfra environment at {}", lock_path.display()))?;
 
-fn materialized_stamp(checkout: &Path) -> Option<String> {
-    fs::read_to_string(checkout.join(STAMP_FILE)).ok().map(|s| s.trim().to_string())
-}
-
-fn materialize(checkout: &Path) -> Result<()> {
-    if let Ok(metadata) = fs::symlink_metadata(checkout) {
-        if metadata.file_type().is_dir() {
-            fs::remove_dir_all(checkout)
-                .with_context(|| format!("Failed to remove stale bonesinfra checkout at {}", checkout.display()))?;
-        } else {
-            fs::remove_file(checkout)
-                .with_context(|| format!("Failed to remove stale bonesinfra checkout at {}", checkout.display()))?;
-        }
+    let python = environment.join(".venv/bin/python");
+    let stamp = package_version(&core)?;
+    if python.is_file() && materialized_stamp(&environment).as_deref() == Some(stamp.as_str()) {
+        return Ok(python);
     }
 
-    fs::create_dir_all(checkout).with_context(|| format!("Failed to create {}", checkout.display()))?;
+    setup_venv(&environment, &core)?;
+    if !python.is_file() {
+        bail!("BonesInfra setup finished at {}, but {} is missing.", environment.display(), python.display());
+    }
+    fs::write(environment.join(STAMP_FILE), stamp)
+        .with_context(|| format!("Failed to write BonesInfra stamp in {}", environment.display()))?;
+    Ok(python)
+}
 
+fn base_command(executable: &Path, project_root: &Path, args: &[&str]) -> Command {
+    let core = project_root.join(CORE_PATH);
+    let mut command = Command::new(executable);
+    command.current_dir(project_root).env("PYTHONPATH", core.join("src"));
+    command.args(["-m", "bonesinfra"]);
+    command.args(args);
+    command
+}
+
+fn write_embedded_source(destination: &Path) -> Result<()> {
     for file_path in embedded_source_paths() {
         let Some(asset) = PythonSource::get(&file_path) else {
             continue;
         };
-
-        let dest = checkout.join(file_path.as_ref());
-        if let Some(parent) = dest.parent() {
+        let target = destination.join(file_path.as_ref());
+        if let Some(parent) = target.parent() {
             fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
         }
-        fs::write(&dest, asset.data.as_ref()).with_context(|| format!("Failed to write {}", dest.display()))?;
+        fs::write(&target, asset.data.as_ref()).with_context(|| format!("Failed to write {}", target.display()))?;
     }
-
     Ok(())
 }
 
-fn setup_venv(checkout: &Path) -> Result<()> {
-    let venv_python = checkout.join(".venv").join("bin").join("python");
-
-    if !venv_python.is_file() {
+fn setup_venv(environment: &Path, core: &Path) -> Result<()> {
+    let python = environment.join(".venv/bin/python");
+    if !python.is_file() {
         let status = Command::new("python3")
             .args(["-m", "venv", ".venv"])
-            .current_dir(checkout)
+            .current_dir(environment)
             .status()
-            .with_context(|| format!("Failed to create venv in {}", checkout.display()))?;
-
+            .with_context(|| format!("Failed to create venv in {}", environment.display()))?;
         if !status.success() {
-            bail!("Failed to create venv in {}.", checkout.display());
+            bail!("Failed to create venv in {}.", environment.display());
         }
     }
-
-    let status = Command::new(&venv_python)
-        .args(["-m", "pip", "install", "--upgrade", "pip"])
+    let status = Command::new(&python)
+        .args(["-m", "pip", "install", "-e"])
+        .arg(core)
         .status()
-        .with_context(|| format!("Failed to upgrade pip in {}", checkout.display()))?;
-
+        .with_context(|| format!("Failed to install BonesInfra dependencies from {}", core.display()))?;
     if !status.success() {
-        bail!("Failed to upgrade pip in {}.", checkout.display());
+        bail!("Failed to install BonesInfra dependencies from {}.", core.display());
     }
-
-    let status = Command::new(&venv_python)
-        .args(["-m", "pip", "install", "-e", "."])
-        .current_dir(checkout)
-        .status()
-        .with_context(|| format!("Failed to install bonesinfra dependencies in {}", checkout.display()))?;
-
-    if !status.success() {
-        bail!("Failed to install bonesinfra dependencies in {}.", checkout.display());
-    }
-
     Ok(())
 }
 
-fn checkout_dir() -> PathBuf {
-    paths::bones_cache_root().join(CHECKOUT_DIR)
+fn environment_dir(project_root: &Path) -> PathBuf {
+    let mut environment = paths::bones_cache_root().join("bonesinfra/projects");
+    for component in project_root.components() {
+        if let Component::Normal(part) = component {
+            environment.push(part);
+        }
+    }
+    environment
+}
+
+fn package_version(core: &Path) -> Result<String> {
+    fs::read_to_string(core.join("pyproject.toml"))
+        .with_context(|| format!("Failed to read project-local BonesInfra package metadata in {}", core.display()))?
+        .lines()
+        .find_map(|line| line.strip_prefix("version = \"")?.strip_suffix('"'))
+        .filter(|version| !version.is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| anyhow::anyhow!("Project-local BonesInfra pyproject.toml has no package version"))
+}
+
+fn materialized_stamp(directory: &Path) -> Option<String> {
+    fs::read_to_string(directory.join(STAMP_FILE)).ok().map(|value| value.trim().to_string())
+}
+
+fn remove_path(path: &Path) -> Result<()> {
+    if let Ok(metadata) = fs::symlink_metadata(path) {
+        if metadata.file_type().is_dir() {
+            fs::remove_dir_all(path).with_context(|| format!("Failed to remove {}", path.display()))?;
+        } else {
+            fs::remove_file(path).with_context(|| format!("Failed to remove {}", path.display()))?;
+        }
+    }
+    Ok(())
 }

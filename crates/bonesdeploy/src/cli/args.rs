@@ -96,6 +96,8 @@ pub enum Command {
         /// Skip remote update
         #[arg(long)]
         skip_remote: bool,
+        #[arg(long, hide = true)]
+        continue_update: bool,
     },
     /// Remote operations
     Remote {

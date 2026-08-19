@@ -27,8 +27,9 @@ def _runtime_context(config: Path):
 
 
 def _link_core(tmp_path: Path):
-    (tmp_path / "infra/provision").mkdir(parents=True)
-    (tmp_path / "infra/provision/core").symlink_to(INFRA, target_is_directory=True)
+    core = tmp_path / "infra/provision/core/src/bonesinfra"
+    core.mkdir(parents=True)
+    (core / "__main__.py").write_text("")
 
 
 def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypatch):

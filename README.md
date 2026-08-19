@@ -48,6 +48,11 @@ And embeds a Python provisioning runtime:
 
 - **`bonesinfra`** — `crates/bonesinfra/python/`, embedded by the Rust `bonesinfra` crate
 
+Each initialized project receives the complete BonesInfra distribution in
+`infra/provision/core/`. Commands execute that committed managed core through a
+project-scoped dependency environment; `infra/provision/custom/` remains
+project-owned and is preserved by updates.
+
 ## The Point
 
 Deploying small apps should not require a platform team.

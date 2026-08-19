@@ -39,11 +39,11 @@ initialization, root `.env` authoring, SSH/Git/GPG integration, and delegation
 to the other two pieces. It does not execute deployments itself; it either
 provisions via `bonesinfra` or triggers `bonesremote` over SSH.
 
-**`bonesinfra`** — an embedded Python provisioning runtime. Compiles a Python
-package into the `bonesdeploy` binary via `rust-embed`, materializes it on demand
-into a venv, and uses `pyinfra` to provision the remote server (users, packages,
-frameworks, databases, SSL, firewalls). Owns *what gets installed* at
-provisioning time.
+**`bonesinfra`** — an embedded Python provisioning runtime. Its complete
+distribution is materialized into project `infra/provision/core/`; a
+project-scoped venv contains dependencies only. It uses `pyinfra` to provision
+the remote server (users, packages, frameworks, databases, SSL, firewalls) and
+owns *what gets installed* at provisioning time.
 
 **`bonesremote`** — the server-side binary that runs as root on the deployment
 host. Owns the release lifecycle: staging, building, promoting, sealing,

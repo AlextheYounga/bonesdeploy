@@ -21,6 +21,7 @@ const SOURCE_REPO_URL: &str = "https://github.com/AlextheYounga/bonesdeploy.git"
 pub struct Options {
     pub skip_local: bool,
     pub skip_remote: bool,
+    pub continue_update: bool,
 }
 
 pub async fn run(options: Options) -> Result<()> {
@@ -46,10 +47,14 @@ pub async fn run(options: Options) -> Result<()> {
         if current_local != release_versions.bonesdeploy {
             println!("{}", style("Updating bonesdeploy").cyan().bold());
             release::update_local_from_crates_io(&release_versions.bonesdeploy)?;
+            if !options.continue_update {
+                return continue_with_installed_binary(options);
+            }
             updated = true;
         }
 
         if Path::new(paths::DOT_ENV).exists() {
+            bonesinfra::materialize_project_core(Path::new("."))?;
             bonesinfra::run(&[
                 "patches",
                 "apply",
@@ -84,6 +89,25 @@ pub async fn run(options: Options) -> Result<()> {
         println!("{} Already up to date.", output::success_marker());
     }
 
+    Ok(())
+}
+
+fn continue_with_installed_binary(options: Options) -> Result<()> {
+    let mut command = Command::new(paths::BONESDEPLOY_BINARY);
+    command.arg("update");
+    if options.skip_local {
+        command.arg("--skip-local");
+    }
+    if options.skip_remote {
+        command.arg("--skip-remote");
+    }
+    let status = command
+        .arg("--continue-update")
+        .status()
+        .context("Failed to continue update with the installed bonesdeploy binary")?;
+    if !status.success() {
+        bail!("Installed bonesdeploy binary failed to continue update");
+    }
     Ok(())
 }
 

@@ -51,9 +51,9 @@ Project-facing provisioning is split into two committed directories:
   preserve it and never silently overwrite it.
 
 Core provisioning runs before custom provisioning through ordinary explicit
-Python composition. No general plugin registry or copied BonesInfra execution
-engine is introduced. Framework-specific provisioning remains managed core
-when BonesDeploy must maintain and fix it.
+Python composition. Managed core is the complete copied BonesInfra execution
+engine, so every project can execute its committed core without a hidden source
+fallback. No general plugin registry is introduced.
 
 An update refreshes managed core files only when their project copies are
 unmodified. If a managed file was changed, update reports the conflict and
@@ -63,10 +63,8 @@ There is no canonical per-project infrastructure tree under
 
 ## Supersedes
 
-Adds ownership and update rules to the existing decision that project-owned
-infrastructure lives under committed `infra/`. It does not change the earlier
-decision to keep generic BonesInfra execution machinery in BonesDeploy rather
-than copying it into each project.
+Superseded by `refactor/project-local-bonesinfra-core`: managed core is the
+complete copied BonesInfra distribution rather than a framework-only snapshot.
 
 ## Effect on the record
 

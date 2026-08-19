@@ -43,23 +43,19 @@ fn refresh_local_infrastructure_updates_managed_files_without_touching_custom() 
 }
 
 #[test]
-fn refresh_local_infrastructure_refuses_managed_conflicts() -> Result<()> {
+fn refresh_local_infrastructure_leaves_managed_core_untouched() -> Result<()> {
     let temp = tempfile::tempdir()?;
     let source_dir = temp.path().join("source");
     let project_root = temp.path().join("project");
     let core_file = project_root.join("infra/provision/core/runtime.py");
     let deployment_file = project_root.join("infra/deployment/build/01_build.sh");
-    write(&source_dir.join("crates/bonesinfra/python/src/bonesinfra/frameworks/custom/runtime.py"), "managed")?;
     write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/functions.sh"), "new functions")?;
     write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/build/01_build.sh"), "new deployment")?;
     write(&project_root.join(".env"), "TEMPLATE=custom\n")?;
     write(&core_file, "locally changed")?;
     write(&deployment_file, "locally preserved")?;
-    let error = refresh_local_infrastructure(&source_dir, &project_root, Some("custom"))
-        .err()
-        .ok_or_else(|| anyhow::anyhow!("conflict should be rejected"))?;
-    assert!(error.to_string().contains("Managed infrastructure conflict"));
+    refresh_local_infrastructure(&source_dir, &project_root, Some("custom"))?;
     assert_eq!(fs::read_to_string(core_file)?, "locally changed");
-    assert_eq!(fs::read_to_string(deployment_file)?, "locally preserved");
+    assert_eq!(fs::read_to_string(deployment_file)?, "new deployment");
     Ok(())
 }

@@ -35,17 +35,36 @@ def test_local_patch_migrates_owned_content_and_preserves_ciphertext(tmp_path, m
     apply_local(ctx, "0.8.0", str(env_file))
 
     assert (tmp_path / "infra/secrets/.env.gpg").read_bytes() == ciphertext
-    assert (tmp_path / "infra/templates/site.conf").is_file()
+    assert (tmp_path / "infra/provision/custom/templates/site.conf").is_file()
+    assert (tmp_path / "infra/provision/custom/__init__.py").is_file()
     assert (tmp_path / "infra/deployment/build/01_build.sh").is_file()
     assert not old.exists()
-    assert not (tmp_path / "infra/bones.toml").exists()
+    assert not (tmp_path / "infra/provision/custom/bones.toml").exists()
     assert (tmp_path / "data/bonesdeploy/patches/atlas/0003-project-infra").is_file()
 
 
-def test_local_patch_refuses_existing_destination_without_writing_marker(tmp_path, monkeypatch):
+def test_local_patch_preserves_pre_materialized_core(tmp_path, monkeypatch):
     ctx, env_file = _context(tmp_path)
-    (tmp_path / ".bones").mkdir()
-    (tmp_path / "infra").mkdir()
+    (tmp_path / ".bones/infra").mkdir(parents=True)
+    (tmp_path / ".bones/infra/runtime.py").write_text("def deploy(_ctx):\n    pass\n")
+    core = tmp_path / "infra/provision/core"
+    core.mkdir(parents=True)
+    (core / "managed.py").write_text("managed")
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
+
+    apply_local(ctx, "0.8.0", str(env_file))
+
+    assert (core / "managed.py").read_text() == "managed"
+    assert (tmp_path / "infra/provision/custom/runtime.py").is_file()
+    assert not (tmp_path / ".bones").exists()
+    assert (tmp_path / "data/bonesdeploy/patches/atlas/0003-project-infra").is_file()
+
+
+def test_local_patch_refuses_custom_collision_without_writing_marker(tmp_path, monkeypatch):
+    ctx, env_file = _context(tmp_path)
+    (tmp_path / ".bones/infra").mkdir(parents=True)
+    (tmp_path / ".bones/infra/runtime.py").write_text("def deploy(_ctx):\n    pass\n")
+    (tmp_path / "infra/provision/custom").mkdir(parents=True)
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "data"))
 
     with pytest.raises(RuntimeError, match="will not merge or overwrite"):

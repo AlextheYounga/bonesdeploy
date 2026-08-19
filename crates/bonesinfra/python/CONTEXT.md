@@ -1,14 +1,15 @@
 # BonesInfra Project Notes
 
-BonesInfra is the hidden Python provisioning engine embedded in the BonesDeploy
-monorepo.
+BonesInfra is the Python provisioning engine embedded in the BonesDeploy
+monorepo and materialized as project-local managed core.
 
 It is not the public product interface. It is called by `bonesdeploy` to run pyinfra-based provisioning, runtime setup, SSL setup, and runtime-specific infrastructure tasks.
 
 The user should normally never call `bonesinfra` directly, except for dev
 testing. The Rust `bonesinfra` crate embeds this Python tree into the
-`bonesdeploy` binary, materializes it into an isolated cache, creates its
-virtualenv, and invokes `python -m bonesinfra`.
+`bonesdeploy` binary, materializes the complete distribution into
+`infra/provision/core/`, creates a project-scoped dependency virtualenv, and
+invokes that project-local package with `python -m bonesinfra`.
 
 ______________________________________________________________________
 
@@ -312,16 +313,11 @@ Raw pyinfra operations should live in focused modules.
 
 ## `frameworks/`
 
-No longer exists as an installed registry.
-
-Runtime-specific infrastructure now lives with each project: `bonesdeploy init`
-materializes `.bones/infra/` into the project (next to `bones.toml`), containing
-`__init__.py`, `runtime.py`, `manifest.py`, an ordinary `custom.py`, and local
-`infra/templates/`. The generated `infra/runtime.py` orchestrates the framework's
-services using the neutral core helpers in `services/`. Laravel's package
-additionally ships `infra/docker.py` and `infra/templates/docker/`; its
-`runtime.py` switches to that module when the project selects the `docker`
-runtime backend.
+Framework packages are part of the complete distribution materialized at
+`infra/provision/core/src/bonesinfra/frameworks/`. The project-local package
+selects its framework from the root `.env` and composes it with optional
+project-owned `infra/provision/custom/` code. It never falls back to a cached
+or globally installed framework implementation.
 
 Each generated runtime must expose a consistent interface:
 
