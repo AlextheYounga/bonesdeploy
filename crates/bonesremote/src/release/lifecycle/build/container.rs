@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::process::{self, Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::config::environment;
 
 use super::build_user::{BuildScriptEnv, build_script_command, build_user_command, build_user_control_command};
 use super::ownership;
@@ -180,23 +181,23 @@ pub fn configure_create(command: &mut Command, create: &ContainerCreate<'_>) {
         .arg(create.container_name)
         .args([
             "--env",
-            &format!("PROJECT_NAME={}", create.env.project_name),
+            &format!("{}={}", environment::PROJECT_NAME, create.env.project_name),
             "--env",
-            "PROJECT_ROOT=/workspace",
+            &format!("{}=/workspace", environment::PROJECT_ROOT),
             "--env",
-            "REPO_PATH=",
+            &format!("{}=", environment::REPO_PATH),
         ])
         .args([
             "--env",
-            &format!("WEB_ROOT={}", create.env.web_root),
+            &format!("{}={}", environment::WEB_ROOT, create.env.web_root),
             "--env",
-            &format!("SERVICE_USER={}", create.env.project_name),
+            &format!("{}={}", environment::SERVICE_USER, create.env.project_name),
         ]);
 
     command
         .args(["--env-file"])
         .arg(create.build_env_file)
-        .args(["--env", "BUILD_CACHE_DIR=/workspace/cache", "--volume"])
+        .args(["--env", &format!("{}=/workspace/cache", environment::BUILD_CACHE_DIR), "--volume"])
         .arg(source_mount)
         .args(["--volume"])
         .arg(cache_mount)

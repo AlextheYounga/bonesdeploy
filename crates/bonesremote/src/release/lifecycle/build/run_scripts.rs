@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::config::{
-    self, build_group_for, build_timeout_seconds, build_user_for, is_numbered_shell_script,
+    self, build_group_for, build_timeout_seconds, build_user_for, environment, is_numbered_shell_script,
 };
 use bonesdeploy_core::env_build;
 use bonesdeploy_core::paths;
@@ -105,8 +105,7 @@ const DERIVED_ENV_DENYLIST: &[&str] = &[
     "build.timeout_seconds",
 ];
 
-const CONTAINER_ENV_DENYLIST: &[&str] =
-    &["PROJECT_NAME", "PROJECT_ROOT", "REPO_PATH", "WEB_ROOT", "SERVICE_USER", "BUILD_CACHE_DIR"];
+const CONTAINER_ENV_DENYLIST: &[&str] = environment::CONTAINER_CONTROLLED;
 
 pub fn derived_config_env(cfg: &config::Bones) -> Result<Vec<(String, String)>> {
     let value = serde_json::to_value(cfg).context("Failed to serialize configuration for build environment")?;

@@ -2,6 +2,7 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::paths;
 
 #[derive(Debug, Clone)]
 pub struct RemoteConnectionDetails {
@@ -65,7 +66,7 @@ pub fn branch_exists(branch: &str) -> Result<bool> {
 }
 
 pub fn branch_exists_at(repo: &Path, branch: &str) -> Result<bool> {
-    let ref_name = format!("refs/heads/{branch}");
+    let ref_name = paths::branch_ref(branch);
     let output = Command::new("git")
         .args(["-C"])
         .arg(repo)

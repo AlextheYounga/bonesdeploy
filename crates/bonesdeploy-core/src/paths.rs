@@ -86,6 +86,11 @@ pub fn default_web_root() -> String {
 }
 
 #[must_use]
+pub fn branch_ref(branch: &str) -> String {
+    format!("refs/heads/{branch}")
+}
+
+#[must_use]
 pub fn ssl_certificate_path(domain: &str) -> String {
     Path::new(ETC_LETSENCRYPT_LIVE).join(domain).join("fullchain.pem").display().to_string()
 }

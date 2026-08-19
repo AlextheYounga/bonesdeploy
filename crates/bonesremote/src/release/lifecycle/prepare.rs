@@ -5,7 +5,7 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{RuntimeBackend, is_numbered_shell_script, project_env, runtime_user_for};
+use bonesdeploy_core::config::{RuntimeBackend, environment, is_numbered_shell_script, project_env, runtime_user_for};
 use bonesdeploy_core::paths;
 
 use crate::privileges;
@@ -154,10 +154,10 @@ fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &P
         .args(["-u", env.runtime_user, "--", "bash", "-c", "umask 0002; exec bash -s"])
         .current_dir(release_root)
         .env(project_env::PROJECT_NAME, env.project_name)
-        .env("PROJECT_ROOT", env.project_root)
-        .env("REPO_PATH", "")
+        .env(environment::PROJECT_ROOT, env.project_root)
+        .env(environment::REPO_PATH, "")
         .env(project_env::WEB_ROOT, env.web_root)
-        .env("SERVICE_USER", env.runtime_user);
+        .env(environment::SERVICE_USER, env.runtime_user);
 }
 
 pub fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {

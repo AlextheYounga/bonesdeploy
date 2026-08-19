@@ -5,6 +5,7 @@ use std::process::{Command, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::config::environment;
 
 use super::command::{APP_PATH, SHARED_PATH, runtime_identity};
 use crate::release::output;
@@ -46,9 +47,9 @@ pub(crate) fn run_scripts(request: &PrepareRequest<'_>) -> Result<()> {
                 "--user",
                 &identity,
                 "--env",
-                &format!("PROJECT_NAME={}", request.project),
+                &format!("{}={}", environment::PROJECT_NAME, request.project),
                 "--env",
-                &format!("PROJECT_ROOT={}", request.project_root.display()),
+                &format!("{}={}", environment::PROJECT_ROOT, request.project_root.display()),
                 request.image,
                 "bash",
                 "-s",
