@@ -44,7 +44,7 @@ def register_service(ctx, *, paths, name):
     service_name = f"{ctx.app.project_name}-{name}.service"
     requires_dir = paths["systemd_site_target_requires"]
     link_path = f"{requires_dir}/{service_name}"
-    service_path = f"/etc/systemd/system/{service_name}"
+    service_path = str(Path(ETC_SYSTEMD_SYSTEM) / service_name)
     server.shell(
         name=f"Require {service_name} from site target",
         commands=[
@@ -79,11 +79,10 @@ def render_app_service(  # noqa: PLR0913
     runtime_write_paths,
     runtime_address_families="AF_UNIX",
 ):
-    project = ctx.app.project_name
     files.template(
         name=f"Deploy {name} systemd service",
         src=str(ASSETS_DIR / "systemd/app.service.j2"),
-        dest=f"/etc/systemd/system/{project}-{name}.service",
+        dest=ctx.paths.systemd_service(name),
         user="root",
         group="root",
         mode="0644",

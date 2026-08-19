@@ -1,17 +1,12 @@
-use std::process::Command;
-
 use bonesdeploy_core::{config, paths};
 
-use crate::commands::inspection::systemd;
+use crate::inspection::systemd;
 use crate::release::state as release_state;
 
 pub(crate) fn check_target(cfg: &config::Bones, issues: &mut Vec<String>) {
     let target_name = paths::site_target_name(&cfg.project_name);
-    let output =
-        Command::new("systemctl").args(["show", "--property=LoadState", "--value", "--", &target_name]).output();
-
-    match output {
-        Ok(output) if output.status.success() && service_exists(&String::from_utf8_lossy(&output.stdout)) => {
+    match systemd::property(&target_name, "LoadState") {
+        Ok(state) if service_exists(&state) => {
             check_target_membership(&target_name, cfg, issues);
         }
         Ok(_) => issues.push(format!("site target is missing: {target_name}")),
@@ -20,16 +15,8 @@ pub(crate) fn check_target(cfg: &config::Bones, issues: &mut Vec<String>) {
 }
 
 fn check_target_membership(target: &str, cfg: &config::Bones, issues: &mut Vec<String>) {
-    let output =
-        Command::new("systemctl").args(["show", "--property=Requires", "--value", "--no-pager", "--", target]).output();
-    let services = match output {
-        Ok(output) if output.status.success() => {
-            systemd::parse_required_services(&String::from_utf8_lossy(&output.stdout))
-        }
-        Ok(_) => {
-            issues.push(format!("could not inspect required services for site target: {target}"));
-            return;
-        }
+    let services = match systemd::required_services(target) {
+        Ok(services) => services,
         Err(error) => {
             issues.push(format!("could not inspect required services for site target {target} ({error})"));
             return;
@@ -65,7 +52,7 @@ fn is_deferred_laravel_worker(cfg: &config::Bones, service: &str) -> bool {
 }
 
 fn is_configured_laravel_worker(template: &str, worker_enabled: bool, project_name: &str, service: &str) -> bool {
-    template == "laravel" && worker_enabled && service == format!("{project_name}-worker.service")
+    template == config::LARAVEL_TEMPLATE && worker_enabled && service == format!("{project_name}-worker.service")
 }
 
 fn current_is_placeholder(project_root: &str) -> bool {
@@ -73,10 +60,7 @@ fn current_is_placeholder(project_root: &str) -> bool {
 }
 
 fn condition_failed(service: &str) -> bool {
-    Command::new("systemctl")
-        .args(["show", "--property=ConditionResult", "--value", "--no-pager", "--", service])
-        .output()
-        .is_ok_and(|output| output.status.success() && String::from_utf8_lossy(&output.stdout).trim() == "no")
+    systemd::property(service, "ConditionResult").is_ok_and(|value| value == "no")
 }
 
 fn inactive_service_issue(target: &str, service: &str) -> String {

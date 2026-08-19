@@ -1,6 +1,6 @@
 from pyinfra.operations import apt, server, systemd
 
-from bonesinfra.config.paths import SCRIPTS_DIR
+from bonesinfra.config.paths import BONESINFRA_SERVICES_ROOT, ETC_SYSTEMD_SYSTEM, SCRIPTS_DIR
 from bonesinfra.services.runtime.base import RuntimeService
 
 
@@ -14,9 +14,9 @@ class ValKeyService(RuntimeService):
         project = self._identifier(ctx.app.project_name)
         service_name = f"{project}-{self.service}"
         return [
-            (f"{self.service} configuration", f"/etc/bonesinfra/services/{service_name}.conf", "file", "service"),
+            (f"{self.service} configuration", f"{BONESINFRA_SERVICES_ROOT}/{service_name}.conf", "file", "service"),
             (f"{self.service} data directory", f"/var/lib/{self.service}/{project}", "directory", "service"),
-            (f"{self.service} systemd service", f"/etc/systemd/system/{service_name}.service", "file", "service"),
+            (f"{self.service} systemd service", ctx.paths.systemd_service(self.service), "file", "service"),
         ]
 
     def manifest_services(self, ctx) -> list[tuple[str, str, str]]:
@@ -39,7 +39,7 @@ class ValKeyService(RuntimeService):
             name=f"Configure isolated {self.service} instance for project",
             src=str(SCRIPTS_DIR / "setup-key-value-store.sh.j2"),
             env=env_path,
-            config=f"/etc/bonesinfra/services/{service_name}.conf",
+            config=f"{BONESINFRA_SERVICES_ROOT}/{service_name}.conf",
             data=f"/var/lib/{self.service}/{project}",
             default_port=str(self.default_port),
             password_key=self.service.upper() + "_PASSWORD",
@@ -51,7 +51,7 @@ class ValKeyService(RuntimeService):
             service=self.service,
             project=project,
             package_user=self.package_user,
-            unit_path=f"/etc/systemd/system/{service_name}.service",
+            unit_path=f"{ETC_SYSTEMD_SYSTEM}/{service_name}.service",
             _sudo=True,
         )
         systemd.service(

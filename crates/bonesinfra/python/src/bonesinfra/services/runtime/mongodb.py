@@ -1,9 +1,7 @@
 from pyinfra.operations import apt, server, systemd
 
-from bonesinfra.config.paths import SCRIPTS_DIR
+from bonesinfra.config.paths import MONGODB_ADMIN_ENV, MONGODB_CONFIG, SCRIPTS_DIR
 from bonesinfra.services.runtime.base import RuntimeService
-
-MONGO_DB_CONFIG = "/etc/mongod.conf"
 
 
 class MongoDBService(RuntimeService):
@@ -25,10 +23,10 @@ class MongoDBService(RuntimeService):
         server.shell(
             name="Configure MongoDB for project",
             commands=[
-                f"sed -ri 's/^[[:space:]]*bindIp:.*/  bindIp: 127.0.0.1/' {MONGO_DB_CONFIG}",
+                f"sed -ri 's/^[[:space:]]*bindIp:.*/  bindIp: 127.0.0.1/' {MONGODB_CONFIG}",
                 (
-                    f"grep -q '^security:' {MONGO_DB_CONFIG} || "
-                    f"printf '\\nsecurity:\\n  authorization: enabled\\n' >> {MONGO_DB_CONFIG}"
+                    f"grep -q '^security:' {MONGODB_CONFIG} || "
+                    f"printf '\\nsecurity:\\n  authorization: enabled\\n' >> {MONGODB_CONFIG}"
                 ),
             ],
             _sudo=True,
@@ -44,7 +42,7 @@ class MongoDBService(RuntimeService):
         server.script_template(
             name="Create least-privilege MongoDB project user",
             src=str(SCRIPTS_DIR / "create-mongodb-project-user.sh.j2"),
-            admin_file="/root/.config/bonesinfra/mongodb-admin.env",
+            admin_file=MONGODB_ADMIN_ENV,
             env=env_path,
             project=project,
             user=f"{project}_mongodb",

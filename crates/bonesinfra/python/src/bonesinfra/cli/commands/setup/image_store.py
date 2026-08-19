@@ -2,10 +2,9 @@ from shlex import quote
 
 from pyinfra.operations import server
 
-from bonesinfra.config.paths import ASSETS_DIR, IMAGE_STORE_GRAPH_ROOT, IMAGE_STORE_RUN_ROOT
+from bonesinfra.config.paths import ASSETS_DIR, IMAGE_STORE_GRAPH_ROOT, IMAGE_STORE_RUN_ROOT, IMAGE_STORE_STORAGE_CONF
 from bonesinfra.pyinfra.operations import mkdir, render
 
-IMAGE_STORE_STORAGE_CONF = "/etc/bonesdeploy/image-store-storage.conf"
 BASE_IMAGE = "docker.io/library/buildpack-deps:bookworm"
 
 

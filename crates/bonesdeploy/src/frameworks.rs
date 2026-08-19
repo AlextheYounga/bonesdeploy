@@ -36,6 +36,21 @@ impl Framework {
         template.parse()
     }
 
+    pub fn display_name(self) -> String {
+        match self {
+            Self::Next => String::from("Next.js"),
+            Self::SvelteKit => String::from("SvelteKit"),
+            other => {
+                let wire = other.to_string();
+                let mut chars = wire.chars();
+                match chars.next() {
+                    None => String::new(),
+                    Some(first) => first.to_uppercase().chain(chars).collect(),
+                }
+            }
+        }
+    }
+
     pub fn questions(self) -> &'static [Question] {
         match self {
             Self::Django => django::questions(),
@@ -260,6 +275,9 @@ mod tests {
             assert_eq!(Framework::parse(wire)?.to_string(), wire);
         }
         assert!(Framework::parse("unknown").is_err());
+        assert_eq!(Framework::Next.display_name(), "Next.js");
+        assert_eq!(Framework::SvelteKit.display_name(), "SvelteKit");
+        assert_eq!(Framework::Django.display_name(), "Django");
         Ok(())
     }
 

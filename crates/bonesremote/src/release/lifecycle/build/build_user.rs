@@ -6,6 +6,8 @@ use std::process::{Command, Stdio};
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::paths;
 
+use crate::inspection::systemd;
+
 pub(super) struct BuildScriptEnv<'a> {
     pub(super) project_name: &'a str,
     pub(super) build_user: &'a str,
@@ -54,11 +56,7 @@ pub(crate) fn ensure_build_user_ready(build_user: &str, working_dir: &Path) -> R
         bail!("Failed to start the systemd user manager for {build_user}: {status}");
     }
 
-    let status = Command::new("systemctl")
-        .args(["is-active", "--quiet", &format!("user@{uid}.service")])
-        .status()
-        .with_context(|| format!("Failed to inspect the systemd user manager for {build_user}"))?;
-    if !status.success() {
+    if !systemd::active_status(&format!("user@{uid}.service"))? {
         bail!("The systemd user manager for {build_user} is not active");
     }
 

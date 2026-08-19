@@ -16,6 +16,14 @@ PHP_SURY_PREREQUISITES = ["apt-transport-https", "ca-certificates", "curl", "lsb
 PHP_FPM_SOCKET_PARENT = "/run/php"
 
 
+def php_fpm_socket_path(version: str, project: str) -> str:
+    return f"{PHP_FPM_SOCKET_PARENT}/php{version}-fpm-{project}.sock"
+
+
+def php_fpm_pool_config_path(version: str, project: str) -> str:
+    return f"/etc/php/{version}/fpm/pool.d/{project}.conf"
+
+
 class PHPRuntime(LanguageRuntime):
     config_key = "php_version"
     default_version = "8.5"
@@ -126,10 +134,10 @@ class PHPRuntime(LanguageRuntime):
         return self.socket_path(project)
 
     def socket_path(self, project: str) -> str:
-        return f"{PHP_FPM_SOCKET_PARENT}/php{self.version}-fpm-{project}.sock"
+        return php_fpm_socket_path(self.version, project)
 
     def pool_config_path(self, project: str) -> str:
-        return f"/etc/php/{self.version}/fpm/pool.d/{project}.conf"
+        return php_fpm_pool_config_path(self.version, project)
 
 
 PHP = PHPRuntime()

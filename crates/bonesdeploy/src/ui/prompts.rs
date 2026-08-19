@@ -4,7 +4,7 @@ use inquire::{Confirm, MultiSelect, Select, Text};
 use serde_json::Value;
 
 use crate::config::Bones;
-use crate::frameworks::{Question, QuestionKind};
+use crate::frameworks::{Framework, Question, QuestionKind};
 use crate::infra::git;
 use bonesdeploy_core::config::RuntimeBackend;
 
@@ -60,20 +60,6 @@ pub fn prompt_framework_questions(
     Ok(answers)
 }
 
-fn display_name(template: &str) -> String {
-    match template {
-        "next" => String::from("Next.js"),
-        "sveltekit" => String::from("SvelteKit"),
-        other => {
-            let mut chars = other.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => first.to_uppercase().chain(chars).collect(),
-            }
-        }
-    }
-}
-
 pub fn choose_template(available_templates: &[String]) -> Result<Option<String>> {
     if available_templates.is_empty() {
         return Ok(None);
@@ -88,9 +74,17 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
         return Ok(None);
     }
 
-    let display_names: Vec<String> = available_templates.iter().map(|t| display_name(t)).collect();
+    let display_names: Vec<String> = available_templates
+        .iter()
+        .map(|template| Framework::parse(template).map(|framework| framework.display_name()))
+        .collect::<Result<_>>()?;
     let chosen_display = Select::new("Template:", display_names).prompt()?;
-    let idx = available_templates.iter().position(|t| display_name(t) == chosen_display).unwrap_or(0);
+    let idx = available_templates
+        .iter()
+        .position(|template| {
+            Framework::parse(template).is_ok_and(|framework| framework.display_name() == chosen_display)
+        })
+        .unwrap_or(0);
     let template_name = available_templates[idx].clone();
 
     Ok(Some(template_name))

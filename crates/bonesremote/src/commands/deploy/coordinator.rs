@@ -1,4 +1,3 @@
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -286,9 +285,7 @@ fn restore_previous_release(project_root: &Path, previous_release: &Path) -> Res
 }
 
 fn process_start_ticks() -> Result<u64> {
-    let path = format!("/proc/{}/stat", process::id());
-    let stat = fs::read_to_string(&path).with_context(|| format!("Failed to read {path}"))?;
-    release::list::process_start_ticks(&stat).context("Failed to read deployment process start time")
+    release::list::current_process_start_ticks().context("Failed to read deployment process start time")
 }
 
 fn deployment_started_at() -> Result<String> {

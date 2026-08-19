@@ -5,7 +5,7 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::paths;
 
-use crate::commands::inspection::systemd;
+use crate::inspection::systemd;
 use crate::privileges;
 use crate::release::SiteMutation;
 

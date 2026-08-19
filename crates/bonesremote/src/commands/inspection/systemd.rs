@@ -17,6 +17,17 @@ pub(crate) fn required_services(target: &str) -> Result<Vec<String>> {
     Ok(parse_required_services(&String::from_utf8_lossy(&output.stdout)))
 }
 
+pub(crate) fn property(unit: &str, property: &str) -> Result<String> {
+    let output = Command::new("systemctl")
+        .args(["show", &format!("--property={property}"), "--value", "--no-pager", "--", unit])
+        .output()
+        .with_context(|| format!("Failed to inspect {property} for {unit}"))?;
+    if !output.status.success() {
+        bail!("Failed to inspect {property} for {unit}");
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
 pub(crate) fn parse_required_services(output: &str) -> Vec<String> {
     output
         .split_whitespace()

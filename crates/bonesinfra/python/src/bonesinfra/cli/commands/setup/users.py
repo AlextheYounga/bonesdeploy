@@ -7,16 +7,20 @@ from pyinfra.operations import server
 
 from bonesinfra.cli.commands.setup.image_store import BASE_IMAGE
 from bonesinfra.config.context import DEPLOY_USER
-from bonesinfra.config.paths import ASSETS_DIR, BUILD_CACHE_NAME, IMAGE_STORE_GRAPH_ROOT, SCRIPTS_DIR
+from bonesinfra.config.paths import (
+    ASSETS_DIR,
+    BUILD_CACHE_NAME,
+    BUILD_SYSTEMD_STAGING_ROOT,
+    BUILD_USER_HOME_ROOT,
+    IMAGE_STORE_GRAPH_ROOT,
+    SCRIPTS_DIR,
+)
 from bonesinfra.pyinfra.operations import mkdir, render
 
 _BUILD_CPU_QUOTA_PERCENT = 80
 _BUILD_MEMORY_HIGH_PERCENT = 80
 _BUILD_MEMORY_MAX_PERCENT = 80
 _BUILD_MEMORY_SWAP_MAX = 0
-
-BUILD_USER_HOME_ROOT = "/var/lib/bonesdeploy/users"
-BUILD_SYSTEMD_STAGING_ROOT = "/run/bonesdeploy"
 
 
 def _ensure_group_membership(user, group):
@@ -106,6 +110,14 @@ def ensure_users_and_groups(ctx):
     cpu_quota = cpu_quota_for(host.get_fact(Cpus))
     staged_dropin = f"{BUILD_SYSTEMD_STAGING_ROOT}/{build_user}.slice.conf"
 
+    _ensure_site_identities(ctx, host, build_group)
+    _ensure_build_user(build_user, build_group, build_home)
+    _configure_build_user(ctx, build_user, cpu_quota, staged_dropin)
+    _verify_build_user(build_user, build_home)
+
+
+def _ensure_site_identities(ctx, host, build_group):
+
     server.user(
         name="Ensure deploy user exists",
         user=DEPLOY_USER,
@@ -144,6 +156,8 @@ def ensure_users_and_groups(ctx):
     ):
         _ensure_group_membership(ctx.runtime.runtime_user, ctx.runtime.runtime_group)
 
+
+def _ensure_build_user(build_user, build_group, build_home):
     mkdir(
         name="Ensure bonesdeploy user home root exists",
         path=BUILD_USER_HOME_ROOT,
@@ -179,6 +193,9 @@ def ensure_users_and_groups(ctx):
         commands=[f"systemctl start user@$(id -u {quote(build_user)}).service"],
         _sudo=True,
     )
+
+
+def _configure_build_user(ctx, build_user, cpu_quota, staged_dropin):
     mkdir(
         name="Ensure systemd drop-in staging directory exists",
         path=BUILD_SYSTEMD_STAGING_ROOT,
@@ -205,6 +222,9 @@ def ensure_users_and_groups(ctx):
     )
     configure_build_user_storage(ctx.app.project_name)
     configure_build_user_cache(ctx.app.project_name)
+
+
+def _verify_build_user(build_user, build_home):
     server.script_template(
         name=f"Verify rootless Podman for {build_user}",
         src=str(SCRIPTS_DIR / "verify-rootless-podman.sh.j2"),

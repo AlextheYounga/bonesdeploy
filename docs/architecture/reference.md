@@ -629,7 +629,8 @@ Cli::Remote::Runtime
 ### External API encapsulation
 
 - SSH connectivity is handled by `infra/ssh.rs` (Rust, for bonesdeploy ↔ bonesremote) and `pyinfra/runner.py` (Python, for bonesinfra provisioning).
-- Git operations are wrapped in `infra/git.rs`.
+- Local Git operations are wrapped in `infra/git.rs`; server-side bare-repository
+  operations are wrapped in `bonesremote/src/git.rs`.
 - GPG operations are contained in `commands/secrets/gpg.rs` with an isolated keyring.
 
 ---

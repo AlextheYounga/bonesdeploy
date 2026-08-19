@@ -1,3 +1,6 @@
+from bonesinfra.services.languages.php import php_fpm_pool_config_path, php_fpm_socket_path
+
+
 def artifacts(ctx):
     paths = ctx.paths
     version = str(ctx.runtime.data.get("php_version", "8.5"))
@@ -5,13 +8,13 @@ def artifacts(ctx):
     entries = [
         (
             "PHP-FPM pool configuration",
-            f"/etc/php/{version}/fpm/pool.d/{project}.conf",
+            php_fpm_pool_config_path(version, project),
             "file",
             "framework",
         ),
         (
             "PHP-FPM socket",
-            f"/run/php/php{version}-fpm-{project}.sock",
+            php_fpm_socket_path(version, project),
             "socket",
             "framework",
         ),

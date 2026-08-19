@@ -5,6 +5,7 @@ from shlex import quote
 from pyinfra.operations import apt, files, server, systemd
 
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import BUILD_USER_HOME_ROOT, RUNTIME_IMAGES_ROOT
 from bonesinfra.services.linux import runtime_logs, systemd as service
 from bonesinfra.services.linux.nginx import site as nginx_site
 
@@ -67,7 +68,7 @@ def _build_runtime_image(ctx) -> str:
     runtime_hash = hashlib.sha256(definition.encode()).hexdigest()[:12]
     image = f"bonesdeploy/laravel-{project}:{runtime_hash}"
     runtime_tag = f"bonesdeploy/laravel-{project}:runtime"
-    build_root = f"/var/lib/bonesdeploy/runtime-images/{project}"
+    build_root = f"{RUNTIME_IMAGES_ROOT}/{project}"
     build_user = f"{project}-build"
     containerfile = f"{build_root}/Containerfile"
     archive = f"{build_root}/{runtime_hash}.tar"
@@ -102,10 +103,10 @@ def _build_runtime_image(ctx) -> str:
         _sudo=True,
     )
     podman = (
-        f"runuser -u {quote(build_user)} -- env HOME=/var/lib/bonesdeploy/users/{quote(build_user)} "
+        f"runuser -u {quote(build_user)} -- env HOME={BUILD_USER_HOME_ROOT}/{quote(build_user)} "
         f"podman build --build-arg PHP_VERSION={quote(php_version)} --tag {quote(image)} --tag {quote(runtime_tag)} "
         f"--file {quote(containerfile)} {quote(build_root)} && "
-        f"runuser -u {quote(build_user)} -- env HOME=/var/lib/bonesdeploy/users/{quote(build_user)} "
+        f"runuser -u {quote(build_user)} -- env HOME={BUILD_USER_HOME_ROOT}/{quote(build_user)} "
         f"podman save --format docker-archive --output {quote(archive)} {quote(image)} {quote(runtime_tag)} && "
         f"docker load --input {quote(archive)}"
     )

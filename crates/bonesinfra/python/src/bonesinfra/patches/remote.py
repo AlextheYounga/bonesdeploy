@@ -6,10 +6,11 @@ from shlex import quote
 from pyinfra.operations import server
 
 from bonesinfra.config.context import DeployContext
+from bonesinfra.config.paths import PATCHES_ROOT
 
 
 def write_marker(ctx: DeployContext, patch_id: str) -> None:
-    marker = f"/var/lib/bonesdeploy/patches/{ctx.app.project_name}/{patch_id}"
+    marker = f"{PATCHES_ROOT}/{ctx.app.project_name}/{patch_id}"
     marker_dir = str(Path(marker).parent)
     server.shell(
         name=f"Write remote patch marker {patch_id}",

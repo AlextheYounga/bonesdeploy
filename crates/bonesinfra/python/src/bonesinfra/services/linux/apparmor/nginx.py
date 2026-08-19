@@ -20,7 +20,7 @@ def setup(ctx, paths, nginx_apparmor_network="network unix stream,"):
     )
 
     profile_name = f"bonesdeploy-{ctx.app.project_name}-nginx"
-    profile_path = f"/etc/apparmor.d/{profile_name}"
+    profile_path = paths["nginx_apparmor_profile"]
 
     render(
         "Deploy per-project nginx AppArmor profile",

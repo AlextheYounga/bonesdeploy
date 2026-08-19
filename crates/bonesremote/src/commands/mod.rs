@@ -1,7 +1,6 @@
 pub(crate) mod deploy;
 pub(crate) mod doctor;
 pub(crate) mod drop_failed_release;
-pub(crate) mod inspection;
 pub(crate) mod release;
 pub(crate) mod service;
 pub(crate) mod status;

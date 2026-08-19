@@ -4,9 +4,9 @@ use std::process::Command;
 
 use bonesdeploy_core::{config, paths};
 
-use crate::commands::inspection::accounts;
+use crate::git::{branch_exists, repository_has_refs};
+use crate::inspection::accounts;
 use crate::release::lifecycle::build::validate_build_cache;
-use crate::release::lifecycle::checkout::{branch_exists, repository_has_refs};
 use crate::release::lifecycle::load_site_config;
 use crate::runtime::docker;
 

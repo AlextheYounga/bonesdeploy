@@ -17,6 +17,7 @@ from bonesinfra.config.keys import (
     SERVICES,
     SSH_USER,
     SSL_ENABLED,
+    SUPPORTED_DATABASE_SERVICES,
     WEB_ROOT,
 )
 from bonesinfra.config.paths import DEFAULT_PROJECT_ROOT_PARENT, DEFAULT_REPO_PARENT, DeploymentPaths
@@ -223,9 +224,8 @@ def _strip_quotes(value: str) -> str:
 def _database_services(value: Any) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(service, str) for service in value):
         raise TypeError("SERVICES must be a comma-separated list")
-    supported = {"postgres", "mariadb", "mysql", "mongodb", "valkey", "redis"}
     services = tuple(value)
-    unsupported = set(services) - supported
+    unsupported = set(services) - SUPPORTED_DATABASE_SERVICES
     if unsupported:
         raise ValueError(f"unsupported database services: {', '.join(sorted(unsupported))}")
     if "mariadb" in services and "mysql" in services:

@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::Path;
+use std::process;
 
 use anyhow::Result;
 use bonesdeploy_core::config::validate_site_name;
@@ -93,6 +94,11 @@ pub(crate) fn process_matches(active: &DeploymentRecord) -> bool {
 pub(crate) fn process_start_ticks(stat: &str) -> Option<u64> {
     let (_, fields) = stat.rsplit_once(") ")?;
     fields.split_whitespace().nth(19)?.parse().ok()
+}
+
+pub(crate) fn current_process_start_ticks() -> Option<u64> {
+    let stat = fs::read_to_string(Path::new("/proc").join(process::id().to_string()).join("stat")).ok()?;
+    process_start_ticks(&stat)
 }
 
 #[cfg(test)]

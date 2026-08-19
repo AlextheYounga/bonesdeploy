@@ -15,7 +15,7 @@ def render_profile(
     apparmor_network="network unix stream,",
 ):
     profile_name = f"bonesdeploy-{ctx.app.project_name}-{runtime}"
-    profile_path = f"/etc/apparmor.d/{profile_name}"
+    profile_path = ctx.paths.apparmor_profile(runtime)
 
     render(
         f"Deploy {runtime} AppArmor profile",

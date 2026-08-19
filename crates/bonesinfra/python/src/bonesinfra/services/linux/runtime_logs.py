@@ -1,6 +1,6 @@
 from pyinfra.operations import files
 
-BONESDEPLOY_LOG_ROOT = "/var/log/bonesdeploy"
+from bonesinfra.config.paths import BONESDEPLOY_LOG_ROOT
 
 
 def ensure(ctx):

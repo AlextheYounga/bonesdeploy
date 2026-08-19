@@ -7,7 +7,7 @@ use bonesdeploy_core::config::validate_site_name;
 use bonesdeploy_core::paths;
 use serde::Serialize;
 
-use crate::commands::inspection::systemd;
+use crate::inspection::systemd;
 use crate::release::state as release_state;
 
 #[derive(Debug, Serialize)]

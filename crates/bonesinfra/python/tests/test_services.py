@@ -6,7 +6,8 @@ import pytest
 import bonesinfra.services.runtime.mongodb as mongodb_mod
 import bonesinfra.services.runtime.postgres as postgres_mod
 import bonesinfra.services.runtime.valkey as valkey_mod
-from bonesinfra.services.runtime import get_service
+from bonesinfra.config.keys import SUPPORTED_DATABASE_SERVICES
+from bonesinfra.services.runtime import SERVICES, get_service
 from bonesinfra.services.runtime.base import RuntimeService
 
 
@@ -26,6 +27,10 @@ def test_all_expected_services_are_registered():
     for name in ("postgres", "mysql", "mariadb", "mongodb", "valkey", "redis"):
         svc = get_service(name)
         assert callable(getattr(svc, "provision", None)), f"{name}: missing provision()"
+
+
+def test_service_registry_matches_configuration_vocabulary():
+    assert set(SERVICES) == SUPPORTED_DATABASE_SERVICES
 
 
 def test_unknown_service_raises_without_exiting_process():

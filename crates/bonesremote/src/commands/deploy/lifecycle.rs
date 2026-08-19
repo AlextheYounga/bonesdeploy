@@ -4,6 +4,7 @@ use anyhow::Result;
 use bonesdeploy_core::config::build_user_for;
 
 use crate::commands::ensure_site_idle;
+use crate::git;
 use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::lifecycle;
@@ -22,7 +23,7 @@ pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
 
     let target_revision = revision.map_or_else(|| mutation.config().branch.clone(), ToOwned::to_owned);
     let repo_path = PathBuf::from(&mutation.config().repo_path);
-    let revision_commit = lifecycle::checkout::resolve_revision_commit(&repo_path, &target_revision)?;
+    let revision_commit = git::resolve_revision_commit(&repo_path, &target_revision)?;
     let snapshot = lifecycle::DeploymentSnapshot::new(&mutation, revision_commit, PathBuf::new());
     DeploymentLifecycleCoordinator::new(&mutation, snapshot).run()
 }

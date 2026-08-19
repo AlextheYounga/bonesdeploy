@@ -68,7 +68,7 @@ owner is canonical. Bypassing it creates a competing abstraction.
 | Per-site persisted state | `SiteState` + `state/` store | Read/write through the store API | Touch state files directly |
 | Infrastructure migrations | Python `Patch` registry (`patches/registry.py`) | Add a registered, version-gated patch | Scatter one-off version checks throughout code |
 | SSH connectivity | `infra/ssh.rs` (Rust), `pyinfra/runner.py` (Python) | Use existing session helpers | Open raw SSH channels |
-| Git operations | `infra/git.rs` | Use existing git wrappers | Shell out to git ad hoc |
+| Git operations | `infra/git.rs` for local repositories; `bonesremote/src/git.rs` for server bare repositories | Use the existing boundary for the process in use | Shell out to git ad hoc |
 | GPG / secrets | `commands/secrets/gpg.rs` | Use the isolated keyring + helpers | Import GPG state from elsewhere |
 | Doctor / health checks | `commands/doctor/` (both binaries) | Add a check module under the doctor tree | Probe system state from deploy/init commands |
 | Embedded static assets | `rust-embed` asset modules | Add to the appropriate asset collection | Check in loose files that the binary must read at runtime |

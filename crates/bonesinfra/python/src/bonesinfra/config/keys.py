@@ -14,6 +14,8 @@ SSL_ENABLED = "SSL_ENABLED"
 TEMPLATE = "TEMPLATE"
 WEB_ROOT = "WEB_ROOT"
 
+SUPPORTED_DATABASE_SERVICES = frozenset({"postgres", "mariadb", "mysql", "mongodb", "valkey", "redis"})
+
 APP_KEYS = frozenset(
     {
         BRANCH,

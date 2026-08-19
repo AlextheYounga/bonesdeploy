@@ -1,5 +1,8 @@
 mod cli;
 mod commands;
+mod git;
+#[path = "commands/inspection/mod.rs"]
+mod inspection;
 mod privileges;
 mod release;
 mod runtime;
