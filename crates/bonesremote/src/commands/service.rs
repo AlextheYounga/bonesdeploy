@@ -1,4 +1,3 @@
-use std::collections::BTreeSet;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
@@ -6,6 +5,7 @@ use std::time::Duration;
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::paths;
 
+use crate::commands::inspection::systemd;
 use crate::privileges;
 use crate::release::SiteMutation;
 
@@ -14,7 +14,7 @@ pub fn run(mutation: &SiteMutation) -> Result<()> {
 
     let cfg = mutation.config();
     let target_name = target_name_for_registered_site(mutation.site(), &cfg.project_name)?;
-    let services = target_services(&target_name)?;
+    let services = systemd::required_services(&target_name)?;
     if services.is_empty() {
         bail!("Site target {target_name} has no registered services");
     }
@@ -44,7 +44,7 @@ fn verify_units_active(target: &str, services: &[String]) -> Result<()> {
     // or `systemctl --wait` if a longer settle window becomes necessary.
     thread::sleep(Duration::from_secs(1));
 
-    let failed: Vec<&str> = services.iter().map(String::as_str).filter(|unit| !is_active(unit)).collect();
+    let failed: Vec<&str> = services.iter().map(String::as_str).filter(|unit| !systemd::is_active(unit)).collect();
 
     if failed.is_empty() {
         return Ok(());
@@ -52,10 +52,6 @@ fn verify_units_active(target: &str, services: &[String]) -> Result<()> {
 
     let names = failed.join(", ");
     bail!("Restart of {target} reported success, but these units are not active: {names}\n{}", journal_output(&failed));
-}
-
-fn is_active(unit: &str) -> bool {
-    Command::new("systemctl").args(["is-active", "--quiet", "--", unit]).status().is_ok_and(|status| status.success())
 }
 
 fn journal_output(units: &[&str]) -> String {
@@ -70,18 +66,6 @@ fn journal_output(units: &[&str]) -> String {
     }
 }
 
-fn target_services(target: &str) -> Result<Vec<String>> {
-    let output = Command::new("systemctl")
-        .args(["show", "--property=Requires", "--value", "--no-pager", "--", target])
-        .output()
-        .with_context(|| format!("Failed to inspect {target}"))?;
-    if !output.status.success() {
-        bail!("Failed to inspect {target}");
-    }
-
-    Ok(parse_target_services(&String::from_utf8_lossy(&output.stdout)))
-}
-
 fn restart_args(target: &str) -> [&str; 3] {
     ["restart", "--", target]
 }
@@ -93,25 +77,9 @@ fn target_name_for_registered_site(site: &str, registered_site: &str) -> Result<
     Ok(paths::site_target_name(site))
 }
 
-fn parse_target_services(output: &str) -> Vec<String> {
-    output
-        .split_whitespace()
-        .filter(|name| name.ends_with(paths::SYSTEMD_SERVICE_SUFFIX))
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{parse_target_services, target_name_for_registered_site};
-
-    #[test]
-    fn target_dependencies_include_only_services() {
-        let names = "nexttest-nginx.service nexttest-next.service nexttest.target";
-        assert_eq!(parse_target_services(names), ["nexttest-next.service", "nexttest-nginx.service"]);
-    }
+    use super::target_name_for_registered_site;
 
     #[test]
     fn site_cannot_restart_another_projects_target() {

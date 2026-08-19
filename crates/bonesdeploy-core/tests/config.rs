@@ -1,11 +1,14 @@
 //! Public config parsing and defaults of the `bonesdeploy-core` library.
 
 use anyhow::Result;
+use bonesdeploy_core::config;
 use bonesdeploy_core::config::BUILD_TIMEOUT_SECONDS_DEFAULT;
 use bonesdeploy_core::config::{
     App, Bones, Build, Runtime, RuntimeBackend, build_timeout_seconds, validate_host, validate_runtime,
 };
 use std::collections::BTreeMap;
+use std::fs;
+use tempfile::tempdir;
 use toml::de::Error;
 use toml::map::Map;
 
@@ -77,5 +80,16 @@ fn build_timeout_of_zero_disables_the_timeout() {
 fn build_timeout_parses_from_toml() -> Result<()> {
     let config: Bones = toml::from_str("[build]\ntimeout_seconds = 120\n")?;
     assert_eq!(build_timeout_seconds(&config), Some(120));
+    Ok(())
+}
+
+#[test]
+fn dotenv_rejects_invalid_and_duplicate_keys() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    fs::write(&path, "PROJECT_NAME=atlas\nBAD-KEY=value\n")?;
+    assert!(config::load(&path).is_err());
+    fs::write(&path, "PROJECT_NAME=atlas\nPROJECT_NAME=other\n")?;
+    assert!(config::load(&path).is_err());
     Ok(())
 }

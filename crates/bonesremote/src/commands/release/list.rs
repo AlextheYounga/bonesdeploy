@@ -3,10 +3,10 @@ use std::path::Path;
 
 use anyhow::Result;
 use bonesdeploy_core::config::validate_site_name;
-use bonesdeploy_core::paths;
 use serde::Serialize;
 
 use crate::privileges;
+use crate::release::lifecycle;
 use crate::release::state::{self as release_state, DeploymentPhase, DeploymentRecord};
 
 #[derive(Serialize)]
@@ -27,7 +27,10 @@ struct Release {
 pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release list")?;
     validate_site_name(site)?;
-    let project_root = paths::default_project_root_for(site);
+    // Listing must remain available while deploy owns the mutation lock, so it
+    // intentionally uses validated configuration plus lock-free inspection.
+    let config = lifecycle::load_site_config(site)?;
+    let project_root = &config.project_root;
     let current = release_state::current_release_name(&project_root).ok();
     let active = release_state::read_active_deployment(site)?;
     let staged = release_state::read_staged_release(site).ok();
@@ -46,13 +49,13 @@ fn release(name: &str, current: Option<&str>, active: Option<&DeploymentRecord>,
         return Release { name: name.to_string(), status: String::from("active"), phase: None, started_at: None };
     }
 
-    if let Some(active) = active.filter(|active| active.release == name) {
+    if let Some(active) = active.filter(|active| active.release() == name) {
         let running = process_matches(active);
         return Release {
             name: name.to_string(),
-            status: if running { phase_status(&active.phase) } else { String::from("interrupted") },
-            phase: Some(active.phase.clone()),
-            started_at: Some(active.started_at.clone()),
+            status: if running { phase_status(active.phase()) } else { String::from("interrupted") },
+            phase: Some(active.phase().clone()),
+            started_at: Some(active.started_at().to_string()),
         };
     }
 
@@ -80,11 +83,11 @@ fn phase_status(phase: &DeploymentPhase) -> String {
 }
 
 pub(crate) fn process_matches(active: &DeploymentRecord) -> bool {
-    let stat = Path::new("/proc").join(active.pid.to_string()).join("stat");
+    let stat = Path::new("/proc").join(active.pid().to_string()).join("stat");
     fs::read_to_string(stat)
         .ok()
         .and_then(|content| process_start_ticks(&content))
-        .is_some_and(|ticks| ticks == active.process_start_ticks)
+        .is_some_and(|ticks| ticks == active.process_start_ticks())
 }
 
 pub(crate) fn process_start_ticks(stat: &str) -> Option<u64> {

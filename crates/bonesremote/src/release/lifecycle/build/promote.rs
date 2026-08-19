@@ -4,11 +4,12 @@ use anyhow::{Context, Result};
 use bonesdeploy_core::config::{runtime_group_for, runtime_user_for};
 
 use super::{release_directory, staged_release_name, tree};
+use crate::release::SiteMutation;
 use crate::release::lifecycle::DeploymentSnapshot;
 
-pub(super) fn run(snapshot: &DeploymentSnapshot, context: &Path) -> Result<PathBuf> {
-    let release_name = staged_release_name(&snapshot.site)?;
-    let release_dir = release_directory(&snapshot.project_root, &release_name);
+pub(super) fn run(mutation: &SiteMutation, snapshot: &DeploymentSnapshot, context: &Path) -> Result<PathBuf> {
+    let release_name = staged_release_name(mutation)?;
+    let release_dir = release_directory(mutation, &release_name);
     let runtime_user = runtime_user_for(&snapshot.config.project_name);
     let runtime_group = runtime_group_for(&snapshot.config.project_name);
     tree::prepare_release_tree(context, &release_dir, &runtime_user, &runtime_group)
@@ -18,9 +19,9 @@ pub(super) fn run(snapshot: &DeploymentSnapshot, context: &Path) -> Result<PathB
     Ok(release_dir)
 }
 
-pub(super) fn finalize(snapshot: &DeploymentSnapshot) -> Result<()> {
-    let release_name = staged_release_name(&snapshot.site)?;
-    let release_dir = release_directory(&snapshot.project_root, &release_name);
+pub(super) fn finalize(mutation: &SiteMutation, snapshot: &DeploymentSnapshot) -> Result<()> {
+    let release_name = staged_release_name(mutation)?;
+    let release_dir = release_directory(mutation, &release_name);
     let runtime_group = runtime_group_for(&snapshot.config.project_name);
 
     tree::seal_release_tree(&release_dir, &runtime_group)

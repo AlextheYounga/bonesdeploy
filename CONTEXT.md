@@ -404,7 +404,7 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 3. `bonesremote deploy` orchestrates the full pipeline:
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
-    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed and injected into the container via `--env`.   - **release_promote** — Copy safe artifacts into a runtime-owned candidate release
+    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed into a mode-0600 temporary env file and passed to Podman with `--env-file`, keeping its values out of process argv.   - **release_promote** — Copy safe artifacts into a runtime-owned candidate release
    - **wire_shared** — Symlink declared shared paths into the candidate release
    - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
    - **release_finalize** — Seal the prepared release as `root:<site>`
@@ -431,7 +431,7 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
    - This command orchestrates the full pipeline:
        - **stage_release** — Create timestamped release state
         - **release_checkout** — Export source from the bare repo into temporary context
-        - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed and injected into the container via `--env`.      - **release_promote** — Copy safe artifacts into a runtime-owned candidate at `releases/<release>`
+        - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed into a mode-0600 temporary env file and passed to Podman with `--env-file`, keeping its values out of process argv.      - **release_promote** — Copy safe artifacts into a runtime-owned candidate at `releases/<release>`
        - **wire_shared** — Link shared runtime paths
 
 ### Config Repo: `bonesdeploy push` (control-plane update)

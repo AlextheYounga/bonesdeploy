@@ -106,3 +106,33 @@ def test_dotenv_parser_rejects_malformed_entries(tmp_path):
 
     with pytest.raises(ValueError, match="line 2"):
         DeployContext.from_files(str(path))
+
+
+@pytest.mark.parametrize("entry", ["1BAD=value", "BAD-KEY=value", "=value"])
+def test_dotenv_parser_rejects_invalid_keys(tmp_path, entry):
+    with pytest.raises(ValueError, match="line 1"):
+        DeployContext.from_files(_write_config(tmp_path, entry + "\n"))
+
+
+def test_dotenv_parser_rejects_duplicate_keys(tmp_path):
+    with pytest.raises(ValueError, match="duplicate"):
+        DeployContext.from_files(_write_config(tmp_path, "HOST=other.example.com\n"))
+
+
+def test_dotenv_parser_preserves_quote_semantics(tmp_path):
+    path = tmp_path / ".env"
+    path.write_text("PROJECT_NAME='lawsnipe'\nCUSTOM=\"quoted value\"\nRAW='one\"two'\n")
+
+    ctx = DeployContext.from_files(str(path))
+
+    assert ctx.app.project_name == "lawsnipe"
+    assert ctx.runtime.data == {"CUSTOM": "quoted value", "RAW": 'one"two'}
+
+
+@pytest.mark.parametrize("project_name", ["", "Demo", "demo_name", "network", "demo;rm"])
+def test_project_identity_matches_remote_validation(tmp_path, project_name):
+    path = tmp_path / ".env"
+    path.write_text(f"PROJECT_NAME={project_name}\n")
+
+    with pytest.raises(ValueError, match="Invalid project name"):
+        DeployContext.from_files(str(path))

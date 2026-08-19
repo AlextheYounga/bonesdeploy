@@ -1,12 +1,14 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 
 use anyhow::Result;
 use bonesdeploy_core::config::validate_site_name;
 use bonesdeploy_core::paths;
 use serde::Serialize;
+
+use crate::commands::inspection::systemd;
+use crate::release::state as release_state;
 
 #[derive(Debug, Serialize)]
 struct Report {
@@ -38,22 +40,14 @@ pub fn run(site: &str) -> Result<()> {
 
 fn build_report(site: &str) -> Report {
     let project_root = paths::default_project_root_for(site);
-    let current = Path::new(&project_root).join(paths::CURRENT_LINK);
     let nginx_site_available =
         Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{site}.conf")).display().to_string();
 
     Report {
-        current_release: current_release(&current),
+        current_release: release_state::current_release_name(&project_root).unwrap_or_else(|_| String::from("unknown")),
         ssl: ssl_status(&nginx_site_available),
         services: services(site),
     }
-}
-
-fn current_release(current_path: &Path) -> String {
-    fs::read_link(current_path).map_or_else(
-        |_| String::from("unknown"),
-        |path| path.file_name().map_or_else(|| String::from("unknown"), |name| name.to_string_lossy().to_string()),
-    )
 }
 
 fn ssl_status(nginx_config_path: &str) -> SslStatus {
@@ -91,40 +85,15 @@ fn services(project_name: &str) -> Vec<ServiceStatus> {
     }
 
     for service in services.values_mut() {
-        service.state = systemctl_output(["is-active", service.name.as_str()]);
-        service.enabled = systemctl_output(["is-enabled", service.name.as_str()]);
+        service.state = systemd::unit_state(service.name.as_str(), "is-active");
+        service.enabled = systemd::unit_state(service.name.as_str(), "is-enabled");
     }
 
     services.into_values().collect()
 }
 
 fn target_service_names(target: &str) -> Vec<String> {
-    let output =
-        Command::new("systemctl").args(["show", "--property=Requires", "--value", "--no-pager", "--", target]).output();
-    match output {
-        Ok(output) if output.status.success() => parse_target_units(&String::from_utf8_lossy(&output.stdout)),
-        _ => Vec::new(),
-    }
-}
-
-fn systemctl_output<const N: usize>(args: [&str; N]) -> String {
-    Command::new("systemctl").args(args).output().map_or_else(
-        |_| String::from("unknown"),
-        |output| {
-            let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if value.is_empty() { String::from("unknown") } else { value }
-        },
-    )
-}
-
-fn parse_target_units(output: &str) -> Vec<String> {
-    output
-        .split_whitespace()
-        .filter(|name| name.ends_with(paths::SYSTEMD_SERVICE_SUFFIX))
-        .map(str::to_owned)
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .collect()
+    systemd::required_services(target).unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -133,14 +102,7 @@ mod tests {
 
     use anyhow::Result;
 
-    use super::{parse_target_units, ssl_status};
-
-    #[test]
-    fn parses_registered_units_from_target_properties() {
-        let output = "atlas-nginx.service atlas-worker.service\natlas-worker.service";
-
-        assert_eq!(parse_target_units(output), vec!["atlas-nginx.service", "atlas-worker.service"]);
-    }
+    use super::ssl_status;
 
     #[test]
     fn reads_ssl_domain_from_conventionally_named_nginx_config() -> Result<()> {

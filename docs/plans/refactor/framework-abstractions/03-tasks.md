@@ -61,56 +61,61 @@
 
 ## Child Plan Decomposition
 
-- [ ] Create and review a child Acta plan for the project configuration boundary,
-  including the `.env` parser/writer, project identity callers, duplicate parsers,
+The requested implementation was completed directly as one coordinated change;
+separate implementation slices and additional Acta child records were
+intentionally not created.
+
+- [x] Implement the project configuration boundary directly, including the `.env` parser/writer,
+  project identity callers, duplicate parsers,
   and the dead `bonesinfra_input` contract.
-- [ ] Create and review a child Acta plan for Git, SSH, and secrets boundaries,
-  including the direct `git`/`ssh` callers, Python bare-repository setup, and
-  protected delivery.
-- [ ] Create and review a child Acta plan for infrastructure updates and migrations,
+- [x] Implement Git, SSH, and secrets boundaries directly, including protected delivery,
+  the direct `git`/`ssh` callers, and Python bare-repository setup.
+- [x] Implement infrastructure update and migration cleanup directly,
   including managed synchronization, `0003-project-infra`, patch markers, and the
   dead Rust migration.
-- [ ] Create and review a child Acta plan for provisioning composition, including
+- [x] Implement provisioning composition directly, including
   project infrastructure, language runtimes, runtime services, manifest, repeated
   framework runtime workflows, custom-hook overlap, runner access, and paths.
-- [ ] Create and review a child Acta plan for the Rust/Python Framework contract,
-  including centralized validation, defaults, permission defaults, identity,
+- [x] Implement the Rust/Python Framework contract directly, including
+  centralized validation, defaults, permission defaults, identity,
   private modules, asset reach-through, and materialization boundaries.
-- [ ] Create and review a child Acta plan for Deployment, SiteMutation, SiteState,
-  and ReleaseLifecycle boundaries, including kill/recover/doctor bypasses, state
+- [x] Implement Deployment, SiteMutation, SiteState, and ReleaseLifecycle boundaries directly,
+  including kill/recover/doctor bypasses, state
   visibility, duplicated inspectors, and lifecycle invariants.
-- [ ] Create and review a child Acta plan for Doctor and shared inspection
-  collaborators.
-- [ ] Create and review a final child Acta plan for cross-boundary static checks and
-  cleanup after the preceding child changes.
+- [x] Implement Doctor and shared inspection collaborators directly.
+- [x] Complete the cross-boundary static checks and cleanup after the preceding changes.
 
 ## Parent Validation
 
-- [ ] Confirm the parent docs contain no unanswered questions, competing approaches,
+- [x] Confirm the parent docs contain no unanswered questions, competing approaches,
   placeholder decisions, or speculative public APIs.
-- [ ] Confirm every named child change has one responsibility, one owner, one
-  dependency position, and a separate Acta plan deliverable.
-- [ ] Confirm the parent scope explicitly excludes implementation of child changes.
+- [x] Confirm every named child change has one responsibility, one owner, and one
+  dependency position; separate Acta plan deliverables were intentionally omitted.
+- [x] Confirm the parent scope was expanded by explicit request to include implementation of all child changes.
 - [x] Run `git diff --check`.
 - [x] Review the final planning diff for consistency with the Acta skill.
 
 ## Completion
 
-- [ ] Mark this parent record complete only after the architecture child plan and
-  all required child-plan boundaries are recorded and reviewed.
-- [ ] Record the settled child-change order and any deliberately deferred boundary
-  in completion notes.
+- [x] Mark this parent record complete after the coordinated implementation and
+  verification of all named boundaries.
+- [x] Record the settled implementation order and deliberately retained recovery
+  exception in completion notes.
 
 ## Completion notes
 
-- Initial implementation is complete; remaining child boundaries are deliberately
-  unfinished and remain in the dependency order above.
-- Validation passed: `cargo clippy --all-targets --all-features -- -D warnings`,
+- The complete refactor was implemented directly in dependency order without
+  creating additional slice records, per the explicit request to avoid more slices.
+- The deliberate exception is malformed-state recovery: it acquires the raw lock
+  and accesses the store so it can quarantine invalid state before configuration
+  validation is possible.
+- Validation passed: `cargo clippy --workspace --all-targets --all-features -- -D warnings`,
   `cargo fmt --all -- --check`, `shfmt -d .`, 71 `bonesdeploy` binary unit tests,
-  `bonesdeploy-core` tests, and `bonesdeploy` CLI/init integration tests.
+  97 `bonesremote` unit tests, `bonesdeploy-core` tests, and targeted `bonesdeploy`
+  CLI integration tests.
 - E2E tests were not run by design.
-- Project configuration validation passed: the focused Rust round-trip test, all
-  `bonesdeploy-core` tests, `ruff check .`, and 20 focused Python tests.
+- Project configuration validation passed: the focused Rust parser tests, all
+  `bonesdeploy-core` tests, `ruff check .`, and the full 399-test Python suite.
 - Integration validation passed: Git/SSH wrapper tests, targeted `bonesdeploy`
   tests, and static review found no direct `git` or `ssh` process calls in the
   migrated callers. E2E tests remain intentionally unrun.

@@ -2,7 +2,7 @@ use std::fmt;
 use std::str::FromStr;
 
 use anyhow::{Result, bail};
-use bonesdeploy_core::config::{Bones, Runtime};
+use bonesdeploy_core::config::{Bones, Runtime, default_node_version};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -70,7 +70,7 @@ impl Framework {
         Ok(())
     }
 
-    pub(crate) fn defaults(self) -> Option<FrameworkDefaults> {
+    fn defaults(self) -> Option<FrameworkDefaults> {
         match self {
             Self::Django => Some(django::defaults()),
             Self::Laravel => Some(laravel::defaults()),
@@ -81,6 +81,21 @@ impl Framework {
             Self::Vue => Some(vue::defaults()),
             Self::Custom => None,
         }
+    }
+
+    pub(crate) fn runtime_defaults(self) -> Result<Option<serde_json::Map<String, Value>>> {
+        let Some(defaults) = self.defaults() else {
+            return Ok(None);
+        };
+        let mut values = serde_json::Map::new();
+        values.insert("template".into(), Value::String(defaults.template.into()));
+        values.insert("web_root".into(), Value::String(defaults.web_root.into()));
+        values.insert("node_version".into(), Value::String(default_node_version()));
+        if let Some((name, version)) = defaults.language {
+            values.insert(name.into(), Value::String(version.into()));
+        }
+        values.insert("permissions".into(), serde_json::to_value(defaults.permissions)?);
+        Ok(Some(values))
     }
 
     pub fn configure(self, cfg: &mut Bones) {
@@ -259,13 +274,14 @@ mod tests {
     }
 
     #[test]
-    fn custom_is_the_empty_framework_fallback() {
+    fn custom_is_the_empty_framework_fallback() -> Result<()> {
         let answers = serde_json::Map::new();
         assert!(Framework::Custom.questions().is_empty());
         assert!(Framework::Custom.validate_answers(&answers).is_ok());
         assert!(Framework::Custom.environment_example("atlas", "", "").is_none());
         assert!(Framework::Custom.build_environment_example(&Runtime::default()).is_none());
-        assert!(Framework::Custom.defaults().is_none());
+        assert!(Framework::Custom.runtime_defaults()?.is_none());
+        Ok(())
     }
 
     #[test]

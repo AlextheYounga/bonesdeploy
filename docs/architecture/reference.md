@@ -692,10 +692,11 @@ BonesInfra owns provisioning configuration and receives only the explicit
 `--env-file` path. Local Git and SSH callers use their existing integration
 boundaries.
 
-### Framework and deployment side doors
-Framework identity, defaults, and assets cross Rust and Python boundaries, while
-release commands can reach state and mutation details directly. These are tracked
-for the Framework and Deployment child changes.
+### Framework and deployment boundaries
+Framework identity, defaults, and assets are selected through the Rust framework
+front door before materialization. Deployment stages receive a validated
+`SiteMutation`; lock-free readers use the state store's immutable snapshot, while
+malformed-state recovery remains the explicit lock-and-quarantine exception.
 
 ### Limited bonesremote integration test coverage
 The `bonesremote` integration test suite (`tests/cli.rs`) only validates CLI argument parsing. Most behavioral guarantees are validated through unit tests (state persistence, phase transitions, idle checks, symlink atomicity). There are no end-to-end deployment pipeline tests in the Rust test suite — those live in `e2e/`.

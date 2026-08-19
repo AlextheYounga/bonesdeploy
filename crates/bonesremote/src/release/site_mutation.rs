@@ -1,8 +1,10 @@
+use std::path::PathBuf;
+
 use anyhow::Result;
 use bonesdeploy_core::config::Bones;
 
 use crate::release::lifecycle;
-use crate::release::state::DeploymentLock;
+use crate::release::state::{self, DeploymentLock, DeploymentRecord};
 
 /// A site-scoped mutation guard: the deployment lock plus the validated site
 /// configuration.
@@ -56,5 +58,49 @@ impl SiteMutation {
 
     pub(crate) fn config(&self) -> &Bones {
         &self.config
+    }
+
+    pub(crate) fn active(&self) -> Result<Option<DeploymentRecord>> {
+        Ok(state::read_site_state(self.site())?.active().cloned())
+    }
+
+    pub(crate) fn state(&self) -> Result<state::store::SiteState> {
+        state::read_site_state(self.site())
+    }
+
+    pub(crate) fn set_active(&self, deployment: &DeploymentRecord) -> Result<()> {
+        state::write_active_deployment(self.site(), deployment)
+    }
+
+    pub(crate) fn clear_active(&self) -> Result<()> {
+        state::clear_active_deployment(self.site())
+    }
+
+    pub(crate) fn staged_release(&self) -> Result<Option<String>> {
+        state::staged_release(self.site())
+    }
+
+    pub(crate) fn required_staged_release(&self) -> Result<String> {
+        state::read_staged_release(self.site())
+    }
+
+    pub(crate) fn release_dir(&self, release: &str) -> PathBuf {
+        state::release_dir(&self.config.project_root, release)
+    }
+
+    pub(crate) fn shared_dir(&self) -> PathBuf {
+        state::shared_dir(&self.config.project_root)
+    }
+
+    pub(crate) fn current_release_name(&self) -> Result<String> {
+        state::current_release_name(&self.config.project_root)
+    }
+
+    pub(crate) fn clear_staged_release(&self) -> Result<()> {
+        state::clear_staged_release(self.site())
+    }
+
+    pub(crate) fn set_staged_release(&self, release: &str) -> Result<()> {
+        state::write_staged_release(self.site(), release)
     }
 }

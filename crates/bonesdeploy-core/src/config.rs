@@ -322,6 +322,11 @@ pub fn load(path: &Path) -> Result<Bones> {
     Ok(config)
 }
 
+/// Validates flat dotenv content without constructing a configuration.
+pub fn validate_dotenv(content: &str) -> Result<()> {
+    parse_dotenv(content).map(|_| ())
+}
+
 /// Writes the flat project environment consumed by Rust, BonesInfra, and the
 /// remote runtime loader.
 ///
@@ -332,37 +337,29 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
         RuntimeBackend::Native => "native",
         RuntimeBackend::Docker => "docker",
     };
-    let content = format!(
-        "{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n{}={}\n",
-        project_env::PROJECT_NAME,
-        config.project_name,
-        project_env::REMOTE_NAME,
-        config.remote_name,
-        project_env::HOST,
-        config.host,
-        project_env::PORT,
-        config.port,
-        project_env::SSH_USER,
-        config.ssh_user,
-        project_env::BRANCH,
-        config.branch,
-        project_env::DOMAIN,
-        config.domain,
-        project_env::PREVIEW_DOMAIN,
-        config.preview_domain,
-        project_env::EMAIL,
-        config.email,
-        project_env::SSL_ENABLED,
-        config.ssl_enabled,
-        project_env::TEMPLATE,
-        config.runtime.template,
-        project_env::RUNTIME_BACKEND,
-        runtime_backend,
-        project_env::WEB_ROOT,
-        config.runtime.web_root,
-        project_env::SERVICES,
-        config.services.services.join(","),
-    );
+    let values = [
+        (project_env::PROJECT_NAME, config.project_name.as_str()),
+        (project_env::REMOTE_NAME, config.remote_name.as_str()),
+        (project_env::HOST, config.host.as_str()),
+        (project_env::PORT, config.port.as_str()),
+        (project_env::SSH_USER, config.ssh_user.as_str()),
+        (project_env::BRANCH, config.branch.as_str()),
+        (project_env::DOMAIN, config.domain.as_str()),
+        (project_env::PREVIEW_DOMAIN, config.preview_domain.as_str()),
+        (project_env::EMAIL, config.email.as_str()),
+        (project_env::SSL_ENABLED, if config.ssl_enabled { "true" } else { "false" }),
+        (project_env::TEMPLATE, config.runtime.template.as_str()),
+        (project_env::RUNTIME_BACKEND, runtime_backend),
+        (project_env::WEB_ROOT, config.runtime.web_root.as_str()),
+        (project_env::SERVICES, &config.services.services.join(",")),
+    ];
+    let mut content = String::new();
+    for (key, value) in values {
+        if value.contains('\n') || value.contains('\r') {
+            bail!(".env values must not contain newlines");
+        }
+        content.push_str(&format!("{key}={}\n", format_dotenv_value(value)));
+    }
     fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
@@ -378,10 +375,39 @@ fn parse_dotenv(content: &str) -> Result<BTreeMap<String, String>> {
             bail!("Invalid .env entry on line {}", line_number + 1);
         };
         let key = key.trim();
-        if key.is_empty() {
+        if !is_valid_env_name(key) {
             bail!("Invalid .env key on line {}", line_number + 1);
         }
-        values.insert(key.to_string(), value.trim().trim_matches('"').to_string());
+        if values.contains_key(key) {
+            bail!("Duplicate .env key `{key}` on line {}", line_number + 1);
+        }
+        values.insert(key.to_string(), strip_quotes(value.trim()).to_string());
     }
     Ok(values)
+}
+
+fn is_valid_env_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else { return false };
+    (first.is_ascii_alphabetic() || first == '_') && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+fn strip_quotes(value: &str) -> &str {
+    let bytes = value.as_bytes();
+    if bytes.len() >= 2
+        && ((bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"')
+            || (bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\''))
+    {
+        &value[1..value.len() - 1]
+    } else {
+        value
+    }
+}
+
+fn format_dotenv_value(value: &str) -> String {
+    if value.trim() != value || value.starts_with(['"', '\'']) || value.ends_with(['"', '\'']) {
+        format!("\"{value}\"")
+    } else {
+        value.to_string()
+    }
 }

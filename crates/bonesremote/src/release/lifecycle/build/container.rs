@@ -1,10 +1,13 @@
-use std::fs;
-use std::path::Path;
-use std::process::{Command, ExitStatus, Stdio};
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::os::unix::fs::OpenOptionsExt;
+use std::path::{Path, PathBuf};
+use std::process::{self, Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, bail};
 
 use super::build_user::{BuildScriptEnv, build_script_command, build_user_command, build_user_control_command};
+use super::ownership;
 use crate::release::output;
 
 const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
@@ -24,6 +27,7 @@ pub(super) struct BuildContainer<'a> {
     env: &'a BuildScriptEnv<'a>,
     source_root: &'a Path,
     name: String,
+    build_env_file: Option<PathBuf>,
     removed: bool,
 }
 
@@ -33,14 +37,29 @@ impl<'a> BuildContainer<'a> {
         remove_existing(source_root, env, &name)?;
         ensure_image(source_root, env, &name)?;
 
+        let build_env_file = write_build_env_file(source_root, env)?;
+        if let Err(error) = ownership::chown_tree_to_user(&build_env_file, env.build_user, env.build_group) {
+            fs::remove_file(&build_env_file).ok();
+            return Err(error);
+        }
         let mut command = service_command(env.build_user, &name);
-        configure_create(&mut command, source_root, env, &name);
-        let status = command.status().with_context(|| format!("Failed to start build container {name}"))?;
+        configure_create(
+            &mut command,
+            &ContainerCreate { source_root, env, container_name: &name, build_env_file: &build_env_file },
+        );
+        let status = match command.status().with_context(|| format!("Failed to start build container {name}")) {
+            Ok(status) => status,
+            Err(error) => {
+                fs::remove_file(&build_env_file).ok();
+                return Err(error);
+            }
+        };
         if !status.success() {
+            fs::remove_file(&build_env_file).ok();
             bail!("Failed to start build container {name}: {status}");
         }
 
-        let container = Self { env, source_root, name, removed: false };
+        let container = Self { env, source_root, name, build_env_file: Some(build_env_file), removed: false };
         container.copy_deployment_tree()?;
         Ok(container)
     }
@@ -74,7 +93,14 @@ impl<'a> BuildContainer<'a> {
             bail!("Failed to remove build container {}: {}", self.name, status);
         }
         self.removed = true;
+        self.remove_build_env_file();
         Ok(())
+    }
+
+    fn remove_build_env_file(&mut self) {
+        if let Some(path) = self.build_env_file.take() {
+            fs::remove_file(path).ok();
+        }
     }
 
     fn copy_deployment_tree(&self) -> Result<()> {
@@ -115,15 +141,23 @@ impl Drop for BuildContainer<'_> {
         let mut command = build_user_control_command(self.env.build_user);
         configure_remove(&mut command, self.source_root, &self.name);
         let _ = command.status();
+        self.remove_build_env_file();
         self.removed = true;
     }
 }
 
-fn configure_create(command: &mut Command, source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) {
-    let source_mount = format!("{}:/workspace/source", source_root.display());
-    let cache_mount = format!("{}:/workspace/cache:rw", env.build_cache_dir.display());
+struct ContainerCreate<'a> {
+    source_root: &'a Path,
+    env: &'a BuildScriptEnv<'a>,
+    container_name: &'a str,
+    build_env_file: &'a Path,
+}
+
+fn configure_create(command: &mut Command, create: &ContainerCreate<'_>) {
+    let source_mount = format!("{}:/workspace/source", create.source_root.display());
+    let cache_mount = format!("{}:/workspace/cache:rw", create.env.build_cache_dir.display());
     command
-        .current_dir(source_root)
+        .current_dir(create.source_root)
         .args(["podman", "run", "-d", "--pull=never"])
         .args([
             "--sdnotify=conmon",
@@ -132,30 +166,51 @@ fn configure_create(command: &mut Command, source_root: &Path, env: &BuildScript
             "--workdir=/workspace/source",
             "--name",
         ])
-        .arg(container_name)
+        .arg(create.container_name)
         .args([
             "--env",
-            &format!("PROJECT_NAME={}", env.project_name),
+            &format!("PROJECT_NAME={}", create.env.project_name),
             "--env",
             "PROJECT_ROOT=/workspace",
             "--env",
             "REPO_PATH=",
         ])
-        .args(["--env", &format!("WEB_ROOT={}", env.web_root), "--env", &format!("SERVICE_USER={}", env.project_name)]);
-
-    for (key, value) in env.build_env_vars {
-        if key != "BUILD_CACHE_DIR" {
-            command.args(["--env", &format!("{key}={value}")]);
-        }
-    }
+        .args([
+            "--env",
+            &format!("WEB_ROOT={}", create.env.web_root),
+            "--env",
+            &format!("SERVICE_USER={}", create.env.project_name),
+        ]);
 
     command
+        .args(["--env-file"])
+        .arg(create.build_env_file)
         .args(["--env", "BUILD_CACHE_DIR=/workspace/cache", "--volume"])
         .arg(source_mount)
         .args(["--volume"])
         .arg(cache_mount)
         .arg(BUILD_IMAGE)
         .args(["sleep", "infinity"]);
+}
+
+fn write_build_env_file(source_root: &Path, env: &BuildScriptEnv<'_>) -> Result<PathBuf> {
+    let path = source_root.join(format!(".env.build.{}", process::id()));
+    let mut file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(&path)
+        .with_context(|| format!("Failed to create protected build environment file {}", path.display()))?;
+
+    for (key, value) in env.build_env_vars {
+        if let Err(error) = writeln!(file, "{key}={value}")
+            .with_context(|| format!("Failed to write protected build environment file {}", path.display()))
+        {
+            fs::remove_file(&path).ok();
+            return Err(error);
+        }
+    }
+    Ok(path)
 }
 
 fn configure_exec(command: &mut Command, source_root: &Path, container_name: &str) {
@@ -223,5 +278,53 @@ fn ensure_image(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &s
             env.build_user
         ),
         _ => bail!("Failed to inspect build image for {container_name}: {status}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{env, fs, os::unix::fs::PermissionsExt, process};
+
+    use anyhow::Result;
+
+    use super::*;
+
+    #[test]
+    fn build_env_values_use_a_private_env_file_instead_of_command_arguments() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-build-env-file-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root)?;
+        let variables = vec![("PUBLIC_API_URL".to_string(), "https://example.test/private-value".to_string())];
+        let env = BuildScriptEnv {
+            project_name: "demo",
+            build_user: "demo-build",
+            build_group: "demo-build",
+            web_root: ".output/public",
+            deployment_dir: &root,
+            build_cache_dir: &root,
+            build_env_vars: &variables,
+            script_timeout_seconds: None,
+        };
+
+        let env_file = write_build_env_file(&root, &env)?;
+        let mut command = service_command(env.build_user, "bonesdeploy-build-demo");
+        let create = ContainerCreate {
+            source_root: &root,
+            env: &env,
+            container_name: "bonesdeploy-build-demo",
+            build_env_file: &env_file,
+        };
+        configure_create(&mut command, &create);
+        let arguments: Vec<_> = command.get_args().map(|argument| argument.to_string_lossy().into_owned()).collect();
+
+        let env_file_argument = env_file.to_string_lossy();
+        assert!(arguments.windows(2).any(|pair| pair[0] == "--env-file" && pair[1] == env_file_argument.as_ref()));
+        assert!(!arguments.iter().any(|argument| argument.contains("private-value")));
+        assert_eq!(fs::metadata(&env_file)?.permissions().mode() & 0o777, 0o600);
+        assert_eq!(fs::read_to_string(&env_file)?, "PUBLIC_API_URL=https://example.test/private-value\n");
+
+        fs::remove_file(env_file).ok();
+        fs::remove_dir_all(root).ok();
+        Ok(())
     }
 }

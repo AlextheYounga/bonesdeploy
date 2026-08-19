@@ -568,7 +568,9 @@ the deployment record.
 - Path constants are owned by `bonesdeploy-core::paths` (Rust) and mirrored by
   `DeploymentPaths` (Python). The two must agree.
 - Remote site state is owned exclusively by `bonesremote`. `bonesdeploy` never
-  reads or writes it directly.
+  reads or writes it directly. The only exception is `release recover`, which
+  must inspect and quarantine malformed state before a validated mutation can
+  exist.
 - Provisioning is owned by `bonesinfra`. Deployment execution is owned by
   `bonesremote`. The two never call each other.
 

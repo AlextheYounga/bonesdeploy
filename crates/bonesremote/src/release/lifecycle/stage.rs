@@ -11,13 +11,14 @@ use time::format_description::FormatItem;
 use time::macros::format_description;
 
 use crate::privileges;
+use crate::release::SiteMutation;
 use crate::release::state as release_state;
 
 const MAX_RELEASE_NAME_ATTEMPTS: u32 = 10;
 
 static RANDOM_FALLBACK_SEQUENCE: AtomicU32 = AtomicU32::new(0);
 
-pub fn run(snapshot: &super::DeploymentSnapshot) -> Result<()> {
+pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Result<()> {
     privileges::ensure_root("bonesremote release stage")?;
 
     let project_root = &snapshot.project_root;
@@ -27,7 +28,7 @@ pub fn run(snapshot: &super::DeploymentSnapshot) -> Result<()> {
 
     let release_name = create_unique_release_dir(&snapshot.project_root.to_string_lossy(), &snapshot.revision)?;
 
-    release_state::write_staged_release(&snapshot.site, &release_name)?;
+    mutation.set_staged_release(&release_name)?;
 
     println!("Staged release: {release_name}");
     Ok(())

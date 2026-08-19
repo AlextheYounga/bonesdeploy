@@ -33,10 +33,33 @@ def test_runtime_setup_uses_tcp_settings_for_tcp_applications(monkeypatch):
     ]
 
 
+def test_runtime_orchestrate_starts_services_after_provisioning(monkeypatch):
+    calls = []
+    ctx = SimpleNamespace(paths_dict={"runtime": "paths"})
+
+    monkeypatch.setattr(runtime, "setup", lambda *_args, **kwargs: calls.append(("setup", kwargs)))
+    monkeypatch.setattr(runtime, "start_services", lambda *_args: calls.append(("start", {})))
+
+    runtime.orchestrate(ctx, lambda current_ctx: calls.append(("provision", current_ctx)), uses_tcp=True)
+
+    assert [call[0] for call in calls] == ["setup", "provision", "start"]
+    assert calls[0][1] == {"uses_tcp": True}
+    assert calls[1][1] is ctx
+
+
 def test_generated_runtimes_include_host_lifecycle_operations():
-    assets = Path(__file__).parents[3] / "bonesdeploy" / "assets" / "frameworks"
-    for runtime_source in sorted(assets.glob("*/infra/runtime.py")):
+    frameworks = Path(__file__).parents[1] / "src" / "bonesinfra" / "frameworks"
+    for runtime_source in sorted(frameworks.glob("*/runtime.py")):
+        if runtime_source.parent.name == "custom":
+            continue
         source = runtime_source.read_text()
-        assert "runtime.setup(ctx" in source, runtime_source
-        assert "runtime.start_services(ctx)" in source, runtime_source
-        assert source.index("runtime.setup(ctx") < source.index("runtime.start_services(ctx)"), runtime_source
+        assert "runtime.orchestrate(ctx, provision" in source, runtime_source
+
+
+def test_generated_framework_runtimes_do_not_reach_through_to_project_hooks():
+    frameworks = Path(__file__).parents[1] / "src" / "bonesinfra" / "frameworks"
+    for runtime_source in sorted(frameworks.glob("*/runtime.py")):
+        if runtime_source.parent.name == "custom":
+            continue
+        source = runtime_source.read_text()
+        assert "custom.deploy(ctx)" not in source, runtime_source

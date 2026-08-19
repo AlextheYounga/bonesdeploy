@@ -6,7 +6,7 @@ use anyhow::{Context, Result, anyhow};
 use rust_embed::Embed;
 use serde_json::{Map, Value};
 
-use bonesdeploy_core::config::{Runtime, default_node_version, project_env};
+use bonesdeploy_core::config::Runtime;
 use bonesdeploy_core::paths;
 
 use super::{kit, write_asset};
@@ -37,20 +37,11 @@ pub fn base_framework_defaults() -> Result<Map<String, Value>> {
 
 pub fn framework_defaults(framework: &str) -> Result<Map<String, Value>> {
     let selected = frameworks::Framework::parse(framework)?;
-    let Some(defaults) = selected.defaults() else {
+    let Some(values) = selected.runtime_defaults()? else {
         let mut values = base_framework_defaults()?;
         values.insert("template".into(), Value::String(selected.to_string()));
         return Ok(values);
     };
-
-    let mut values = Map::new();
-    values.insert("template".into(), Value::String(defaults.template.into()));
-    values.insert(project_env::WEB_ROOT.into(), Value::String(defaults.web_root.into()));
-    values.insert("node_version".into(), Value::String(default_node_version()));
-    if let Some((name, version)) = defaults.language {
-        values.insert(name.into(), Value::String(version.into()));
-    }
-    values.insert("permissions".into(), serde_json::to_value(defaults.permissions)?);
     Ok(values)
 }
 

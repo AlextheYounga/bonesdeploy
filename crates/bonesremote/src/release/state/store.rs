@@ -18,11 +18,28 @@ use super::{atomic_write, resolved_site_root};
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct SiteState {
     #[serde(default)]
-    pub schema_version: u32,
+    schema_version: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub active: Option<DeploymentRecord>,
+    active: Option<DeploymentRecord>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub staged_release: Option<String>,
+    staged_release: Option<String>,
+}
+
+impl SiteState {
+    pub(crate) fn active(&self) -> Option<&DeploymentRecord> {
+        self.active.as_ref()
+    }
+    pub(crate) fn staged_release(&self) -> Option<&str> {
+        self.staged_release.as_deref()
+    }
+    pub(crate) fn with_active(mut self, active: Option<DeploymentRecord>) -> Self {
+        self.active = active;
+        self
+    }
+    pub(crate) fn with_staged_release(mut self, staged_release: Option<String>) -> Self {
+        self.staged_release = staged_release;
+        self
+    }
 }
 
 const SCHEMA_VERSION: u32 = 1;
@@ -166,7 +183,7 @@ mod tests {
         let loaded = read_state("unitapp")?;
 
         let active = loaded.active.ok_or_else(|| anyhow::anyhow!("active record must round-trip"))?;
-        assert_eq!(active.release, "20260804_190321-46a0b75c-a7f2");
+        assert_eq!(active.release(), "20260804_190321-46a0b75c-a7f2");
         assert_eq!(loaded.staged_release.as_deref(), Some("staged"));
         fs::remove_dir_all(root).ok();
         Ok(())
@@ -200,7 +217,7 @@ mod tests {
         let state = read_state("unitapp")?;
 
         let active = state.active.ok_or_else(|| anyhow::anyhow!("previous active deployment must be migrated"))?;
-        assert_eq!(active.phase, DeploymentPhase::Created);
+        assert_eq!(active.phase(), &DeploymentPhase::Created);
         assert_eq!(state.staged_release.as_deref(), Some("20260101_000000"));
         assert!(state_path("unitapp").exists(), "migration must persist the store");
         assert!(!site_root.join(paths::ACTIVE_DEPLOYMENT_FILE).exists(), "previous active file must be removed");

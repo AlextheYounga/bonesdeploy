@@ -6,18 +6,18 @@ use anyhow::{Context, Result, bail};
 use bonesdeploy_core::paths;
 
 use crate::privileges;
-use crate::release::state as release_state;
+use crate::release::SiteMutation;
 
-pub fn run(snapshot: &super::DeploymentSnapshot) -> Result<()> {
+pub fn run(mutation: &SiteMutation, _snapshot: &super::DeploymentSnapshot) -> Result<()> {
     privileges::ensure_root("bonesremote release wire")?;
 
-    let release_name = release_state::read_staged_release(&snapshot.site)?;
-    let release_dir = release_state::release_dir(&snapshot.project_root.to_string_lossy(), &release_name);
+    let release_name = mutation.required_staged_release()?;
+    let release_dir = mutation.release_dir(&release_name);
     if !release_dir.is_dir() {
         bail!("Promoted release is missing: {}", release_dir.display());
     }
 
-    let shared_dir = release_state::shared_dir(&snapshot.project_root.to_string_lossy());
+    let shared_dir = mutation.shared_dir();
     if !shared_dir.is_dir() {
         bail!(
             "Shared root is missing: {}. Run 'bonesdeploy remote setup' or runtime provisioning first.",

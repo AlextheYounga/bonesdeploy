@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 import typer
 
@@ -37,11 +38,20 @@ def _validate_host(ctx: DeployContext) -> None:
         sys.exit(3)
 
 
+def _load_context(env_file: str, missing_message: str = "missing HOST in the root .env file") -> DeployContext:
+    try:
+        return DeployContext.from_files(env_file)
+    except ValueError as error:
+        message = missing_message if not Path(env_file).read_text().strip() else str(error)
+        print(f"Error: {message}", file=sys.stderr)
+        sys.exit(3)
+
+
 @runtime_app.command("apply")
 def runtime_apply_cmd(
     env_file: str = typer.Option(..., "--env-file", help="Path to the root .env file"),
 ):
-    ctx = DeployContext.from_files(env_file)
+    ctx = _load_context(env_file)
     _validate_host(ctx)
     project_runtime = load_runtime(env_file)
     run(ctx=ctx, deploy=project_runtime.deploy)
@@ -52,7 +62,7 @@ def setup_apply_cmd(
     env_file: str = typer.Option(..., "--env-file", help="Path to the root .env file"),
     bonesremote_version: str = typer.Option(..., "--bonesremote-version", help="Release version to install"),
 ):
-    ctx = DeployContext.from_files(env_file)
+    ctx = _load_context(env_file)
     _validate_host(ctx)
     run(
         ctx=ctx,
@@ -64,7 +74,7 @@ def setup_apply_cmd(
 def ssl_apply_cmd(
     env_file: str = typer.Option(..., "--env-file", help="Path to the root .env file"),
 ):
-    ctx = DeployContext.from_files(env_file)
+    ctx = _load_context(env_file, "DOMAIN and EMAIL are required in the root .env file")
     if not ctx.app.dns.domain or not ctx.app.dns.email:
         print("Error: DOMAIN and EMAIL are required in the root .env file", file=sys.stderr)
         sys.exit(3)
@@ -76,7 +86,7 @@ def ssl_apply_cmd(
 def helpers_apply_cmd(
     env_file: str = typer.Option(..., "--env-file", help="Path to the root .env file"),
 ):
-    ctx = DeployContext.from_files(env_file)
+    ctx = _load_context(env_file)
     _validate_host(ctx)
     run(ctx=ctx, deploy=deploy_helpers)
 
@@ -85,7 +95,7 @@ def helpers_apply_cmd(
 def services_apply_cmd(
     env_file: str = typer.Option(..., "--env-file", help="Path to the root .env file"),
 ):
-    ctx = DeployContext.from_files(env_file)
+    ctx = _load_context(env_file)
     _validate_host(ctx)
     run(ctx=ctx, deploy=deploy_services)
 
@@ -97,7 +107,7 @@ def manifest_show_cmd(
 ):
     if output_format not in {"text", "json"}:
         raise typer.BadParameter("must be text or json", param_hint="--format")
-    ctx = DeployContext.from_files(env_file)
+    ctx = _load_context(env_file)
     _validate_host(ctx)
     project_manifest = load_manifest(env_file)
     data = run(ctx=ctx, deploy=lambda current_ctx: inspect_for_runner(current_ctx, project_manifest), quiet=True)
@@ -123,7 +133,7 @@ def patches_apply_cmd(
 ):
     if scope not in {"local", "remote"}:
         raise typer.BadParameter("must be local or remote", param_hint="--scope")
-    ctx = DeployContext.from_files(env_file)
+    ctx = _load_context(env_file)
     if scope == "local":
         apply_local(ctx, target_version, env_file)
         return

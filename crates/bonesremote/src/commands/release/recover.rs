@@ -11,7 +11,9 @@ pub fn run(site: &str) -> Result<()> {
     recover_site(site)
 }
 
-/// Quarantines malformed centralized deployment state so the site becomes
+/// This is intentionally the one command that reads state without a
+/// `SiteMutation`: malformed state cannot be loaded into one. It quarantines
+/// malformed centralized deployment state so the site becomes
 /// recoverable (status, cancellation, and idle checks all parse the store).
 ///
 /// A running deployment holds the site's deployment lock for its entire
@@ -24,7 +26,7 @@ fn recover_site(site: &str) -> Result<()> {
 
     match release_state::read_site_state(site) {
         Ok(state) => {
-            if state.active.is_none() && state.staged_release.is_none() {
+            if state.active().is_none() && state.staged_release().is_none() {
                 println!("No deployment state for {site}.");
             } else {
                 println!("Deployment state for {site} is valid; nothing to recover.");
@@ -135,7 +137,7 @@ mod tests {
         assert!(!site_root.join(paths::ACTIVE_DEPLOYMENT_FILE).exists());
         let active = release_state::read_active_deployment("unitapp")?
             .ok_or_else(|| anyhow::anyhow!("migrated active deployment must be present"))?;
-        assert_eq!(active.phase, DeploymentPhase::Prepared);
+        assert_eq!(active.phase(), &DeploymentPhase::Prepared);
         fs::remove_dir_all(root).ok();
         Ok(())
     }

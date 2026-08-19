@@ -4,8 +4,10 @@ use std::process::Command;
 
 use bonesdeploy_core::{config, paths};
 
+use crate::commands::inspection::accounts;
 use crate::release::lifecycle::build::validate_build_cache;
 use crate::release::lifecycle::checkout::{branch_exists, repository_has_refs};
+use crate::release::lifecycle::load_site_config;
 use crate::runtime::docker;
 
 use super::services;
@@ -16,7 +18,13 @@ pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<Stri
         return;
     }
 
-    let cfg = config::Bones::for_site(site);
+    let cfg = match load_site_config(site) {
+        Ok(cfg) => cfg,
+        Err(error) => {
+            issues.push(format!("deployed site configuration is invalid: {error}"));
+            return;
+        }
+    };
     if !paths::bonesremote_site_root(site).is_dir() {
         issues.push(format!("control-plane site state is missing: {}", paths::bonesremote_site_root(site).display()));
         return;
@@ -78,17 +86,17 @@ fn check_docker_runtime(cfg: &config::Bones, issues: &mut Vec<String>) {
 }
 
 fn check_build_user(build_user: &str, passwd: &str, issues: &mut Vec<String>) {
-    if !account_exists(passwd, build_user) {
+    if !accounts::account_exists(passwd, build_user) {
         issues.push(format!("build user does not exist: {build_user}"));
         return;
     }
 
     let expected_home = paths::bonesdeploy_user_home(build_user);
-    if account_home(passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
+    if accounts::account_home(passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
         issues.push(format!("build user home must be {}: {build_user}", expected_home.display()));
     }
 
-    let Some((uid, gid)) = account_identity(passwd, build_user) else {
+    let Some((uid, gid)) = accounts::account_identity(passwd, build_user) else {
         issues.push(format!("build user has invalid passwd identity: {build_user}"));
         return;
     };
@@ -131,7 +139,7 @@ fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pen
 }
 
 fn check_runtime_identity(runtime_user: &str, runtime_group: &str, passwd: &str, issues: &mut Vec<String>) {
-    if !account_exists(passwd, runtime_user) {
+    if !accounts::account_exists(passwd, runtime_user) {
         issues.push(format!("runtime user does not exist: {runtime_user}"));
     }
 
@@ -142,7 +150,7 @@ fn check_runtime_identity(runtime_user: &str, runtime_group: &str, passwd: &str,
             return;
         }
     };
-    let Some(members) = group_members(&groupfile, runtime_group) else {
+    let Some(members) = accounts::group_members(&groupfile, runtime_group) else {
         issues.push(format!("runtime group does not exist: {runtime_group}"));
         return;
     };
@@ -161,39 +169,9 @@ fn check_site_layout(shared_root: &Path, releases_root: &Path, issues: &mut Vec<
     }
 }
 
-fn account_exists(passwd: &str, account: &str) -> bool {
-    passwd.lines().any(|line| line.starts_with(&format!("{account}:")))
-}
-
-fn account_home<'a>(passwd: &'a str, account: &str) -> Option<&'a str> {
-    account_field(passwd, account, 5)
-}
-
-fn account_identity(passwd: &str, account: &str) -> Option<(u32, u32)> {
-    let uid = account_field(passwd, account, 2)?.parse().ok()?;
-    let gid = account_field(passwd, account, 3)?.parse().ok()?;
-    Some((uid, gid))
-}
-
-fn account_field<'a>(passwd: &'a str, account: &str, index: usize) -> Option<&'a str> {
-    passwd.lines().find(|line| line.starts_with(&format!("{account}:")))?.split(':').nth(index)
-}
-
-fn group_members(groupfile: &str, group: &str) -> Option<Vec<String>> {
-    let line = groupfile.lines().find(|line| line.starts_with(&format!("{group}:")))?;
-    let fields: Vec<&str> = line.split(':').collect();
-    let members = fields.get(3).copied().unwrap_or_default();
-    if members.is_empty() {
-        return Some(Vec::new());
-    }
-    Some(members.split(',').map(str::to_string).collect())
-}
-
 #[cfg(test)]
 mod tests {
     use std::{env, fs, process, process::Command};
-
-    use super::{account_exists, account_home, account_identity, group_members};
 
     #[test]
     fn empty_bare_repo_is_pending_before_first_push() {
@@ -209,28 +187,5 @@ mod tests {
         let _ = fs::remove_dir_all(root);
         assert!(issues.is_empty());
         assert_eq!(pending.len(), 1);
-    }
-
-    #[test]
-    fn account_exists_matches_passwd_entries() {
-        assert!(account_exists("demo:x:1000:1000::/srv:/usr/sbin/nologin\n", "demo"));
-        assert!(!account_exists("demo:x:1000:1000::/srv:/usr/sbin/nologin\n", "git"));
-    }
-
-    #[test]
-    fn build_user_home_is_parsed() {
-        let passwd = "demo-build:x:1002:1002::/var/lib/bonesdeploy/users/demo-build:/usr/sbin/nologin\n";
-        assert_eq!(account_home(passwd, "demo-build"), Some("/var/lib/bonesdeploy/users/demo-build"));
-        assert_eq!(account_identity(passwd, "demo-build"), Some((1002, 1002)));
-    }
-
-    #[test]
-    fn group_members_reads_group_member_list() {
-        assert_eq!(
-            group_members("demo:x:1000:git,www-data\n", "demo"),
-            Some(vec!["git".to_string(), "www-data".to_string()])
-        );
-        assert_eq!(group_members("demo:x:1000:\n", "demo"), Some(Vec::new()));
-        assert_eq!(group_members("demo:x:1000:\n", "nope"), None);
     }
 }

@@ -1,7 +1,9 @@
-use std::path::Path;
 use std::process::Command;
 
 use bonesdeploy_core::{config, paths};
+
+use crate::commands::inspection::systemd;
+use crate::release::state as release_state;
 
 pub(crate) fn check_target(cfg: &config::Bones, issues: &mut Vec<String>) {
     let target_name = paths::site_target_name(&cfg.project_name);
@@ -21,7 +23,9 @@ fn check_target_membership(target: &str, cfg: &config::Bones, issues: &mut Vec<S
     let output =
         Command::new("systemctl").args(["show", "--property=Requires", "--value", "--no-pager", "--", target]).output();
     let services = match output {
-        Ok(output) if output.status.success() => required_services(&String::from_utf8_lossy(&output.stdout)),
+        Ok(output) if output.status.success() => {
+            systemd::parse_required_services(&String::from_utf8_lossy(&output.stdout))
+        }
         Ok(_) => {
             issues.push(format!("could not inspect required services for site target: {target}"));
             return;
@@ -41,15 +45,11 @@ fn check_target_membership(target: &str, cfg: &config::Bones, issues: &mut Vec<S
     }
 }
 
-fn required_services(output: &str) -> Vec<String> {
-    output.split_whitespace().filter(|name| name.ends_with(paths::SYSTEMD_SERVICE_SUFFIX)).map(str::to_owned).collect()
-}
-
 fn check_required_service_active(target: &str, service: &str, cfg: &config::Bones, issues: &mut Vec<String>) {
-    match Command::new("systemctl").args(["is-active", "--quiet", "--", service]).status() {
-        Ok(status) if status.success() => {}
-        Ok(_) if is_deferred_laravel_worker(cfg, service) => {}
-        Ok(_) => issues.push(inactive_service_issue(target, service)),
+    match systemd::active_status(service) {
+        Ok(true) => {}
+        Ok(false) if is_deferred_laravel_worker(cfg, service) => {}
+        Ok(false) => issues.push(inactive_service_issue(target, service)),
         Err(error) => issues.push(format!("could not inspect required service {service} for {target} ({error})")),
     }
 }
@@ -60,7 +60,7 @@ fn is_deferred_laravel_worker(cfg: &config::Bones, service: &str) -> bool {
         cfg.runtime.extra.get(config::LARAVEL_INSTALL_QUEUE_WORKER).and_then(|value| value.as_bool()) == Some(true),
         &cfg.project_name,
         service,
-    ) && current_is_placeholder(Path::new(&cfg.project_root))
+    ) && current_is_placeholder(&cfg.project_root)
         && condition_failed(service)
 }
 
@@ -68,12 +68,8 @@ fn is_configured_laravel_worker(template: &str, worker_enabled: bool, project_na
     template == "laravel" && worker_enabled && service == format!("{project_name}-worker.service")
 }
 
-fn current_is_placeholder(project_root: &Path) -> bool {
-    let current = project_root.join(paths::CURRENT_LINK);
-    let placeholder = project_root.join(paths::RELEASES_DIR).join(paths::PLACEHOLDER_RELEASE_NAME);
-    current
-        .canonicalize()
-        .is_ok_and(|current| placeholder.canonicalize().is_ok_and(|placeholder| current == placeholder))
+fn current_is_placeholder(project_root: &str) -> bool {
+    release_state::current_release_name(project_root).is_ok_and(|release| release == paths::PLACEHOLDER_RELEASE_NAME)
 }
 
 fn condition_failed(service: &str) -> bool {
@@ -97,13 +93,7 @@ mod tests {
 
     use bonesdeploy_core::paths;
 
-    use super::{current_is_placeholder, is_configured_laravel_worker, required_services, service_exists};
-
-    #[test]
-    fn target_without_required_services_is_rejected() {
-        assert!(required_services("").is_empty());
-        assert!(required_services("nexttest.target").is_empty());
-    }
+    use super::{current_is_placeholder, is_configured_laravel_worker, service_exists};
 
     #[test]
     fn only_the_first_laravel_release_can_defer_its_configured_worker() {
@@ -123,11 +113,11 @@ mod tests {
         fs::create_dir_all(&deployed)?;
         symlink(&placeholder, root.join(paths::CURRENT_LINK))?;
 
-        assert!(current_is_placeholder(&root));
+        assert!(current_is_placeholder(root.to_str().unwrap_or_default()));
 
         fs::remove_file(root.join(paths::CURRENT_LINK))?;
         symlink(&deployed, root.join(paths::CURRENT_LINK))?;
-        assert!(!current_is_placeholder(&root));
+        assert!(!current_is_placeholder(root.to_str().unwrap_or_default()));
 
         fs::remove_dir_all(root)?;
         Ok(())

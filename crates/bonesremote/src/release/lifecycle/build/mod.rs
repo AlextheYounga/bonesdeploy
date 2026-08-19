@@ -13,27 +13,27 @@ pub(crate) use build_user::{ensure_build_user_ready, validate_build_cache};
 pub(crate) use container::remove_build_container;
 
 use crate::privileges;
-use crate::release::state as release_state;
+use crate::release::SiteMutation;
 
-pub fn run(snapshot: &super::DeploymentSnapshot, context: &Path) -> Result<()> {
+pub fn run(_mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot, context: &Path) -> Result<()> {
     privileges::ensure_root("bonesremote release build")?;
     run_scripts::run(snapshot, context)
 }
 
-pub fn promote(snapshot: &super::DeploymentSnapshot, context: &Path) -> Result<PathBuf> {
+pub fn promote(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot, context: &Path) -> Result<PathBuf> {
     privileges::ensure_root("bonesremote release promote")?;
-    promote::run(snapshot, context)
+    promote::run(mutation, snapshot, context)
 }
 
-pub fn finalize(snapshot: &super::DeploymentSnapshot) -> Result<()> {
+pub fn finalize(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Result<()> {
     privileges::ensure_root("bonesremote release finalize")?;
-    promote::finalize(snapshot)
+    promote::finalize(mutation, snapshot)
 }
 
-pub(super) fn staged_release_name(site: &str) -> Result<String> {
-    release_state::read_staged_release(site)
+pub(super) fn staged_release_name(mutation: &SiteMutation) -> Result<String> {
+    mutation.required_staged_release()
 }
 
-pub(super) fn release_directory(project_root: &Path, release_name: &str) -> PathBuf {
-    release_state::release_dir(&project_root.to_string_lossy(), release_name)
+pub(super) fn release_directory(mutation: &SiteMutation, release_name: &str) -> PathBuf {
+    mutation.release_dir(release_name)
 }

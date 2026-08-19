@@ -8,6 +8,7 @@ pub(crate) mod wire_shared;
 
 use std::path::PathBuf;
 
+use crate::release::SiteMutation;
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::{config, paths};
 
@@ -22,12 +23,14 @@ pub(crate) struct DeploymentSnapshot {
 }
 
 impl DeploymentSnapshot {
-    pub(crate) fn new(site: &str, config: &config::Bones, revision: String, deployment_dir: PathBuf) -> Self {
+    pub(crate) fn new(mutation: &SiteMutation, revision: String, deployment_dir: PathBuf) -> Self {
+        let site = mutation.site();
+        let config = mutation.config();
         Self {
             site: site.to_string(),
             config: config.clone(),
-            repo_path: PathBuf::from(paths::default_repo_path_for(site)),
-            project_root: PathBuf::from(paths::default_project_root_for(site)),
+            repo_path: PathBuf::from(&config.app.repo_path),
+            project_root: PathBuf::from(&config.project_root),
             revision,
             deployment_dir,
         }
@@ -57,19 +60,28 @@ pub(crate) fn load_site_config(site: &str) -> Result<config::Bones> {
 
 #[cfg(test)]
 mod tests {
+    use std::env;
     use std::path::PathBuf;
+    use std::process;
 
-    use bonesdeploy_core::config::Bones;
+    use bonesdeploy_core::config;
 
     use super::DeploymentSnapshot;
+    use crate::release::SiteMutation;
+    use crate::release::state::{DeploymentLock, set_sites_root_for_tests};
 
     #[test]
-    fn snapshot_uses_convention_paths_and_one_revision() {
-        let snapshot = DeploymentSnapshot::new("demo", &Bones::default(), "deadbeef".to_string(), PathBuf::new());
+    fn snapshot_uses_convention_paths_and_one_revision() -> anyhow::Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote_snapshot_{}", process::id()));
+        let _root_guard = set_sites_root_for_tests(root);
+        let lock = DeploymentLock::acquire("demo")?;
+        let mutation = SiteMutation::adopt("demo", config::Bones::for_site("demo"), lock);
+        let snapshot = DeploymentSnapshot::new(&mutation, "deadbeef".to_string(), PathBuf::new());
 
         assert_eq!(snapshot.repo_path, PathBuf::from("/home/git/demo.git"));
         assert_eq!(snapshot.project_root, PathBuf::from("/srv/sites/demo"));
         assert_eq!(snapshot.revision, "deadbeef");
         assert_eq!(snapshot.site, "demo");
+        Ok(())
     }
 }

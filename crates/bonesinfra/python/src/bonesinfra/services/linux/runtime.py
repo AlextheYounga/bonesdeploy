@@ -16,5 +16,11 @@ def setup(ctx, *, uses_tcp=False):
     )
 
 
+def orchestrate(ctx, provision, *, uses_tcp=False):
+    setup(ctx, uses_tcp=uses_tcp)
+    provision(ctx)
+    start_services(ctx)
+
+
 def start_services(ctx):
     router.start_services(ctx, ctx.paths_dict)

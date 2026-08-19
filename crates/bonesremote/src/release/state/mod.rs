@@ -100,44 +100,44 @@ pub fn read_site_state(site: &str) -> Result<store::SiteState> {
 }
 
 pub fn read_active_deployment(site: &str) -> Result<Option<DeploymentRecord>> {
-    Ok(store::read_state(site)?.active)
+    Ok(store::read_state(site)?.active().cloned())
 }
 
 pub fn write_active_deployment(site: &str, deployment: &DeploymentRecord) -> Result<()> {
-    let mut state = store::read_state(site)?;
-    state.active = Some(deployment.clone());
+    let state = store::read_state(site)?;
+    let state = state.with_active(Some(deployment.clone()));
     store::write_state(site, &state).with_context(|| format!("Failed to write active deployment state for {site}"))
 }
 
 pub fn clear_active_deployment(site: &str) -> Result<()> {
-    let mut state = store::read_state(site)?;
-    state.active = None;
+    let state = store::read_state(site)?;
+    let state = state.with_active(None);
     store::write_state(site, &state).with_context(|| format!("Failed to clear active deployment state for {site}"))
 }
 
 /// Returns `Ok(name)` with the staged release present in the store, or an error
 /// when no staging is recorded (mirrors the historical staged-release behavior).
 pub fn read_staged_release(site: &str) -> Result<String> {
-    match store::read_state(site)?.staged_release {
-        Some(release) if !release.is_empty() => Ok(release),
+    match store::read_state(site)?.staged_release() {
+        Some(release) if !release.is_empty() => Ok(release.to_string()),
         _ => bail!("Staged release state is empty: {}", store::state_path(site).display()),
     }
 }
 
 /// Returns the staged release name if one is recorded.
 pub fn staged_release(site: &str) -> Result<Option<String>> {
-    Ok(store::read_state(site)?.staged_release)
+    Ok(store::read_state(site)?.staged_release().map(str::to_string))
 }
 
 pub fn write_staged_release(site: &str, release: &str) -> Result<()> {
-    let mut state = store::read_state(site)?;
-    state.staged_release = Some(release.to_string());
+    let state = store::read_state(site)?;
+    let state = state.with_staged_release(Some(release.to_string()));
     store::write_state(site, &state).with_context(|| format!("Failed to write staged release state for {site}"))
 }
 
 pub fn clear_staged_release(site: &str) -> Result<()> {
-    let mut state = store::read_state(site)?;
-    state.staged_release = None;
+    let state = store::read_state(site)?;
+    let state = state.with_staged_release(None);
     store::write_state(site, &state).with_context(|| format!("Failed to clear staged release state for {site}"))
 }
 
@@ -176,7 +176,7 @@ mod tests {
 
         assert!(super::read_staged_release("emptyapp").is_err());
         let state = store::read_state("emptyapp")?;
-        assert!(state.staged_release.is_none());
+        assert!(state.staged_release().is_none());
         fs::remove_dir_all(root).ok();
         Ok(())
     }

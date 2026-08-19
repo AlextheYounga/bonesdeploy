@@ -61,30 +61,61 @@ impl DeploymentPhase {
 /// is cleared (or left as `cleanup_pending`) when the site returns to idle.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct DeploymentRecord {
-    pub release: String,
-    pub source_revision: String,
-    pub phase: DeploymentPhase,
-    pub pid: u32,
-    pub process_start_ticks: u64,
-    pub started_at: String,
+    release: String,
+    source_revision: String,
+    phase: DeploymentPhase,
+    pid: u32,
+    process_start_ticks: u64,
+    started_at: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub previous_release: Option<String>,
+    previous_release: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub context: Option<String>,
+    context: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
+    error: Option<String>,
     /// Reserved keys: populated by later phases (config revision + protocol
     /// version in Phase 5, build-image digest in Phase 4). Kept in the schema
     /// now so the persisted format is stable across releases.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub config_revision: Option<String>,
+    config_revision: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub protocol_version: Option<u32>,
+    protocol_version: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub image_digest: Option<String>,
+    image_digest: Option<String>,
 }
 
 impl DeploymentRecord {
+    pub(crate) fn release(&self) -> &str {
+        &self.release
+    }
+    pub(crate) fn phase(&self) -> &DeploymentPhase {
+        &self.phase
+    }
+    pub(crate) fn pid(&self) -> u32 {
+        self.pid
+    }
+    pub(crate) fn process_start_ticks(&self) -> u64 {
+        self.process_start_ticks
+    }
+    pub(crate) fn started_at(&self) -> &str {
+        &self.started_at
+    }
+    pub(crate) fn context(&self) -> Option<&str> {
+        self.context.as_deref()
+    }
+    pub(crate) fn set_context(&mut self, context: String) {
+        self.context = Some(context);
+    }
+    pub(crate) fn set_previous_release(&mut self, release: Option<String>) {
+        self.previous_release = release;
+    }
+    pub(crate) fn set_phase(&mut self, phase: DeploymentPhase) {
+        self.phase = phase;
+    }
+    pub(crate) fn set_error(&mut self, error: String) {
+        self.error = Some(error);
+    }
+
     #[expect(clippy::too_many_arguments)]
     pub(crate) fn new(
         release: String,

@@ -45,6 +45,7 @@ pub(super) fn run(snapshot: &super::super::DeploymentSnapshot, context: &Path) -
     let build_env = BuildScriptEnv {
         project_name: &cfg.project_name,
         build_user: &build_user,
+        build_group: &build_group,
         web_root: &cfg.runtime.web_root,
         deployment_dir,
         build_cache_dir: &build_cache_dir,
@@ -79,6 +80,9 @@ fn resolve_build_env(cfg: &config::Bones, source_context: &Path) -> Result<Vec<(
 
     let env_build = env_build::load(source_context)?;
     for (key, value) in env_build {
+        if CONTAINER_ENV_DENYLIST.contains(&key.as_str()) {
+            bail!(".env.build variable `{key}` is reserved for the build container contract");
+        }
         env_vars.push((key, value));
     }
 
@@ -86,15 +90,23 @@ fn resolve_build_env(cfg: &config::Bones, source_context: &Path) -> Result<Vec<(
 }
 
 const DERIVED_ENV_DENYLIST: &[&str] = &[
+    "app.remote_name",
+    "app.ssh_user",
+    "app.host",
+    "app.port",
+    "app.branch",
+    "app.repo_path",
+    "app.project_root",
     "runtime.permissions",
-    "runtime.runtime_user",
-    "runtime.runtime_group",
+    "runtime.backend",
     "app.server.host",
     "app.server.port",
     "app.dns",
-    "app.ssl_enabled",
     "build.timeout_seconds",
 ];
+
+const CONTAINER_ENV_DENYLIST: &[&str] =
+    &["PROJECT_NAME", "PROJECT_ROOT", "REPO_PATH", "WEB_ROOT", "SERVICE_USER", "BUILD_CACHE_DIR"];
 
 fn derived_config_env(cfg: &config::Bones) -> Result<Vec<(String, String)>> {
     let value = serde_json::to_value(cfg).context("Failed to serialize configuration for build environment")?;
@@ -154,7 +166,7 @@ mod tests {
     use std::fs;
     use std::process;
 
-    use anyhow::Result;
+    use anyhow::{Result, anyhow};
     use bonesdeploy_core::config::load;
 
     use super::{derived_config_env, list_scripts, resolve_build_env};
@@ -195,6 +207,10 @@ mod tests {
         assert!(env.contains(&("BONES_RUNTIME_TEMPLATE".to_string(), "nuxt".to_string())));
         assert!(env.contains(&("BONES_APP_PROJECT_NAME".to_string(), "demo".to_string())), "{env:?}");
         assert!(!env.iter().any(|(key, _)| key == "BONES_APP_SERVER_HOST"));
+        assert!(!env.iter().any(|(key, _)| key == "BONES_APP_SERVER_PORT"));
+        assert!(!env.iter().any(|(key, _)| key == "BONES_APP_REPO_PATH"));
+        assert!(!env.iter().any(|(key, _)| key == "BONES_APP_PROJECT_ROOT"));
+        assert!(!env.iter().any(|(key, _)| key == "BONES_APP_REMOTE_NAME"));
         assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_APP_DNS_")));
         assert!(!env.iter().any(|(key, _)| key.starts_with("BONES_RUNTIME_SHARED_")));
         fs::remove_dir_all(root).ok();
@@ -327,6 +343,28 @@ mod tests {
         assert!(env.contains(&("BONES_RUNTIME_TEMPLATE".to_string(), "nuxt".to_string())));
         assert!(!env.iter().any(|(key, _)| key == "NEXT_PUBLIC_API_URL"), "no .env.build means no extra vars");
         fs::remove_dir_all(site_root).ok();
+        fs::remove_dir_all(source).ok();
+        Ok(())
+    }
+
+    #[test]
+    fn container_contract_values_cannot_be_overridden_by_env_build() -> Result<()> {
+        let root = env::temp_dir().join(format!("bonesremote-env-build-contract-{}", process::id()));
+        let source = env::temp_dir().join(format!("bonesremote-env-build-contract-src-{}", process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let _ = fs::remove_dir_all(&source);
+        fs::create_dir_all(&root)?;
+        fs::create_dir_all(&source)?;
+        fs::write(root.join(".env"), "PROJECT_NAME=demo\nHOST=deploy.example.com\nTEMPLATE=next\n")?;
+        fs::write(source.join(".env.build"), "PROJECT_NAME=attacker\n")?;
+        let cfg = load(&root.join(".env"))?;
+
+        let result = resolve_build_env(&cfg, &source);
+
+        assert!(result.is_err());
+        let error = result.err().ok_or_else(|| anyhow!("reserved container variables must be rejected"))?;
+        assert!(error.to_string().contains("reserved"));
+        fs::remove_dir_all(root).ok();
         fs::remove_dir_all(source).ok();
         Ok(())
     }

@@ -1,3 +1,4 @@
+mod coordinator;
 pub(crate) mod lifecycle;
 pub(crate) mod rollback;
 

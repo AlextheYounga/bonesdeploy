@@ -102,12 +102,13 @@ def _compose_runtime(core: ModuleType, custom: ModuleType | None) -> ModuleType:
     if custom is None:
         return core
 
+    project_hook = custom
+
     composed = ModuleType("bonesinfra.project.runtime")
 
-    def deploy(ctx):
+    def deploy(ctx: Any) -> Any:
         core.deploy(ctx)
-        if custom is not None:
-            custom.deploy(ctx)
+        return project_hook.deploy(ctx)
 
     composed.deploy = deploy
     return composed

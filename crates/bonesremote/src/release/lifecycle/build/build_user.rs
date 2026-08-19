@@ -9,6 +9,7 @@ use bonesdeploy_core::paths;
 pub(super) struct BuildScriptEnv<'a> {
     pub(super) project_name: &'a str,
     pub(super) build_user: &'a str,
+    pub(super) build_group: &'a str,
     pub(super) web_root: &'a str,
     pub(super) deployment_dir: &'a Path,
     pub(super) build_cache_dir: &'a Path,

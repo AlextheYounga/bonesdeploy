@@ -15,7 +15,7 @@ pub fn rollback(site: &str) -> Result<()> {
     // also runs against an idle site so it never repoints `current` under an
     // in-flight or interrupted deployment.
     let mutation = SiteMutation::acquire(site)?;
-    ensure_site_idle(site)?;
+    ensure_site_idle(&mutation)?;
 
     let cfg = mutation.config();
 

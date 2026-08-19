@@ -23,9 +23,35 @@ from bonesinfra.config.paths import DEFAULT_PROJECT_ROOT_PARENT, DEFAULT_REPO_PA
 
 DEPLOY_USER = "git"
 
+_RESERVED_PROJECT_NAMES = {
+    "basic",
+    "default",
+    "emergency",
+    "final",
+    "graphical",
+    "halt",
+    "initrd",
+    "local-fs",
+    "multi-user",
+    "network",
+    "network-online",
+    "poweroff",
+    "reboot",
+    "remote-fs",
+    "rescue",
+    "shutdown",
+    "sockets",
+    "swap",
+    "sysinit",
+    "system-update",
+    "timers",
+    "umount",
+}
+
 DEFAULT_SSH_USER = "root"
 DEFAULT_SSH_PORT = "22"
 DEFAULT_WEB_ROOT = "public"
+MIN_QUOTED_VALUE_LENGTH = 2
 
 
 @dataclass
@@ -38,6 +64,7 @@ class DeployContext:
     def from_files(cls, config_path: str) -> DeployContext:
         values = read_dotenv(Path(config_path).read_text())
         project_name = values.get(PROJECT_NAME, "")
+        _validate_project_name(project_name)
 
         app = AppConfig(
             project_name=project_name,
@@ -170,10 +197,27 @@ def read_dotenv(content: str) -> dict[str, str]:
         if not line or line.startswith("#"):
             continue
         key, separator, value = line.partition("=")
-        if not separator or not key.strip():
+        key = key.strip()
+        if not separator or not _valid_env_name(key):
             raise ValueError(f"invalid .env entry on line {line_number}")
-        values[key.strip()] = value.strip().strip('"')
+        if key in values:
+            raise ValueError(f"duplicate .env key {key!r} on line {line_number}")
+        values[key] = _strip_quotes(value.strip())
     return values
+
+
+def _valid_env_name(name: str) -> bool:
+    return (
+        bool(name)
+        and ((name[0].isascii() and name[0].isalpha()) or name[0] == "_")
+        and all((character.isascii() and character.isalnum()) or character == "_" for character in name[1:])
+    )
+
+
+def _strip_quotes(value: str) -> str:
+    if len(value) >= MIN_QUOTED_VALUE_LENGTH and ((value[0] == value[-1] == '"') or (value[0] == value[-1] == "'")):
+        return value[1:-1]
+    return value
 
 
 def _database_services(value: Any) -> tuple[str, ...]:
@@ -195,3 +239,10 @@ def _runtime_backend(value: Any) -> str:
     if not isinstance(value, str) or value not in {"native", "docker"}:
         raise ValueError("RUNTIME_BACKEND must be 'native' or 'docker'")
     return value
+
+
+def _validate_project_name(value: str) -> None:
+    valid_characters = all(char.isascii() and (char.islower() or char.isdigit() or char == "-") for char in value)
+    if value and valid_characters and value not in _RESERVED_PROJECT_NAMES:
+        return
+    raise ValueError(f"Invalid project name: {value}")
