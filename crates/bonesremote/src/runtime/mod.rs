@@ -1,1 +1,1 @@
-pub(crate) mod docker;
+pub mod docker;

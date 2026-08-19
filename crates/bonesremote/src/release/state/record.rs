@@ -31,7 +31,7 @@ impl DeploymentPhase {
     /// Whether the phase is at or after the cut-over commit point. A site with a
     /// committed record is serialization-idle: a next deployment may proceed
     /// even while the record remains (e.g. `cleanup_pending`).
-    pub(crate) fn is_committed(&self) -> bool {
+    pub fn is_committed(&self) -> bool {
         matches!(self, Self::Activated | Self::Verified | Self::Completed | Self::CleanupPending)
     }
 
@@ -40,7 +40,7 @@ impl DeploymentPhase {
     /// policy. `promoted` is included because prepare scripts run while the
     /// record still reads `promoted` (the phase is advanced only once they
     /// succeed).
-    pub(crate) fn may_have_mutated_runtime(&self) -> bool {
+    pub fn may_have_mutated_runtime(&self) -> bool {
         matches!(
             self,
             Self::Promoted
@@ -85,51 +85,51 @@ pub struct DeploymentRecord {
 
 /// Identifies the process that owns an in-flight deployment.
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct ProcessIdentity {
+pub struct ProcessIdentity {
     pid: u32,
     process_start_ticks: u64,
     started_at: String,
 }
 
 impl ProcessIdentity {
-    pub(crate) fn new(pid: u32, process_start_ticks: u64, started_at: String) -> Self {
+    pub fn new(pid: u32, process_start_ticks: u64, started_at: String) -> Self {
         Self { pid, process_start_ticks, started_at }
     }
 }
 
 impl DeploymentRecord {
-    pub(crate) fn release(&self) -> &str {
+    pub fn release(&self) -> &str {
         &self.release
     }
-    pub(crate) fn phase(&self) -> &DeploymentPhase {
+    pub fn phase(&self) -> &DeploymentPhase {
         &self.phase
     }
-    pub(crate) fn pid(&self) -> u32 {
+    pub fn pid(&self) -> u32 {
         self.process_identity.pid
     }
-    pub(crate) fn process_start_ticks(&self) -> u64 {
+    pub fn process_start_ticks(&self) -> u64 {
         self.process_identity.process_start_ticks
     }
-    pub(crate) fn started_at(&self) -> &str {
+    pub fn started_at(&self) -> &str {
         &self.process_identity.started_at
     }
-    pub(crate) fn context(&self) -> Option<&str> {
+    pub fn context(&self) -> Option<&str> {
         self.context.as_deref()
     }
-    pub(crate) fn set_context(&mut self, context: String) {
+    pub fn set_context(&mut self, context: String) {
         self.context = Some(context);
     }
-    pub(crate) fn set_previous_release(&mut self, release: Option<String>) {
+    pub fn set_previous_release(&mut self, release: Option<String>) {
         self.previous_release = release;
     }
-    pub(crate) fn set_phase(&mut self, phase: DeploymentPhase) {
+    pub fn set_phase(&mut self, phase: DeploymentPhase) {
         self.phase = phase;
     }
-    pub(crate) fn set_error(&mut self, error: String) {
+    pub fn set_error(&mut self, error: String) {
         self.error = Some(error);
     }
 
-    pub(crate) fn new(
+    pub fn new(
         release: String,
         source_revision: String,
         phase: DeploymentPhase,
@@ -168,7 +168,7 @@ pub struct PreviousDeployment {
 }
 
 impl PreviousDeployment {
-    pub(crate) fn to_record(self) -> Result<DeploymentRecord> {
+    pub fn to_record(self) -> Result<DeploymentRecord> {
         let phase = match self.phase.as_str() {
             "building" => DeploymentPhase::Created,
             "preparing" => DeploymentPhase::Prepared,
@@ -186,44 +186,5 @@ impl PreviousDeployment {
             protocol_version: None,
             image_digest: None,
         })
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use anyhow::Result;
-
-    use super::{DeploymentPhase, DeploymentRecord, ProcessIdentity};
-
-    #[test]
-    fn phases_after_commit_are_serialization_idle() {
-        assert!(!DeploymentPhase::Created.is_committed());
-        assert!(!DeploymentPhase::Sealed.is_committed());
-        assert!(DeploymentPhase::Activated.is_committed());
-        assert!(DeploymentPhase::Verified.is_committed());
-        assert!(DeploymentPhase::CleanupPending.is_committed());
-    }
-
-    #[test]
-    fn cancellation_is_refused_after_runtime_mutation() {
-        assert!(!DeploymentPhase::Built.may_have_mutated_runtime());
-        assert!(DeploymentPhase::Promoted.may_have_mutated_runtime());
-        assert!(DeploymentPhase::Prepared.may_have_mutated_runtime());
-        assert!(DeploymentPhase::Verified.may_have_mutated_runtime());
-    }
-
-    #[test]
-    fn record_round_trips_through_json() -> Result<()> {
-        let record = DeploymentRecord::new(
-            String::from("20260804_190321-46a0b75c-a7f2"),
-            String::from("46a0b75c"),
-            DeploymentPhase::Verified,
-            ProcessIdentity::new(1234, 42, String::from("2026-08-04T19:03:21Z")),
-        );
-        let json = serde_json::to_string(&record)?;
-        let decoded: DeploymentRecord = serde_json::from_str(&json)?;
-        assert_eq!(decoded.release, record.release);
-        assert_eq!(decoded.phase, DeploymentPhase::Verified);
-        Ok(())
     }
 }

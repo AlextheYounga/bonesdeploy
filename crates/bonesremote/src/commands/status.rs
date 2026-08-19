@@ -18,9 +18,9 @@ struct Report {
 }
 
 #[derive(Debug, Serialize)]
-struct SslStatus {
-    enabled: bool,
-    domain: String,
+pub struct SslStatus {
+    pub enabled: bool,
+    pub domain: String,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -50,7 +50,7 @@ fn build_report(site: &str) -> Report {
     }
 }
 
-fn ssl_status(nginx_config_path: &str) -> SslStatus {
+pub fn ssl_status(nginx_config_path: &str) -> SslStatus {
     let content = fs::read_to_string(nginx_config_path).unwrap_or_default();
     let domain = content
         .lines()
@@ -94,25 +94,4 @@ fn services(project_name: &str) -> Vec<ServiceStatus> {
 
 fn target_service_names(target: &str) -> Vec<String> {
     systemd::required_services(target).unwrap_or_default()
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{env, fs, process};
-
-    use anyhow::Result;
-
-    use super::ssl_status;
-
-    #[test]
-    fn reads_ssl_domain_from_conventionally_named_nginx_config() -> Result<()> {
-        let path = env::temp_dir().join(format!("bonesremote-status-{}.conf", process::id()));
-        fs::write(&path, "server_name example.test;\nlisten 443 ssl;\n")?;
-        let path = path.display().to_string();
-
-        assert_eq!(ssl_status(&path).domain, "example.test");
-        assert!(ssl_status(&path).enabled);
-        fs::remove_file(path)?;
-        Ok(())
-    }
 }

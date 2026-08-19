@@ -1,10 +1,10 @@
-pub(crate) mod activate;
-pub(crate) mod build;
-pub(crate) mod checkout;
-pub(crate) mod preflight;
-pub(crate) mod prepare;
-pub(crate) mod stage;
-pub(crate) mod wire_shared;
+pub mod activate;
+pub mod build;
+pub mod checkout;
+pub mod preflight;
+pub mod prepare;
+pub mod stage;
+pub mod wire_shared;
 
 use std::path::PathBuf;
 
@@ -13,17 +13,17 @@ use anyhow::{Context, Result, bail};
 use bonesdeploy_core::{config, paths};
 
 #[derive(Clone, Debug)]
-pub(crate) struct DeploymentSnapshot {
-    pub(crate) site: String,
-    pub(crate) config: config::Bones,
-    pub(crate) repo_path: PathBuf,
-    pub(crate) project_root: PathBuf,
-    pub(crate) revision: String,
-    pub(crate) deployment_dir: PathBuf,
+pub struct DeploymentSnapshot {
+    pub site: String,
+    pub config: config::Bones,
+    pub repo_path: PathBuf,
+    pub project_root: PathBuf,
+    pub revision: String,
+    pub deployment_dir: PathBuf,
 }
 
 impl DeploymentSnapshot {
-    pub(crate) fn new(mutation: &SiteMutation, revision: String, deployment_dir: PathBuf) -> Self {
+    pub fn new(mutation: &SiteMutation, revision: String, deployment_dir: PathBuf) -> Self {
         let site = mutation.site();
         let config = mutation.config();
         Self {
@@ -36,7 +36,7 @@ impl DeploymentSnapshot {
         }
     }
 
-    pub(crate) fn with_deployment_dir(mut self, deployment_dir: PathBuf) -> Self {
+    pub fn with_deployment_dir(mut self, deployment_dir: PathBuf) -> Self {
         self.deployment_dir = deployment_dir;
         self
     }
@@ -47,7 +47,7 @@ impl DeploymentSnapshot {
 /// Every command that writes or reads site state as root must call this rather
 /// than loading config directly, so the confused-deputy check (`project_name` ==
 /// site) is applied consistently.
-pub(crate) fn load_site_config(site: &str) -> Result<config::Bones> {
+pub fn load_site_config(site: &str) -> Result<config::Bones> {
     config::validate_site_name(site)?;
     let config_path = PathBuf::from(paths::default_project_root_for(site)).join(paths::SHARED_DIR).join(paths::DOT_ENV);
     let cfg = config::load(&config_path)
@@ -56,32 +56,4 @@ pub(crate) fn load_site_config(site: &str) -> Result<config::Bones> {
         bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
     }
     Ok(cfg)
-}
-
-#[cfg(test)]
-mod tests {
-    use std::env;
-    use std::path::PathBuf;
-    use std::process;
-
-    use bonesdeploy_core::config;
-
-    use super::DeploymentSnapshot;
-    use crate::release::SiteMutation;
-    use crate::release::state::{DeploymentLock, set_sites_root_for_tests};
-
-    #[test]
-    fn snapshot_uses_convention_paths_and_one_revision() -> anyhow::Result<()> {
-        let root = env::temp_dir().join(format!("bonesremote_snapshot_{}", process::id()));
-        let _root_guard = set_sites_root_for_tests(root);
-        let lock = DeploymentLock::acquire("demo")?;
-        let mutation = SiteMutation::adopt("demo", config::Bones::for_site("demo"), lock);
-        let snapshot = DeploymentSnapshot::new(&mutation, "deadbeef".to_string(), PathBuf::new());
-
-        assert_eq!(snapshot.repo_path, PathBuf::from("/home/git/demo.git"));
-        assert_eq!(snapshot.project_root, PathBuf::from("/srv/sites/demo"));
-        assert_eq!(snapshot.revision, "deadbeef");
-        assert_eq!(snapshot.site, "demo");
-        Ok(())
-    }
 }

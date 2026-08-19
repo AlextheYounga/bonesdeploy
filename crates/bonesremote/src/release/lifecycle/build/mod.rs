@@ -2,12 +2,12 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
-mod build_user;
-mod container;
-mod ownership;
-mod promote;
-mod run_scripts;
-mod tree;
+pub mod build_user;
+pub mod container;
+pub mod ownership;
+pub mod promote;
+pub mod run_scripts;
+pub mod tree;
 
 pub(crate) use build_user::{ensure_build_user_ready, validate_build_cache};
 pub(crate) use container::remove_build_container;

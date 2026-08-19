@@ -138,7 +138,7 @@ pub fn infer_remote_connection_details(remote_name: &str) -> Result<Option<Remot
     Ok(parse_remote_url(&url))
 }
 
-fn parse_remote_url(url: &str) -> Option<RemoteConnectionDetails> {
+pub fn parse_remote_url(url: &str) -> Option<RemoteConnectionDetails> {
     parse_ssh_style_url(url.trim()).or_else(|| parse_scp_style_url(url.trim()))
 }
 
@@ -180,76 +180,4 @@ fn parse_scp_style_url(url: &str) -> Option<RemoteConnectionDetails> {
     }
 
     Some(RemoteConnectionDetails { host: host.to_string(), port: "22".to_string(), repo_path: right.to_string() })
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::{branch_exists_at, parse_remote_url, parse_scp_style_url, parse_ssh_style_url};
-
-    #[test]
-    fn branch_exists_reports_missing_branch_without_error() {
-        assert_eq!(branch_exists_at(Path::new("/path/that/does/not/exist"), "main").ok(), Some(false));
-    }
-
-    #[test]
-    fn parse_ssh_style_url_parses_host_port_and_repo_path() {
-        let details = parse_ssh_style_url("ssh://git@example.com:2222/home/git/myapp.git");
-        assert!(details.is_some());
-        if let Some(details) = details {
-            assert_eq!(details.host, "example.com");
-            assert_eq!(details.port, "2222");
-            assert_eq!(details.repo_path, "/home/git/myapp.git");
-        }
-    }
-
-    #[test]
-    fn parse_ssh_style_url_defaults_port_to_22() {
-        let details = parse_ssh_style_url("ssh://git@example.com/home/git/myapp.git");
-        assert!(details.is_some());
-        if let Some(details) = details {
-            assert_eq!(details.host, "example.com");
-            assert_eq!(details.port, "22");
-            assert_eq!(details.repo_path, "/home/git/myapp.git");
-        }
-    }
-
-    #[test]
-    fn parse_scp_style_url_parses_absolute_repo_path() {
-        let details = parse_scp_style_url("git@example.com:/home/git/myapp.git");
-        assert!(details.is_some());
-        if let Some(details) = details {
-            assert_eq!(details.host, "example.com");
-            assert_eq!(details.port, "22");
-            assert_eq!(details.repo_path, "/home/git/myapp.git");
-        }
-    }
-
-    #[test]
-    fn parse_scp_style_url_trims_surrounding_whitespace() {
-        let details = parse_scp_style_url("git@example.com : /home/git/myapp.git");
-        assert!(details.is_some());
-        if let Some(details) = details {
-            assert_eq!(details.host, "example.com");
-            assert_eq!(details.port, "22");
-            assert_eq!(details.repo_path, "/home/git/myapp.git");
-        }
-    }
-
-    #[test]
-    fn parse_remote_url_rejects_non_git_paths() {
-        assert!(parse_remote_url("ssh://git@example.com:22/home/git/myapp").is_none());
-        assert!(parse_remote_url("git@example.com:/home/git/myapp").is_none());
-    }
-
-    #[test]
-    fn parse_remote_url_rejects_relative_scp_paths() {
-        assert!(parse_remote_url("git@example.com:myapp.git").is_none());
-    }
-
-    #[test]
-    fn parse_remote_url_rejects_non_ssh_urls() {
-        assert!(parse_remote_url("https://example.com/org/repo.git").is_none());
-    }
 }

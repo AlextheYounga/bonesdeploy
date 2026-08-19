@@ -4,11 +4,11 @@ use bonesdeploy_core::paths;
 use crate::privileges;
 use crate::ui;
 
-mod apparmor;
-mod security;
-mod services;
-mod site;
-mod system;
+pub mod apparmor;
+pub mod security;
+pub mod services;
+pub mod site;
+pub mod system;
 
 pub fn run(site: Option<&str>, exhaustive: bool) -> Result<()> {
     privileges::ensure_root("bonesremote doctor")?;

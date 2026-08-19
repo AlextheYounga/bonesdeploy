@@ -11,16 +11,20 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
+use std::sync::OnceLock;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, anyhow, bail};
+
+static BONESINFRA_READY: OnceLock<Result<(), String>> = OnceLock::new();
 
 /// Absolute path to the compiled `bonesdeploy` binary.
 pub fn binary() -> &'static str {
     env!("CARGO_BIN_EXE_bonesdeploy")
 }
 
-/// A throwaway project workspace: a git repository paired with an isolated
-/// HOME and XDG roots that child `bonesdeploy` processes use as their own.
+/// A throwaway project workspace: a git repository paired with isolated HOME,
+/// configuration, data, and state roots. The disposable Cargo cache is shared
+/// so command tests bootstrap the embedded bonesinfra runtime only once.
 pub struct TestEnv {
     _temp: tempfile::TempDir,
     repo: PathBuf,
@@ -30,6 +34,7 @@ pub struct TestEnv {
 impl TestEnv {
     /// Creates a temporary git repository and an isolated HOME.
     pub fn new() -> Result<Self> {
+        ensure_bonesinfra_ready()?;
         let temp = tempfile::TempDir::new().context("failed to create temp workspace")?;
         let repo = temp.path().join("repo");
         let home = temp.path().join("home");
@@ -47,8 +52,8 @@ impl TestEnv {
         &self.home
     }
 
-    /// Runs `bonesdeploy` in this repository with an isolated HOME and XDG
-    /// roots, returning its raw output.
+    /// Runs `bonesdeploy` with isolated user state and a shared disposable
+    /// cache, returning its raw output.
     pub fn run(&self, args: &[&str]) -> Result<Output> {
         Command::new(binary())
             .args(args)
@@ -56,11 +61,25 @@ impl TestEnv {
             .env("HOME", &self.home)
             .env("XDG_CONFIG_HOME", self.home.join(".config"))
             .env("XDG_DATA_HOME", self.home.join(".local/share"))
-            .env("XDG_CACHE_HOME", self.home.join(".cache"))
+            .env("XDG_CACHE_HOME", shared_cache_home())
             .env("XDG_STATE_HOME", self.home.join(".local/state"))
             .output()
             .context("failed to run bonesdeploy")
     }
+}
+
+fn shared_cache_home() -> PathBuf {
+    Path::new(env!("CARGO_TARGET_TMPDIR")).join("bonesdeploy-command-cache")
+}
+
+fn ensure_bonesinfra_ready() -> Result<()> {
+    BONESINFRA_READY
+        .get_or_init(|| {
+            bonesinfra::prepare_in(&shared_cache_home().join("bonesdeploy")).map_err(|error| format!("{error:#}"))
+        })
+        .as_ref()
+        .map(|_| ())
+        .map_err(|error| anyhow!(error.clone()))
 }
 
 /// Initializes a fresh git repository on a `master` branch at `path`.

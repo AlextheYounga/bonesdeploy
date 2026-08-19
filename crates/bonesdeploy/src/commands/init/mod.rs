@@ -4,8 +4,8 @@ use std::path::Path;
 use anyhow::Result;
 use console::style;
 
-mod config;
-mod framework;
+pub mod config;
+pub mod framework;
 mod scaffold;
 
 pub struct Args {
@@ -28,9 +28,9 @@ use crate::ui::output;
 use bonesdeploy_core::paths;
 
 #[derive(Debug)]
-pub(super) struct FrameworkSelection {
-    template: Option<String>,
-    config: serde_json::Map<String, serde_json::Value>,
+pub struct FrameworkSelection {
+    pub template: Option<String>,
+    pub config: serde_json::Map<String, serde_json::Value>,
 }
 
 pub fn run(args: &Args) -> Result<()> {

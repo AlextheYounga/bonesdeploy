@@ -10,9 +10,9 @@ use super::build_user::{BuildScriptEnv, build_script_command, build_user_command
 use super::ownership;
 use crate::release::output;
 
-const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
+pub const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
 
-fn service_command(build_user: &str, container_name: &str) -> Command {
+pub fn service_command(build_user: &str, container_name: &str) -> Command {
     let mut command = Command::new("systemd-run");
     // Conmon reports readiness while Podman remains responsible for stopping the container.
     command
@@ -23,7 +23,7 @@ fn service_command(build_user: &str, container_name: &str) -> Command {
     command
 }
 
-pub(super) struct BuildContainer<'a> {
+pub struct BuildContainer<'a> {
     env: &'a BuildScriptEnv<'a>,
     source_root: &'a Path,
     name: String,
@@ -32,7 +32,7 @@ pub(super) struct BuildContainer<'a> {
 }
 
 impl<'a> BuildContainer<'a> {
-    pub(super) fn start(source_root: &'a Path, env: &'a BuildScriptEnv<'a>) -> Result<Self> {
+    pub fn start(source_root: &'a Path, env: &'a BuildScriptEnv<'a>) -> Result<Self> {
         let name = container_name(env.project_name);
         remove_existing(source_root, env, &name)?;
         ensure_image(source_root, env, &name)?;
@@ -64,7 +64,7 @@ impl<'a> BuildContainer<'a> {
         Ok(container)
     }
 
-    pub(super) fn run_script(&self, script: &Path, log_path: &Path) -> Result<ExitStatus> {
+    pub fn run_script(&self, script: &Path, log_path: &Path) -> Result<ExitStatus> {
         let script_file =
             fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
         let description = format!("podman build script {}", script.display());
@@ -82,7 +82,7 @@ impl<'a> BuildContainer<'a> {
         output::stream_child_output(&mut child, log_path, &description)
     }
 
-    pub(super) fn remove(&mut self) -> Result<()> {
+    pub fn remove(&mut self) -> Result<()> {
         if self.removed {
             return Ok(());
         }
@@ -97,13 +97,13 @@ impl<'a> BuildContainer<'a> {
         Ok(())
     }
 
-    fn remove_build_env_file(&mut self) {
+    pub fn remove_build_env_file(&mut self) {
         if let Some(path) = self.build_env_file.take() {
             fs::remove_file(path).ok();
         }
     }
 
-    fn copy_deployment_tree(&self) -> Result<()> {
+    pub fn copy_deployment_tree(&self) -> Result<()> {
         let mut archive = Command::new("tar")
             .current_dir(self.env.deployment_dir)
             .args(["--create", "--file=-", "."])
@@ -146,14 +146,25 @@ impl Drop for BuildContainer<'_> {
     }
 }
 
-struct ContainerCreate<'a> {
+pub struct ContainerCreate<'a> {
     source_root: &'a Path,
     env: &'a BuildScriptEnv<'a>,
     container_name: &'a str,
     build_env_file: &'a Path,
 }
 
-fn configure_create(command: &mut Command, create: &ContainerCreate<'_>) {
+pub fn build_container_command(
+    source_root: &Path,
+    env: &BuildScriptEnv<'_>,
+    container_name: &str,
+    build_env_file: &Path,
+) -> Command {
+    let mut command = service_command(env.build_user, container_name);
+    configure_create(&mut command, &ContainerCreate { source_root, env, container_name, build_env_file });
+    command
+}
+
+pub fn configure_create(command: &mut Command, create: &ContainerCreate<'_>) {
     let source_mount = format!("{}:/workspace/source", create.source_root.display());
     let cache_mount = format!("{}:/workspace/cache:rw", create.env.build_cache_dir.display());
     command
@@ -193,7 +204,7 @@ fn configure_create(command: &mut Command, create: &ContainerCreate<'_>) {
         .args(["sleep", "infinity"]);
 }
 
-fn write_build_env_file(source_root: &Path, env: &BuildScriptEnv<'_>) -> Result<PathBuf> {
+pub fn write_build_env_file(source_root: &Path, env: &BuildScriptEnv<'_>) -> Result<PathBuf> {
     let path = source_root.join(format!(".env.build.{}", process::id()));
     let mut file = OpenOptions::new()
         .write(true)
@@ -213,7 +224,7 @@ fn write_build_env_file(source_root: &Path, env: &BuildScriptEnv<'_>) -> Result<
     Ok(path)
 }
 
-fn configure_exec(command: &mut Command, source_root: &Path, container_name: &str) {
+pub fn configure_exec(command: &mut Command, source_root: &Path, container_name: &str) {
     command.current_dir(source_root).args([
         "podman",
         "exec",
@@ -225,7 +236,7 @@ fn configure_exec(command: &mut Command, source_root: &Path, container_name: &st
     ]);
 }
 
-fn configure_deployment_extract_command(command: &mut Command, source_root: &Path, container_name: &str) {
+pub fn configure_deployment_extract_command(command: &mut Command, source_root: &Path, container_name: &str) {
     command.current_dir(source_root).args([
         "podman",
         "exec",
@@ -237,15 +248,15 @@ fn configure_deployment_extract_command(command: &mut Command, source_root: &Pat
     ]);
 }
 
-fn configure_remove(command: &mut Command, source_root: &Path, container_name: &str) {
+pub fn configure_remove(command: &mut Command, source_root: &Path, container_name: &str) {
     command.current_dir(source_root).args(["podman", "rm", "--force", "--time", "0", "--ignore", container_name]);
 }
 
-fn container_name(project_name: &str) -> String {
+pub fn container_name(project_name: &str) -> String {
     format!("bonesdeploy-build-{project_name}")
 }
 
-pub(crate) fn remove_build_container(build_user: &str, project_name: &str, working_dir: &Path) -> Result<()> {
+pub fn remove_build_container(build_user: &str, project_name: &str, working_dir: &Path) -> Result<()> {
     let name = container_name(project_name);
     let mut remove = build_user_control_command(build_user);
     configure_remove(&mut remove, working_dir, &name);
@@ -256,7 +267,7 @@ pub(crate) fn remove_build_container(build_user: &str, project_name: &str, worki
     Ok(())
 }
 
-fn remove_existing(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
+pub fn remove_existing(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
     let mut remove = build_user_control_command(env.build_user);
     configure_remove(&mut remove, source_root, container_name);
     let status =
@@ -267,7 +278,7 @@ fn remove_existing(source_root: &Path, env: &BuildScriptEnv<'_>, container_name:
     Ok(())
 }
 
-fn ensure_image(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
+pub fn ensure_image(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {
     let mut exists = build_user_command(env.build_user);
     exists.current_dir(source_root).args(["podman", "image", "exists", BUILD_IMAGE]);
     let status = exists.status().with_context(|| format!("Failed to inspect build image for {container_name}"))?;
@@ -278,53 +289,5 @@ fn ensure_image(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &s
             env.build_user
         ),
         _ => bail!("Failed to inspect build image for {container_name}: {status}"),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{env, fs, os::unix::fs::PermissionsExt, process};
-
-    use anyhow::Result;
-
-    use super::*;
-
-    #[test]
-    fn build_env_values_use_a_private_env_file_instead_of_command_arguments() -> Result<()> {
-        let root = env::temp_dir().join(format!("bonesremote-build-env-file-{}", process::id()));
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir_all(&root)?;
-        let variables = vec![("PUBLIC_API_URL".to_string(), "https://example.test/private-value".to_string())];
-        let env = BuildScriptEnv {
-            project_name: "demo",
-            build_user: "demo-build",
-            build_group: "demo-build",
-            web_root: ".output/public",
-            deployment_dir: &root,
-            build_cache_dir: &root,
-            build_env_vars: &variables,
-            script_timeout_seconds: None,
-        };
-
-        let env_file = write_build_env_file(&root, &env)?;
-        let mut command = service_command(env.build_user, "bonesdeploy-build-demo");
-        let create = ContainerCreate {
-            source_root: &root,
-            env: &env,
-            container_name: "bonesdeploy-build-demo",
-            build_env_file: &env_file,
-        };
-        configure_create(&mut command, &create);
-        let arguments: Vec<_> = command.get_args().map(|argument| argument.to_string_lossy().into_owned()).collect();
-
-        let env_file_argument = env_file.to_string_lossy();
-        assert!(arguments.windows(2).any(|pair| pair[0] == "--env-file" && pair[1] == env_file_argument.as_ref()));
-        assert!(!arguments.iter().any(|argument| argument.contains("private-value")));
-        assert_eq!(fs::metadata(&env_file)?.permissions().mode() & 0o777, 0o600);
-        assert_eq!(fs::read_to_string(&env_file)?, "PUBLIC_API_URL=https://example.test/private-value\n");
-
-        fs::remove_file(env_file).ok();
-        fs::remove_dir_all(root).ok();
-        Ok(())
     }
 }

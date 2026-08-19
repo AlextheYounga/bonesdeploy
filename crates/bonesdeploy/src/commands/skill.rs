@@ -89,7 +89,7 @@ pub async fn build_report() -> Result<Report> {
     if ssl_enabled { Ok(ready_report(cfg)) } else { Ok(initialized_report(cfg, true)) }
 }
 
-pub(crate) fn prompt_free_init_command(project: &str) -> String {
+pub fn prompt_free_init_command(project: &str) -> String {
     format!("bonesdeploy init --non-interactive --project-name {project} --host <host>")
 }
 
@@ -217,35 +217,4 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones) -> Result<bool> {
     session.close().await?;
 
     Ok(enabled)
-}
-
-#[cfg(test)]
-mod tests {
-    use anyhow::Result;
-    use clap::Parser;
-
-    use crate::cli::args::{Cli, Command};
-    use crate::commands::skill::prompt_free_init_command;
-
-    /// The guide's prompt-free init command must stay valid against the real CLI.
-    /// If the flag drifts again, copy-pasting the suggestion breaks for new users.
-    #[test]
-    fn prompt_free_init_command_parses_with_cli() -> Result<()> {
-        let command = prompt_free_init_command("atlas");
-        let mut parts = command.split_whitespace();
-        assert_eq!(parts.next(), Some("bonesdeploy"));
-        let argv: Vec<&str> = parts.collect();
-        let parsed = Cli::try_parse_from(["bonesdeploy"].into_iter().chain(argv.iter().copied()))
-            .map_err(|err| anyhow::anyhow!("guide init command should parse, got: {err}"))?;
-        // Force-use parsed to confirm it is the expected variant.
-        assert!(matches!(parsed.command, Command::Init { .. }));
-        Ok(())
-    }
-
-    #[test]
-    fn guide_compatibility_command_still_parses() -> Result<()> {
-        let parsed = Cli::try_parse_from(["bonesdeploy", "guide", "--format", "json"])?;
-        assert!(matches!(parsed.command, Command::Guide { .. }));
-        Ok(())
-    }
 }

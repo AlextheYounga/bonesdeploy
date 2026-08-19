@@ -130,7 +130,7 @@ pub(super) fn decrypt(path: &Path) -> Result<Vec<u8>> {
     Ok(output.stdout)
 }
 
-fn extract_fingerprint(output: &str) -> Option<String> {
+pub fn extract_fingerprint(output: &str) -> Option<String> {
     for line in output.lines() {
         if line.starts_with("fpr:") {
             let parts: Vec<&str> = line.split(':').collect();
@@ -140,21 +140,4 @@ fn extract_fingerprint(output: &str) -> Option<String> {
         }
     }
     None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::extract_fingerprint;
-
-    #[test]
-    fn extract_fingerprint_parses_fpr_line() {
-        let output = "tru::1:1754651437:0:3:1:3\nfpr:::::::::ABCDEF1234567890ABCDEF1234567890ABCDEF:\nuid:::::::::Test <test@example.com>:\n";
-        assert_eq!(extract_fingerprint(output).as_deref(), Some("ABCDEF1234567890ABCDEF1234567890ABCDEF"));
-    }
-
-    #[test]
-    fn extract_fingerprint_returns_none_without_fpr_line() {
-        let output = "tru::1:1754651437:0:3:1:3\nuid:::::::::Test <test@example.com>:\n";
-        assert_eq!(extract_fingerprint(output), None);
-    }
 }

@@ -32,17 +32,3 @@ pub fn doc(name: &str) -> Result<String> {
         SkillAssets::get(&path).ok_or_else(|| anyhow!("no skill doc named {name}. Run `bonesdeploy skill list`."))?;
     Ok(String::from_utf8(asset.data.to_vec())?)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::doc_names;
-
-    #[test]
-    fn skill_doc_names_cover_the_expected_topics() {
-        let names = doc_names();
-        assert!(names.contains(&"commands".to_string()), "missing `commands` skill doc");
-        assert!(names.contains(&"workflows".to_string()), "missing `workflows` skill doc");
-        assert!(names.contains(&"methodology".to_string()), "missing `methodology` skill doc");
-        assert!(!names.contains(&"SKILL".to_string()), "SKILL.md must be excluded from `skill list`");
-    }
-}

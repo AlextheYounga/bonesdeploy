@@ -44,7 +44,7 @@ impl SiteMutation {
     /// its serialization lock becomes available: the config is loaded and the
     /// site identity verified *before* terminating, then the lock is taken and
     /// the guard assembled for all subsequent file mutations.
-    pub(crate) fn adopt(site: &str, config: Bones, lock: DeploymentLock) -> Self {
+    pub fn adopt(site: &str, config: Bones, lock: DeploymentLock) -> Self {
         Self::new(site, config, lock)
     }
 
@@ -56,7 +56,7 @@ impl SiteMutation {
         &self.site
     }
 
-    pub(crate) fn config(&self) -> &Bones {
+    pub fn config(&self) -> &Bones {
         &self.config
     }
 

@@ -20,17 +20,17 @@ struct PreparedDeployment {
     previous_release: PathBuf,
 }
 
-pub(super) struct DeploymentLifecycleCoordinator<'a> {
+pub struct DeploymentLifecycleCoordinator<'a> {
     mutation: &'a SiteMutation,
     snapshot: lifecycle::DeploymentSnapshot,
 }
 
 impl<'a> DeploymentLifecycleCoordinator<'a> {
-    pub(super) fn new(mutation: &'a SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Self {
+    pub fn new(mutation: &'a SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Self {
         Self { mutation, snapshot }
     }
 
-    pub(super) fn run(self) -> Result<()> {
+    pub fn run(self) -> Result<()> {
         run_staged_deployment(self.mutation, self.snapshot)
     }
 }
@@ -279,7 +279,7 @@ fn finish_failed_activation(
     finish_abort(mutation, context, error)
 }
 
-fn restore_previous_release(project_root: &Path, previous_release: &Path) -> Result<()> {
+pub fn restore_previous_release(project_root: &Path, previous_release: &Path) -> Result<()> {
     let current_link = PathBuf::from(project_root).join(paths::CURRENT_LINK);
     release_state::point_symlink_atomically(&current_link, previous_release)
 }
@@ -335,37 +335,4 @@ fn abort_context_only(mutation: &SiteMutation, context: Option<&Path>, mut error
         error = error.context(format!("Cleanup failed: {cleanup_error:#}"));
     }
     error
-}
-
-#[cfg(test)]
-mod tests {
-    use std::env;
-    use std::fs;
-    use std::os::unix::fs::symlink;
-    use std::path::Path;
-    use std::process;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    use anyhow::Result;
-    use bonesdeploy_core::paths;
-
-    use super::restore_previous_release;
-
-    #[test]
-    fn failed_activation_restores_previous_release() -> Result<()> {
-        let nonce = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-        let root = env::temp_dir().join(format!("bonesremote_restore_{}_{}", process::id(), nonce));
-        let releases = root.join(paths::RELEASES_DIR);
-        let previous = releases.join("previous");
-        let failed = releases.join("failed");
-        fs::create_dir_all(&previous)?;
-        fs::create_dir(&failed)?;
-        symlink(&failed, root.join(paths::CURRENT_LINK))?;
-
-        restore_previous_release(Path::new(&root), &previous)?;
-
-        assert_eq!(fs::read_link(root.join(paths::CURRENT_LINK))?, previous);
-        fs::remove_dir_all(root)?;
-        Ok(())
-    }
 }

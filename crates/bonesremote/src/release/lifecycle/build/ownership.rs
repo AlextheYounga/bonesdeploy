@@ -5,7 +5,7 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
 
-pub(super) fn chown_tree_to_user(path: &Path, user: &str, group: &str) -> Result<()> {
+pub fn chown_tree_to_user(path: &Path, user: &str, group: &str) -> Result<()> {
     let uid = user_uid(user)?;
     let gid = site_group_gid(group)?;
     chown_tree(path, uid, gid)
@@ -28,13 +28,13 @@ fn chown_tree(path: &Path, uid: u32, gid: u32) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn user_uid(user: &str) -> Result<u32> {
+pub fn user_uid(user: &str) -> Result<u32> {
     let passwd = fs::read_to_string(paths::ETC_PASSWD)
         .with_context(|| format!("Failed to read {} while resolving uid for {user}", paths::ETC_PASSWD))?;
     parse_user_uid(&passwd, user)
 }
 
-pub(super) fn site_group_gid(group: &str) -> Result<u32> {
+pub fn site_group_gid(group: &str) -> Result<u32> {
     let groupfile = fs::read_to_string(paths::ETC_GROUP)
         .with_context(|| format!("Failed to read {} while sealing release", paths::ETC_GROUP))?;
     let line = groupfile
@@ -50,7 +50,7 @@ pub(super) fn site_group_gid(group: &str) -> Result<u32> {
     Ok(gid)
 }
 
-pub(super) fn parse_user_uid(passwd: &str, user: &str) -> Result<u32> {
+pub fn parse_user_uid(passwd: &str, user: &str) -> Result<u32> {
     let line = passwd
         .lines()
         .find(|line| line.starts_with(&format!("{user}:")))
@@ -61,18 +61,4 @@ pub(super) fn parse_user_uid(passwd: &str, user: &str) -> Result<u32> {
         .with_context(|| format!("User '{user}' missing uid field"))?
         .parse::<u32>()
         .with_context(|| format!("User '{user}' uid is not a valid integer"))
-}
-
-#[cfg(test)]
-mod tests {
-    use anyhow::Result;
-
-    use super::parse_user_uid;
-
-    #[test]
-    fn parse_user_uid_reads_uid_field() -> Result<()> {
-        let passwd = "root:x:0:0:root:/root:/bin/bash\ndemo-build:x:1234:1234::/nonexistent:/usr/sbin/nologin\n";
-        assert_eq!(parse_user_uid(passwd, "demo-build")?, 1234);
-        Ok(())
-    }
 }

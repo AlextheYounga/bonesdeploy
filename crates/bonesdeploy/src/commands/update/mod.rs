@@ -11,8 +11,8 @@ use crate::config;
 use crate::infra::git;
 use crate::ui::output;
 
-mod release;
-mod sync;
+pub mod release;
+pub mod sync;
 mod version;
 
 const SOURCE_REPO_URL: &str = "https://github.com/AlextheYounga/bonesdeploy.git";
@@ -110,7 +110,7 @@ fn latest_release_version() -> Result<String> {
     parse_release_tag(value.get("tag_name").and_then(serde_json::Value::as_str))
 }
 
-fn parse_release_tag(tag: Option<&str>) -> Result<String> {
+pub fn parse_release_tag(tag: Option<&str>) -> Result<String> {
     let tag = tag.ok_or_else(|| anyhow::anyhow!("GitHub release response has no tag_name"))?;
     let Some(version) = tag.strip_prefix('v') else {
         bail!("Latest GitHub release tag must start with 'v', got '{tag}'");
@@ -147,24 +147,4 @@ fn read_release_versions(source_dir: &Path, release_version: &str) -> Result<Rel
     }
 
     Ok(ReleaseVersions { bonesdeploy, bonesremote })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::parse_release_tag;
-    use anyhow::Result;
-
-    #[test]
-    fn release_tag_accepts_semver_versions() -> Result<()> {
-        assert_eq!(parse_release_tag(Some("v0.7.3"))?, "0.7.3");
-        assert_eq!(parse_release_tag(Some("v0.7.3-rc.1+build"))?, "0.7.3-rc.1+build");
-        Ok(())
-    }
-
-    #[test]
-    fn release_tag_rejects_unexpected_values() {
-        assert!(parse_release_tag(Some("0.7.3")).is_err());
-        assert!(parse_release_tag(Some("v0.7.3/tag")).is_err());
-        assert!(parse_release_tag(None).is_err());
-    }
 }

@@ -83,7 +83,7 @@ fn phase_status(phase: &DeploymentPhase) -> String {
     }
 }
 
-pub(crate) fn process_matches(active: &DeploymentRecord) -> bool {
+pub fn process_matches(active: &DeploymentRecord) -> bool {
     let stat = Path::new("/proc").join(active.pid().to_string()).join("stat");
     fs::read_to_string(stat)
         .ok()
@@ -91,23 +91,12 @@ pub(crate) fn process_matches(active: &DeploymentRecord) -> bool {
         .is_some_and(|ticks| ticks == active.process_start_ticks())
 }
 
-pub(crate) fn process_start_ticks(stat: &str) -> Option<u64> {
+pub fn process_start_ticks(stat: &str) -> Option<u64> {
     let (_, fields) = stat.rsplit_once(") ")?;
     fields.split_whitespace().nth(19)?.parse().ok()
 }
 
-pub(crate) fn current_process_start_ticks() -> Option<u64> {
+pub fn current_process_start_ticks() -> Option<u64> {
     let stat = fs::read_to_string(Path::new("/proc").join(process::id().to_string()).join("stat")).ok()?;
     process_start_ticks(&stat)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::process_start_ticks;
-
-    #[test]
-    fn parses_process_start_ticks_after_parenthesized_name() {
-        let stat = "123 (bonesremote) R 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 99 20";
-        assert_eq!(process_start_ticks(stat), Some(99));
-    }
 }

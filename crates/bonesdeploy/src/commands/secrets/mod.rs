@@ -17,7 +17,7 @@ use bonesdeploy_core::config as shared_config;
 use bonesdeploy_core::config::parse_port;
 use bonesdeploy_core::paths;
 
-mod gpg;
+pub mod gpg;
 
 const LOCAL_ENV_SECRET: &str = "infra/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
@@ -82,7 +82,7 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     Ok(())
 }
 
-fn framework_for_secrets(template: &str) -> Result<frameworks::Framework> {
+pub fn framework_for_secrets(template: &str) -> Result<frameworks::Framework> {
     if template.trim().is_empty() {
         return Ok(frameworks::Framework::Custom);
     }
@@ -212,24 +212,4 @@ fn create_temp_edit_path() -> Result<PathBuf> {
         .with_context(|| format!("Failed to create temp file {}", path.display()))?;
 
     Ok(path)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::framework_for_secrets;
-    use crate::frameworks::Framework;
-
-    #[test]
-    fn invalid_template_is_an_error() {
-        let result = framework_for_secrets("not-a-framework");
-        assert!(result.as_ref().is_err());
-        if let Err(error) = result {
-            assert!(error.to_string().contains("Invalid TEMPLATE value"));
-        }
-    }
-
-    #[test]
-    fn blank_template_uses_custom_defaults() {
-        assert!(framework_for_secrets("  ").is_ok_and(|framework| framework == Framework::Custom));
-    }
 }

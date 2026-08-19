@@ -8,33 +8,32 @@ use anyhow::{Context, Result, bail};
 
 use bonesdeploy_core::paths;
 
-mod atomic;
-pub(crate) mod record;
-pub(crate) mod releases;
-pub(crate) mod store;
+pub mod atomic;
+pub mod record;
+pub mod releases;
+pub mod store;
 
-pub(crate) use atomic::atomic_write;
-pub(crate) use record::{DeploymentPhase, DeploymentRecord, ProcessIdentity};
-pub(crate) use releases::{
+pub use atomic::atomic_write;
+pub use record::{DeploymentPhase, DeploymentRecord, ProcessIdentity};
+pub use releases::{
     current_release_dir, current_release_name, list_releases_sorted, point_symlink_atomically, release_dir, shared_dir,
 };
-pub(crate) use store::quarantine_candidates;
+pub use store::quarantine_candidates;
 
 thread_local! {
     static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
 }
 
-#[cfg(test)]
-pub(crate) fn set_sites_root_for_tests(root: PathBuf) -> ScopedRoot {
+/// Overrides the state root for the current thread until the returned scope is dropped.
+pub fn override_sites_root(root: PathBuf) -> ScopedSitesRoot {
     let prev = SITES_ROOT_OVERRIDE.with(|slot| slot.replace(Some(root)));
-    ScopedRoot(prev)
+    ScopedSitesRoot(prev)
 }
 
-#[cfg(test)]
-pub(crate) struct ScopedRoot(Option<PathBuf>);
+#[must_use = "the scope must be retained for the root override to remain active"]
+pub struct ScopedSitesRoot(Option<PathBuf>);
 
-#[cfg(test)]
-impl Drop for ScopedRoot {
+impl Drop for ScopedSitesRoot {
     fn drop(&mut self) {
         let previous = self.0.take();
         SITES_ROOT_OVERRIDE.with(|slot| {
@@ -43,15 +42,15 @@ impl Drop for ScopedRoot {
     }
 }
 
-pub(crate) fn resolved_sites_root() -> PathBuf {
+pub fn resolved_sites_root() -> PathBuf {
     SITES_ROOT_OVERRIDE.with(|slot| slot.borrow().clone()).unwrap_or_else(paths::bonesremote_sites_root)
 }
 
-pub(crate) fn resolved_site_root(site: &str) -> PathBuf {
+pub fn resolved_site_root(site: &str) -> PathBuf {
     resolved_sites_root().join(site)
 }
 
-pub(crate) fn recovery_dir(site: &str) -> PathBuf {
+pub fn recovery_dir(site: &str) -> PathBuf {
     resolved_site_root(site).join(paths::RECOVERY_DIR)
 }
 
@@ -139,57 +138,4 @@ pub fn clear_staged_release(site: &str) -> Result<()> {
     let state = store::read_state(site)?;
     let state = state.with_staged_release(None);
     store::write_state(site, &state).with_context(|| format!("Failed to clear staged release state for {site}"))
-}
-
-#[cfg(test)]
-mod tests {
-    use std::env;
-    use std::fs;
-    use std::path::PathBuf;
-    use std::process;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    use anyhow::Result;
-
-    use super::{ScopedRoot, set_sites_root_for_tests, staged_release, store};
-
-    fn temp_root(test_name: &str) -> Result<(ScopedRoot, PathBuf)> {
-        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
-        let path = env::temp_dir().join(format!("bonesremote_state_test_{}_{}_{}", process::id(), nanos, test_name));
-        fs::create_dir_all(&path)?;
-        Ok((set_sites_root_for_tests(path.clone()), path))
-    }
-
-    #[test]
-    fn write_then_read_staged_release_round_trips() -> Result<()> {
-        let (_guard, _root) = temp_root("round_trip")?;
-
-        super::write_staged_release("unitapp", "20260507_151500")?;
-        assert_eq!(super::read_staged_release("unitapp")?, "20260507_151500");
-
-        Ok(())
-    }
-
-    #[test]
-    fn read_staged_release_rejects_missing_state() -> Result<()> {
-        let (_guard, root) = temp_root("empty_state")?;
-
-        assert!(super::read_staged_release("emptyapp").is_err());
-        let state = store::read_state("emptyapp")?;
-        assert!(state.staged_release().is_none());
-        fs::remove_dir_all(root).ok();
-        Ok(())
-    }
-
-    #[test]
-    fn clear_staged_release_removes_the_pointer() -> Result<()> {
-        let (_guard, _root) = temp_root("clear_state")?;
-
-        super::write_staged_release("clearapp", "20260507_151501")?;
-        assert_eq!(staged_release("clearapp")?.as_deref(), Some("20260507_151501"));
-        super::clear_staged_release("clearapp")?;
-        assert!(staged_release("clearapp")?.is_none());
-
-        Ok(())
-    }
 }

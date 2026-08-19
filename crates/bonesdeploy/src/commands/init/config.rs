@@ -8,7 +8,7 @@ use crate::config;
 use crate::infra::git;
 use crate::ui::{output, prompts};
 
-pub(super) fn collect_fresh_config(args: &super::Args) -> Result<config::Bones> {
+pub fn collect_fresh_config(args: &super::Args) -> Result<config::Bones> {
     let project_name = config::repo_directory_name()?;
 
     if args.non_interactive {
@@ -72,7 +72,7 @@ fn cli_or_prompt(
     }
 }
 
-pub(super) fn collect_non_interactive(
+pub fn collect_non_interactive(
     project_name_hint: &str,
     existing_config: Option<&config::Bones>,
     args: &super::Args,
@@ -249,98 +249,4 @@ fn apply_existing_fields(config: &mut config::Bones, existing_config: Option<&co
     config.ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
     config.domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
     config.email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
-}
-
-#[cfg(test)]
-mod tests {
-    use anyhow::{Result, bail};
-    use bonesdeploy_core::paths;
-
-    use super::RuntimeBackend;
-    use super::collect_non_interactive;
-    use crate::config::Bones;
-
-    fn incomplete_existing(project_name: &str) -> Bones {
-        let mut config = Bones::default();
-        config.remote_name = String::from("production");
-        config.project_name = String::from(project_name);
-        config.port = String::from("22");
-        config.branch = String::from("main");
-        config
-    }
-
-    #[test]
-    fn uses_existing_and_cli_values_without_prompting() -> Result<()> {
-        let existing = incomplete_existing("atlas");
-        let args = super::super::Args {
-            non_interactive: true,
-            project_name: None,
-            branch: None,
-            remote: None,
-            host: Some(String::from("deploy.example.com")),
-            port: None,
-            template: None,
-            runtime_backend: None,
-            framework_vars: Vec::new(),
-            services: Vec::new(),
-        };
-
-        let cfg = collect_non_interactive("workspace", Some(&existing), &args)?;
-
-        assert_eq!(cfg.project_name, "atlas");
-        assert_eq!(cfg.host, "deploy.example.com");
-        assert_eq!(cfg.branch, "main");
-        assert_eq!(cfg.remote_name, "production");
-        assert_eq!(cfg.repo_path, paths::default_repo_path_for("atlas"));
-
-        Ok(())
-    }
-
-    #[test]
-    fn non_interactive_docker_backend_is_recorded() -> Result<()> {
-        let mut args = super::super::Args {
-            non_interactive: true,
-            project_name: Some(String::from("atlas")),
-            branch: None,
-            remote: None,
-            host: Some(String::from("deploy.example.com")),
-            port: None,
-            template: None,
-            runtime_backend: Some(String::from("docker")),
-            framework_vars: Vec::new(),
-            services: Vec::new(),
-        };
-
-        let config = collect_non_interactive("workspace", None, &args)?;
-        assert_eq!(config.runtime.backend, RuntimeBackend::Docker);
-
-        args.runtime_backend = Some(String::from("compose"));
-        assert!(collect_non_interactive("workspace", None, &args).is_err());
-        Ok(())
-    }
-
-    #[test]
-    fn requires_host_when_existing_and_cli_are_missing_it() -> Result<()> {
-        let existing = incomplete_existing("atlas");
-        let args = super::super::Args {
-            non_interactive: true,
-            project_name: None,
-            branch: None,
-            remote: Some(String::from("missing-test-remote")),
-            host: None,
-            port: None,
-            template: None,
-            runtime_backend: None,
-            framework_vars: Vec::new(),
-            services: Vec::new(),
-        };
-
-        let result = collect_non_interactive("workspace", Some(&existing), &args);
-        let Err(err) = result else {
-            bail!("missing host should fail");
-        };
-        assert!(err.to_string().contains("--host is required"));
-
-        Ok(())
-    }
 }

@@ -46,7 +46,7 @@ pub async fn run_cmd(session: &Session, cmd: &str) -> Result<String> {
         .with_context(|| format!("Failed to execute remote command: {cmd}"))?;
 
     if !output.status.success() {
-        bail!("{}", format_remote_command_failure(cmd, &output.stdout, &output.stderr));
+        bail!("{}", remote_command_failure(cmd, &output.stdout, &output.stderr));
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
@@ -113,13 +113,13 @@ pub async fn run_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[u8]
 
     let output = child.wait_with_output().await.context("Failed to wait for remote command")?;
     if !output.status.success() {
-        bail!("{}", format_remote_command_failure(cmd, &output.stdout, &output.stderr));
+        bail!("{}", remote_command_failure(cmd, &output.stdout, &output.stderr));
     }
 
     Ok(())
 }
 
-fn format_remote_command_failure(cmd: &str, stdout: &[u8], stderr: &[u8]) -> String {
+pub fn remote_command_failure(cmd: &str, stdout: &[u8], stderr: &[u8]) -> String {
     let stdout = String::from_utf8_lossy(stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(stderr).trim().to_string();
     let mut message = format!("Remote command failed: {cmd}");
@@ -135,27 +135,4 @@ fn format_remote_command_failure(cmd: &str, stdout: &[u8], stderr: &[u8]) -> Str
     }
 
     message
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{format_remote_command_failure, shell_quote};
-
-    #[test]
-    fn shell_quote_preserves_single_quotes() {
-        assert_eq!(shell_quote("site's"), "'site'\\''s'");
-    }
-
-    #[test]
-    fn remote_command_failure_includes_stdout_and_stderr() {
-        let message = format_remote_command_failure(
-            "bonesremote doctor --site demo",
-            b"issue one\nissue two\n",
-            b"Doctor found 2 issues\n",
-        );
-
-        assert!(message.contains("Remote command failed: bonesremote doctor --site demo"));
-        assert!(message.contains("stdout:\nissue one\nissue two"));
-        assert!(message.contains("stderr:\nDoctor found 2 issues"));
-    }
 }

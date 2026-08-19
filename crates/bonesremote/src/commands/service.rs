@@ -70,19 +70,9 @@ fn restart_args(target: &str) -> [&str; 3] {
     ["restart", "--", target]
 }
 
-fn target_name_for_registered_site(site: &str, registered_site: &str) -> Result<String> {
+pub fn target_name_for_registered_site(site: &str, registered_site: &str) -> Result<String> {
     if registered_site != site {
         bail!("Registered site state belongs to '{registered_site}', expected '{site}'");
     }
     Ok(paths::site_target_name(site))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::target_name_for_registered_site;
-
-    #[test]
-    fn site_cannot_restart_another_projects_target() {
-        assert!(target_name_for_registered_site("shop", "shop-admin").is_err());
-    }
 }

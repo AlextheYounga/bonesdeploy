@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum Status {
+pub enum Status {
     Pass,
     Fail,
     Unverified,
@@ -10,37 +10,37 @@ pub(super) enum Status {
 }
 
 impl Status {
-    pub(super) fn requires_failure(self) -> bool {
+    pub fn requires_failure(self) -> bool {
         matches!(self, Self::Fail | Self::Unverified)
     }
 }
 
-pub(super) struct Finding {
-    pub(super) rule: &'static str,
-    pub(super) observed: String,
-    pub(super) remediation: String,
-    pub(super) status: Status,
+pub struct Finding {
+    pub rule: &'static str,
+    pub observed: String,
+    pub remediation: String,
+    pub status: Status,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct Account {
-    pub(super) name: String,
-    pub(super) uid: u32,
-    pub(super) gid: u32,
-    pub(super) shell: String,
-    pub(super) groups: BTreeSet<u32>,
+pub struct Account {
+    pub name: String,
+    pub uid: u32,
+    pub gid: u32,
+    pub shell: String,
+    pub groups: BTreeSet<u32>,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct Site {
-    pub(super) name: String,
-    pub(super) project_root: PathBuf,
-    pub(super) runtime: Account,
-    pub(super) build: Account,
+pub struct Site {
+    pub name: String,
+    pub project_root: PathBuf,
+    pub runtime: Account,
+    pub build: Account,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum FileKind {
+pub enum FileKind {
     Directory,
     File,
     Symlink,
@@ -48,29 +48,29 @@ pub(super) enum FileKind {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct FileNode {
-    pub(super) path: PathBuf,
-    pub(super) kind: FileKind,
-    pub(super) uid: u32,
-    pub(super) gid: u32,
-    pub(super) mode: u32,
-    pub(super) has_acl: bool,
+pub struct FileNode {
+    pub path: PathBuf,
+    pub kind: FileKind,
+    pub uid: u32,
+    pub gid: u32,
+    pub mode: u32,
+    pub has_acl: bool,
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct PathTree {
-    pub(super) requested: PathBuf,
-    pub(super) nodes: BTreeMap<PathBuf, FileNode>,
+pub struct PathTree {
+    pub requested: PathBuf,
+    pub nodes: BTreeMap<PathBuf, FileNode>,
 }
 
 impl PathTree {
-    pub(super) fn node(&self, path: &Path) -> Option<&FileNode> {
+    pub fn node(&self, path: &Path) -> Option<&FileNode> {
         self.nodes.get(path)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum CurrentState {
+pub enum CurrentState {
     Missing,
     Broken,
     NotSymlink,
@@ -78,33 +78,33 @@ pub(super) enum CurrentState {
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct ReleaseEvidence {
-    pub(super) site: String,
-    pub(super) releases_root: PathBuf,
-    pub(super) current: CurrentState,
-    pub(super) filesystem: PathTree,
+pub struct ReleaseEvidence {
+    pub site: String,
+    pub releases_root: PathBuf,
+    pub current: CurrentState,
+    pub filesystem: PathTree,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub(super) enum PolicyDecision {
+pub enum PolicyDecision {
     Allowed(String),
     Denied,
     Unverified(String),
 }
 
 #[derive(Clone, Debug)]
-pub(super) struct SudoEvidence {
-    pub(super) user: String,
-    pub(super) decision: PolicyDecision,
+pub struct SudoEvidence {
+    pub user: String,
+    pub decision: PolicyDecision,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct Rule {
-    pub(super) name: &'static str,
-    pub(super) remediation: &'static str,
+pub struct Rule {
+    pub name: &'static str,
+    pub remediation: &'static str,
 }
 
-pub(super) fn unverified(rule: &'static str, observed: String) -> Finding {
+pub fn unverified(rule: &'static str, observed: String) -> Finding {
     Finding {
         rule,
         observed,
@@ -113,6 +113,6 @@ pub(super) fn unverified(rule: &'static str, observed: String) -> Finding {
     }
 }
 
-pub(super) fn finding(status: Status, rule: Rule, observed: String) -> Finding {
+pub fn finding(status: Status, rule: Rule, observed: String) -> Finding {
     Finding { rule: rule.name, observed, remediation: rule.remediation.to_string(), status }
 }

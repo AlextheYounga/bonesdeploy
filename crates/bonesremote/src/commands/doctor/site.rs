@@ -12,7 +12,7 @@ use crate::runtime::docker;
 
 use super::services;
 
-pub(crate) fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
+pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if let Err(error) = config::validate_site_name(site) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
@@ -112,7 +112,7 @@ fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {
     }
 }
 
-fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
+pub fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     if branch.is_empty() {
         return;
     }
@@ -166,26 +166,5 @@ fn check_site_layout(shared_root: &Path, releases_root: &Path, issues: &mut Vec<
 
     if !releases_root.is_dir() {
         issues.push(format!("releases root is missing: {}", releases_root.display()));
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{env, fs, process, process::Command};
-
-    #[test]
-    fn empty_bare_repo_is_pending_before_first_push() {
-        let root = env::temp_dir().join(format!("bonesremote-doctor-empty-repo-{}", process::id()));
-        let _ = fs::remove_dir_all(&root);
-        let output = Command::new("git").args(["init", "--bare", root.to_str().unwrap_or_default()]).output();
-        assert!(output.is_ok_and(|output| output.status.success()));
-
-        let mut issues = Vec::new();
-        let mut pending = Vec::new();
-        super::check_branch_ref(root.to_str().unwrap_or_default(), "master", &mut issues, &mut pending);
-
-        let _ = fs::remove_dir_all(root);
-        assert!(issues.is_empty());
-        assert_eq!(pending.len(), 1);
     }
 }

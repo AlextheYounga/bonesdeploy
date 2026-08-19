@@ -201,7 +201,7 @@ async fn check_remote_doctor(cfg: &config::Bones, verbose: bool) -> (Option<Stri
     }
 }
 
-fn render_remote_doctor_output(output: &str, verbose: bool) -> bool {
+pub fn render_remote_doctor_output(output: &str, verbose: bool) -> bool {
     let pending = output.contains("has not been pushed yet");
     if verbose {
         print!("{output}");
@@ -218,7 +218,7 @@ fn render_remote_doctor_output(output: &str, verbose: bool) -> bool {
     pending
 }
 
-fn strip_ansi(input: &str) -> String {
+pub fn strip_ansi(input: &str) -> String {
     let chars: Vec<char> = input.chars().collect();
     let mut out = String::with_capacity(input.len());
     let mut i = 0;
@@ -238,27 +238,4 @@ fn strip_ansi(input: &str) -> String {
         i += 1;
     }
     out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{render_remote_doctor_output, strip_ansi};
-
-    #[test]
-    fn verbose_remote_report_preserves_pending_state() {
-        assert!(render_remote_doctor_output(
-            "bonesremote doctor\n  • deploy branch 'main' has not been pushed yet\n",
-            true
-        ));
-        assert!(!render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
-    }
-
-    #[test]
-    fn strip_ansi_removes_sgr_color_sequences() {
-        assert_eq!(
-            strip_ansi("\x1b[1;33m•\x1b[0m deploy branch 'master' has not been pushed yet"),
-            "• deploy branch 'master' has not been pushed yet"
-        );
-        assert_eq!(strip_ansi("plain text"), "plain text");
-    }
 }

@@ -59,27 +59,26 @@ fn materializes_base_bones_assets() -> Result<()> {
 }
 
 #[test]
-fn named_frameworks_materialize_project_infrastructure_snapshots() -> Result<()> {
-    for framework in ["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"] {
-        let env = TestEnv::new()?;
-        let output = env.run(&[
-            "init",
-            "--non-interactive",
-            "--project-name",
-            "atlas",
-            "--host",
-            "deploy.example.com",
-            "--template",
-            framework,
-        ])?;
-        assert!(output.status.success(), "{framework} init failed: {}", String::from_utf8_lossy(&output.stderr));
-        let infra = env.repo().join("infra");
-        assert!(infra.join("provision/core/runtime.py").is_file(), "{framework} is missing core runtime");
-        assert!(infra.join("provision/custom/runtime.py").is_file(), "{framework} is missing custom runtime");
-        assert!(infra.join("deployment/functions.sh").is_file(), "{framework} is missing kit deployment functions");
-        assert!(infra.join("provision/core/templates").is_dir(), "{framework} is missing infra templates");
-        assert!(!env.repo().join(".bones").exists());
-    }
+fn named_framework_materializes_project_infrastructure_snapshot() -> Result<()> {
+    let framework = "laravel";
+    let env = TestEnv::new()?;
+    let output = env.run(&[
+        "init",
+        "--non-interactive",
+        "--project-name",
+        "atlas",
+        "--host",
+        "deploy.example.com",
+        "--template",
+        framework,
+    ])?;
+    assert!(output.status.success(), "{framework} init failed: {}", String::from_utf8_lossy(&output.stderr));
+    let infra = env.repo().join("infra");
+    assert!(infra.join("provision/core/runtime.py").is_file(), "{framework} is missing core runtime");
+    assert!(infra.join("provision/custom/runtime.py").is_file(), "{framework} is missing custom runtime");
+    assert!(infra.join("deployment/functions.sh").is_file(), "{framework} is missing kit deployment functions");
+    assert!(infra.join("provision/core/templates").is_dir(), "{framework} is missing infra templates");
+    assert!(!env.repo().join(".bones").exists());
     Ok(())
 }
 

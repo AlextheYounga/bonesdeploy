@@ -6,7 +6,8 @@
 //! keeps the materialized copy in sync with the embedded source: any change
 //! to the embedded tree triggers a fresh extraction and reinstall.
 
-use std::fs;
+use std::borrow::Cow;
+use std::fs::{self, OpenOptions};
 use std::hash::{DefaultHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -75,16 +76,39 @@ fn base_command(executable: &Path, args: &[&str]) -> Command {
 }
 
 fn ensure_available() -> Result<PathBuf> {
-    let checkout = checkout_dir();
+    ensure_available_in(&checkout_dir())
+}
+
+/// Materializes and installs the embedded Python runtime below `cache_root`.
+///
+/// # Errors
+/// Fails when the runtime cannot be materialized or installed.
+pub fn prepare_in(cache_root: &Path) -> Result<()> {
+    ensure_available_in(&cache_root.join(CHECKOUT_DIR)).map(|_| ())
+}
+
+fn ensure_available_in(checkout: &Path) -> Result<PathBuf> {
+    let cache_root = checkout.parent().context("bonesinfra checkout has no cache root")?;
+    fs::create_dir_all(cache_root).with_context(|| format!("Failed to create {}", cache_root.display()))?;
+    let lock_path = cache_root.join(".bonesinfra.lock");
+    let lock = OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(&lock_path)
+        .with_context(|| format!("Failed to open bonesinfra lock at {}", lock_path.display()))?;
+    lock.lock().with_context(|| format!("Failed to lock bonesinfra runtime at {}", lock_path.display()))?;
+
     let venv_python = checkout.join(".venv").join("bin").join("python");
-    let stamp = embedded_stamp();
+    let stamp = embedded_source_version();
 
     if venv_python.is_file() && materialized_stamp(&checkout).as_deref() == Some(stamp.as_str()) {
         return Ok(venv_python);
     }
 
-    materialize(&checkout)?;
-    setup_venv(&checkout)?;
+    materialize(checkout)?;
+    setup_venv(checkout)?;
 
     if !venv_python.is_file() {
         bail!("bonesinfra setup finished at {}, but {} is missing.", checkout.display(), venv_python.display());
@@ -97,7 +121,13 @@ fn ensure_available() -> Result<PathBuf> {
     Ok(venv_python)
 }
 
-fn embedded_stamp() -> String {
+/// Returns the paths packaged in the embedded Python distribution.
+pub fn embedded_source_paths() -> impl Iterator<Item = Cow<'static, str>> {
+    PythonSource::iter()
+}
+
+/// Returns the deterministic version identifier for the embedded Python distribution.
+pub fn embedded_source_version() -> String {
     let mut files: Vec<_> = PythonSource::iter().collect();
     files.sort();
 
@@ -129,7 +159,7 @@ fn materialize(checkout: &Path) -> Result<()> {
 
     fs::create_dir_all(checkout).with_context(|| format!("Failed to create {}", checkout.display()))?;
 
-    for file_path in PythonSource::iter() {
+    for file_path in embedded_source_paths() {
         let Some(asset) = PythonSource::get(&file_path) else {
             continue;
         };
@@ -183,36 +213,4 @@ fn setup_venv(checkout: &Path) -> Result<()> {
 
 fn checkout_dir() -> PathBuf {
     paths::bones_cache_root().join(CHECKOUT_DIR)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::PythonSource;
-
-    #[test]
-    fn embeds_the_python_package_and_install_metadata() {
-        assert!(PythonSource::get("pyproject.toml").is_some());
-        assert!(PythonSource::get("README.md").is_some(), "pyproject readme reference must be embedded");
-        assert!(PythonSource::get("src/bonesinfra/__main__.py").is_some());
-        assert!(PythonSource::get("src/bonesinfra/project.py").is_some());
-    }
-
-    #[test]
-    fn excludes_dev_only_and_derived_trees() {
-        for file_path in PythonSource::iter() {
-            assert!(
-                !file_path.starts_with("docs/")
-                    && !file_path.starts_with("tests/")
-                    && !file_path.starts_with(".venv/")
-                    && !file_path.contains("__pycache__")
-                    && !file_path.contains(".egg-info"),
-                "unexpected embedded file: {file_path}"
-            );
-        }
-    }
-
-    #[test]
-    fn stamp_is_stable_across_calls() {
-        assert_eq!(super::embedded_stamp(), super::embedded_stamp());
-    }
 }

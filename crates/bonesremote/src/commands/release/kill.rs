@@ -117,7 +117,7 @@ fn signal(pid: u32, signal: &str) -> Result<()> {
     Ok(())
 }
 
-fn wait_for_process_exit(active: &DeploymentRecord, timeout: Duration) -> bool {
+pub fn wait_for_process_exit(active: &DeploymentRecord, timeout: Duration) -> bool {
     let attempts = timeout.as_millis() / 100;
     for _ in 0..attempts {
         if !list::process_matches(active) {
@@ -126,22 +126,4 @@ fn wait_for_process_exit(active: &DeploymentRecord, timeout: Duration) -> bool {
         thread::sleep(Duration::from_millis(100));
     }
     !list::process_matches(active)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::wait_for_process_exit;
-    use crate::release::state::{DeploymentPhase, DeploymentRecord, ProcessIdentity};
-    use std::time::Duration;
-
-    #[test]
-    fn wait_returns_when_process_is_already_gone() {
-        let deployment = DeploymentRecord::new(
-            String::from("20260715_225306"),
-            String::from("46a0b75c"),
-            DeploymentPhase::Created,
-            ProcessIdentity::new(u32::MAX, 0, String::new()),
-        );
-        assert!(wait_for_process_exit(&deployment, Duration::from_millis(1)));
-    }
 }

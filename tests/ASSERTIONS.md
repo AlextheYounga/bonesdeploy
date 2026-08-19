@@ -6,8 +6,11 @@
 - build timeout defaults to five minutes. (build_timeout_defaults_to_five_minutes)
 - build timeout of zero disables the timeout. (build_timeout_of_zero_disables_the_timeout)
 - build timeout parses from toml. (build_timeout_parses_from_toml)
+- dotenv rejects invalid and duplicate keys. (dotenv_rejects_invalid_and_duplicate_keys)
 - omitted nested sections keep app defaults. (omitted_nested_sections_keep_app_defaults)
-- runtime parses shared paths. (runtime_parses_shared_paths)
+- removed runtime shared configuration is rejected. (removed_runtime_shared_configuration_is_rejected)
+- runtime backend defaults to native. (runtime_backend_defaults_to_native)
+- runtime backend serializes as lowercase toml. (runtime_backend_serializes_as_lowercase_toml)
 - validate host accepts hostnames and ips. (validate_host_accepts_hostnames_and_ips)
 - validate host rejects shell metacharacters. (validate_host_rejects_shell_metacharacters)
 
@@ -31,223 +34,174 @@
 - numbered shell scripts require digits underscore and name. (numbered_shell_scripts_require_digits_underscore_and_name)
 - rejects unit name syntax and reserved targets. (rejects_unit_name_syntax_and_reserved_targets)
 
+## `crates/bonesdeploy/tests/assets.rs`
+- every framework has a build environment example. (every_framework_has_a_build_environment_example)
+- framework answers accept boolean template settings. (framework_answers_accept_boolean_template_settings)
+- framework assets do not duplicate canonical infrastructure. (framework_assets_do_not_duplicate_canonical_infrastructure)
+- framework assets include expected build content. (framework_assets_include_expected_build_content)
+- framework build environment example does not overwrite existing file. (framework_build_environment_example_does_not_overwrite_existing_file)
+- framework defaults match runtime and canonical names. (framework_defaults_match_runtime_and_canonical_names)
+- framework pnpm installs use the persistent store. (framework_pnpm_installs_use_the_persistent_store)
+- node install extracts a cold cache archive. (node_install_extracts_a_cold_cache_archive)
+- prepare scripts preserve validation and mutation order. (prepare_scripts_preserve_validation_and_mutation_order)
+- skill doc names cover the expected topics. (skill_doc_names_cover_the_expected_topics)
+
 ## `crates/bonesdeploy/tests/cli.rs`
 - doctor accepts verbose flag. (doctor_accepts_verbose_flag)
+- manifest accepts json format and reports missing config. (manifest_accepts_json_format_and_reports_missing_config)
 
-## `crates/bonesdeploy/tests/config.rs`
-- dumps full file when key omitted. (dumps_full_file_when_key_omitted)
-- missing key bails. (missing_key_bails)
-- reads integer key. (reads_integer_key)
-- reads string key. (reads_string_key)
+## `crates/bonesdeploy/tests/commands.rs`
+- gpg fingerprint parser preserves machine output behavior. (gpg_fingerprint_parser_preserves_machine_output_behavior)
+- guide compatibility command still parses. (guide_compatibility_command_still_parses)
+- prompt free init command parses with cli. (prompt_free_init_command_parses_with_cli)
+- release tags accept semver and reject unexpected values. (release_tags_accept_semver_and_reject_unexpected_values)
+- remote update downloads versioned release and checksum. (remote_update_downloads_versioned_release_and_checksum)
+- secrets framework rejects invalid and accepts blank templates. (secrets_framework_rejects_invalid_and_accepts_blank_templates)
+- strip ansi removes sgr color sequences. (strip_ansi_removes_sgr_color_sequences)
+- verbose remote report preserves pending state. (verbose_remote_report_preserves_pending_state)
+
+## `crates/bonesdeploy/tests/config_frameworks.rs`
+- bootstrap ssh user resolves defaults config and whitespace. (bootstrap_ssh_user_resolves_defaults_config_and_whitespace)
+- build environments use selected language versions. (build_environments_use_selected_language_versions)
+- custom is the empty framework fallback. (custom_is_the_empty_framework_fallback)
+- environment examples use project name in shared paths. (environment_examples_use_project_name_in_shared_paths)
+- framework answer validation preserves all cases. (framework_answer_validation_preserves_all_cases)
+- framework wire values parse and display. (framework_wire_values_parse_and_display)
+- save round trips dotenv values. (save_round_trips_dotenv_values)
+- save writes flat local input file. (save_writes_flat_local_input_file)
+- static framework configuration overrides only static web roots. (static_framework_configuration_overrides_only_static_web_roots)
 
 ## `crates/bonesdeploy/tests/doctor.rs`
 - deployment script check accepts nested build and prepare layout. (deployment_script_check_accepts_nested_build_and_prepare_layout)
 
+## `crates/bonesdeploy/tests/infra.rs`
+- branch exists reports missing branch without error. (branch_exists_reports_missing_branch_without_error)
+- remote command failure includes stdout and stderr. (remote_command_failure_includes_stdout_and_stderr)
+- remote url parser rejects unsupported urls. (remote_url_parser_rejects_unsupported_urls)
+- scp style remote urls parse absolute paths and whitespace. (scp_style_remote_urls_parse_absolute_paths_and_whitespace)
+- shell quote preserves single quotes. (shell_quote_preserves_single_quotes)
+- ssh style remote urls parse host port and path. (ssh_style_remote_urls_parse_host_port_and_path)
+
 ## `crates/bonesdeploy/tests/init.rs`
+- assert framework snapshot. (assert_framework_snapshot)
+- assert project infra. (assert_project_infra)
 - failure before completed prompts leaves no bones assets. (failure_before_completed_prompts_leaves_no_bones_assets)
 - init preserves existing env build. (init_preserves_existing_env_build)
+- init success. (init_success)
 - materializes base bones assets. (materializes_base_bones_assets)
-- repairs dangling bones symlink. (repairs_dangling_bones_symlink)
+- rejects old bones layout. (rejects_old_bones_layout)
 - rerun preserves existing bones assets. (rerun_preserves_existing_bones_assets)
 
-## `crates/bonesdeploy/tests/push_state.rs`
-- pushes to bones config repo. (pushes_to_bones_config_repo)
-
-## `crates/bonesdeploy/src/commands/doctor.rs`
-- strip ansi removes sgr color sequences. (strip_ansi_removes_sgr_color_sequences)
-- verbose remote report preserves pending state. (verbose_remote_report_preserves_pending_state)
-
-## `crates/bonesdeploy/src/commands/init/config.rs`
-- requires host when existing and cli are missing it. (requires_host_when_existing_and_cli_are_missing_it)
-- uses existing and cli values without prompting. (uses_existing_and_cli_values_without_prompting)
-
-## `crates/bonesdeploy/src/commands/init/framework.rs`
-- framework var parses bool false case insensitive. (framework_var_parses_bool_false_case_insensitive)
-- framework var parses bool true. (framework_var_parses_bool_true)
-- framework var parses string. (framework_var_parses_string)
-- framework var rejects empty key. (framework_var_rejects_empty_key)
-- framework var rejects missing equals. (framework_var_rejects_missing_equals)
+## `crates/bonesdeploy/tests/init_api.rs`
+- framework config validates vars and template fallbacks. (framework_config_validates_vars_and_template_fallbacks)
+- framework var parser preserves bool string and error cases. (framework_var_parser_preserves_bool_string_and_error_cases)
+- non interactive config records and validates runtime backend. (non_interactive_config_records_and_validates_runtime_backend)
+- non interactive config requires host when not inferred. (non_interactive_config_requires_host_when_not_inferred)
+- non interactive config uses existing and cli values. (non_interactive_config_uses_existing_and_cli_values)
 - non interactive database services are validated. (non_interactive_database_services_are_validated)
-- template none uses base defaults. (template_none_uses_base_defaults)
-- template omitted uses base defaults. (template_omitted_uses_base_defaults)
-- validate accepts known framework vars. (validate_accepts_known_framework_vars)
-- validate rejects unknown framework var. (validate_rejects_unknown_framework_var)
 
-## `crates/bonesdeploy/src/commands/secrets/gpg.rs`
-- extract fingerprint parses fpr line. (extract_fingerprint_parses_fpr_line)
-- extract fingerprint returns none without fpr line. (extract_fingerprint_returns_none_without_fpr_line)
+## `crates/bonesdeploy/tests/update_sync.rs`
+- refresh local infrastructure refuses managed conflicts. (refresh_local_infrastructure_refuses_managed_conflicts)
+- refresh local infrastructure updates managed files without touching custom. (refresh_local_infrastructure_updates_managed_files_without_touching_custom)
 
-## `crates/bonesdeploy/src/commands/skill.rs`
-- guide compatibility command still parses. (guide_compatibility_command_still_parses)
-- The guide's prompt-free init command must stay valid against the real CLI. If the flag drifts again, copy-pasting the suggestion breaks for new users. (prompt_free_init_command_parses_with_cli)
-
-## `crates/bonesdeploy/src/commands/update/mod.rs`
-- release tag accepts semver versions. (release_tag_accepts_semver_versions)
-- release tag rejects unexpected values. (release_tag_rejects_unexpected_values)
-
-## `crates/bonesdeploy/src/commands/update/release.rs`
-- remote update downloads versioned release and checksum. (remote_update_downloads_versioned_release_and_checksum)
-
-## `crates/bonesdeploy/src/commands/update/sync.rs`
-- refresh local bones updates scaffold without touching configs. (refresh_local_bones_updates_scaffold_without_touching_configs)
-
-## `crates/bonesdeploy/src/config.rs`
-- bootstrap ssh user defaults to root. (bootstrap_ssh_user_defaults_to_root)
-- bootstrap ssh user trims and rejects blank values. (bootstrap_ssh_user_trims_and_rejects_blank_values)
-- bootstrap ssh user uses config value. (bootstrap_ssh_user_uses_config_value)
-- save adds comments to nested sections. (save_adds_comments_to_nested_sections)
-- save formats permission entries as inline tables. (save_formats_permission_entries_as_inline_tables)
-- save persists ssl settings. (save_persists_ssl_settings)
-- save writes file header. (save_writes_file_header)
-
-## `crates/bonesdeploy/src/frameworks.rs`
-- configure server next keeps web root. (configure_server_next_keeps_web_root)
-- configure static next overrides web root. (configure_static_next_overrides_web_root)
-- configure static nuxt overrides web root. (configure_static_nuxt_overrides_web_root)
-- django build environment uses selected python version. (django_build_environment_uses_selected_python_version)
-- environment examples use project name in shared paths. (environment_examples_use_project_name_in_shared_paths)
-- every template has an environment example. (every_template_has_an_environment_example)
-- laravel build environment uses selected php version. (laravel_build_environment_uses_selected_php_version)
-- validate rejects bad choice. (validate_rejects_bad_choice)
-- validate rejects unknown key. (validate_rejects_unknown_key)
-- validate rejects wrong type. (validate_rejects_wrong_type)
-
-## `crates/bonesdeploy/src/infra/assets/frameworks.rs`
-- django validates before mutating framework state. (django_validates_before_mutating_framework_state)
-- every framework has a build environment example. (every_framework_has_a_build_environment_example)
-- framework answers accept boolean template settings. (framework_answers_accept_boolean_template_settings)
-- framework build environment example does not overwrite existing file. (framework_build_environment_example_does_not_overwrite_existing_file)
-- framework defaults fit the single file schema. (framework_defaults_fit_the_single_file_schema)
-- framework pnpm installs use the persistent store. (framework_pnpm_installs_use_the_persistent_store)
-- laravel prepare only mutates candidate and required framework state. (laravel_prepare_only_mutates_candidate_and_required_framework_state)
-- next framework includes the build script. (next_framework_includes_the_build_script)
-- nuxt build selects generate or build from static mode. (nuxt_build_selects_generate_or_build_from_static_mode)
-
-## `crates/bonesdeploy/src/infra/assets/kit.rs`
-- node install extracts a cold cache archive. (node_install_extracts_a_cold_cache_archive)
-
-## `crates/bonesdeploy/src/infra/assets/skill.rs`
-- skill doc names cover the expected topics. (skill_doc_names_cover_the_expected_topics)
-
-## `crates/bonesdeploy/src/infra/git.rs`
-- parse remote url rejects non git paths. (parse_remote_url_rejects_non_git_paths)
-- parse remote url rejects non ssh urls. (parse_remote_url_rejects_non_ssh_urls)
-- parse remote url rejects relative scp paths. (parse_remote_url_rejects_relative_scp_paths)
-- parse scp style url parses absolute repo path. (parse_scp_style_url_parses_absolute_repo_path)
-- parse scp style url trims surrounding whitespace. (parse_scp_style_url_trims_surrounding_whitespace)
-- parse ssh style url defaults port to 22. (parse_ssh_style_url_defaults_port_to_22)
-- parse ssh style url parses host port and repo path. (parse_ssh_style_url_parses_host_port_and_repo_path)
-
-## `crates/bonesdeploy/src/infra/ssh.rs`
-- remote command failure includes stdout and stderr. (remote_command_failure_includes_stdout_and_stderr)
-- shell quote preserves single quotes. (shell_quote_preserves_single_quotes)
-
-## `crates/bonesinfra/src/lib.rs`
-- embeds the python package and install metadata. (embeds_the_python_package_and_install_metadata)
-- excludes dev only and derived trees. (excludes_dev_only_and_derived_trees)
-- stamp is stable across calls. (stamp_is_stable_across_calls)
+## `crates/bonesinfra/tests/embedded_source.rs`
+- distribution contains the python package and install metadata. (distribution_contains_the_python_package_and_install_metadata)
+- distribution excludes development and derived trees. (distribution_excludes_development_and_derived_trees)
+- distribution version is stable across calls. (distribution_version_is_stable_across_calls)
 
 ## `crates/bonesremote/tests/cli.rs`
 - exhaustive doctor accepts a site. (exhaustive_doctor_accepts_a_site)
 - exhaustive doctor requires a site. (exhaustive_doctor_requires_a_site)
 
-## `crates/bonesremote/src/commands/deploy/lifecycle.rs`
+## `crates/bonesremote/tests/commands/deploy_coordinator.rs`
 - failed activation restores previous release. (failed_activation_restores_previous_release)
 
-## `crates/bonesremote/src/commands/deploy/rollback.rs`
+## `crates/bonesremote/tests/commands/deploy_rollback.rs`
 - rollback points current to previous release when restart succeeds. (rollback_points_current_to_previous_release_when_restart_succeeds)
 - rollback restores original release when restart fails. (rollback_restores_original_release_when_restart_fails)
 
-## `crates/bonesremote/src/commands/doctor/security/collection/filesystem.rs`
+## `crates/bonesremote/tests/commands/doctor_security.rs`
+- duplicate runtime identity fails isolation. (duplicate_runtime_identity_fails_isolation)
+- nologin shells are not interactive. (nologin_shells_are_not_interactive)
+
+## `crates/bonesremote/tests/commands/doctor_security_collection_filesystem.rs`
 - protected path scan does not follow symlink targets. (protected_path_scan_does_not_follow_symlink_targets)
 - release boundary scan skips nested entries unless exhaustive. (release_boundary_scan_skips_nested_entries_unless_exhaustive)
 
-## `crates/bonesremote/src/commands/doctor/security/collection/sudo.rs`
+## `crates/bonesremote/tests/commands/doctor_security_collection_sudo.rs`
 - sudo listing denial is not authority. (sudo_listing_denial_is_not_authority)
 - sudo policy denial is distinct from collector failure. (sudo_policy_denial_is_distinct_from_collector_failure)
 - sudo policy output keeps stdout and stderr. (sudo_policy_output_keeps_stdout_and_stderr)
 
-## `crates/bonesremote/src/commands/doctor/security/evaluators.rs`
+## `crates/bonesremote/tests/commands/doctor_security_evaluators.rs`
 - broken and out of tree current targets fail. (broken_and_out_of_tree_current_targets_fail)
 - writable child of protected directory fails. (writable_child_of_protected_directory_fails)
 
-## `crates/bonesremote/src/commands/doctor/security/fs.rs`
+## `crates/bonesremote/tests/commands/doctor_security_fs.rs`
 - acl evidence is unverified instead of passing. (acl_evidence_is_unverified_instead_of_passing)
 - symlink mode bits do not grant replacement authority. (symlink_mode_bits_do_not_grant_replacement_authority)
 - writable file behind unsearchable directory is not effectively writable. (writable_file_behind_unsearchable_directory_is_not_effectively_writable)
 
-## `crates/bonesremote/src/commands/doctor/security/mod.rs`
-- duplicate runtime identity fails isolation. (duplicate_runtime_identity_fails_isolation)
-- nologin shells are not interactive. (nologin_shells_are_not_interactive)
-
-## `crates/bonesremote/src/commands/doctor/site.rs`
-- account exists matches passwd entries. (account_exists_matches_passwd_entries)
-- build user home is parsed. (build_user_home_is_parsed)
-- empty bare repo is pending before first push. (empty_bare_repo_is_pending_before_first_push)
-- group members reads group member list. (group_members_reads_group_member_list)
-- hook uses thin trigger accepts bonesremote post receive delegate. (hook_uses_thin_trigger_accepts_bonesremote_post_receive_delegate)
+## `crates/bonesremote/tests/commands/doctor_services.rs`
+- only the first laravel release can defer its configured worker. (only_the_first_laravel_release_can_defer_its_configured_worker)
+- recognizes only the canonical placeholder release. (recognizes_only_the_canonical_placeholder_release)
 - service exists accepts loaded unit. (service_exists_accepts_loaded_unit)
-- target without required services is rejected. (target_without_required_services_is_rejected)
 
-## `crates/bonesremote/src/commands/drop_failed_release.rs`
+## `crates/bonesremote/tests/commands/doctor_site.rs`
+- empty bare repo is pending before first push. (empty_bare_repo_is_pending_before_first_push)
+
+## `crates/bonesremote/tests/commands/drop_failed_release.rs`
 - active release cannot be dropped. (active_release_cannot_be_dropped)
 - cleanup requires a readable active release. (cleanup_requires_a_readable_active_release)
 
-## `crates/bonesremote/src/commands/hook.rs`
-- ignores non matching branch. (ignores_non_matching_branch)
-- ignores tags. (ignores_tags)
-- resolves newrev for configured branch. (resolves_newrev_for_configured_branch)
+## `crates/bonesremote/tests/commands/inspection_accounts.rs`
+- parses group members and missing groups. (parses_group_members_and_missing_groups)
+- parses passwd accounts without prefix collisions. (parses_passwd_accounts_without_prefix_collisions)
 
-## `crates/bonesremote/src/commands/mod.rs`
-- committed deployment is serialization idle. (committed_deployment_is_serialization_idle)
-- pre commit active deployment blocks site mutation. (pre_commit_active_deployment_blocks_site_mutation)
-- staged release without committed deployment blocks site mutation. (staged_release_without_committed_deployment_blocks_site_mutation)
+## `crates/bonesremote/tests/commands/inspection_systemd.rs`
+- parses unique service dependencies only. (parses_unique_service_dependencies_only)
 
-## `crates/bonesremote/src/commands/release/kill.rs`
+## `crates/bonesremote/tests/commands/release_kill.rs`
 - wait returns when process is already gone. (wait_returns_when_process_is_already_gone)
 
-## `crates/bonesremote/src/commands/release/list.rs`
+## `crates/bonesremote/tests/commands/release_list.rs`
 - parses process start ticks after parenthesized name. (parses_process_start_ticks_after_parenthesized_name)
 
-## `crates/bonesremote/src/commands/release/prune.rs`
+## `crates/bonesremote/tests/commands/release_prune.rs`
 - prune old releases keeps active release when within keep limit. (prune_old_releases_keeps_active_release_when_within_keep_limit)
 - prune old releases removes oldest inactive releases up to keep limit. (prune_old_releases_removes_oldest_inactive_releases_up_to_keep_limit)
 - prune old releases terminates when active is the oldest release. (prune_old_releases_terminates_when_active_is_the_oldest_release)
 
-## `crates/bonesremote/src/commands/release/recover.rs`
+## `crates/bonesremote/tests/commands/release_recover.rs`
 - recover is noop when state is valid. (recover_is_noop_when_state_is_valid)
 - recover migrates previous state instead of quarantining. (recover_migrates_previous_state_instead_of_quarantining)
 - recover quarantines malformed store state. (recover_quarantines_malformed_store_state)
 - recover refuses while a deployment holds the lock. (recover_refuses_while_a_deployment_holds_the_lock)
 
-## `crates/bonesremote/src/commands/service.rs`
+## `crates/bonesremote/tests/commands/root.rs`
+- committed deployment is serialization idle. (committed_deployment_is_serialization_idle)
+- pre commit active deployment blocks site mutation. (pre_commit_active_deployment_blocks_site_mutation)
+- staged release without committed deployment blocks site mutation. (staged_release_without_committed_deployment_blocks_site_mutation)
+
+## `crates/bonesremote/tests/commands/service.rs`
 - site cannot restart another projects target. (site_cannot_restart_another_projects_target)
-- target dependencies include only services. (target_dependencies_include_only_services)
 
-## `crates/bonesremote/src/commands/site/tests.rs`
-- arbitrary deployment files are allowed. (arbitrary_deployment_files_are_allowed)
-- imports share a stable lock and reject staged releases. (imports_share_a_stable_lock_and_reject_staged_releases)
-- plaintext env validation allows encrypted env files. (plaintext_env_validation_allows_encrypted_env_files)
-- plaintext env validation allows local files. (plaintext_env_validation_allows_local_files)
-- plaintext env validation rejects nested env files. (plaintext_env_validation_rejects_nested_env_files)
-- validate repo path rejects paths outside configured parent. (validate_repo_path_rejects_paths_outside_configured_parent)
-- write hook file installs baked trigger with executable mode. (write_hook_file_installs_baked_trigger_with_executable_mode)
+## `crates/bonesremote/tests/commands/status.rs`
+- reads ssl domain from conventionally named nginx config. (reads_ssl_domain_from_conventionally_named_nginx_config)
 
-## `crates/bonesremote/src/commands/status.rs`
-- parses registered units from target properties. (parses_registered_units_from_target_properties)
+## `crates/bonesremote/tests/release/lifecycle.rs`
+- snapshot uses convention paths and one revision. (snapshot_uses_convention_paths_and_one_revision)
 
-## `crates/bonesremote/src/release/lifecycle/build/build_user.rs`
-- build cache validation requires private owned directory. (build_cache_validation_requires_private_owned_directory)
-- build script command includes runtime max sec. (build_script_command_includes_runtime_max_sec)
-- build script command runs as the build user machine. (build_script_command_runs_as_the_build_user_machine)
-- plain build user command has no runtime max sec. (plain_build_user_command_has_no_runtime_max_sec)
+## `crates/bonesremote/tests/release/lifecycle_build_container.rs`
+- build env values use a private env file instead of command arguments. (build_env_values_use_a_private_env_file_instead_of_command_arguments)
 
-## `crates/bonesremote/src/release/lifecycle/build/ownership.rs`
+## `crates/bonesremote/tests/release/lifecycle_build_ownership.rs`
 - parse user uid reads uid field. (parse_user_uid_reads_uid_field)
 
-## `crates/bonesremote/src/release/lifecycle/build/run_scripts.rs`
+## `crates/bonesremote/tests/release/lifecycle_build_scripts.rs`
 - build env includes env build values. (build_env_includes_env_build_values)
 - build timeout setting is denied in build env. (build_timeout_setting_is_denied_in_build_env)
+- container contract values cannot be overridden by env build. (container_contract_values_cannot_be_overridden_by_env_build)
 - denied values remain absent in build env. (denied_values_remain_absent_in_build_env)
 - derived bones values are present in build env. (derived_bones_values_are_present_in_build_env)
 - derived bones values cannot be overridden by env build. (derived_bones_values_cannot_be_overridden_by_env_build)
@@ -255,7 +209,7 @@
 - list scripts only includes numbered shell scripts. (list_scripts_only_includes_numbered_shell_scripts)
 - missing env build is not an error. (missing_env_build_is_not_an_error)
 
-## `crates/bonesremote/src/release/lifecycle/build/tree.rs`
+## `crates/bonesremote/tests/release/lifecycle_build_tree.rs`
 - candidate tree is writable by its temporary owner. (candidate_tree_is_writable_by_its_temporary_owner)
 - empty release directory passes the nonempty guard. (empty_release_directory_passes_the_nonempty_guard)
 - nonempty release directory fails the nonempty guard. (nonempty_release_directory_fails_the_nonempty_guard)
@@ -263,60 +217,70 @@
 - promote refuses nonempty release directory. (promote_refuses_nonempty_release_directory)
 - validate symlink target rejects absolute and escaping targets. (validate_symlink_target_rejects_absolute_and_escaping_targets)
 
-## `crates/bonesremote/src/release/lifecycle/preflight.rs`
+## `crates/bonesremote/tests/release/lifecycle_build_user.rs`
+- build cache validation requires private owned directory. (build_cache_validation_requires_private_owned_directory)
+- build script command includes runtime max sec. (build_script_command_includes_runtime_max_sec)
+- build script command runs as the build user machine. (build_script_command_runs_as_the_build_user_machine)
+- plain build user command has no runtime max sec. (plain_build_user_command_has_no_runtime_max_sec)
+
+## `crates/bonesremote/tests/release/lifecycle_preflight.rs`
+- site nginx config uses the registered sites configuration. (site_nginx_config_uses_the_registered_sites_configuration)
 - validate ready propagates nginx failure. (validate_ready_propagates_nginx_failure)
 - validate ready rejects missing web root before running nginx. (validate_ready_rejects_missing_web_root_before_running_nginx)
 
-## `crates/bonesremote/src/release/lifecycle/prepare.rs`
+## `crates/bonesremote/tests/release/lifecycle_prepare.rs`
 - early successful exit ignores broken pipe. (early_successful_exit_ignores_broken_pipe)
 - failing prepare preserves status and output. (failing_prepare_preserves_status_and_output)
 - framework prepare templates do not source control plane files. (framework_prepare_templates_do_not_source_control_plane_files)
 - list scripts sorts prepare scripts. (list_scripts_sorts_prepare_scripts)
 - shared functions precede prepare script. (shared_functions_precede_prepare_script)
 
-## `crates/bonesremote/src/release/lifecycle/stage.rs`
+## `crates/bonesremote/tests/release/lifecycle_shared.rs`
+- link relative creates symlink to shared target. (link_relative_creates_symlink_to_shared_target)
+- remove if present handles files dirs and missing. (remove_if_present_handles_files_dirs_and_missing)
+
+## `crates/bonesremote/tests/release/lifecycle_stage.rs`
 - release name embeds commit prefix and suffix. (release_name_embeds_commit_prefix_and_suffix)
 - release name tolerates short revision commits. (release_name_tolerates_short_revision_commits)
 - unique release dir retries on collision. (unique_release_dir_retries_on_collision)
 
-## `crates/bonesremote/src/release/lifecycle/wire_shared.rs`
-- link relative creates symlink to shared target. (link_relative_creates_symlink_to_shared_target)
-- remove if present handles files dirs and missing. (remove_if_present_handles_files_dirs_and_missing)
-- validate shared path rejects absolute and parent paths. (validate_shared_path_rejects_absolute_and_parent_paths)
-
-## `crates/bonesremote/src/release/output.rs`
+## `crates/bonesremote/tests/release/output.rs`
 - applies group writable umask. (applies_group_writable_umask)
 - preserves failing exit status. (preserves_failing_exit_status)
 - streams output to console and log. (streams_output_to_console_and_log)
 
-## `crates/bonesremote/src/release/state/atomic.rs`
-- atomic write creates parent and persists content. (atomic_write_creates_parent_and_persists_content)
-- atomic write leaves no temporary file behind. (atomic_write_leaves_no_temporary_file_behind)
-- atomic write replaces existing content and keeps mode. (atomic_write_replaces_existing_content_and_keeps_mode)
-
-## `crates/bonesremote/src/release/state/mod.rs`
+## `crates/bonesremote/tests/release/state.rs`
 - clear staged release removes the pointer. (clear_staged_release_removes_the_pointer)
 - read staged release rejects missing state. (read_staged_release_rejects_missing_state)
 - write then read staged release round trips. (write_then_read_staged_release_round_trips)
 
-## `crates/bonesremote/src/release/state/record.rs`
+## `crates/bonesremote/tests/release/state_atomic.rs`
+- atomic write creates parent and persists content. (atomic_write_creates_parent_and_persists_content)
+- atomic write leaves no temporary file behind. (atomic_write_leaves_no_temporary_file_behind)
+- atomic write replaces existing content and keeps mode. (atomic_write_replaces_existing_content_and_keeps_mode)
+
+## `crates/bonesremote/tests/release/state_record.rs`
 - cancellation is refused after runtime mutation. (cancellation_is_refused_after_runtime_mutation)
 - phases after commit are serialization idle. (phases_after_commit_are_serialization_idle)
 - record round trips through json. (record_round_trips_through_json)
 
-## `crates/bonesremote/src/release/state/releases.rs`
+## `crates/bonesremote/tests/release/state_releases.rs`
 - current release name resolves symlink target name. (current_release_name_resolves_symlink_target_name)
 - list releases sorted skips placeholder. (list_releases_sorted_skips_placeholder)
 - point symlink atomically creates parent dirs and points to target. (point_symlink_atomically_creates_parent_dirs_and_points_to_target)
 - point symlink atomically repoints existing link. (point_symlink_atomically_repoints_existing_link)
 
-## `crates/bonesremote/src/release/state/store.rs`
+## `crates/bonesremote/tests/release/state_store.rs`
 - malformed store fails to parse. (malformed_store_fails_to_parse)
 - missing state reads as default without writing. (missing_state_reads_as_default_without_writing)
 - previous active and staged are migrated into the store. (previous_active_and_staged_are_migrated_into_the_store)
 - state round trips through json. (state_round_trips_through_json)
 
-## `crates/bonesremote/src/ui.rs`
+## `crates/bonesremote/tests/runtime/docker_command.rs`
+- application command has restricted mounts. (application_command_has_restricted_mounts)
+- names are site scoped. (names_are_site_scoped)
+
+## `crates/bonesremote/tests/ui.rs`
 - markers keep color when output is piped over ssh. (markers_keep_color_when_output_is_piped_over_ssh)
 
 ## `tests/cleancode/src/cleancode_file_too_long.rs`

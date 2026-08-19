@@ -89,7 +89,7 @@ pub(super) async fn update_remote_from_release(current_version: &str, target_ver
     Ok(())
 }
 
-fn bonesremote_download_command(version: &str, install_root: &str) -> String {
+pub fn bonesremote_download_command(version: &str, install_root: &str) -> String {
     let artifact = "bonesremote-x86_64-unknown-linux-musl";
     let base_url = format!("https://github.com/AlextheYounga/bonesdeploy/releases/download/v{version}");
     format!(
@@ -97,23 +97,4 @@ fn bonesremote_download_command(version: &str, install_root: &str) -> String {
         artifact = artifact,
         binary = paths::BONESREMOTE_BINARY,
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::bonesremote_download_command;
-
-    #[test]
-    fn remote_update_downloads_versioned_release_and_checksum() {
-        let command = bonesremote_download_command("0.7.3", "/usr/local/bin");
-
-        assert!(command.contains("releases/download/v0.7.3"));
-        assert!(command.contains("bonesremote-x86_64-unknown-linux-musl.sha256"));
-        assert!(command.contains("sha256sum --check"));
-        assert!(command.contains("uname -m"));
-        assert!(command.contains("bonesremote 0.7.3"));
-        assert!(command.contains("install -o root -g root -m 0755"));
-        assert!(command.contains("'/usr/local/bin/bonesremote.tmp'"));
-        assert!(command.contains("'/usr/local/bin/bonesremote'"));
-    }
 }
