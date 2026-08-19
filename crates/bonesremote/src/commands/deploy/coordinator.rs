@@ -14,6 +14,13 @@ use crate::release::lifecycle;
 use crate::release::lifecycle::preflight;
 use crate::release::state as release_state;
 
+struct PreparedDeployment {
+    snapshot: lifecycle::DeploymentSnapshot,
+    deployment: release_state::DeploymentRecord,
+    context_dir: PathBuf,
+    previous_release: PathBuf,
+}
+
 pub(super) struct DeploymentLifecycleCoordinator<'a> {
     mutation: &'a SiteMutation,
     snapshot: lifecycle::DeploymentSnapshot,
@@ -29,12 +36,35 @@ impl<'a> DeploymentLifecycleCoordinator<'a> {
     }
 }
 
-#[expect(clippy::too_many_lines)]
 fn run_staged_deployment(mutation: &SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Result<()> {
-    let site = mutation.site();
+    let prepared = prepare_deployment(mutation, snapshot)?;
+    activate_deployment(mutation, &prepared)?;
+    complete_deployment(mutation, &prepared)
+}
 
-    // Phase A: prepare and validate the new release while the old release still
-    // serves. Any failure here aborts and returns the site to idle.
+fn prepare_deployment(mutation: &SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Result<PreparedDeployment> {
+    let (mut deployment, snapshot, context_dir) = start_release(mutation, snapshot)?;
+    build_and_prepare(mutation, &snapshot, &context_dir, &mut deployment)?;
+
+    let site = mutation.site();
+    stage("Verifying before cut-over");
+    if let Err(error) = preflight::validate_ready(mutation, deployment.release(), || preflight::run_nginx_test(site)) {
+        return finish_abort(mutation, Some(&context_dir), error);
+    }
+
+    let previous_release = match release_state::current_release_dir(&mutation.config().project_root) {
+        Ok(release) => release,
+        Err(error) => return finish_abort(mutation, Some(&context_dir), error),
+    };
+    deployment.set_previous_release(previous_release.file_name().map(|name| name.to_string_lossy().into_owned()));
+
+    Ok(PreparedDeployment { snapshot, deployment, context_dir, previous_release })
+}
+
+fn start_release(
+    mutation: &SiteMutation,
+    snapshot: lifecycle::DeploymentSnapshot,
+) -> Result<(release_state::DeploymentRecord, lifecycle::DeploymentSnapshot, PathBuf)> {
     stage("Staging release");
     if let Err(error) = lifecycle::stage::run(mutation, &snapshot) {
         return finish_abort(mutation, None, error);
@@ -44,13 +74,12 @@ fn run_staged_deployment(mutation: &SiteMutation, snapshot: lifecycle::Deploymen
         Ok(release_name) => release_name,
         Err(error) => return finish_abort(mutation, None, error),
     };
+    let identity = release_state::ProcessIdentity::new(process::id(), process_start_ticks()?, deployment_started_at()?);
     let mut deployment = release_state::DeploymentRecord::new(
-        release_name.clone(),
+        release_name,
         snapshot.revision.clone(),
         release_state::DeploymentPhase::Created,
-        process::id(),
-        process_start_ticks()?,
-        deployment_started_at()?,
+        identity,
     );
     if let Err(error) = mutation.set_active(&deployment) {
         return finish_abort(mutation, None, error);
@@ -66,101 +95,110 @@ fn run_staged_deployment(mutation: &SiteMutation, snapshot: lifecycle::Deploymen
         return finish_abort(mutation, Some(&context_dir), error);
     }
     let snapshot = snapshot.with_deployment_dir(context_dir.join(paths::LOCAL_INFRA_DIR).join(paths::DEPLOYMENT_DIR));
-    if let Err(error) = lifecycle::checkout::run(&snapshot, &context_dir) {
-        return finish_abort(mutation, Some(&context_dir), error);
+    Ok((deployment, snapshot, context_dir))
+}
+
+fn build_and_prepare(
+    mutation: &SiteMutation,
+    snapshot: &lifecycle::DeploymentSnapshot,
+    context_dir: &Path,
+    deployment: &mut release_state::DeploymentRecord,
+) -> Result<()> {
+    if let Err(error) = lifecycle::checkout::run(snapshot, context_dir) {
+        return finish_abort(mutation, Some(context_dir), error);
     }
     if let Err(error) =
-        advance_phase(mutation, &deployment, Some(release_state::DeploymentPhase::SourceExported), Some(&context_dir))
+        advance_phase(mutation, deployment, Some(release_state::DeploymentPhase::SourceExported), Some(context_dir))
     {
-        return finish_abort(mutation, Some(&context_dir), error);
+        return finish_abort(mutation, Some(context_dir), error);
     }
 
     stage("Building release");
-    if let Err(error) = lifecycle::build::run(mutation, &snapshot, &context_dir) {
-        return finish_abort(mutation, Some(&context_dir), error);
+    if let Err(error) = lifecycle::build::run(mutation, snapshot, context_dir) {
+        return finish_abort(mutation, Some(context_dir), error);
     }
     if let Err(error) =
-        advance_phase(mutation, &deployment, Some(release_state::DeploymentPhase::Built), Some(&context_dir))
+        advance_phase(mutation, deployment, Some(release_state::DeploymentPhase::Built), Some(context_dir))
     {
-        return finish_abort(mutation, Some(&context_dir), error);
+        return finish_abort(mutation, Some(context_dir), error);
     }
 
     stage("Preparing release");
-    if let Err(error) = lifecycle::build::promote(mutation, &snapshot, &context_dir) {
-        return finish_abort(mutation, Some(&context_dir), error);
+    if let Err(error) = lifecycle::build::promote(mutation, snapshot, context_dir) {
+        return finish_abort(mutation, Some(context_dir), error);
     }
     if let Err(error) =
-        advance_phase(mutation, &deployment, Some(release_state::DeploymentPhase::Promoted), Some(&context_dir))
+        advance_phase(mutation, deployment, Some(release_state::DeploymentPhase::Promoted), Some(context_dir))
     {
-        return finish_abort(mutation, Some(&context_dir), error);
+        return finish_abort(mutation, Some(context_dir), error);
     }
-    if let Err(error) = lifecycle::wire_shared::run(mutation, &snapshot) {
-        return finish_abort(mutation, Some(&context_dir), error);
+    if let Err(error) = lifecycle::wire_shared::run(mutation, snapshot) {
+        return finish_abort(mutation, Some(context_dir), error);
     }
-    if let Err(error) = lifecycle::prepare::run(mutation, &snapshot) {
-        return finish_abort(mutation, Some(&context_dir), error);
+    if let Err(error) = lifecycle::prepare::run(mutation, snapshot) {
+        return finish_abort(mutation, Some(context_dir), error);
     }
     if let Err(error) =
-        advance_phase(mutation, &deployment, Some(release_state::DeploymentPhase::Prepared), Some(&context_dir))
+        advance_phase(mutation, deployment, Some(release_state::DeploymentPhase::Prepared), Some(context_dir))
     {
-        return finish_abort(mutation, Some(&context_dir), error);
+        return finish_abort(mutation, Some(context_dir), error);
     }
-    if let Err(error) = lifecycle::build::finalize(mutation, &snapshot) {
-        return finish_abort(mutation, Some(&context_dir), error);
+    if let Err(error) = lifecycle::build::finalize(mutation, snapshot) {
+        return finish_abort(mutation, Some(context_dir), error);
     }
     if let Err(error) =
-        advance_phase(mutation, &deployment, Some(release_state::DeploymentPhase::Sealed), Some(&context_dir))
+        advance_phase(mutation, deployment, Some(release_state::DeploymentPhase::Sealed), Some(context_dir))
     {
-        return finish_abort(mutation, Some(&context_dir), error);
+        return finish_abort(mutation, Some(context_dir), error);
     }
+    Ok(())
+}
 
-    // Perfect-before-cut-over gate: last check while the old release still
-    // serves. `nginx -t` runs before any reload; a failure aborts.
-    stage("Verifying before cut-over");
-    if let Err(error) = preflight::validate_ready(mutation, &release_name, || preflight::run_nginx_test(site)) {
-        return finish_abort(mutation, Some(&context_dir), error);
-    }
-
-    let previous_release = match release_state::current_release_dir(&mutation.config().project_root) {
-        Ok(release) => release,
-        Err(error) => return finish_abort(mutation, Some(&context_dir), error),
-    };
-    deployment.set_previous_release(previous_release.file_name().map(|name| name.to_string_lossy().into_owned()));
-
+fn activate_deployment(mutation: &SiteMutation, prepared: &PreparedDeployment) -> Result<()> {
     // Phase B: cut-over — the commit point. Failure restores the previous
     // release (transactional rollback), leaving the site idle.
     stage("Activating release");
-    if let Err(error) = lifecycle::activate::run(mutation, &snapshot) {
-        return finish_abort(mutation, Some(&context_dir), error);
+    if let Err(error) = lifecycle::activate::run(mutation, &prepared.snapshot) {
+        return finish_abort(mutation, Some(&prepared.context_dir), error);
     }
-    if let Err(error) =
-        advance_phase(mutation, &deployment, Some(release_state::DeploymentPhase::Activated), Some(&context_dir))
-    {
-        return finish_abort(mutation, Some(&context_dir), error);
+    if let Err(error) = advance_phase(
+        mutation,
+        &prepared.deployment,
+        Some(release_state::DeploymentPhase::Activated),
+        Some(&prepared.context_dir),
+    ) {
+        return finish_abort(mutation, Some(&prepared.context_dir), error);
     }
 
     stage("Restarting services");
     if let Err(error) = service::run(mutation) {
-        return finish_failed_activation(mutation, &previous_release, Some(&context_dir), error);
+        return finish_failed_activation(mutation, &prepared.previous_release, Some(&prepared.context_dir), error);
     }
-    if let Err(error) =
-        advance_phase(mutation, &deployment, Some(release_state::DeploymentPhase::Verified), Some(&context_dir))
-    {
-        return finish_abort_without_release_drop(mutation, Some(&context_dir), error);
+    if let Err(error) = advance_phase(
+        mutation,
+        &prepared.deployment,
+        Some(release_state::DeploymentPhase::Verified),
+        Some(&prepared.context_dir),
+    ) {
+        return finish_abort_without_release_drop(mutation, Some(&prepared.context_dir), error);
     }
+    Ok(())
+}
 
+fn complete_deployment(mutation: &SiteMutation, prepared: &PreparedDeployment) -> Result<()> {
     // Phase C: post-commit maintenance. The new release is serving; failures
     // here are recorded as `cleanup_pending` warnings, never deployment errors.
-    if let Err(error) = run_maintenance(mutation, &context_dir) {
-        finish_cleanup_pending(mutation, Some(&context_dir), &error);
+    if let Err(error) = run_maintenance(mutation, &prepared.context_dir) {
+        finish_cleanup_pending(mutation, Some(&prepared.context_dir), &error);
         return Ok(());
     }
-    if let Err(error) = advance_phase(mutation, &deployment, Some(release_state::DeploymentPhase::Completed), None) {
-        finish_cleanup_pending(mutation, Some(&context_dir), &error);
+    if let Err(error) =
+        advance_phase(mutation, &prepared.deployment, Some(release_state::DeploymentPhase::Completed), None)
+    {
+        finish_cleanup_pending(mutation, Some(&prepared.context_dir), &error);
         return Ok(());
     }
-    mutation.clear_active()?;
-    Ok(())
+    mutation.clear_active()
 }
 
 /// Advances the persisted deployment phase and writes the record (with the
@@ -274,9 +312,12 @@ fn abort(mutation: &SiteMutation, context: Option<&Path>, error: Error) -> Resul
     Err(error)
 }
 
-fn finish_abort(mutation: &SiteMutation, context: Option<&Path>, error: Error) -> Result<()> {
+fn finish_abort<T>(mutation: &SiteMutation, context: Option<&Path>, error: Error) -> Result<T> {
     let result = abort(mutation, context, error);
-    clear_active_after_result(mutation, result)
+    match clear_active_after_result(mutation, result) {
+        Ok(()) => Err(anyhow::anyhow!("Deployment abort unexpectedly succeeded")),
+        Err(error) => Err(error),
+    }
 }
 
 fn finish_abort_without_release_drop(mutation: &SiteMutation, context: Option<&Path>, error: Error) -> Result<()> {

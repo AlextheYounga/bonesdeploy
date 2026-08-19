@@ -18,13 +18,12 @@ pub(super) fn configure(cfg: &mut Bones) {
 }
 
 pub(super) fn environment_example(project_name: &str, site_url: &str) -> String {
-    super::join_env_lines(&[
-        "NODE_ENV=production",
-        &format!("NEXT_PUBLIC_API_URL=\"{site_url}\""),
-        &format!("NEXT_PUBLIC_SITE_NAME=\"{project_name}\""),
-    ])
+    super::render_env_template(
+        include_str!("../../assets/frameworks/next/next.env.example"),
+        &[("{project_name}", project_name), ("{site_url}", site_url)],
+    )
 }
 
 pub(super) fn build_environment_example() -> String {
-    super::join_env_lines(&[super::BUILD_ENV_HEADER, "NEXT_PUBLIC_API_URL=", "NEXT_PUBLIC_SITE_NAME="])
+    include_str!("../../assets/frameworks/next/next.env.build.example").to_string()
 }

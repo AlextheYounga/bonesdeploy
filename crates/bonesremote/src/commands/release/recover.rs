@@ -106,9 +106,7 @@ mod tests {
             String::from("20260804_190321-46a0b75c-0000"),
             String::from("46a0b75c"),
             DeploymentPhase::Activated,
-            process::id(),
-            0,
-            String::from("2026-08-04T19:03:21Z"),
+            release_state::ProcessIdentity::new(process::id(), 0, String::from("2026-08-04T19:03:21Z")),
         );
         release_state::write_active_deployment("unitapp", &record)?;
 

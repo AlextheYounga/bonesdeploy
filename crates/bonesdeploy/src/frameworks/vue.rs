@@ -12,9 +12,9 @@ pub(super) fn questions() -> &'static [Question] {
 }
 
 pub(super) fn environment_example(_project_name: &str, _site_url: &str) -> String {
-    super::join_env_lines(&["NODE_ENV=production"])
+    include_str!("../../assets/frameworks/vue/vue.env.example").to_string()
 }
 
 pub(super) fn build_environment_example() -> String {
-    super::join_env_lines(&[super::BUILD_ENV_HEADER])
+    include_str!("../../assets/frameworks/vue/vue.env.build.example").to_string()
 }

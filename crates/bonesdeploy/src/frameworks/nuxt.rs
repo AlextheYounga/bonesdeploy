@@ -20,9 +20,12 @@ pub(super) fn configure(cfg: &mut Bones) {
 }
 
 pub(super) fn environment_example(_project_name: &str, site_url: &str) -> String {
-    super::join_env_lines(&["NODE_ENV=production", &format!("NUXT_PUBLIC_SITE_URL={site_url}")])
+    super::render_env_template(
+        include_str!("../../assets/frameworks/nuxt/nuxt.env.example"),
+        &[("{site_url}", site_url)],
+    )
 }
 
 pub(super) fn build_environment_example() -> String {
-    super::join_env_lines(&[super::BUILD_ENV_HEADER, "NUXT_PUBLIC_SITE_URL="])
+    include_str!("../../assets/frameworks/nuxt/nuxt.env.build.example").to_string()
 }

@@ -14,7 +14,7 @@ pub(crate) mod releases;
 pub(crate) mod store;
 
 pub(crate) use atomic::atomic_write;
-pub(crate) use record::{DeploymentPhase, DeploymentRecord};
+pub(crate) use record::{DeploymentPhase, DeploymentRecord, ProcessIdentity};
 pub(crate) use releases::{
     current_release_dir, current_release_name, list_releases_sorted, point_symlink_atomically, release_dir, shared_dir,
 };

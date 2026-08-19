@@ -64,9 +64,8 @@ pub struct DeploymentRecord {
     release: String,
     source_revision: String,
     phase: DeploymentPhase,
-    pid: u32,
-    process_start_ticks: u64,
-    started_at: String,
+    #[serde(flatten)]
+    process_identity: ProcessIdentity,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     previous_release: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -84,6 +83,20 @@ pub struct DeploymentRecord {
     image_digest: Option<String>,
 }
 
+/// Identifies the process that owns an in-flight deployment.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct ProcessIdentity {
+    pid: u32,
+    process_start_ticks: u64,
+    started_at: String,
+}
+
+impl ProcessIdentity {
+    pub(crate) fn new(pid: u32, process_start_ticks: u64, started_at: String) -> Self {
+        Self { pid, process_start_ticks, started_at }
+    }
+}
+
 impl DeploymentRecord {
     pub(crate) fn release(&self) -> &str {
         &self.release
@@ -92,13 +105,13 @@ impl DeploymentRecord {
         &self.phase
     }
     pub(crate) fn pid(&self) -> u32 {
-        self.pid
+        self.process_identity.pid
     }
     pub(crate) fn process_start_ticks(&self) -> u64 {
-        self.process_start_ticks
+        self.process_identity.process_start_ticks
     }
     pub(crate) fn started_at(&self) -> &str {
-        &self.started_at
+        &self.process_identity.started_at
     }
     pub(crate) fn context(&self) -> Option<&str> {
         self.context.as_deref()
@@ -116,22 +129,17 @@ impl DeploymentRecord {
         self.error = Some(error);
     }
 
-    #[expect(clippy::too_many_arguments)]
     pub(crate) fn new(
         release: String,
         source_revision: String,
         phase: DeploymentPhase,
-        pid: u32,
-        process_start_ticks: u64,
-        started_at: String,
+        process_identity: ProcessIdentity,
     ) -> Self {
         Self {
             release,
             source_revision,
             phase,
-            pid,
-            process_start_ticks,
-            started_at,
+            process_identity,
             previous_release: None,
             context: None,
             error: None,
@@ -170,9 +178,7 @@ impl PreviousDeployment {
             release: self.release,
             source_revision: String::new(),
             phase,
-            pid: self.pid,
-            process_start_ticks: self.process_start_ticks,
-            started_at: self.started_at,
+            process_identity: ProcessIdentity::new(self.pid, self.process_start_ticks, self.started_at),
             previous_release: None,
             context: self.context,
             error: None,
@@ -187,7 +193,7 @@ impl PreviousDeployment {
 mod tests {
     use anyhow::Result;
 
-    use super::{DeploymentPhase, DeploymentRecord};
+    use super::{DeploymentPhase, DeploymentRecord, ProcessIdentity};
 
     #[test]
     fn phases_after_commit_are_serialization_idle() {
@@ -212,9 +218,7 @@ mod tests {
             String::from("20260804_190321-46a0b75c-a7f2"),
             String::from("46a0b75c"),
             DeploymentPhase::Verified,
-            1234,
-            42,
-            String::from("2026-08-04T19:03:21Z"),
+            ProcessIdentity::new(1234, 42, String::from("2026-08-04T19:03:21Z")),
         );
         let json = serde_json::to_string(&record)?;
         let decoded: DeploymentRecord = serde_json::from_str(&json)?;

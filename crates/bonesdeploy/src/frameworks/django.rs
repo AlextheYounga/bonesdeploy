@@ -31,15 +31,17 @@ pub(super) fn questions() -> &'static [Question] {
 }
 
 pub(super) fn environment_example(project_name: &str, _site_url: &str) -> String {
-    super::join_env_lines(&[
-        &format!("DJANGO_SETTINGS_MODULE={project_name}.settings.production"),
-        "SECRET_KEY=",
-        &format!("DATABASE_URL=sqlite:////srv/sites/{project_name}/shared/database.sqlite"),
-    ])
+    super::render_env_template(
+        include_str!("../../assets/frameworks/django/django.env.example"),
+        &[("{project_name}", project_name)],
+    )
 }
 
 pub(super) fn build_environment_example(runtime: &Runtime) -> String {
     let python_version =
         runtime.extra.get(PYTHON_VERSION_KEY).and_then(|value| value.as_str()).unwrap_or(DEFAULT_PYTHON_VERSION);
-    super::join_env_lines(&[super::BUILD_ENV_HEADER, &format!("PYTHON_VERSION={python_version}")])
+    super::render_env_template(
+        include_str!("../../assets/frameworks/django/django.env.build.example"),
+        &[("{python_version}", python_version)],
+    )
 }

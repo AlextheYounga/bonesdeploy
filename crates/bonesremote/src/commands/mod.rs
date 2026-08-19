@@ -54,7 +54,7 @@ mod tests {
 
     use super::ensure_site_idle;
     use crate::release::SiteMutation;
-    use crate::release::state::{self as release_state, DeploymentPhase, DeploymentRecord};
+    use crate::release::state::{self as release_state, DeploymentPhase, DeploymentRecord, ProcessIdentity};
 
     fn temp_root(test_name: &str) -> Result<PathBuf> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |duration| duration.as_nanos());
@@ -68,9 +68,7 @@ mod tests {
             String::from("20260804_190321-46a0b75c-a7f2"),
             String::from("46a0b75c"),
             phase,
-            process::id(),
-            0,
-            String::from("2026-08-04T19:03:21Z"),
+            ProcessIdentity::new(process::id(), 0, String::from("2026-08-04T19:03:21Z")),
         )
     }
 

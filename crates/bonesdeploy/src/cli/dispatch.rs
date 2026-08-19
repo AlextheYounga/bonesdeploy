@@ -4,8 +4,6 @@ use crate::cli::args::{Cli, Command, ManifestFormat, ReleasesCommand, RemoteComm
 use crate::commands::{
     deploy, doctor, init, manifest, releases, remote, rollback, secrets, setup, skill, status, update, version,
 };
-// ponytail: direct command dispatch keeps CLI routing visible; split only if commands need shared dispatch state.
-#[expect(clippy::cognitive_complexity)]
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init {
@@ -43,30 +41,42 @@ pub async fn run(cli: &Cli) -> Result<()> {
         }),
         Command::Skill { command } => skill::dispatch(command.as_ref()).await,
         Command::Guide { format } => skill::run_next(*format).await,
-        Command::Secrets { command } => match command {
-            SecretsCommand::Init => secrets::init(),
-            SecretsCommand::Edit => secrets::edit(),
-            SecretsCommand::Push => secrets::push().await,
-        },
+        Command::Secrets { command } => dispatch_secrets(command).await,
         Command::Deploy => deploy::run().await,
-        Command::Releases { command } => match command {
-            None => releases::list().await,
-            Some(ReleasesCommand::Kill { release }) => releases::kill(release).await,
-        },
+        Command::Releases { command } => dispatch_releases(command).await,
         Command::Update { skip_local, skip_remote } => {
             update::run(update::Options { skip_local: *skip_local, skip_remote: *skip_remote }).await
         }
-        Command::Remote { command } => match command {
-            RemoteCommand::Bootstrap => remote::bootstrap::run(false, true),
-            RemoteCommand::Runtime { yes } => remote::runtime::run(*yes, true),
-            RemoteCommand::Ssl { yes, domain, email } => remote::ssl::run(*yes, domain.clone(), email.clone()),
-            RemoteCommand::Helpers { yes } => remote::helpers::run(*yes),
-            RemoteCommand::Services { yes } => remote::services::run(*yes, true),
-        },
+        Command::Remote { command } => dispatch_remote(command),
         Command::Rollback => rollback::run().await,
         Command::Version => {
             version::run();
             Ok(())
         }
+    }
+}
+
+async fn dispatch_secrets(command: &SecretsCommand) -> Result<()> {
+    match command {
+        SecretsCommand::Init => secrets::init(),
+        SecretsCommand::Edit => secrets::edit(),
+        SecretsCommand::Push => secrets::push().await,
+    }
+}
+
+async fn dispatch_releases(command: &Option<ReleasesCommand>) -> Result<()> {
+    match command {
+        None => releases::list().await,
+        Some(ReleasesCommand::Kill { release }) => releases::kill(release).await,
+    }
+}
+
+fn dispatch_remote(command: &RemoteCommand) -> Result<()> {
+    match command {
+        RemoteCommand::Bootstrap => remote::bootstrap::run(false, true),
+        RemoteCommand::Runtime { yes } => remote::runtime::run(*yes, true),
+        RemoteCommand::Ssl { yes, domain, email } => remote::ssl::run(*yes, domain.clone(), email.clone()),
+        RemoteCommand::Helpers { yes } => remote::helpers::run(*yes),
+        RemoteCommand::Services { yes } => remote::services::run(*yes, true),
     }
 }

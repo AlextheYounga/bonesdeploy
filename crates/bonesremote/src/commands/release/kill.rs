@@ -131,7 +131,7 @@ fn wait_for_process_exit(active: &DeploymentRecord, timeout: Duration) -> bool {
 #[cfg(test)]
 mod tests {
     use super::wait_for_process_exit;
-    use crate::release::state::{DeploymentPhase, DeploymentRecord};
+    use crate::release::state::{DeploymentPhase, DeploymentRecord, ProcessIdentity};
     use std::time::Duration;
 
     #[test]
@@ -140,9 +140,7 @@ mod tests {
             String::from("20260715_225306"),
             String::from("46a0b75c"),
             DeploymentPhase::Created,
-            u32::MAX,
-            0,
-            String::new(),
+            ProcessIdentity::new(u32::MAX, 0, String::new()),
         );
         assert!(wait_for_process_exit(&deployment, Duration::from_millis(1)));
     }

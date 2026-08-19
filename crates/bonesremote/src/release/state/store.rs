@@ -144,7 +144,7 @@ mod tests {
 
     use super::{SiteState, read_state, state_path, write_state};
     use crate::release::state::record::{DeploymentPhase, DeploymentRecord};
-    use crate::release::state::{ScopedRoot, set_sites_root_for_tests};
+    use crate::release::state::{ProcessIdentity, ScopedRoot, set_sites_root_for_tests};
 
     fn temp_root(test_name: &str) -> Result<(ScopedRoot, PathBuf)> {
         let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
@@ -173,9 +173,7 @@ mod tests {
             String::from("20260804_190321-46a0b75c-a7f2"),
             String::from("46a0b75c"),
             DeploymentPhase::Verified,
-            1234,
-            42,
-            String::from("2026-08-04T19:03:21Z"),
+            ProcessIdentity::new(1234, 42, String::from("2026-08-04T19:03:21Z")),
         );
         let state = SiteState { schema_version: 1, active: Some(record), staged_release: Some(String::from("staged")) };
 

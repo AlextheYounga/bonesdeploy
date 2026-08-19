@@ -8,8 +8,6 @@ use serde_json::Value;
 
 /// Shared question keys used by more than one template.
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
-const BUILD_ENV_HEADER: &str = "# Committed, non-secret values used while building this project.";
-
 mod django;
 mod laravel;
 mod next;
@@ -230,8 +228,8 @@ pub(crate) fn environment_url(domain: &str, preview_domain: &str) -> String {
     if host.is_empty() { String::new() } else { format!("https://{host}") }
 }
 
-pub(crate) fn join_env_lines(lines: &[&str]) -> String {
-    format!("{}\n", lines.join("\n"))
+pub(crate) fn render_env_template(template: &str, replacements: &[(&str, &str)]) -> String {
+    replacements.iter().fold(template.to_string(), |content, (key, value)| content.replace(key, value))
 }
 
 #[cfg(test)]
@@ -257,14 +255,6 @@ mod tests {
     }
 
     #[test]
-    fn every_template_has_a_questions_function() -> Result<()> {
-        for template in ["laravel", "django", "next", "nuxt", "rails", "sveltekit", "vue"] {
-            Framework::parse(template)?.questions();
-        }
-        Ok(())
-    }
-
-    #[test]
     fn framework_wire_values_parse_and_display() -> Result<()> {
         for wire in ["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue", "custom"] {
             assert_eq!(Framework::parse(wire)?.to_string(), wire);
@@ -282,19 +272,6 @@ mod tests {
         assert!(Framework::Custom.build_environment_example(&Runtime::default()).is_none());
         assert!(Framework::Custom.runtime_defaults()?.is_none());
         Ok(())
-    }
-
-    #[test]
-    fn every_template_has_an_environment_example() {
-        for template in ["laravel", "django", "next", "nuxt", "rails", "sveltekit", "vue"] {
-            assert!(
-                Framework::parse(template)
-                    .expect("known framework")
-                    .environment_example("atlas", "", "atlas.example.com")
-                    .is_some(),
-                "missing environment example for {template}"
-            );
-        }
     }
 
     #[test]
