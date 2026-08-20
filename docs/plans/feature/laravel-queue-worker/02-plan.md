@@ -35,7 +35,7 @@ When `install_queue_worker` is `true` in `bones.toml` (accessible as `ctx.runtim
    - `ReadWritePaths` includes shared Laravel storage, the current release's `bootstrap/cache`, and the site deployment log directory. `ProtectSystem=strict` keeps other paths read-only.
    - `StandardOutput=journal`, `StandardError=journal`
 
-3. **Deploy restart**: `bonesremote service restart` restarts the site target, then explicitly restarts the configured Laravel worker after cut-over. This re-evaluates `ConditionPathExists` after `current` changes from the generic placeholder to the Laravel release. No `php artisan queue:restart` call is needed in prepare scripts — the existing test at `frameworks.rs:195` already forbids `queue:restart` in prepare.
+3. **Deploy restart**: `bonesremote service restart` reads the root-owned `{project}.target.requires/` directory, starts the site target, and explicitly restarts every registered site service after cut-over. This re-evaluates `ConditionPathExists` after `current` changes from the generic placeholder to the Laravel release without consulting framework configuration or `.env`. No `php artisan queue:restart` call is needed in prepare scripts — the existing test at `frameworks.rs:195` already forbids `queue:restart` in prepare.
 
 4. **Manifest**: `manifest.py::artifacts()` includes the worker systemd unit file. `manifest.py::services()` includes `{project}-worker.service`. Both gated on `install_queue_worker`.
 

@@ -2,15 +2,7 @@ use std::{env, fs, io::Result, os::unix::fs::symlink, process};
 
 use bonesdeploy_core::paths;
 
-use bonesremote::commands::doctor::services::{current_is_placeholder, is_configured_laravel_worker, service_exists};
-
-#[test]
-fn only_the_first_laravel_release_can_defer_its_configured_worker() {
-    assert!(is_configured_laravel_worker("laravel", true, "shop", "shop-worker.service"));
-    assert!(!is_configured_laravel_worker("laravel", true, "shop", "shop-nginx.service"));
-    assert!(!is_configured_laravel_worker("next", true, "shop", "shop-worker.service"));
-    assert!(!is_configured_laravel_worker("laravel", false, "shop", "shop-worker.service"));
-}
+use bonesremote::commands::doctor::services::{current_is_placeholder, service_exists};
 
 #[test]
 fn recognizes_only_the_canonical_placeholder_release() -> Result<()> {
