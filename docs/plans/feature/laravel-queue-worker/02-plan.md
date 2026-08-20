@@ -35,7 +35,7 @@ When `install_queue_worker` is `true` in `bones.toml` (accessible as `ctx.runtim
    - `ReadWritePaths` includes shared Laravel storage, the current release's `bootstrap/cache`, and the site deployment log directory. `ProtectSystem=strict` keeps other paths read-only.
    - `StandardOutput=journal`, `StandardError=journal`
 
-3. **Deploy restart**: Since the worker is registered in the site target (via `register_service`), `bonesremote service restart` during deploy will restart it. No `php artisan queue:restart` call is needed in prepare scripts — the existing test at `frameworks.rs:195` already forbids `queue:restart` in prepare.
+3. **Deploy restart**: `bonesremote service restart` restarts the site target, then explicitly restarts the configured Laravel worker after cut-over. This re-evaluates `ConditionPathExists` after `current` changes from the generic placeholder to the Laravel release. No `php artisan queue:restart` call is needed in prepare scripts — the existing test at `frameworks.rs:195` already forbids `queue:restart` in prepare.
 
 4. **Manifest**: `manifest.py::artifacts()` includes the worker systemd unit file. `manifest.py::services()` includes `{project}-worker.service`. Both gated on `install_queue_worker`.
 
@@ -87,7 +87,7 @@ The worker deployment belongs in `runtime.py::deploy()` rather than `custom.py::
 
 **Worker uses the project-level PHP version from `php_version` framework var.** The `ExecStart` path is `/usr/bin/php{version} artisan queue:work ...`, matching how the project is configured.
 
-**No `queue:restart` in prepare scripts.** The existing test at `frameworks.rs:195` already asserts prepare must NOT run `queue:restart`. Worker restart is handled by the site target restart during deploy — the worker service is registered in the target, so restarting the target restarts the worker.
+**No `queue:restart` in prepare scripts.** The existing test at `frameworks.rs:195` already asserts prepare must NOT run `queue:restart`. BonesRemote explicitly restarts an enabled Laravel worker after activating the release, so the worker sees the new `current` target and re-evaluates its `artisan` condition.
 
 **Default worker arguments are hardcoded in the template**: `--sleep=3 --tries=3 --max-time=3600`. These are sensible production defaults. Site-specific overrides belong in `custom.py` or supervisor-level configuration, not in the framework template.
 

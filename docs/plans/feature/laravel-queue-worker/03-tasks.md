@@ -24,9 +24,10 @@
 - [x] Review the final diff to ensure no accidental behaviour change when `install_queue_worker` is absent or false.
 - [x] Confirm `templates.md` documentation accurately describes the option.
 - [x] Extend the Laravel e2e setup to provision `install_queue_worker=true` and assert the per-site worker service after setup and deploy.
+- [x] Explicitly restart an enabled Laravel queue worker after release activation so its `artisan` condition is re-evaluated after the placeholder is replaced.
 
 ## Completion notes
 
-Implemented the Laravel native queue worker behind the existing opt-in `install_queue_worker` runtime variable. The worker is a per-site systemd service registered in the site target, uses the selected PHP executable and explicit Laravel writable paths, and is included in the manifest only when enabled. Repository investigation clarified that the native Laravel FPM path does not attach an AppArmor profile, so the worker uses systemd hardening instead of profile reuse.
+Implemented the Laravel native queue worker behind the existing opt-in `install_queue_worker` runtime variable. The worker is a per-site systemd service registered in the site target, uses the selected PHP executable and explicit Laravel writable paths, and is included in the manifest only when enabled. Repository investigation clarified that the native Laravel FPM path does not attach an AppArmor profile, so the worker uses systemd hardening instead of profile reuse. BonesRemote explicitly restarts an enabled worker after activation because the generic placeholder release intentionally does not contain Laravel's `artisan` entrypoint.
 
 Validation passed with `ruff check .`, `ruff format .`, `uv run pytest` (259 tests), `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, `cargo test --workspace --exclude e2e`, and `shfmt -w .`. E2E tests were intentionally not run.

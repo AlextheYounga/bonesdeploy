@@ -184,6 +184,11 @@ pub const BUILD_TIMEOUT_SECONDS_DEFAULT: u64 = 300;
 pub const LARAVEL_INSTALL_QUEUE_WORKER: &str = "install_queue_worker";
 pub const LARAVEL_TEMPLATE: &str = "laravel";
 
+#[must_use]
+pub fn laravel_worker_service_name(project_name: &str) -> String {
+    format!("{project_name}-worker.service")
+}
+
 /// Per-site build limits. Kept as its own nested section so build settings do
 /// not leak into `BONES_*` environment variables as unrelated scalars.
 #[derive(Clone, Debug, Serialize, Deserialize)]

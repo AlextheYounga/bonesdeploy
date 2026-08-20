@@ -54,6 +54,11 @@ fn runtime_backend_serializes_as_lowercase_toml() -> Result<()> {
 }
 
 #[test]
+fn laravel_worker_service_name_is_project_scoped() {
+    assert_eq!(config::laravel_worker_service_name("shop"), "shop-worker.service");
+}
+
+#[test]
 fn removed_runtime_shared_configuration_is_rejected() {
     let runtime = Runtime {
         extra: BTreeMap::from([(String::from("shared"), toml::Value::Table(Map::new()))]),

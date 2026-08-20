@@ -52,7 +52,9 @@ fn is_deferred_laravel_worker(cfg: &config::Bones, service: &str) -> bool {
 }
 
 pub fn is_configured_laravel_worker(template: &str, worker_enabled: bool, project_name: &str, service: &str) -> bool {
-    template == config::LARAVEL_TEMPLATE && worker_enabled && service == format!("{project_name}-worker.service")
+    template == config::LARAVEL_TEMPLATE
+        && worker_enabled
+        && service == config::laravel_worker_service_name(project_name)
 }
 
 pub fn current_is_placeholder(project_root: &str) -> bool {
