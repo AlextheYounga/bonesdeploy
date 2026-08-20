@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::PathBuf;
 
 use bonesdeploy_core::{config, paths};
@@ -10,7 +11,11 @@ use super::accounts::collect_identity_groups;
 
 pub(crate) fn collect_sites(accounts: &BTreeMap<String, Account>) -> Result<Vec<Site>, String> {
     let root = paths::bonesremote_sites_root();
-    let entries = fs::read_dir(&root).map_err(|error| format!("cannot read {}: {error}", root.display()))?;
+    let entries = match fs::read_dir(&root) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => return Err(format!("cannot read {}: {error}", root.display())),
+    };
     let mut sites = Vec::new();
     for entry in entries {
         let entry = entry.map_err(|error| format!("cannot enumerate {}: {error}", root.display()))?;

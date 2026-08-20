@@ -12,7 +12,7 @@ mod app;
 pub use app::App;
 
 mod dotenv;
-pub use dotenv::{load, project_env, save, validate_dotenv};
+pub use dotenv::{load, merge_dotenv, project_env, save, validate_dotenv};
 
 pub mod environment;
 

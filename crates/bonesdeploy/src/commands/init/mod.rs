@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use bonesdeploy_core::config::apply_derived_defaults;
 use console::style;
 
 pub mod config;
@@ -64,6 +65,7 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
 
     scaffold::update_gitignore()?;
     scaffold::ensure_env_build()?;
+    apply_derived_defaults(&mut cfg);
     bones_config::save(&cfg, Path::new(paths::DOT_ENV))?;
     secrets::initialize_defaults(&cfg)?;
 

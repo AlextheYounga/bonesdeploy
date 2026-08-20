@@ -15,6 +15,14 @@ def _user_env_command(user, command):
 
 def setup_repo_and_project(ctx, paths):
     mkdir(
+        name="Ensure control-plane site state directory exists",
+        path=paths["site_root"],
+        user="root",
+        group="root",
+        mode="0700",
+    )
+
+    mkdir(
         name="Ensure bare repo parent directory exists",
         path=paths["repo_parent"],
         user=DEPLOY_USER,
@@ -68,9 +76,10 @@ def setup_repo_and_project(ctx, paths):
 
     env_path = f"{paths['shared']}/.env"
     server.script_template(
-        name="Seed blank .env in shared directory",
+        name="Seed .env in shared directory",
         src=str(SCRIPTS_DIR / "seed-blank-env.sh.j2"),
         env_path=env_path,
+        config_content=_shared_config_content(ctx),
         runtime_user=ctx.runtime.runtime_user,
         runtime_group=ctx.runtime.runtime_group,
         _sudo=True,
@@ -83,3 +92,22 @@ def setup_repo_and_project(ctx, paths):
         group=ctx.runtime.runtime_group,
         mode="0750",
     )
+
+
+def _shared_config_content(ctx):
+    values = {
+        "PROJECT_NAME": ctx.app.project_name,
+        "HOST": ctx.app.server.host,
+        "PORT": ctx.app.server.port,
+        "SSH_USER": ctx.app.server.ssh_user,
+        "BRANCH": ctx.app.deploy.branch,
+        "DOMAIN": ctx.app.dns.domain,
+        "PREVIEW_DOMAIN": ctx.app.dns.preview_domain,
+        "EMAIL": ctx.app.dns.email,
+        "SSL_ENABLED": str(ctx.app.dns.ssl_enabled).lower(),
+        "TEMPLATE": ctx.runtime.data.get("TEMPLATE", ""),
+        "RUNTIME_BACKEND": ctx.runtime.backend,
+        "WEB_ROOT": ctx.runtime.web_root,
+        "SERVICES": ",".join(ctx.services.services),
+    }
+    return quote("".join(f"{key}={value}\n" for key, value in values.items()))

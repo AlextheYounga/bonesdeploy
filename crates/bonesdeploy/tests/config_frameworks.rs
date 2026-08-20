@@ -3,7 +3,7 @@ use std::fs;
 use anyhow::{Result, bail};
 use bonesdeploy::config::{Bones, bootstrap_ssh_user, load, save};
 use bonesdeploy::frameworks::Framework;
-use bonesdeploy_core::config::{Runtime, RuntimeBackend};
+use bonesdeploy_core::config::{Runtime, RuntimeBackend, apply_derived_defaults};
 use serde_json::{Map, Value, json};
 
 fn sample_config(project_name: &str) -> Bones {
@@ -82,6 +82,18 @@ fn save_writes_flat_local_input_file() -> Result<()> {
     save(&sample_config("phoenix"), &path)?;
     assert!(fs::read_to_string(path)?.lines().all(|line| !line.starts_with('[')));
     Ok(())
+}
+
+#[test]
+fn derived_preview_domain_uses_project_and_host_without_overwriting_explicit_value() {
+    let mut config = sample_config("lawsnipe");
+    config.host = String::from("178.0.0.61");
+    apply_derived_defaults(&mut config);
+    assert_eq!(config.preview_domain, "lawsnipe-178-0-0-61.nip.io");
+
+    config.preview_domain = String::from("preview.example.com");
+    apply_derived_defaults(&mut config);
+    assert_eq!(config.preview_domain, "preview.example.com");
 }
 
 #[test]

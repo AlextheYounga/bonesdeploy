@@ -26,7 +26,7 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
         }
     };
     if !paths::bonesremote_site_root(site).is_dir() {
-        issues.push(format!("control-plane site state is missing: {}", paths::bonesremote_site_root(site).display()));
+        pending.push(format!("first deployment is pending for {site}"));
         return;
     }
 

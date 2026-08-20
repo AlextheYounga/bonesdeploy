@@ -77,6 +77,32 @@ pub fn validate_dotenv(content: &str) -> Result<()> {
     parse_dotenv(content).map(|_| ())
 }
 
+/// Merges dotenv content while preserving the original text of retained values.
+/// Values from `overlay` replace values with the same key in `base`.
+///
+/// # Errors
+/// Returns an error when either layer is not valid dotenv content.
+pub fn merge_dotenv(base: &str, overlay: &str) -> Result<String> {
+    validate_dotenv(base)?;
+    let overlay_values = parse_dotenv(overlay)?;
+    let mut merged = String::new();
+    for line in base.lines() {
+        let key = line.trim().split_once('=').map(|(key, _)| key.trim());
+        if key.is_some_and(|key| overlay_values.contains_key(key)) {
+            continue;
+        }
+        merged.push_str(line);
+        merged.push('\n');
+    }
+    if !overlay.is_empty() {
+        merged.push_str(overlay);
+        if !overlay.ends_with('\n') {
+            merged.push('\n');
+        }
+    }
+    Ok(merged)
+}
+
 /// Writes the flat project environment consumed by Rust, BonesInfra, and the
 /// remote runtime loader.
 ///

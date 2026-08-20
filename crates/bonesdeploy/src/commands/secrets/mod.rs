@@ -162,18 +162,23 @@ pub async fn push() -> Result<()> {
         bail!("Missing encrypted secrets\n\n{}", output::next_step("bonesdeploy secrets edit"));
     }
 
-    let plaintext = gpg::decrypt(encrypted_path)?;
+    let plaintext =
+        String::from_utf8(gpg::decrypt(encrypted_path)?).context("Decrypted secrets are not valid UTF-8")?;
     let shared = Path::new(&cfg.project_root).join(paths::SHARED_DIR);
     let target = shared.join(paths::DOT_ENV);
     let parent = target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
     let parent_s = ssh::shell_quote(&parent.display().to_string());
     let target_s = ssh::shell_quote(&target.display().to_string());
     let group_s = ssh::shell_quote(&runtime_group);
+    let remote = ssh::run_cmd(&session, &format!("if test -f {target_s}; then cat {target_s}; fi")).await?;
+    let local = fs::read_to_string(paths::DOT_ENV).context("Failed to read local project environment")?;
+    let environment = shared_config::merge_dotenv(&remote, &plaintext)?;
+    let environment = shared_config::merge_dotenv(&environment, &local)?;
     let cmd = format!(
         "tmp=; trap 'rm -f \"$tmp\"' EXIT; mkdir -p {parent_s} && tmp=$(mktemp {target_s}.XXXXXX) && cat > \"$tmp\" && chown root:{group_s} \"$tmp\" && chmod {DEFAULT_SECRET_MODE} \"$tmp\" && mv \"$tmp\" {target_s} && tmp=",
     );
 
-    ssh::run_cmd_with_stdin(&session, &cmd, &plaintext).await?;
+    ssh::run_cmd_with_stdin(&session, &cmd, environment.as_bytes()).await?;
     session.close().await?;
     println!("{} Secrets pushed.", output::success_marker());
     Ok(())

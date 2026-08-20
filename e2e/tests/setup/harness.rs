@@ -118,7 +118,7 @@ impl Harness {
             "systemctl is-active --quiet {site}.target && systemctl is-active --quiet {site}-nginx.service && test -d /srv/sites/{site}"
         ))?;
         self.exec(&format!(
-            "test \"$(stat -c '%U:%G:%a' /usr/local/bin/bonesremote)\" = 'root:root:755' && test -f /root/.config/bonesremote/sites/{site}/bones.toml"
+            "test \"$(stat -c '%U:%G:%a' /usr/local/bin/bonesremote)\" = 'root:root:755' && test \"$(stat -c '%U:%G:%a' /root/.config/bonesremote/sites/{site})\" = 'root:root:700'"
         ))?;
         self.exec(&format!(
             "test -f /srv/sites/{site}/shared/.env && test -d /srv/sites/{site}/releases/19700101_000000"

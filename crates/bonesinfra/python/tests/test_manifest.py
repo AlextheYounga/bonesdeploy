@@ -7,6 +7,7 @@ from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra import manifest
 from bonesinfra.config.context import DeployContext
+from bonesinfra.frameworks.vue import manifest as vue_manifest
 from bonesinfra.manifest import (
     Artifact,
     collect_services,
@@ -53,6 +54,12 @@ def test_project_manifest_declarations_are_included(tmp_path: Path):
     assert "ACME certificate" in names
     assert collect_services(ctx, project)[-1].unit == "example-app.service"
     assert report(ctx, [], [], project)["strategy"]["mode"] == "server"
+
+
+def test_vue_declares_nginx_socket_as_socket(tmp_path: Path):
+    ctx = _context(tmp_path)
+    socket = next(entry for entry in vue_manifest.artifacts(ctx) if entry[0] == "runtime nginx socket")
+    assert socket[2] == "socket"
 
 
 def test_resolve_artifacts_rejects_unknown_path_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

@@ -93,3 +93,20 @@ fn dotenv_rejects_invalid_and_duplicate_keys() -> Result<()> {
     assert!(config::load(&path).is_err());
     Ok(())
 }
+
+#[test]
+fn dotenv_merge_preserves_existing_values_and_replaces_overlaid_keys() -> Result<()> {
+    let existing = "PROJECT_NAME=old\nDATABASE_PASSWORD=generated\nAPP_KEY=old\n";
+    let secrets = "APP_KEY=secret\nNODE_ENV=production\n";
+    let project = "PROJECT_NAME=e2evue\nHOST=192.0.2.1\n";
+
+    let merged = config::merge_dotenv(existing, secrets)?;
+    let merged = config::merge_dotenv(&merged, project)?;
+
+    assert!(merged.contains("DATABASE_PASSWORD=generated\n"));
+    assert!(merged.contains("APP_KEY=secret\n"));
+    assert!(merged.contains("PROJECT_NAME=e2evue\n"));
+    assert!(!merged.contains("PROJECT_NAME=old\n"));
+    assert!(!merged.contains("APP_KEY=old\n"));
+    Ok(())
+}

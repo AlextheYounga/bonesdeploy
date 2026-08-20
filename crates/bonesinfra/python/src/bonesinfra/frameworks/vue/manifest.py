@@ -13,7 +13,7 @@ def artifacts(ctx):
         ("site nginx systemd requirement", paths.systemd_site_nginx_requirement, "link", "runtime"),
         ("runtime socket directory", paths.runtime_socket_dir, "directory", "runtime"),
         ("runtime nginx directory", paths.runtime_nginx_dir, "directory", "runtime"),
-        ("runtime nginx socket", paths.runtime_nginx_socket, "file", "runtime"),
+        ("runtime nginx socket", paths.runtime_nginx_socket, "socket", "runtime"),
         ("runtime nginx PID", paths.runtime_nginx_pid, "file", "runtime"),
     ]
 
