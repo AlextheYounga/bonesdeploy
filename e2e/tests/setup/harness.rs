@@ -133,7 +133,9 @@ impl Harness {
 
     pub fn assert_service_condition_skipped(&self, service: &str) -> Result<()> {
         self.exec(&format!(
-            "test \"$(systemctl show --property=ConditionResult --value -- {service})\" = no && ! systemctl is-active --quiet {service}"
+            "test \"$(systemctl show --property=LoadState --value -- {service})\" = loaded && \
+             test \"$(systemctl show --property=ConditionResult --value -- {service})\" = no && \
+             ! systemctl is-active --quiet {service}"
         ))?;
         Ok(())
     }

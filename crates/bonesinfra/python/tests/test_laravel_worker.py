@@ -7,15 +7,14 @@ from bonesinfra.project import load_manifest, load_runtime
 INFRA = Path(__file__).parents[1] / "src/bonesinfra/frameworks/laravel"
 
 
-def _config(tmp_path: Path, *, worker: bool | None = None) -> Path:
-    value = "" if worker is None else f"install_queue_worker={'true' if worker else ''}\n"
+def _config(tmp_path: Path) -> Path:
     config = tmp_path / ".env"
     config.write_text(
-        f"""PROJECT_NAME=atlas
+        """PROJECT_NAME=atlas
 HOST=example.test
 TEMPLATE=laravel
 php_version=8.5
-{value}SERVICES=
+SERVICES=
 """
     )
     return config
@@ -33,7 +32,7 @@ def _link_core(tmp_path: Path):
 
 
 def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypatch):
-    config = _config(tmp_path, worker=True)
+    config = _config(tmp_path)
     _link_core(tmp_path)
     module = load_runtime(config)
     ctx = _runtime_context(config)
@@ -71,28 +70,8 @@ def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypa
     assert "ConditionPathExists={{ paths.current }}/artisan" in template
 
 
-def test_laravel_runtime_skips_queue_worker_when_disabled(tmp_path, monkeypatch):
-    config = _config(tmp_path, worker=False)
-    _link_core(tmp_path)
-    module = load_runtime(config)
-    ctx = _runtime_context(config)
-    renders = []
-
-    monkeypatch.setattr(module.PHP, "install", lambda _ctx: "/usr/bin/php8.5")
-    monkeypatch.setattr(module.PHP, "configure_fpm_pool", lambda _ctx, **_kwargs: "/run/php/php8.5-fpm-atlas.sock")
-    monkeypatch.setattr(module.site, "render_php_fpm", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(module.shared, "ensure_directories", lambda *_args: None)
-    monkeypatch.setattr(module.runtime, "setup", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(module.runtime, "start_services", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(module, "render", lambda *args, **_kwargs: renders.append(args[0]))
-
-    module.deploy(ctx)
-
-    assert "Deploy Laravel queue worker service" not in renders
-
-
-def test_laravel_manifest_declares_worker_only_when_enabled(tmp_path):
-    config = _config(tmp_path, worker=True)
+def test_laravel_manifest_declares_worker_without_configuration_flag(tmp_path):
+    config = _config(tmp_path)
     _link_core(tmp_path)
     ctx = _runtime_context(config)
     project_manifest = load_manifest(config)
@@ -102,16 +81,3 @@ def test_laravel_manifest_declares_worker_only_when_enabled(tmp_path):
 
     assert any(entry.name == "Laravel queue worker service" for entry in artifacts)
     assert any(entry.unit == "atlas-worker.service" for entry in services)
-
-
-def test_laravel_manifest_omits_worker_when_disabled(tmp_path):
-    config = _config(tmp_path, worker=False)
-    _link_core(tmp_path)
-    ctx = _runtime_context(config)
-    project_manifest = load_manifest(config)
-
-    artifacts = resolve_artifacts(ctx, project_manifest)
-    services = collect_services(ctx, project_manifest)
-
-    assert all(entry.name != "Laravel queue worker service" for entry in artifacts)
-    assert all(entry.unit != "atlas-worker.service" for entry in services)

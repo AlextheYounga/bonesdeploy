@@ -27,14 +27,13 @@ def deploy(ctx):
             template_src=TEMPLATES / "nginx/laravel-site-nginx.conf.j2",
             php_fpm_socket_path=socket,
         )
-        if current_ctx.runtime.data.get("install_queue_worker", False):
-            render(
-                "Deploy Laravel queue worker service",
-                TEMPLATES / "queue-worker.service.j2",
-                current_ctx.paths.systemd_service("worker"),
-                **template_data(current_ctx, paths=paths, php_executable=php_executable),
-            )
-            systemd.register_service(current_ctx, paths=paths, name="worker")
-            systemd.enable_and_start(current_ctx, "worker")
+        render(
+            "Deploy Laravel queue worker service",
+            TEMPLATES / "queue-worker.service.j2",
+            current_ctx.paths.systemd_service("worker"),
+            **template_data(current_ctx, paths=paths, php_executable=php_executable),
+        )
+        systemd.register_service(current_ctx, paths=paths, name="worker")
+        systemd.enable_and_start(current_ctx, "worker")
 
     runtime.orchestrate(ctx, provision)

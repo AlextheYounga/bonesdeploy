@@ -28,20 +28,18 @@ runtime is provisioned; you wire your own. Most projects pick a template.
 
 ### laravel
 
-PHP + PHP-FPM. Set `install_queue_worker=true` to provision an opt-in Laravel
-`queue:work` systemd service that consumes the application's configured queue.
+PHP + PHP-FPM. Provisions a Laravel `queue:work` systemd service that consumes
+the application's configured queue.
 
 | Key | Type | Choices | Default |
 |-----|------|---------|---------|
 | `php_version` | choice | 8.2, 8.3, 8.4, 8.5 | 8.5 |
-| `install_queue_worker` | bool | — | false |
 
 ```
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
   --template laravel --framework-var php_version=8.5
 ```
 
-Enable the queue worker with `--framework-var install_queue_worker=true`.
 
 ### django
 

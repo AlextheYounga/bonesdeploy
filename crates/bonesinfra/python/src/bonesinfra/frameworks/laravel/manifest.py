@@ -41,8 +41,7 @@ def artifacts(ctx):
                 ),
             ]
         )
-    if ctx.runtime.data.get("install_queue_worker", False):
-        entries.append(("Laravel queue worker service", paths.systemd_service("worker"), "file", "framework"))
+    entries.append(("Laravel queue worker service", paths.systemd_service("worker"), "file", "framework"))
     return entries
 
 
@@ -50,8 +49,7 @@ def services(ctx):
     entries = [("site nginx", "{project}-nginx.service", "runtime")]
     if ctx.runtime.backend == "docker":
         entries.append(("Docker application", "{project}-docker.service", "docker"))
-    if ctx.runtime.data.get("install_queue_worker", False):
-        entries.append(("Laravel queue worker", "{project}-worker.service", "framework"))
+    entries.append(("Laravel queue worker", "{project}-worker.service", "framework"))
     return entries
 
 

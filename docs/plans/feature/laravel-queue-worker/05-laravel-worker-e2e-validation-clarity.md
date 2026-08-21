@@ -6,11 +6,11 @@ The Laravel e2e setup was requested to exercise the new queue worker without run
 
 ## Decision
 
-The Laravel e2e scenario will provision with `install_queue_worker=true`, assert that `{site}-worker.service` is condition-skipped while the placeholder release is active, then assert it is active after deployment. The existing Laravel fixture is sufficient because it already uses `QUEUE_CONNECTION=database` and includes the database queue migration.
+The Laravel e2e scenario will use the default worker provisioning, assert that `{site}-worker.service` is loaded but condition-skipped while the placeholder release is active, then assert it is active after deployment. The existing Laravel fixture is sufficient because it already uses `QUEUE_CONNECTION=database` and includes the database queue migration.
 
 ## Supersedes
 
-This clarification adds e2e coverage to the validation scope without changing the worker behavior, opt-in configuration, or exclusions.
+This clarification adds e2e coverage to the validation scope without changing the worker behavior or exclusions.
 
 ## Effect on the record
 
