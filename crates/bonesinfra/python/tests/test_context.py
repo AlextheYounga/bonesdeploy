@@ -48,6 +48,19 @@ def test_template_data_contains_runtime_values(tmp_path):
     assert td["runtime_backend"] == "native"
 
 
+def test_framework_values_are_available_to_runtime_templates(tmp_path):
+    ctx = DeployContext.from_files(_write_config(tmp_path, "is_static=true\n"))
+
+    assert ctx.runtime.data["is_static"] is True
+    assert template_data(ctx)["is_static"] is True
+
+
+def test_false_framework_boolean_is_false(tmp_path):
+    ctx = DeployContext.from_files(_write_config(tmp_path, "is_static=false\n"))
+
+    assert ctx.runtime.data["is_static"] is False
+
+
 def test_docker_runtime_backend_is_preserved(tmp_path):
     ctx = DeployContext.from_files(_write_config(tmp_path, "RUNTIME_BACKEND=docker\n"))
 

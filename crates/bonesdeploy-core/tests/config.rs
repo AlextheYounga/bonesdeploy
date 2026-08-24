@@ -110,3 +110,17 @@ fn dotenv_merge_preserves_existing_values_and_replaces_overlaid_keys() -> Result
     assert!(!merged.contains("APP_KEY=old\n"));
     Ok(())
 }
+
+#[test]
+fn dotenv_round_trips_framework_values() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    let mut config = Bones::default();
+    config.runtime.extra.insert(String::from("is_static"), toml::Value::Boolean(true));
+
+    config::save(&config, &path)?;
+    let loaded = config::load(&path)?;
+
+    assert_eq!(loaded.runtime.extra.get("is_static"), Some(&toml::Value::Boolean(true)));
+    Ok(())
+}

@@ -53,6 +53,11 @@ pub fn load(path: &Path) -> Result<Bones> {
         "docker" => RuntimeBackend::Docker,
         value => bail!("Invalid {}: {value}", project_env::RUNTIME_BACKEND),
     };
+    for (key, value) in &values {
+        if !is_project_env_key(key) {
+            config.runtime.extra.insert(key.clone(), parse_runtime_value(value));
+        }
+    }
     config.services.services = values
         .get(project_env::SERVICES)
         .map(|value| {
@@ -136,8 +141,55 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
         }
         content.push_str(&format!("{key}={}\n", format_dotenv_value(value)));
     }
+    for (key, value) in &config.runtime.extra {
+        let value = runtime_value_to_string(value)
+            .with_context(|| format!("Runtime framework value `{key}` must be a scalar"))?;
+        if value.contains('\n') || value.contains('\r') {
+            bail!(".env values must not contain newlines");
+        }
+        content.push_str(&format!("{key}={}\n", format_dotenv_value(&value)));
+    }
     fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
+}
+
+fn is_project_env_key(key: &str) -> bool {
+    matches!(
+        key,
+        project_env::PROJECT_NAME
+            | project_env::REMOTE_NAME
+            | project_env::SSH_USER
+            | project_env::HOST
+            | project_env::PORT
+            | project_env::BRANCH
+            | project_env::DOMAIN
+            | project_env::PREVIEW_DOMAIN
+            | project_env::EMAIL
+            | project_env::SSL_ENABLED
+            | project_env::TEMPLATE
+            | project_env::RUNTIME_BACKEND
+            | project_env::WEB_ROOT
+            | project_env::SERVICES
+    )
+}
+
+fn parse_runtime_value(value: &str) -> toml::Value {
+    match value {
+        "true" => toml::Value::Boolean(true),
+        "false" => toml::Value::Boolean(false),
+        _ => toml::Value::String(value.to_string()),
+    }
+}
+
+fn runtime_value_to_string(value: &toml::Value) -> Option<String> {
+    match value {
+        toml::Value::String(value) => Some(value.clone()),
+        toml::Value::Integer(value) => Some(value.to_string()),
+        toml::Value::Float(value) => Some(value.to_string()),
+        toml::Value::Boolean(value) => Some(value.to_string()),
+        toml::Value::Datetime(value) => Some(value.to_string()),
+        toml::Value::Array(_) | toml::Value::Table(_) => None,
+    }
 }
 
 fn parse_dotenv(content: &str) -> Result<BTreeMap<String, String>> {
