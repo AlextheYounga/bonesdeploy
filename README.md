@@ -28,7 +28,7 @@ The result is not a general-purpose platform for every imaginable workload. It i
 
 All without turning a $5 Linux box into a tiny Kubernetes tribute act.
 
-BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds deployment configs and scripts into your repo, publishes the `.bones/` dataset into root-owned `bonesremote` site state, and runs the release lifecycle remotely without turning the bare Git repo into the control plane.
+BonesDeploy deploys project releases to a remote Linux server over SSH. It scaffolds ordinary project-local deployment and infrastructure files, resolves one immutable Git revision for each deployment, and runs the release lifecycle remotely without turning a configuration repository into the control plane.
 
 No platform.
 No control plane.
@@ -51,7 +51,9 @@ And embeds a Python provisioning runtime:
 Each initialized project receives the complete BonesInfra distribution in
 `infra/.framework/`. Commands execute that committed managed framework through a
 project-scoped dependency environment; `infra/custom/` remains
-project-owned and is preserved by updates.
+project-owned and is preserved by updates. The managed framework can be updated
+explicitly, while modified managed files are reported as conflicts instead of
+being silently overwritten.
 
 ## The Point
 
@@ -113,12 +115,11 @@ Docker just is not the foundation.
 ## Runtime Backends
 
 BonesDeploy can run applications directly on Linux or inside Docker. Native is
-the default, so existing `bones.toml` files do not change behavior. Select the
-backend during initialization or set it explicitly:
+the default. Select the backend during initialization or set
+`RUNTIME_BACKEND=docker` in the project `.env`:
 
-```toml
-[runtime]
-backend = "docker"
+```dotenv
+RUNTIME_BACKEND=docker
 ```
 
 Docker mode keeps the existing release lifecycle and rootless Podman build
@@ -145,10 +146,15 @@ Runtime templates set up the Linux pieces for a framework.
 | Next.js  | Working    | Node runtime setup                 |
 | Nuxt     | Working    | Nuxt runtime setup                 |
 | Vue      | Working    | Static frontend setup              |
+| SvelteKit| Working    | Node runtime setup                 |
 | Django   | Not tested | Python / Gunicorn not tested yet   |
 | Rails    | Not tested | Ruby not tested yet                |
 
 Templates are not magic. They are shared server setup so every project does not become a custom snowflake.
+
+Native Laravel sites also receive a per-site systemd queue worker by default.
+It runs `php artisan queue:work` with bounded lifetime and explicit writable
+Laravel storage paths, and is restarted with the application after activation.
 
 ## Install
 
@@ -178,7 +184,7 @@ For CI or AI agents, pick a runtime template and pass variables non-interactivel
 
 ```sh
 bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
-  --template laravel --runtime-backend docker --runtime-var php_version=8.5 \
+  --template laravel --runtime-backend docker --framework-var php_version=8.5 \
   --service postgres --service valkey
 ```
 
@@ -187,16 +193,14 @@ See `bonesdeploy skill doc templates` for every template and its variables.
 This creates:
 
 ```text
-.bones/
-├── bones.toml
-├── deployment/
-│   └── 01_*.sh
-└── infra/                  # project-owned provisioning source
-    ├── __init__.py
-    ├── runtime.py          # orchestrates the framework's services
-    ├── manifest.py         # declares artifacts, services, and mode
-    ├── custom.py           # ordinary project infrastructure module
-    └── templates/          # local Jinja2 templates for this project
+.
+├── .env                    # local project and provisioning inputs; do not commit
+├── .env.build              # committed, non-secret build inputs
+├── deployment/             # committed build and prepare scripts
+└── infra/                  # committed project infrastructure
+    ├── .framework/         # BonesDeploy-managed BonesInfra snapshot
+    ├── custom/             # project-owned provisioning extensions
+    └── secrets/             # encrypted project secrets
 ```
 
 The files are yours.
@@ -204,10 +208,10 @@ Edit them.
 Commit them.
 Read them when something breaks.
 
-`infra/runtime.py` is imported and run by BonesInfra when you invoke
-`bonesdeploy remote runtime`. It is a vendored snapshot of the selected canonical
-framework implementation; edit it, its supporting modules, and its local
-templates as project infrastructure.
+The managed framework is executed when you invoke `bonesdeploy remote runtime`.
+The project-owned `infra/custom/` package is composed after the managed
+framework. Edit custom provisioning and local templates as project
+infrastructure; use `bonesdeploy update` to refresh the managed snapshot.
 
 Deployment scripts run in filename order:
 
@@ -233,16 +237,16 @@ bonesdeploy remote runtime
 
 This runs the provisioning in your project's `infra/.framework/` package:
 framework services, per-site nginx, AppArmor, and your `infra/custom/` project
-hooks. Templates rendered by the managed framework come from
+extensions. Templates rendered by the managed framework come from
 `infra/.framework/src/bonesinfra/frameworks/<name>/templates/`.
 
 Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
 
 ```sh
-bonesdeploy remote dbs
+bonesdeploy remote services
 ```
 
-Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Generated credentials live in the protected remote `shared/.env`, never in `.bones/`. MariaDB and MySQL are alternatives and cannot share one host.
+Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Generated credentials live in the protected remote `shared/.env`, never in Git. MariaDB and MySQL are alternatives and cannot share one host.
 
 Add SSL after DNS points at the server:
 
@@ -322,12 +326,6 @@ bonesdeploy skill doc workflows      # end-to-end flows
 bonesdeploy skill doc methodology    # permission model and doctrine
 ```
 
-Sync `.bones/` changes to the server:
-
-```sh
-bonesdeploy push
-```
-
 Update the local and remote binaries:
 
 ```sh
@@ -336,60 +334,49 @@ bonesdeploy update
 
 ## Config
 
-`bonesdeploy init` creates `.bones/bones.toml`:
+`bonesdeploy init` creates a project-root `.env` with local provisioning inputs:
 
-```toml
-[app]
-remote_name = "production"
-project_name = "myproject"
-repo_path = "/home/git/myproject.git"
-project_root = "/srv/sites/myproject"
-
-[app.server]
-host = "deploy.example.com"
-ssh_user = "root"
-port = "22"
-
-[app.deploy]
-branch = "master"
-deploy_on_push = false
-releases = 5
-
-[app.dns]
-domain = ""
-preview_domain = ""
-email = ""
-ssl_enabled = false
-
-[runtime]
-template = "custom"
+```dotenv
+PROJECT_NAME=myproject
+REMOTE_NAME=production
+HOST=deploy.example.com
+SSH_USER=root
+PORT=22
+BRANCH=main
+TEMPLATE=custom
+RUNTIME_BACKEND=native
 ```
 
-Common defaults:
+`.env` is local configuration and is excluded from Git. `.env.build` is the
+committed, non-secret build configuration. Runtime secrets are edited through
+`bonesdeploy secrets edit`, stored encrypted at `infra/secrets/.env.gpg`, and
+sent to the protected remote `shared/.env` with `bonesdeploy secrets push`.
 
 ## Project Structure
 
 ```text
-.bones/
-├── bones.toml           # project, build, and runtime configuration
-└── deployment/
-    ├── build/
-    │   └── 01_*.sh      # build scripts (run sequentially in the buildpack-deps container)
-    └── prepare/
-        └── 01_*.sh      # prepare scripts (run as the site user before activation)
+deployment/
+├── build/
+│   └── 01_*.sh      # build scripts (run sequentially in the build container)
+└── prepare/
+    └── 01_*.sh      # prepare scripts (run as the site user before activation)
 ```
 
-The optional git push transport uses two thin internal adapters (local pre-push guard and remote post-receive trigger) that are embedded in the binaries. You do not see or manage them under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys; the default is `false`.
+Deployments are explicit: `bonesdeploy deploy` does not push application
+changes, synchronize a second repository, or trigger from Git hooks.
 
-Build scripts in `.bones/deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Each build script is capped at `[build].timeout_seconds` (default 300; systemd terminates the script's whole process tree when exceeded). A value of `0` disables the per-script timeout. Bonesremote streams an ephemeral copy of the deployment bundle into the container at `/workspace/deployment`, so the build user never needs host access to bonesremote's control-plane files. BonesInfra provisions a private persistent cache for each build user; bonesremote mounts it at `/workspace/cache` and exposes `BUILD_CACHE_DIR`. The shared deployment functions use it for Node, Corepack, npm, pnpm, Yarn, Composer, and Bundler downloads. Installed dependency trees and build output remain disposable. Prepare scripts in `.bones/deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation. Bonesremote streams the shared functions into each prepare shell before the prepare script, so prepare scripts do not source the root-owned deployment bundle.
+Build scripts in `deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Each build script is capped at 300 seconds by default; a configured timeout of `0` disables that per-script limit. Bonesremote streams an ephemeral copy of the deployment bundle into the container at `/workspace/deployment`, so the build user never needs host access to control-plane files. BonesInfra provisions a private persistent cache for each build user; bonesremote mounts it at `/workspace/cache` and exposes `BUILD_CACHE_DIR`. The shared deployment functions use it for Node, Corepack, npm, pnpm, Yarn, Composer, and Bundler downloads. Installed dependency trees and build output remain disposable. Prepare scripts in `deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation. Bonesremote streams the shared functions into each prepare shell before the prepare script.
 
 Build scripts can set runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool. Beyond per-script timeouts, BonesInfra caps each build user's host-level slice at 80% CPU quota, 80% memory high/max, and `MemorySwapMax=0`, so a runaway build fails rather than exhausting host memory or swap.
 
-BonesRemote also exposes scalar values from `bones.toml` as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use `shared/.env` for runtime secrets.
+BonesRemote also exposes safe scalar runtime values as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use remote `shared/.env` for runtime secrets.
 
 Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager, Podman, and the Infra-provisioned build cache before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 
-Git hooks are an optional transport — `bonesdeploy deploy` is the primary deployment command. The remote `post-receive` trigger is embedded in the `bonesremote` binary and installed into the bare repo automatically.
+Each deployment resolves its requested branch or revision to one full Git SHA,
+then uses that immutable revision for source, deployment scripts, infrastructure,
+and build-safe scalar inputs throughout the release lifecycle. Runtime plaintext
+secrets and decryption keys are never included in build inputs.
 
 ## Good Fit
 
