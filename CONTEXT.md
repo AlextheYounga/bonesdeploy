@@ -142,13 +142,13 @@ Laravel builds use Composer `2.8.12` by default. Set `COMPOSER_VERSION` in
 the selected PHP version. Builds download the pinned PHAR directly with curl,
 verify its SHA-256 checksum, and use bounded network timeouts.
 
-Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. Runtime secrets belong in `shared/.env` via `bonesdeploy secrets push`.
+Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. The encrypted `infra/secrets/.env.gpg` is the source of truth for the complete remote `shared/.env`; `bonesdeploy secrets push` atomically replaces that file without reading or merging another environment file.
 
 ### Hooks
 The optional git push transport uses thin adapters: a local `pre-push` guard embedded in the `bonesdeploy` binary and a remote `post-receive` trigger embedded in the `bonesremote` binary. The config repo uses a separate `pre-receive` trigger installed by provisioning. Neither adapter is visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
 
 - `pre-push` => Installed by `bonesdeploy init` into `.git/hooks/pre-push`. This checks if we are pushing to the bonesdeploy designated remote. If so, it runs `bonesdeploy doctor --local` and fails if doctor reports warnings or errors.
-- `post-receive` (app repo) => Installed automatically into the bare repo at `/home/git/<project>.git/`. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and config from `/root/.config/bonesremote/sites/<site>/`.
+- `post-receive` (app repo) => Installed automatically into the bare repo at `/home/git/<project>.git/`. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and runtime config from `/srv/sites/<site>/shared/.env`.
 - `config-pre-receive` (config repo) => Installed during provisioning into `/root/.config/bonesremote/repos/<project>.bones.git/`. Derives `<site>` from `GIT_DIR` by stripping `.bones.git`, reads the pushed revision, and calls `bonesremote site receive --site <site> --revision <rev>` directly as root before Git accepts the update. `bonesremote` archives the revision from the bones repo via `git archive`, validates the dataset, and atomically replaces the control-plane state.
 
 ### Config Repo
@@ -272,7 +272,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 
 - **deploy**
   - Publishes the local `.bones/` dataset into remote bonesremote site state first, then SSHes into the configured host and runs `bonesremote deploy --site <project>` directly.
-  - Pushes the decrypted local `.bones/secrets/.env.gpg` into the remote `shared/.env` before starting the deployment.
+  - Does not modify the remote environment. Run `bonesdeploy secrets push` explicitly to replace `shared/.env` from the encrypted local source.
   - Omits the `--revision` flag, so `bonesremote deploy` uses the configured branch from `bones.toml`.
 
 - ****remote setup****
@@ -317,7 +317,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - Manages GPG-encrypted environment secrets under `.bones/secrets/`.
   - `init` bootstraps `.bones/secrets/.env.gpg` with the selected runtime's defaults; `secrets init` remains an idempotent manual equivalent.
   - `secrets edit` decrypts `.bones/secrets/.env.gpg` for editing and re-encrypts on save.
-  - `secrets push` uploads the decrypted runtime secrets to the remote `shared/.env` over SSH and never uploads or merges the local root `.env`. Remote control-plane configuration is stored separately under the root-owned site state directory.
+  - `secrets push` atomically replaces remote `shared/.env` with the decrypted `infra/secrets/.env.gpg` content. It does not read, merge, or upload the local root `.env`.
 
 - **config**
   - Reads or prints values from `.bones/bones.toml`.

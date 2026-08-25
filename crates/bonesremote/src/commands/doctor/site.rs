@@ -17,6 +17,14 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
     }
+    let shared_env = Path::new(&paths::default_project_root_for(site)).join(paths::SHARED_DIR).join(paths::DOT_ENV);
+    if !shared_env.is_file() {
+        pending.push(format!(
+            "shared environment is missing: {}. Run 'bonesdeploy secrets push' first.",
+            shared_env.display()
+        ));
+        return;
+    }
 
     let cfg = match load_site_config(site) {
         Ok(cfg) => cfg,

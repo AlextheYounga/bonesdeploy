@@ -3,11 +3,12 @@ from types import SimpleNamespace
 from bonesinfra.cli.commands.setup import directories
 
 
-def test_setup_creates_root_owned_control_plane_site_directory(monkeypatch):
+def test_setup_does_not_provision_the_shared_environment(monkeypatch):
     created = []
+    script_calls = []
     monkeypatch.setattr(directories, "mkdir", lambda **kwargs: created.append(kwargs))
     monkeypatch.setattr(directories.server, "shell", lambda **_kwargs: None)
-    monkeypatch.setattr(directories.server, "script_template", lambda **_kwargs: None)
+    monkeypatch.setattr(directories.server, "script_template", lambda **kwargs: script_calls.append(kwargs))
     ctx = SimpleNamespace(
         app=SimpleNamespace(
             project_name="atlas",
@@ -22,7 +23,6 @@ def test_setup_creates_root_owned_control_plane_site_directory(monkeypatch):
     )
     paths = {
         "site_root": "/root/.config/bonesremote/sites/atlas",
-        "site_config": "/root/.config/bonesremote/sites/atlas/config.env",
         "repo_parent": "/home/git",
         "repo": "/home/git/atlas.git",
         "project_root_parent": "/srv/sites",
@@ -41,3 +41,4 @@ def test_setup_creates_root_owned_control_plane_site_directory(monkeypatch):
         "group": "root",
         "mode": "0700",
     }
+    assert script_calls == []

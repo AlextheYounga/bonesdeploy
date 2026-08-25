@@ -56,7 +56,6 @@ pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
 pub const BONESREMOTE_BINARY: &str = "bonesremote";
 pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
 pub const BONESREMOTE_SITES_DIR: &str = "sites";
-pub const BONESREMOTE_SITE_CONFIG_FILE: &str = "config.env";
 pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
 pub const BUILD_CACHE_DIR: &str = "cache";
 pub const NGINX_SOCKET: &str = "nginx.sock";
@@ -114,11 +113,6 @@ pub fn bonesremote_sites_root() -> PathBuf {
 #[must_use]
 pub fn bonesremote_site_root(site: &str) -> PathBuf {
     bonesremote_sites_root().join(site)
-}
-
-#[must_use]
-pub fn bonesremote_site_config_path(site: &str) -> PathBuf {
-    bonesremote_site_root(site).join(BONESREMOTE_SITE_CONFIG_FILE)
 }
 
 #[must_use]

@@ -7,7 +7,6 @@ def test_paths_default_repo_parent_is_srv_git():
     paths = DeploymentPaths.new("lawsnipe", "/srv/git/lawsnipe.git", "/srv/sites/lawsnipe")
 
     assert paths.repo_parent == "/srv/git"
-    assert paths.site_config == "/root/.config/bonesremote/sites/lawsnipe/config.env"
 
 
 def test_paths_include_global_nginx_default_deny_site():
