@@ -317,7 +317,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - Manages GPG-encrypted environment secrets under `.bones/secrets/`.
   - `init` bootstraps `.bones/secrets/.env.gpg` with the selected runtime's defaults; `secrets init` remains an idempotent manual equivalent.
   - `secrets edit` decrypts `.bones/secrets/.env.gpg` for editing and re-encrypts on save.
-  - `secrets push` uploads the decrypted `.env` to the remote `shared/.env` over SSH.
+  - `secrets push` uploads the decrypted runtime secrets to the remote `shared/.env` over SSH and never uploads or merges the local root `.env`. Remote control-plane configuration is stored separately under the root-owned site state directory.
 
 - **config**
   - Reads or prints values from `.bones/bones.toml`.

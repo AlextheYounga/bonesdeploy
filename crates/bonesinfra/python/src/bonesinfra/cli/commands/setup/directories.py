@@ -76,10 +76,18 @@ def setup_repo_and_project(ctx, paths):
 
     env_path = f"{paths['shared']}/.env"
     server.script_template(
+        name="Seed root-owned site configuration",
+        src=str(SCRIPTS_DIR / "seed-site-config.sh.j2"),
+        env_path=paths["site_config"],
+        config_content=_shared_config_content(ctx),
+        _sudo=True,
+    )
+
+    server.script_template(
         name="Seed .env in shared directory",
         src=str(SCRIPTS_DIR / "seed-blank-env.sh.j2"),
         env_path=env_path,
-        config_content=_shared_config_content(ctx),
+        config_content="",
         runtime_user=ctx.runtime.runtime_user,
         runtime_group=ctx.runtime.runtime_group,
         _sudo=True,

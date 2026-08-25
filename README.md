@@ -351,6 +351,10 @@ RUNTIME_BACKEND=native
 committed, non-secret build configuration. Runtime secrets are edited through
 `bonesdeploy secrets edit`, stored encrypted at `infra/secrets/.env.gpg`, and
 sent to the protected remote `shared/.env` with `bonesdeploy secrets push`.
+The secrets push never uploads or merges the local root `.env`; values such as
+`HOST`, `PORT`, and `SSH_USER` remain local deployment configuration.
+The remote control-plane copy is kept separately under the root-owned site
+state directory; it is never used as the application environment.
 
 ## Project Structure
 

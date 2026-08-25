@@ -22,6 +22,7 @@ def test_setup_creates_root_owned_control_plane_site_directory(monkeypatch):
     )
     paths = {
         "site_root": "/root/.config/bonesremote/sites/atlas",
+        "site_config": "/root/.config/bonesremote/sites/atlas/config.env",
         "repo_parent": "/home/git",
         "repo": "/home/git/atlas.git",
         "project_root_parent": "/srv/sites",

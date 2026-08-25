@@ -21,6 +21,37 @@ pub mod gpg;
 
 const LOCAL_ENV_SECRET: &str = "infra/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
+const CONTROL_PLANE_KEYS: &[&str] = &[
+    "PROJECT_NAME",
+    "REMOTE_NAME",
+    "HOST",
+    "SSH_USER",
+    "PORT",
+    "BRANCH",
+    "DOMAIN",
+    "PREVIEW_DOMAIN",
+    "EMAIL",
+    "SSL_ENABLED",
+    "TEMPLATE",
+    "RUNTIME_BACKEND",
+    "WEB_ROOT",
+    "SERVICES",
+];
+
+fn merge_runtime_environment(remote: &str, plaintext: &str) -> Result<String> {
+    shared_config::validate_dotenv(remote)?;
+    let runtime_remote = remote
+        .lines()
+        .filter(|line| {
+            let Some((key, _)) = line.trim().split_once('=') else {
+                return true;
+            };
+            !CONTROL_PLANE_KEYS.contains(&key.trim())
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    shared_config::merge_dotenv(&runtime_remote, plaintext)
+}
 
 pub fn init() -> Result<()> {
     if !Path::new(paths::LOCAL_INFRA_DIR).is_dir() {
@@ -171,9 +202,7 @@ pub async fn push() -> Result<()> {
     let target_s = ssh::shell_quote(&target.display().to_string());
     let group_s = ssh::shell_quote(&runtime_group);
     let remote = ssh::run_cmd(&session, &format!("if test -f {target_s}; then cat {target_s}; fi")).await?;
-    let local = fs::read_to_string(paths::DOT_ENV).context("Failed to read local project environment")?;
-    let environment = shared_config::merge_dotenv(&remote, &plaintext)?;
-    let environment = shared_config::merge_dotenv(&environment, &local)?;
+    let environment = merge_runtime_environment(&remote, &plaintext)?;
     let cmd = format!(
         "tmp=; trap 'rm -f \"$tmp\"' EXIT; mkdir -p {parent_s} && tmp=$(mktemp {target_s}.XXXXXX) && cat > \"$tmp\" && chown root:{group_s} \"$tmp\" && chmod {DEFAULT_SECRET_MODE} \"$tmp\" && mv \"$tmp\" {target_s} && tmp=",
     );
@@ -182,6 +211,27 @@ pub async fn push() -> Result<()> {
     session.close().await?;
     println!("{} Secrets pushed.", output::success_marker());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+
+    use super::merge_runtime_environment;
+
+    #[test]
+    fn runtime_merge_only_accepts_remote_and_encrypted_runtime_values() -> Result<()> {
+        let remote = "PROJECT_NAME=sveltetest\nHOST=45.33.96.98\nPORT=22\n";
+        let secrets = "DATABASE_URL=postgres://localhost/app\n";
+
+        let merged = merge_runtime_environment(remote, secrets)?;
+
+        assert!(merged.contains("DATABASE_URL=postgres://localhost/app\n"));
+        assert!(!merged.contains("HOST=45.33.96.98\n"));
+        assert!(!merged.contains("PORT=22\n"));
+        assert!(!merged.contains("SSH_USER="));
+        Ok(())
+    }
 }
 
 fn open_editor(path: &Path) -> Result<()> {
