@@ -202,8 +202,9 @@ async fn check_remote_doctor(cfg: &config::Bones, verbose: bool) -> (Option<Stri
 }
 
 pub fn render_remote_doctor_output(output: &str, verbose: bool) -> bool {
-    let pending =
-        output.contains("has not been pushed yet") || output.contains("Run 'bonesdeploy secrets push' first.");
+    let pending = output.contains("has not been pushed yet")
+        || output.contains("repository has no refs yet")
+        || output.contains("Run 'bonesdeploy secrets push' first.");
     if verbose {
         print!("{output}");
         if !output.is_empty() && !output.ends_with('\n') {
@@ -211,7 +212,9 @@ pub fn render_remote_doctor_output(output: &str, verbose: bool) -> bool {
         }
     } else if pending {
         for line in output.lines().filter(|line| {
-            line.contains("has not been pushed yet") || line.contains("Run 'bonesdeploy secrets push' first.")
+            line.contains("has not been pushed yet")
+                || line.contains("repository has no refs yet")
+                || line.contains("Run 'bonesdeploy secrets push' first.")
         }) {
             let clean = strip_ansi(line);
             let clean = clean.trim().strip_prefix('•').map_or(clean.trim(), str::trim_start);

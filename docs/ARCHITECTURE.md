@@ -145,7 +145,12 @@ Runtime.extra is a serde-flattened BTreeMap for framework-specific keys.
 
 Existing implementations:
 - Loaded from the project root `.env` via config::load()
-- Loaded remotely from the site root `.env` via config::load_runtime()
+- Projected into `RemoteDeploymentConfig` for deploy-time SSH transport
+- Reconstructed remotely with identity and paths derived from `--site`
+
+`bonesremote` does not load `shared/.env` as Bones configuration. That file is
+application runtime input only and is linked into each release. `secrets push`
+replaces it atomically from encrypted `infra/secrets/.env.gpg`.
 
 To add another:
 Add a field to the struct (global) or use Runtime.extra (framework-specific).

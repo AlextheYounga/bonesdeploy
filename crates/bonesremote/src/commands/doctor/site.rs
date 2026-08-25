@@ -4,10 +4,9 @@ use std::process::Command;
 
 use bonesdeploy_core::{config, paths};
 
-use crate::git::{branch_exists, repository_has_refs};
+use crate::git::repository_has_refs;
 use crate::inspection::accounts;
 use crate::release::lifecycle::build::validate_build_cache;
-use crate::release::lifecycle::load_site_config;
 use crate::runtime::docker;
 
 use super::services;
@@ -17,36 +16,35 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
     }
-    let shared_env = Path::new(&paths::default_project_root_for(site)).join(paths::SHARED_DIR).join(paths::DOT_ENV);
-    if !shared_env.is_file() {
-        pending.push(format!(
-            "shared environment is missing: {}. Run 'bonesdeploy secrets push' first.",
-            shared_env.display()
-        ));
-        return;
-    }
 
-    let cfg = match load_site_config(site) {
-        Ok(cfg) => cfg,
-        Err(error) => {
-            issues.push(format!("deployed site configuration is invalid: {error}"));
-            return;
-        }
-    };
     if !paths::bonesremote_site_root(site).is_dir() {
         pending.push(format!("first deployment is pending for {site}"));
         return;
     }
 
-    let project_root = &cfg.project_root;
-    let shared_root = Path::new(project_root).join(paths::SHARED_DIR);
-    let releases_root = Path::new(project_root).join(paths::RELEASES_DIR);
-    let runtime_user = config::runtime_user_for(&cfg.project_name);
-    let runtime_group = config::runtime_group_for(&cfg.project_name);
-    let build_user = config::build_user_for(&cfg.project_name);
+    let project_root = paths::default_project_root_for(site);
+    let shared_root = Path::new(&project_root).join(paths::SHARED_DIR);
+    let releases_root = Path::new(&project_root).join(paths::RELEASES_DIR);
+    let runtime_user = config::runtime_user_for(site);
+    let runtime_group = config::runtime_group_for(site);
+    let build_user = config::build_user_for(site);
+    let repo_path = paths::default_repo_path_for(site);
 
-    check_repo_exists(&cfg.repo_path, issues);
-    check_branch_ref(&cfg.repo_path, &cfg.branch, issues, pending);
+    let shared_env = shared_root.join(paths::DOT_ENV);
+    if !shared_env.is_file() {
+        pending.push(format!(
+            "shared environment is missing: {}. Run 'bonesdeploy secrets push' first.",
+            shared_env.display()
+        ));
+    }
+
+    check_repo_exists(&repo_path, issues);
+
+    // Branch validation requires the repo to exist; skip if it doesn't to
+    // avoid duplicate error messages.
+    if Path::new(&repo_path).is_dir() {
+        check_branch_ref(&repo_path, issues, pending);
+    }
 
     match fs::read_to_string(paths::ETC_PASSWD) {
         Ok(passwd) => {
@@ -59,13 +57,21 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     }
 
     check_site_layout(&shared_root, &releases_root, issues);
+
+    // Services and Docker runtime checks need a config only for the target
+    // name, which is always derivable from the site name.
+    let cfg = config::Bones::for_site(site);
     services::check_target(&cfg, issues);
-    if cfg.runtime.backend == config::RuntimeBackend::Docker {
-        check_docker_runtime(&cfg, issues);
+
+    // Docker runtime is provisioned from local config at setup time; if the
+    // Docker socket directory exists, validate the image is loaded.
+    let docker_socket_dir = Path::new("/run").join(site);
+    if docker_socket_dir.is_dir() {
+        check_docker_runtime(site, issues);
     }
 }
 
-fn check_docker_runtime(cfg: &config::Bones, issues: &mut Vec<String>) {
+fn check_docker_runtime(site: &str, issues: &mut Vec<String>) {
     match Command::new("docker").arg("info").output() {
         Ok(output) if output.status.success() => {}
         Ok(output) => {
@@ -74,7 +80,7 @@ fn check_docker_runtime(cfg: &config::Bones, issues: &mut Vec<String>) {
         Err(error) => issues.push(format!("Docker is unavailable: {error}")),
     }
 
-    let image = match docker::command::image_name(&cfg.project_name) {
+    let image = match docker::command::image_name(site) {
         Ok(image) => image,
         Err(error) => {
             issues.push(format!("Docker runtime image name is invalid: {error}"));
@@ -87,7 +93,7 @@ fn check_docker_runtime(cfg: &config::Bones, issues: &mut Vec<String>) {
         Err(error) => issues.push(format!("could not inspect Docker runtime image {image}: {error}")),
     }
 
-    let socket_dir = Path::new("/run").join(&cfg.project_name);
+    let socket_dir = Path::new("/run").join(site);
     if !socket_dir.is_dir() {
         issues.push(format!("Docker runtime socket directory is missing: {}", socket_dir.display()));
     }
@@ -120,30 +126,22 @@ fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {
     }
 }
 
-pub fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
-    if branch.is_empty() {
-        return;
-    }
+pub fn check_branch_ref(repo_path: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     match repository_has_refs(Path::new(repo_path)) {
         Ok(true) => {}
         Ok(false) => {
-            pending.push(format!(
-                "deploy branch '{branch}' has not been pushed yet. Run 'git push <remote> {branch}' before the first deploy."
-            ));
+            pending.push(
+                "repository has no refs yet. Run 'git push <remote> <branch>' before the first deploy.".to_string(),
+            );
             return;
         }
         Err(error) => {
             issues.push(format!("could not inspect branches in {repo_path}: {error}"));
-            return;
         }
     }
-    match branch_exists(Path::new(repo_path), branch) {
-        Ok(true) => {}
-        Ok(false) => issues.push(format!(
-            "deploy branch '{branch}' has not been pushed to {repo_path}. Run 'git push <remote> {branch}' first."
-        )),
-        Err(error) => issues.push(format!("could not check branch '{branch}': {error}")),
-    }
+    // Branch existence is validated during deploy when the descriptor provides
+    // the configured branch. The remote doctor only verifies the repository
+    // has refs.
 }
 
 fn check_runtime_identity(runtime_user: &str, runtime_group: &str, passwd: &str, issues: &mut Vec<String>) {

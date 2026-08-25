@@ -142,13 +142,13 @@ Laravel builds use Composer `2.8.12` by default. Set `COMPOSER_VERSION` in
 the selected PHP version. Builds download the pinned PHAR directly with curl,
 verify its SHA-256 checksum, and use bounded network timeouts.
 
-Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. The encrypted `infra/secrets/.env.gpg` is the source of truth for the complete remote `shared/.env`; `bonesdeploy secrets push` atomically replaces that file without reading or merging another environment file.
+Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. During deploy they are built from a small local `RemoteDeploymentConfig` descriptor sent over SSH stdin. The encrypted `infra/secrets/.env.gpg` is the source of truth for the complete remote `shared/.env`; `bonesdeploy secrets push` atomically replaces that file without reading or merging another environment file. The remote environment is application runtime data, not BonesRemote control-plane configuration.
 
 ### Hooks
 The optional git push transport uses thin adapters: a local `pre-push` guard embedded in the `bonesdeploy` binary and a remote `post-receive` trigger embedded in the `bonesremote` binary. The config repo uses a separate `pre-receive` trigger installed by provisioning. Neither adapter is visible or editable under `.bones/`. Set `deploy_on_push = true` in `.bones/bones.toml` to enable git-triggered deploys.
 
 - `pre-push` => Installed by `bonesdeploy init` into `.git/hooks/pre-push`. This checks if we are pushing to the bonesdeploy designated remote. If so, it runs `bonesdeploy doctor --local` and fails if doctor reports warnings or errors.
-- `post-receive` (app repo) => Installed automatically into the bare repo at `/home/git/<project>.git/`. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. `bonesremote` then reads branch policy and runtime config from `/srv/sites/<site>/shared/.env`.
+- `post-receive` (app repo) => Installed automatically into the bare repo at `/home/git/<project>.git/`. Derives `<site>` from `GIT_DIR` and runs `sudo bonesremote hook post-receive --site <site>`. Explicit local deploys pass branch and runtime configuration to BonesRemote; `shared/.env` is never used as control-plane input.
 - `config-pre-receive` (config repo) => Installed during provisioning into `/root/.config/bonesremote/repos/<project>.bones.git/`. Derives `<site>` from `GIT_DIR` by stripping `.bones.git`, reads the pushed revision, and calls `bonesremote site receive --site <site> --revision <rev>` directly as root before Git accepts the update. `bonesremote` archives the revision from the bones repo via `git archive`, validates the dataset, and atomically replaces the control-plane state.
 
 ### Config Repo
@@ -250,7 +250,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
     - Local `pre-push` guard is installed properly when `deploy_on_push = true`. Checks for the presence and version marker in the baked script.
   - Runs remote checks (skipped with `--local`):
     - Opens a privileged SSH session and runs `bonesremote doctor --site <project>`.
-    - `bonesremote doctor --site <project>` requires root and checks Podman availability, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until the configured branch is pushed.
+  - `bonesremote doctor --site <project>` requires root and checks Podman availability, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until a branch is pushed.
     - The security audit is read-only and fail-closed. It verifies site identity isolation (unique UIDs/GIDs, no login shells, no cross-site group membership, deploy not in runtime groups), runtime sudo absence, privileged configuration root-control (recursively inspecting systemd, sudoers, nginx, AppArmor, and BonesRemote state plus their parent chains without following symlink targets), and release activation (current must be a valid symlink resolving inside the site's releases directory; active release roots and activation parents must be immutable to the runtime identity). `bonesremote doctor --site <project> --exhaustive` additionally inspects every entry in that active release for permission drift; this can take time on large releases. The exact deploy-user sudoers policy is rendered and validated by `bonesinfra` during provisioning rather than probed with fabricated commands during doctor. POSIX ACLs on protected paths are detected through extended attributes and reported as UNVERIFIED. Supplementary groups are collected through `id -G`. Required evidence that cannot be collected is reported as UNVERIFIED and causes doctor to fail.
    - The `--local` flag skips all remote checks. The `pre-push` hook uses this flag because it is only a local guard before optional git-triggered deploys. `--verbose` prints the complete successful remote doctor report instead of collapsing it to the `remote doctor` check.
 
@@ -271,9 +271,9 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Re-installs the local pre-push guard so the repository regains its pre-push check after recovery.
 
 - **deploy**
-  - Publishes the local `.bones/` dataset into remote bonesremote site state first, then SSHes into the configured host and runs `bonesremote deploy --site <project>` directly.
+  - SSHes into the configured host and runs `bonesremote deploy --site <project> --config-stdin`, sending only the local deployment descriptor over stdin.
   - Does not modify the remote environment. Run `bonesdeploy secrets push` explicitly to replace `shared/.env` from the encrypted local source.
-  - Omits the `--revision` flag, so `bonesremote deploy` uses the configured branch from `bones.toml`.
+  - Omits the `--revision` flag, so `bonesremote deploy` uses the branch from the local descriptor.
 
 - ****remote setup****
   - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra setup apply --config <path>` against the configured host as root (or `BONES_BOOTSTRAP_SSH_USER`).

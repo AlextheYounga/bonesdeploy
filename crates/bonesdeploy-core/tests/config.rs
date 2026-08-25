@@ -4,8 +4,10 @@ use anyhow::Result;
 use bonesdeploy_core::config;
 use bonesdeploy_core::config::BUILD_TIMEOUT_SECONDS_DEFAULT;
 use bonesdeploy_core::config::{
-    App, Bones, Build, Runtime, RuntimeBackend, build_timeout_seconds, validate_host, validate_runtime,
+    App, Bones, Build, RemoteDeploymentConfig, Runtime, RuntimeBackend, build_timeout_seconds, validate_host,
+    validate_runtime,
 };
+use bonesdeploy_core::paths;
 use std::collections::BTreeMap;
 use std::fs;
 use tempfile::tempdir;
@@ -124,4 +126,87 @@ fn dotenv_round_trips_framework_values() -> Result<()> {
 
     assert_eq!(loaded.runtime.extra.get("is_static"), Some(&toml::Value::Boolean(true)));
     Ok(())
+}
+
+#[test]
+fn remote_deployment_config_excludes_identity_and_secrets() -> Result<()> {
+    let mut bones = Bones::for_site("mysite");
+    bones.branch = "main".to_string();
+    bones.releases_keep = 3;
+    bones.runtime.backend = RuntimeBackend::Docker;
+    bones.runtime.web_root = "public".to_string();
+    bones.build.timeout_seconds = 120;
+    bones.host = "example.com".to_string();
+    bones.ssh_user = "root".to_string();
+    bones.port = "2222".to_string();
+    bones.domain = "myapp.com".to_string();
+    bones.ssl_enabled = true;
+
+    let descriptor = RemoteDeploymentConfig::from_bones(&bones);
+
+    let json = serde_json::to_string(&descriptor)?;
+    assert!(!json.contains("project_name"));
+    assert!(!json.contains("host"));
+    assert!(!json.contains("ssh_user"));
+    assert!(!json.contains("port"));
+    assert!(!json.contains("domain"));
+    assert!(!json.contains("ssl_enabled"));
+    assert!(!json.contains("repo_path"));
+    assert!(!json.contains("project_root"));
+    assert!(!json.contains("remote_name"));
+    assert!(json.contains("\"branch\":\"main\""));
+    assert!(json.contains("\"releases_keep\":3"));
+    assert!(json.contains("\"backend\":\"docker\""));
+    assert!(json.contains("\"web_root\":\"public\""));
+    assert!(json.contains("\"timeout_seconds\":120"));
+    Ok(())
+}
+
+#[test]
+fn remote_deployment_config_round_trips_through_json() -> Result<()> {
+    let mut bones = Bones::for_site("atlas");
+    bones.branch = "develop".to_string();
+    bones.releases_keep = 7;
+    bones.runtime.web_root = "dist".to_string();
+    bones.runtime.backend = RuntimeBackend::Native;
+    bones.build.timeout_seconds = 600;
+
+    let descriptor = RemoteDeploymentConfig::from_bones(&bones);
+    let json = serde_json::to_string(&descriptor)?;
+    let restored: RemoteDeploymentConfig = serde_json::from_str(&json)?;
+
+    assert_eq!(restored.branch, "develop");
+    assert_eq!(restored.releases_keep, 7);
+    assert_eq!(restored.runtime.web_root, "dist");
+    assert_eq!(restored.runtime.backend, RuntimeBackend::Native);
+    assert_eq!(restored.build.timeout_seconds, 600);
+    Ok(())
+}
+
+#[test]
+fn remote_deployment_config_into_site_config_derives_identity_from_site() {
+    let mut bones = Bones::for_site("original");
+    bones.branch = "release".to_string();
+    bones.releases_keep = 2;
+    bones.runtime.web_root = "build".to_string();
+
+    let descriptor = RemoteDeploymentConfig::from_bones(&bones);
+    let site_config = descriptor.into_site_config("target-site");
+
+    assert_eq!(site_config.project_name, "target-site");
+    assert_eq!(site_config.project_root, paths::default_project_root_for("target-site"));
+    assert_eq!(site_config.repo_path, paths::default_repo_path_for("target-site"));
+    assert_eq!(site_config.branch, "release");
+    assert_eq!(site_config.releases_keep, 2);
+    assert_eq!(site_config.runtime.web_root, "build");
+    // Host and SSH settings are not carried by the descriptor.
+    assert!(site_config.host.is_empty());
+    assert_eq!(site_config.ssh_user, "root");
+}
+
+#[test]
+fn remote_deployment_config_rejects_unknown_fields() {
+    let json = r#"{"branch":"main","releases_keep":5,"runtime":{"backend":"native","template":"","web_root":"public","node_version":"24.19.0"},"build":{"timeout_seconds":300},"extra_field":"bad"}"#;
+    let result: Result<RemoteDeploymentConfig, _> = serde_json::from_str(json);
+    assert!(result.is_err());
 }

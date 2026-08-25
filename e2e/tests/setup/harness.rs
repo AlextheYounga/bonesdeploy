@@ -99,11 +99,6 @@ impl Harness {
         if template == "laravel" {
             project.generate_laravel_app_key(&self.session, &self.artifacts.bonesdeploy)?;
         }
-        let environment = format!(
-            "PROJECT_NAME={site}\nHOST={}\nPORT=22\nSSH_USER=root\nBRANCH=main\nTEMPLATE={template}\nRUNTIME_BACKEND=native\nWEB_ROOT=public\n",
-            self.host
-        );
-        project.configure_remote_environment(&self.session, &self.artifacts.bonesdeploy, &environment)?;
         project.assert_infrastructure(template)?;
         if NODE_TEMPLATES.contains(&template) {
             project.pin_node_version(E2E_NODE_VERSION)?;

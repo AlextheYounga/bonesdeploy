@@ -194,7 +194,7 @@ mod tests {
 
     #[test]
     fn environment_push_uses_the_encrypted_file_without_modification() -> Result<()> {
-        let secrets = "PROJECT_NAME=sveltetest\nHOST=45.33.96.98\nPORT=22\nDATABASE_URL=postgres://localhost/app\n";
+        let secrets = "APP_KEY=base64:abc123\nDATABASE_URL=postgres://localhost/app\n";
 
         let environment = environment_to_push(secrets)?;
 
