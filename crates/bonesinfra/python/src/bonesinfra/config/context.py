@@ -90,7 +90,7 @@ class DeployContext:
             web_root=values.get(WEB_ROOT) or DEFAULT_WEB_ROOT,
             runtime_user=project_name,
             runtime_group=project_name,
-            data={key: _runtime_value(value) for key, value in values.items() if key not in APP_KEYS},
+            data={key.lower(): _runtime_value(value) for key, value in values.items() if key not in APP_KEYS},
         )
 
         services_value = values.get(SERVICES, "")

@@ -55,7 +55,7 @@ pub fn load(path: &Path) -> Result<Bones> {
     };
     for (key, value) in &values {
         if !is_project_env_key(key) {
-            config.runtime.extra.insert(key.clone(), parse_runtime_value(value));
+            config.runtime.extra.insert(key.to_ascii_lowercase(), parse_runtime_value(value));
         }
     }
     config.services.services = values
@@ -147,7 +147,7 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
         if value.contains('\n') || value.contains('\r') {
             bail!(".env values must not contain newlines");
         }
-        content.push_str(&format!("{key}={}\n", format_dotenv_value(&value)));
+        content.push_str(&format!("{}={}\n", key.to_ascii_uppercase(), format_dotenv_value(&value)));
     }
     fs::write(path, content).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())

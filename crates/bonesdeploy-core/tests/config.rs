@@ -119,6 +119,7 @@ fn dotenv_round_trips_framework_values() -> Result<()> {
     config.runtime.extra.insert(String::from("is_static"), toml::Value::Boolean(true));
 
     config::save(&config, &path)?;
+    assert!(fs::read_to_string(&path)?.contains("IS_STATIC=true\n"));
     let loaded = config::load(&path)?;
 
     assert_eq!(loaded.runtime.extra.get("is_static"), Some(&toml::Value::Boolean(true)));

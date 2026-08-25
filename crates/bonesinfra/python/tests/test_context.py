@@ -49,14 +49,14 @@ def test_template_data_contains_runtime_values(tmp_path):
 
 
 def test_framework_values_are_available_to_runtime_templates(tmp_path):
-    ctx = DeployContext.from_files(_write_config(tmp_path, "is_static=true\n"))
+    ctx = DeployContext.from_files(_write_config(tmp_path, "IS_STATIC=true\n"))
 
     assert ctx.runtime.data["is_static"] is True
     assert template_data(ctx)["is_static"] is True
 
 
 def test_false_framework_boolean_is_false(tmp_path):
-    ctx = DeployContext.from_files(_write_config(tmp_path, "is_static=false\n"))
+    ctx = DeployContext.from_files(_write_config(tmp_path, "IS_STATIC=false\n"))
 
     assert ctx.runtime.data["is_static"] is False
 
@@ -110,7 +110,7 @@ def test_dotenv_parser_ignores_comments_and_unquotes_values(tmp_path):
 
     assert ctx.app.project_name == "lawsnipe"
     assert ctx.app.server.host == "example.com"
-    assert ctx.runtime.data["CUSTOM"] == "value"
+    assert ctx.runtime.data["custom"] == "value"
 
 
 def test_dotenv_parser_rejects_malformed_entries(tmp_path):
@@ -139,7 +139,7 @@ def test_dotenv_parser_preserves_quote_semantics(tmp_path):
     ctx = DeployContext.from_files(str(path))
 
     assert ctx.app.project_name == "lawsnipe"
-    assert ctx.runtime.data == {"CUSTOM": "quoted value", "RAW": 'one"two'}
+    assert ctx.runtime.data == {"custom": "quoted value", "raw": 'one"two'}
 
 
 @pytest.mark.parametrize("project_name", ["", "Demo", "demo_name", "network", "demo;rm"])

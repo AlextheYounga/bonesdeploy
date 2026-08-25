@@ -22,6 +22,10 @@ fn assert_project_infra(repo: &Path) -> Result<()> {
     assert!(infra.join(".framework/src/bonesinfra/frameworks/custom/runtime.py").is_file());
     assert!(infra.join("custom/__init__.py").is_file());
     assert!(infra.join("custom/runtime.py").is_file());
+    assert_eq!(
+        fs::read_to_string(infra.join("custom/.gitignore"))?,
+        fs::read_to_string(env!("CARGO_MANIFEST_DIR").to_owned() + "/../bonesinfra/python/.gitignore")?
+    );
     assert!(infra.join("custom/manifest.py").is_file());
     assert!(infra.join("secrets").is_dir());
     let deploy_dir = infra.join("deployment");
