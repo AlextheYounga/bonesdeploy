@@ -221,6 +221,8 @@ Framework templates ship starter overlays that `bonesdeploy init` uses when scaf
 - `frameworks/vue/`        → Vue (Node)
 - `frameworks/rails/`      → Rails (Ruby)
 
+Django resolves its configured `python_version` minor to a BonesInfra-pinned CPython patch release, verifies the official source archive checksum, and installs it under `/opt/bonesdeploy/python/<patch>`. It never changes Debian's `/usr/bin/python3`; Django releases create their `.venv` with the versioned `python3.<minor>` executable.
+
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
 
 Projects materialize the complete BonesInfra distribution under `infra/.framework/` and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the project-local package and composes its selected framework runtime with custom provisioning; it has no cached-source fallback.

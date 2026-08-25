@@ -47,7 +47,7 @@ Python + Gunicorn.
 
 | Key | Type | Choices | Default |
 |-----|------|---------|---------|
-| `python_version` | choice | 3.12, 3.13, 3.14 | 3.14 |
+| `python_version` | choice | 3.14 | 3.14 |
 | `wsgi_module` | text | — | `config.wsgi:application` |
 
 ```

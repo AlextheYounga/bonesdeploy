@@ -141,7 +141,7 @@ fn environment_examples_use_project_name_in_shared_paths() -> Result<()> {
 fn build_environments_use_selected_language_versions() -> Result<()> {
     for (framework, key, version, expected, old) in [
         (Framework::Laravel, "php_version", "8.3", "PHP_VERSION=8.3", "PHP_VERSION=8.5"),
-        (Framework::Django, "python_version", "3.12", "PYTHON_VERSION=3.12", "PYTHON_VERSION=3.14"),
+        (Framework::Django, "python_version", "3.14", "PYTHON_VERSION=3.14", "PYTHON_VERSION=3.13"),
         (Framework::Rails, "ruby_version", "3.4", "RUBY_VERSION=3.4", "RUBY_VERSION=3.3"),
     ] {
         let runtime: Runtime = serde_json::from_value(Value::Object(

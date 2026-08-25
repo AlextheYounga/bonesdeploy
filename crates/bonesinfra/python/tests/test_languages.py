@@ -4,6 +4,7 @@ import pytest
 
 from bonesinfra.services.languages import NODE, PYTHON, RUBY
 from bonesinfra.services.languages.php import PHPRuntime
+from bonesinfra.services.languages.python import PYTHON_BUILD_PACKAGES, PYTHON_RELEASES, PythonRuntime
 
 
 def _context(**runtime_data):
@@ -27,6 +28,33 @@ def test_language_runtime_stores_selected_version_and_executable(monkeypatch):
 def test_language_runtime_rejects_non_major_minor_versions(runtime, key, value):
     with pytest.raises(ValueError, match=key):
         runtime.install(_context(**{key: value}))
+
+
+def test_python_runtime_builds_the_pinned_release_for_the_selected_minor(monkeypatch):
+    calls = {}
+    runtime = PythonRuntime()
+
+    monkeypatch.setattr(
+        "bonesinfra.services.languages.python.apt.packages", lambda **kwargs: calls.setdefault("packages", kwargs)
+    )
+    monkeypatch.setattr(
+        "bonesinfra.services.languages.python.server.script", lambda **kwargs: calls.setdefault("script", kwargs)
+    )
+
+    executable = runtime.install(_context(python_version="3.14"))
+
+    release, checksum = PYTHON_RELEASES["3.14"]
+    assert calls["packages"]["packages"] == PYTHON_BUILD_PACKAGES
+    assert calls["script"]["args"] == (release, checksum, "/opt/bonesdeploy/python")
+    assert executable == f"/opt/bonesdeploy/python/{release}/bin/python3.14"
+
+
+def test_python_runtime_rejects_unpinned_minor_versions():
+    runtime = PythonRuntime()
+    runtime.version = "3.13"
+
+    with pytest.raises(ValueError, match="Unsupported python_version"):
+        runtime._release()
 
 
 def test_php_runtime_configures_the_project_fpm_pool(monkeypatch):
