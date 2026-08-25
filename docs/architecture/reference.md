@@ -529,7 +529,6 @@ Site setup does not push Git or secrets, configure SSL, or deploy a release.
 Cli::Deploy
   └─ commands/deploy.rs::run()
        ├─ revision                    # deployment unit: committed repository revision
-       ├─ secrets::push()             # decrypt + upload .env to shared/.env
        └─ SSH: bonesremote deploy --site <site>
             └─ commands/deploy/lifecycle.rs::run_full()
                  ├─ SiteMutation::acquire(site)   # lock + validate config
@@ -624,8 +623,9 @@ Cli::Site::Runtime
 ### Config ownership
 
 - `bonesdeploy-core` defines the canonical `Bones` struct, all path constants, and validation functions.
-- Both binaries load root/site `.env` config via `bonesdeploy_core::config::load()` or `bonesdeploy_core::config::load_runtime()`.
-- Config is saved by `bonesdeploy` (on init, on edit). It is read on the server by `bonesremote`.
+- `bonesdeploy` loads the local root `.env` and sends only `RemoteDeploymentConfig` over SSH stdin for deploys.
+- `bonesremote` derives identity and paths from `--site`; it never parses the application `shared/.env` as control-plane config.
+- Runtime secrets are saved encrypted by `bonesdeploy` and atomically published to `shared/.env` by `secrets push`.
 
 ### Path ownership
 

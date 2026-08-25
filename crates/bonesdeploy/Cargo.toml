@@ -1,6 +1,6 @@
 [package]
 name = "bonesdeploy"
-version = "0.8.4"
+version = "0.8.6"
 edition = "2024"
 authors=["Alex Younger <thealexyounger@proton.me>"]
 description="Deployments with a Spine in a Barebones Framework"
@@ -20,8 +20,8 @@ toml = "1.1.3"
 toml_edit = "0.22"
 tempfile = "3.27"
 tokio = { version = "1.52.3", features = ["rt", "rt-multi-thread", "macros"] }
-bonesdeploy-core = { version = "0.8.4", path = "../bonesdeploy-core" }
-bonesinfra = { version = "0.3.1", path = "../bonesinfra" }
+bonesdeploy-core = { version = "0.8.6", path = "../bonesdeploy-core" }
+bonesinfra = { version = "0.3.3", path = "../bonesinfra" }
 easy-tree = "0.4.0"
 
 [lints]

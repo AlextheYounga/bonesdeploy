@@ -22,10 +22,12 @@ private keys are not in that directory or in the project repository.
 On the server, site import/receive validates and replaces a persisted site
 dataset containing `bones.toml` and deployment files. `SiteMutation` loads
 that dataset and couples it to the site lock. Remote release stages repeatedly
-call `load_site_config`; checkout resolves a revision and exports the complete
-bare-repository tree, while build and prepare scripts are read from persisted
-site state. Runtime settings and shared paths are also reloaded from that
-state. The deployment record already stores the resolved full revision SHA.
+use site-derived identity and paths plus a small `RemoteDeploymentConfig`
+received over SSH stdin; checkout resolves a revision and exports the complete
+bare-repository tree, while build and prepare scripts use the in-memory
+descriptor. Runtime settings are never reloaded from `shared/.env`, which is
+application runtime input only. The deployment record already stores the
+resolved full revision SHA.
 
 BonesInfra's `DeployContext.from_files` parses `bones.toml`, derives machine
 paths and identities, and feeds setup, runtime, services, SSL, helpers, and

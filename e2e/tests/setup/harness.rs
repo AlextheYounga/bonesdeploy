@@ -109,6 +109,7 @@ impl Harness {
         project.commit(&self.session, "bonesdeploy init")?;
         self.setup_server(&project)?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, SITE_SETUP_ARGS)?;
+        project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["secrets", "push"])?;
         self.assert_site(site)?;
         let manifest = project.bonesdeploy_output(&self.session, &self.artifacts.bonesdeploy, &["site", "manifest"])?;
         eprintln!("\n--- manifest for {site} ---\n{manifest}--- end manifest for {site} ---");

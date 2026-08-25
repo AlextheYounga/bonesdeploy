@@ -77,7 +77,10 @@ Repoints `current` to the previous release and restarts the site target.
 `bonesdeploy secrets edit`
 `bonesdeploy secrets push`
 
-Manages encrypted local secrets and pushes them to remote `shared/.env`.
+GPG-encrypted `.env` under `.bones/secrets/`. `init` bootstraps. `edit`
+decrypts, opens `$EDITOR`, re-encrypts on save. `push` atomically replaces
+remote `shared/.env` with the decrypted complete environment. Runtime secrets
+come from `shared/.env`; build-time public values come from `.env.build`.
 
 ## update
 

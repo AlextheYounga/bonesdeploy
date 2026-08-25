@@ -33,6 +33,15 @@ fn verbose_remote_report_preserves_pending_state() {
         true
     ));
     assert!(!site::render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
+    assert!(site::render_remote_doctor_output(
+        "bonesremote doctor\n  • repository has no refs yet. Run 'git push <remote> <branch>' before the first deploy.\n",
+        true
+    ));
+    assert!(!site::render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
+    assert!(site::render_remote_doctor_output(
+        "bonesremote doctor\n  • shared environment is missing: /srv/sites/demo/shared/.env. Run 'bonesdeploy secrets push' first.\n",
+        false
+    ));
 }
 
 #[test]
@@ -41,6 +50,7 @@ fn strip_ansi_removes_sgr_color_sequences() {
         site::strip_ansi("\x1b[1;33m•\x1b[0m deploy branch 'master' has not been pushed yet"),
         "• deploy branch 'master' has not been pushed yet"
     );
+    assert_eq!(site::strip_ansi("\x1b[1;33m•\x1b[0m repository has no refs yet"), "• repository has no refs yet");
     assert_eq!(site::strip_ansi("plain text"), "plain text");
 }
 

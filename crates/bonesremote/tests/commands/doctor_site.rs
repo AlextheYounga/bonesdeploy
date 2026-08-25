@@ -11,7 +11,7 @@ fn empty_bare_repo_is_pending_before_first_push() {
 
     let mut issues = Vec::new();
     let mut pending = Vec::new();
-    check_branch_ref(root.to_str().unwrap_or_default(), "master", &mut issues, &mut pending);
+    check_branch_ref(root.to_str().unwrap_or_default(), &mut issues, &mut pending);
 
     let _ = fs::remove_dir_all(root);
     assert!(issues.is_empty());

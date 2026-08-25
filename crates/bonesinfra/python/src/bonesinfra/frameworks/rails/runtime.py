@@ -10,6 +10,15 @@ from bonesinfra.services.linux import application, runtime, shared, validation
 
 TEMPLATES = Path(__file__).parent / "templates"
 SHARED_DIRECTORIES = ("tmp", "log", "storage")
+BUNDLER_PATH = "vendor/bundle"
+
+
+def bundler_binary(ruby_binary):
+    return str(Path(ruby_binary).with_name("bundle"))
+
+
+def bundler_command(bundle_binary, command):
+    return f"BUNDLE_PATH={BUNDLER_PATH} {quote(bundle_binary)} {command}"
 
 
 def deploy(ctx):
@@ -18,6 +27,7 @@ def deploy(ctx):
 
         def seed_placeholder(current_ctx, paths, ruby_binary):
             placeholder = paths["placeholder_release"]
+            bundle_binary = bundler_binary(ruby_binary)
             render(
                 "Seed placeholder Gemfile",
                 TEMPLATES / "rails/placeholder-Gemfile.j2",
@@ -29,7 +39,7 @@ def deploy(ctx):
             )
             server.shell(
                 name="Install placeholder gems",
-                commands=[f"cd {quote(placeholder)} && {ruby_binary} -S bundle install"],
+                commands=[f"cd {quote(placeholder)} && {bundler_command(bundle_binary, 'install')}"],
                 _sudo=True,
             )
             render(
@@ -48,13 +58,18 @@ def deploy(ctx):
         def command(current_ctx, paths, ruby_binary):
             environment = current_ctx.runtime.data.get("rails_env", "production")
             socket = f"{paths['runtime_socket_dir']}/puma/puma.sock"
-            return f"/usr/bin/env RAILS_ENV={environment} {ruby_binary} -S bundle exec puma -e {environment} -b unix://{socket}"
+            bundle_binary = bundler_binary(ruby_binary)
+            return (
+                f"/usr/bin/env RAILS_ENV={environment} "
+                f"{bundler_command(bundle_binary, f'exec puma -e {environment} -b unix://{socket}')}"
+            )
 
         def validate(current_ctx, paths, ruby_binary):
+            bundle_binary = bundler_binary(ruby_binary)
             validation.run_as_runtime_user(
                 current_ctx,
                 "Validate Puma availability as runtime user",
-                f"cd {quote(paths['current'])} && {ruby_binary} -S bundle exec puma --help >/dev/null",
+                f"cd {quote(paths['current'])} && {bundler_command(bundle_binary, 'exec puma --help >/dev/null')}",
             )
 
         application.deploy_server(
@@ -67,7 +82,7 @@ def deploy(ctx):
             seed_placeholder=seed_placeholder,
             validate=validate,
             command=command,
-            exec_paths=lambda _ctx, _paths, ruby: [ruby, "/usr/bin/bundle*"],
+            exec_paths=lambda _ctx, _paths, ruby: [ruby, bundler_binary(ruby)],
             writable_paths=lambda _ctx, paths: [
                 f"{paths['shared']}/tmp",  # noqa: S108 - Rails owns this shared application path.
                 f"{paths['shared']}/log",

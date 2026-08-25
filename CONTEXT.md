@@ -142,7 +142,7 @@ Laravel builds use Composer `2.8.12` by default. Set `COMPOSER_VERSION` in
 the selected PHP version. Builds download the pinned PHAR directly with curl,
 verify its SHA-256 checksum, and use bounded network timeouts.
 
-Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. Runtime secrets belong in `shared/.env` via `bonesdeploy secrets push`.
+Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. During deploy they are built from a small local `RemoteDeploymentConfig` descriptor sent over SSH stdin. The encrypted `infra/secrets/.env.gpg` is the source of truth for the complete remote `shared/.env`; `bonesdeploy secrets push` atomically replaces that file without reading or merging another environment file. The remote environment is application runtime data, not BonesRemote control-plane configuration.
 
 ### Update Patches
 `bonesdeploy update` invokes the embedded `bonesinfra patches apply` command after each local or remote binary update. Python owns the ordered registry, version gates, local Git migrations, remote pyinfra operations, and per-project/per-scope completion markers. Completed patches are recorded per project and scope, so interrupted updates retry safely without rerunning successful patches. Local markers use the project data directory; remote markers use `/var/lib/bonesdeploy/patches/<site>/`. Remote patch plans connect as root through the local embedded BonesInfra runtime; Python is not installed on the deployment host. `--skip-local` and `--skip-remote` also skip their respective patches.
@@ -238,8 +238,9 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Reports present, missing, and wrong-kind paths, plus active and enabled state for managed services. `--format json` is intended for automation and never includes file contents or secrets.
 
 - **deploy**
-  - Pushes decrypted local secrets into remote `shared/.env`, then SSHes into the configured host and runs `bonesremote deploy --site <project>` directly.
-  - Uses the branch configured in the root `.env`.
+  - SSHes into the configured host and runs `bonesremote deploy --site <project> --config-stdin`, sending only the local deployment descriptor over stdin.
+  - Does not modify the remote environment. Run `bonesdeploy secrets push` explicitly to replace `shared/.env` from the encrypted local source.
+  - Omits the `--revision` flag, so `bonesremote deploy` uses the branch from the local descriptor.
 
 - **server setup**
   - Delegates to `python -m bonesinfra server apply --env-file <path>` using only SSH host, user, and port.
@@ -283,7 +284,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - Manages GPG-encrypted environment secrets under `.bones/secrets/`.
   - `init` bootstraps `.bones/secrets/.env.gpg` with the selected runtime's defaults; `secrets init` remains an idempotent manual equivalent.
   - `secrets edit` decrypts `.bones/secrets/.env.gpg` for editing and re-encrypts on save.
-  - `secrets push` uploads the decrypted `.env` to the remote `shared/.env` over SSH.
+  - `secrets push` atomically replaces remote `shared/.env` with the decrypted `infra/secrets/.env.gpg` content. It does not read, merge, or upload the local root `.env`.
 
 - **config**
   - Reads or prints values from `.bones/bones.toml`.

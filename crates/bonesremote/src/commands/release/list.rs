@@ -3,11 +3,10 @@ use std::path::Path;
 use std::process;
 
 use anyhow::Result;
-use bonesdeploy_core::config::validate_site_name;
+use bonesdeploy_core::{config::validate_site_name, paths};
 use serde::Serialize;
 
 use crate::privileges;
-use crate::release::lifecycle;
 use crate::release::state::{self as release_state, DeploymentPhase, DeploymentRecord};
 
 #[derive(Serialize)]
@@ -29,9 +28,8 @@ pub fn run(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release list")?;
     validate_site_name(site)?;
     // Listing must remain available while deploy owns the mutation lock, so it
-    // intentionally uses validated configuration plus lock-free inspection.
-    let config = lifecycle::load_site_config(site)?;
-    let project_root = &config.project_root;
+    // intentionally uses lock-free inspection with site-derived paths.
+    let project_root = paths::default_project_root_for(site);
     let current = release_state::current_release_name(&project_root).ok();
     let active = release_state::read_active_deployment(site)?;
     let staged = release_state::read_staged_release(site).ok();

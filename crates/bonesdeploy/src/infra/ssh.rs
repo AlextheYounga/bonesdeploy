@@ -119,6 +119,53 @@ pub async fn run_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[u8]
     Ok(())
 }
 
+pub async fn stream_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[u8]) -> Result<()> {
+    let mut child = session
+        .command("bash")
+        .arg("-c")
+        .arg(cmd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .await
+        .with_context(|| format!("Failed to execute remote command: {cmd}"))?;
+
+    let mut stdin = child.stdin().take().ok_or_else(|| anyhow::anyhow!("stdin was not piped"))?;
+    stdin.write_all(stdin_bytes).await.context("Failed to write stdin to remote command")?;
+    stdin.shutdown().await.context("Failed to close stdin for remote command")?;
+    drop(stdin);
+
+    let stdout = child.stdout().take().ok_or_else(|| anyhow::anyhow!("stdout was not piped"))?;
+    let stderr = child.stderr().take().ok_or_else(|| anyhow::anyhow!("stderr was not piped"))?;
+
+    let stdout_task = tokio::spawn(async move {
+        let reader = BufReader::new(stdout);
+        let mut lines = reader.lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            println!("{line}");
+        }
+    });
+
+    let stderr_task = tokio::spawn(async move {
+        let reader = BufReader::new(stderr);
+        let mut lines = reader.lines();
+        while let Ok(Some(line)) = lines.next_line().await {
+            eprintln!("{line}");
+        }
+    });
+
+    let _ = tokio::join!(stdout_task, stderr_task);
+
+    let status = child.wait().await.context("Failed to wait for remote command")?;
+
+    if !status.success() {
+        bail!("Remote command failed: {cmd}");
+    }
+
+    Ok(())
+}
+
 pub fn remote_command_failure(cmd: &str, stdout: &[u8], stderr: &[u8]) -> String {
     let stdout = String::from_utf8_lossy(stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(stderr).trim().to_string();

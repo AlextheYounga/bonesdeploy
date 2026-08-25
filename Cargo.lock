@@ -84,7 +84,7 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy"
-version = "0.8.4"
+version = "0.8.6"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
@@ -105,17 +105,18 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy-core"
-version = "0.8.4"
+version = "0.8.6"
 dependencies = [
  "anyhow",
  "serde",
+ "serde_json",
  "tempfile",
  "toml 0.8.23",
 ]
 
 [[package]]
 name = "bonesinfra"
-version = "0.3.1"
+version = "0.3.3"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
@@ -125,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "bonesremote"
-version = "0.8.4"
+version = "0.8.6"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",

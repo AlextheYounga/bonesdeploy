@@ -5,14 +5,14 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{build_user_for, validate_site_name};
+use bonesdeploy_core::config::{Bones, build_user_for, validate_site_name};
 use bonesdeploy_core::paths;
 
 use crate::commands::{drop_failed_release, release::list};
 use crate::privileges;
 use crate::release::SiteMutation;
-use crate::release::lifecycle::build::ensure_build_user_ready;
-use crate::release::lifecycle::{self, build::remove_build_container, checkout};
+use crate::release::lifecycle::build::{ensure_build_user_ready, remove_build_container};
+use crate::release::lifecycle::checkout;
 use crate::release::state::{self as release_state, DeploymentLock, DeploymentRecord};
 
 const PROCESS_STOP_TIMEOUT: Duration = Duration::from_secs(5);
@@ -24,7 +24,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     // site identity and stop the process *before* the lock becomes available.
     // Only then is the guard assembled and used for all file mutations.
     validate_site_name(site)?;
-    let config = lifecycle::load_site_config(site)?;
+    let config = Bones::for_site(site);
     let active = release_state::read_active_deployment(site)?;
     if let Some(active) = &active {
         if active.release() != release {
@@ -45,20 +45,20 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     }
 
     let lock = DeploymentLock::acquire(site)?;
-    let mutation = SiteMutation::adopt(site, config, lock);
+    let mutation = SiteMutation::adopt(site, config.clone(), lock);
     let current = mutation.active()?;
     if current.as_ref().is_some_and(|deployment| deployment.release() != release) {
         bail!("Active deployment changed while cancelling {release}; no cleanup was performed.");
     }
 
-    let build_user = build_user_for(&mutation.config().project_name);
-    let working_dir = Path::new(&mutation.config().project_root);
+    let build_user = build_user_for(site);
+    let working_dir = Path::new(&config.project_root);
     ensure_build_user_ready(&build_user, working_dir)?;
-    remove_build_container(&build_user, &mutation.config().project_name, working_dir)?;
+    remove_build_container(&build_user, site, working_dir)?;
 
     if let Some(context) = current.as_ref().and_then(|deployment| deployment.context()) {
         let context = Path::new(context);
-        let tmp_root = Path::new(&mutation.config().project_root).join(paths::TMP_BUILDS_DIR);
+        let tmp_root = Path::new(&config.project_root).join(paths::TMP_BUILDS_DIR);
         if !context.starts_with(&tmp_root)
             || !context.file_name().is_some_and(|name| name.to_string_lossy().starts_with(&format!("build-{site}-")))
         {
@@ -66,7 +66,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
         }
         checkout::cleanup_build_context(site, context)?;
     } else {
-        cleanup_stale_contexts(site, &mutation.config().project_root)?;
+        cleanup_stale_contexts(site, &config.project_root)?;
     }
 
     let staged = mutation.staged_release()?;

@@ -422,6 +422,7 @@ Responsibilities:
 
 - `server apply` installs packages and hardening; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
 - `site apply` creates runtime and build identities, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
+- `site apply` creates the shared directory but not `shared/.env`; `bonesdeploy secrets push` explicitly publishes the validated encrypted environment.
 - `site apply` does not install services, configure the framework runtime, configure SSL, push Git or secrets, or deploy.
 
 Server setup should run as root or bootstrap SSH user. Site base provisioning

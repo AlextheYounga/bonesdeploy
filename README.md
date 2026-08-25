@@ -244,6 +244,13 @@ framework services, per-site nginx, AppArmor, and your `infra/custom/` project
 extensions. Templates rendered by the managed framework come from
 `infra/.framework/src/bonesinfra/frameworks/<name>/templates/`.
 
+After editing the complete remote environment, explicitly publish it before the
+first deploy or whenever it changes:
+
+```sh
+bonesdeploy secrets push
+```
+
 Database services selected at init are provisioned by `bonesdeploy site setup`, or later with:
 
 ```sh
@@ -354,7 +361,12 @@ RUNTIME_BACKEND=native
 `.env` is local configuration and is excluded from Git. `.env.build` is the
 committed, non-secret build configuration. Runtime secrets are edited through
 `bonesdeploy secrets edit`, stored encrypted at `infra/secrets/.env.gpg`, and
-sent to the protected remote `shared/.env` with `bonesdeploy secrets push`.
+explicitly sent as the complete protected remote `shared/.env` with
+`bonesdeploy secrets push`. The push atomically replaces the remote file; it
+does not read, merge, or upload the local root `.env`. `bonesdeploy deploy`
+does not push environment values. The local root `.env` supplies BonesRemote's
+deployment descriptor at deploy time; the encrypted file contains only values
+the application needs at runtime.
 
 ## Project Structure
 
@@ -373,7 +385,7 @@ Build scripts in `deployment/build/` must be numbered (for example `01_install_d
 
 Build scripts can set runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool. Beyond per-script timeouts, BonesInfra caps each build user's host-level slice at 80% CPU quota, 80% memory high/max, and `MemorySwapMax=0`, so a runaway build fails rather than exhausting host memory or swap.
 
-BonesRemote also exposes safe scalar runtime values as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use remote `shared/.env` for runtime secrets.
+BonesRemote also exposes safe scalar runtime values as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). These values come from the local deployment descriptor; application secrets from remote `shared/.env` are never parsed or injected into build inputs. Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use remote `shared/.env` for runtime secrets.
 
 Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager, Podman, and the Infra-provisioned build cache before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 

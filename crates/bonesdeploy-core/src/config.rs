@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
-use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
@@ -35,14 +34,47 @@ pub struct Bones {
 
 impl Bones {
     /// Builds the remote-side identity and convention-derived paths for a site.
-    /// Runtime settings remain at their defaults until a lifecycle operation
-    /// loads the deployed shared environment.
+    /// Runtime settings are supplied separately by the local deploy descriptor.
     #[must_use]
     pub fn for_site(site: &str) -> Self {
         let mut config = Self::default();
         config.project_name = site.to_string();
         config.repo_path = default_repo_path_for(site);
         config.project_root = paths::default_project_root_for(site);
+        config
+    }
+}
+
+/// Configuration supplied by the local deploy command for one deployment.
+/// Site identity, paths, SSH settings, and application secrets deliberately do
+/// not cross this boundary.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RemoteDeploymentConfig {
+    pub branch: String,
+    pub releases_keep: usize,
+    pub runtime: Runtime,
+    pub build: Build,
+}
+
+impl RemoteDeploymentConfig {
+    #[must_use]
+    pub fn from_bones(config: &Bones) -> Self {
+        Self {
+            branch: config.branch.clone(),
+            releases_keep: config.releases_keep,
+            runtime: config.runtime.clone(),
+            build: config.build.clone(),
+        }
+    }
+
+    #[must_use]
+    pub fn into_site_config(self, site: &str) -> Bones {
+        let mut config = Bones::for_site(site);
+        config.branch = self.branch;
+        config.releases_keep = self.releases_keep;
+        config.runtime = self.runtime;
+        config.build = self.build;
         config
     }
 }
@@ -248,11 +280,6 @@ pub fn validate_runtime(runtime: &Runtime) -> Result<()> {
 
 /// # Errors
 /// Returns an error when the local environment file cannot be read or parsed.
-pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
-    let path = config_dir.join(paths::DOT_ENV);
-    Ok(load(&path)?.runtime)
-}
-
 pub fn apply_derived_defaults(config: &mut Bones) {
     let project_name = config.project_name.clone();
 

@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from bonesinfra.frameworks.rails.runtime import bundler_binary, bundler_command
 from bonesinfra.services.languages import NODE, PYTHON, RUBY
 from bonesinfra.services.languages.php import PHPRuntime
 from bonesinfra.services.languages.python import PYTHON_BUILD_PACKAGES, PYTHON_RELEASES, PythonRuntime
@@ -79,6 +80,17 @@ def test_ruby_runtime_installs_supported_release_and_returns_versioned_binary(mo
 def test_ruby_runtime_rejects_unsupported_patch_release():
     with pytest.raises(ValueError, match="ruby_version"):
         RubyRuntime().install(_context(ruby_version="3.4.9"))
+
+
+def test_rails_bundler_binary_is_next_to_managed_ruby():
+    assert bundler_binary("/opt/bonesdeploy/ruby/3.4.8/bin/ruby") == "/opt/bonesdeploy/ruby/3.4.8/bin/bundle"
+
+
+def test_rails_bundler_commands_use_the_project_local_bundle():
+    assert (
+        bundler_command("/opt/bonesdeploy/ruby/3.4.8/bin/bundle", "exec puma --help")
+        == "BUNDLE_PATH=vendor/bundle /opt/bonesdeploy/ruby/3.4.8/bin/bundle exec puma --help"
+    )
 
 
 def test_php_runtime_configures_the_project_fpm_pool(monkeypatch):
