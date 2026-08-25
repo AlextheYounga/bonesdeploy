@@ -434,7 +434,7 @@ Responsibilities:
 - create project root
 - create releases directory
 - create shared directory
-- seed blank `shared/.env`
+- create the `shared/` directory without creating `.env`; operators publish the encrypted environment explicitly with `bonesdeploy secrets push`
 - create trusted site registry parent directory
 - seed placeholder release (only repoints `current` at the placeholder when no release exists, so re-running setup never replaces the active release)
 - install deploy authorized key

@@ -3,7 +3,6 @@ from shlex import quote
 from pyinfra.operations import server
 
 from bonesinfra.config.context import DEPLOY_USER
-from bonesinfra.config.paths import SCRIPTS_DIR
 from bonesinfra.pyinfra.operations import mkdir
 
 
@@ -74,25 +73,6 @@ def setup_repo_and_project(ctx, paths):
         mode="0750",
     )
 
-    env_path = f"{paths['shared']}/.env"
-    server.script_template(
-        name="Seed root-owned site configuration",
-        src=str(SCRIPTS_DIR / "seed-site-config.sh.j2"),
-        env_path=paths["site_config"],
-        config_content=_shared_config_content(ctx),
-        _sudo=True,
-    )
-
-    server.script_template(
-        name="Seed .env in shared directory",
-        src=str(SCRIPTS_DIR / "seed-blank-env.sh.j2"),
-        env_path=env_path,
-        config_content="",
-        runtime_user=ctx.runtime.runtime_user,
-        runtime_group=ctx.runtime.runtime_group,
-        _sudo=True,
-    )
-
     mkdir(
         name="Ensure placeholder release directory exists",
         path=paths["placeholder_web_root"],
@@ -100,22 +80,3 @@ def setup_repo_and_project(ctx, paths):
         group=ctx.runtime.runtime_group,
         mode="0750",
     )
-
-
-def _shared_config_content(ctx):
-    values = {
-        "PROJECT_NAME": ctx.app.project_name,
-        "HOST": ctx.app.server.host,
-        "PORT": ctx.app.server.port,
-        "SSH_USER": ctx.app.server.ssh_user,
-        "BRANCH": ctx.app.deploy.branch,
-        "DOMAIN": ctx.app.dns.domain,
-        "PREVIEW_DOMAIN": ctx.app.dns.preview_domain,
-        "EMAIL": ctx.app.dns.email,
-        "SSL_ENABLED": str(ctx.app.dns.ssl_enabled).lower(),
-        "TEMPLATE": ctx.runtime.data.get("TEMPLATE", ""),
-        "RUNTIME_BACKEND": ctx.runtime.backend,
-        "WEB_ROOT": ctx.runtime.web_root,
-        "SERVICES": ",".join(ctx.services.services),
-    }
-    return quote("".join(f"{key}={value}\n" for key, value in values.items()))

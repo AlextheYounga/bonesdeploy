@@ -240,6 +240,13 @@ framework services, per-site nginx, AppArmor, and your `infra/custom/` project
 extensions. Templates rendered by the managed framework come from
 `infra/.framework/src/bonesinfra/frameworks/<name>/templates/`.
 
+After editing the complete remote environment, explicitly publish it before the
+first deploy or whenever it changes:
+
+```sh
+bonesdeploy secrets push
+```
+
 Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
 
 ```sh
@@ -350,11 +357,11 @@ RUNTIME_BACKEND=native
 `.env` is local configuration and is excluded from Git. `.env.build` is the
 committed, non-secret build configuration. Runtime secrets are edited through
 `bonesdeploy secrets edit`, stored encrypted at `infra/secrets/.env.gpg`, and
-sent to the protected remote `shared/.env` with `bonesdeploy secrets push`.
-The secrets push never uploads or merges the local root `.env`; values such as
-`HOST`, `PORT`, and `SSH_USER` remain local deployment configuration.
-The remote control-plane copy is kept separately under the root-owned site
-state directory; it is never used as the application environment.
+explicitly sent as the complete protected remote `shared/.env` with
+`bonesdeploy secrets push`. The push atomically replaces the remote file; it
+does not read, merge, or upload the local root `.env`. `bonesdeploy deploy`
+does not push environment values. Include every value required by the remote
+application and BonesRemote in the encrypted file.
 
 ## Project Structure
 

@@ -33,6 +33,10 @@ fn verbose_remote_report_preserves_pending_state() {
         true
     ));
     assert!(!doctor::render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
+    assert!(doctor::render_remote_doctor_output(
+        "bonesremote doctor\n  • shared environment is missing: /srv/sites/demo/shared/.env. Run 'bonesdeploy secrets push' first.\n",
+        false
+    ));
 }
 
 #[test]

@@ -49,7 +49,7 @@ impl DeploymentSnapshot {
 /// site) is applied consistently.
 pub fn load_site_config(site: &str) -> Result<config::Bones> {
     config::validate_site_name(site)?;
-    let config_path = paths::bonesremote_site_config_path(site);
+    let config_path = PathBuf::from(paths::default_project_root_for(site)).join(paths::SHARED_DIR).join(paths::DOT_ENV);
     let cfg = config::load(&config_path)
         .with_context(|| format!("Failed to load deployed site configuration from {}", config_path.display()))?;
     if cfg.project_name != site {

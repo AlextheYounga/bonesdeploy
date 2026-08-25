@@ -514,7 +514,6 @@ Cli::Remote::Bootstrap
 Cli::Deploy
   └─ commands/deploy.rs::run()
        ├─ revision                    # deployment unit: committed repository revision
-       ├─ secrets::push()             # decrypt + upload .env to shared/.env
        └─ SSH: bonesremote deploy --site <site>
             └─ commands/deploy/lifecycle.rs::run_full()
                  ├─ SiteMutation::acquire(site)   # lock + validate config

@@ -89,9 +89,9 @@ No rebuild. The first answer to a bad deploy.
 `bonesdeploy secrets push`
 
 GPG-encrypted `.env` under `.bones/secrets/`. `init` bootstraps. `edit`
-decrypts, opens `$EDITOR`, re-encrypts on save. `push` ships the decrypted
-`.env` to remote `shared/.env` over SSH. Runtime secrets come from `shared/.env`;
-build-time public values come from `.env.build`.
+decrypts, opens `$EDITOR`, re-encrypts on save. `push` atomically replaces
+remote `shared/.env` with the decrypted complete environment. Runtime secrets
+come from `shared/.env`; build-time public values come from `.env.build`.
 
 ## remote bootstrap
 

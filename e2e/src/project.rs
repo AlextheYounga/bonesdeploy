@@ -144,6 +144,36 @@ impl SampleProject {
         status_ok(status, "bonesdeploy secrets edit")
     }
 
+    pub fn configure_remote_environment(
+        &self,
+        session: &Session,
+        binary: &Path,
+        project_name: &str,
+        host: &str,
+        template: &str,
+    ) -> Result<()> {
+        let editor = self.dir.join(".bones-e2e-environment-editor.sh");
+        fs::write(
+            &editor,
+            "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s' \"$BONES_E2E_ENVIRONMENT\" >> \"$1\"\n",
+        )?;
+        fs::set_permissions(&editor, fs::Permissions::from_mode(0o700))?;
+
+        let environment = format!(
+            "PROJECT_NAME={project_name}\nHOST={host}\nPORT=22\nSSH_USER=root\nBRANCH=main\nTEMPLATE={template}\nRUNTIME_BACKEND=native\nWEB_ROOT=public\n"
+        );
+        let status = session
+            .command(binary)
+            .current_dir(&self.dir)
+            .args(["secrets", "edit"])
+            .env("EDITOR", editor.to_string_lossy().into_owned())
+            .env("BONES_E2E_ENVIRONMENT", environment)
+            .status()
+            .with_context(|| "Failed to run bonesdeploy secrets edit")?;
+        fs::remove_file(&editor).ok();
+        status_ok(status, "bonesdeploy secrets edit")
+    }
+
     /// Runs the given bonesdeploy binary in the project directory with output
     /// streaming to the terminal.
     pub fn bonesdeploy(&self, session: &Session, binary: &Path, args: &[&str]) -> Result<()> {
