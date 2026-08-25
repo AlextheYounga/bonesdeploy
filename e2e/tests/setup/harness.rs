@@ -9,6 +9,9 @@ use std::ops::Deref;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
+const E2E_NODE_VERSION: &str = "24.19.0";
+const NODE_TEMPLATES: &[&str] = &["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"];
+
 use dtor::dtor;
 
 static HARNESS: OnceLock<Mutex<Option<Harness>>> = OnceLock::new();
@@ -97,6 +100,9 @@ impl Harness {
             project.generate_laravel_app_key(&self.session, &self.artifacts.bonesdeploy)?;
         }
         project.assert_infrastructure(template)?;
+        if NODE_TEMPLATES.contains(&template) {
+            project.pin_node_version(E2E_NODE_VERSION)?;
+        }
         project.commit(&self.session, "bonesdeploy init")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["setup", "--yes"])?;
         self.assert_site(site)?;

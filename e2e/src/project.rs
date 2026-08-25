@@ -66,6 +66,17 @@ impl SampleProject {
         Ok(())
     }
 
+    pub fn pin_node_version(&self, version: &str) -> Result<()> {
+        let path = self.dir.join(".env.build");
+        let source = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+        let updated = source.replace("NODE_VERSION=\n", &format!("NODE_VERSION={version}\n"));
+        if updated == source {
+            bail!(".env.build does not contain an empty NODE_VERSION in {}", self.dir.display());
+        }
+        fs::write(&path, updated).with_context(|| format!("Failed to write {}", path.display()))?;
+        Ok(())
+    }
+
     fn assert_only_readme_markdown(root: &Path, template: &str) -> Result<()> {
         for entry in fs::read_dir(root).with_context(|| format!("Failed to read {}", root.display()))? {
             let path = entry?.path();
