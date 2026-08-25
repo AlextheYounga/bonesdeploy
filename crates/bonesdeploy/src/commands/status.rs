@@ -8,9 +8,10 @@ use crate::infra::ssh;
 use crate::ui::output;
 
 #[derive(Debug, Deserialize)]
-struct RemoteReport {
+pub(crate) struct RemoteReport {
     current_release: String,
     ssl: RemoteSslStatus,
+    pub(crate) preview: Option<RemotePreviewStatus>,
     services: Vec<RemoteServiceStatus>,
 }
 
@@ -18,6 +19,12 @@ struct RemoteReport {
 struct RemoteSslStatus {
     enabled: bool,
     domain: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct RemotePreviewStatus {
+    pub(crate) active: bool,
+    pub(crate) url: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,6 +52,11 @@ pub async fn run() -> Result<()> {
             Ok(remote) => {
                 println!("{} {}", style("Release").dim(), style(&remote.current_release).bold());
                 println!("{} {}", style("SSL").dim(), ssl_state(&remote.ssl));
+                if let Some(preview) = remote.preview.as_ref().filter(|preview| preview.active) {
+                    if let Some(url) = &preview.url {
+                        println!("{} {}", style("Preview").dim(), url);
+                    }
+                }
                 if !remote.services.is_empty() {
                     println!();
                     println!("{}", style("Services").dim());
@@ -71,7 +83,7 @@ pub async fn run() -> Result<()> {
     Ok(())
 }
 
-async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
+pub(crate) async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
     let session = ssh::connect_privileged(cfg).await?;
     let command = format!("bonesremote status --site {}", ssh::shell_quote(&cfg.project_name));
     let output = ssh::run_cmd(&session, &command).await;

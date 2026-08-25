@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
 
 use anyhow::Result;
 use bonesdeploy_core::config::validate_site_name;
@@ -14,6 +15,7 @@ use crate::release::state as release_state;
 struct Report {
     current_release: String,
     ssl: SslStatus,
+    preview: Option<PreviewStatus>,
     services: Vec<ServiceStatus>,
 }
 
@@ -21,6 +23,12 @@ struct Report {
 pub struct SslStatus {
     pub enabled: bool,
     pub domain: String,
+}
+
+#[derive(Debug, Serialize)]
+struct PreviewStatus {
+    active: bool,
+    url: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -46,8 +54,37 @@ fn build_report(site: &str) -> Report {
     Report {
         current_release: release_state::current_release_name(&project_root).unwrap_or_else(|_| String::from("unknown")),
         ssl: ssl_status(&nginx_site_available),
+        preview: preview_status(site),
         services: services(site),
     }
+}
+
+fn preview_status(site: &str) -> Option<PreviewStatus> {
+    let service = format!("{site}-cloudflared.service");
+    if systemd::unit_state(&service, "is-active") != "active" {
+        return None;
+    }
+    let journal = Command::new("journalctl")
+        .args(["--boot", "0", "--unit", &service, "--no-pager", "--output", "cat"])
+        .output()
+        .ok()?;
+    let output = String::from_utf8(journal.stdout).ok()?;
+    Some(PreviewStatus { active: true, url: extract_preview_url(&output) })
+}
+
+fn extract_preview_url(journal: &str) -> Option<String> {
+    journal
+        .split_whitespace()
+        .filter_map(|token| token.strip_prefix("https://"))
+        .filter_map(|host| host.strip_suffix(".trycloudflare.com").map(|_| host))
+        .filter(|host| {
+            !host.is_empty()
+                && host
+                    .chars()
+                    .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-')
+        })
+        .map(|host| format!("https://{host}.trycloudflare.com"))
+        .next_back()
 }
 
 pub fn ssl_status(nginx_config_path: &str) -> SslStatus {

@@ -54,13 +54,7 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     let temp_path = create_temp_edit_path()?;
     fs::write(
         &temp_path,
-        framework
-            .environment_example(
-                &effective_config.project_name,
-                &effective_config.domain,
-                &effective_config.preview_domain,
-            )
-            .unwrap_or_default(),
+        framework.environment_example(&effective_config.project_name, &effective_config.domain).unwrap_or_default(),
     )
     .with_context(|| format!("Failed to write default secrets to {}", temp_path.display()))?;
     fs::set_permissions(&temp_path, Permissions::from_mode(0o600))?;

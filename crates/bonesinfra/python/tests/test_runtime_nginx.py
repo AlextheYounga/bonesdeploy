@@ -1,18 +1,15 @@
 from pathlib import Path
 
-import pytest
-
 from bonesinfra.config.context import DeployContext
 from bonesinfra.services.linux.nginx import router as nginx_router, site as nginx_site
 
 
-def _make_ctx(tmp_path, *, domain: str = "", preview_domain: str = "preview.example.com"):
+def _make_ctx(tmp_path, *, domain: str = ""):
     config_path = tmp_path / ".env"
     config_path.write_text(
         f"""PROJECT_NAME=lawsnipe
 HOST=example.com
 DOMAIN={domain}
-PREVIEW_DOMAIN={preview_domain}
 EMAIL=ops@example.com
 """
     )
@@ -23,8 +20,8 @@ def _noop(*args, **kwargs):
     del args, kwargs
 
 
-def test_runtime_nginx_uses_preview_domain_when_domain_is_empty(tmp_path, monkeypatch):
-    ctx = _make_ctx(tmp_path, domain="", preview_domain="preview.example.com")
+def test_runtime_nginx_provisions_site_service_without_a_public_domain(tmp_path, monkeypatch):
+    ctx = _make_ctx(tmp_path, domain="")
     paths = ctx.paths_dict
     calls = []
 
@@ -44,27 +41,7 @@ def test_runtime_nginx_uses_preview_domain_when_domain_is_empty(tmp_path, monkey
 
     nginx_router.setup(ctx, paths)
 
-    router_call = next(call for _, call in calls if "nginx_server_name" in call)
-    assert router_call["nginx_server_name"] == "preview.example.com"
-    assert router_call["preview_domain"] == "preview.example.com"
-
-
-def test_runtime_nginx_requires_a_real_name(tmp_path, monkeypatch):
-    ctx = _make_ctx(tmp_path, domain="", preview_domain="")
-    paths = ctx.paths_dict
-
-    monkeypatch.setattr(nginx_router, "mkdir", _noop)
-    monkeypatch.setattr(nginx_router.service, "render_target", _noop)
-    monkeypatch.setattr(nginx_router.service, "register_service", _noop)
-    monkeypatch.setattr(nginx_router.files, "link", _noop)
-    monkeypatch.setattr(nginx_router.server, "shell", _noop)
-    monkeypatch.setattr(nginx_router.systemd, "daemon_reload", _noop)
-    monkeypatch.setattr(nginx_router, "install_default_deny_server", _noop)
-    monkeypatch.setattr(nginx_router, "validate_config", _noop)
-    monkeypatch.setattr(nginx_router, "render", _noop)
-
-    with pytest.raises(ValueError, match="domain or preview_domain"):
-        nginx_router.setup(ctx, paths)
+    assert all("nginx_server_name" not in kwargs for _, kwargs in calls)
 
 
 def test_runtime_nginx_migrates_site_service_to_target(monkeypatch):

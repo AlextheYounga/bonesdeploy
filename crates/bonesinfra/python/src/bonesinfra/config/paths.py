@@ -89,6 +89,7 @@ class DeploymentPaths:
     nginx_default_deny_ssl_certificate_key: str
     nginx_default_site_enabled: str
     systemd_site_nginx_service: str
+    systemd_cloudflared_service: str
     systemd_site_nginx_requirement: str
     systemd_site_target: str
     systemd_site_target_requires: str
@@ -152,6 +153,7 @@ class DeploymentPaths:
             nginx_default_deny_ssl_certificate_key=str(Path(ETC_SSL_PRIVATE) / BONESDEPLOY_NGINX_DEFAULT_DENY_KEY),
             nginx_default_site_enabled=str(Path(ETC_NGINX_SITES_ENABLED) / DEFAULT_NGINX_SITE),
             systemd_site_nginx_service=str(Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}-nginx.service"),
+            systemd_cloudflared_service=str(Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}-cloudflared.service"),
             systemd_site_nginx_requirement=str(
                 Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}.target.requires/{project_name}-nginx.service"
             ),

@@ -14,7 +14,6 @@ def _write_config(tmp_path: Path, extra: str = "") -> Path:
 HOST=example.com
 PORT=2222
 DOMAIN=example.com
-PREVIEW_DOMAIN=preview.example.com
 EMAIL=ops@example.com
 SSL_ENABLED=true
 BRANCH=main
@@ -46,6 +45,13 @@ def test_template_data_contains_runtime_values(tmp_path):
     assert td["runtime_user"] == "lawsnipe"
     assert td["runtime_group"] == "lawsnipe"
     assert td["runtime_backend"] == "native"
+    assert "preview_domain" not in td
+
+
+def test_legacy_preview_domain_is_discarded_from_runtime_data(tmp_path):
+    ctx = DeployContext.from_files(str(_write_config(tmp_path, "PREVIEW_DOMAIN=preview.example.com\n")))
+
+    assert "PREVIEW_DOMAIN" not in ctx.runtime.data
 
 
 def test_docker_runtime_backend_is_preserved(tmp_path):
@@ -110,7 +116,7 @@ def test_dotenv_parser_rejects_malformed_entries(tmp_path):
 
 @pytest.mark.parametrize("entry", ["1BAD=value", "BAD-KEY=value", "=value"])
 def test_dotenv_parser_rejects_invalid_keys(tmp_path, entry):
-    with pytest.raises(ValueError, match="line 1"):
+    with pytest.raises(ValueError, match="line 9"):
         DeployContext.from_files(_write_config(tmp_path, entry + "\n"))
 
 

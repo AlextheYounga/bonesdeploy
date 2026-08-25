@@ -6,7 +6,9 @@ from bonesinfra.services.linux import runtime
 
 def test_runtime_setup_configures_apparmor_and_nginx_for_unix_sockets(monkeypatch):
     calls = []
-    ctx = SimpleNamespace(paths_dict={"runtime": "paths"})
+    ctx = SimpleNamespace(
+        paths_dict={"runtime": "paths"}, app=SimpleNamespace(dns=SimpleNamespace(domain="example.test"))
+    )
 
     monkeypatch.setattr(runtime.apparmor, "setup", lambda *args, **kwargs: calls.append(("apparmor", args, kwargs)))
     monkeypatch.setattr(runtime.router, "setup", lambda *args, **kwargs: calls.append(("router", args, kwargs)))
@@ -20,7 +22,9 @@ def test_runtime_setup_configures_apparmor_and_nginx_for_unix_sockets(monkeypatc
 
 def test_runtime_setup_uses_tcp_settings_for_tcp_applications(monkeypatch):
     calls = []
-    ctx = SimpleNamespace(paths_dict={"runtime": "paths"})
+    ctx = SimpleNamespace(
+        paths_dict={"runtime": "paths"}, app=SimpleNamespace(dns=SimpleNamespace(domain="example.test"))
+    )
 
     monkeypatch.setattr(runtime.apparmor, "setup", lambda _ctx, _paths, **kwargs: calls.append(kwargs))
     monkeypatch.setattr(runtime.router, "setup", lambda _ctx, _paths, **kwargs: calls.append(kwargs))
@@ -35,14 +39,17 @@ def test_runtime_setup_uses_tcp_settings_for_tcp_applications(monkeypatch):
 
 def test_runtime_orchestrate_starts_services_after_provisioning(monkeypatch):
     calls = []
-    ctx = SimpleNamespace(paths_dict={"runtime": "paths"})
+    ctx = SimpleNamespace(
+        paths_dict={"runtime": "paths"}, app=SimpleNamespace(dns=SimpleNamespace(domain="example.test"))
+    )
 
     monkeypatch.setattr(runtime, "setup", lambda *_args, **kwargs: calls.append(("setup", kwargs)))
+    monkeypatch.setattr(runtime, "reconcile_ingress", lambda *_args: calls.append(("ingress", {})))
     monkeypatch.setattr(runtime, "start_services", lambda *_args: calls.append(("start", {})))
 
     runtime.orchestrate(ctx, lambda current_ctx: calls.append(("provision", current_ctx)), uses_tcp=True)
 
-    assert [call[0] for call in calls] == ["setup", "provision", "start"]
+    assert [call[0] for call in calls] == ["setup", "provision", "ingress", "start"]
     assert calls[0][1] == {"uses_tcp": True}
     assert calls[1][1] is ctx
 

@@ -50,7 +50,7 @@ fn materializes_base_bones_assets() -> Result<()> {
     assert!(env_build_content.contains("Do not place passwords"));
 
     let dotenv = fs::read_to_string(repo.join(".env"))?;
-    assert!(dotenv.lines().any(|line| line == "PREVIEW_DOMAIN=atlas-deploy-example-com.nip.io"));
+    assert!(!dotenv.lines().any(|line| line.starts_with("PREVIEW_DOMAIN=")));
 
     let gitignore = fs::read_to_string(repo.join(".gitignore"))?;
     assert!(gitignore.lines().any(|line| line.trim() == "!.env.build"));

@@ -82,13 +82,11 @@ def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifa
     for name in ctx.services.services:
         artifacts.extend(Artifact.at_path(*spec) for spec in get_service(name).manifest_artifacts(ctx))
 
-    if ctx.app.dns.ssl_enabled:
+    if ctx.app.dns.ssl_enabled and ctx.app.dns.domain:
         artifacts.append(Artifact("ACME webroot", "acme_webroot", "directory", "ssl"))
-        domain = ctx.app.dns.domain or ctx.app.dns.preview_domain
-        if domain:
-            certificate, key = letsencrypt_cert_paths(domain)
-            artifacts.append(Artifact.at_path("ACME certificate", certificate, "link", "ssl"))
-            artifacts.append(Artifact.at_path("ACME certificate key", key, "link", "ssl"))
+        certificate, key = letsencrypt_cert_paths(ctx.app.dns.domain)
+        artifacts.append(Artifact.at_path("ACME certificate", certificate, "link", "ssl"))
+        artifacts.append(Artifact.at_path("ACME certificate key", key, "link", "ssl"))
 
     return _deduplicate(artifacts)
 
@@ -105,6 +103,8 @@ def collect_services(ctx: DeployContext, project_manifest: Any) -> tuple[Managed
     )
     for name in ctx.services.services:
         services.extend(ManagedService(*spec) for spec in get_service(name).manifest_services(ctx))
+    if not ctx.app.dns.domain:
+        services.append(ManagedService("quick tunnel", f"{ctx.app.project_name}-cloudflared.service", "runtime"))
     return _deduplicate_services(services)
 
 

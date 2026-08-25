@@ -11,7 +11,6 @@ from bonesinfra.config.keys import (
     EMAIL,
     HOST,
     PORT,
-    PREVIEW_DOMAIN,
     PROJECT_NAME,
     RUNTIME_BACKEND,
     SERVICES,
@@ -78,7 +77,6 @@ class DeployContext:
             ),
             dns=DnsConfig(
                 domain=values.get(DOMAIN, ""),
-                preview_domain=values.get(PREVIEW_DOMAIN, ""),
                 email=values.get(EMAIL, ""),
                 ssl_enabled=values.get(SSL_ENABLED, "false").lower() == "true",
             ),
@@ -90,7 +88,7 @@ class DeployContext:
             web_root=values.get(WEB_ROOT) or DEFAULT_WEB_ROOT,
             runtime_user=project_name,
             runtime_group=project_name,
-            data={key: value for key, value in values.items() if key not in APP_KEYS},
+            data={key: value for key, value in values.items() if key not in APP_KEYS and key != "PREVIEW_DOMAIN"},
         )
 
         services_value = values.get(SERVICES, "")
@@ -136,7 +134,6 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
         "paths": paths,
         "ssl_domain": ctx.app.dns.domain,
         "ssl_email": ctx.app.dns.email,
-        "preview_domain": ctx.app.dns.preview_domain,
     }
 
     for key, value in ctx.runtime.data.items():
@@ -167,7 +164,6 @@ class ServerConfig:
 @dataclass
 class DnsConfig:
     domain: str
-    preview_domain: str
     email: str
     ssl_enabled: bool
 

@@ -31,13 +31,13 @@ class ProjectManifest:
         return "server"
 
 
-def _context(tmp_path: Path, *, ssl: bool = False):
+def _context(tmp_path: Path, *, ssl: bool = False, domain: str = "example.test"):
     config = tmp_path / ".env"
     config.write_text(
         f"""PROJECT_NAME=example
 HOST=example.test
 SSL_ENABLED={str(ssl).lower()}
-DOMAIN=example.test
+DOMAIN={domain}
 TEMPLATE=custom
 SERVICES=
 """
@@ -135,6 +135,12 @@ def test_acme_certificate_links_are_declared_as_links(tmp_path: Path):
 
     assert certificates["ACME certificate"].kind == "link"
     assert certificates["ACME certificate key"].kind == "link"
+
+
+def test_quick_tunnel_is_expected_only_without_a_real_domain(tmp_path: Path):
+    services = collect_services(_context(tmp_path, domain=""), ProjectManifest())
+
+    assert any(service.unit == "example-cloudflared.service" for service in services)
 
 
 def test_services_are_inspected_without_mutations(tmp_path: Path):

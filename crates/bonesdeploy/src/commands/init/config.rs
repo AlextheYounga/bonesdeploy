@@ -248,6 +248,5 @@ fn apply_existing_fields(config: &mut config::Bones, existing_config: Option<&co
     config.releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
     config.ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
     config.domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
-    config.preview_domain = existing_config.map_or_else(String::new, |cfg| cfg.preview_domain.clone());
     config.email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 }

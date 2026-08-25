@@ -1,13 +1,3 @@
-{% if preview_domain and ssl_domain and preview_domain != ssl_domain %}
-# When a real domain is configured, preview_domain redirects to it.
-server {
-    listen 80;
-    listen [::]:80;
-    server_name {{ preview_domain }};
-    return 301 https://{{ ssl_domain }}$request_uri;
-}
-
-{% endif %}
 server {
     listen 80;
     listen [::]:80;

@@ -354,7 +354,7 @@ Typed fields read from nested `bones.toml` tables:
 ```text
 `app.project_name`, `app.repo_path`, `app.project_root`, `app.server.host`,
 `app.server.ssh_user`, `app.server.port`, `app.deploy.branch`,
-`app.dns.preview_domain`, `app.dns.ssl_enabled`, `app.dns.domain`, and
+`app.dns.ssl_enabled`, `app.dns.domain`, and
 `app.dns.email`. Deployment-owned fields such as `app.remote_name`,
 `app.deploy.deploy_on_push`, and `app.deploy.releases` remain outside
 `DeployContext`.
@@ -512,6 +512,12 @@ verify every required service remains active after restarting, because a
 `Type=simple` process can exit shortly after systemd reports a successful start.
 
 Runtime setup is separate from SSL.
+
+When `app.dns.domain` is empty, runtime setup installs and starts the
+project-scoped `cloudflared` Quick Tunnel service against the per-site Nginx
+Unix socket. The assigned `trycloudflare.com` URL is runtime state read from
+journald and can change after a restart. A real domain instead uses the public
+Nginx router and Certbot; successful SSL activation removes the Quick Tunnel.
 
 ______________________________________________________________________
 

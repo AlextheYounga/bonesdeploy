@@ -102,7 +102,6 @@ def _shared_config_content(ctx):
         "SSH_USER": ctx.app.server.ssh_user,
         "BRANCH": ctx.app.deploy.branch,
         "DOMAIN": ctx.app.dns.domain,
-        "PREVIEW_DOMAIN": ctx.app.dns.preview_domain,
         "EMAIL": ctx.app.dns.email,
         "SSL_ENABLED": str(ctx.app.dns.ssl_enabled).lower(),
         "TEMPLATE": ctx.runtime.data.get("TEMPLATE", ""),

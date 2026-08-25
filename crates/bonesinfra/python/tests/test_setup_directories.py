@@ -13,7 +13,7 @@ def test_setup_creates_root_owned_control_plane_site_directory(monkeypatch):
             project_name="atlas",
             server=SimpleNamespace(host="192.0.2.1", port="22", ssh_user="root"),
             deploy=SimpleNamespace(branch="main"),
-            dns=SimpleNamespace(domain="", preview_domain="atlas-192-0-2-1.nip.io", email="", ssl_enabled=False),
+            dns=SimpleNamespace(domain="", email="", ssl_enabled=False),
         ),
         runtime=SimpleNamespace(
             runtime_user="atlas", runtime_group="atlas", backend="native", web_root="public", data={}

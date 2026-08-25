@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
 use console::style;
 
-use crate::commands::{doctor, remote};
+use crate::commands::{doctor, remote, status};
 use crate::config;
 use crate::ui::output;
 
@@ -30,6 +30,18 @@ pub async fn run(skip_confirm: bool) -> Result<()> {
                 "to publish the first deploy branch",
             )
         );
+    } else if cfg.domain.is_empty() {
+        match status::remote_status(&cfg).await {
+            Ok(remote) => match remote.preview.and_then(|preview| preview.active.then_some(preview.url).flatten()) {
+                Some(url) => println!("{} {url}", style("Preview").dim()),
+                None => println!(
+                    "{} Quick Tunnel is starting; run `bonesdeploy status` for its URL.",
+                    output::pending_marker()
+                ),
+            },
+            Err(error) => println!("{} Preview status unavailable: {error:#}", output::pending_marker()),
+        }
+        println!("{}", output::next_step("bonesdeploy deploy"));
     } else if cfg.ssl_enabled {
         println!("{}", output::next_step("bonesdeploy deploy"));
     } else {

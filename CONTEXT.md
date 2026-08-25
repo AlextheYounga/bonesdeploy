@@ -109,7 +109,6 @@ host = "deploy.example.com"
 port = "22"
 
 [app.dns]
-preview_domain = "lawsnipe-deploy-example-com.nip.io"
 domain = "app.example.com"
 email = "ops@example.com"
 ssl_enabled = true

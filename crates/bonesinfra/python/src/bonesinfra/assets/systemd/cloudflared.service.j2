@@ -1,0 +1,30 @@
+[Unit]
+Description=Cloudflare Quick Tunnel for {{ project_name }}
+After=network.target {{ project_name }}-nginx.service
+Requires={{ project_name }}-nginx.service
+PartOf={{ project_name }}.target
+Before={{ project_name }}.target
+
+[Service]
+Type=simple
+User={{ runtime_user }}
+Group={{ runtime_group }}
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url unix:{{ paths.runtime_nginx_socket }}
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+Restart=on-failure
+RestartSec=5

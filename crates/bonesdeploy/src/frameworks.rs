@@ -119,8 +119,8 @@ impl Framework {
         }
     }
 
-    pub fn environment_example(self, project_name: &str, domain: &str, preview_domain: &str) -> Option<String> {
-        let site_url = environment_url(domain, preview_domain);
+    pub fn environment_example(self, project_name: &str, domain: &str) -> Option<String> {
+        let site_url = environment_url(domain);
         Some(match self {
             Self::Django => django::environment_example(project_name, &site_url),
             Self::Laravel => laravel::environment_example(project_name, &site_url),
@@ -238,9 +238,8 @@ impl Question {
 
 /// Every promptable question for a framework template. Empty for templates
 /// that take no configuration (sveltekit, vue).
-pub(crate) fn environment_url(domain: &str, preview_domain: &str) -> String {
-    let host = if domain.is_empty() { preview_domain } else { domain };
-    if host.is_empty() { String::new() } else { format!("https://{host}") }
+pub(crate) fn environment_url(domain: &str) -> String {
+    if domain.is_empty() { String::new() } else { format!("https://{domain}") }
 }
 
 pub(crate) fn render_env_template(template: &str, replacements: &[(&str, &str)]) -> String {

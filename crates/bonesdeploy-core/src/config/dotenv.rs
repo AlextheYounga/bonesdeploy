@@ -4,7 +4,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 
-use super::{Bones, RuntimeBackend, default_preview_domain_for, default_repo_path_for, validate_database_services};
+use super::{Bones, RuntimeBackend, default_repo_path_for, validate_database_services};
 use super::{validate_host, validate_runtime};
 use crate::paths;
 
@@ -17,7 +17,6 @@ pub mod project_env {
     pub const PORT: &str = "PORT";
     pub const BRANCH: &str = "BRANCH";
     pub const DOMAIN: &str = "DOMAIN";
-    pub const PREVIEW_DOMAIN: &str = "PREVIEW_DOMAIN";
     pub const EMAIL: &str = "EMAIL";
     pub const SSL_ENABLED: &str = "SSL_ENABLED";
     pub const TEMPLATE: &str = "TEMPLATE";
@@ -43,7 +42,6 @@ pub fn load(path: &Path) -> Result<Bones> {
     config.port = values.get(project_env::PORT).cloned().unwrap_or_else(|| String::from("22"));
     config.branch = values.get(project_env::BRANCH).cloned().unwrap_or_else(|| String::from("main"));
     config.domain = values.get(project_env::DOMAIN).cloned().unwrap_or_default();
-    config.preview_domain = values.get(project_env::PREVIEW_DOMAIN).cloned().unwrap_or_default();
     config.email = values.get(project_env::EMAIL).cloned().unwrap_or_default();
     config.ssl_enabled = values.get(project_env::SSL_ENABLED).is_some_and(|value| value == "true");
     config.runtime.template = values.get(project_env::TEMPLATE).cloned().unwrap_or_default();
@@ -61,11 +59,6 @@ pub fn load(path: &Path) -> Result<Bones> {
         .unwrap_or_default();
     config.repo_path = default_repo_path_for(&project_name);
     config.project_root = paths::default_project_root_for(&project_name);
-    config.preview_domain = if config.preview_domain.is_empty() {
-        default_preview_domain_for(&project_name, &config.host)
-    } else {
-        config.preview_domain.clone()
-    };
     validate_host(&config.host)?;
     validate_runtime(&config.runtime)?;
     validate_database_services(&config.services.services)?;
@@ -121,7 +114,6 @@ pub fn save(config: &Bones, path: &Path) -> Result<()> {
         (project_env::SSH_USER, config.ssh_user.as_str()),
         (project_env::BRANCH, config.branch.as_str()),
         (project_env::DOMAIN, config.domain.as_str()),
-        (project_env::PREVIEW_DOMAIN, config.preview_domain.as_str()),
         (project_env::EMAIL, config.email.as_str()),
         (project_env::SSL_ENABLED, if config.ssl_enabled { "true" } else { "false" }),
         (project_env::TEMPLATE, config.runtime.template.as_str()),

@@ -1,4 +1,5 @@
 from pathlib import Path
+from shlex import quote
 
 from pyinfra.operations import files, server, systemd
 
@@ -48,7 +49,9 @@ def validate_config(name="Validate nginx configuration"):
 
 
 def render_router_config(ctx, paths, *, ssl_enabled, stage=None, validate=False, reload=False):
-    nginx_server_name = ctx.app.dns.domain or ctx.app.dns.preview_domain
+    nginx_server_name = ctx.app.dns.domain
+    if not nginx_server_name:
+        raise ValueError("domain is required for public nginx routing")
     label = f" ({stage})" if stage else ""
     cert_path, key_path = letsencrypt_cert_paths(nginx_server_name)
     render(
@@ -73,10 +76,6 @@ def render_router_config(ctx, paths, *, ssl_enabled, stage=None, validate=False,
 
 
 def setup(ctx, paths, *, nginx_address_families="AF_UNIX", nginx_ip_loopback_only=False):
-    nginx_server_name = ctx.app.dns.domain or ctx.app.dns.preview_domain
-    if not nginx_server_name:
-        raise ValueError("domain or preview_domain is required for nginx config")
-
     service.render_target(ctx, paths=paths)
     # 0711: system nginx (www-data) needs traversal to reach the per-site
     # nginx socket at /run/<project>/nginx/nginx.sock. 0750 would block it.
@@ -114,20 +113,40 @@ def setup(ctx, paths, *, nginx_address_families="AF_UNIX", nginx_ip_loopback_onl
         _sudo=True,
     )
 
-    # SSL state comes from bones.toml (app.dns.ssl_enabled), not runtime data —
-    # SSL is owned by `ssl apply`, not `runtime apply`.
-    nginx_ssl_enabled = ctx.app.dns.ssl_enabled and ctx.app.dns.domain
-    render_router_config(ctx, paths, ssl_enabled=nginx_ssl_enabled)
     install_default_deny_server(paths)
+    if ctx.app.dns.domain:
+        # SSL state comes from the project config; certificate lifecycle is owned
+        # by `ssl apply`, not runtime provisioning.
+        render_router_config(ctx, paths, ssl_enabled=ctx.app.dns.ssl_enabled)
+        files.link(
+            name="Enable router nginx site",
+            path=paths["nginx_site_enabled"],
+            target=paths["nginx_site_available"],
+            force=True,
+            _sudo=True,
+        )
+        validate_config("Validate nginx configuration")
 
+
+def remove_project_router(paths):
     files.link(
-        name="Enable router nginx site",
+        name="Disable project nginx router",
         path=paths["nginx_site_enabled"],
-        target=paths["nginx_site_available"],
-        force=True,
+        present=False,
         _sudo=True,
     )
-    validate_config("Validate nginx configuration")
+    server.shell(
+        name="Remove project nginx router config",
+        commands=[f"rm -f -- {quote(paths['nginx_site_available'])}"],
+        _sudo=True,
+    )
+    validate_config("Validate nginx configuration after router removal")
+    systemd.service(
+        name="Reload nginx after router removal",
+        service="nginx",
+        reloaded=True,
+        _sudo=True,
+    )
 
 
 def start_services(ctx, paths):

@@ -100,6 +100,19 @@ fn dotenv_rejects_invalid_and_duplicate_keys() -> Result<()> {
 }
 
 #[test]
+fn legacy_preview_domain_is_ignored_and_not_saved() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    fs::write(&path, "PROJECT_NAME=atlas\nPREVIEW_DOMAIN=atlas.example.nip.io\n")?;
+
+    let config = config::load(&path)?;
+    config::save(&config, &path)?;
+
+    assert!(!fs::read_to_string(path)?.contains("PREVIEW_DOMAIN"));
+    Ok(())
+}
+
+#[test]
 fn dotenv_merge_preserves_existing_values_and_replaces_overlaid_keys() -> Result<()> {
     let existing = "PROJECT_NAME=old\nDATABASE_PASSWORD=generated\nAPP_KEY=old\n";
     let secrets = "APP_KEY=secret\nNODE_ENV=production\n";

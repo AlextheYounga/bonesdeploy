@@ -44,6 +44,7 @@ def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypa
     monkeypatch.setattr(module.site, "render_php_fpm", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.shared, "ensure_directories", lambda *_args: None)
     monkeypatch.setattr(module.runtime, "setup", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module.runtime, "reconcile_ingress", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.runtime, "start_services", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "render", lambda *args, **kwargs: calls.append((args, kwargs)))
     monkeypatch.setattr(
@@ -83,6 +84,7 @@ def test_laravel_runtime_skips_queue_worker_when_disabled(tmp_path, monkeypatch)
     monkeypatch.setattr(module.site, "render_php_fpm", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.shared, "ensure_directories", lambda *_args: None)
     monkeypatch.setattr(module.runtime, "setup", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(module.runtime, "reconcile_ingress", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module.runtime, "start_services", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(module, "render", lambda *args, **_kwargs: renders.append(args[0]))
 

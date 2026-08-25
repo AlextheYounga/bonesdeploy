@@ -110,28 +110,6 @@ pub fn default_repo_path_for(project_name: &str) -> String {
     paths::default_repo_path_for(project_name)
 }
 
-#[must_use]
-pub fn default_preview_domain_for(project_name: &str, host: &str) -> String {
-    let project = sanitize_domain_label(project_name);
-    let host = sanitize_domain_label(host);
-
-    if project.is_empty() || host.is_empty() {
-        return String::new();
-    }
-
-    format!("{project}-{host}.nip.io")
-}
-
-fn sanitize_domain_label(value: &str) -> String {
-    value
-        .trim()
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch.to_ascii_lowercase() } else { '-' })
-        .collect::<String>()
-        .trim_matches('-')
-        .to_string()
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Runtime {
     #[serde(default)]
@@ -258,12 +236,7 @@ pub fn load_runtime(config_dir: &Path) -> Result<Runtime> {
 }
 
 pub fn apply_derived_defaults(config: &mut Bones) {
-    let project_name = config.project_name.clone();
-
     if config.ssh_user.is_empty() {
         config.ssh_user = String::from("root");
-    }
-    if config.preview_domain.is_empty() {
-        config.preview_domain = default_preview_domain_for(&project_name, &config.host);
     }
 }
