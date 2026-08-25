@@ -17,7 +17,9 @@ esac
 ruby_root="/opt/bonesdeploy/ruby"
 install_dir="$ruby_root/$version"
 ruby_binary="$install_dir/bin/ruby"
-if [ -x "$ruby_binary" ] && "$ruby_binary" --version | grep -q "^ruby $version "; then
+bundle_binary="$install_dir/bin/bundle"
+if [ -x "$ruby_binary" ] && [ -x "$bundle_binary" ] && "$ruby_binary" --version | grep -q "^ruby $version "; then
+	"$bundle_binary" --version >/dev/null
 	exit 0
 fi
 
@@ -59,3 +61,5 @@ rm -rf -- "$install_dir"
 )
 
 "$ruby_binary" --version | grep -q "^ruby $version "
+[ -x "$bundle_binary" ]
+"$bundle_binary" --version >/dev/null
