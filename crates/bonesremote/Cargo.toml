@@ -1,6 +1,6 @@
 [package]
 name = "bonesremote"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
 authors=["Alex Younger <thealexyounger@proton.me>"]
 description="Deployments with a Spine in a Barebones Framework"
@@ -16,7 +16,7 @@ libc = "0.2.186"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.150"
 time = { version = "0.3.51", features = ["formatting", "macros"] }
-bonesdeploy-core = { version = "0.8.2", path = "../bonesdeploy-core" }
+bonesdeploy-core = { version = "0.8.3", path = "../bonesdeploy-core" }
 
 [lints]
 workspace = true
