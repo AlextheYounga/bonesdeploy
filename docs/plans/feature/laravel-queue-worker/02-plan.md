@@ -2,7 +2,7 @@
 
 ## Current behavior
 
-The `install_queue_worker` option is defined in `crates/bonesdeploy/src/frameworks/laravel.rs` as a boolean question with a `// TODO: Set up queue worker.` comment. It is accepted as a framework variable during init and persisted into `bones.toml` under `[runtime]`. In Python, the value is reachable via `ctx.runtime.data.get("install_queue_worker")`.
+The Laravel queue worker is standard native Laravel infrastructure. It is provisioned without a framework variable; older `install_queue_worker` values are ignored.
 
 No code reads or acts on the value:
 
@@ -19,7 +19,7 @@ During deploy, `bonesremote service restart` restarts the site target, which res
 
 ## Intended behavior
 
-When `install_queue_worker` is `true` in `bones.toml` (accessible as `ctx.runtime.data.get("install_queue_worker")`):
+For native Laravel sites:
 
 1. **Provisioning** (`runtime.py::deploy`): After the existing FPM/nginx setup, a queue worker systemd unit is rendered from a new template, registered in the site target, enabled at boot, and started.
 
@@ -35,25 +35,24 @@ When `install_queue_worker` is `true` in `bones.toml` (accessible as `ctx.runtim
    - `ReadWritePaths` includes shared Laravel storage, the current release's `bootstrap/cache`, and the site deployment log directory. `ProtectSystem=strict` keeps other paths read-only.
    - `StandardOutput=journal`, `StandardError=journal`
 
-3. **Deploy restart**: `bonesremote service restart` restarts the site target, then explicitly restarts the configured Laravel worker after cut-over. This re-evaluates `ConditionPathExists` after `current` changes from the generic placeholder to the Laravel release. No `php artisan queue:restart` call is needed in prepare scripts — the existing test at `frameworks.rs:195` already forbids `queue:restart` in prepare.
+3. **Deploy restart**: `bonesremote service restart` reads the root-owned `{project}.target.requires/` directory, starts the site target, and explicitly restarts every registered site service after cut-over. This re-evaluates `ConditionPathExists` after `current` changes from the generic placeholder to the Laravel release without consulting framework configuration or `.env`. No `php artisan queue:restart` call is needed in prepare scripts — the existing test at `frameworks.rs:195` already forbids `queue:restart` in prepare.
 
-4. **Manifest**: `manifest.py::artifacts()` includes the worker systemd unit file. `manifest.py::services()` includes `{project}-worker.service`. Both gated on `install_queue_worker`.
+4. **Manifest**: `manifest.py::artifacts()` includes the worker systemd unit file and `manifest.py::services()` includes `{project}-worker.service`.
 
-When `install_queue_worker` is `false` or absent, behavior is unchanged — no worker provisioned, no manifest entries.
 
 ## Approach
 
 1. **Create `queue-worker.service.j2`** in `assets/frameworks/laravel/infra/templates/`. Base it on the existing `app.service.j2` but adapt it for queue worker semantics: no socket directory, writable storage paths, and `--sleep`, `--tries`, `--max-time` arguments.
 
-2. **Add worker deployment in `runtime.py::deploy()`**: After the nginx site rendering, check `install_queue_worker`. If true, render the worker template, register it, and start it. Use `systemd.register_service` and `systemd.enable_and_start` to follow existing conventions. The worker uses the site runtime user/group and explicit shared Laravel writable paths; it does not attach an AppArmor profile.
+2. **Add worker deployment in `runtime.py::deploy()`**: After the nginx site rendering, render the worker template, register it, and start it. Use `systemd.register_service` and `systemd.enable_and_start` to follow existing conventions. The worker uses the site runtime user/group and explicit shared Laravel writable paths; it does not attach an AppArmor profile.
 
    The worker does not need an AppArmor profile name because Laravel's native FPM path does not provision one. Its filesystem access is constrained by systemd hardening and explicit writable paths.
 
-3. **Add manifest entries in `manifest.py`**: In both `artifacts()` and `services()`, append worker entries when `ctx.runtime.data.get("install_queue_worker")`. The artifact path uses `paths.systemd_service("worker")`. The service entry is `("{project}-worker.service", "framework")`.
+3. **Add manifest entries in `manifest.py`**: In both `artifacts()` and `services()`, always append the worker entries. The artifact path uses `paths.systemd_service("worker")`. The service entry is `("{project}-worker.service", "framework")`.
 
-4. **Update `templates.md`**: Remove any ambiguity about the `install_queue_worker` option being unimplemented. Document what the option provisions.
+4. **Update `templates.md`**: Document the default worker behavior.
 
-5. **Add Python tests**: A test that provisions with `install_queue_worker=true` verifies the systemd service file is rendered and the service is started. A test with `install_queue_worker=false` verifies no worker is created. Manifest tests verify the entries appear.
+5. **Add Python tests**: A test verifies the worker is rendered and started without a configuration flag. Manifest tests verify the entries appear.
 
 ## Responsibilities and boundaries
 
@@ -99,9 +98,8 @@ The worker deployment belongs in `runtime.py::deploy()` rather than `custom.py::
 
 ## Validation
 
-- Python test: provisioning with `install_queue_worker=true` renders the worker unit file and registers/starts the service.
-- Python test: provisioning with `install_queue_worker=false` (or absent) does not create the worker.
-- Python manifest test: worker artifacts and service appear when enabled, absent when disabled.
+- Python test: provisioning without a worker flag renders the worker unit file and registers/starts the service.
+- Python manifest test: worker artifacts and service are always present for native Laravel.
 - Existing `frameworks.rs:195` test continues to pass (no `queue:restart` in prepare).
 - `ruff check .` and `ruff format .` pass in the Python package.
 - `cargo clippy`, `cargo fmt` pass in the Rust workspace.

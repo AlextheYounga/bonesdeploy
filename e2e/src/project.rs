@@ -66,6 +66,17 @@ impl SampleProject {
         Ok(())
     }
 
+    pub fn pin_node_version(&self, version: &str) -> Result<()> {
+        let path = self.dir.join(".env.build");
+        let source = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+        let updated = source.replace("NODE_VERSION=\n", &format!("NODE_VERSION={version}\n"));
+        if updated == source {
+            bail!(".env.build does not contain an empty NODE_VERSION in {}", self.dir.display());
+        }
+        fs::write(&path, updated).with_context(|| format!("Failed to write {}", path.display()))?;
+        Ok(())
+    }
+
     fn assert_only_readme_markdown(root: &Path, template: &str) -> Result<()> {
         for entry in fs::read_dir(root).with_context(|| format!("Failed to read {}", root.display()))? {
             let path = entry?.path();
@@ -127,6 +138,36 @@ impl SampleProject {
             .current_dir(&self.dir)
             .args(["secrets", "edit"])
             .env("EDITOR", editor_path)
+            .status()
+            .with_context(|| "Failed to run bonesdeploy secrets edit")?;
+        fs::remove_file(&editor).ok();
+        status_ok(status, "bonesdeploy secrets edit")
+    }
+
+    pub fn configure_remote_environment(
+        &self,
+        session: &Session,
+        binary: &Path,
+        project_name: &str,
+        host: &str,
+        template: &str,
+    ) -> Result<()> {
+        let editor = self.dir.join(".bones-e2e-environment-editor.sh");
+        fs::write(
+            &editor,
+            "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s' \"$BONES_E2E_ENVIRONMENT\" >> \"$1\"\n",
+        )?;
+        fs::set_permissions(&editor, fs::Permissions::from_mode(0o700))?;
+
+        let environment = format!(
+            "PROJECT_NAME={project_name}\nHOST={host}\nPORT=22\nSSH_USER=root\nBRANCH=main\nTEMPLATE={template}\nRUNTIME_BACKEND=native\nWEB_ROOT=public\n"
+        );
+        let status = session
+            .command(binary)
+            .current_dir(&self.dir)
+            .args(["secrets", "edit"])
+            .env("EDITOR", editor.to_string_lossy().into_owned())
+            .env("BONES_E2E_ENVIRONMENT", environment)
             .status()
             .with_context(|| "Failed to run bonesdeploy secrets edit")?;
         fs::remove_file(&editor).ok();

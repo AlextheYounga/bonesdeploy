@@ -6,7 +6,7 @@ use super::harness::Harness;
 const SITE: &str = "e2erails";
 
 pub fn provision(harness: &Harness) -> Result<SampleProject> {
-    harness.provision(SITE, "rails", &["ruby_version=3.4"])
+    harness.provision(SITE, "rails", &["ruby_version=3.4.8"])
 }
 
 pub fn assert_running(harness: &Harness) -> Result<()> {

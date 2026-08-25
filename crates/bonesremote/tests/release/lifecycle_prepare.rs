@@ -107,3 +107,27 @@ fn framework_prepare_templates_do_not_source_control_plane_files() -> Result<()>
     }
     Ok(())
 }
+
+#[test]
+fn django_prepare_template_uses_the_configured_python_minor() -> Result<()> {
+    let template = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../bonesdeploy/assets/frameworks/django/deployment/prepare/01_prepare_django.sh"),
+    )?;
+
+    assert!(template.contains("BONES_RUNTIME_PYTHON_VERSION"));
+    assert!(template.contains("\"$PYTHON_BIN\" -m venv"));
+    Ok(())
+}
+
+#[test]
+fn rails_prepare_template_uses_the_managed_bundler_binary() -> Result<()> {
+    let template = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../bonesdeploy/assets/frameworks/rails/deployment/prepare/01_prepare_rails.sh"),
+    )?;
+
+    assert!(template.contains("local bundle_binary=\"${ruby_binary%/*}/bundle\""));
+    assert!(!template.contains("-S bundle"));
+    Ok(())
+}

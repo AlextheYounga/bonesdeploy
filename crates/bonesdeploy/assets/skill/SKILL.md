@@ -68,7 +68,7 @@ write shell scripts, numbered, in lexical order. The constraint is the feature.
 
 - `bonesdeploy secrets init` — bootstrap GPG-encrypted `.env` (also performed by `bonesdeploy init`).
 - `bonesdeploy secrets edit` — decrypt, edit, re-encrypt.
-- `bonesdeploy secrets push` — ship the decrypted `.env` to remote `shared/.env`.
+- `bonesdeploy secrets push` — atomically replace remote `shared/.env` with the decrypted complete `.env`.
 
 Never commit plaintext secrets. Never put secret values in `bones.toml`. Use
 `.env.build` for committed public build values; use `shared/.env` for runtime

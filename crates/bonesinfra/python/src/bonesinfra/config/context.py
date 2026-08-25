@@ -88,7 +88,11 @@ class DeployContext:
             web_root=values.get(WEB_ROOT) or DEFAULT_WEB_ROOT,
             runtime_user=project_name,
             runtime_group=project_name,
-            data={key: value for key, value in values.items() if key not in APP_KEYS and key != "PREVIEW_DOMAIN"},
+            data={
+                key.lower(): _runtime_value(value)
+                for key, value in values.items()
+                if key not in APP_KEYS and key.lower() != "preview_domain"
+            },
         )
 
         services_value = values.get(SERVICES, "")
@@ -112,6 +116,14 @@ class DeployContext:
     @property
     def paths_dict(self) -> dict[str, Any]:
         return self.paths.__dict__
+
+
+def _runtime_value(value: str) -> Any:
+    if value.lower() == "true":
+        return True
+    if value.lower() == "false":
+        return False
+    return value
 
 
 def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **extra: Any) -> dict[str, Any]:

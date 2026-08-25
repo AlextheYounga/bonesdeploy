@@ -8,7 +8,7 @@ const MARKER: &str = "e2e-laravel-php";
 const PHP_VERSION: &str = "8.5";
 
 pub fn provision(harness: &Harness) -> Result<SampleProject> {
-    let project = harness.provision(SITE, "laravel", &["php_version=8.5", "install_queue_worker=true"])?;
+    let project = harness.provision(SITE, "laravel", &["php_version=8.5"])?;
     harness.write_laravel_probe(SITE, MARKER)?;
     Ok(project)
 }

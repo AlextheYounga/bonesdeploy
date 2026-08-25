@@ -52,8 +52,9 @@ bonesdeploy deploy
 
 `.env.build` at the project root holds committed, non-secret build-time values
 (e.g. `NEXT_PUBLIC_API_URL=https://api.example.com`). Runtime secrets come from
-`shared/.env` via `bonesdeploy secrets push`. `bones.toml` is committed;
-`shared/.env` is not. That's the contract.
+`shared/.env` via `bonesdeploy secrets push`. The explicit push atomically
+replaces the complete remote environment; it does not merge any `.env` files.
+`bones.toml` is committed; `shared/.env` is not. That's the contract.
 
 ## Recovery
 

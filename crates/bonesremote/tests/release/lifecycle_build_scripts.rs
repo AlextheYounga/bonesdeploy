@@ -62,7 +62,7 @@ fn build_env_includes_env_build_values() -> Result<()> {
     fs::create_dir_all(&site_root)?;
     fs::create_dir_all(&source)?;
     fs::write(site_root.join(".env"), "PROJECT_NAME=demo\nHOST=deploy.example.com\nTEMPLATE=nuxt\n")?;
-    fs::write(source.join(".env.build"), "NEXT_PUBLIC_API_URL=https://api.example.com\n")?;
+    fs::write(source.join(".env.build"), "NODE_VERSION=24.19.0\nNEXT_PUBLIC_API_URL=https://api.example.com\n")?;
     let cfg = load(&site_root.join(".env"))?;
 
     let env = resolve_build_env(&cfg, &source)?;
@@ -70,6 +70,11 @@ fn build_env_includes_env_build_values() -> Result<()> {
     assert!(
         env.contains(&("NEXT_PUBLIC_API_URL".to_string(), "https://api.example.com".to_string())),
         "should include .env.build value: {env:?}"
+    );
+    assert!(env.contains(&("NODE_VERSION".to_string(), "24.19.0".to_string())), "should include Node version: {env:?}");
+    assert!(
+        !env.iter().any(|(key, _)| key == "BONES_RUNTIME_NODE_VERSION"),
+        "Node version must come from .env.build: {env:?}"
     );
     fs::remove_dir_all(site_root).ok();
     fs::remove_dir_all(source).ok();

@@ -84,7 +84,7 @@ pub fn commit_initial(path: &Path) -> Result<()> {
     let status = Command::new("git")
         .args(["-C"])
         .arg(path)
-        .args(["-c", "user.name=BonesDeploy", "-c", "user.email=bonesdeploy@local"])
+        .args(["-c", "user.name=BonesDeploy", "-c", "user.email=bonesdeploy@local", "-c", "commit.gpgsign=false"])
         .args(["commit", "--allow-empty", "-m", "initial"])
         .status()
         .context("failed to create initial commit")?;

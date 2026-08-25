@@ -9,6 +9,9 @@ use std::ops::Deref;
 use std::path::Path;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
+const E2E_NODE_VERSION: &str = "24.19.0";
+const NODE_TEMPLATES: &[&str] = &["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"];
+
 use dtor::dtor;
 
 static HARNESS: OnceLock<Mutex<Option<Harness>>> = OnceLock::new();
@@ -96,9 +99,14 @@ impl Harness {
         if template == "laravel" {
             project.generate_laravel_app_key(&self.session, &self.artifacts.bonesdeploy)?;
         }
+        project.configure_remote_environment(&self.session, &self.artifacts.bonesdeploy, site, &self.host, template)?;
         project.assert_infrastructure(template)?;
+        if NODE_TEMPLATES.contains(&template) {
+            project.pin_node_version(E2E_NODE_VERSION)?;
+        }
         project.commit(&self.session, "bonesdeploy init")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["setup", "--yes"])?;
+        project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["secrets", "push"])?;
         self.assert_site(site)?;
         let manifest = project.bonesdeploy_output(&self.session, &self.artifacts.bonesdeploy, &["manifest"])?;
         eprintln!("\n--- manifest for {site} ---\n{manifest}--- end manifest for {site} ---");
@@ -133,7 +141,9 @@ impl Harness {
 
     pub fn assert_service_condition_skipped(&self, service: &str) -> Result<()> {
         self.exec(&format!(
-            "test \"$(systemctl show --property=ConditionResult --value -- {service})\" = no && ! systemctl is-active --quiet {service}"
+            "test \"$(systemctl show --property=LoadState --value -- {service})\" = loaded && \
+             test \"$(systemctl show --property=ConditionResult --value -- {service})\" = no && \
+             ! systemctl is-active --quiet {service}"
         ))?;
         Ok(())
     }

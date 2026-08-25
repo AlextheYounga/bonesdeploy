@@ -27,10 +27,7 @@ pub fn run(mutation: &SiteMutation, _snapshot: &super::DeploymentSnapshot) -> Re
 
     let shared_env = shared_dir.join(paths::DOT_ENV);
     if !shared_env.is_file() {
-        bail!(
-            "Shared environment file is missing: {}. Run 'bonesdeploy remote setup' or secrets provisioning first.",
-            shared_env.display()
-        );
+        bail!("Shared environment file is missing: {}. Run 'bonesdeploy secrets push' first.", shared_env.display());
     }
 
     link_relative(&release_dir, paths::DOT_ENV, &shared_env)?;

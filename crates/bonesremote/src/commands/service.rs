@@ -3,7 +3,7 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::{config, paths};
+use bonesdeploy_core::paths;
 
 use crate::inspection::systemd;
 use crate::privileges;
@@ -12,15 +12,14 @@ use crate::release::SiteMutation;
 pub fn run(mutation: &SiteMutation) -> Result<()> {
     privileges::ensure_root("bonesremote service restart")?;
 
-    let cfg = mutation.config();
-    let target_name = target_name_for_registered_site(mutation.site(), &cfg.project_name)?;
-    let mut services = systemd::required_services(&target_name)?;
+    let target_name = target_name_for_registered_site(mutation.site(), &mutation.config().project_name)?;
+    let services = systemd::required_services(&target_name)?;
     if services.is_empty() {
         bail!("Site target {target_name} has no registered services");
     }
 
     let status = Command::new("systemctl")
-        .args(restart_args(&target_name))
+        .args(["start", "--", &target_name])
         .status()
         .with_context(|| format!("Failed to restart {target_name}"))?;
 
@@ -28,29 +27,14 @@ pub fn run(mutation: &SiteMutation) -> Result<()> {
         bail!("Failed to restart {target_name}");
     }
 
-    if let Some(worker) = laravel_worker_service(&cfg) {
-        restart_service(&worker)?;
-        if !services.contains(&worker) {
-            services.push(worker);
-        }
+    for service in &services {
+        restart_service(service)?;
     }
 
     verify_units_active(&target_name, &services)?;
 
     println!("Restarted {target_name}: {}", services.join(", "));
     Ok(())
-}
-
-fn laravel_worker_service(cfg: &config::Bones) -> Option<String> {
-    configured_laravel_worker_service(
-        &cfg.runtime.template,
-        cfg.runtime.extra.get(config::LARAVEL_INSTALL_QUEUE_WORKER).and_then(|value| value.as_bool()) == Some(true),
-        &cfg.project_name,
-    )
-}
-
-pub fn configured_laravel_worker_service(template: &str, worker_enabled: bool, project_name: &str) -> Option<String> {
-    (template == config::LARAVEL_TEMPLATE && worker_enabled).then(|| config::laravel_worker_service_name(project_name))
 }
 
 fn restart_service(service: &str) -> Result<()> {
@@ -94,10 +78,6 @@ fn journal_output(units: &[&str]) -> String {
         Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout).into_owned(),
         _ => String::new(),
     }
-}
-
-fn restart_args(target: &str) -> [&str; 3] {
-    ["restart", "--", target]
 }
 
 pub fn target_name_for_registered_site(site: &str, registered_site: &str) -> Result<String> {

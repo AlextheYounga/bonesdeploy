@@ -22,6 +22,11 @@ pub mod gpg;
 const LOCAL_ENV_SECRET: &str = "infra/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
 
+fn environment_to_push(plaintext: &str) -> Result<&str> {
+    shared_config::validate_dotenv(plaintext)?;
+    Ok(plaintext)
+}
+
 pub fn init() -> Result<()> {
     if !Path::new(paths::LOCAL_INFRA_DIR).is_dir() {
         bail!("Missing infra/ directory\n\n{}", output::next_step("bonesdeploy init"));
@@ -164,10 +169,7 @@ pub async fn push() -> Result<()> {
     let parent_s = ssh::shell_quote(&parent.display().to_string());
     let target_s = ssh::shell_quote(&target.display().to_string());
     let group_s = ssh::shell_quote(&runtime_group);
-    let remote = ssh::run_cmd(&session, &format!("if test -f {target_s}; then cat {target_s}; fi")).await?;
-    let local = fs::read_to_string(paths::DOT_ENV).context("Failed to read local project environment")?;
-    let environment = shared_config::merge_dotenv(&remote, &plaintext)?;
-    let environment = shared_config::merge_dotenv(&environment, &local)?;
+    let environment = environment_to_push(&plaintext)?;
     let cmd = format!(
         "tmp=; trap 'rm -f \"$tmp\"' EXIT; mkdir -p {parent_s} && tmp=$(mktemp {target_s}.XXXXXX) && cat > \"$tmp\" && chown root:{group_s} \"$tmp\" && chmod {DEFAULT_SECRET_MODE} \"$tmp\" && mv \"$tmp\" {target_s} && tmp=",
     );
@@ -176,6 +178,23 @@ pub async fn push() -> Result<()> {
     session.close().await?;
     println!("{} Secrets pushed.", output::success_marker());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+
+    use super::environment_to_push;
+
+    #[test]
+    fn environment_push_uses_the_encrypted_file_without_modification() -> Result<()> {
+        let secrets = "PROJECT_NAME=sveltetest\nHOST=45.33.96.98\nPORT=22\nDATABASE_URL=postgres://localhost/app\n";
+
+        let environment = environment_to_push(secrets)?;
+
+        assert_eq!(environment, secrets);
+        Ok(())
+    }
 }
 
 fn open_editor(path: &Path) -> Result<()> {

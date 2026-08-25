@@ -20,7 +20,7 @@ pub(super) fn questions() -> &'static [Question] {
         Question {
             key: PYTHON_VERSION_KEY,
             label: "Python version",
-            kind: QuestionKind::Choice { choices: &["3.12", "3.13", "3.14"], default: DEFAULT_PYTHON_VERSION },
+            kind: QuestionKind::Choice { choices: &[DEFAULT_PYTHON_VERSION], default: DEFAULT_PYTHON_VERSION },
         },
         Question {
             key: "wsgi_module",

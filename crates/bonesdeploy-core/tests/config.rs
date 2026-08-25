@@ -54,11 +54,6 @@ fn runtime_backend_serializes_as_lowercase_toml() -> Result<()> {
 }
 
 #[test]
-fn laravel_worker_service_name_is_project_scoped() {
-    assert_eq!(config::laravel_worker_service_name("shop"), "shop-worker.service");
-}
-
-#[test]
 fn removed_runtime_shared_configuration_is_rejected() {
     let runtime = Runtime {
         extra: BTreeMap::from([(String::from("shared"), toml::Value::Table(Map::new()))]),
@@ -100,7 +95,7 @@ fn dotenv_rejects_invalid_and_duplicate_keys() -> Result<()> {
 }
 
 #[test]
-fn legacy_preview_domain_is_ignored_and_not_saved() -> Result<()> {
+fn preview_domain_is_ignored_and_not_saved() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join(".env");
     fs::write(&path, "PROJECT_NAME=atlas\nPREVIEW_DOMAIN=atlas.example.nip.io\n")?;
@@ -126,5 +121,20 @@ fn dotenv_merge_preserves_existing_values_and_replaces_overlaid_keys() -> Result
     assert!(merged.contains("PROJECT_NAME=e2evue\n"));
     assert!(!merged.contains("PROJECT_NAME=old\n"));
     assert!(!merged.contains("APP_KEY=old\n"));
+    Ok(())
+}
+
+#[test]
+fn dotenv_round_trips_framework_values() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    let mut config = Bones::default();
+    config.runtime.extra.insert(String::from("is_static"), toml::Value::Boolean(true));
+
+    config::save(&config, &path)?;
+    assert!(fs::read_to_string(&path)?.contains("IS_STATIC=true\n"));
+    let loaded = config::load(&path)?;
+
+    assert_eq!(loaded.runtime.extra.get("is_static"), Some(&toml::Value::Boolean(true)));
     Ok(())
 }

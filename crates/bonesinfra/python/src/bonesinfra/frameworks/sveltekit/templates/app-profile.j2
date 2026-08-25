@@ -20,6 +20,8 @@ profile {{ apparmor_profile_name }} flags=(attach_disconnected,mediate_deleted) 
 
   # current is a symlink, so AppArmor mediates the resolved release path.
   {{ paths.releases }}/*/** r,
+  # The release .env symlink resolves to the protected shared environment.
+  {{ paths.shared_env }} r,
 {% for write_path in apparmor_writable_paths %}
   {{ write_path }}/ rw,
   {{ write_path }}/** rwk,

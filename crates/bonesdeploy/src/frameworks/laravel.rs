@@ -1,5 +1,5 @@
 use super::{FrameworkDefaults, PermissionDefault, Question, QuestionKind, directory, file, non_recursive_file};
-use bonesdeploy_core::config::{LARAVEL_INSTALL_QUEUE_WORKER, Runtime};
+use bonesdeploy_core::config::Runtime;
 
 const PHP_VERSION_KEY: &str = "php_version";
 const DEFAULT_PHP_VERSION: &str = "8.5";
@@ -23,18 +23,11 @@ pub(super) fn defaults() -> FrameworkDefaults {
 }
 
 pub(super) fn questions() -> &'static [Question] {
-    &[
-        Question {
-            key: PHP_VERSION_KEY,
-            label: "PHP version",
-            kind: QuestionKind::Choice { choices: &["8.2", "8.3", "8.4", "8.5"], default: DEFAULT_PHP_VERSION },
-        },
-        Question {
-            key: LARAVEL_INSTALL_QUEUE_WORKER,
-            label: "Install Laravel queue worker?",
-            kind: QuestionKind::Bool { default: false },
-        },
-    ]
+    &[Question {
+        key: PHP_VERSION_KEY,
+        label: "PHP version",
+        kind: QuestionKind::Choice { choices: &["8.2", "8.3", "8.4", "8.5"], default: DEFAULT_PHP_VERSION },
+    }]
 }
 
 pub(super) fn environment_example(project_name: &str, site_url: &str) -> String {

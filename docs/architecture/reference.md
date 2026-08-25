@@ -103,8 +103,8 @@ Serialization crates (`serde`, `toml`), path derivation functions (`paths` modul
 **Extension model:**
 `Runtime.extra` captures framework-specific values into a map. New framework
 configuration fields are added here rather than extending the `Runtime` struct.
-Derived `BONES_*` environment variables (e.g. `BONES_RUNTIME_NODE_VERSION`)
-are extracted from the config at build time.
+Derived `BONES_*` environment variables are extracted from the config at build
+time. Build-only values such as `NODE_VERSION` come directly from `.env.build`.
 
 `Runtime.backend` is the typed `RuntimeBackend` selection (`native` or
 `docker`). `Runtime.permissions` carries framework permission defaults and
@@ -514,7 +514,6 @@ Cli::Remote::Bootstrap
 Cli::Deploy
   └─ commands/deploy.rs::run()
        ├─ revision                    # deployment unit: committed repository revision
-       ├─ secrets::push()             # decrypt + upload .env to shared/.env
        └─ SSH: bonesremote deploy --site <site>
             └─ commands/deploy/lifecycle.rs::run_full()
                  ├─ SiteMutation::acquire(site)   # lock + validate config

@@ -3,7 +3,7 @@ use bonesdeploy_core::config::Runtime;
 use super::{FrameworkDefaults, PermissionDefault, Question, QuestionKind, directory, file};
 
 const RUBY_VERSION_KEY: &str = "ruby_version";
-const DEFAULT_RUBY_VERSION: &str = "3.3";
+const DEFAULT_RUBY_VERSION: &str = "3.3.8";
 const PERMISSIONS: [PermissionDefault; 6] = [
     directory("*", 750, false),
     file("*", 640),
@@ -27,7 +27,7 @@ pub(super) fn questions() -> &'static [Question] {
         Question {
             key: RUBY_VERSION_KEY,
             label: "Ruby version",
-            kind: QuestionKind::Choice { choices: &["3.2", "3.3", "3.4"], default: DEFAULT_RUBY_VERSION },
+            kind: QuestionKind::Choice { choices: &["3.2.8", "3.3.8", "3.4.8"], default: DEFAULT_RUBY_VERSION },
         },
         Question { key: "rails_env", label: "Rails environment", kind: QuestionKind::Text { default: "production" } },
     ]

@@ -24,6 +24,10 @@ fn framework_assets_include_expected_build_content() {
     assert!(nuxt.contains("BONES_RUNTIME_IS_STATIC"));
     assert!(nuxt.contains("corepack pnpm \"$command\""));
     assert!(nuxt.contains("npm run \"$command\""));
+    assert!(
+        kit_asset("deployment/functions.sh")
+            .is_some_and(|functions| { !String::from_utf8_lossy(&functions).contains("BONES_RUNTIME_NODE_VERSION") })
+    );
 }
 
 #[test]
@@ -51,6 +55,10 @@ fn every_framework_has_a_build_environment_example() -> Result<()> {
             .build_environment_example(&Runtime::default())
             .ok_or_else(|| anyhow::anyhow!("{framework} is missing .env.build"))?;
         assert!(content.contains("Committed, non-secret"), "{framework} must include build environment header");
+        assert!(
+            content.contains("# BonesDeploy Infra\nNODE_VERSION=\n"),
+            "{framework} must declare Node in .env.build"
+        );
     }
     Ok(())
 }

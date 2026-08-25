@@ -50,6 +50,7 @@ BonesInfra owns:
 - canonical framework infrastructure and scaffold resources
 - Jinja2 templates used by provisioning
 - runtime package installation
+- Ruby runtime installation from pinned, checksum-verified official source archives
 - runtime services
 - nginx/AppArmor/systemd provisioning details
 
@@ -433,7 +434,7 @@ Responsibilities:
 - create project root
 - create releases directory
 - create shared directory
-- seed blank `shared/.env`
+- create the `shared/` directory without creating `.env`; operators publish the encrypted environment explicitly with `bonesdeploy secrets push`
 - create trusted site registry parent directory
 - seed placeholder release (only repoints `current` at the placeholder when no release exists, so re-running setup never replaces the active release)
 - install deploy authorized key
