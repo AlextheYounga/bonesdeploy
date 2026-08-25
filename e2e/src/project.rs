@@ -144,14 +144,7 @@ impl SampleProject {
         status_ok(status, "bonesdeploy secrets edit")
     }
 
-    pub fn configure_remote_environment(
-        &self,
-        session: &Session,
-        binary: &Path,
-        project_name: &str,
-        host: &str,
-        template: &str,
-    ) -> Result<()> {
+    pub fn configure_remote_environment(&self, session: &Session, binary: &Path, environment: &str) -> Result<()> {
         let editor = self.dir.join(".bones-e2e-environment-editor.sh");
         fs::write(
             &editor,
@@ -159,9 +152,6 @@ impl SampleProject {
         )?;
         fs::set_permissions(&editor, fs::Permissions::from_mode(0o700))?;
 
-        let environment = format!(
-            "PROJECT_NAME={project_name}\nHOST={host}\nPORT=22\nSSH_USER=root\nBRANCH=main\nTEMPLATE={template}\nRUNTIME_BACKEND=native\nWEB_ROOT=public\n"
-        );
         let status = session
             .command(binary)
             .current_dir(&self.dir)

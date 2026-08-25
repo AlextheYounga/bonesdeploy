@@ -21,6 +21,8 @@ mod validation;
 pub use validation::{is_numbered_shell_script, validate_project_name, validate_site_name};
 
 pub const PROJECT_SETUP_ERROR: &str = "root .env and infra/ are required. Run `bonesdeploy init` first.";
+pub const RUNTIME_PYTHON_VERSION: &str = "python_version";
+pub const RUNTIME_RUBY_VERSION: &str = "ruby_version";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]

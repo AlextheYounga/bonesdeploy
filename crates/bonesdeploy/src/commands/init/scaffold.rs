@@ -43,7 +43,7 @@ fn scaffold_custom_provisioning(infra_dir: &Path) -> Result<()> {
     fs::write(custom.join("__init__.py"), "\"\"\"Project-owned provisioning.\"\"\"\n")?;
     fs::write(custom.join("runtime.py"), "def deploy(_ctx):\n    pass\n")?;
     fs::write(
-        custom.join(".gitignore"),
+        custom.join(paths::GITIGNORE_FILE),
         include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../bonesinfra/python/.gitignore")),
     )?;
     fs::write(
