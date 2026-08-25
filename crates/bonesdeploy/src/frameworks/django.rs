@@ -1,7 +1,6 @@
 use super::{FrameworkDefaults, PermissionDefault, Question, QuestionKind, directory, file};
-use bonesdeploy_core::config::Runtime;
+use bonesdeploy_core::config::{RUNTIME_PYTHON_VERSION, Runtime};
 
-const PYTHON_VERSION_KEY: &str = "python_version";
 const DEFAULT_PYTHON_VERSION: &str = "3.14";
 
 const PERMISSIONS: [PermissionDefault; 3] = [directory("*", 750, false), file("*", 640), directory("media", 770, true)];
@@ -10,7 +9,7 @@ pub(super) fn defaults() -> FrameworkDefaults {
     FrameworkDefaults {
         template: "django",
         web_root: "public",
-        language: Some((PYTHON_VERSION_KEY, DEFAULT_PYTHON_VERSION)),
+        language: Some((RUNTIME_PYTHON_VERSION, DEFAULT_PYTHON_VERSION)),
         permissions: &PERMISSIONS,
     }
 }
@@ -18,7 +17,7 @@ pub(super) fn defaults() -> FrameworkDefaults {
 pub(super) fn questions() -> &'static [Question] {
     &[
         Question {
-            key: PYTHON_VERSION_KEY,
+            key: RUNTIME_PYTHON_VERSION,
             label: "Python version",
             kind: QuestionKind::Choice { choices: &[DEFAULT_PYTHON_VERSION], default: DEFAULT_PYTHON_VERSION },
         },
@@ -39,7 +38,7 @@ pub(super) fn environment_example(project_name: &str, _site_url: &str) -> String
 
 pub(super) fn build_environment_example(runtime: &Runtime) -> String {
     let python_version =
-        runtime.extra.get(PYTHON_VERSION_KEY).and_then(|value| value.as_str()).unwrap_or(DEFAULT_PYTHON_VERSION);
+        runtime.extra.get(RUNTIME_PYTHON_VERSION).and_then(|value| value.as_str()).unwrap_or(DEFAULT_PYTHON_VERSION);
     super::render_env_template(
         include_str!("../../assets/frameworks/django/django.env.build.example"),
         &[("{python_version}", python_version)],

@@ -5,7 +5,10 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{RuntimeBackend, environment, is_numbered_shell_script, project_env, runtime_user_for};
+use bonesdeploy_core::config::{
+    RUNTIME_PYTHON_VERSION, RUNTIME_RUBY_VERSION, RuntimeBackend, environment, is_numbered_shell_script, project_env,
+    runtime_user_for,
+};
 use bonesdeploy_core::paths;
 
 use crate::privileges;
@@ -62,8 +65,8 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
         project_root: &cfg.project_root,
         runtime_user: &runtime_user,
         web_root: &web_root,
-        python_version: cfg.runtime.extra.get("python_version").and_then(|value| value.as_str()),
-        ruby_version: cfg.runtime.extra.get("ruby_version").and_then(|version| version.as_str()),
+        python_version: cfg.runtime.extra.get(RUNTIME_PYTHON_VERSION).and_then(|value| value.as_str()),
+        ruby_version: cfg.runtime.extra.get(RUNTIME_RUBY_VERSION).and_then(|version| version.as_str()),
         shared_functions: &shared_functions,
     };
 
