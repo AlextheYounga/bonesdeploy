@@ -19,6 +19,7 @@ struct PrepareScriptEnv<'a> {
     runtime_user: &'a str,
     web_root: &'a str,
     python_version: Option<&'a str>,
+    ruby_version: Option<&'a str>,
     shared_functions: &'a Path,
 }
 
@@ -62,6 +63,7 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
         runtime_user: &runtime_user,
         web_root: &web_root,
         python_version: cfg.runtime.extra.get("python_version").and_then(|value| value.as_str()),
+        ruby_version: cfg.runtime.extra.get("ruby_version").and_then(|version| version.as_str()),
         shared_functions: &shared_functions,
     };
 
@@ -163,6 +165,9 @@ fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &P
 
     if let Some(python_version) = env.python_version {
         command.env("BONES_RUNTIME_PYTHON_VERSION", python_version);
+    }
+    if let Some(ruby_version) = env.ruby_version {
+        command.env("BONES_RUNTIME_RUBY_VERSION", ruby_version);
     }
 }
 

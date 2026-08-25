@@ -219,7 +219,7 @@ Framework templates ship starter overlays that `bonesdeploy init` uses when scaf
 - `frameworks/nuxt/`       → Nuxt (Node)
 - `frameworks/sveltekit/`  → SvelteKit (Node)
 - `frameworks/vue/`        → Vue (Node)
-- `frameworks/rails/`      → Rails (Ruby)
+- `frameworks/rails/`      → Rails (Ruby; supported releases are provisioned from verified source archives)
 
 Django resolves its configured `python_version` minor to a BonesInfra-pinned CPython patch release, verifies the official source archive checksum, and installs it under `/opt/bonesdeploy/python/<patch>`. It never changes Debian's `/usr/bin/python3`; Django releases create their `.venv` with the versioned `python3.<minor>` executable.
 

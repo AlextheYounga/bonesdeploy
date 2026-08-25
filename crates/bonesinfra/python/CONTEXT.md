@@ -50,6 +50,7 @@ BonesInfra owns:
 - canonical framework infrastructure and scaffold resources
 - Jinja2 templates used by provisioning
 - runtime package installation
+- Ruby runtime installation from pinned, checksum-verified official source archives
 - runtime services
 - nginx/AppArmor/systemd provisioning details
 
