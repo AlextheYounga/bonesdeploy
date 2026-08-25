@@ -5,6 +5,7 @@ use bonesdeploy_core::paths;
 use console::style;
 use serde::Deserialize;
 
+use crate::cli::args::ReleasesCommand;
 use crate::config;
 use crate::infra::ssh;
 use crate::ui::output;
@@ -20,6 +21,13 @@ struct Release {
     status: String,
     phase: Option<String>,
     started_at: Option<String>,
+}
+
+pub async fn run(command: Option<&ReleasesCommand>) -> Result<()> {
+    match command {
+        None => list().await,
+        Some(ReleasesCommand::Kill { release }) => kill(release).await,
+    }
 }
 
 pub async fn list() -> Result<()> {

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from bonesinfra.cli.commands.setup import placeholder
+from bonesinfra.cli.commands.site import placeholder
 from bonesinfra.config.context import DeployContext
 
 

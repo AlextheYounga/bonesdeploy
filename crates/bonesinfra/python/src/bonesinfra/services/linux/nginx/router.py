@@ -114,7 +114,7 @@ def setup(ctx, paths, *, nginx_address_families="AF_UNIX", nginx_ip_loopback_onl
         _sudo=True,
     )
 
-    # SSL state comes from bones.toml (app.dns.ssl_enabled), not runtime data —
+    # SSL state comes from the root .env (app.dns.ssl_enabled), not runtime data —
     # SSL is owned by `ssl apply`, not `runtime apply`.
     nginx_ssl_enabled = ctx.app.dns.ssl_enabled and ctx.app.dns.domain
     render_router_config(ctx, paths, ssl_enabled=nginx_ssl_enabled)

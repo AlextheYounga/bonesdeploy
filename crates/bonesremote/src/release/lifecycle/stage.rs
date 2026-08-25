@@ -36,10 +36,7 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
 
 fn require_dir(path: &Path, label: &str) -> Result<()> {
     if !path.is_dir() {
-        bail!(
-            "Site not provisioned: {} does not exist ({label}). Run 'bonesdeploy remote setup' first.",
-            path.display()
-        );
+        bail!("Site not provisioned: {} does not exist ({label}). Run 'bonesdeploy site setup' first.", path.display());
     }
     Ok(())
 }

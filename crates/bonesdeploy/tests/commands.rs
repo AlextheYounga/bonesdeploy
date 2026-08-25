@@ -1,6 +1,6 @@
 use anyhow::Result;
-use bonesdeploy::cli::args::{Cli, Command};
-use bonesdeploy::commands::{doctor, secrets, skill, update};
+use bonesdeploy::cli::args::{Cli, Command, ServerCommand, SiteCommand};
+use bonesdeploy::commands::{secrets, site, skill, update};
 use bonesdeploy::frameworks::Framework;
 use clap::Parser;
 
@@ -28,20 +28,20 @@ fn gpg_fingerprint_parser_preserves_machine_output_behavior() {
 
 #[test]
 fn verbose_remote_report_preserves_pending_state() {
-    assert!(doctor::render_remote_doctor_output(
+    assert!(site::render_remote_doctor_output(
         "bonesremote doctor\n  • deploy branch 'main' has not been pushed yet\n",
         true
     ));
-    assert!(!doctor::render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
+    assert!(!site::render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
 }
 
 #[test]
 fn strip_ansi_removes_sgr_color_sequences() {
     assert_eq!(
-        doctor::strip_ansi("\x1b[1;33m•\x1b[0m deploy branch 'master' has not been pushed yet"),
+        site::strip_ansi("\x1b[1;33m•\x1b[0m deploy branch 'master' has not been pushed yet"),
         "• deploy branch 'master' has not been pushed yet"
     );
-    assert_eq!(doctor::strip_ansi("plain text"), "plain text");
+    assert_eq!(site::strip_ansi("plain text"), "plain text");
 }
 
 #[test]
@@ -57,9 +57,37 @@ fn prompt_free_init_command_parses_with_cli() -> Result<()> {
 }
 
 #[test]
-fn guide_compatibility_command_still_parses() -> Result<()> {
-    let parsed = Cli::try_parse_from(["bonesdeploy", "guide", "--format", "json"])?;
-    assert!(matches!(parsed.command, Command::Guide { .. }));
+fn removed_guide_command_is_rejected() {
+    assert!(Cli::try_parse_from(["bonesdeploy", "guide", "--format", "json"]).is_err());
+}
+
+#[test]
+fn removed_remote_command_is_rejected() {
+    assert!(Cli::try_parse_from(["bonesdeploy", "remote", "bootstrap"]).is_err());
+}
+
+#[test]
+fn removed_flat_status_command_is_rejected() {
+    assert!(Cli::try_parse_from(["bonesdeploy", "status"]).is_err());
+}
+
+#[test]
+fn removed_flat_manifest_command_is_rejected() {
+    assert!(Cli::try_parse_from(["bonesdeploy", "manifest"]).is_err());
+}
+
+#[test]
+fn removed_flat_releases_command_is_rejected() {
+    assert!(Cli::try_parse_from(["bonesdeploy", "releases"]).is_err());
+}
+
+#[test]
+fn server_and_site_commands_parse_under_their_scopes() -> Result<()> {
+    let server = Cli::try_parse_from(["bonesdeploy", "server", "setup", "--yes"])?;
+    assert!(matches!(server.command, Command::Server { command: ServerCommand::Setup { yes: true } }));
+
+    let site = Cli::try_parse_from(["bonesdeploy", "site", "doctor", "--local"])?;
+    assert!(matches!(site.command, Command::Site { command: SiteCommand::Doctor { local: true, .. } }));
     Ok(())
 }
 

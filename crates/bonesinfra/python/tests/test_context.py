@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from bonesinfra.config.context import DeployContext, template_data
+from bonesinfra.config.context import DeployContext, ServerContext, template_data
 
 
 def _write_config(tmp_path: Path, extra: str = "") -> Path:
@@ -30,8 +30,8 @@ def test_reads_nested_single_file_config(tmp_path):
     assert ctx.app.project_name == "lawsnipe"
     assert ctx.app.repo_path == "/home/git/lawsnipe.git"
     assert ctx.app.project_root == "/srv/sites/lawsnipe"
-    assert ctx.app.server.host == "example.com"
-    assert ctx.app.server.port == "2222"
+    assert ctx.server.host == "example.com"
+    assert ctx.server.port == "2222"
     assert ctx.paths.repo == "/home/git/lawsnipe.git"
     assert ctx.paths.project_root == "/srv/sites/lawsnipe"
     assert ctx.paths.current_web_root == "/srv/sites/lawsnipe/current/dist"
@@ -78,7 +78,7 @@ def test_missing_nested_tables_use_defaults(tmp_path):
     path.write_text("PROJECT_NAME=lawsnipe\n")
     ctx = DeployContext.from_files(str(path))
     assert ctx.app.deploy.branch == "main"
-    assert ctx.app.server.host == ""
+    assert ctx.server.host == ""
     assert ctx.app.repo_path == "/home/git/lawsnipe.git"
     assert ctx.app.project_root == "/srv/sites/lawsnipe"
     assert ctx.runtime.web_root == "public"
@@ -109,7 +109,7 @@ def test_dotenv_parser_ignores_comments_and_unquotes_values(tmp_path):
     ctx = DeployContext.from_files(str(path))
 
     assert ctx.app.project_name == "lawsnipe"
-    assert ctx.app.server.host == "example.com"
+    assert ctx.server.host == "example.com"
     assert ctx.runtime.data["custom"] == "value"
 
 
@@ -149,3 +149,11 @@ def test_project_identity_matches_remote_validation(tmp_path, project_name):
 
     with pytest.raises(ValueError, match="Invalid project name"):
         DeployContext.from_files(str(path))
+
+
+def test_server_context_uses_only_connection_values(tmp_path):
+    path = _write_config(tmp_path, "INVALID_RUNTIME=value\n")
+
+    ctx = ServerContext.from_files(str(path))
+
+    assert (ctx.host, ctx.ssh_user, ctx.port) == ("example.com", "root", "2222")

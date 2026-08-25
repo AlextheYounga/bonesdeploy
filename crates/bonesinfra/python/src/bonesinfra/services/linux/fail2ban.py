@@ -11,7 +11,7 @@ def configure(ctx):
         "Install fail2ban jail.local",
         ASSETS_DIR / "fail2ban/jail.local.j2",
         FAIL2BAN_JAIL_LOCAL,
-        ssh_port=int(ctx.app.server.port),
+        ssh_port=int(ctx.port),
     )
 
     systemd.service(

@@ -1,42 +1,11 @@
-use std::path::Path;
-
 use anyhow::{Context, Result};
-use bonesdeploy_core::paths;
-use console::style;
 
-use crate::commands::{doctor, remote};
-use crate::config;
+use crate::commands::{server, site};
 use crate::ui::output;
 
 pub async fn run(skip_confirm: bool) -> Result<()> {
-    let bones_toml = Path::new(paths::DOT_ENV);
-    let cfg = config::load(bones_toml)?;
-
-    println!("{} {}", style("Setting up").cyan().bold(), style(&cfg.host).bold());
-
-    remote::bootstrap::run(skip_confirm, false).with_context(|| setup_error("bootstrapping remote server"))?;
-    remote::services::run(true, false).with_context(|| setup_error("provisioning services"))?;
-    remote::runtime::run(true, false).with_context(|| setup_error("applying runtime"))?;
-    let pending_first_push = doctor::run(false, false).await.with_context(|| setup_error("checking deployment"))?;
-
-    println!();
-    println!("{} Setup complete.", output::success_marker());
-    println!();
-    if pending_first_push {
-        println!(
-            "{}",
-            output::next_step_with_detail(
-                &format!("git push {} {}", cfg.remote_name, cfg.branch),
-                "to publish the first deploy branch",
-            )
-        );
-    } else if cfg.ssl_enabled {
-        println!("{}", output::next_step("bonesdeploy deploy"));
-    } else {
-        println!("{}", output::next_step_with_detail("bonesdeploy remote ssl", "to configure HTTPS"));
-    }
-
-    Ok(())
+    server::setup(skip_confirm).await.with_context(|| setup_error("setting up the server baseline"))?;
+    site::setup(skip_confirm).await.with_context(|| setup_error("setting up the site"))
 }
 
 fn setup_error(step: &str) -> String {

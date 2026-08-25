@@ -6,12 +6,13 @@ use std::process::{self, Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::config::environment;
+use bonesdeploy_core::paths;
 
 use super::build_user::{BuildScriptEnv, build_script_command, build_user_command, build_user_control_command};
 use super::ownership;
 use crate::release::output;
 
-pub const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
+pub const BUILD_IMAGE: &str = paths::IMAGE_STORE_BASE_IMAGE;
 
 pub fn service_command(build_user: &str, container_name: &str) -> Command {
     let mut command = Command::new("systemd-run");

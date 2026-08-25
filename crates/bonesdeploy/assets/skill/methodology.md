@@ -22,7 +22,7 @@ runtime group inherit read access without a post-deploy `chown`.
 ## Permissions are a provisioning-time contract
 
 Not a deployment-time repair. The ownership layout is established once
-during `bonesdeploy remote bootstrap` and never rewritten by deploy
+during `bonesdeploy server setup` and never rewritten by deploy
 commands. If you find yourself wanting to `chmod` during a deploy, you are
 fixing the wrong thing. Fix the provisioning.
 

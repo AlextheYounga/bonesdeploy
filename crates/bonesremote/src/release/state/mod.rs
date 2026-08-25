@@ -78,7 +78,7 @@ impl DeploymentLock {
         match file.try_lock() {
             Ok(()) => Ok(Self(file)),
             Err(TryLockError::WouldBlock) => {
-                bail!("A deployment is already running for {site}. Run 'bonesdeploy releases' to inspect it.")
+                bail!("A deployment is already running for {site}. Run 'bonesdeploy site releases' to inspect it.")
             }
             Err(TryLockError::Error(error)) => {
                 Err(error).with_context(|| format!("Failed to lock deployment state for {site}"))

@@ -1,7 +1,7 @@
 import pytest
 from jinja2 import Template
 
-from bonesinfra.cli.commands.setup.users import (
+from bonesinfra.cli.commands.site.users import (
     _BUILD_MEMORY_MAX_PERCENT,
     _BUILD_MEMORY_SWAP_MAX,
     build_cache_for,

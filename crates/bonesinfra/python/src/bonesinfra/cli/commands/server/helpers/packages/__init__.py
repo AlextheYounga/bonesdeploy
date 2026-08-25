@@ -1,6 +1,6 @@
 from pyinfra.operations import apt, server
 
-from bonesinfra.cli.commands.helpers.packages import neovim, rainfrog, starship
+from bonesinfra.cli.commands.server.helpers.packages import neovim, rainfrog, starship
 from bonesinfra.config.paths import SCRIPTS_DIR
 
 HELPER_APT_PACKAGES: list[str] = [

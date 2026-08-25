@@ -57,6 +57,7 @@ MIN_QUOTED_VALUE_LENGTH = 2
 
 @dataclass
 class DeployContext:
+    server: ServerContext
     app: AppConfig
     runtime: RuntimeConfig
     services: ServicesConfig
@@ -71,11 +72,6 @@ class DeployContext:
             project_name=project_name,
             repo_path=f"{DEFAULT_REPO_PARENT}/{project_name}.git",
             project_root=f"{DEFAULT_PROJECT_ROOT_PARENT}/{project_name}",
-            server=ServerConfig(
-                host=values.get(HOST, ""),
-                ssh_user=values.get(SSH_USER, DEFAULT_SSH_USER),
-                port=values.get(PORT, DEFAULT_SSH_PORT),
-            ),
             dns=DnsConfig(
                 domain=values.get(DOMAIN, ""),
                 preview_domain=values.get(PREVIEW_DOMAIN, ""),
@@ -95,7 +91,7 @@ class DeployContext:
 
         services_value = values.get(SERVICES, "")
         services = ServicesConfig(services=_database_services(services_value.split(",") if services_value else []))
-        return cls(app=app, runtime=runtime, services=services)
+        return cls(server=ServerContext.from_values(values), app=app, runtime=runtime, services=services)
 
     @property
     def paths(self) -> DeploymentPaths:
@@ -140,7 +136,7 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
         "runtime_group": ctx.runtime.runtime_group,
         "runtime_backend": ctx.runtime.backend,
         "project_root_parent": paths["project_root_parent"],
-        "ssh_port": int(ctx.app.server.port),
+        "ssh_port": int(ctx.server.port),
         "paths": paths,
         "ssl_domain": ctx.app.dns.domain,
         "ssl_email": ctx.app.dns.email,
@@ -160,16 +156,27 @@ class AppConfig:
     project_name: str
     repo_path: str
     project_root: str
-    server: ServerConfig
     dns: DnsConfig
     deploy: DeployConfig
 
 
 @dataclass
-class ServerConfig:
+class ServerContext:
     ssh_user: str
     host: str
     port: str
+
+    @classmethod
+    def from_files(cls, config_path: str) -> ServerContext:
+        return cls.from_values(read_dotenv(Path(config_path).read_text()))
+
+    @classmethod
+    def from_values(cls, values: dict[str, str]) -> ServerContext:
+        return cls(
+            host=values.get(HOST, ""),
+            ssh_user=values.get(SSH_USER, DEFAULT_SSH_USER),
+            port=values.get(PORT, DEFAULT_SSH_PORT),
+        )
 
 
 @dataclass

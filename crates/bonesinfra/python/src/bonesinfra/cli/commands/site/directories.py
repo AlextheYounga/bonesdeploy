@@ -97,9 +97,9 @@ def setup_repo_and_project(ctx, paths):
 def _shared_config_content(ctx):
     values = {
         "PROJECT_NAME": ctx.app.project_name,
-        "HOST": ctx.app.server.host,
-        "PORT": ctx.app.server.port,
-        "SSH_USER": ctx.app.server.ssh_user,
+        "HOST": ctx.server.host,
+        "PORT": ctx.server.port,
+        "SSH_USER": ctx.server.ssh_user,
         "BRANCH": ctx.app.deploy.branch,
         "DOMAIN": ctx.app.dns.domain,
         "PREVIEW_DOMAIN": ctx.app.dns.preview_domain,

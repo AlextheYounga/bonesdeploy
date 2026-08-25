@@ -19,10 +19,16 @@ def _run_no_input(*args):
     )
 
 
-def test_setup_apply_rejects_missing_host():
-    result = _run_no_input("setup", "apply", "--env-file", "/dev/null", "--bonesremote-version", "0.7.3")
+def test_server_apply_rejects_missing_host():
+    result = _run_no_input("server", "apply", "--env-file", "/dev/null", "--bonesremote-version", "0.7.3")
     assert result.returncode == 3, f"Expected exit 3 for missing host, got {result.returncode}"
     assert "missing host" in result.stderr.lower()
+
+
+def test_setup_apply_command_is_removed():
+    result = _run_no_input("setup", "apply", "--env-file", "/dev/null", "--bonesremote-version", "0.7.3")
+    assert result.returncode != 0, f"Expected non-zero exit for removed setup command, got {result.returncode}"
+    assert "no such command" in result.stderr.lower()
 
 
 def test_runtime_apply_rejects_missing_host():

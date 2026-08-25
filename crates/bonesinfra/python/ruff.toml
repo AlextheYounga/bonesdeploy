@@ -95,10 +95,13 @@ combine-as-imports = true
   "PLR0913", # render_router_config() accepts many keyword-only args naturally
 ]
 "src/bonesinfra/services/runtime/__init__.py" = ["T20"]
-"src/bonesinfra/cli/commands/setup/bonesremote.py" = [
+"src/bonesinfra/cli/commands/server/bonesremote.py" = [
   "S604",    # pyinfra.server.user with shell=True is standard
 ]
-"src/bonesinfra/cli/commands/setup/users.py" = [
+"src/bonesinfra/cli/commands/server/users.py" = [
+  "S604",    # pyinfra.server.user with shell=True is standard
+]
+"src/bonesinfra/cli/commands/site/users.py" = [
   "S604",    # pyinfra.server.user with shell=True is standard
 ]
 "src/bonesinfra/cli/commands/ssl/__init__.py" = [

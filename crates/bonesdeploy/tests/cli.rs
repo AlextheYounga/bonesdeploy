@@ -5,7 +5,7 @@ use anyhow::Result;
 #[test]
 fn doctor_accepts_verbose_flag() -> Result<()> {
     let env = common::TestEnv::new()?;
-    let output = env.run(&["doctor", "--local", "--verbose"])?;
+    let output = env.run(&["site", "doctor", "--local", "--verbose"])?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Checking deployment"), "doctor should run with --verbose: {stdout}");
@@ -15,9 +15,9 @@ fn doctor_accepts_verbose_flag() -> Result<()> {
 }
 
 #[test]
-fn manifest_accepts_json_format_and_reports_missing_config() -> Result<()> {
+fn site_manifest_accepts_json_format_and_reports_missing_config() -> Result<()> {
     let env = common::TestEnv::new()?;
-    let output = env.run(&["manifest", "--format", "json"])?;
+    let output = env.run(&["site", "manifest", "--format", "json"])?;
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);

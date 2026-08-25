@@ -28,7 +28,9 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     let active = release_state::read_active_deployment(site)?;
     if let Some(active) = &active {
         if active.release() != release {
-            bail!("Release {release} is not the active deployment. Run 'bonesdeploy releases' to inspect releases.");
+            bail!(
+                "Release {release} is not the active deployment. Run 'bonesdeploy site releases' to inspect releases."
+            );
         }
         if active.phase().may_have_mutated_runtime() && list::process_matches(active) {
             bail!(
@@ -39,7 +41,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
             terminate_deployment(active)?;
         }
     } else if release_state::read_staged_release(site).ok().as_deref() != Some(release) {
-        bail!("Release {release} is not building or interrupted. Run 'bonesdeploy releases' to inspect releases.");
+        bail!("Release {release} is not building or interrupted. Run 'bonesdeploy site releases' to inspect releases.");
     }
 
     let lock = DeploymentLock::acquire(site)?;

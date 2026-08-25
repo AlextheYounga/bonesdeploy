@@ -8,42 +8,42 @@ ECS. Not Nomad. A real Linux box, a dedicated runtime user per project, systemd,
 nginx, and a rootless Podman build container. That's the whole stage. Everything
 else is a recovery or inspection move.
 
-The beauty is in the constraints. There are exactly five moves that matter.
+The beauty is in the constraints. There are exactly six moves that matter.
 Everything else is recovery or inspection. Learn the moves and you can operate
 any bonesdeploy project without reading a single line of YAML.
 
-## The five moves
+## The six moves
 
 1. `bonesdeploy init` — claim a project, point it at a fresh VPS, pick a
    framework template. Non-interactive agents: pass `--template <name>` and
    `--framework-var key=value` (see `bonesdeploy skill doc templates` for
    every template and every variable).
-2. `bonesdeploy setup --yes` — provision the server in one shot: bootstrap
-   (users, bare repo, `bonesremote`), runtime (nginx, app service, AppArmor),
-   `.bones/` sync, and `doctor`. One command. Don't split it unless something
-   fails. If it does, re-run `setup` after you fix the cause — it's idempotent.
-3. `git push <remote> <branch>` — publish the source so `bonesremote` has
+2. `bonesdeploy server setup --yes` — provision the shared host baseline once:
+   packages, hardening, image store, deploy identity, BonesRemote, and sudoers.
+   It is independent of every site's framework and runtime settings.
+3. `bonesdeploy site setup --yes` — verify server readiness, then provision one
+   site in this exact order: site base, services, runtime, and doctor. It never
+   pushes Git or secrets, configures SSL, or deploys a release.
+4. `git push <remote> <branch>` — publish the source so `bonesremote` has
    something to build. Required once, before the first deploy.
-4. `bonesdeploy remote ssl --yes --domain app.example.com --email ops@example.com`
+5. `bonesdeploy site ssl --yes --domain app.example.com --email ops@example.com`
    — TLS. Separate from `setup` because certificate concerns and runtime
    concerns are different concerns.
-5. `bonesdeploy deploy` — ship the release.
+6. `bonesdeploy deploy` — ship the release.
 
 That's a deployment. In between, you repeat move five. Nothing else matters
 until move five works.
 
-Note: `bonesdeploy setup` already runs `remote runtime` for you. You only run
-`bonesdeploy remote runtime --yes` on its own when you're changing the
-framework template on an already-provisioned box.
+`bonesdeploy setup --yes` remains an idempotent convenience command that runs
+server setup and site setup in sequence. On an already prepared shared host,
+start directly with site setup. Run
+`bonesdeploy site runtime --yes` separately when reapplying an existing site.
 
 ## What you actually own
 
-A directory called `.bones/` in your repo. It's a symlink to
-`~/.config/bonesdeploy/projects/<project>.bones/`. Inside:
-
-- `bones.toml` — the project's configuration. Edit it by hand. It's the source of truth.
-- `deployment/build/NN_*.sh` — runs in a container during build.
-- `deployment/prepare/NN_*.sh` — runs as the runtime user before activation.
+A root `.env` holds local connection and site inputs. `infra/` holds the
+committed project infrastructure, and `deployment/{build,prepare}/NN_*.sh`
+holds the ordered build and prepare scripts.
 
 That's it. You don't write Kubernetes YAML. You don't write Dockerfiles. You
 write shell scripts, numbered, in lexical order. The constraint is the feature.
@@ -53,15 +53,15 @@ write shell scripts, numbered, in lexical order. The constraint is the feature.
 - `bonesdeploy skill next` — the next prompt-free command to run. This is your
   compass. It knows whether you're uninitialized, half-provisioned, missing
   TLS, or ready to ship. Ask it first. Ask it often.
-- `bonesdeploy status` — the live picture: current release, SSL, services.
-- `bonesdeploy doctor` — local + remote health. Exit code tells you everything.
-- `bonesdeploy releases` — what's on the box: `active`, `previous`, `building`,
+- `bonesdeploy site status` — the live picture: current release, SSL, services.
+- `bonesdeploy doctor` — server + site health. Exit code tells you everything.
+- `bonesdeploy site releases` — what's on the box: `active`, `previous`, `building`,
   `preparing`, `interrupted`.
 
 ## How to recover
 
 - `bonesdeploy rollback` — repoint `current` to the previous release. One command.
-- `bonesdeploy releases kill <release>` — cancel a stuck build.
+- `bonesdeploy site releases kill <release>` — cancel a stuck build.
 - `bonesdeploy pull` — restore local `.bones/` from remote site state.
 
 ## How to push secrets
@@ -70,7 +70,7 @@ write shell scripts, numbered, in lexical order. The constraint is the feature.
 - `bonesdeploy secrets edit` — decrypt, edit, re-encrypt.
 - `bonesdeploy secrets push` — ship the decrypted `.env` to remote `shared/.env`.
 
-Never commit plaintext secrets. Never put secret values in `bones.toml`. Use
+Never commit plaintext secrets. Never put secret values in `.env`. Use
 `.env.build` for committed public build values; use `shared/.env` for runtime
 secrets via `bonesdeploy secrets push`.
 

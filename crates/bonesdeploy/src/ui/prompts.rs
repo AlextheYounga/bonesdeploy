@@ -228,23 +228,27 @@ pub fn prompt_port(
         .map_err(|err| anyhow!(err))
 }
 
-pub fn confirm_remote_setup() -> Result<bool> {
-    confirm_prompt("Bootstrap remote server?", "Remote bootstrap prepares the VPS for this project.")
+pub fn confirm_server_setup() -> Result<bool> {
+    confirm_prompt("Set up server baseline?", "Server setup prepares the VPS host for all projects.")
 }
 
-pub fn confirm_remote_runtime() -> Result<bool> {
+pub fn confirm_site_setup() -> Result<bool> {
+    confirm_prompt("Set up site?", "Site setup provisions this project on the server after the baseline is ready.")
+}
+
+pub fn confirm_site_runtime() -> Result<bool> {
     confirm_prompt("Apply runtime setup?", "Runtime setup installs app services for this project.")
 }
 
-pub fn confirm_remote_ssl() -> Result<bool> {
+pub fn confirm_site_ssl() -> Result<bool> {
     confirm_prompt("Configure HTTPS?", "HTTPS requires DNS to point at this server.")
 }
 
-pub fn confirm_remote_helpers() -> Result<bool> {
-    confirm_prompt("Install remote helper tools?", "Helper tools install shell and editor utilities on the server.")
+pub fn confirm_server_helpers() -> Result<bool> {
+    confirm_prompt("Install server helper tools?", "Helper tools install shell and editor utilities on the server.")
 }
 
-pub fn confirm_remote_services() -> Result<bool> {
+pub fn confirm_site_services() -> Result<bool> {
     confirm_prompt("Provision services?", "Services will be bound to localhost and credentials written to shared/.env.")
 }
 

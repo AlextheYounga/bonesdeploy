@@ -11,7 +11,8 @@ execution uses the embedded copy.
 
 ## Interface
 
-- `bonesinfra setup apply --env-file <.env>`
+- `bonesinfra server apply --env-file <.env> --bonesremote-version <version>`
+- `bonesinfra site apply --env-file <.env>`
 - `bonesinfra runtime apply --env-file <.env>`
 - `bonesinfra ssl apply --env-file <.env>`
 - `bonesinfra helpers apply --env-file <.env>`

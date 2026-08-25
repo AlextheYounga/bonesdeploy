@@ -2,14 +2,18 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
+use bonesdeploy_core::{config::is_numbered_shell_script, paths};
 
 use crate::config;
 use crate::infra::{git, ssh};
 use crate::ui::output;
-use bonesdeploy_core::{config::is_numbered_shell_script, paths};
 
-pub async fn run(local_only: bool, verbose: bool) -> Result<bool> {
-    println!("{} Checking deployment...", console::style("bonesdeploy doctor").bold());
+pub async fn run(local_only: bool, verbose: bool) -> Result<()> {
+    run_with_pending(local_only, verbose).await.map(|_| ())
+}
+
+pub(super) async fn run_with_pending(local_only: bool, verbose: bool) -> Result<bool> {
+    println!("{} Checking deployment...", console::style("bonesdeploy site doctor").bold());
 
     let cfg = config::load(Path::new(paths::DOT_ENV)).ok();
     let mut issues = 0usize;
@@ -61,8 +65,11 @@ async fn check_remote(cfg: Option<&config::Bones>, verbose: bool) -> (usize, boo
             );
             if remote_ssh_issue.is_none() {
                 let (remote_issue, pending) = check_remote_doctor(cfg, verbose).await;
-                issues +=
-                    print_check("remote doctor", remote_issue, Some(output::run_command("bonesdeploy remote setup")));
+                issues += print_check(
+                    "remote doctor",
+                    remote_issue,
+                    Some(output::run_command("bonesdeploy site setup --yes")),
+                );
                 return (issues, pending);
             }
             (issues, false)
@@ -167,14 +174,13 @@ fn check_local_branch(cfg: &config::Bones) -> Option<String> {
     match git::branch_exists(&cfg.branch) {
         Ok(true) => None,
         Ok(false) => Some(format!("Local branch '{}' does not exist", cfg.branch)),
-        Err(error) => Some(format!("Unable to inspect git branch '{}': {error}", cfg.branch)),
+        Err(error) => Some(format!("Unable to inspect local branch '{}': {error}", cfg.branch)),
     }
 }
 
 async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
     match ssh::connect(cfg).await {
         Ok(session) => {
-            // This check only asks whether SSH can connect; ignore failure while closing the test session.
             let _ = session.close().await;
             None
         }
@@ -189,53 +195,13 @@ async fn check_remote_doctor(cfg: &config::Bones, verbose: bool) -> (Option<Stri
     };
     let command = format!("bonesremote doctor --site {}", cfg.project_name);
     let result = ssh::run_cmd(&session, &command).await;
-    // The remote command has finished; ignore failure while closing this short-lived SSH session.
     let _ = session.close().await;
 
     match result {
         Ok(output) => {
-            let pending = render_remote_doctor_output(&output, verbose);
+            let pending = output::render_remote_doctor_output(&output, verbose);
             (None, pending)
         }
         Err(error) => (Some(format!("remote doctor failed\n  {error}")), false),
     }
-}
-
-pub fn render_remote_doctor_output(output: &str, verbose: bool) -> bool {
-    let pending = output.contains("has not been pushed yet");
-    if verbose {
-        print!("{output}");
-        if !output.is_empty() && !output.ends_with('\n') {
-            println!();
-        }
-    } else if pending {
-        for line in output.lines().filter(|line| line.contains("has not been pushed yet")) {
-            let clean = strip_ansi(line);
-            let clean = clean.trim().strip_prefix('•').map_or(clean.trim(), str::trim_start);
-            println!("{} {}", output::pending_marker(), clean);
-        }
-    }
-    pending
-}
-
-pub fn strip_ansi(input: &str) -> String {
-    let chars: Vec<char> = input.chars().collect();
-    let mut out = String::with_capacity(input.len());
-    let mut i = 0;
-    while i < chars.len() {
-        if chars[i] == '\x1b' {
-            i += 1;
-            if i < chars.len() && chars[i] == '[' {
-                i += 1;
-                while i < chars.len() && !('@'..='~').contains(&chars[i]) {
-                    i += 1;
-                }
-                i += 1;
-            }
-            continue;
-        }
-        out.push(chars[i]);
-        i += 1;
-    }
-    out
 }

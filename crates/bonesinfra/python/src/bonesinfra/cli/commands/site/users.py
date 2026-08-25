@@ -5,8 +5,6 @@ from pyinfra.facts.hardware import Cpus
 from pyinfra.facts.server import Users
 from pyinfra.operations import server
 
-from bonesinfra.cli.commands.setup.image_store import BASE_IMAGE
-from bonesinfra.config.context import DEPLOY_USER
 from bonesinfra.config.paths import (
     ASSETS_DIR,
     BUILD_CACHE_NAME,
@@ -16,6 +14,7 @@ from bonesinfra.config.paths import (
     SCRIPTS_DIR,
 )
 from bonesinfra.pyinfra.operations import mkdir, render
+from bonesinfra.services.linux.image_store import BASE_IMAGE
 
 _BUILD_CPU_QUOTA_PERCENT = 80
 _BUILD_MEMORY_HIGH_PERCENT = 80
@@ -117,15 +116,6 @@ def ensure_users_and_groups(ctx):
 
 
 def _ensure_site_identities(ctx, host, build_group):
-
-    server.user(
-        name="Ensure deploy user exists",
-        user=DEPLOY_USER,
-        shell="/bin/bash",
-        ensure_home=True,
-        _sudo=True,
-    )
-
     server.group(
         name="Ensure runtime group exists",
         group=ctx.runtime.runtime_group,
@@ -255,16 +245,4 @@ def _verify_build_user(build_user, build_home):
         _sudo=True,
         _sudo_user=build_user,
         _chdir=build_home,
-    )
-
-
-def install_authorized_key(ctx):
-    deploy_user = DEPLOY_USER
-    ssh_user = ctx.app.server.ssh_user
-    server.script_template(
-        name=f"Copy {ssh_user} SSH key to deploy user {deploy_user}",
-        src=str(SCRIPTS_DIR / "copy-ssh-authorized-keys.sh.j2"),
-        deploy_user=deploy_user,
-        ssh_user=ssh_user,
-        _sudo=True,
     )

@@ -170,7 +170,7 @@ Install the remote runner on the server:
 sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
-Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy init` remote setup.
+Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy server setup`.
 
 ## Start a Project
 
@@ -208,7 +208,7 @@ Edit them.
 Commit them.
 Read them when something breaks.
 
-The managed framework is executed when you invoke `bonesdeploy remote runtime`.
+The managed framework is executed when you invoke `bonesdeploy site runtime`.
 The project-owned `infra/custom/` package is composed after the managed
 framework. Edit custom provisioning and local templates as project
 infrastructure; use `bonesdeploy update` to refresh the managed snapshot.
@@ -223,27 +223,31 @@ Deployment scripts run in filename order:
 
 ## Set Up the Server
 
-Provision the base server:
+Provision the reusable server baseline:
 
 ```sh
-bonesdeploy remote setup
+bonesdeploy server setup --yes
 ```
 
-Provision the site runtime:
+Provision the site, including its base, services, runtime, and doctor:
 
 ```sh
-bonesdeploy remote runtime
+bonesdeploy site setup --yes
 ```
+
+`site setup` runs exactly server readiness, site base provisioning, services,
+runtime, and site doctor. It does not push Git or secrets, configure SSL, or
+deploy a release.
 
 This runs the provisioning in your project's `infra/.framework/` package:
 framework services, per-site nginx, AppArmor, and your `infra/custom/` project
 extensions. Templates rendered by the managed framework come from
 `infra/.framework/src/bonesinfra/frameworks/<name>/templates/`.
 
-Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
+Database services selected at init are provisioned by `bonesdeploy site setup`, or later with:
 
 ```sh
-bonesdeploy remote services
+bonesdeploy site services --yes
 ```
 
 Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Generated credentials live in the protected remote `shared/.env`, never in Git. MariaDB and MySQL are alternatives and cannot share one host.
@@ -251,7 +255,7 @@ Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. T
 Add SSL after DNS points at the server:
 
 ```sh
-bonesdeploy remote ssl --domain app.example.com --email ops@example.com
+bonesdeploy site ssl --domain app.example.com --email ops@example.com
 ```
 
 SSL is separate on purpose. Get the site working first. Add certificates after DNS is real.
@@ -273,13 +277,13 @@ bonesdeploy rollback
 Inspect releases, including a release that is currently building:
 
 ```sh
-bonesdeploy releases
+bonesdeploy site releases
 ```
 
 Cancel a named building or interrupted release and clean its temporary build state:
 
 ```sh
-bonesdeploy releases kill 20260715_225306
+bonesdeploy site releases kill 20260715_225306
 ```
 
 Check the setup:
@@ -288,10 +292,10 @@ Check the setup:
 bonesdeploy doctor
 ```
 
-Check only the local side:
+Check only the local site side:
 
 ```sh
-bonesdeploy doctor --local
+bonesdeploy site doctor --local
 ```
 
 `doctor` reports three states: green checks are healthy, yellow pending items
@@ -309,8 +313,8 @@ declared by the managed framework manifest, the configured services, and the SSL
 strategy without changing the server:
 
 ```sh
-bonesdeploy manifest
-bonesdeploy manifest --format json
+bonesdeploy site manifest
+bonesdeploy site manifest --format json
 ```
 
 The manifest reports present, missing, and wrong-kind paths, plus active and

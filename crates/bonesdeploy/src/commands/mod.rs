@@ -1,14 +1,11 @@
 pub mod deploy;
-pub mod doctor;
 pub mod init;
-pub mod manifest;
-pub mod releases;
-pub mod remote;
 pub mod rollback;
 pub mod secrets;
+pub mod server;
 pub mod setup;
+pub mod site;
 pub mod skill;
-pub mod status;
 pub mod update;
 pub mod version;
 

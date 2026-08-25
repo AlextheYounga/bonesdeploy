@@ -82,5 +82,8 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
 
 fn print_follow_up_hint() {
     println!();
-    println!("{}", output::next_step_with_detail("bonesdeploy setup", "to setup the remote server"));
+    println!(
+        "{}",
+        output::next_step_with_detail("bonesdeploy server setup", "to provision the shared server baseline")
+    );
 }
