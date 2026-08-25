@@ -55,9 +55,10 @@ fn every_framework_has_a_build_environment_example() -> Result<()> {
             .build_environment_example(&Runtime::default())
             .ok_or_else(|| anyhow::anyhow!("{framework} is missing .env.build"))?;
         assert!(content.contains("Committed, non-secret"), "{framework} must include build environment header");
-        if matches!(framework.as_str(), "next" | "nuxt" | "sveltekit" | "vue") {
-            assert!(content.contains("NODE_VERSION=24.19.0"), "{framework} must pin Node in .env.build");
-        }
+        assert!(
+            content.contains("# BonesDeploy Infra\nNODE_VERSION=\n"),
+            "{framework} must declare Node in .env.build"
+        );
     }
     Ok(())
 }

@@ -81,7 +81,7 @@ Python infra scripts and templates live in the `bonesinfra` crate (`crates/bones
 ### Project Environment
 `bonesdeploy init` collects project settings and writes the canonical flat root `.env`. It includes the project name, SSH connection, deployment branch, domain, selected framework, web root, and services.
 
-Build-only public settings live in the committed `.env.build`. Node-based framework templates include `NODE_VERSION=24.19.0`; this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository. Provisioning uses the same `24.19.0` default.
+Build-only public settings live in the committed `.env.build`. Framework templates declare `NODE_VERSION`; when set, this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository. Provisioning defaults to `24.19.0`.
 
 `[services].services` is selected during init (or with repeated non-interactive `--service` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost, generates credentials on the host, and writes connection values only to the protected `shared/.env`. Redis and Valkey use separate per-project instances; PostgreSQL, MariaDB, MySQL, and MongoDB use database-scoped accounts. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
 

@@ -31,6 +31,11 @@ fn skips_comments_and_blank_lines() -> Result<()> {
 }
 
 #[test]
+fn default_content_declares_node_version() {
+    assert!(env_build::default_content().contains("# BonesDeploy Infra\nNODE_VERSION=\n"));
+}
+
+#[test]
 fn rejects_invalid_keys() {
     assert!(env_build::parse("1BAD=value").is_err());
     assert!(env_build::parse("BAD-KEY=value").is_err());

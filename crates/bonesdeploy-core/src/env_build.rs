@@ -9,6 +9,8 @@ use crate::paths;
 const ENV_BUILD_HEADER: &str = "\
 # Committed, non-secret values used while building this project.
 # Do not place passwords, tokens, or private keys here.
+# BonesDeploy Infra
+NODE_VERSION=
 ";
 
 /// Returns the default content for a fresh `.env.build` file.
