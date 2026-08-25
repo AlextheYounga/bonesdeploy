@@ -18,6 +18,7 @@ struct PrepareScriptEnv<'a> {
     project_root: &'a str,
     runtime_user: &'a str,
     web_root: &'a str,
+    ruby_version: Option<&'a str>,
     shared_functions: &'a Path,
 }
 
@@ -60,6 +61,7 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
         project_root: &cfg.project_root,
         runtime_user: &runtime_user,
         web_root: &web_root,
+        ruby_version: cfg.runtime.extra.get("ruby_version").and_then(|version| version.as_str()),
         shared_functions: &shared_functions,
     };
 
@@ -158,6 +160,9 @@ fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &P
         .env(environment::REPO_PATH, "")
         .env(project_env::WEB_ROOT, env.web_root)
         .env(environment::SERVICE_USER, env.runtime_user);
+    if let Some(ruby_version) = env.ruby_version {
+        command.env("BONES_RUNTIME_RUBY_VERSION", ruby_version);
+    }
 }
 
 pub fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {

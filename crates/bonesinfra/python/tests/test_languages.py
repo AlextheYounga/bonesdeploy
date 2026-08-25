@@ -4,6 +4,7 @@ import pytest
 
 from bonesinfra.services.languages import NODE, PYTHON, RUBY
 from bonesinfra.services.languages.php import PHPRuntime
+from bonesinfra.services.languages.ruby import RUBY_ROOT, RubyRuntime
 
 
 def _context(**runtime_data):
@@ -24,9 +25,32 @@ def test_language_runtime_stores_selected_version_and_executable(monkeypatch):
     ("runtime", "key", "value"),
     [(PYTHON, "python_version", "3"), (RUBY, "ruby_version", "3.x")],
 )
-def test_language_runtime_rejects_non_major_minor_versions(runtime, key, value):
+def test_language_runtime_rejects_invalid_versions(runtime, key, value):
     with pytest.raises(ValueError, match=key):
         runtime.install(_context(**{key: value}))
+
+
+@pytest.mark.parametrize(
+    ("selected", "expected"),
+    [("3.4.8", "3.4.8"), ("3.4", "3.4.8")],
+)
+def test_ruby_runtime_installs_supported_release_and_returns_versioned_binary(monkeypatch, selected, expected):
+    calls = []
+    monkeypatch.setattr("bonesinfra.services.languages.ruby.server.script", lambda **kwargs: calls.append(kwargs))
+
+    executable = RubyRuntime().install(_context(ruby_version=selected))
+
+    assert executable == f"{RUBY_ROOT}/{expected}/bin/ruby"
+    assert len(calls) == 1
+    assert calls[0]["name"] == f"Install Ruby {expected}"
+    assert calls[0]["src"].endswith("assets/scripts/install-ruby.sh")
+    assert calls[0]["args"] == (expected,)
+    assert calls[0]["_sudo"] is True
+
+
+def test_ruby_runtime_rejects_unsupported_patch_release():
+    with pytest.raises(ValueError, match="ruby_version"):
+        RubyRuntime().install(_context(ruby_version="3.4.9"))
 
 
 def test_php_runtime_configures_the_project_fpm_pool(monkeypatch):

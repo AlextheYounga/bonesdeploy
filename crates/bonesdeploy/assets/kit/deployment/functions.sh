@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 BUILD_NODE_TMP_DIR=""
+BUILD_RUBY_TMP_DIR=""
 COREPACK_VERSION="0.31.0"
 
 log() {
@@ -26,7 +27,18 @@ cleanup_node_install() {
 	fi
 }
 
-trap cleanup_node_install EXIT
+cleanup_ruby_install() {
+	if [ -n "${BUILD_RUBY_TMP_DIR:-}" ]; then
+		rm -rf "$BUILD_RUBY_TMP_DIR"
+	fi
+}
+
+cleanup_build_toolchain_install() {
+	cleanup_node_install
+	cleanup_ruby_install
+}
+
+trap cleanup_build_toolchain_install EXIT
 
 configure_build_cache() {
 	[ -n "${BUILD_CACHE_DIR:-}" ] || return 0
@@ -40,7 +52,8 @@ configure_build_cache() {
 		"$BUILD_CACHE_DIR/yarn/global" \
 		"$BUILD_CACHE_DIR/composer" \
 		"$BUILD_CACHE_DIR/bundler" \
-		"$BUILD_CACHE_DIR/node"; do
+		"$BUILD_CACHE_DIR/node" \
+		"$BUILD_CACHE_DIR/ruby"; do
 		mkdir -p "$directory"
 	done
 
@@ -271,6 +284,87 @@ node_enable_toolchain() {
 	command -v npm >/dev/null 2>&1 || die "npm not found"
 	node_is_installed "$version" || die "Cached Node installation is missing or has the wrong version"
 	node_ensure_corepack
+}
+
+ruby_resolve_version() {
+	case "${RUBY_VERSION:-}" in
+	3.2 | 3.2.8) echo "3.2.8" ;;
+	3.3 | 3.3.8) echo "3.3.8" ;;
+	3.4 | 3.4.8) echo "3.4.8" ;;
+	*) die "Ruby requires one of 3.2.8, 3.3.8, or 3.4.8. Set RUBY_VERSION in .env.build." ;;
+	esac
+}
+
+ruby_configure_paths() {
+	local version="$1"
+
+	: "${BUILD_CACHE_DIR:?BUILD_CACHE_DIR must be set by bonesremote}"
+
+	RUBY_DIR="$BUILD_CACHE_DIR/ruby/$version"
+	RUBY_BIN="$RUBY_DIR/bin/ruby"
+
+	export RUBY_DIR RUBY_BIN
+}
+
+ruby_is_installed() {
+	local version="$1"
+
+	[ -x "$RUBY_BIN" ] && "$RUBY_BIN" --version | grep -q "^ruby $version "
+}
+
+ruby_checksum() {
+	case "$1" in
+	3.2.8) echo "77acdd8cfbbe1f8e573b5e6536e03c5103df989dc05fa68c70f011833c356075" ;;
+	3.3.8) echo "5ae28a87a59a3e4ad66bc2931d232dbab953d0aa8f6baf3bc4f8f80977c89cab" ;;
+	3.4.8) echo "53c4ddad41fbb6189f1f5ee0db57a51d54bd1f87f8755b3d68604156a35b045b" ;;
+	esac
+}
+
+ruby_install() {
+	local version="$1"
+	local archive="ruby-$version.tar.gz"
+	local checksum
+	local source_url="https://cache.ruby-lang.org/pub/ruby/${version%.*}/$archive"
+
+	ruby_configure_paths "$version"
+	checksum="$(ruby_checksum "$version")"
+	BUILD_RUBY_TMP_DIR="$(mktemp -d "$BUILD_CACHE_DIR/ruby/.tmp.XXXXXX")"
+
+	log "Installing Ruby $version..."
+	apt-get update
+	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+		bison build-essential ca-certificates curl libffi-dev libgdbm-dev libpq-dev \
+		libreadline-dev libssl-dev libyaml-dev shared-mime-info zlib1g-dev
+	curl -fsSL --retry 3 --retry-delay 2 -o "$BUILD_RUBY_TMP_DIR/$archive" "$source_url"
+	printf '%s  %s\n' "$checksum" "$archive" >"$BUILD_RUBY_TMP_DIR/$archive.sha256"
+	(cd "$BUILD_RUBY_TMP_DIR" && sha256sum --check --status "$archive.sha256") || die "Ruby archive checksum verification failed"
+	tar -xzf "$BUILD_RUBY_TMP_DIR/$archive" -C "$BUILD_RUBY_TMP_DIR"
+
+	rm -rf "$RUBY_DIR"
+	(
+		cd "$BUILD_RUBY_TMP_DIR/ruby-$version"
+		./configure --prefix="$RUBY_DIR" --disable-install-doc
+		make -j "$(nproc)"
+		make install
+	)
+	ruby_is_installed "$version" || die "Ruby installation did not contain version $version"
+	BUILD_RUBY_TMP_DIR=""
+}
+
+ruby_enable_toolchain() {
+	local version
+
+	version="$(ruby_resolve_version)"
+	ruby_configure_paths "$version"
+	if ! ruby_is_installed "$version"; then
+		ruby_install "$version"
+	fi
+
+	export PATH="$RUBY_DIR/bin:$PATH"
+	command -v ruby >/dev/null 2>&1 || die "Ruby not found"
+	command -v bundle >/dev/null 2>&1 || die "Bundler not found"
+	ruby_is_installed "$version" || die "Cached Ruby installation is missing or has the wrong version"
+	log "Ruby: $(ruby --version)"
 }
 
 configure_build_cache

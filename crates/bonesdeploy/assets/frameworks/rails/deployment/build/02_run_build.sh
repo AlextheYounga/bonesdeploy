@@ -11,28 +11,13 @@ skip_unless_rails_project() {
 	fi
 }
 
-install_system_packages() {
-	log "Installing Ruby and native build packages..."
-	local ruby_version="${RUBY_VERSION:-}"
-	if [ -z "$ruby_version" ]; then
-		die "RUBY_VERSION must be set in bones.toml"
-	fi
-	export DEBIAN_FRONTEND=noninteractive
+install_application_packages() {
 	apt-get update
-	apt-get install -y --no-install-recommends \
-		build-essential \
+	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 		default-libmysqlclient-dev \
 		git \
-		libffi-dev \
-		libpq-dev \
 		libsqlite3-dev \
-		libssl-dev \
-		libyaml-dev \
-		pkg-config \
-		"ruby${ruby_version}" \
-		"ruby${ruby_version}-dev" \
-		ruby-bundler \
-		zlib1g-dev
+		pkg-config
 }
 
 install_bundle_dependencies() {
@@ -48,7 +33,8 @@ precompile_assets() {
 
 main() {
 	skip_unless_rails_project
-	install_system_packages
+	ruby_enable_toolchain
+	install_application_packages
 	install_bundle_dependencies
 	precompile_assets
 

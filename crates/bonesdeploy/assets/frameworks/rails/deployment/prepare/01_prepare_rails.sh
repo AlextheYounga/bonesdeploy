@@ -14,7 +14,8 @@ main() {
 	fi
 
 	log "Running Rails migrations..."
-	RAILS_ENV=production bundle exec rails db:migrate
+	local ruby_binary="/opt/bonesdeploy/ruby/${BONES_RUNTIME_RUBY_VERSION:?Ruby runtime version is required}/bin/ruby"
+	RAILS_ENV=production "$ruby_binary" -S bundle exec rails db:migrate
 
 	trap - ERR
 

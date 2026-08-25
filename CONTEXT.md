@@ -219,7 +219,7 @@ Framework templates ship starter overlays that `bonesdeploy init` uses when scaf
 - `frameworks/nuxt/`       → Nuxt (Node)
 - `frameworks/sveltekit/`  → SvelteKit (Node)
 - `frameworks/vue/`        → Vue (Node)
-- `frameworks/rails/`      → Rails (Ruby)
+- `frameworks/rails/`      → Rails (Ruby; supported releases are provisioned from verified source archives)
 
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
 

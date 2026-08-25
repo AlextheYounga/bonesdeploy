@@ -142,7 +142,7 @@ fn build_environments_use_selected_language_versions() -> Result<()> {
     for (framework, key, version, expected, old) in [
         (Framework::Laravel, "php_version", "8.3", "PHP_VERSION=8.3", "PHP_VERSION=8.5"),
         (Framework::Django, "python_version", "3.12", "PYTHON_VERSION=3.12", "PYTHON_VERSION=3.14"),
-        (Framework::Rails, "ruby_version", "3.4", "RUBY_VERSION=3.4", "RUBY_VERSION=3.3"),
+        (Framework::Rails, "ruby_version", "3.4.8", "RUBY_VERSION=3.4.8", "RUBY_VERSION=3.3.8"),
     ] {
         let runtime: Runtime = serde_json::from_value(Value::Object(
             [(key.to_string(), Value::String(version.to_string()))].into_iter().collect(),
@@ -153,6 +153,20 @@ fn build_environments_use_selected_language_versions() -> Result<()> {
         assert!(environment.contains(expected));
         assert!(!environment.contains(old));
     }
+    Ok(())
+}
+
+#[test]
+fn rails_requires_supported_exact_ruby_versions_for_new_projects() -> Result<()> {
+    let mut answers = Map::new();
+    for question in Framework::Rails.questions() {
+        answers.insert(question.key.to_string(), question.default_value());
+    }
+    answers.insert("ruby_version".to_string(), Value::String("3.4.8".to_string()));
+    Framework::Rails.validate_answers(&answers)?;
+
+    answers.insert("ruby_version".to_string(), Value::String("3.4".to_string()));
+    assert!(Framework::Rails.validate_answers(&answers).is_err_and(|error| error.to_string().contains("not one of")));
     Ok(())
 }
 

@@ -148,7 +148,7 @@ Runtime templates set up the Linux pieces for a framework.
 | Vue      | Working    | Static frontend setup              |
 | SvelteKit| Working    | Node runtime setup                 |
 | Django   | Not tested | Python / Gunicorn not tested yet   |
-| Rails    | Not tested | Ruby not tested yet                |
+| Rails    | E2E coverage | Pinned Ruby / Puma setup         |
 
 Templates are not magic. They are shared server setup so every project does not become a custom snowflake.
 
