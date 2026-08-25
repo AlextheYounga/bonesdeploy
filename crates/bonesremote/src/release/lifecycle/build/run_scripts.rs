@@ -99,6 +99,7 @@ const DERIVED_ENV_DENYLIST: &[&str] = &[
     "app.project_root",
     "runtime.permissions",
     "runtime.backend",
+    "runtime.node_version",
     "app.server.host",
     "app.server.port",
     "app.dns",

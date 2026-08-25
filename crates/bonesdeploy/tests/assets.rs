@@ -24,6 +24,10 @@ fn framework_assets_include_expected_build_content() {
     assert!(nuxt.contains("BONES_RUNTIME_IS_STATIC"));
     assert!(nuxt.contains("corepack pnpm \"$command\""));
     assert!(nuxt.contains("npm run \"$command\""));
+    assert!(
+        kit_asset("deployment/functions.sh")
+            .is_some_and(|functions| { !String::from_utf8_lossy(&functions).contains("BONES_RUNTIME_NODE_VERSION") })
+    );
 }
 
 #[test]
@@ -51,6 +55,9 @@ fn every_framework_has_a_build_environment_example() -> Result<()> {
             .build_environment_example(&Runtime::default())
             .ok_or_else(|| anyhow::anyhow!("{framework} is missing .env.build"))?;
         assert!(content.contains("Committed, non-secret"), "{framework} must include build environment header");
+        if matches!(framework.as_str(), "next" | "nuxt" | "sveltekit" | "vue") {
+            assert!(content.contains("NODE_VERSION=24.19.0"), "{framework} must pin Node in .env.build");
+        }
     }
     Ok(())
 }

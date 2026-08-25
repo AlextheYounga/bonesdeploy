@@ -10,7 +10,7 @@ NODE_ROOT = "/opt/bonesdeploy/node"
 
 class NodeRuntime(LanguageRuntime):
     config_key = "node_version"
-    default_version = "24.18.0"
+    default_version = "24.19.0"
     version_pattern = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 
     def install_version(self, _ctx) -> str:

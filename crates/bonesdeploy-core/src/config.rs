@@ -171,7 +171,7 @@ pub enum RuntimeBackend {
 
 #[must_use]
 pub fn default_node_version() -> String {
-    String::from("24.18.0")
+    String::from("24.19.0")
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]

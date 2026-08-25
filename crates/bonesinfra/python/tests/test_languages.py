@@ -13,11 +13,11 @@ def _context(**runtime_data):
 def test_language_runtime_stores_selected_version_and_executable(monkeypatch):
     monkeypatch.setattr("bonesinfra.services.languages.node.server.script", lambda **_kwargs: None)
 
-    executable = NODE.install(_context(node_version="24.18.0"))
+    executable = NODE.install(_context(node_version="24.19.0"))
 
-    assert NODE.version == "24.18.0"
+    assert NODE.version == "24.19.0"
     assert NODE.executable == executable
-    assert executable.endswith("/v24.18.0/bin/node")
+    assert executable.endswith("/v24.19.0/bin/node")
 
 
 @pytest.mark.parametrize(
