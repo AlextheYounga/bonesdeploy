@@ -1,4 +1,4 @@
-from pyinfra.operations import server, systemd
+from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import ASSETS_DIR
@@ -6,13 +6,6 @@ from bonesinfra.pyinfra.operations import render
 
 
 def setup(ctx, paths, nginx_apparmor_network="network unix stream,"):
-    systemd.service(
-        name="Ensure apparmor service is enabled and started",
-        service="apparmor",
-        enabled=True,
-        running=True,
-        _sudo=True,
-    )
     server.shell(
         name="Verify apparmor kernel enabled",
         commands=[f"cat {paths['apparmor_enabled_param']}"],

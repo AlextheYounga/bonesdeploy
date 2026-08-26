@@ -6,6 +6,7 @@ from bonesinfra.cli.commands import server, site
 def test_server_setup_runs_only_server_operations(monkeypatch):
     calls = []
     monkeypatch.setattr(server.packages, "install_system", lambda *_: calls.append("packages"))
+    monkeypatch.setattr(server.apparmor, "ensure_service", lambda: calls.append("apparmor"))
     monkeypatch.setattr(server.disable_algif_aead, "configure", lambda: calls.append("hardening"))
     monkeypatch.setattr(server.image_store, "ensure_shared_store", lambda: calls.append("image-store"))
     monkeypatch.setattr(server.image_store, "seed_base_image", lambda: calls.append("base-image"))
@@ -21,6 +22,7 @@ def test_server_setup_runs_only_server_operations(monkeypatch):
 
     assert calls == [
         "packages",
+        "apparmor",
         "hardening",
         "image-store",
         "base-image",
