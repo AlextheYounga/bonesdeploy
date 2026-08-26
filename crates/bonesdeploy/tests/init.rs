@@ -92,7 +92,34 @@ fn named_framework_materializes_project_infrastructure_snapshot() -> Result<()> 
         infra.join(".framework/src/bonesinfra/frameworks/laravel/templates").is_dir(),
         "{framework} is missing infra templates"
     );
+    let dotenv = fs::read_to_string(env.repo().join(".env"))?;
+    assert!(dotenv.contains("APP_URL=https://atlas-deploy-example-com.nip.io\n"));
+    assert!(dotenv.contains("DB_CONNECTION=sqlite\n"));
     assert!(!env.repo().join(".bones").exists());
+    Ok(())
+}
+
+#[test]
+fn init_merges_framework_defaults_without_replacing_existing_environment_values() -> Result<()> {
+    let env = TestEnv::new()?;
+    fs::write(env.repo().join(".env"), "APP_URL=https://local.example.test\nAPP_NAME=Existing application\n")?;
+
+    let output = env.run(&[
+        "init",
+        "--non-interactive",
+        "--project-name",
+        "atlas",
+        "--host",
+        "deploy.example.com",
+        "--template",
+        "laravel",
+    ])?;
+    assert!(output.status.success(), "init failed: {}", String::from_utf8_lossy(&output.stderr));
+
+    let dotenv = fs::read_to_string(env.repo().join(".env"))?;
+    assert!(dotenv.contains("APP_URL=https://local.example.test\n"));
+    assert!(dotenv.contains("APP_NAME=Existing application\n"));
+    assert!(dotenv.contains("DB_CONNECTION=sqlite\n"));
     Ok(())
 }
 

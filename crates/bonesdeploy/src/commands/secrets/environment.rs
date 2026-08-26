@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -18,12 +19,13 @@ pub(super) fn prepare(
     cfg: &config::Bones,
     local: &config::LoadedLocal,
 ) -> Result<String> {
-    let framework_values = config::parse_dotenv(framework_content)?.applications;
-    let mut keys = framework_values.keys().cloned().collect::<Vec<_>>();
-    keys.extend(service_blank_keys(&cfg.services.services).into_iter().map(String::from));
-    merge_application_keys(path, &keys.iter().map(|key| (key.as_str(), "")).collect::<Vec<_>>())?;
-
     let framework_parsed = config::parse_dotenv(framework_content)?;
+    let mut local_defaults = framework_parsed.applications.clone();
+    for key in service_blank_keys(&cfg.services.services) {
+        local_defaults.entry(key.into()).or_default();
+    }
+    merge_application_keys(path, &local_defaults)?;
+
     let mut production = framework_content.to_string();
     let mut values = config::production_application_keys(&framework_parsed)?;
     values.extend(local.applications.clone());
@@ -51,7 +53,7 @@ fn service_blank_keys(services: &[String]) -> Vec<&'static str> {
     keys
 }
 
-fn merge_application_keys(path: &Path, keys: &[(&str, &str)]) -> Result<()> {
+fn merge_application_keys(path: &Path, keys: &BTreeMap<String, String>) -> Result<()> {
     let content = fs::read_to_string(path)?;
     let parsed = config::parse_dotenv(&content)?;
     let missing = keys.iter().filter(|(key, _)| !parsed.applications.contains_key(*key)).collect::<Vec<_>>();

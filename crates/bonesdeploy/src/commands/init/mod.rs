@@ -66,6 +66,12 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     scaffold::update_gitignore()?;
     scaffold::ensure_env_build()?;
     apply_derived_defaults(&mut cfg);
+    if !Path::new(paths::DOT_ENV).exists() {
+        let framework = secrets::framework_for_secrets(&cfg.runtime.template)?;
+        if let Some(content) = framework.environment_example(&cfg.project_name, &cfg.domain, &cfg.preview_domain) {
+            fs::write(paths::DOT_ENV, content)?;
+        }
+    }
     bones_config::write_local_environment(&cfg, Path::new(paths::DOT_ENV))?;
     secrets::initialize_defaults(&cfg)?;
 
