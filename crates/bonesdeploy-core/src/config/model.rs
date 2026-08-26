@@ -1,3 +1,6 @@
+//! Canonical configuration model: identity, runtime, services, and build
+//! sections plus their derivation and validation helpers.
+
 use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
 
@@ -6,22 +9,47 @@ use serde::{Deserialize, Serialize};
 
 use crate::paths;
 
-#[path = "app.rs"]
-mod app;
-pub use app::App;
-
-mod dotenv;
-pub use dotenv::{load, merge_dotenv, project_env, save, validate_dotenv};
-
-pub mod environment;
-
-#[path = "validation.rs"]
-mod validation;
-pub use validation::{is_numbered_shell_script, validate_project_name, validate_site_name};
-
 pub const PROJECT_SETUP_ERROR: &str = "root .env and infra/ are required. Run `bonesdeploy init` first.";
 pub const RUNTIME_PYTHON_VERSION: &str = "python_version";
 pub const RUNTIME_RUBY_VERSION: &str = "ruby_version";
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub struct App {
+    pub remote_name: String,
+    pub project_name: String,
+    pub ssh_user: String,
+    pub host: String,
+    pub port: String,
+    pub repo_path: String,
+    pub project_root: String,
+    pub branch: String,
+    pub preview_domain: String,
+    pub releases_keep: usize,
+    pub ssl_enabled: bool,
+    pub domain: String,
+    pub email: String,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            remote_name: String::new(),
+            project_name: String::new(),
+            ssh_user: String::from("root"),
+            host: String::new(),
+            port: String::from("22"),
+            repo_path: String::new(),
+            project_root: String::new(),
+            branch: String::from("main"),
+            preview_domain: String::new(),
+            releases_keep: 5,
+            ssl_enabled: false,
+            domain: String::new(),
+            email: String::new(),
+        }
+    }
+}
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -41,40 +69,6 @@ impl Bones {
         config.project_name = site.to_string();
         config.repo_path = default_repo_path_for(site);
         config.project_root = paths::default_project_root_for(site);
-        config
-    }
-}
-
-/// Configuration supplied by the local deploy command for one deployment.
-/// Site identity, paths, SSH settings, and application secrets deliberately do
-/// not cross this boundary.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RemoteDeploymentConfig {
-    pub branch: String,
-    pub releases_keep: usize,
-    pub runtime: Runtime,
-    pub build: Build,
-}
-
-impl RemoteDeploymentConfig {
-    #[must_use]
-    pub fn from_bones(config: &Bones) -> Self {
-        Self {
-            branch: config.branch.clone(),
-            releases_keep: config.releases_keep,
-            runtime: config.runtime.clone(),
-            build: config.build.clone(),
-        }
-    }
-
-    #[must_use]
-    pub fn into_site_config(self, site: &str) -> Bones {
-        let mut config = Bones::for_site(site);
-        config.branch = self.branch;
-        config.releases_keep = self.releases_keep;
-        config.runtime = self.runtime;
-        config.build = self.build;
         config
     }
 }
@@ -269,6 +263,9 @@ pub fn validate_database_services(services: &[String]) -> Result<()> {
 ///
 /// Frameworks own their shared directory declarations now; the only managed
 /// shared file is always `shared/.env`.
+///
+/// # Errors
+/// Returns an error when the runtime still declares a `shared` extra key.
 pub fn validate_runtime(runtime: &Runtime) -> Result<()> {
     if runtime.extra.contains_key("shared") {
         bail!(
@@ -278,8 +275,7 @@ pub fn validate_runtime(runtime: &Runtime) -> Result<()> {
     Ok(())
 }
 
-/// # Errors
-/// Returns an error when the local environment file cannot be read or parsed.
+/// Fills convention-derived defaults that were left empty by the caller.
 pub fn apply_derived_defaults(config: &mut Bones) {
     let project_name = config.project_name.clone();
 

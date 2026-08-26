@@ -6,8 +6,7 @@ use std::thread;
 
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::config::{
-    RUNTIME_PYTHON_VERSION, RUNTIME_RUBY_VERSION, RuntimeBackend, environment, is_numbered_shell_script, project_env,
-    runtime_user_for,
+    RUNTIME_PYTHON_VERSION, RUNTIME_RUBY_VERSION, RuntimeBackend, is_numbered_shell_script, runtime_user_for, variables,
 };
 use bonesdeploy_core::paths;
 
@@ -160,11 +159,11 @@ fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &P
     command
         .args(["-u", env.runtime_user, "--", "bash", "-c", "umask 0002; exec bash -s"])
         .current_dir(release_root)
-        .env(project_env::PROJECT_NAME, env.project_name)
-        .env(environment::PROJECT_ROOT, env.project_root)
-        .env(environment::REPO_PATH, "")
-        .env(project_env::WEB_ROOT, env.web_root)
-        .env(environment::SERVICE_USER, env.runtime_user);
+        .env(variables::PROJECT_NAME, env.project_name)
+        .env(variables::PROJECT_ROOT, env.project_root)
+        .env(variables::REPO_PATH, "")
+        .env(variables::WEB_ROOT, env.web_root)
+        .env(variables::SERVICE_USER, env.runtime_user);
 
     if let Some(python_version) = env.python_version {
         command.env("BONES_RUNTIME_PYTHON_VERSION", python_version);

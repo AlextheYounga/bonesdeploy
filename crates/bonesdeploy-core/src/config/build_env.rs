@@ -78,7 +78,7 @@ fn validate_key(key: &str, line_num: usize) -> Result<()> {
         bail!("Line {line_num}: invalid variable name `{key}`");
     }
 
-    if key.starts_with("BONES_") {
+    if key.starts_with(super::local_env::MANAGED_PREFIX) {
         bail!("Line {line_num}: `BONES_*` names are reserved, found `{key}`");
     }
 

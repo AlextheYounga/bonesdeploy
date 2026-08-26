@@ -8,41 +8,40 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from bonesinfra.config.context import read_dotenv
-from bonesinfra.config.keys import TEMPLATE
+from bonesinfra.config.context import DeployContext
 
 FRAMEWORKS = frozenset({"custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"})
 
 
-def load_runtime(config_path: str | Path) -> ModuleType:
-    core, custom = _load_selected(config_path, "runtime.py", "deploy")
+def load_runtime(ctx: DeployContext) -> ModuleType:
+    core, custom = _load_selected(ctx, "runtime.py", "deploy")
     return _compose_runtime(core, custom)
 
 
-def load_manifest(config_path: str | Path) -> ModuleType:
-    core, custom = _load_selected(config_path, "manifest.py", "artifacts")
-    core_path = _module_path(config_path, core, "manifest.py")
+def load_manifest(ctx: DeployContext) -> ModuleType:
+    core, custom = _load_selected(ctx, "manifest.py", "artifacts")
+    core_path = _module_path(core, "manifest.py")
     _require_callable(core, "services", core_path)
     _require_callable(core, "mode", core_path)
     if custom is not None:
-        custom_path = _module_path(config_path, custom, "manifest.py")
+        custom_path = _module_path(custom, "manifest.py")
         _require_callable(custom, "services", custom_path)
         _require_callable(custom, "mode", custom_path)
     return _compose_manifest(core, custom)
 
 
-def _load_selected(config_path: str | Path, filename: str, callable_name: str) -> tuple[ModuleType, ModuleType | None]:
-    core = _framework_path(config_path)
+def _load_selected(ctx: DeployContext, filename: str, callable_name: str) -> tuple[ModuleType, ModuleType | None]:
+    core = _framework_path()
     if not (core / "src/bonesinfra/__main__.py").is_file():
         raise FileNotFoundError(f"project-local BonesInfra framework does not exist: {core}")
 
-    framework = _selected_framework(config_path)
+    framework = _selected_framework(ctx)
     try:
         module = importlib.import_module(f"bonesinfra.frameworks.{framework}.{filename[:-3]}")
     except Exception as error:
         raise ImportError(f"failed to import project framework infrastructure for {framework}: {error}") from error
     _require_callable(module, callable_name, Path(module.__file__ or filename))
-    custom = _load_local_entrypoint(_custom_path(config_path), filename, callable_name, required=False)
+    custom = _load_local_entrypoint(_custom_path(), filename, callable_name, required=False)
     return module, custom
 
 
@@ -103,23 +102,23 @@ def _combined_entries(core: ModuleType, custom: ModuleType, name: str, ctx: Any)
     return [*getattr(core, name)(ctx), *getattr(custom, name)(ctx)]
 
 
-def _selected_framework(config_path: str | Path) -> str:
-    selected = read_dotenv(Path(config_path).read_text()).get(TEMPLATE) or "custom"
+def _selected_framework(ctx: DeployContext) -> str:
+    selected = ctx.template or "custom"
     if selected not in FRAMEWORKS:
         raise ValueError(f"unknown framework infrastructure: {selected}")
     return selected
 
 
-def _module_path(config_path: str | Path, module: ModuleType, filename: str) -> Path:
-    return Path(module.__file__) if module.__file__ else _framework_path(config_path) / filename
+def _module_path(module: ModuleType, filename: str) -> Path:
+    return Path(module.__file__) if module.__file__ else _framework_path() / filename
 
 
-def _framework_path(config_path: str | Path) -> Path:
-    return Path(config_path).resolve().parent / "infra" / ".framework"
+def _framework_path() -> Path:
+    return Path.cwd() / "infra" / ".framework"
 
 
-def _custom_path(config_path: str | Path) -> Path:
-    return Path(config_path).resolve().parent / "infra" / "custom"
+def _custom_path() -> Path:
+    return Path.cwd() / "infra" / "custom"
 
 
 def _import_module(name: str, path: Path, package_name: str, *, is_package: bool = False) -> ModuleType:

@@ -100,16 +100,16 @@ bonesinfra = "bonesinfra.__main__:main"
 The private command shapes currently used by the Rust CLI are:
 
 ```sh
-bonesinfra helpers apply --env-file <.env>
-bonesinfra server apply --env-file <.env> --bonesremote-version <version>
-bonesinfra site apply --env-file <.env>
-bonesinfra runtime apply --env-file <.env>
-bonesinfra ssl apply --env-file <.env>
-bonesinfra services apply --env-file <.env>
-bonesinfra manifest show --env-file <.env>
+bonesinfra helpers apply --request-stdin
+bonesinfra server apply --request-stdin --bonesremote-version <version>
+bonesinfra site apply --request-stdin
+bonesinfra runtime apply --request-stdin
+bonesinfra ssl apply --request-stdin
+bonesinfra services apply --request-stdin
+bonesinfra manifest show --request-stdin
 ```
 
-`ssh_user` is read from the root `.env` (`SSH_USER` key, default `"root"`) instead of a CLI flag.
+`ssh_user` comes from the server request (default `"root"`) instead of a CLI flag.
 
 This command surface is an internal contract with `bonesdeploy`. Runtime
 questions are owned by the Rust runtime definitions under
@@ -201,19 +201,16 @@ CLI should stay thin.
 
 Example shape:
 
-```python
-def server_apply_cmd(env_file: str):
-    ctx = ServerContext.from_files(env_file)
-    run(ctx=ctx, deploy=deploy_server_setup)
-```
+Commands read one typed JSON provisioning request from stdin with
+`--request-stdin`; the CLI does not read or parse the root `.env`.
 
 ## `cli/` and `pyinfra/`
 
 Command orchestration lives in `cli/app.py` and the pyinfra bridge in
 `pyinfra/runner.py`.
 
-Server commands load `ServerContext.from_files()` and site commands load
-`DeployContext.from_files()`. They validate command-specific requirements,
+Server commands load `ServerContext.from_request()` and site commands load
+`DeployContext.from_request()`. They validate command-specific requirements,
 select a deploy plan, and pass it to `pyinfra.runner.run()`.
 The runner owns pyinfra connection and execution concerns. CLI code should
 not contain raw pyinfra operations, and the runner should not contain
@@ -240,14 +237,15 @@ Responsibilities:
 
 Config code should not import pyinfra.
 
-`config/context.py` parses the canonical root `.env`:
+`config/request.py` parses the typed request contract:
 
 - **`ServerContext`**: `HOST`, `SSH_USER`, and `PORT` only
 - **`AppConfig`**: project, DNS, and deploy values
 - **`RuntimeConfig`**: the typed `[runtime]` identity fields, plus dynamic runtime settings
 - **`DeployContext`**: wraps `server`, `app`, `runtime`, and `services` and provides derived deployment paths
 
-No flat dict. No `host.data` side-channel.
+No flat dict. No `host.data` side-channel. Service credentials are kept on the
+deploy context and rendered directly into service provisioning scripts.
 
 ## `pyinfra/`
 
@@ -264,7 +262,7 @@ Responsibilities:
 
 - run pyinfra programmatically
 - load TOML files
-- receive the explicit `.env` path from the Rust subprocess boundary
+- receive the typed request from the Rust subprocess boundary
 - bridge CLI-selected deploy plans to pyinfra
 
 Pyinfra code may import pyinfra.
@@ -422,7 +420,7 @@ Responsibilities:
 
 - `server apply` installs packages and hardening; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
 - `site apply` creates runtime and build identities, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
-- `site apply` creates the shared directory but not `shared/.env`; `bonesdeploy secrets push` explicitly publishes the validated encrypted environment.
+- `site apply` creates the shared directory but does not write `shared/.env`; that file is published only by `bonesdeploy secrets push` outside this crate.
 - `site apply` does not install services, configure the framework runtime, configure SSL, push Git or secrets, or deploy.
 
 Server setup should run as root or bootstrap SSH user. Site base provisioning
@@ -624,7 +622,7 @@ ______________________________________________________________________
 The current target is clarity, not cleverness.
 
 ```text
-Typer CLI -> DeployContext.from_files() -> pyinfra_runner.run(ctx) -> deploy plan -> grouped operations
+Typer CLI -> DeployContext.from_request() -> pyinfra_runner.run(ctx) -> deploy plan -> grouped operations
 ```
 
 Keep files small.

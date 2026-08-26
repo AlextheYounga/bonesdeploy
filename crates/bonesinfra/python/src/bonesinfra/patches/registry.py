@@ -36,9 +36,9 @@ class Patch:
 PATCHES = (Patch("0003-project-infra", Version(0, 8, 0), local.migrate_to_project_infra),)
 
 
-def apply_local(ctx: DeployContext, target_version: str, env_file: str) -> None:
+def apply_local(ctx: DeployContext, target_version: str) -> None:
     marker_dir = _local_marker_dir(ctx)
-    project_root = Path(env_file).resolve().parent
+    project_root = Path.cwd()
     for patch in select_patches(target_version):
         marker = marker_dir / patch.identifier
         if marker.exists():

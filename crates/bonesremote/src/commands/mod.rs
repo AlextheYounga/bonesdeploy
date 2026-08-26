@@ -1,3 +1,4 @@
+pub mod config;
 pub mod deploy;
 pub mod doctor;
 pub mod drop_failed_release;

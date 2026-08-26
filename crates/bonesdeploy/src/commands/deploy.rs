@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use console::style;
 
 use crate::config;
-use crate::infra::ssh;
+use crate::infra::{self, ssh};
 use crate::ui::output;
 use bonesdeploy_core::config::RemoteDeploymentConfig;
 use bonesdeploy_core::paths;
@@ -26,9 +26,11 @@ pub async fn run() -> Result<()> {
     );
 
     let descriptor = RemoteDeploymentConfig::from_bones(&cfg);
-    let descriptor_json = serde_json::to_string(&descriptor).context("Failed to serialize deployment config")?;
+    let descriptor_json =
+        format!("{}\n", serde_json::to_string_pretty(&descriptor).context("Failed to serialize deployment config")?);
 
     let session = ssh::connect_privileged(&cfg).await?;
+    infra::sync_control_plane(&session, &cfg).await?;
     let command = format!("bonesremote deploy --site {} --config-stdin", ssh::shell_quote(&cfg.project_name));
     ssh::stream_cmd_with_stdin(&session, &command, descriptor_json.as_bytes()).await?;
     session.close().await?;

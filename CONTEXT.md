@@ -1,6 +1,6 @@
 # BonesDeploy v3
 
-A remote release deployment tool for simple Linux servers. It produces two executables: `bonesdeploy` (local CLI for setup, provisioning, deployment, and management) and `bonesremote` (server-side release lifecycle executor, installed on the deployment host). Git remains supported as an optional trigger, but it does not own the deployment model. **We only handle Debian/Ubuntu machines.**
+A remote release deployment tool for simple Linux servers. It produces two executables: `bonesdeploy` (local CLI for setup, provisioning, deployment, and management) and `bonesremote` (server-side release lifecycle executor, installed on the deployment host). Source code reaches the host through Git push into a per-site bare repository, while deploy execution is driven by BonesDeploy over SSH. **We only handle Debian/Ubuntu machines.**
 
 The command behavior is documented in this file and in the command examples in `README.md`.
 
@@ -66,49 +66,51 @@ Deployment state files (`active-deployment.json` and `staged-release`) are writt
 
 ## Bones Scaffolding
 ```
-.bones
-├── bones.toml
-├── deployment
-│   ├── build/
-│   │   ├── 01_install_build_deps.sh
-│   │   └── 02_run_build.sh
-│   └── prepare/
-│       └── 01_prepare.sh
+.env                      # gitignored local environment + managed BONES_* configuration block
+.env.build                # committed, non-secret build inputs
+infra/secrets/.env.gpg    # encrypted production environment (application + service credentials)
+deployment/
+├── build/
+│   ├── 01_install_build_deps.sh
+│   └── 02_run_build.sh
+└── prepare/
+    └── 01_prepare.sh
 ```
 
 Python infra scripts and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`) and are embedded into the `bonesdeploy` binary. The complete distribution is materialized into each project's `infra/.framework/`; a project-scoped cached venv holds only dependencies and editable-install metadata. See `crates/bonesinfra/src/lib.rs`.
 
 ### Project Environment
-`bonesdeploy init` collects project settings and writes the canonical flat root `.env`. It includes the project name, SSH connection, deployment branch, domain, selected framework, web root, and services.
+Rust is the sole parser of the project-root `.env`. It models two environments:
+
+- `LocalEnvironment` is the gitignored root `.env`, conceptually `.env.local`. Application-owned content (comments, values, order) survives byte-for-byte; it also carries exactly one BonesDeploy-managed, comment-delimited `BONES_*` configuration block holding project identity, SSH connection, deployment branch, domains, framework, web root, services, and framework-specific scalar settings.
+- `ProductionEnvironment` is the decrypted `infra/secrets/.env.gpg`, conceptually `.env.production`, published to the host as `shared/.env` only by `bonesdeploy secrets push`. It contains application runtime keys and generated service credentials — never `BONES_*` keys.
 
 Build-only public settings live in the committed `.env.build`. Framework templates declare `NODE_VERSION`; when set, this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository. Provisioning defaults to `24.19.0`.
 
-`[services].services` is selected during init (or with repeated non-interactive `--service` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost, generates credentials on the host, and writes connection values only to the protected `shared/.env`. Redis and Valkey use separate per-project instances; PostgreSQL, MariaDB, MySQL, and MongoDB use database-scoped accounts. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
+`[services].services` is selected during init (or with repeated non-interactive `--service` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost and consumes credentials supplied by BonesDeploy in typed requests; it never generates application credentials or writes `shared/.env`. First initialization generates service credentials locally into the encrypted environment (service values override framework defaults), and later additions are made through `bonesdeploy secrets edit`. Redis and Valkey use separate per-project instances on port `6379` by default; provisioning fails when the requested port is occupied rather than selecting another. PostgreSQL, MariaDB, MySQL, and MongoDB use database-scoped accounts. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
 
 Example `.env`:
 ```dotenv
-PROJECT_NAME=lawsnipe
-REMOTE_NAME=production
+# Local environment for the application.
+APP_URL=http://app.example.test
 
-[app.server]
-ssh_user = "root"
-host = "deploy.example.com"
-port = "22"
-
-[app.dns]
-preview_domain = "lawsnipe-deploy-example-com.nip.io"
-domain = "app.example.com"
-email = "ops@example.com"
-ssl_enabled = true
-
-[app.deploy]
-branch = "master"
-deploy_on_push = false
-releases = 5
-
-[runtime]
-template = "next"
-web_root = "public"
+# >>> BonesDeploy managed configuration >>>
+BONES_PROJECT_NAME=lawsnipe
+BONES_REMOTE_NAME=production
+BONES_SSH_USER=root
+BONES_HOST=deploy.example.com
+BONES_PORT=22
+BONES_BRANCH=main
+BONES_DOMAIN=app.example.com
+BONES_PREVIEW_DOMAIN=lawsnipe-deploy-example-com.nip.io
+BONES_EMAIL=ops@example.com
+BONES_SSL_ENABLED=false
+BONES_TEMPLATE=next
+BONES_RUNTIME_BACKEND=native
+BONES_WEB_ROOT=public
+BONES_NODE_VERSION=24.19.0
+BONES_SERVICES=postgres
+# <<< BonesDeploy managed configuration <<<
 ```
 
 ### Build-time configuration
@@ -134,7 +136,7 @@ Rules:
 The build environment consists of:
 1. Existing generic variables (`PROJECT_NAME`, `WEB_ROOT`, etc.).
 2. Values from committed `.env.build`.
-3. Derived `BONES_*` values from `bones.toml`.
+3. Derived `BONES_*` values projected from the sanitized `RemoteDeploymentConfig` descriptor sent over SSH stdin.
 4. Fixed internal values such as `BUILD_CACHE_DIR`.
 
 Laravel builds use Composer `2.8.12` by default. Set `COMPOSER_VERSION` in
@@ -226,24 +228,24 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 - **doctor**
   - Root `bonesdeploy doctor` runs both `server doctor` and `site doctor`, reporting both failures when necessary.
   - `bonesdeploy site doctor --local` checks only the local root `.env`, `infra/`, and numbered deployment scripts.
-  - Site remote checks open a privileged SSH session and run `bonesremote doctor --site <project>`.
-    - `bonesremote doctor --site <project>` requires root and checks Podman availability, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo and thin `post-receive` hook, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. An empty bare repo is reported as pending until the configured branch is pushed.
+   - Site remote checks open a privileged SSH session, synchronize the sanitized control-plane snapshot to `/srv/conf/<site>/bones.json`, then run `bonesremote doctor --site <project>`.
+    - `bonesremote doctor --site <project>` requires root and reads the synchronized `/srv/conf/<project>/bones.json` snapshot for runtime backend and branch (missing snapshot is reported as pending with guidance). It checks Podman availability, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo with an exact ref for the configured branch, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. Docker daemon and image checks run only when the synchronized descriptor declares the Docker backend — never inferred from `/run/<site>`. An empty bare repo is reported as pending until the configured branch is pushed.
     - The security audit is read-only and fail-closed. It verifies site identity isolation (unique UIDs/GIDs, no login shells, no cross-site group membership, deploy not in runtime groups), runtime sudo absence, privileged configuration root-control (recursively inspecting systemd, sudoers, nginx, AppArmor, and BonesRemote state plus their parent chains without following symlink targets), and release activation (current must be a valid symlink resolving inside the site's releases directory; active release roots and activation parents must be immutable to the runtime identity). `bonesremote doctor --site <project> --exhaustive` additionally inspects every entry in that active release for permission drift; this can take time on large releases. The exact deploy-user sudoers policy is rendered and validated by `bonesinfra` during provisioning rather than probed with fabricated commands during doctor. POSIX ACLs on protected paths are detected through extended attributes and reported as UNVERIFIED. Supplementary groups are collected through `id -G`. Required evidence that cannot be collected is reported as UNVERIFIED and causes doctor to fail.
    - Server doctor verifies Debian/Ubuntu, Podman, AppArmor, deploy identity, BonesRemote roots and binary, sudoers, shared image store, firewall, fail2ban, and unattended-upgrades. `--verbose` prints successful remote reports.
 
 - **site manifest**
   - Inspects every project-specific filesystem artifact and managed systemd service expected by the effective framework, service, and SSL strategy. Shared host-wide packages, daemons, and configuration are excluded.
-  - Delegates to the embedded BonesInfra runtime as `python -m bonesinfra manifest show --env-file <path> --format <format>`.
+   - Delegates to the embedded BonesInfra runtime as `python -m bonesinfra manifest show --request-stdin --format <format>`, feeding the typed site request on stdin.
   - Uses typed Python declarations inside BonesInfra, resolves path keys through `DeploymentPaths`, and performs read-only PyInfra fact checks.
   - Reports present, missing, and wrong-kind paths, plus active and enabled state for managed services. `--format json` is intended for automation and never includes file contents or secrets.
 
 - **deploy**
-  - SSHes into the configured host and runs `bonesremote deploy --site <project> --config-stdin`, sending only the local deployment descriptor over stdin.
+  - SSHes into the configured host, first synchronizes the sanitized control-plane snapshot (`bonesremote config sync --site <project> --config-stdin` writing `/srv/conf/<site>/bones.json` atomically), then runs `bonesremote deploy --site <project> --config-stdin`, sending the deployment descriptor over stdin.
   - Does not modify the remote environment. Run `bonesdeploy secrets push` explicitly to replace `shared/.env` from the encrypted local source.
   - Omits the `--revision` flag, so `bonesremote deploy` uses the branch from the local descriptor.
 
 - **server setup**
-  - Delegates to `python -m bonesinfra server apply --env-file <path>` using only SSH host, user, and port.
+  - Delegates to `python -m bonesinfra server apply --request-stdin`, feeding a connection-only request (SSH host, user, port) on stdin.
   - Provisions shared packages, hardening, firewall, image store, deploy identity, BonesRemote roots and binary, and sudoers.
   - Does not read project runtime, service, framework, DNS, or release settings.
 
@@ -261,7 +263,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 
 - **site runtime**:
   - Reapplies the configured runtime settings from the root `.env` to the host and provisions the selected framework's runtime.
-  - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra runtime apply --env-file <path>` against the configured host as the configured `ssh_user`.
+   - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra runtime apply --request-stdin` against the configured host as the configured `ssh_user`, feeding the typed site request on stdin.
   - Imports and runs the project's `infra/runtime.py` (local vendored package) or the selected canonical BonesInfra framework package, which installs framework-specific packages and services.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
   - Does not handle SSL; use `site ssl` for TLS configuration.
@@ -271,7 +273,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - Keeps all database listeners loopback-only and does not publish credentials into the remote control-plane dataset.
 
 - **site ssl**
-  - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra ssl apply --config <path>` against the configured host as root.
+  - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra ssl apply --request-stdin` against the configured host as root, feeding the typed site request on stdin.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
   - Separate from `site runtime` to keep certificate management decoupled from app runtime concerns.
@@ -281,15 +283,10 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 
 - **secrets**
   - Subcommands: `init`, `edit`, `push`.
-  - Manages GPG-encrypted environment secrets under `.bones/secrets/`.
-  - `init` bootstraps `.bones/secrets/.env.gpg` with the selected runtime's defaults; `secrets init` remains an idempotent manual equivalent.
-  - `secrets edit` decrypts `.bones/secrets/.env.gpg` for editing and re-encrypts on save.
-  - `secrets push` atomically replaces remote `shared/.env` with the decrypted `infra/secrets/.env.gpg` content. It does not read, merge, or upload the local root `.env`.
-
-- **config**
-  - Reads or prints values from `.bones/bones.toml`.
-  - `--file <path>` overrides the config file location (defaults to `.bones/bones.toml`).
-  - `<key>` prints a single value when supplied; when omitted, dumps the whole file.
+  - Manages the GPG-encrypted production environment at `infra/secrets/.env.gpg`.
+  - First initialization merges missing framework keys and blank local service keys into the root `.env` (application-owned values are never replaced), generates service credentials and framework-native settings, validates, and encrypts the result. If the encrypted file already exists it is returned untouched; later additions go through `secrets edit`.
+  - `secrets edit` decrypts `infra/secrets/.env.gpg` for editing and re-encrypts on save.
+  - `secrets push` atomically replaces remote `shared/.env` with the decrypted content. It does not read, merge, or upload the local root `.env`.
 
 - **skill**
   - Embedded documentation for AI agents, plus the state-aware next-step compass.
@@ -304,6 +301,8 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 ### BonesRemote CLI Commands
 - **Release commands** live under `bonesremote release ...`
 - **Service commands** live under `bonesremote service ...`
+- **config sync**:
+  - `--site <name> --config-stdin` receives the sanitized control-plane descriptor as JSON on stdin, validates it, and atomically installs root-owned `/srv/conf/<site>/bones.json`. BonesDeploy synchronizes it before every config-dependent remote action.
 - **deploy**:
   - Runs the full deployment lifecycle as a single command (the primary entrypoint used by both `post-receive` hook and `bonesdeploy deploy`).
   - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → runtime-writable candidate release → shared wiring → prepare scripts as the site user → seal release → activate → restart `<site>.target` → post-deploy pruning.
@@ -313,7 +312,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
 - **doctor**:
   - Host mode checks `bonesremote` in `PATH`, Podman, AppArmor support, and the deploy-user sudoers drop-in.
-  - `--site <name>` also checks the imported site boundary: validated control-plane state, bare repo and thin hook, runtime identity constraints, `shared/` and `releases/` layout, and `<site>.target`.
+  - `--site <name>` loads `/srv/conf/<name>/bones.json` for explicit runtime backend and branch, checks the imported site boundary: validated control-plane state, bare repo with an exact ref for the configured branch, runtime identity constraints, `shared/` and `releases/` layout, and `<site>.target`. Docker daemon/image checks run only for a Docker backend; a missing snapshot is pending guidance.
 - **release stage**
 	- Creates a staged release tree under `releases/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout. Release directories are created exclusively: the identity embeds the resolved source commit plus a random suffix (for example `20260804_190321-46a0b75c-a7f2`), and a second deployment staged within the same second retries with a fresh name instead of reusing or erasing an existing release directory.
 - **release wire**
@@ -354,39 +353,16 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 
 ### Primary Deploy Flow
 
-1. `bonesdeploy deploy` pushes encrypted secrets, then SSHes into the configured host.
-2. It runs `bonesremote deploy --site <site>`.
-3. `bonesremote deploy` orchestrates the full pipeline:
+1. `bonesdeploy deploy` SSHes into the configured host, synchronizes the sanitized control-plane snapshot to `/srv/conf/<site>/bones.json`, then runs `bonesremote deploy --site <site> --config-stdin` with the deployment descriptor on stdin.
+2. `bonesremote deploy` orchestrates the full pipeline:
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
-    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed into a mode-0600 temporary env file and passed to Podman with `--env-file`, keeping its values out of process argv.   - **release_promote** — Copy safe artifacts into a runtime-owned candidate release
-   - **wire_shared** — Symlink declared shared paths into the candidate release
-   - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
-   - **release_finalize** — Seal the prepared release as `root:<site>`
-   - **activate_release** — Atomically repoint `current`
-   - **restart_services** — Restart `<site>.target`, which restarts all registered site services
-   - **post_deploy** — Prune old releases beyond `releases`
-   - On failure: **drop_failed_release** — Clean up staged release
-
-## Hook Event Order
-
-### App Repo: `git push` (deployment trigger)
-
-`pre-push -> post-receive`
-
-1. **pre-push** (local): Runs `bonesdeploy site doctor --local` if pushing to the configured bones remote and `deploy_on_push = true`. Aborts on warnings or errors.
-2. Git updates refs in the bare repository.
-3. **post-receive** (remote): Resolves the configured deployment ref from stdin:
-   - If `deploy_on_push = false`, exits early without deploying.
-   - If the configured branch wasn't pushed, or the push deleted it, exits without deploying.
-     - Otherwise runs a single unified command:
-       ```
-       bonesremote deploy --site <site> --revision <newrev>
-       ```
-   - This command orchestrates the full pipeline:
-       - **stage_release** — Create timestamped release state
-        - **release_checkout** — Export source from the bare repo into temporary context
-        - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed into a mode-0600 temporary env file and passed to Podman with `--env-file`, keeping its values out of process argv.      - **release_promote** — Copy safe artifacts into a runtime-owned candidate at `releases/<release>`
-       - **wire_shared** — Link shared runtime paths
-
-`bonesdeploy deploy` performs the same remote pipeline by SSHing into the host and running `bonesremote deploy --site <site>` directly (without `--revision`, so it uses the configured branch). Git-triggered deploy is optional plumbing, not the primary model.
+    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed into a mode-0600 temporary env file and passed to Podman with `--env-file`, keeping its values out of process argv.
+    - **release_promote** — Copy safe artifacts into a runtime-owned candidate release
+    - **wire_shared** — Symlink declared shared paths into the candidate release
+    - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
+    - **release_finalize** — Seal the prepared release as `root:<site>`
+    - **activate_release** — Atomically repoint `current`
+    - **restart_services** — Restart `<site>.target`, which restarts all registered site services
+    - **post_deploy** — Prune old releases beyond `releases`
+    - On failure: **drop_failed_release** — Clean up staged release

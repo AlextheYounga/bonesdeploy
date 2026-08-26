@@ -5,7 +5,7 @@
 ```text
 bonesdeploy init
 bonesdeploy setup --yes
-git push production master
+git push production main
 bonesdeploy site ssl --yes --domain app.example.com --email ops@example.com
 bonesdeploy deploy
 ```
@@ -20,7 +20,7 @@ bonesdeploy init
 bonesdeploy server setup --yes
 bonesdeploy server doctor
 bonesdeploy site setup --yes
-git push production master
+git push production main
 bonesdeploy site ssl --yes --domain app.example.com --email ops@example.com
 bonesdeploy deploy
 ```
@@ -32,7 +32,7 @@ once per project.
 ## The daily deploy
 
 ```text
-git push production master
+git push production main
 bonesdeploy deploy
 ```
 

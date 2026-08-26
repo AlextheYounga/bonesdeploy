@@ -11,13 +11,13 @@ execution uses the embedded copy.
 
 ## Interface
 
-- `bonesinfra server apply --env-file <.env> --bonesremote-version <version>`
-- `bonesinfra site apply --env-file <.env>`
-- `bonesinfra runtime apply --env-file <.env>`
-- `bonesinfra ssl apply --env-file <.env>`
-- `bonesinfra helpers apply --env-file <.env>`
-- `bonesinfra services apply --env-file <.env>`
-- `bonesinfra manifest show --env-file <.env>`
+- `bonesinfra server apply --request-stdin --bonesremote-version <version>`
+- `bonesinfra site apply --request-stdin`
+- `bonesinfra runtime apply --request-stdin`
+- `bonesinfra ssl apply --request-stdin`
+- `bonesinfra helpers apply --request-stdin`
+- `bonesinfra services apply --request-stdin`
+- `bonesinfra manifest show --request-stdin`
 
 Framework template questions are defined by the Rust CLI under
 `crates/bonesdeploy/src/frameworks/`. BonesInfra reads the resulting

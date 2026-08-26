@@ -5,18 +5,11 @@ import pytest
 from bonesinfra.config.context import DeployContext
 from bonesinfra.services.linux.nginx import router as nginx_router, site as nginx_site
 
+from .helpers import make_site_request
 
-def _make_ctx(tmp_path, *, domain: str = "", preview_domain: str = "preview.example.com"):
-    config_path = tmp_path / ".env"
-    config_path.write_text(
-        f"""PROJECT_NAME=lawsnipe
-HOST=example.com
-DOMAIN={domain}
-PREVIEW_DOMAIN={preview_domain}
-EMAIL=ops@example.com
-"""
-    )
-    return DeployContext.from_files(str(config_path))
+
+def _make_ctx(*, domain: str = "", preview_domain: str = "preview.example.com"):
+    return DeployContext.from_request(make_site_request(domain=domain, preview_domain=preview_domain))
 
 
 def _noop(*args, **kwargs):
@@ -24,7 +17,7 @@ def _noop(*args, **kwargs):
 
 
 def test_runtime_nginx_uses_preview_domain_when_domain_is_empty(tmp_path, monkeypatch):
-    ctx = _make_ctx(tmp_path, domain="", preview_domain="preview.example.com")
+    ctx = _make_ctx(domain="", preview_domain="preview.example.com")
     paths = ctx.paths_dict
     calls = []
 
@@ -50,7 +43,7 @@ def test_runtime_nginx_uses_preview_domain_when_domain_is_empty(tmp_path, monkey
 
 
 def test_runtime_nginx_requires_a_real_name(tmp_path, monkeypatch):
-    ctx = _make_ctx(tmp_path, domain="", preview_domain="")
+    ctx = _make_ctx(domain="", preview_domain="")
     paths = ctx.paths_dict
 
     monkeypatch.setattr(nginx_router, "mkdir", _noop)
@@ -85,7 +78,7 @@ def test_runtime_nginx_migrates_site_service_to_target(monkeypatch):
 
 
 def test_static_nginx_validation_runs_as_runtime_user(tmp_path, monkeypatch):
-    ctx = _make_ctx(tmp_path)
+    ctx = _make_ctx()
     calls = []
 
     monkeypatch.setattr(nginx_site.files, "template", _noop)

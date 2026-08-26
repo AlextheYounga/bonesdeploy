@@ -4,25 +4,15 @@ from bonesinfra.config.context import DeployContext
 from bonesinfra.manifest import collect_services, resolve_artifacts
 from bonesinfra.project import load_manifest, load_runtime
 
+from .helpers import make_site_request
+
 INFRA = Path(__file__).parents[1] / "src/bonesinfra/frameworks/laravel"
 
 
-def _config(tmp_path: Path) -> Path:
-    config = tmp_path / ".env"
-    config.write_text(
-        """PROJECT_NAME=atlas
-HOST=example.test
-TEMPLATE=laravel
-php_version=8.5
-SERVICES=
-"""
+def _config() -> DeployContext:
+    return DeployContext.from_request(
+        make_site_request(project_name="atlas", template="laravel", extras={"php_version": 8.5})
     )
-    return config
-
-
-def _runtime_context(config: Path):
-    ctx = DeployContext.from_files(str(config))
-    return ctx
 
 
 def _link_core(tmp_path: Path):
@@ -32,10 +22,10 @@ def _link_core(tmp_path: Path):
 
 
 def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypatch):
-    config = _config(tmp_path)
+    ctx = _config()
+    monkeypatch.chdir(tmp_path)
     _link_core(tmp_path)
-    module = load_runtime(config)
-    ctx = _runtime_context(config)
+    module = load_runtime(ctx)
     calls = []
 
     monkeypatch.setattr(module.PHP, "install", lambda _ctx: "/usr/bin/php8.5")
@@ -70,11 +60,11 @@ def test_laravel_runtime_provisions_queue_worker_when_enabled(tmp_path, monkeypa
     assert "ConditionPathExists={{ paths.current }}/artisan" in template
 
 
-def test_laravel_manifest_declares_worker_without_configuration_flag(tmp_path):
-    config = _config(tmp_path)
+def test_laravel_manifest_declares_worker_without_configuration_flag(tmp_path, monkeypatch):
+    ctx = _config()
     _link_core(tmp_path)
-    ctx = _runtime_context(config)
-    project_manifest = load_manifest(config)
+    monkeypatch.chdir(tmp_path)
+    project_manifest = load_manifest(ctx)
 
     artifacts = resolve_artifacts(ctx, project_manifest)
     services = collect_services(ctx, project_manifest)

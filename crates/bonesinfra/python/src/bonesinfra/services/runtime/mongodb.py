@@ -1,7 +1,7 @@
 from pyinfra.operations import apt, server, systemd
 
 from bonesinfra.config.paths import MONGODB_ADMIN_ENV, MONGODB_CONFIG, SCRIPTS_DIR
-from bonesinfra.services.runtime.base import RuntimeService
+from bonesinfra.services.runtime.base import RuntimeService, credentials_for
 
 
 class MongoDBService(RuntimeService):
@@ -19,7 +19,7 @@ class MongoDBService(RuntimeService):
             _sudo=True,
         )
         project = self._identifier(ctx.app.project_name)
-        env_path = f"{ctx.paths_dict['shared']}/.env"
+        creds = credentials_for(ctx, "mongodb")
         server.shell(
             name="Configure MongoDB for project",
             commands=[
@@ -43,9 +43,11 @@ class MongoDBService(RuntimeService):
             name="Create least-privilege MongoDB project user",
             src=str(SCRIPTS_DIR / "create-mongodb-project-user.sh.j2"),
             admin_file=MONGODB_ADMIN_ENV,
-            env=env_path,
             project=project,
             user=f"{project}_mongodb",
+            database=creds.get("database", project),
+            username=creds.get("username", f"{project}_mongodb"),
+            password=creds["password"],
             _sudo=True,
         )
 

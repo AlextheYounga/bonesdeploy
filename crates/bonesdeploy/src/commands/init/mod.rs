@@ -66,7 +66,7 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     scaffold::update_gitignore()?;
     scaffold::ensure_env_build()?;
     apply_derived_defaults(&mut cfg);
-    bones_config::save(&cfg, Path::new(paths::DOT_ENV))?;
+    bones_config::write_local_environment(&cfg, Path::new(paths::DOT_ENV))?;
     secrets::initialize_defaults(&cfg)?;
 
     if is_fresh {

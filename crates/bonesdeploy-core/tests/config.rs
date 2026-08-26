@@ -4,8 +4,8 @@ use anyhow::Result;
 use bonesdeploy_core::config;
 use bonesdeploy_core::config::BUILD_TIMEOUT_SECONDS_DEFAULT;
 use bonesdeploy_core::config::{
-    App, Bones, Build, RemoteDeploymentConfig, Runtime, RuntimeBackend, build_timeout_seconds, validate_host,
-    validate_runtime,
+    App, Bones, Build, ParsedDotEnv, ProvisioningRequest, RemoteDeploymentConfig, Runtime, RuntimeBackend,
+    build_timeout_seconds, production_application_keys, validate_host, validate_runtime,
 };
 use bonesdeploy_core::paths;
 use std::collections::BTreeMap;
@@ -20,7 +20,7 @@ fn omitted_nested_sections_keep_app_defaults() -> Result<(), Error> {
 
     assert_eq!(app.ssh_user, "root");
     assert_eq!(app.port, "22");
-    assert_eq!(app.branch, "master");
+    assert_eq!(app.branch, "main");
     assert_eq!(app.releases_keep, 5);
     Ok(())
 }
@@ -97,31 +97,14 @@ fn dotenv_rejects_invalid_and_duplicate_keys() -> Result<()> {
 }
 
 #[test]
-fn dotenv_merge_preserves_existing_values_and_replaces_overlaid_keys() -> Result<()> {
-    let existing = "PROJECT_NAME=old\nDATABASE_PASSWORD=generated\nAPP_KEY=old\n";
-    let secrets = "APP_KEY=secret\nNODE_ENV=production\n";
-    let project = "PROJECT_NAME=e2evue\nHOST=192.0.2.1\n";
-
-    let merged = config::merge_dotenv(existing, secrets)?;
-    let merged = config::merge_dotenv(&merged, project)?;
-
-    assert!(merged.contains("DATABASE_PASSWORD=generated\n"));
-    assert!(merged.contains("APP_KEY=secret\n"));
-    assert!(merged.contains("PROJECT_NAME=e2evue\n"));
-    assert!(!merged.contains("PROJECT_NAME=old\n"));
-    assert!(!merged.contains("APP_KEY=old\n"));
-    Ok(())
-}
-
-#[test]
 fn dotenv_round_trips_framework_values() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join(".env");
     let mut config = Bones::default();
     config.runtime.extra.insert(String::from("is_static"), toml::Value::Boolean(true));
 
-    config::save(&config, &path)?;
-    assert!(fs::read_to_string(&path)?.contains("IS_STATIC=true\n"));
+    config::write_local_environment(&config, &path)?;
+    assert!(fs::read_to_string(&path)?.contains("BONES_IS_STATIC=true\n"));
     let loaded = config::load(&path)?;
 
     assert_eq!(loaded.runtime.extra.get("is_static"), Some(&toml::Value::Boolean(true)));
@@ -209,4 +192,110 @@ fn remote_deployment_config_rejects_unknown_fields() {
     let json = r#"{"branch":"main","releases_keep":5,"runtime":{"backend":"native","template":"","web_root":"public","node_version":"24.19.0"},"build":{"timeout_seconds":300},"extra_field":"bad"}"#;
     let result: Result<RemoteDeploymentConfig, _> = serde_json::from_str(json);
     assert!(result.is_err());
+}
+
+#[test]
+fn managed_block_delimiters_replaced_atomically_preserving_application_content() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    fs::write(
+        &path,
+        "# app\nAPP_TOKEN=\"quoted value\"\n\n# >>> BonesDeploy managed configuration >>>\nPROJECT_NAME=old\n# ignored\n# <<< BonesDeploy managed configuration <<<\n",
+    )?;
+    let mut bones = Bones::default();
+    bones.project_name = "new".into();
+    config::write_local_environment(&bones, &path)?;
+    let output = fs::read_to_string(&path)?;
+    assert!(output.starts_with("# app\nAPP_TOKEN=\"quoted value\"\n\n"));
+    assert_eq!(output.matches("# >>> BonesDeploy managed configuration >>>").count(), 1);
+    assert_eq!(output.matches("BONES_PROJECT_NAME=new\n").count(), 1);
+    assert!(!output.contains("PROJECT_NAME=old"));
+    assert!(output.ends_with('\n'));
+    Ok(())
+}
+
+#[test]
+fn flat_configuration_absorbed_into_managed_block_on_load() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    fs::write(&path, "PROJECT_NAME=atlas\nHOST=192.0.2.1\nSSL_ENABLED=true\nSERVICES=postgres\nIS_STATIC=true\n")?;
+    let loaded = config::load_local(&path)?;
+    assert_eq!(loaded.environment.project_name, "atlas");
+    assert!(loaded.environment.ssl_enabled);
+    assert_eq!(loaded.environment.services.services, vec!["postgres"]);
+    assert!(loaded.environment.runtime.extra.contains_key("is_static"));
+    let parsed = config::parse_dotenv(&fs::read_to_string(&path)?)?;
+    assert!(parsed.needs_rewrite);
+    config::write_local_environment(&loaded.environment, &path)?;
+    let output = fs::read_to_string(&path)?;
+    assert!(output.contains("BONES_IS_STATIC=true\n"));
+    assert!(!output.lines().any(|line| line == "PROJECT_NAME=atlas"));
+    Ok(())
+}
+
+#[test]
+fn reserved_bones_prefix_outside_block_is_rejected() {
+    let error = config::validate_dotenv("BONES_UNKNOWN=value\n").expect_err("reserved key");
+    assert!(error.to_string().contains("BONES_UNKNOWN"));
+    assert!(error.to_string().contains("managed"));
+}
+
+#[test]
+fn duplicates_across_flat_and_block_forms_are_rejected() {
+    let content = "PROJECT_NAME=one\n# >>> BonesDeploy managed configuration >>>\nBONES_PROJECT_NAME=two\n# <<< BonesDeploy managed configuration <<<\n";
+    assert!(config::validate_dotenv(content).is_err());
+}
+
+#[test]
+fn production_filter_excludes_every_managed_source_and_retains_applications() -> Result<()> {
+    let parsed = ParsedDotEnv {
+        managed: BTreeMap::from([(String::from("PROJECT_NAME"), String::from("atlas"))]),
+        applications: BTreeMap::from([
+            (String::from("PROJECT_NAME"), String::from("flat")),
+            (String::from("API_TOKEN"), String::from("secret")),
+            (String::from("APP_VALUE_2"), String::from("two")),
+        ]),
+        needs_rewrite: false,
+    };
+    let applications = production_application_keys(&parsed)?;
+    assert_eq!(
+        applications,
+        BTreeMap::from([
+            (String::from("API_TOKEN"), String::from("secret")),
+            (String::from("APP_VALUE_2"), String::from("two"))
+        ])
+    );
+    Ok(())
+}
+
+#[test]
+fn provisioning_request_round_trips_through_json() -> Result<()> {
+    let mut bones = Bones::default();
+    bones.host = "example.com".into();
+    bones.runtime.extra.insert("php_version".into(), toml::Value::Boolean(true));
+    let request = ProvisioningRequest::from_bones(&bones)?;
+    let json = serde_json::to_string(&request)?;
+    let restored: ProvisioningRequest = serde_json::from_str(&json)?;
+    assert_eq!(request, restored);
+    assert!(serde_json::to_string(&ProvisioningRequest::server_only("h", "u", "22"))?.find("site").is_none());
+    assert!(
+        serde_json::from_str::<ProvisioningRequest>(
+            r#"{"server":{"host":"h","ssh_user":"u","port":"22","intruder":1}}"#
+        )
+        .is_err()
+    );
+    Ok(())
+}
+
+#[test]
+fn header_synthesis_when_file_absent_creates_normalized_environment() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    let bones = Bones::default();
+    config::write_local_environment(&bones, &path)?;
+    let output = fs::read_to_string(&path)?;
+    assert!(output.starts_with("# Local environment for the application.\n\n"));
+    assert!(output.contains("# >>> BonesDeploy managed configuration >>>\n"));
+    assert_eq!(config::load(&path)?.branch, bones.branch);
+    Ok(())
 }

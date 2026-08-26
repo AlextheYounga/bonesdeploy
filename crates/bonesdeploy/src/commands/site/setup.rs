@@ -4,9 +4,9 @@ use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
 
 use crate::commands::server;
-use crate::config;
 use crate::ui::output;
 use crate::ui::prompts;
+use crate::{config, infra};
 
 pub async fn run(yes: bool) -> Result<()> {
     if !yes && !prompts::confirm_site_setup()? {
@@ -16,7 +16,9 @@ pub async fn run(yes: bool) -> Result<()> {
 
     server::doctor(false).await.context("Server baseline is not ready.\n\nNext: bonesdeploy server setup --yes")?;
     println!("Provisioning site base...");
-    bonesinfra::run(&["site", "apply", "--env-file", paths::DOT_ENV])?;
+    let cfg = config::load(Path::new(paths::DOT_ENV))?;
+    let request = infra::provisioning_request(&cfg)?;
+    bonesinfra::run_with_request(&["site", "apply", "--request-stdin"], &request)?;
     super::services::apply()?;
     super::runtime::apply()?;
 

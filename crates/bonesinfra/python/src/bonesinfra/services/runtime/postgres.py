@@ -1,7 +1,7 @@
 from pyinfra.operations import apt, server, systemd
 
 from bonesinfra.config.paths import SCRIPTS_DIR
-from bonesinfra.services.runtime.base import RuntimeService
+from bonesinfra.services.runtime.base import RuntimeService, credentials_for
 
 
 class PostgresService(RuntimeService):
@@ -15,13 +15,15 @@ class PostgresService(RuntimeService):
             _sudo=True,
         )
         project = self._identifier(ctx.app.project_name)
-        env_path = f"{ctx.paths_dict['shared']}/.env"
+        creds = credentials_for(ctx, "postgres")
         server.script_template(
             name="Configure PostgreSQL for project",
             src=str(SCRIPTS_DIR / "configure-postgres-project.sh.j2"),
-            env=env_path,
             user=f"{project}_postgres",
             project=project,
+            database=creds.get("database", project),
+            username=creds.get("username", f"{project}_postgres"),
+            password=creds["password"],
             _sudo=True,
         )
         systemd.service(

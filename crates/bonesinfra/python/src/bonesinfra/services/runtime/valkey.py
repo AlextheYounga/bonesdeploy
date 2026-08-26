@@ -1,7 +1,7 @@
 from pyinfra.operations import apt, server, systemd
 
 from bonesinfra.config.paths import BONESINFRA_SERVICES_ROOT, ETC_SYSTEMD_SYSTEM, SCRIPTS_DIR
-from bonesinfra.services.runtime.base import RuntimeService
+from bonesinfra.services.runtime.base import RuntimeService, credentials_for
 
 
 class ValKeyService(RuntimeService):
@@ -33,18 +33,15 @@ class ValKeyService(RuntimeService):
             _sudo=True,
         )
         project = self._identifier(ctx.app.project_name)
-        env_path = f"{ctx.paths_dict['shared']}/.env"
+        creds = credentials_for(ctx, self.service)
         service_name = f"{project}-{self.service}"
         server.script_template(
             name=f"Configure isolated {self.service} instance for project",
             src=str(SCRIPTS_DIR / "setup-key-value-store.sh.j2"),
-            env=env_path,
             config=f"{BONESINFRA_SERVICES_ROOT}/{service_name}.conf",
             data=f"/var/lib/{self.service}/{project}",
-            default_port=str(self.default_port),
-            password_key=self.service.upper() + "_PASSWORD",
-            port_key=self.service.upper() + "_PORT",
-            url_key=self.service.upper() + "_URL",
+            password=creds["password"],
+            port=str(creds.get("port", "6379")),
             unit=self.unit,
             runtime_group=ctx.runtime.runtime_group,
             binary=f"/usr/bin/{self.package_user}-server",

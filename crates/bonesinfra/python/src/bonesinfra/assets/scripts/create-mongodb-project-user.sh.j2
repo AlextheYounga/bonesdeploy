@@ -2,9 +2,10 @@
 set -euo pipefail
 
 ADMIN_FILE="{{ admin_file }}"
-ENV="{{ env }}"
 PROJECT="{{ project }}"
-USER="{{ user }}"
+USER="{{ username }}"
+DATABASE="{{ database }}"
+PASSWORD="{{ password }}"
 
 install -d -m 0700 /root/.config/bonesinfra
 
@@ -16,14 +17,23 @@ else
   chmod 0600 "$ADMIN_FILE"
 fi
 
-if ! mongosh --username bonesinfra_admin --password "$admin_password" --authenticationDatabase admin --quiet --eval "db.getSiblingDB('admin').getUser('bonesinfra_admin')" >/dev/null 2>&1; then
-  mongosh --quiet --eval "db.getSiblingDB('admin').createUser({user: 'bonesinfra_admin', pwd: '$admin_password', roles: [{role: 'root', db: 'admin'}]})"
+if ! ADMIN_FILE="$ADMIN_FILE" mongosh --quiet --eval '
+  const admin = cat(process.env.ADMIN_FILE).split("\\n");
+  const adminUser = admin.find((line) => line.startsWith("MONGODB_ADMIN_USER="))?.slice(19);
+  const adminPassword = admin.find((line) => line.startsWith("MONGODB_ADMIN_PASSWORD="))?.slice(23);
+  db.getSiblingDB("admin").auth(adminUser, adminPassword);
+  db.getSiblingDB("admin").getUser("bonesinfra_admin");
+' >/dev/null 2>&1; then
+  ADMIN_PASSWORD="$admin_password" mongosh --quiet --eval 'db.getSiblingDB("admin").createUser({user: "bonesinfra_admin", pwd: process.env.ADMIN_PASSWORD, roles: [{role: "root", db: "admin"}]})'
 fi
 
-password=$(sed -n 's/^MONGODB_PASSWORD=//p' "$ENV" | head -n1)
-[ -n "$password" ] || password=$(openssl rand -hex 24)
-
-mongosh --username bonesinfra_admin --password "$admin_password" --authenticationDatabase admin --quiet --eval "const database = db.getSiblingDB('$PROJECT'); const existing = database.getUser('$USER'); if (existing) database.updateUser('$USER', {pwd: '$password', roles: [{role: 'readWrite', db: '$PROJECT'}]}); else database.createUser({user: '$USER', pwd: '$password', roles: [{role: 'readWrite', db: '$PROJECT'}]})"
-
-sed -i '/^MONGODB_USER=/d; /^MONGODB_URI=/d' "$ENV"
-printf 'MONGODB_PASSWORD=%s\nMONGODB_USER=%s\nMONGODB_URI=mongodb://%s:%s@127.0.0.1:27017/%s?authSource=%s\n' "$password" "$USER" "$USER" "$password" "$PROJECT" "$PROJECT" >> "$ENV"
+ADMIN_FILE="$ADMIN_FILE" PROJECT="$PROJECT" USER="$USER" DATABASE="$DATABASE" PASSWORD="$PASSWORD" mongosh --quiet --eval '
+const admin = cat(process.env.ADMIN_FILE).split("\\n");
+const adminUser = admin.find((line) => line.startsWith("MONGODB_ADMIN_USER="))?.slice(19);
+const adminPassword = admin.find((line) => line.startsWith("MONGODB_ADMIN_PASSWORD="))?.slice(23);
+db.getSiblingDB("admin").auth(adminUser, adminPassword);
+const database = db.getSiblingDB(process.env.DATABASE);
+const existing = database.getUser(process.env.USER);
+if (existing) database.updateUser(process.env.USER, {pwd: process.env.PASSWORD, roles: [{role: "readWrite", db: process.env.DATABASE}]});
+else database.createUser({user: process.env.USER, pwd: process.env.PASSWORD, roles: [{role: "readWrite", db: process.env.DATABASE}]});
+'

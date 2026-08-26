@@ -23,6 +23,7 @@ tokio = { version = "1.52.3", features = ["rt", "rt-multi-thread", "macros"] }
 bonesdeploy-core = { version = "0.8.6", path = "../bonesdeploy-core" }
 bonesinfra = { version = "0.3.3", path = "../bonesinfra" }
 easy-tree = "0.4.0"
+getrandom = "0.4.3"
 
 [lints]
 workspace = true

@@ -2,17 +2,18 @@ from pathlib import Path
 
 import pytest
 
+from bonesinfra.config.context import DeployContext
 from bonesinfra.frameworks.custom import manifest as core_manifest, runtime as core_runtime
 from bonesinfra.project import load_manifest, load_runtime
 
+from .helpers import make_site_request
 
-def _project(tmp_path: Path, *, template: str = "custom") -> Path:
+
+def _project(tmp_path: Path, *, template: str = "custom") -> DeployContext:
     core = tmp_path / "infra/.framework/src/bonesinfra"
     core.mkdir(parents=True)
     (core / "__main__.py").write_text("")
-    config = tmp_path / ".env"
-    config.write_text(f"TEMPLATE={template}\n")
-    return config
+    return DeployContext.from_request(make_site_request(template=template))
 
 
 def _custom(tmp_path: Path, filename: str, content: str) -> None:
@@ -22,40 +23,44 @@ def _custom(tmp_path: Path, filename: str, content: str) -> None:
     (custom / filename).write_text(content)
 
 
-def test_runtime_loader_supports_relative_imports_in_custom_provisioning(tmp_path: Path):
+def test_runtime_loader_supports_relative_imports_in_custom_provisioning(tmp_path: Path, monkeypatch):
     config = _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
     _custom(tmp_path, "value.py", "VALUE = 7\n")
     _custom(tmp_path, "runtime.py", "from . import value\ndef deploy(_ctx):\n    return value.VALUE\n")
 
     assert load_runtime(config).deploy(None) == 7
 
 
-def test_missing_project_local_core_is_rejected(tmp_path: Path):
-    config = tmp_path / ".env"
-    config.write_text("TEMPLATE=next\n")
+def test_missing_project_local_core_is_rejected(tmp_path: Path, monkeypatch):
+    config = DeployContext.from_request(make_site_request(template="next"))
+    monkeypatch.chdir(tmp_path)
 
     with pytest.raises(FileNotFoundError, match="project-local BonesInfra framework"):
         load_runtime(config)
 
 
-def test_runtime_loader_reports_custom_syntax_error_with_path(tmp_path: Path):
+def test_runtime_loader_reports_custom_syntax_error_with_path(tmp_path: Path, monkeypatch):
     config = _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
     _custom(tmp_path, "runtime.py", "def deploy(:\n")
 
     with pytest.raises(ImportError, match=r"infra/custom/runtime\.py"):
         load_runtime(config)
 
 
-def test_runtime_loader_requires_custom_deploy_callable(tmp_path: Path):
+def test_runtime_loader_requires_custom_deploy_callable(tmp_path: Path, monkeypatch):
     config = _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
     _custom(tmp_path, "runtime.py", "deploy = 3\n")
 
     with pytest.raises(TypeError, match="deploy"):
         load_runtime(config)
 
 
-def test_manifest_loader_requires_all_custom_manifest_callables(tmp_path: Path):
+def test_manifest_loader_requires_all_custom_manifest_callables(tmp_path: Path, monkeypatch):
     config = _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
     _custom(tmp_path, "manifest.py", "def artifacts(_ctx):\n    return []\n")
 
     with pytest.raises(TypeError, match="services"):
@@ -64,6 +69,7 @@ def test_manifest_loader_requires_all_custom_manifest_callables(tmp_path: Path):
 
 def test_local_runtime_composes_core_before_custom(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     config = _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
     _custom(
         tmp_path,
         "runtime.py",
@@ -84,6 +90,7 @@ def test_local_runtime_composes_core_before_custom(tmp_path: Path, monkeypatch: 
 
 def test_local_manifest_composes_managed_and_custom_entries(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     config = _project(tmp_path)
+    monkeypatch.chdir(tmp_path)
     _custom(
         tmp_path,
         "manifest.py",

@@ -257,7 +257,7 @@ Database services selected at init are provisioned by `bonesdeploy site setup`, 
 bonesdeploy site services --yes
 ```
 
-Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Generated credentials live in the protected remote `shared/.env`, never in Git. MariaDB and MySQL are alternatives and cannot share one host.
+Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances on port `6379` by default, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Credentials are generated locally into the encrypted `infra/secrets/.env.gpg` during first initialization and reach the host as protected remote `shared/.env` through `bonesdeploy secrets push`, never in Git. MariaDB and MySQL are alternatives and cannot share one host.
 
 Add SSL after DNS points at the server:
 
@@ -345,28 +345,37 @@ bonesdeploy update
 
 ## Config
 
-`bonesdeploy init` creates a project-root `.env` with local provisioning inputs:
+`bonesdeploy init` creates a project-root `.env` holding the application's
+local environment plus one BonesDeploy-managed configuration block:
 
 ```dotenv
-PROJECT_NAME=myproject
-REMOTE_NAME=production
-HOST=deploy.example.com
-SSH_USER=root
-PORT=22
-BRANCH=main
-TEMPLATE=custom
-RUNTIME_BACKEND=native
+# Local environment for the application.
+
+# >>> BonesDeploy managed configuration >>>
+BONES_PROJECT_NAME=myproject
+BONES_REMOTE_NAME=production
+BONES_HOST=deploy.example.com
+BONES_SSH_USER=root
+BONES_PORT=22
+BONES_BRANCH=main
+BONES_TEMPLATE=custom
+BONES_RUNTIME_BACKEND=native
+# <<< BonesDeploy managed configuration <<<
 ```
 
-`.env` is local configuration and is excluded from Git. `.env.build` is the
-committed, non-secret build configuration. Runtime secrets are edited through
-`bonesdeploy secrets edit`, stored encrypted at `infra/secrets/.env.gpg`, and
-explicitly sent as the complete protected remote `shared/.env` with
-`bonesdeploy secrets push`. The push atomically replaces the remote file; it
-does not read, merge, or upload the local root `.env`. `bonesdeploy deploy`
-does not push environment values. The local root `.env` supplies BonesRemote's
-deployment descriptor at deploy time; the encrypted file contains only values
-the application needs at runtime.
+`.env` is the local environment and is excluded from Git. Its application-owned
+content (everything outside the managed block, including comments and values)
+is never replaced by `init`; only the delimited `BONES_*` block is rewritten.
+`BONES_*` keys never leave the workstation — they are stripped from production
+environments. `.env.build` is the committed, non-secret build configuration.
+Runtime secrets are edited through `bonesdeploy secrets edit`, stored encrypted
+at `infra/secrets/.env.gpg`, and explicitly sent as the complete protected
+remote `shared/.env` with `bonesdeploy secrets push`. The push atomically
+replaces the remote file; it does not read, merge, or upload the local root
+`.env`. `bonesdeploy deploy` does not push environment values. The local managed
+block supplies BonesRemote's deployment descriptor at deploy time and is
+mirrored to `/srv/conf/<site>/bones.json` on the host for remote-only commands;
+the encrypted file contains only values the application needs at runtime.
 
 ## Project Structure
 

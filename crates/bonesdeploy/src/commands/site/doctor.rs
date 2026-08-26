@@ -5,7 +5,7 @@ use anyhow::Result;
 use bonesdeploy_core::{config::is_numbered_shell_script, paths};
 
 use crate::config;
-use crate::infra::{git, ssh};
+use crate::infra::{self, git, ssh};
 use crate::ui::output;
 
 pub async fn run(local_only: bool, verbose: bool) -> Result<()> {
@@ -193,8 +193,13 @@ async fn check_remote_doctor(cfg: &config::Bones, verbose: bool) -> (Option<Stri
         Ok(session) => session,
         Err(error) => return (Some(format!("Cannot connect as privileged remote user\n  {error}")), false),
     };
-    let command = format!("bonesremote doctor --site {}", cfg.project_name);
-    let result = ssh::run_cmd(&session, &command).await;
+    let result = match infra::sync_control_plane(&session, cfg).await {
+        Ok(()) => {
+            let command = format!("bonesremote doctor --site {}", ssh::shell_quote(&cfg.project_name));
+            ssh::run_cmd(&session, &command).await
+        }
+        Err(error) => Err(error),
+    };
     let _ = session.close().await;
 
     match result {

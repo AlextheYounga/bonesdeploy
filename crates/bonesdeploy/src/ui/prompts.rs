@@ -121,7 +121,7 @@ pub fn prompt_runtime_backend(existing_config: Option<&Bones>) -> Result<String>
 }
 
 pub fn prompt_branch(existing_config: Option<&Bones>) -> Result<String> {
-    let default_branch = config_default(existing_config, |cfg| cfg.branch.as_str(), "master");
+    let default_branch = config_default(existing_config, |cfg| cfg.branch.as_str(), "main");
     Text::new("Branch:")
         .with_default(default_branch)
         .prompt()

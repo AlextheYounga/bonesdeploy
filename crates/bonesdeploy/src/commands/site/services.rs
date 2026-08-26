@@ -1,8 +1,10 @@
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
+use bonesdeploy_core::config::ProvisioningRequest;
 use bonesdeploy_core::paths;
 
+use crate::commands::secrets;
 use crate::config;
 use crate::ui::prompts;
 
@@ -28,6 +30,13 @@ pub(super) fn apply() -> Result<()> {
         return Ok(());
     }
     println!("Provisioning services...");
-    bonesinfra::run(&["services", "apply", "--env-file", paths::DOT_ENV])?;
+    let request = service_request(&cfg)?;
+    bonesinfra::run_with_request(&["services", "apply", "--request-stdin"], &request)?;
     Ok(())
+}
+
+fn service_request(cfg: &config::Bones) -> Result<String> {
+    let mut request = ProvisioningRequest::from_bones(cfg)?;
+    request.services = Some(secrets::read_service_credentials(cfg)?);
+    serde_json::to_string(&request).context("Failed to serialize services request")
 }

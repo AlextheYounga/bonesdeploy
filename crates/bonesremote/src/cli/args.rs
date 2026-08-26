@@ -30,6 +30,11 @@ pub enum Command {
         #[arg(long)]
         config_stdin: bool,
     },
+    /// Synchronize the sanitized site configuration snapshot
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
+    },
     /// Print remote deployment status as JSON
     Status {
         #[arg(long)]
@@ -52,6 +57,17 @@ pub enum Command {
     },
     /// Print the version
     Version,
+}
+
+#[derive(Subcommand)]
+pub enum ConfigCommand {
+    /// Install a site configuration snapshot from stdin
+    Sync {
+        #[arg(long)]
+        site: String,
+        #[arg(long, required = true)]
+        config_stdin: bool,
+    },
 }
 
 #[derive(Subcommand)]

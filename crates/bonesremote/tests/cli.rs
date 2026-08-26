@@ -17,3 +17,11 @@ fn exhaustive_doctor_accepts_a_site() -> Result<()> {
     assert_ne!(output.status.code(), Some(2), "accepted arguments must not be a usage error");
     Ok(())
 }
+
+#[test]
+fn config_sync_requires_config_stdin() -> Result<()> {
+    let output = common::run(&["config", "sync", "--site", "atlas"])?;
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--config-stdin"));
+    Ok(())
+}

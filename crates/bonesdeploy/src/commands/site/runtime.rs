@@ -1,8 +1,10 @@
 use anyhow::Result;
 use bonesdeploy_core::paths;
+use std::path::Path;
 
 use crate::ui::output;
 use crate::ui::prompts;
+use crate::{config, infra};
 
 pub fn run(yes: bool) -> Result<()> {
     super::readiness::ensure_project_ready()?;
@@ -19,6 +21,8 @@ pub fn run(yes: bool) -> Result<()> {
 
 pub(super) fn apply() -> Result<()> {
     println!("Applying runtime...");
-    bonesinfra::run(&["runtime", "apply", "--env-file", paths::DOT_ENV])?;
+    let cfg = config::load(Path::new(paths::DOT_ENV))?;
+    let request = infra::provisioning_request(&cfg)?;
+    bonesinfra::run_with_request(&["runtime", "apply", "--request-stdin"], &request)?;
     Ok(())
 }

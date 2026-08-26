@@ -1,13 +1,13 @@
-use bonesdeploy_core::{config, paths};
+use bonesdeploy_core::paths;
 
 use crate::inspection::systemd;
 use crate::release::state as release_state;
 
-pub fn check_target(cfg: &config::Bones, issues: &mut Vec<String>) {
-    let target_name = paths::site_target_name(&cfg.project_name);
+pub fn check_target(site: &str, issues: &mut Vec<String>) {
+    let target_name = paths::site_target_name(site);
     match systemd::property(&target_name, "LoadState") {
         Ok(state) if service_exists(&state) => {
-            check_target_membership(&target_name, &cfg.project_root, issues);
+            check_target_membership(&target_name, &paths::default_project_root_for(site), issues);
         }
         Ok(_) => issues.push(format!("site target is missing: {target_name}")),
         Err(error) => issues.push(format!("could not inspect site target {target_name} ({error})")),

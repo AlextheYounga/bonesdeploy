@@ -40,6 +40,7 @@ pub(crate) fn resolve_revision_commit(repo_path: &Path, revision: &str) -> Resul
     Ok(sha)
 }
 
+#[expect(dead_code)]
 pub(crate) fn repository_has_refs(repo_path: &Path) -> Result<bool> {
     let repo_path = repo_path.to_str().context("Bare repository path is not valid UTF-8")?;
     let output = Command::new("git")

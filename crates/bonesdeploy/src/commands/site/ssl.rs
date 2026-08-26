@@ -5,12 +5,14 @@ use bonesdeploy_core::paths;
 use console::style;
 
 use crate::config;
+use crate::infra;
 use crate::ui::output;
 use crate::ui::prompts;
 
 pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<()> {
     let env_file = Path::new(paths::DOT_ENV);
-    let mut cfg = config::load(env_file)?;
+    let loaded = config::load_local(env_file)?;
+    let mut cfg = loaded.environment;
     if let Some(value) = domain {
         cfg.domain = value.trim().to_string();
     } else if cfg.domain.is_empty() && !yes {
@@ -27,7 +29,6 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     if cfg.email.is_empty() {
         bail!("SSL email is missing. Pass --email or set EMAIL in root .env");
     }
-    config::save(&cfg, env_file)?;
     if !yes && !prompts::confirm_site_ssl()? {
         println!("Skipped HTTPS setup.");
         println!();
@@ -35,9 +36,10 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
         return Ok(());
     }
     println!("{} {}", style("Configuring HTTPS for").cyan().bold(), style(&cfg.domain).bold());
-    bonesinfra::run(&["ssl", "apply", "--env-file", paths::DOT_ENV])?;
+    let request = infra::provisioning_request(&cfg)?;
+    bonesinfra::run_with_request(&["ssl", "apply", "--request-stdin"], &request)?;
     cfg.ssl_enabled = true;
-    config::save(&cfg, env_file)?;
+    config::write_local_environment(&cfg, env_file)?;
     println!("{} HTTPS configured.", output::success_marker());
     println!();
     println!("{}", output::next_step("bonesdeploy deploy"));

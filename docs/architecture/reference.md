@@ -494,8 +494,8 @@ Cli::Init
 ```
 Cli::Server::Setup
    └─ commands/server/setup.rs::run()
-        ├─ bonesinfra::run("server", "apply", "--env-file", ".env")
-        │    └─ Python: cli/commands/server::deploy_server_setup()
+        ├─ bonesinfra::run_with_request(["server", "apply", "--request-stdin", ...], server_request)
+         │    └─ Python: cli/commands/server::deploy_server_setup()
         │         ├─ packages.py and disable_algif_aead.py
         │         ├─ services/linux/image_store.py
         │         ├─ firewall.py, fail2ban.py, unattended_upgrades.py
@@ -511,8 +511,8 @@ Cli::Server::Setup
 Cli::Site::Setup
    └─ commands/site/setup.rs::run()
         ├─ SSH: bonesremote doctor     # stops before site mutation when unavailable
-        ├─ bonesinfra::run("site", "apply", "--env-file", ".env")
-        │    └─ Python: cli/commands/site::deploy_site_setup()
+        ├─ bonesinfra::run_with_request(["site", "apply", "--request-stdin"], site_request)
+         │    └─ Python: cli/commands/site::deploy_site_setup()
         │         ├─ users.py          # site runtime and build identities
         │         ├─ directories.py    # one bare repo and one site layout
         │         └─ placeholder.py    # initial current link only
@@ -707,10 +707,11 @@ Cli::Site::Runtime
 Older versions stored deployment state in separate files (`active-deployment.json`, `staged-release`). The `store` module migrates these to the unified `SiteState` format on first read. The migration path is one-way and the old files are deleted after migration.
 
 ### Cross-layer configuration and integration side doors
-Rust and Python have separate dotenv readers with the same root `.env` contract.
-BonesInfra owns provisioning configuration and receives only the explicit
-`--env-file` path. Local Git and SSH callers use their existing integration
-boundaries.
+Rust (`bonesdeploy-core`) is the sole parser of the root `.env`. Python and
+remote consumers receive typed JSON requests on stdin: BonesInfra commands take
+`--request-stdin` bodies, and BonesRemote deploy/doctor/config sync take the
+`RemoteDeploymentConfig` descriptor through `--config-stdin`. The sanitized
+control-plane copy lives at `/srv/conf/<site>/bones.json`.
 
 ### Framework and deployment boundaries
 Framework identity, defaults, and assets are selected through the Rust framework

@@ -1,7 +1,7 @@
 use std::fs;
 
 use anyhow::{Result, bail};
-use bonesdeploy::config::{Bones, bootstrap_ssh_user, load, save};
+use bonesdeploy::config::{Bones, bootstrap_ssh_user, load, write_local_environment};
 use bonesdeploy::frameworks::Framework;
 use bonesdeploy_core::config::{Runtime, RuntimeBackend, apply_derived_defaults};
 use serde_json::{Map, Value, json};
@@ -41,7 +41,7 @@ fn bootstrap_ssh_user_resolves_defaults_config_and_whitespace() {
 }
 
 #[test]
-fn save_round_trips_dotenv_values() -> Result<()> {
+fn write_local_environment_round_trips_dotenv_values() -> Result<()> {
     let temp = tempfile::tempdir()?;
     let path = temp.path().join("save.env");
     let mut config = sample_config("phoenix");
@@ -54,7 +54,7 @@ fn save_round_trips_dotenv_values() -> Result<()> {
     config.runtime.web_root = String::from("dist");
     config.services.services = vec![String::from("postgres"), String::from("redis")];
 
-    save(&config, &path)?;
+    write_local_environment(&config, &path)?;
     let content = fs::read_to_string(&path)?;
     assert!(content.contains("SSL_ENABLED=true"));
     assert!(content.contains("DOMAIN=app.example.com"));
@@ -76,10 +76,10 @@ fn save_round_trips_dotenv_values() -> Result<()> {
 }
 
 #[test]
-fn save_writes_flat_local_input_file() -> Result<()> {
+fn write_local_environment_writes_flat_local_input_file() -> Result<()> {
     let temp = tempfile::tempdir()?;
     let path = temp.path().join("flat.env");
-    save(&sample_config("phoenix"), &path)?;
+    write_local_environment(&sample_config("phoenix"), &path)?;
     assert!(fs::read_to_string(path)?.lines().all(|line| !line.starts_with('[')));
     Ok(())
 }

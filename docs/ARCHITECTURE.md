@@ -186,7 +186,7 @@ DeployContext (bonesinfra/python/.../config/context.py)
 template_data(ctx) flattens it for Jinja2 rendering.
 
 Existing implementations:
-- Built from the root `.env` by DeployContext.from_files()
+- Built from the typed provisioning request delivered as JSON on stdin (`DeployContext.from_request` in `config/request.py`); Python never parses the root `.env`.
 
 To add another:
 Extend AppConfig / RuntimeConfig dataclasses. Framework-specific values go in RuntimeConfig.data.
@@ -599,10 +599,11 @@ both systems by design.
 files. The `store` module migrates these to unified `SiteState` on first read
 and deletes the old files. The migration is one-way.
 
-**Cross-layer configuration and integration side doors.** Rust and Python have
-separate readers for the same root `.env` contract. BonesInfra provisioning
-receives the explicit `--env-file` path, while Git and SSH callers use their
-existing integration boundaries.
+**Cross-layer configuration and integration side doors.** Rust is the sole
+parser of the root `.env`; Python provisioning consumes typed JSON requests on
+stdin (`--request-stdin`), and the remote deployment lifecycle consumes the
+`RemoteDeploymentConfig` descriptor through the established `--config-stdin`
+protocol, so the two layers share one schema defined in `bonesdeploy-core`.
 
 **Framework and deployment side doors.** Framework identity, defaults, and
 assets cross Rust and Python boundaries, while release commands can reach state

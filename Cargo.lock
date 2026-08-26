@@ -92,6 +92,7 @@ dependencies = [
  "clap",
  "console",
  "easy-tree",
+ "getrandom",
  "inquire",
  "openssh",
  "rust-embed",
@@ -136,6 +137,7 @@ dependencies = [
  "serde",
  "serde_json",
  "time",
+ "toml 0.8.23",
 ]
 
 [[package]]

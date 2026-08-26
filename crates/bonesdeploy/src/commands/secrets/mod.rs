@@ -14,9 +14,10 @@ use crate::frameworks;
 use crate::infra::ssh;
 use crate::ui::output;
 use bonesdeploy_core::config as shared_config;
-use bonesdeploy_core::config::parse_port;
+use bonesdeploy_core::config::{KeyValueCredentials, ServiceCredentials, ServicesRequest, parse_port};
 use bonesdeploy_core::paths;
 
+mod environment;
 pub mod gpg;
 
 const LOCAL_ENV_SECRET: &str = "infra/secrets/.env.gpg";
@@ -51,23 +52,21 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     shared_config::apply_derived_defaults(&mut effective_config);
     let framework = framework_for_secrets(&effective_config.runtime.template)?;
 
+    let env_path = Path::new(paths::DOT_ENV);
+    let loaded = config::load_local(env_path)?;
+    let framework_content = framework
+        .environment_example(&effective_config.project_name, &effective_config.domain, &effective_config.preview_domain)
+        .unwrap_or_default();
+    let plaintext = environment::prepare(env_path, &framework_content, &effective_config, &loaded)?;
+
     gpg::ensure_installed()?;
     let key_fingerprint = gpg::ensure_project_key(&cfg.project_name)?;
     fs::create_dir_all(paths::LOCAL_INFRA_SECRETS_DIR)
         .with_context(|| format!("Failed to create {}", paths::LOCAL_INFRA_SECRETS_DIR))?;
 
     let temp_path = create_temp_edit_path()?;
-    fs::write(
-        &temp_path,
-        framework
-            .environment_example(
-                &effective_config.project_name,
-                &effective_config.domain,
-                &effective_config.preview_domain,
-            )
-            .unwrap_or_default(),
-    )
-    .with_context(|| format!("Failed to write default secrets to {}", temp_path.display()))?;
+    fs::write(&temp_path, plaintext)
+        .with_context(|| format!("Failed to write default secrets to {}", temp_path.display()))?;
     fs::set_permissions(&temp_path, Permissions::from_mode(0o600))?;
 
     let encrypted_result = gpg::run(&[
@@ -85,6 +84,77 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     cleanup_result.with_context(|| format!("Failed to remove temporary secrets file {}", temp_path.display()))?;
     fs::set_permissions(encrypted_path, Permissions::from_mode(0o640))?;
     Ok(())
+}
+
+pub(super) fn read_service_credentials(cfg: &config::Bones) -> Result<ServicesRequest> {
+    let path = Path::new(LOCAL_ENV_SECRET);
+    if !path.is_file() {
+        bail!("Missing encrypted secrets; run `bonesdeploy secrets edit` first")
+    }
+    let plaintext = String::from_utf8(gpg::decrypt(path)?).context("Decrypted secrets are not valid UTF-8")?;
+    let values = shared_config::parse_dotenv(&plaintext)?.applications;
+    let required = |key: &str| -> Result<String> {
+        values
+            .get(key)
+            .filter(|value| !value.trim().is_empty())
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Missing {key} in encrypted secrets; run `bonesdeploy secrets edit`"))
+    };
+    let project = &cfg.project_name;
+    let database = sanitize_identifier(project);
+    let selected = |name: &str| cfg.services.services.iter().any(|service| service == name);
+    let port =
+        |key: &str| values.get(key).filter(|value| !value.trim().is_empty()).cloned().unwrap_or_else(|| "6379".into());
+    Ok(ServicesRequest {
+        postgres: selected("postgres")
+            .then(|| {
+                required(environment::POSTGRES_PASSWORD).map(|password| ServiceCredentials {
+                    password,
+                    username: format!("{project}_postgres"),
+                    database: database.clone(),
+                })
+            })
+            .transpose()?,
+        mysql: selected("mysql")
+            .then(|| {
+                required(environment::MYSQL_PASSWORD).map(|password| ServiceCredentials {
+                    password,
+                    username: format!("{project}_mysql"),
+                    database: database.clone(),
+                })
+            })
+            .transpose()?,
+        mongodb: selected("mongodb")
+            .then(|| {
+                required(environment::MONGODB_PASSWORD).map(|password| ServiceCredentials {
+                    password,
+                    username: format!("{project}_mongodb"),
+                    database: database.clone(),
+                })
+            })
+            .transpose()?,
+        valkey: selected("valkey")
+            .then(|| {
+                required(environment::VALKEY_PASSWORD)
+                    .map(|password| KeyValueCredentials { password, port: port(environment::VALKEY_PORT) })
+            })
+            .transpose()?,
+        redis: selected("redis")
+            .then(|| {
+                required(environment::REDIS_PASSWORD)
+                    .map(|password| KeyValueCredentials { password, port: port(environment::REDIS_PORT) })
+            })
+            .transpose()?,
+    })
+}
+
+fn sanitize_identifier(value: &str) -> String {
+    value
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+        .collect::<String>()
+        .trim_matches('_')
+        .to_string()
 }
 
 pub fn framework_for_secrets(template: &str) -> Result<frameworks::Framework> {
