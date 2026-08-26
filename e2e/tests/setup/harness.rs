@@ -11,6 +11,8 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 
 const E2E_NODE_VERSION: &str = "24.19.0";
 const NODE_TEMPLATES: &[&str] = &["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"];
+const SERVER_SETUP_ARGS: &[&str] = &["server", "setup", "--yes"];
+const SITE_SETUP_ARGS: &[&str] = &["site", "setup", "--yes"];
 
 use dtor::dtor;
 
@@ -53,6 +55,7 @@ pub struct Harness {
     container: Container,
     host: String,
     session: Session,
+    server_setup_complete: Mutex<bool>,
 }
 
 impl Harness {
@@ -71,7 +74,7 @@ impl Harness {
         container.push_file(&artifacts.bonesremote, "/usr/local/bin/bonesremote", "0755")?;
         let host = container.ipv4()?;
 
-        Ok(Self { artifacts, container, host, session })
+        Ok(Self { artifacts, container, host, session, server_setup_complete: Mutex::new(false) })
     }
 
     pub fn provision(&self, site: &str, template: &str, framework_vars: &[&str]) -> Result<SampleProject> {
@@ -99,20 +102,16 @@ impl Harness {
         if template == "laravel" {
             project.generate_laravel_app_key(&self.session, &self.artifacts.bonesdeploy)?;
         }
-        let environment = format!(
-            "PROJECT_NAME={site}\nHOST={}\nPORT=22\nSSH_USER=root\nBRANCH=main\nTEMPLATE={template}\nRUNTIME_BACKEND=native\nWEB_ROOT=public\n",
-            self.host
-        );
-        project.configure_remote_environment(&self.session, &self.artifacts.bonesdeploy, &environment)?;
         project.assert_infrastructure(template)?;
         if NODE_TEMPLATES.contains(&template) {
             project.pin_node_version(E2E_NODE_VERSION)?;
         }
         project.commit(&self.session, "bonesdeploy init")?;
-        project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["setup", "--yes"])?;
+        self.setup_server(&project)?;
+        project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, SITE_SETUP_ARGS)?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["secrets", "push"])?;
         self.assert_site(site)?;
-        let manifest = project.bonesdeploy_output(&self.session, &self.artifacts.bonesdeploy, &["manifest"])?;
+        let manifest = project.bonesdeploy_output(&self.session, &self.artifacts.bonesdeploy, &["site", "manifest"])?;
         eprintln!("\n--- manifest for {site} ---\n{manifest}--- end manifest for {site} ---");
         Ok(project)
     }
@@ -120,6 +119,15 @@ impl Harness {
     pub fn deploy(&self, project: &SampleProject) -> Result<()> {
         project.push(&self.session, "production", "main")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["deploy"])
+    }
+
+    fn setup_server(&self, project: &SampleProject) -> Result<()> {
+        let mut complete = self.server_setup_complete.lock().unwrap_or_else(|error| error.into_inner());
+        if !*complete {
+            project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, SERVER_SETUP_ARGS)?;
+            *complete = true;
+        }
+        Ok(())
     }
 
     pub fn assert_site(&self, site: &str) -> Result<()> {
@@ -195,4 +203,10 @@ impl Harness {
             "curl --silent --show-error --fail --max-time 10 --resolve {preview_host}:80:127.0.0.1 http://{preview_host}/"
         ))
     }
+}
+
+#[test]
+fn shared_server_lifecycle_runs_baseline_once_before_each_site_setup() {
+    assert_eq!(SERVER_SETUP_ARGS, ["server", "setup", "--yes"]);
+    assert_eq!(SITE_SETUP_ARGS, ["site", "setup", "--yes"]);
 }

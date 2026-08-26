@@ -1,36 +1,21 @@
-"""Deploy context parsing for the root dotenv contract."""
-
-from pathlib import Path
+"""Typed provisioning request parsing at the process boundary."""
 
 import pytest
 
-from bonesinfra.config.context import DeployContext, template_data
+from bonesinfra.config.context import DeployContext, ServerContext, template_data
+from bonesinfra.config.request import parse_request
+
+from .helpers import make_server_request, make_site_request
 
 
-def _write_config(tmp_path: Path, extra: str = "") -> Path:
-    path = tmp_path / ".env"
-    path.write_text(
-        f"""PROJECT_NAME=lawsnipe
-HOST=example.com
-PORT=2222
-DOMAIN=example.com
-EMAIL=ops@example.com
-SSL_ENABLED=true
-BRANCH=main
-WEB_ROOT=dist
-{extra}"""
-    )
-    return path
-
-
-def test_reads_nested_single_file_config(tmp_path):
-    ctx = DeployContext.from_files(str(_write_config(tmp_path)))
+def test_reads_typed_site_request():
+    ctx = DeployContext.from_request(make_site_request())
 
     assert ctx.app.project_name == "lawsnipe"
     assert ctx.app.repo_path == "/home/git/lawsnipe.git"
     assert ctx.app.project_root == "/srv/sites/lawsnipe"
-    assert ctx.app.server.host == "example.com"
-    assert ctx.app.server.port == "2222"
+    assert ctx.server.host == "example.com"
+    assert ctx.server.port == "2222"
     assert ctx.paths.repo == "/home/git/lawsnipe.git"
     assert ctx.paths.project_root == "/srv/sites/lawsnipe"
     assert ctx.paths.current_web_root == "/srv/sites/lawsnipe/current/dist"
@@ -40,118 +25,104 @@ def test_reads_nested_single_file_config(tmp_path):
     assert ctx.runtime.runtime_group == "lawsnipe"
 
 
-def test_template_data_contains_runtime_values(tmp_path):
-    td = template_data(DeployContext.from_files(str(_write_config(tmp_path))))
+def test_template_data_contains_runtime_values():
+    td = template_data(DeployContext.from_request(make_site_request()))
     assert td["runtime_user"] == "lawsnipe"
     assert td["runtime_group"] == "lawsnipe"
     assert td["runtime_backend"] == "native"
     assert "preview_domain" not in td
 
 
-def test_legacy_preview_domain_is_discarded_from_runtime_data(tmp_path):
-    ctx = DeployContext.from_files(str(_write_config(tmp_path, "PREVIEW_DOMAIN=preview.example.com\n")))
+def test_extras_are_forwarded_with_json_types():
+    request = make_site_request(extras={"php_version": True, "is_static": False, "custom": "value"})
+    ctx = DeployContext.from_request(request)
 
-    assert "PREVIEW_DOMAIN" not in ctx.runtime.data
-
-
-def test_framework_values_are_available_to_runtime_templates(tmp_path):
-    ctx = DeployContext.from_files(_write_config(tmp_path, "IS_STATIC=true\n"))
-
-    assert ctx.runtime.data["is_static"] is True
-    assert template_data(ctx)["is_static"] is True
+    assert ctx.runtime.data == {"php_version": True, "is_static": False, "custom": "value"}
+    assert template_data(ctx)["is_static"] is False
 
 
-def test_false_framework_boolean_is_false(tmp_path):
-    ctx = DeployContext.from_files(_write_config(tmp_path, "IS_STATIC=false\n"))
+def test_ssl_enabled_accepts_boolean_string_for_request_compatibility():
+    ctx = DeployContext.from_request(make_site_request(ssl_enabled="false"))
+    assert ctx.app.dns.ssl_enabled is False
 
-    assert ctx.runtime.data["is_static"] is False
 
-
-def test_docker_runtime_backend_is_preserved(tmp_path):
-    ctx = DeployContext.from_files(_write_config(tmp_path, "RUNTIME_BACKEND=docker\n"))
-
+def test_docker_runtime_backend_is_preserved():
+    ctx = DeployContext.from_request(make_site_request(backend="docker"))
     assert ctx.runtime.backend == "docker"
     assert "backend" not in ctx.runtime.data
 
 
-def test_unknown_runtime_backend_is_rejected(tmp_path):
+def test_unknown_runtime_backend_is_rejected():
     with pytest.raises(ValueError, match="RUNTIME_BACKEND"):
-        DeployContext.from_files(_write_config(tmp_path, "RUNTIME_BACKEND=compose\n"))
+        DeployContext.from_request(make_site_request(backend="compose"))
 
 
-def test_missing_nested_tables_use_defaults(tmp_path):
-    path = tmp_path / ".env"
-    path.write_text("PROJECT_NAME=lawsnipe\n")
-    ctx = DeployContext.from_files(str(path))
+def test_missing_site_fields_use_defaults():
+    request = {"server": make_server_request()["server"], "site": {"project_name": "lawsnipe"}}
+    ctx = DeployContext.from_request(request)
     assert ctx.app.deploy.branch == "main"
-    assert ctx.app.server.host == ""
     assert ctx.app.repo_path == "/home/git/lawsnipe.git"
-    assert ctx.app.project_root == "/srv/sites/lawsnipe"
     assert ctx.runtime.web_root == "public"
     assert ctx.runtime.runtime_user == "lawsnipe"
 
 
-def test_database_services_are_read_and_validated(tmp_path):
-    ctx = DeployContext.from_files(_write_config(tmp_path, "SERVICES=postgres,valkey\n"))
+def test_database_services_are_read_and_validated():
+    ctx = DeployContext.from_request(make_site_request(site_services=["postgres", "valkey"]))
     assert ctx.services.services == ("postgres", "valkey")
 
 
-def test_conflicting_mysql_implementations_are_rejected(tmp_path):
-    path = _write_config(tmp_path, "SERVICES=mariadb,mysql\n")
+def test_service_credentials_are_supplied_separately():
+    request = make_site_request(site_services=["postgres"], service_credentials={"postgres": {"password": "secret"}})
+    ctx = DeployContext.from_request(request)
+    assert ctx.service_credentials == {"postgres": {"password": "secret"}}
+
+
+def test_conflicting_mysql_implementations_are_rejected():
     with pytest.raises(ValueError, match="cannot be provisioned together"):
-        DeployContext.from_files(str(path))
+        DeployContext.from_request(make_site_request(site_services=["mariadb", "mysql"]))
 
 
-def test_duplicate_database_services_are_rejected(tmp_path):
-    path = _write_config(tmp_path, "SERVICES=postgres,postgres\n")
+def test_duplicate_database_services_are_rejected():
     with pytest.raises(ValueError, match="must not contain duplicates"):
-        DeployContext.from_files(str(path))
+        DeployContext.from_request(make_site_request(site_services=["postgres", "postgres"]))
 
 
-def test_dotenv_parser_ignores_comments_and_unquotes_values(tmp_path):
-    path = tmp_path / ".env"
-    path.write_text('# deployment settings\nPROJECT_NAME="lawsnipe"\nHOST=example.com  \nCUSTOM=value\n')
-
-    ctx = DeployContext.from_files(str(path))
-
-    assert ctx.app.project_name == "lawsnipe"
-    assert ctx.app.server.host == "example.com"
-    assert ctx.runtime.data["custom"] == "value"
+def test_unknown_request_fields_are_rejected():
+    request = make_site_request()
+    request["unexpected"] = "value"
+    with pytest.raises(ValueError, match="unknown request field 'unexpected'"):
+        DeployContext.from_request(request)
 
 
-def test_dotenv_parser_rejects_malformed_entries(tmp_path):
-    path = tmp_path / ".env"
-    path.write_text("PROJECT_NAME=lawsnipe\nnot-an-entry\n")
-
-    with pytest.raises(ValueError, match="line 2"):
-        DeployContext.from_files(str(path))
+def test_unknown_site_fields_are_rejected():
+    with pytest.raises(ValueError, match="unknown site field 'unexpected'"):
+        DeployContext.from_request(make_site_request(unexpected="value"))
 
 
-@pytest.mark.parametrize("entry", ["1BAD=value", "BAD-KEY=value", "=value"])
-def test_dotenv_parser_rejects_invalid_keys(tmp_path, entry):
-    with pytest.raises(ValueError, match="line 9"):
-        DeployContext.from_files(_write_config(tmp_path, entry + "\n"))
-
-
-def test_dotenv_parser_rejects_duplicate_keys(tmp_path):
-    with pytest.raises(ValueError, match="duplicate"):
-        DeployContext.from_files(_write_config(tmp_path, "HOST=other.example.com\n"))
-
-
-def test_dotenv_parser_preserves_quote_semantics(tmp_path):
-    path = tmp_path / ".env"
-    path.write_text("PROJECT_NAME='lawsnipe'\nCUSTOM=\"quoted value\"\nRAW='one\"two'\n")
-
-    ctx = DeployContext.from_files(str(path))
-
-    assert ctx.app.project_name == "lawsnipe"
-    assert ctx.runtime.data == {"custom": "quoted value", "raw": 'one"two'}
+def test_invalid_extras_are_rejected():
+    with pytest.raises(ValueError, match="must be a scalar"):
+        DeployContext.from_request(make_site_request(extras={"nested": {"value": 1}}))
 
 
 @pytest.mark.parametrize("project_name", ["", "Demo", "demo_name", "network", "demo;rm"])
-def test_project_identity_matches_remote_validation(tmp_path, project_name):
-    path = tmp_path / ".env"
-    path.write_text(f"PROJECT_NAME={project_name}\n")
-
+def test_project_identity_matches_remote_validation(project_name):
     with pytest.raises(ValueError, match="Invalid project name"):
-        DeployContext.from_files(str(path))
+        DeployContext.from_request(make_site_request(project_name=project_name))
+
+
+def test_server_context_uses_connection_values():
+    ctx = ServerContext.from_request(make_server_request())
+    assert (ctx.host, ctx.ssh_user, ctx.port) == ("example.com", "root", "2222")
+
+
+def test_server_request_rejects_unknown_fields():
+    with pytest.raises(ValueError, match="unknown server field 'invalid'"):
+        parse_request({"server": {"host": "example.com", "invalid": True}}, server_only=True)
+
+
+def test_null_and_absent_service_credentials_are_equivalent():
+    absent = DeployContext.from_request(make_site_request(site_services=["postgres"]))
+    null = DeployContext.from_request(
+        make_site_request(site_services=["postgres"], service_credentials={"postgres": None})
+    )
+    assert absent.service_credentials == null.service_credentials == {}

@@ -170,7 +170,7 @@ Install the remote runner on the server:
 sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
-Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy init` remote setup.
+Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy server setup`.
 
 ## Start a Project
 
@@ -208,7 +208,7 @@ Edit them.
 Commit them.
 Read them when something breaks.
 
-The managed framework is executed when you invoke `bonesdeploy remote runtime`.
+The managed framework is executed when you invoke `bonesdeploy site runtime`.
 The project-owned `infra/custom/` package is composed after the managed
 framework. Edit custom provisioning and local templates as project
 infrastructure; use `bonesdeploy update` to refresh the managed snapshot.
@@ -223,17 +223,21 @@ Deployment scripts run in filename order:
 
 ## Set Up the Server
 
-Provision the base server:
+Provision the reusable server baseline:
 
 ```sh
-bonesdeploy remote setup
+bonesdeploy server setup --yes
 ```
 
-Provision the site runtime:
+Provision the site, including its base, services, runtime, and doctor:
 
 ```sh
-bonesdeploy remote runtime
+bonesdeploy site setup --yes
 ```
+
+`site setup` runs exactly server readiness, site base provisioning, services,
+runtime, and site doctor. It does not push Git or secrets, configure SSL, or
+deploy a release.
 
 This runs the provisioning in your project's `infra/.framework/` package:
 framework services, per-site nginx, AppArmor, and your `infra/custom/` project
@@ -253,18 +257,18 @@ first deploy or whenever it changes:
 bonesdeploy secrets push
 ```
 
-Database services selected at init are provisioned by `bonesdeploy setup`, or later with:
+Database services selected at init are provisioned by `bonesdeploy site setup`, or later with:
 
 ```sh
-bonesdeploy remote services
+bonesdeploy site services --yes
 ```
 
-Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Generated credentials live in the protected remote `shared/.env`, never in Git. MariaDB and MySQL are alternatives and cannot share one host.
+Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances on port `6379` by default, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Credentials are generated locally into the encrypted `infra/secrets/.env.gpg` during first initialization and reach the host as protected remote `shared/.env` through `bonesdeploy secrets push`, never in Git. MariaDB and MySQL are alternatives and cannot share one host.
 
 Add SSL after DNS points at the server:
 
 ```sh
-bonesdeploy remote ssl --domain app.example.com --email ops@example.com
+bonesdeploy site ssl --domain app.example.com --email ops@example.com
 ```
 
 SSL is separate on purpose. Get the site working first. Add certificates after DNS is real. A real domain uses the existing public Nginx and Certbot path; it replaces the temporary Quick Tunnel only after HTTPS is active.
@@ -286,13 +290,13 @@ bonesdeploy rollback
 Inspect releases, including a release that is currently building:
 
 ```sh
-bonesdeploy releases
+bonesdeploy site releases
 ```
 
 Cancel a named building or interrupted release and clean its temporary build state:
 
 ```sh
-bonesdeploy releases kill 20260715_225306
+bonesdeploy site releases kill 20260715_225306
 ```
 
 Check the setup:
@@ -301,10 +305,10 @@ Check the setup:
 bonesdeploy doctor
 ```
 
-Check only the local side:
+Check only the local site side:
 
 ```sh
-bonesdeploy doctor --local
+bonesdeploy site doctor --local
 ```
 
 `doctor` reports three states: green checks are healthy, yellow pending items
@@ -322,8 +326,8 @@ declared by the managed framework manifest, the configured services, and the SSL
 strategy without changing the server:
 
 ```sh
-bonesdeploy manifest
-bonesdeploy manifest --format json
+bonesdeploy site manifest
+bonesdeploy site manifest --format json
 ```
 
 The manifest reports present, missing, and wrong-kind paths, plus active and
@@ -347,27 +351,37 @@ bonesdeploy update
 
 ## Config
 
-`bonesdeploy init` creates a project-root `.env` with local provisioning inputs:
+`bonesdeploy init` creates a project-root `.env` holding the application's
+local environment plus one BonesDeploy-managed configuration block:
 
 ```dotenv
-PROJECT_NAME=myproject
-REMOTE_NAME=production
-HOST=deploy.example.com
-SSH_USER=root
-PORT=22
-BRANCH=main
-TEMPLATE=custom
-RUNTIME_BACKEND=native
+# Local environment for the application.
+
+# >>> BonesDeploy managed configuration >>>
+BONES_PROJECT_NAME=myproject
+BONES_REMOTE_NAME=production
+BONES_HOST=deploy.example.com
+BONES_SSH_USER=root
+BONES_PORT=22
+BONES_BRANCH=main
+BONES_TEMPLATE=custom
+BONES_RUNTIME_BACKEND=native
+# <<< BonesDeploy managed configuration <<<
 ```
 
-`.env` is local configuration and is excluded from Git. `.env.build` is the
-committed, non-secret build configuration. Runtime secrets are edited through
-`bonesdeploy secrets edit`, stored encrypted at `infra/secrets/.env.gpg`, and
-explicitly sent as the complete protected remote `shared/.env` with
-`bonesdeploy secrets push`. The push atomically replaces the remote file; it
-does not read, merge, or upload the local root `.env`. `bonesdeploy deploy`
-does not push environment values. Include every value required by the remote
-application and BonesRemote in the encrypted file.
+`.env` is the local environment and is excluded from Git. Its application-owned
+content (everything outside the managed block, including comments and values)
+is never replaced by `init`; only the delimited `BONES_*` block is rewritten.
+`BONES_*` keys never leave the workstation — they are stripped from production
+environments. `.env.build` is the committed, non-secret build configuration.
+Runtime secrets are edited through `bonesdeploy secrets edit`, stored encrypted
+at `infra/secrets/.env.gpg`, and explicitly sent as the complete protected
+remote `shared/.env` with `bonesdeploy secrets push`. The push atomically
+replaces the remote file; it does not read, merge, or upload the local root
+`.env`. `bonesdeploy deploy` does not push environment values. The local managed
+block supplies BonesRemote's deployment descriptor at deploy time and is
+mirrored to `/srv/conf/<site>/bones.json` on the host for remote-only commands;
+the encrypted file contains only values the application needs at runtime.
 
 ## Project Structure
 
@@ -386,7 +400,7 @@ Build scripts in `deployment/build/` must be numbered (for example `01_install_d
 
 Build scripts can set runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool. Beyond per-script timeouts, BonesInfra caps each build user's host-level slice at 80% CPU quota, 80% memory high/max, and `MemorySwapMax=0`, so a runaway build fails rather than exhausting host memory or swap.
 
-BonesRemote also exposes safe scalar runtime values as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use remote `shared/.env` for runtime secrets.
+BonesRemote also exposes safe scalar runtime values as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). These values come from the local deployment descriptor; application secrets from remote `shared/.env` are never parsed or injected into build inputs. Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use remote `shared/.env` for runtime secrets.
 
 Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager, Podman, and the Infra-provisioned build cache before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 

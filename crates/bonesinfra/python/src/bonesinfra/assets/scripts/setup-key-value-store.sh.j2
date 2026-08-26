@@ -1,13 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV="{{ env }}"
 CONFIG="{{ config }}"
 DATA_DIR="{{ data }}"
-DEFAULT_PORT="{{ default_port }}"
-PASSWORD_KEY="{{ password_key }}"
-PORT_KEY="{{ port_key }}"
-URL_KEY="{{ url_key }}"
+PASSWORD="{{ password }}"
+PORT="{{ port }}"
 UNIT="{{ unit }}"
 RUNTIME_GROUP="{{ runtime_group }}"
 BINARY="{{ binary }}"
@@ -16,24 +13,15 @@ PROJECT="{{ project }}"
 PACKAGE_USER="{{ package_user }}"
 UNIT_PATH="{{ unit_path }}"
 
-password=$(sed -n "s/^${PASSWORD_KEY}=//p" "$ENV" | head -n1)
-port=$(sed -n "s/^${PORT_KEY}=//p" "$ENV" | head -n1)
-[ -n "$password" ] || password=$(openssl rand -hex 24)
-
-if ! case "$port" in ""|*[!0-9]*) false;; esac; then
-  for candidate in $(seq "$DEFAULT_PORT" $((DEFAULT_PORT + 100))); do
-    if ! ss -ltn "sport = :$candidate" | grep -q LISTEN; then
-      port=$candidate
-      break
-    fi
-  done
+if [ -n "$(ss -ltn "sport = :$PORT")" ]; then
+  printf 'Port %s is already in use\n' "$PORT" >&2
+  exit 1
 fi
-test -n "$port"
 
 install -d -m 0755 -o root -g root /etc/bonesinfra/services
 install -d -m 0700 -o "$PACKAGE_USER" -g "$PACKAGE_USER" "$DATA_DIR"
 
-printf 'bind 127.0.0.1\nport %s\nprotected-mode yes\ndaemonize no\nrequirepass %s\ndir %s\n' "$port" "$password" "$DATA_DIR" > "$CONFIG"
+printf 'bind 127.0.0.1\nport %s\nprotected-mode yes\ndaemonize no\nrequirepass %s\ndir %s\n' "$PORT" "$PASSWORD" "$DATA_DIR" > "$CONFIG"
 chown "root:$PACKAGE_USER" "$CONFIG"
 chmod 0640 "$CONFIG"
 
@@ -43,6 +31,3 @@ chown root:root "$UNIT_PATH"
 chmod 0644 "$UNIT_PATH"
 
 systemctl disable --now "${UNIT}.service" 2>/dev/null || true
-
-sed -i "/^${PORT_KEY}=/d; /^${URL_KEY}=/d" "$ENV"
-printf '%s=%s\n%s=%s\n%s=redis://:%s@127.0.0.1:%s/0\n' "$PASSWORD_KEY" "$password" "$PORT_KEY" "$port" "$URL_KEY" "$password" "$port" >> "$ENV"

@@ -20,7 +20,7 @@ pub fn run(mutation: &SiteMutation, _snapshot: &super::DeploymentSnapshot) -> Re
     let shared_dir = mutation.shared_dir();
     if !shared_dir.is_dir() {
         bail!(
-            "Shared root is missing: {}. Run 'bonesdeploy remote setup' or runtime provisioning first.",
+            "Shared root is missing: {}. Run 'bonesdeploy site setup' or site runtime provisioning first.",
             shared_dir.display()
         );
     }

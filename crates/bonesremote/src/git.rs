@@ -2,7 +2,6 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::paths;
 
 pub(crate) fn archive(repo_path: &Path, revision: &str) -> Result<Vec<u8>> {
     let repo_path = repo_path.to_str().context("Application repository path is not valid UTF-8")?;
@@ -41,6 +40,7 @@ pub(crate) fn resolve_revision_commit(repo_path: &Path, revision: &str) -> Resul
     Ok(sha)
 }
 
+#[expect(dead_code)]
 pub(crate) fn repository_has_refs(repo_path: &Path) -> Result<bool> {
     let repo_path = repo_path.to_str().context("Bare repository path is not valid UTF-8")?;
     let output = Command::new("git")
@@ -51,14 +51,4 @@ pub(crate) fn repository_has_refs(repo_path: &Path) -> Result<bool> {
         bail!("Failed to inspect refs in {repo_path}\n{}", String::from_utf8_lossy(&output.stderr));
     }
     Ok(!output.stdout.is_empty())
-}
-
-pub(crate) fn branch_exists(repo_path: &Path, branch: &str) -> Result<bool> {
-    let repo_path = repo_path.to_str().context("Bare repository path is not valid UTF-8")?;
-    let ref_name = paths::branch_ref(branch);
-    let output = Command::new("git")
-        .args(["--git-dir", repo_path, "rev-parse", "--verify", &ref_name])
-        .output()
-        .with_context(|| format!("Failed to inspect branch {branch} in {repo_path}"))?;
-    Ok(output.status.success())
 }

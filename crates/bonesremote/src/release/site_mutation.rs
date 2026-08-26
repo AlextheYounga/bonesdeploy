@@ -1,23 +1,25 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use bonesdeploy_core::config::Bones;
+use bonesdeploy_core::config::{self, Bones};
 
-use crate::release::lifecycle;
 use crate::release::state::{self, DeploymentLock, DeploymentRecord};
 
-/// A site-scoped mutation guard: the deployment lock plus the validated site
-/// configuration.
+/// A site-scoped mutation guard: the deployment lock plus the site configuration.
 ///
 /// Every operation that changes per-site state takes this object instead of
-/// locking or loading config on its own, so the deployment serialization lock
-/// and the confused-deputy check (`project_name == site`) are always applied
-/// together and on the same configuration snapshot.
+/// locking or deriving config on its own, so the deployment serialization lock
+/// is always applied together with site validation.
 ///
 /// Acquiring a `SiteMutation` does **not** require the site to be idle:
 /// cancellation and drop-failed operate on sites that are deliberately
-/// non-idle. Callers that need to run against an idle site (deploy, rollback,
-/// site import) call `ensure_site_idle` themselves after acquiring.
+/// non-idle. Callers that need to run against an idle site (deploy, rollback)
+/// call `ensure_site_idle` themselves after acquiring.
+///
+/// Site identity, paths, users, and systemd targets are always derived from
+/// `--site` via `Bones::for_site(site)`. Runtime settings (branch, web root,
+/// build timeouts, etc.) are supplied by the deploy descriptor for deploy
+/// operations and left at defaults for other commands.
 pub struct SiteMutation {
     site: String,
     config: Bones,
@@ -25,25 +27,25 @@ pub struct SiteMutation {
 }
 
 impl SiteMutation {
-    /// Acquires the serialization lock and loads the validated site config.
-    ///
-    /// Fails if another deployment holds the lock or if the site config is
-    /// unreadable or does not belong to `site`.
+    /// Acquires the serialization lock using identity and paths derived from
+    /// the site name. Runtime settings remain at defaults.
     pub(crate) fn acquire(site: &str) -> Result<Self> {
+        config::validate_site_name(site)?;
         let _lock = DeploymentLock::acquire(site)?;
-        let config = lifecycle::load_site_config(site)?;
+        let config = Bones::for_site(site);
         Ok(Self::new(site, config, _lock))
     }
 
-    /// Acquires the serialization lock and adopts an already-validated
-    /// configuration.
-    ///
-    /// Builds the guard from an already-loaded config and a held lock.
-    ///
-    /// Used by cancellation, which must stop a live deployment process before
-    /// its serialization lock becomes available: the config is loaded and the
-    /// site identity verified *before* terminating, then the lock is taken and
-    /// the guard assembled for all subsequent file mutations.
+    /// Acquires the serialization lock and applies a deployment descriptor
+    /// supplied by the local deploy command.
+    pub(crate) fn acquire_with_config(site: &str, config: Bones) -> Result<Self> {
+        config::validate_site_name(site)?;
+        let _lock = DeploymentLock::acquire(site)?;
+        Ok(Self::new(site, config, _lock))
+    }
+
+    /// Adopts an already-held lock for cancellation, which must stop a live
+    /// deployment process before the lock becomes available.
     pub fn adopt(site: &str, config: Bones, lock: DeploymentLock) -> Self {
         Self::new(site, config, lock)
     }

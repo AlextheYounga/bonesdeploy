@@ -2,7 +2,7 @@ use anyhow::Result;
 use bonesdeploy_core::paths;
 use std::env;
 
-pub use bonesdeploy_core::config::{Bones, load, save};
+pub use bonesdeploy_core::config::{Bones, load, load_local, write_local_environment};
 
 /// Resolves the SSH user for provisioning commands: `BONES_BOOTSTRAP_SSH_USER`
 /// overrides the configured `ssh_user`; blank values fall back to `root`.

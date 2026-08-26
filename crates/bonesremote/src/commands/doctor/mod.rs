@@ -5,6 +5,7 @@ use crate::privileges;
 use crate::ui;
 
 pub mod apparmor;
+pub mod baseline;
 pub mod security;
 pub mod services;
 pub mod site;
@@ -20,6 +21,9 @@ pub fn run(site: Option<&str>, exhaustive: bool) -> Result<()> {
     system::check_supported_distribution(&mut issues);
     system::check_podman_available(&mut issues);
     apparmor::check_support(&mut issues);
+    if site.is_none() {
+        baseline::check(&mut issues);
+    }
 
     if exhaustive {
         println!("  {} Exhaustively scanning the active release for permission drift.", ui::pending_marker());

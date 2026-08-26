@@ -1,6 +1,6 @@
 [package]
 name = "bonesinfra"
-version = "0.3.2"
+version = "0.3.4"
 edition = "2024"
 authors=["Alex Younger <thealexyounger@proton.me>"]
 description="Deployments with a Spine in a Barebones Framework"
@@ -10,7 +10,7 @@ repository="https://github.com/AlextheYounga/bonesdeploy"
 [dependencies]
 anyhow = "1.0.103"
 rust-embed = { version = "8.11.0", features = ["include-exclude"] }
-bonesdeploy-core = { version = "0.8.5", path = "../bonesdeploy-core" }
+bonesdeploy-core = { version = "0.8.7", path = "../bonesdeploy-core" }
 tempfile = "3.27.0"
 
 [dev-dependencies]

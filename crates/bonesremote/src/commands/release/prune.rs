@@ -6,16 +6,16 @@ use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::state as release_state;
 
-pub fn run(site: &str) -> Result<()> {
+pub fn run(site: &str, keep: usize) -> Result<()> {
     privileges::ensure_root("bonesremote release prune")?;
     let mutation = SiteMutation::acquire(site)?;
-    run_locked(&mutation)
+    run_locked(&mutation, keep)
 }
 
-pub fn run_locked(mutation: &SiteMutation) -> Result<()> {
+pub fn run_locked(mutation: &SiteMutation, keep: usize) -> Result<()> {
     let project_root = &mutation.config().project_root;
 
-    let pruned = prune_old_releases(project_root, mutation.config().releases_keep)?;
+    let pruned = prune_old_releases(project_root, keep)?;
     if !pruned.is_empty() {
         println!("Pruned releases: {}", pruned.join(", "));
     }

@@ -17,16 +17,16 @@ The system is organized as a Cargo workspace of four crates, with a deliberate s
 Developer workstation                           Deployment server
 ┌─────────────────────────┐                   ┌────────────────────────────┐
 │ bonesdeploy init        │                   │                            │
-│ bonesdeploy remote ...  │── SSH/bonesinfra──▶│ bonesinfra (Python)        │
-│   (bootstrap, runtime,  │                   │   pyinfra provisioning     │
-│    services, ssl,       │                   │                            │
-│    helpers)             │                   │                            │
+│ bonesdeploy server ...  │── SSH/bonesinfra──▶│ bonesinfra (Python)        │
+│ bonesdeploy site ...    │                   │   pyinfra provisioning     │
+│   (setup, runtime,      │                   │                            │
+│    services, ssl)       │                   │                            │
 │                         │                   │                            │
 │ bonesdeploy deploy      │── SSH ───────────▶│ bonesremote deploy         │
 │   (committed revision)  │                   │   └─ release lifecycle      │
 │                         │                   │                            │
 │ bonesdeploy rollback    │                   │ bonesremote release ...    │
-│ bonesdeploy releases    │                   │ bonesremote doctor         │
+│ bonesdeploy site releases│                   │ bonesremote doctor        │
 │ bonesdeploy doctor      │                   │ bonesremote status         │
 └─────────────────────────┘                   └────────────────────────────┘
 ```
@@ -36,7 +36,7 @@ Developer workstation                           Deployment server
 ```
 crates/
 ├── bonesdeploy-core/       # Foundation: config schema, path constants, validation
-├── bonesdeploy/            # Local CLI binary (init, deploy, doctor, remote, secrets, etc.)
+├── bonesdeploy/            # Local CLI binary (init, server, site, deploy, doctor, secrets, etc.)
 ├── bonesremote/            # Remote server binary (deployment lifecycle, site state, doctor)
 └── bonesinfra/             # Embedded Python provisioning runtime
     ├── src/lib.rs          # Rust shim: embeds Python, materializes venv, run() API
@@ -206,7 +206,7 @@ The `pid` + `process_start_ticks` pair survives PID reuse for crash detection: i
 ### 3.6 `DeploymentLock` — Per-Site Advisory File Lock
 
 **Responsibility:**
-Serializes all site mutations (deployments, rollbacks, imports, cancellations) across concurrent processes. Uses POSIX `flock()` with `try_lock()` — if another process holds the lock, the operation fails immediately with a clear error directing the user to check `bonesdeploy releases`.
+Serializes all site mutations (deployments, rollbacks, imports, cancellations) across concurrent processes. Uses POSIX `flock()` with `try_lock()` — if another process holds the lock, the operation fails immediately with a clear error directing the user to check `bonesdeploy site releases`.
 
 **Lives in:**
 `crates/bonesremote/src/release/state/mod.rs` (lines 62-95)
@@ -489,26 +489,41 @@ Cli::Init
         └─ infra/git.rs             # inspect application Git remotes
 ```
 
-### 4.2 `bonesdeploy remote bootstrap` (server provisioning)
+### 4.2 `bonesdeploy server setup` (server provisioning)
 
 ```
-Cli::Remote::Bootstrap
-  └─ commands/remote/bootstrap.rs::run()
-        ├─ bonesinfra::run("setup", "apply", "--env-file", ".env")
-       │    └─ Python: cli/commands/setup/__init__.py::deploy_setup()
-       │         ├─ packages.py       # apt install base + supplementary packages
-       │         ├─ users.py          # create deploy user, runtime users, groups
-       │         ├─ directories.py    # create git repos, project directories
-       │         ├─ sudoers.py        # write /etc/sudoers.d/bonesdeploy
-       │         ├─ firewall.py       # configure UFW, fail2ban
-       │         ├─ bonesremote.py    # download + verify bonesremote binary
-       │         ├─ placeholder.py    # create placeholder release
-       │         ├─ disable_algif_aead.py  # kernel module blacklist
-       │         └─ image_store.py    # configure rootless podman image store
-       └─ bonesinfra::run("runtime", "apply")  # apply runtime provisioning
+Cli::Server::Setup
+   └─ commands/server/setup.rs::run()
+        ├─ bonesinfra::run_with_request(["server", "apply", "--request-stdin", ...], server_request)
+         │    └─ Python: cli/commands/server::deploy_server_setup()
+        │         ├─ packages.py and disable_algif_aead.py
+        │         ├─ services/linux/image_store.py
+        │         ├─ firewall.py, fail2ban.py, unattended_upgrades.py
+        │         ├─ users.py          # global deploy user and authorized key
+        │         ├─ BonesRemote roots and binary
+        │         └─ sudoers.py        # write /etc/sudoers.d/bonesdeploy
+        └─ SSH: bonesremote doctor     # host-mode baseline verification
 ```
 
-### 4.3 `bonesdeploy deploy`
+### 4.3 `bonesdeploy site setup` (site provisioning)
+
+```
+Cli::Site::Setup
+   └─ commands/site/setup.rs::run()
+        ├─ SSH: bonesremote doctor     # stops before site mutation when unavailable
+        ├─ bonesinfra::run_with_request(["site", "apply", "--request-stdin"], site_request)
+         │    └─ Python: cli/commands/site::deploy_site_setup()
+        │         ├─ users.py          # site runtime and build identities
+        │         ├─ directories.py    # one bare repo and one site layout
+        │         └─ placeholder.py    # initial current link only
+        ├─ bonesinfra::run("services", "apply")
+        ├─ bonesinfra::run("runtime", "apply")
+        └─ SSH: bonesremote doctor --site <site>
+```
+
+Site setup does not push Git or secrets, configure SSL, or deploy a release.
+
+### 4.4 `bonesdeploy deploy`
 
 ```
 Cli::Deploy
@@ -532,31 +547,36 @@ Cli::Deploy
                  └─ (on failure) abort / rollback / cleanup_pending
 ```
 
-### 4.4 `bonesdeploy doctor`
+### 4.5 `bonesdeploy doctor`
 
 ```
 Cli::Doctor
-  └─ commands/doctor.rs::run()
-       ├─ Local checks:
-       │    ├─ root .env loads
+   └─ cli/dispatch.rs::run_doctor()
+        ├─ commands/server/doctor.rs::run()
+       │    └─ SSH: bonesremote doctor
+       │         ├─ doctor/system.rs      # distro, podman
+       │         ├─ doctor/apparmor.rs    # AppArmor support
+       │         ├─ doctor/baseline.rs    # server roots, binary, sudoers, image store, hardening
+       │         └─ doctor/security/      # deploy identity and privileged paths
+        └─ commands/site/doctor.rs::run()
+                 ├─ Local checks:
+        │    ├─ root .env loads
        │    ├─ infra/ exists with project provisioning and secrets
        │    ├─ deployment scripts follow NN_name.sh convention
        │    ├─ local branch exists
        │    └─ committed revision is available
-       └─ Remote checks (unless --local):
-            └─ SSH: bonesremote doctor --site <site>
-                 ├─ doctor/system.rs      # distro, podman
-                 ├─ doctor/apparmor.rs    # AppArmor support
-                 ├─ doctor/site.rs        # config state, repo, users, layout
-                 ├─ doctor/services.rs    # systemd target + service health
-                 └─ doctor/security/      # identity isolation, sudo, paths, release immutability
+                 └─ Remote checks (unless --local):
+                      └─ SSH: bonesremote doctor --site <site>
+                           ├─ doctor/site.rs        # config state, repo, users, layout
+                           ├─ doctor/services.rs    # systemd target + service health
+                           └─ doctor/security/      # identity isolation, sudo, paths, release immutability
 ```
 
-### 4.5 `bonesdeploy remote runtime`
+### 4.6 `bonesdeploy site runtime`
 
 ```
-Cli::Remote::Runtime
-  └─ commands/remote/runtime.rs::run()
+Cli::Site::Runtime
+   └─ commands/site/runtime.rs::run()
        ├─ bonesinfra::run("runtime", "apply", "--config", "...")
        │    └─ Python: project.load_runtime(config)
         │         └─ loads materialized infra/.framework + custom packages
@@ -578,9 +598,9 @@ Cli::Remote::Runtime
 | Add a web framework | Rust framework contract plus built-in Python package materialized as `infra/.framework` and `infra/custom` | `laravel`, `django` | `crates/bonesdeploy/src/frameworks/` and `crates/bonesinfra/python/src/bonesinfra/frameworks/` |
 | Add a database service | Python: `services/runtime/<name>.py` + register in `SERVICES` dict | `postgres.py`, `redis.py` | `crates/bonesinfra/python/src/bonesinfra/services/runtime/` |
 | Add a language runtime | Python: `services/languages/<name>.py`, extend `LanguageRuntime` ABC | `php.py`, `python.py` | `crates/bonesinfra/python/src/bonesinfra/services/languages/` |
-| Add a CLI command (bonesdeploy) | `commands/<name>.rs` + variant in `cli/args.rs::Command` enum | `commands/status.rs` | `crates/bonesdeploy/src/commands/` |
+| Add a CLI command (bonesdeploy) | Focused handler under the owning command group (`commands/server/<name>.rs`, `commands/site/<name>.rs`, or `commands/<name>.rs`) + variant in `cli/args.rs::Command` | `commands/site/status.rs` | `crates/bonesdeploy/src/commands/` |
 | Add a CLI command (bonesremote) | `commands/<name>.rs` + variant in `cli/args.rs::Command` enum | `commands/status.rs` | `crates/bonesremote/src/commands/` |
-| Add a remote provisioning step | Python: `cli/commands/<group>/__init__.py` + Typer command group | `cli/commands/setup/` | `crates/bonesinfra/python/src/bonesinfra/cli/commands/` |
+| Add a provisioning step | Python: `cli/commands/server/` or `cli/commands/site/` + Typer command group | `cli/commands/site/` | `crates/bonesinfra/python/src/bonesinfra/cli/commands/` |
 | Add a migration patch | Python: `patches/registry.py` — `Patch(id, version, apply_fn)` | `0003-project-infra` | `crates/bonesinfra/python/src/bonesinfra/patches/` |
 | Add a doctor check | `commands/doctor/<category>.rs` in bonesremote | `doctor/site.rs` | `crates/bonesremote/src/commands/doctor/` |
 | Add a new config field | `Runtime.extra` for framework-specific values; add to `Bones` for global values | `php_version` in laravel | `crates/bonesdeploy-core/src/config.rs` |
@@ -603,8 +623,9 @@ Cli::Remote::Runtime
 ### Config ownership
 
 - `bonesdeploy-core` defines the canonical `Bones` struct, all path constants, and validation functions.
-- Both binaries load root/site `.env` config via `bonesdeploy_core::config::load()` or `bonesdeploy_core::config::load_runtime()`.
-- Config is saved by `bonesdeploy` (on init, on edit). It is read on the server by `bonesremote`.
+- `bonesdeploy` loads the local root `.env` and sends only `RemoteDeploymentConfig` over SSH stdin for deploys.
+- `bonesremote` derives identity and paths from `--site`; it never parses the application `shared/.env` as control-plane config.
+- Runtime secrets are saved encrypted by `bonesdeploy` and atomically published to `shared/.env` by `secrets push`.
 
 ### Path ownership
 
@@ -614,7 +635,7 @@ Cli::Remote::Runtime
 
 ### Permission model
 
-- Provisioning-time contract: ownership layout is established once during `remote setup` and never rewritten by deploy commands.
+- Provisioning-time contract: shared ownership is established during `server setup` and site ownership during `site setup`; deploy commands never rewrite either layout.
 - Three identity classes: `git` (application repository access), `<site>` (runtime user, shared files, `/run/<site>`), `root` (sealed releases, system units, config dirs).
 - Build scripts run in Podman as an unprivileged build user. Prepare scripts run as the runtime user. Only `bonesremote` (running as root) promotes, activates, and restarts services.
 
@@ -686,10 +707,11 @@ Cli::Remote::Runtime
 Older versions stored deployment state in separate files (`active-deployment.json`, `staged-release`). The `store` module migrates these to the unified `SiteState` format on first read. The migration path is one-way and the old files are deleted after migration.
 
 ### Cross-layer configuration and integration side doors
-Rust and Python have separate dotenv readers with the same root `.env` contract.
-BonesInfra owns provisioning configuration and receives only the explicit
-`--env-file` path. Local Git and SSH callers use their existing integration
-boundaries.
+Rust (`bonesdeploy-core`) is the sole parser of the root `.env`. Python and
+remote consumers receive typed JSON requests on stdin: BonesInfra commands take
+`--request-stdin` bodies, and BonesRemote deploy/doctor/config sync take the
+`RemoteDeploymentConfig` descriptor through `--config-stdin`. The sanitized
+control-plane copy lives at `/srv/conf/<site>/bones.json`.
 
 ### Framework and deployment boundaries
 Framework identity, defaults, and assets are selected through the Rust framework

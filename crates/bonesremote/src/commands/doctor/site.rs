@@ -2,12 +2,12 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+use bonesdeploy_core::config::RemoteDeploymentConfig;
 use bonesdeploy_core::{config, paths};
 
-use crate::git::{branch_exists, repository_has_refs};
+use crate::control_plane;
 use crate::inspection::accounts;
 use crate::release::lifecycle::build::validate_build_cache;
-use crate::release::lifecycle::load_site_config;
 use crate::runtime::docker;
 
 use super::services;
@@ -17,36 +17,44 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
     }
-    let shared_env = Path::new(&paths::default_project_root_for(site)).join(paths::SHARED_DIR).join(paths::DOT_ENV);
-    if !shared_env.is_file() {
-        pending.push(format!(
-            "shared environment is missing: {}. Run 'bonesdeploy secrets push' first.",
-            shared_env.display()
-        ));
-        return;
-    }
 
-    let cfg = match load_site_config(site) {
-        Ok(cfg) => cfg,
+    // Without the synchronized descriptor, runtime and branch checks would be fabricated from the site name.
+    let descriptor = match control_plane::load(site) {
+        Ok(descriptor) => descriptor,
         Err(error) => {
-            issues.push(format!("deployed site configuration is invalid: {error}"));
+            pending.push(error.to_string());
             return;
         }
     };
+
     if !paths::bonesremote_site_root(site).is_dir() {
         pending.push(format!("first deployment is pending for {site}"));
         return;
     }
 
-    let project_root = &cfg.project_root;
-    let shared_root = Path::new(project_root).join(paths::SHARED_DIR);
-    let releases_root = Path::new(project_root).join(paths::RELEASES_DIR);
-    let runtime_user = config::runtime_user_for(&cfg.project_name);
-    let runtime_group = config::runtime_group_for(&cfg.project_name);
-    let build_user = config::build_user_for(&cfg.project_name);
+    let project_root = paths::default_project_root_for(site);
+    let shared_root = Path::new(&project_root).join(paths::SHARED_DIR);
+    let releases_root = Path::new(&project_root).join(paths::RELEASES_DIR);
+    let runtime_user = config::runtime_user_for(site);
+    let runtime_group = config::runtime_group_for(site);
+    let build_user = config::build_user_for(site);
+    let repo_path = paths::default_repo_path_for(site);
 
-    check_repo_exists(&cfg.repo_path, issues);
-    check_branch_ref(&cfg.repo_path, &cfg.branch, issues, pending);
+    let shared_env = shared_root.join(paths::DOT_ENV);
+    if !shared_env.is_file() {
+        pending.push(format!(
+            "shared environment is missing: {}. Run 'bonesdeploy secrets push' first.",
+            shared_env.display()
+        ));
+    }
+
+    check_repo_exists(&repo_path, issues);
+
+    // Branch validation requires the repo to exist; skip if it doesn't to
+    // avoid duplicate error messages.
+    if Path::new(&repo_path).is_dir() {
+        check_branch_ref_for_branch(&repo_path, &descriptor.branch, issues, pending);
+    }
 
     match fs::read_to_string(paths::ETC_PASSWD) {
         Ok(passwd) => {
@@ -59,13 +67,20 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     }
 
     check_site_layout(&shared_root, &releases_root, issues);
-    services::check_target(&cfg, issues);
-    if cfg.runtime.backend == config::RuntimeBackend::Docker {
-        check_docker_runtime(&cfg, issues);
+
+    services::check_target(site, issues);
+
+    if docker_checks_required(&descriptor) {
+        check_docker_runtime(site, issues);
     }
 }
 
-fn check_docker_runtime(cfg: &config::Bones, issues: &mut Vec<String>) {
+#[must_use]
+pub fn docker_checks_required(descriptor: &RemoteDeploymentConfig) -> bool {
+    descriptor.runtime.backend == config::RuntimeBackend::Docker
+}
+
+fn check_docker_runtime(site: &str, issues: &mut Vec<String>) {
     match Command::new("docker").arg("info").output() {
         Ok(output) if output.status.success() => {}
         Ok(output) => {
@@ -74,7 +89,7 @@ fn check_docker_runtime(cfg: &config::Bones, issues: &mut Vec<String>) {
         Err(error) => issues.push(format!("Docker is unavailable: {error}")),
     }
 
-    let image = match docker::command::image_name(&cfg.project_name) {
+    let image = match docker::command::image_name(site) {
         Ok(image) => image,
         Err(error) => {
             issues.push(format!("Docker runtime image name is invalid: {error}"));
@@ -85,11 +100,6 @@ fn check_docker_runtime(cfg: &config::Bones, issues: &mut Vec<String>) {
         Ok(status) if status.success() => {}
         Ok(_) => issues.push(format!("Docker runtime image is missing: {image}")),
         Err(error) => issues.push(format!("could not inspect Docker runtime image {image}: {error}")),
-    }
-
-    let socket_dir = Path::new("/run").join(&cfg.project_name);
-    if !socket_dir.is_dir() {
-        issues.push(format!("Docker runtime socket directory is missing: {}", socket_dir.display()));
     }
 }
 
@@ -120,29 +130,49 @@ fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {
     }
 }
 
-pub fn check_branch_ref(repo_path: &str, branch: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
-    if branch.is_empty() {
+pub fn check_branch_ref(repo_path: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
+    check_branch_ref_for_branch(repo_path, "main", issues, pending);
+}
+
+pub fn check_branch_ref_for_branch(repo_path: &str, branch: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
+    let repo_path = Path::new(repo_path);
+    let ref_name = paths::branch_ref(branch);
+    let Some(repo) = repo_path.to_str() else {
+        issues.push(format!("could not inspect branch {branch} in {}: path is not valid UTF-8", repo_path.display()));
         return;
-    }
-    match repository_has_refs(Path::new(repo_path)) {
-        Ok(true) => {}
-        Ok(false) => {
-            pending.push(format!(
-                "deploy branch '{branch}' has not been pushed yet. Run 'git push <remote> {branch}' before the first deploy."
+    };
+    match Command::new("git").args(["--git-dir", repo, "for-each-ref", "--format=%(refname)", &ref_name]).output() {
+        Ok(output) if output.status.success() && !output.stdout.is_empty() => {}
+        Ok(output) if output.status.success() => {
+            match Command::new("git").args(["--git-dir", repo, "for-each-ref", "--format=%(refname)"]).output() {
+                Ok(all_refs) if all_refs.status.success() && all_refs.stdout.is_empty() => {
+                    pending.push(
+                        "repository has no refs yet. Run 'git push <remote> <branch>' before the first deploy."
+                            .to_string(),
+                    );
+                }
+                Ok(all_refs) if all_refs.status.success() => {
+                    issues.push(format!(
+                        "repository is missing expected branch ref {ref_name} in {}",
+                        repo_path.display()
+                    ));
+                }
+                Ok(all_refs) => issues.push(format!(
+                    "could not inspect refs in {}: {}",
+                    repo_path.display(),
+                    String::from_utf8_lossy(&all_refs.stderr).trim()
+                )),
+                Err(error) => issues.push(format!("could not inspect refs in {}: {error}", repo_path.display())),
+            }
+        }
+        Ok(output) => {
+            issues.push(format!(
+                "could not inspect branch {branch} in {}: {}",
+                repo_path.display(),
+                String::from_utf8_lossy(&output.stderr).trim()
             ));
-            return;
         }
-        Err(error) => {
-            issues.push(format!("could not inspect branches in {repo_path}: {error}"));
-            return;
-        }
-    }
-    match branch_exists(Path::new(repo_path), branch) {
-        Ok(true) => {}
-        Ok(false) => issues.push(format!(
-            "deploy branch '{branch}' has not been pushed to {repo_path}. Run 'git push <remote> {branch}' first."
-        )),
-        Err(error) => issues.push(format!("could not check branch '{branch}': {error}")),
+        Err(error) => issues.push(format!("could not inspect branch {branch} in {}: {error}", repo_path.display())),
     }
 }
 

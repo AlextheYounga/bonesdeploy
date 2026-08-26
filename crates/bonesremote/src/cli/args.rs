@@ -20,12 +20,20 @@ pub enum Command {
     },
     /// Run the full remote deployment lifecycle
     Deploy {
-        /// Site identifier (must match an imported site directory)
+        /// Site identifier (must match a provisioned site directory)
         #[arg(long)]
         site: String,
         /// Exact revision to deploy (defaults to the configured branch)
         #[arg(long)]
         revision: Option<String>,
+        /// Read the deployment config descriptor as JSON from stdin
+        #[arg(long)]
+        config_stdin: bool,
+    },
+    /// Synchronize the sanitized site configuration snapshot
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommand,
     },
     /// Print remote deployment status as JSON
     Status {
@@ -49,6 +57,17 @@ pub enum Command {
     },
     /// Print the version
     Version,
+}
+
+#[derive(Subcommand)]
+pub enum ConfigCommand {
+    /// Install a site configuration snapshot from stdin
+    Sync {
+        #[arg(long)]
+        site: String,
+        #[arg(long, required = true)]
+        config_stdin: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -89,10 +108,12 @@ pub enum ReleaseCommand {
         #[arg(long)]
         site: String,
     },
-    /// Prune old releases according to the registry keep count
+    /// Prune old releases, keeping the most recent `keep` count
     Prune {
         #[arg(long)]
         site: String,
+        #[arg(long, default_value_t = 5)]
+        keep: usize,
     },
     /// Quarantine malformed deployment state after verifying no deployment is running
     Recover {

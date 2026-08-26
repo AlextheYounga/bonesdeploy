@@ -6,7 +6,7 @@ import pytest
 import bonesinfra.services.runtime.mongodb as mongodb_mod
 import bonesinfra.services.runtime.postgres as postgres_mod
 import bonesinfra.services.runtime.valkey as valkey_mod
-from bonesinfra.config.keys import SUPPORTED_DATABASE_SERVICES
+from bonesinfra.config.request import SUPPORTED_DATABASE_SERVICES
 from bonesinfra.services.runtime import SERVICES, get_service
 from bonesinfra.services.runtime.base import RuntimeService
 
@@ -16,6 +16,11 @@ def _ctx(project="atlas-api"):
         app=SimpleNamespace(project_name=project),
         runtime=SimpleNamespace(runtime_group="atlas-api"),
         paths_dict={"shared": "/srv/sites/atlas/shared"},
+        service_credentials={
+            "postgres": {"password": "secret", "username": "atlas", "database": "atlas"},
+            "mongodb": {"password": "secret", "username": "atlas", "database": "atlas"},
+            "valkey": {"password": "secret", "port": "6379"},
+        },
     )
 
 
@@ -87,12 +92,16 @@ def test_mongodb_project_account_is_not_a_cluster_admin(monkeypatch):
     call = template_calls[0]
     assert call["project"] == "atlas_api"
     assert call["user"] == "atlas_api_mongodb"
-    assert call["env"] == "/srv/sites/atlas/shared/.env"
+    assert "env" not in call
     assert call["admin_file"] == "/root/.config/bonesinfra/mongodb-admin.env"
+    assert call["database"] == "atlas"
+    assert call["username"] == "atlas"
+    assert call["password"] == "secret"  # noqa: S105
 
     script = Path(call["src"]).read_text()
     assert "updateUser" in script
-    assert "roles: [{role: 'readWrite', db: '$PROJECT'}]" in script
+    assert "process.env.PASSWORD" in script
+    assert "--password" not in script
 
 
 def test_database_identifier_rejects_unsafe_project_names():

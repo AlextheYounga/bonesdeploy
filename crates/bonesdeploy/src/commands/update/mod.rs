@@ -8,6 +8,7 @@ use tempfile::TempDir;
 use bonesdeploy_core::paths;
 
 use crate::config;
+use crate::infra;
 use crate::infra::git;
 use crate::ui::output;
 
@@ -55,16 +56,20 @@ pub async fn run(options: Options) -> Result<()> {
 
         if Path::new(paths::DOT_ENV).exists() {
             bonesinfra::materialize_project_framework(Path::new("."))?;
-            bonesinfra::run(&[
-                "patches",
-                "apply",
-                "--env-file",
-                paths::DOT_ENV,
-                "--target-version",
-                &release_versions.bonesdeploy,
-                "--scope",
-                "local",
-            ])?;
+            let cfg = config::load(Path::new(paths::DOT_ENV))?;
+            let request = infra::provisioning_request(&cfg)?;
+            bonesinfra::run_with_request(
+                &[
+                    "patches",
+                    "apply",
+                    "--request-stdin",
+                    "--target-version",
+                    &release_versions.bonesdeploy,
+                    "--scope",
+                    "local",
+                ],
+                &request,
+            )?;
         }
         let template = if Path::new(paths::DOT_ENV).exists() {
             let template = config::load(Path::new(paths::DOT_ENV))?.runtime.template;

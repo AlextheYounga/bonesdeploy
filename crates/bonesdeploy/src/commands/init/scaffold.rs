@@ -10,7 +10,7 @@ use crate::config;
 use crate::frameworks;
 use crate::infra::assets::frameworks as framework_assets;
 use crate::infra::git;
-use bonesdeploy_core::env_build;
+use bonesdeploy_core::config::build_env;
 
 pub(super) fn materialize_project(cfg: &mut config::Bones, framework: FrameworkSelection) -> Result<()> {
     cfg.runtime = serde_json::from_value(serde_json::Value::Object(framework.config))?;
@@ -91,7 +91,7 @@ pub(super) fn ensure_env_build() -> Result<()> {
     if env_build_path.exists() {
         return Ok(());
     }
-    fs::write(env_build_path, env_build::default_content())
+    fs::write(env_build_path, build_env::default_content())
         .with_context(|| format!("Failed to write {}", env_build_path.display()))?;
     Ok(())
 }

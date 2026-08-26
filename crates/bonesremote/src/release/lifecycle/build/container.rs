@@ -5,13 +5,14 @@ use std::path::{Path, PathBuf};
 use std::process::{self, Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::environment;
+use bonesdeploy_core::config::variables;
+use bonesdeploy_core::paths;
 
 use super::build_user::{BuildScriptEnv, build_script_command, build_user_command, build_user_control_command};
 use super::ownership;
 use crate::release::output;
 
-pub const BUILD_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
+pub const BUILD_IMAGE: &str = paths::IMAGE_STORE_BASE_IMAGE;
 
 pub fn service_command(build_user: &str, container_name: &str) -> Command {
     let mut command = Command::new("systemd-run");
@@ -181,23 +182,23 @@ pub fn configure_create(command: &mut Command, create: &ContainerCreate<'_>) {
         .arg(create.container_name)
         .args([
             "--env",
-            &format!("{}={}", environment::PROJECT_NAME, create.env.project_name),
+            &format!("{}={}", variables::PROJECT_NAME, create.env.project_name),
             "--env",
-            &format!("{}=/workspace", environment::PROJECT_ROOT),
+            &format!("{}=/workspace", variables::PROJECT_ROOT),
             "--env",
-            &format!("{}=", environment::REPO_PATH),
+            &format!("{}=", variables::REPO_PATH),
         ])
         .args([
             "--env",
-            &format!("{}={}", environment::WEB_ROOT, create.env.web_root),
+            &format!("{}={}", variables::WEB_ROOT, create.env.web_root),
             "--env",
-            &format!("{}={}", environment::SERVICE_USER, create.env.project_name),
+            &format!("{}={}", variables::SERVICE_USER, create.env.project_name),
         ]);
 
     command
         .args(["--env-file"])
         .arg(create.build_env_file)
-        .args(["--env", &format!("{}=/workspace/cache", environment::BUILD_CACHE_DIR), "--volume"])
+        .args(["--env", &format!("{}=/workspace/cache", variables::BUILD_CACHE_DIR), "--volume"])
         .arg(source_mount)
         .args(["--volume"])
         .arg(cache_mount)

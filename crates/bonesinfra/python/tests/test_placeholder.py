@@ -1,19 +1,11 @@
-from pathlib import Path
-
-from bonesinfra.cli.commands.setup import placeholder
+from bonesinfra.cli.commands.site import placeholder
 from bonesinfra.config.context import DeployContext
 
+from .helpers import make_site_request
 
-def _ctx(tmp: Path) -> DeployContext:
-    config = tmp / ".env"
-    config.write_text(
-        """PROJECT_NAME=lawsnipe
-HOST=example.com
-SSH_USER=root
-PORT=2222
-"""
-    )
-    return DeployContext.from_files(str(config))
+
+def _ctx() -> DeployContext:
+    return DeployContext.from_request(make_site_request())
 
 
 def _seed(ctx, monkeypatch):
@@ -32,7 +24,7 @@ def _seed(ctx, monkeypatch):
 
 
 def test_seed_never_replaces_an_existing_current_release(tmp_path, monkeypatch):
-    ctx = _ctx(tmp_path)
+    ctx = _ctx()
     commands = _seed(ctx, monkeypatch)
 
     current = ctx.paths_dict["current"]

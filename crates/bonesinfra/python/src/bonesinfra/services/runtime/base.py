@@ -15,3 +15,10 @@ class RuntimeService:
         if not name or len(name) > _max_identifier_len or not name.replace("_", "").isalnum():
             raise ValueError("project_name cannot be used as a service identifier")
         return name
+
+
+def credentials_for(ctx, name):
+    credentials = getattr(ctx, "service_credentials", {}).get(name)
+    if not credentials or not credentials.get("password"):
+        raise ValueError(f"credentials for {name} are required; use bonesdeploy secrets edit")
+    return credentials

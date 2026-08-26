@@ -3,25 +3,19 @@ from pathlib import Path
 from bonesinfra.config.context import DeployContext
 from bonesinfra.services.linux.nginx import router as nginx_router, site as nginx_site
 
+from .helpers import make_site_request
 
-def _make_ctx(tmp_path, *, domain: str = ""):
-    config_path = tmp_path / ".env"
-    config_path.write_text(
-        f"""PROJECT_NAME=lawsnipe
-HOST=example.com
-DOMAIN={domain}
-EMAIL=ops@example.com
-"""
-    )
-    return DeployContext.from_files(str(config_path))
+
+def _make_ctx(*, domain: str = ""):
+    return DeployContext.from_request(make_site_request(domain=domain))
 
 
 def _noop(*args, **kwargs):
     del args, kwargs
 
 
-def test_runtime_nginx_provisions_site_service_without_a_public_domain(tmp_path, monkeypatch):
-    ctx = _make_ctx(tmp_path, domain="")
+def test_runtime_nginx_provisions_site_service_without_a_public_domain(monkeypatch):
+    ctx = _make_ctx(domain="")
     paths = ctx.paths_dict
     calls = []
 
@@ -62,7 +56,7 @@ def test_runtime_nginx_migrates_site_service_to_target(monkeypatch):
 
 
 def test_static_nginx_validation_runs_as_runtime_user(tmp_path, monkeypatch):
-    ctx = _make_ctx(tmp_path)
+    ctx = _make_ctx()
     calls = []
 
     monkeypatch.setattr(nginx_site.files, "template", _noop)

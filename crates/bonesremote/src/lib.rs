@@ -1,5 +1,6 @@
 pub mod cli;
 pub mod commands;
+pub mod control_plane;
 pub mod git;
 #[path = "commands/inspection/mod.rs"]
 pub mod inspection;

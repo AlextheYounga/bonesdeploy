@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::env;
 use std::fs::{self, OpenOptions};
+use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -69,6 +70,28 @@ pub fn run(args: &[&str]) -> Result<()> {
         .with_context(|| format!("Failed to run bonesinfra {}", args.join(" ")))?
         .wait()
         .with_context(|| format!("Failed to wait on bonesinfra {}", args.join(" ")))?;
+    if !status.success() {
+        bail!("bonesinfra {} failed", args.join(" "));
+    }
+    Ok(())
+}
+
+/// Run one bonesinfra command feeding a typed provisioning request on stdin.
+///
+/// # Errors
+/// Returns an error when the child process exits nonzero.
+pub fn run_with_request(args: &[&str], request_body: &str) -> Result<()> {
+    let project_root = env::current_dir().context("Failed to determine project directory")?;
+    let executable = ensure_available(&project_root)?;
+    let mut command = base_command(&executable, &project_root, args);
+    command.stdin(Stdio::piped());
+    let mut child = command.spawn().with_context(|| format!("Failed to run bonesinfra {}", args.join(" ")))?;
+    let mut stdin = child.stdin.take().context("bonesinfra stdin was not piped")?;
+    stdin
+        .write_all(request_body.as_bytes())
+        .with_context(|| format!("Failed to write request to bonesinfra {}", args.join(" ")))?;
+    drop(stdin);
+    let status = child.wait().with_context(|| format!("Failed to wait on bonesinfra {}", args.join(" ")))?;
     if !status.success() {
         bail!("bonesinfra {} failed", args.join(" "));
     }

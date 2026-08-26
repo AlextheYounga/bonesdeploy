@@ -12,7 +12,8 @@ use crate::release::SiteMutation;
 pub fn run(mutation: &SiteMutation) -> Result<()> {
     privileges::ensure_root("bonesremote service restart")?;
 
-    let target_name = target_name_for_registered_site(mutation.site(), &mutation.config().project_name)?;
+    let site = mutation.site();
+    let target_name = paths::site_target_name(site);
     let services = systemd::required_services(&target_name)?;
     if services.is_empty() {
         bail!("Site target {target_name} has no registered services");
@@ -53,9 +54,6 @@ fn restart_service(service: &str) -> Result<()> {
 // starts then immediately exits is reported as a failure here instead of
 // silently leaving the site down.
 fn verify_units_active(target: &str, services: &[String]) -> Result<()> {
-    // ponytail: 1s window catches immediate post-start crashes. Slower failures
-    // still surface via journald/watchdog later; upgrade to a configurable wait
-    // or `systemctl --wait` if a longer settle window becomes necessary.
     thread::sleep(Duration::from_secs(1));
 
     let failed: Vec<&str> = services.iter().map(String::as_str).filter(|unit| !systemd::is_active(unit)).collect();
@@ -78,11 +76,4 @@ fn journal_output(units: &[&str]) -> String {
         Ok(output) if output.status.success() => String::from_utf8_lossy(&output.stdout).into_owned(),
         _ => String::new(),
     }
-}
-
-pub fn target_name_for_registered_site(site: &str, registered_site: &str) -> Result<String> {
-    if registered_site != site {
-        bail!("Registered site state belongs to '{registered_site}', expected '{site}'");
-    }
-    Ok(paths::site_target_name(site))
 }

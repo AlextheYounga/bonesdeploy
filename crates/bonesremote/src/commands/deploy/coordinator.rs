@@ -225,7 +225,7 @@ fn advance_phase(
 fn run_maintenance(mutation: &SiteMutation, context_dir: &Path) -> Result<()> {
     stage("Pruning old releases");
     mutation.clear_staged_release()?;
-    release::prune::run_locked(mutation)?;
+    release::prune::run_locked(mutation, mutation.config().releases_keep)?;
     stage("Cleaning up");
     cleanup(mutation, Some(context_dir))
 }

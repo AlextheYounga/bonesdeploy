@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from bonesinfra.cli.commands.setup import directories
+from bonesinfra.cli.commands.site import directories
 
 
 def test_setup_does_not_provision_the_shared_environment(monkeypatch):
@@ -10,9 +10,9 @@ def test_setup_does_not_provision_the_shared_environment(monkeypatch):
     monkeypatch.setattr(directories.server, "shell", lambda **_kwargs: None)
     monkeypatch.setattr(directories.server, "script_template", lambda **kwargs: script_calls.append(kwargs))
     ctx = SimpleNamespace(
+        server=SimpleNamespace(host="192.0.2.1", port="22", ssh_user="root"),
         app=SimpleNamespace(
             project_name="atlas",
-            server=SimpleNamespace(host="192.0.2.1", port="22", ssh_user="root"),
             deploy=SimpleNamespace(branch="main"),
             dns=SimpleNamespace(domain="", email="", ssl_enabled=False),
         ),

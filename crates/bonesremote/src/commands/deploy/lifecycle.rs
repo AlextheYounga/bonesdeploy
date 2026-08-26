@@ -1,9 +1,10 @@
 use std::path::PathBuf;
 
 use anyhow::Result;
-use bonesdeploy_core::config::build_user_for;
+use bonesdeploy_core::config;
 
 use crate::commands::ensure_site_idle;
+use crate::control_plane;
 use crate::git;
 use crate::privileges;
 use crate::release::SiteMutation;
@@ -12,12 +13,18 @@ use crate::release::lifecycle::build::ensure_build_user_ready;
 
 use super::coordinator::DeploymentLifecycleCoordinator;
 
-pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
+pub fn run_full(site: &str, revision: Option<&str>, config_stdin: bool) -> Result<()> {
     privileges::ensure_root("bonesremote deploy")?;
-    let mutation = SiteMutation::acquire(site)?;
+
+    if !config_stdin {
+        anyhow::bail!("bonesremote deploy requires --config-stdin");
+    }
+    let bones = control_plane::read_stdin_descriptor()?.into_site_config(site);
+
+    let mutation = SiteMutation::acquire_with_config(site, bones)?;
     ensure_site_idle(&mutation)?;
 
-    let build_user = build_user_for(mutation.site());
+    let build_user = config::build_user_for(mutation.site());
     let project_root = PathBuf::from(&mutation.config().project_root);
     ensure_build_user_ready(&build_user, &project_root)?;
 

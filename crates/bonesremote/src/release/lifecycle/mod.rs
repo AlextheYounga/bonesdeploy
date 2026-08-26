@@ -9,8 +9,7 @@ pub mod wire_shared;
 use std::path::PathBuf;
 
 use crate::release::SiteMutation;
-use anyhow::{Context, Result, bail};
-use bonesdeploy_core::{config, paths};
+use bonesdeploy_core::config;
 
 #[derive(Clone, Debug)]
 pub struct DeploymentSnapshot {
@@ -40,20 +39,4 @@ impl DeploymentSnapshot {
         self.deployment_dir = deployment_dir;
         self
     }
-}
-
-/// Loads the deployed site configuration and verifies that it belongs to the named site.
-///
-/// Every command that writes or reads site state as root must call this rather
-/// than loading config directly, so the confused-deputy check (`project_name` ==
-/// site) is applied consistently.
-pub fn load_site_config(site: &str) -> Result<config::Bones> {
-    config::validate_site_name(site)?;
-    let config_path = PathBuf::from(paths::default_project_root_for(site)).join(paths::SHARED_DIR).join(paths::DOT_ENV);
-    let cfg = config::load(&config_path)
-        .with_context(|| format!("Failed to load deployed site configuration from {}", config_path.display()))?;
-    if cfg.project_name != site {
-        bail!("Remote site state belongs to '{}', expected '{}'", cfg.project_name, site);
-    }
-    Ok(cfg)
 }

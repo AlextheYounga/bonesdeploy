@@ -1,11 +1,11 @@
 from contextlib import contextmanager
-from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import pyinfra.connectors.ssh as pyinfra_ssh
 
-from bonesinfra.config.context import DeployContext
+from bonesinfra.config.context import ServerContext
 from bonesinfra.pyinfra import runner
+
+from .helpers import make_server_request
 
 sentinel_key = object()
 
@@ -33,17 +33,7 @@ def _noop_deploy(*args, **kwargs):
 
 
 def test_run_passes_ssh_auth_through_inventory(monkeypatch):
-    with TemporaryDirectory() as tmp:
-        config_path = Path(tmp) / ".env"
-        config_path.write_text(
-            """PROJECT_NAME=lawsnipe
-HOST=example.com
-SSH_USER=root
-PORT=2222
-"""
-        )
-
-        ctx = DeployContext.from_files(str(config_path))
+    ctx = ServerContext.from_request(make_server_request())
 
     seen = {}
 
@@ -74,15 +64,8 @@ PORT=2222
 
 
 def test_run_can_override_ssh_user_for_update_patches(monkeypatch, tmp_path):
-    config_path = tmp_path / ".env"
-    config_path.write_text(
-        """PROJECT_NAME=lawsnipe
-HOST=example.com
-SSH_USER=deploy
-PORT=2222
-"""
-    )
-    ctx = DeployContext.from_files(str(config_path))
+    del tmp_path
+    ctx = ServerContext.from_request(make_server_request(ssh_user="deploy"))
     seen = {}
 
     monkeypatch.setattr(

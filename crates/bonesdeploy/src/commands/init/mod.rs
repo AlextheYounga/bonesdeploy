@@ -66,7 +66,7 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     scaffold::update_gitignore()?;
     scaffold::ensure_env_build()?;
     apply_derived_defaults(&mut cfg);
-    bones_config::save(&cfg, Path::new(paths::DOT_ENV))?;
+    bones_config::write_local_environment(&cfg, Path::new(paths::DOT_ENV))?;
     secrets::initialize_defaults(&cfg)?;
 
     if is_fresh {
@@ -82,5 +82,8 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
 
 fn print_follow_up_hint() {
     println!();
-    println!("{}", output::next_step_with_detail("bonesdeploy setup", "to setup the remote server"));
+    println!(
+        "{}",
+        output::next_step_with_detail("bonesdeploy server setup", "to provision the shared server baseline")
+    );
 }

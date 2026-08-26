@@ -27,7 +27,7 @@ pub async fn run() -> Result<()> {
 
     println!("{} Rollback complete.", output::success_marker());
     println!();
-    println!("{}", output::next_step("bonesdeploy status"));
+    println!("{}", output::next_step("bonesdeploy site status"));
 
     Ok(())
 }

@@ -42,39 +42,33 @@ pub enum Command {
         #[arg(long = "service", value_name = "SERVICE")]
         services: Vec<String>,
     },
-    /// Run the full first-time deployment setup
+    /// Run server setup followed by site setup
     Setup {
         /// Skip setup confirmation prompts
         #[arg(long)]
         yes: bool,
     },
-    /// Check local and remote environment health
+    /// Run server and site diagnostics
     Doctor {
-        /// Skip remote checks
-        #[arg(long)]
-        local: bool,
         /// Show all successful remote checks
         #[arg(long)]
         verbose: bool,
     },
-    /// Show the current deployment state and next steps
-    Status,
-    /// Inspect project-owned remote deployment artifacts
-    Manifest {
-        /// Output format
-        #[arg(long, value_enum, default_value_t = ManifestFormat::Text)]
-        format: ManifestFormat,
+    /// Server-wide provisioning and diagnostics
+    Server {
+        #[command(subcommand)]
+        command: ServerCommand,
+    },
+    /// Project-scoped provisioning, diagnostics, and inspection
+    Site {
+        #[command(subcommand)]
+        command: SiteCommand,
     },
     /// Embedded documentation and next-step guidance for AI agents
     Skill {
         /// Optional subcommand: `next`, `list`, or `doc <name>`
         #[command(subcommand)]
         command: Option<SkillCommand>,
-    },
-    #[command(hide = true)]
-    Guide {
-        #[arg(long, value_enum, default_value_t = GuideFormat::Text)]
-        format: GuideFormat,
     },
     /// Manage encrypted local secrets and push them to remote shared/
     Secrets {
@@ -83,11 +77,6 @@ pub enum Command {
     },
     /// Deploy the configured project release to the remote server
     Deploy,
-    /// List remote releases and their deployment state
-    Releases {
-        #[command(subcommand)]
-        command: Option<ReleasesCommand>,
-    },
     /// Update BonesDeploy, BonesRemote, and project infrastructure to the latest version
     Update {
         /// Skip local update
@@ -98,11 +87,6 @@ pub enum Command {
         skip_remote: bool,
         #[arg(long, hide = true)]
         continue_update: bool,
-    },
-    /// Remote operations
-    Remote {
-        #[command(subcommand)]
-        command: RemoteCommand,
     },
     /// Roll back current release to the previous one
     Rollback,
@@ -124,16 +108,63 @@ pub enum SecretsCommand {
 pub enum ReleasesCommand {
     /// Cancel a building or interrupted release and clean its temporary state
     Kill {
-        /// Release identifier shown by `bonesdeploy releases`
+        /// Release identifier shown by `bonesdeploy site releases`
         release: String,
     },
 }
 
 #[derive(Subcommand)]
-pub enum RemoteCommand {
-    /// Run remote bootstrap against configured host
-    #[command(alias = "setup")]
-    Bootstrap,
+pub enum ServerCommand {
+    /// Provision the shared server baseline
+    Setup {
+        /// Skip setup confirmation prompts
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Check the shared server baseline
+    Doctor {
+        /// Show all successful remote checks
+        #[arg(long)]
+        verbose: bool,
+    },
+    /// Install optional helper tools on the server
+    Helpers {
+        /// Skip helper installation confirmation prompts
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SiteCommand {
+    /// Provision one project's base, services, runtime, and diagnostics
+    Setup {
+        /// Skip setup confirmation prompts
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Check one project's local and remote health
+    Doctor {
+        /// Skip remote checks
+        #[arg(long)]
+        local: bool,
+        /// Show all successful remote checks
+        #[arg(long)]
+        verbose: bool,
+    },
+    /// Show the current deployment state and next steps
+    Status,
+    /// Inspect project-owned remote deployment artifacts
+    Manifest {
+        /// Output format
+        #[arg(long, value_enum, default_value_t = ManifestFormat::Text)]
+        format: ManifestFormat,
+    },
+    /// List remote releases and their deployment state
+    Releases {
+        #[command(subcommand)]
+        command: Option<ReleasesCommand>,
+    },
     /// Apply the configured runtime against configured host
     Runtime {
         /// Skip runtime confirmation prompts
@@ -151,12 +182,6 @@ pub enum RemoteCommand {
         /// Email used for Let's Encrypt registration and notices
         #[arg(long)]
         email: Option<String>,
-    },
-    /// Install helper tools on the remote host (starship, neovim, aptui, etc.)
-    Helpers {
-        /// Skip helper installation confirmation prompts
-        #[arg(long)]
-        yes: bool,
     },
     /// Provision configured services (bound to localhost only)
     Services {

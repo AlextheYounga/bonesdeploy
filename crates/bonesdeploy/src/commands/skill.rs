@@ -77,16 +77,19 @@ pub async fn build_report() -> Result<Report> {
     }
 
     let cfg = config::load(bones_toml).with_context(|| format!("Failed to read {}", bones_toml.display()))?;
-    let setup_complete = remote_setup_complete(&cfg).await.context("Unable to determine remote setup status")?;
 
-    if !setup_complete {
-        return Ok(initialized_report(cfg, false));
+    if !server_ready(&cfg).await.context("Unable to determine server readiness")? {
+        return Ok(server_missing_report(cfg));
+    }
+
+    if !site_ready(&cfg).await.context("Unable to determine site readiness")? {
+        return Ok(site_missing_report(cfg));
     }
 
     let ssl_enabled =
         cfg.ssl_enabled || remote_ssl_enabled(&cfg).await.context("Unable to determine remote SSL status")?;
 
-    if ssl_enabled { Ok(ready_report(cfg)) } else { Ok(initialized_report(cfg, true)) }
+    if ssl_enabled { Ok(ready_report(cfg)) } else { Ok(ssl_missing_report(cfg)) }
 }
 
 pub fn prompt_free_init_command(project: &str) -> String {
@@ -106,33 +109,47 @@ fn uninitialized_report(project: &str) -> Report {
     }
 }
 
-fn initialized_report(cfg: config::Bones, setup_complete: bool) -> Report {
-    if setup_complete {
-        let command = ssl_command(&cfg);
-        let commands = vec![command.clone(), String::from("bonesdeploy deploy")];
-        return Report {
-            project: cfg.project_name.clone(),
-            state: String::from("setup_complete_ssl_missing"),
-            state_label: String::from("setup complete, HTTPS missing."),
-            missing: vec![String::from("ssl")],
-            commands,
-            next: next_command(&command, true, true),
-            cfg: Some(cfg),
-        };
+fn server_missing_report(cfg: config::Bones) -> Report {
+    let command = String::from("bonesdeploy server setup --yes");
+    let commands = vec![
+        command.clone(),
+        String::from("bonesdeploy site setup --yes"),
+        ssl_command(&cfg),
+        String::from("bonesdeploy deploy"),
+    ];
+    Report {
+        project: cfg.project_name.clone(),
+        state: String::from("server_missing"),
+        state_label: String::from("initialized, server baseline missing."),
+        missing: vec![String::from("server_baseline")],
+        commands,
+        next: next_command(&command, true, true),
+        cfg: Some(cfg),
     }
+}
 
-    let command = String::from("bonesdeploy setup --yes");
+fn site_missing_report(cfg: config::Bones) -> Report {
+    let command = String::from("bonesdeploy site setup --yes");
     let commands = vec![command.clone(), ssl_command(&cfg), String::from("bonesdeploy deploy")];
     Report {
         project: cfg.project_name.clone(),
-        state: String::from("initialized_setup_missing"),
-        state_label: String::from("initialized, setup not complete."),
-        missing: vec![
-            String::from("remote_bootstrap"),
-            String::from("runtime"),
-            String::from("bones_sync"),
-            String::from("doctor_pass"),
-        ],
+        state: String::from("site_missing"),
+        state_label: String::from("server ready, site not provisioned."),
+        missing: vec![String::from("site_base"), String::from("runtime"), String::from("doctor_pass")],
+        commands,
+        next: next_command(&command, true, true),
+        cfg: Some(cfg),
+    }
+}
+
+fn ssl_missing_report(cfg: config::Bones) -> Report {
+    let command = ssl_command(&cfg);
+    let commands = vec![command.clone(), String::from("bonesdeploy deploy")];
+    Report {
+        project: cfg.project_name.clone(),
+        state: String::from("ssl_missing"),
+        state_label: String::from("site provisioned, HTTPS missing."),
+        missing: vec![String::from("ssl")],
         commands,
         next: next_command(&command, true, true),
         cfg: Some(cfg),
@@ -160,7 +177,7 @@ fn next_command(command: &str, mutates: bool, contacts_remote: bool) -> NextComm
 fn ssl_command(cfg: &config::Bones) -> String {
     let domain = if cfg.domain.is_empty() { String::from("<domain>") } else { cfg.domain.clone() };
     let email = if cfg.email.is_empty() { String::from("<email>") } else { cfg.email.clone() };
-    format!("bonesdeploy remote ssl --yes --domain {domain} --email {email}")
+    format!("bonesdeploy site ssl --yes --domain {domain} --email {email}")
 }
 
 fn print_text(report: &Report) {
@@ -177,13 +194,27 @@ fn print_text(report: &Report) {
     }
 }
 
-async fn remote_setup_complete(cfg: &config::Bones) -> Result<bool> {
-    let session = ssh::connect_privileged(cfg).await?;
-
-    if ssh::run_cmd(&session, "command -v bonesremote >/dev/null 2>&1").await.is_err() {
-        session.close().await?;
+async fn server_ready(cfg: &config::Bones) -> Result<bool> {
+    let Ok(session) = ssh::connect_privileged(cfg).await else {
         return Ok(false);
-    }
+    };
+
+    let bonesremote_installed = ssh::run_cmd(&session, "command -v bonesremote >/dev/null 2>&1").await.is_ok();
+
+    let host_doctor_ok = if bonesremote_installed {
+        ssh::run_cmd(&session, "bonesremote doctor >/dev/null 2>&1").await.is_ok()
+    } else {
+        false
+    };
+
+    session.close().await?;
+    Ok(host_doctor_ok)
+}
+
+async fn site_ready(cfg: &config::Bones) -> Result<bool> {
+    let Ok(session) = ssh::connect_privileged(cfg).await else {
+        return Ok(false);
+    };
 
     let registry_path = Path::new(&cfg.project_root).join(paths::SHARED_DIR).join(paths::DOT_ENV);
     let sync_ok =
@@ -217,4 +248,44 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones) -> Result<bool> {
     session.close().await?;
 
     Ok(enabled)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ready_report, server_missing_report, site_missing_report, ssl_missing_report, uninitialized_report};
+    use crate::config;
+
+    fn config() -> config::Bones {
+        let mut cfg = config::Bones::default();
+        cfg.project_name = "atlas".to_string();
+        cfg.domain = "atlas.example.com".to_string();
+        cfg.email = "ops@example.com".to_string();
+        cfg
+    }
+
+    #[test]
+    fn readiness_reports_follow_the_server_site_ssl_sequence() {
+        let uninitialized = uninitialized_report("atlas");
+        assert_eq!(uninitialized.state, "uninitialized");
+        assert!(uninitialized.next.command.starts_with("bonesdeploy init"));
+
+        let server_missing = server_missing_report(config());
+        assert_eq!(server_missing.state, "server_missing");
+        assert_eq!(server_missing.next.command, "bonesdeploy server setup --yes");
+
+        let site_missing = site_missing_report(config());
+        assert_eq!(site_missing.state, "site_missing");
+        assert_eq!(site_missing.next.command, "bonesdeploy site setup --yes");
+
+        let ssl_missing = ssl_missing_report(config());
+        assert_eq!(ssl_missing.state, "ssl_missing");
+        assert_eq!(
+            ssl_missing.next.command,
+            "bonesdeploy site ssl --yes --domain atlas.example.com --email ops@example.com"
+        );
+
+        let ready = ready_report(config());
+        assert_eq!(ready.state, "ready");
+        assert_eq!(ready.next.command, "bonesdeploy deploy");
+    }
 }

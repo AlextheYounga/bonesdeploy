@@ -101,8 +101,26 @@ Implementation uses the repository's current flat `.env` contract rather than
 the older `bones.toml` terminology in this record. Legacy `PREVIEW_DOMAIN` is
 discarded during loading and omitted during saving.
 
+After the develop-side config-centralization refactor landed on this branch,
+the integration kept that design and re-applied the tunnel semantics on top:
+
+- The typed request transports (`ProvisioningRequest`/`SiteFields`) and the
+  Python site parser no longer carry `preview_domain`; the field was removed
+  from `transport.rs`, `request.py`, and test fixtures. The old key remains a
+  recognized-but-discarded managed input in the Rust parser so existing files
+  keep loading.
+- `secrets init` composes the first encrypted environment through
+  `environment::prepare()` with the two-argument framework examples.
+- `bonesdeploy setup` delegates to `server::setup` + `site::setup`; the
+  no-domain preview guidance moved into `site::setup::print_next_step`, which
+  reports the current Quick Tunnel URL instead of suggesting SSL for
+  domain-less sites.
+- Nginx router reconciliation stays tunnel-based: public routing only for a
+  real domain, plus `remove_project_router` cleanup with tunnel setup.
+
 `cargo fmt`, `cargo clippy`, `shfmt -w .`, focused Rust tests, `ruff format .`,
 `ruff check .`, and the full BonesInfra Python test suite pass. The manual
 Quick Tunnel smoke test, restart observation, and real-domain handoff remain
 for a server with Cloudflare network access. Focused Rust status/setup and
-BonesInfra SSL-handoff tests remain unchecked.
+BonesInfra SSL-handoff tests remain unchecked. The E2E harness still routes
+through nip.io hosts and needs a follow-up decision for no-domain sites.

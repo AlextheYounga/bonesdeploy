@@ -42,11 +42,11 @@ ______________________________________________________________________
 BonesInfra owns:
 
 - pyinfra API integration
-- setup provisioning
+- server baseline and site base provisioning
 - setup disables and unloads `algif_aead` to prevent Copy Fail (CVE-2026-31431) exploitation
 - runtime provisioning
 - SSL provisioning
-- loading and running the project's `.bones/infra` infrastructure
+- loading and running the project's `infra/` infrastructure
 - canonical framework infrastructure and scaffold resources
 - Jinja2 templates used by provisioning
 - runtime package installation
@@ -59,7 +59,7 @@ distribution-allocated subordinate UID/GID mappings, and a lingering systemd
 user manager for rootless Podman. Runtime application users remain home-less
 and non-login.
 
-Repository and site paths are derived from `project_name`: `repo_path` defaults to `/home/git/<project>.git`, `bones_repo` defaults to `/root/.config/bonesremote/repos/<project>.bones.git`, and `project_root` defaults to `/srv/sites/<project>`.
+Repository and site paths are derived from `project_name`: `repo_path` defaults to `/home/git/<project>.git` and `project_root` defaults to `/srv/sites/<project>`.
 
 Each build user's outer `user-<UID>.slice` is limited by root-owned systemd
 resource control at 80% CPU quota, 80% memory high, and 80% memory max, plus
@@ -73,7 +73,7 @@ BonesInfra does not own:
 
 - public user UX
 - local project initialization
-- `.bones` scaffold ownership
+- project infrastructure scaffold ownership
 - git hook lifecycle
 - release activation
 - release rollback
@@ -100,20 +100,21 @@ bonesinfra = "bonesinfra.__main__:main"
 The private command shapes currently used by the Rust CLI are:
 
 ```sh
-bonesinfra helpers apply --env-file <.env>
-bonesinfra setup apply --env-file <.env>
-bonesinfra runtime apply --env-file <.env>
-bonesinfra ssl apply --env-file <.env>
-bonesinfra services apply --env-file <.env>
-bonesinfra manifest show --env-file <.env>
+bonesinfra helpers apply --request-stdin
+bonesinfra server apply --request-stdin --bonesremote-version <version>
+bonesinfra site apply --request-stdin
+bonesinfra runtime apply --request-stdin
+bonesinfra ssl apply --request-stdin
+bonesinfra services apply --request-stdin
+bonesinfra manifest show --request-stdin
 ```
 
-`ssh_user` is read from the root `.env` (`SSH_USER` key, default `"root"`) instead of a CLI flag.
+`ssh_user` comes from the server request (default `"root"`) instead of a CLI flag.
 
 This command surface is an internal contract with `bonesdeploy`. Runtime
 questions are owned by the Rust runtime definitions under
-`crates/bonesdeploy/src/frameworks/`; BonesInfra receives the resulting
-`bones.toml` and does not prompt for runtime settings.
+`crates/bonesdeploy/src/frameworks/`; BonesInfra receives the resulting root
+`.env` and does not prompt for runtime settings.
 
 Do not treat it as public user-facing API unless that decision is made deliberately later.
 
@@ -142,7 +143,7 @@ crates/bonesinfra/
         ├── cli/               # Typer command definitions
         ├── config/            # DeployContext, paths, template_data
         ├── manifest.py        # artifact/service inspection and reporting
-        ├── project.py         # project `.bones/infra` loader
+        ├── project.py         # project `infra/` loader
         ├── pyinfra/           # runner + small operation helpers
         └── services/          # languages, linux, runtime services
 ```
@@ -200,19 +201,17 @@ CLI should stay thin.
 
 Example shape:
 
-```python
-def setup_apply_cmd(config: str):
-    ctx = DeployContext.from_files(config)
-    run(ctx=ctx, deploy=deploy_setup)
-```
+Commands read one typed JSON provisioning request from stdin with
+`--request-stdin`; the CLI does not read or parse the root `.env`.
 
 ## `cli/` and `pyinfra/`
 
 Command orchestration lives in `cli/app.py` and the pyinfra bridge in
 `pyinfra/runner.py`.
 
-The CLI commands load `DeployContext.from_files()`, validate command-specific
-requirements, select a deploy plan, and pass it to `pyinfra.runner.run()`.
+Server commands load `ServerContext.from_request()` and site commands load
+`DeployContext.from_request()`. They validate command-specific requirements,
+select a deploy plan, and pass it to `pyinfra.runner.run()`.
 The runner owns pyinfra connection and execution concerns. CLI code should
 not contain raw pyinfra operations, and the runner should not contain
 framework-specific provisioning logic.
@@ -238,13 +237,15 @@ Responsibilities:
 
 Config code should not import pyinfra.
 
-`config/context.py` mirrors the top-level `bones.toml` sections:
+`config/request.py` parses the typed request contract:
 
-- **`AppConfig`**: the `[app]`, `[app.server]`, `[app.dns]`, and `[app.deploy]` tables
+- **`ServerContext`**: `HOST`, `SSH_USER`, and `PORT` only
+- **`AppConfig`**: project, DNS, and deploy values
 - **`RuntimeConfig`**: the typed `[runtime]` identity fields, plus dynamic runtime settings
-- **`DeployContext`**: wraps `app`, `runtime`, and `services` and provides derived deployment paths
+- **`DeployContext`**: wraps `server`, `app`, `runtime`, and `services` and provides derived deployment paths
 
-No flat dict. No `host.data` side-channel.
+No flat dict. No `host.data` side-channel. Service credentials are kept on the
+deploy context and rendered directly into service provisioning scripts.
 
 ## `pyinfra/`
 
@@ -261,7 +262,7 @@ Responsibilities:
 
 - run pyinfra programmatically
 - load TOML files
-- receive the explicit `.env` path from the Rust subprocess boundary
+- receive the typed request from the Rust subprocess boundary
 - bridge CLI-selected deploy plans to pyinfra
 
 Pyinfra code may import pyinfra.
@@ -272,7 +273,7 @@ plans are the pyinfra boundary.
 ## `project.py` and `manifest.py`
 
 `project.py` owns loading the project's own infrastructure: it resolves
-`.bones/infra` relative to `bones.toml`, imports `runtime.py` / `manifest.py`
+`infra/` relative to the root `.env`, imports `runtime.py` / `manifest.py`
 as a package (supporting relative imports such as `from . import custom`),
 and validates entrypoints before SSH.
 
@@ -297,13 +298,10 @@ Deploy plan files should read like stories.
 Example:
 
 ```python
-def deploy_setup(ctx):     # ctx: DeployContext
-    install_system_packages(ctx)
+def deploy_site_setup(ctx):     # ctx: DeployContext
     ensure_users_and_groups(ctx)
-    setup_repo_and_project_dirs(ctx)
-    seed_placeholder_release(ctx)
-    setup_firewall(ctx)
-    install_bonesremote(ctx)
+    setup_repo_and_project(ctx, ctx.paths_dict)
+    seed(ctx, ctx.paths_dict)
 ```
 
 Sub-modules receive `(ctx, paths)` — no flat dict.
@@ -343,6 +341,7 @@ It mirrors the top-level config sections:
 ```python
 @dataclass
 class DeployContext:
+    server: ServerContext
     app: AppConfig
     runtime: RuntimeConfig
     services: ServicesConfig
@@ -350,15 +349,11 @@ class DeployContext:
 
 ## AppConfig
 
-Typed fields read from nested `bones.toml` tables:
+Typed fields read from the root `.env`:
 
 ```text
-`app.project_name`, `app.repo_path`, `app.project_root`, `app.server.host`,
-`app.server.ssh_user`, `app.server.port`, `app.deploy.branch`,
-`app.dns.ssl_enabled`, `app.dns.domain`, and
-`app.dns.email`. Deployment-owned fields such as `app.remote_name`,
-`app.deploy.deploy_on_push`, and `app.deploy.releases` remain outside
-`DeployContext`.
+`PROJECT_NAME`, derived repository and project roots, `BRANCH`, `SSL_ENABLED`,
+`DOMAIN`, and `EMAIL`.
 ```
 
 ## RuntimeConfig
@@ -384,18 +379,16 @@ Plan files receive `ctx` directly as a function parameter.
 The installed runtime catalog no longer exists.
 
 Runtimes are selected by the user-facing Rust CLI during `bonesdeploy init`,
-which writes the chosen values into `.bones/bones.toml` and scaffolds the
-project's `.bones/infra/` snapshot. BonesInfra then loads that project source
-at deploy time via `project.load_runtime(config)` / `load_manifest(config)`,
-resolving `infra/runtime.py` and `infra/manifest.py` relative to `bones.toml`
-as an importable package.
+which writes the chosen values into the root `.env` and scaffolds the project's
+`infra/.framework/` snapshot. BonesInfra then loads that project source at
+provisioning time via `project.load_runtime(env_file)` / `load_manifest(env_file)`.
 
 Broken project infrastructure surfaces before SSH: missing entrypoints raise
 `FileNotFoundError`, import failures raise `ImportError` with the file path,
 and missing callables raise `TypeError`.
 
 Rust does not depend on a Python question endpoint. It owns the prompt schema
-and writes the selected values into `bones.toml` before invoking BonesInfra.
+and writes the selected values into `.env` before invoking BonesInfra.
 
 ______________________________________________________________________
 
@@ -408,43 +401,31 @@ It should:
 - create pyinfra config
 - create inventory
 - connect
-- execute deploy plan with `ctx: DeployContext`
+- execute a deploy plan with `ctx: ServerContext | DeployContext`
 - run operations
 - return nonzero exit on pyinfra failure
 
 It should not know about Laravel, SSL, nginx, config files, or project infrastructure selection.
 
-The runner no longer attaches a flat data dict to `host.data`. It calls `deploy(ctx)` directly, passing the typed `DeployContext`. Plan files receive the context as a parameter and pass it to sub-modules.
+The runner no longer attaches a flat data dict to `host.data`. It calls `deploy(ctx)` directly, passing a typed `ServerContext` or `DeployContext`. Plan files receive the context as a parameter and pass it to sub-modules.
 
 ______________________________________________________________________
 
-# Setup Provisioning
+# Server And Site Provisioning
 
-Setup provisioning prepares the machine.
+Server provisioning prepares the reusable host baseline. Site provisioning
+prepares one project after that baseline is ready.
 
 Responsibilities:
 
-- install base packages
-- ensure deploy user
-- ensure runtime user
-- ensure runtime group
-- create bare repo parent
-- initialize bare git repo
-- set bare repo default branch (symbolic-ref HEAD refs/heads/<branch>)
-- create project root
-- create releases directory
-- create shared directory
-- create the `shared/` directory without creating `.env`; operators publish the encrypted environment explicitly with `bonesdeploy secrets push`
-- create trusted site registry parent directory
-- seed placeholder release (only repoints `current` at the placeholder when no release exists, so re-running setup never replaces the active release)
-- install deploy authorized key
-- install thin post-receive hook (delegates to `bonesremote hook post-receive`)
-- initialize the root-owned `.bones` config repository and install its pre-receive import hook
-- configure firewall
-- download, checksum-verify, version-check, and install the root-owned `0755` static `x86_64` `bonesremote` release binary matching the local `bonesdeploy` version
-- install validated `/etc/sudoers.d/bonesdeploy` with exact command arguments
+- `server apply` installs packages and hardening; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
+- `site apply` creates runtime and build identities, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
+- `site apply` creates the shared directory but does not write `shared/.env`; that file is published only by `bonesdeploy secrets push` outside this crate.
+- `site apply` does not install services, configure the framework runtime, configure SSL, push Git or secrets, or deploy.
 
-Setup should run as root or bootstrap SSH user.
+Server setup should run as root or bootstrap SSH user. Site base provisioning
+does not install services, configure the framework runtime, configure SSL, or
+deploy.
 
 ## Runtime Identity Model
 
@@ -459,10 +440,6 @@ The current model uses a single per-project identity:
 ## Sudoers Contract
 
 The deploy user can run only these narrow commands via sudo:
-
-The `.bones` repository is not included in this policy. It is owned and pushed
-by `root`, so its pre-receive hook can invoke `bonesremote site receive` without
-crossing a sudo boundary.
 
 ```
 bonesremote hook post-receive --site *
@@ -541,7 +518,7 @@ ______________________________________________________________________
 # Runtime-Specific Infrastructure
 
 Per-framework logic is maintained canonically in this package and copied into
-each project's `.bones/infra/runtime.py` by `bonesdeploy init`. The copied files
+each project's `infra/.framework/` snapshot by `bonesdeploy init`. The copied files
 are project-owned snapshots and orchestrate framework services using neutral core
 helpers in `services/`:
 
@@ -651,7 +628,7 @@ ______________________________________________________________________
 The current target is clarity, not cleverness.
 
 ```text
-Typer CLI -> DeployContext.from_files() -> pyinfra_runner.run(ctx) -> deploy plan -> grouped operations
+Typer CLI -> DeployContext.from_request() -> pyinfra_runner.run(ctx) -> deploy plan -> grouped operations
 ```
 
 Keep files small.

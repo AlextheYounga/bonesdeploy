@@ -1,3 +1,4 @@
+pub mod config;
 pub mod deploy;
 pub mod doctor;
 pub mod drop_failed_release;
@@ -22,7 +23,7 @@ pub fn ensure_site_idle(mutation: &SiteMutation) -> Result<()> {
     if let Some(active) = state.active() {
         if !active.phase().is_committed() {
             bail!(
-                "Release {} is still active or interrupted. Run 'bonesdeploy releases' and cancel it before changing site state.",
+                "Release {} is still active or interrupted. Run 'bonesdeploy site releases' and cancel it before changing site state.",
                 active.release()
             );
         }
@@ -34,7 +35,7 @@ pub fn ensure_site_idle(mutation: &SiteMutation) -> Result<()> {
     if let Some(staged) = state.staged_release() {
         if !committed {
             bail!(
-                "Release {staged} is staged without an active deployment. Run 'bonesdeploy releases' before changing site state."
+                "Release {staged} is staged without an active deployment. Run 'bonesdeploy site releases' before changing site state."
             );
         }
     }

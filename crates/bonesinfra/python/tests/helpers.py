@@ -1,6 +1,9 @@
+import json
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
+from copy import deepcopy
 from functools import cache
 from pathlib import Path
 
@@ -53,11 +56,53 @@ def exec_module(path):
     return ns
 
 
-def run(*args):
+def make_server_request(**overrides):
+    request = {"server": {"host": "example.com", "ssh_user": "root", "port": "2222"}}
+    request["server"].update(overrides)
+    return request
+
+
+def make_site_request(**overrides):
+    request = {
+        "server": make_server_request()["server"],
+        "site": {
+            "project_name": "lawsnipe",
+            "domain": "example.com",
+            "email": "ops@example.com",
+            "ssl_enabled": True,
+            "template": "custom",
+            "backend": "native",
+            "web_root": "dist",
+            "branch": "main",
+            "node_version": "22",
+            "services": [],
+            "extras": {},
+        },
+        "services": {},
+    }
+    credentials = overrides.pop("service_credentials", None)
+    if credentials is not None:
+        request["services"] = deepcopy(credentials)
+    site_services = overrides.pop("site_services", None)
+    if site_services is not None:
+        request["site"]["services"] = deepcopy(site_services)
+    for section in ("server", "site"):
+        values = overrides.pop(section, None)
+        if values is not None:
+            request[section].update(deepcopy(values))
+    values = overrides.pop("services", None)
+    if isinstance(values, Mapping):
+        request["services"].update(deepcopy(values))
+    request["site"].update(deepcopy(overrides))
+    return request
+
+
+def run(*args, input_text=None):
     result = subprocess.run(
         [sys.executable, "-m", "bonesinfra", *args],
         capture_output=True,
         text=True,
+        input=json.dumps(input_text) if isinstance(input_text, dict) else input_text,
         timeout=10,
         env=PYTHON_ENV,
         check=False,

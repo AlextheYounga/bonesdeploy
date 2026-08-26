@@ -1,6 +1,6 @@
 [package]
 name = "bonesdeploy-core"
-version = "0.8.5"
+version = "0.8.7"
 edition = "2024"
 authors=["Alex Younger <thealexyounger@proton.me>"]
 description="Deployments with a Spine in a Barebones Framework"
@@ -10,6 +10,7 @@ repository="https://github.com/AlextheYounga/bonesdeploy"
 [dependencies]
 anyhow = "1.0.103"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 toml = "0.8"
 
 [dev-dependencies]

@@ -70,7 +70,10 @@ owner is canonical. Bypassing it creates a competing abstraction.
 | SSH connectivity | `infra/ssh.rs` (Rust), `pyinfra/runner.py` (Python) | Use existing session helpers | Open raw SSH channels |
 | Git operations | `infra/git.rs` for local repositories; `bonesremote/src/git.rs` for server bare repositories | Use the existing boundary for the process in use | Shell out to git ad hoc |
 | GPG / secrets | `commands/secrets/gpg.rs` | Use the isolated keyring + helpers | Import GPG state from elsewhere |
-| Doctor / health checks | `commands/doctor/` (both binaries) | Add a check module under the doctor tree | Probe system state from deploy/init commands |
+| Server CLI orchestration | `commands/server/{setup,doctor,helpers}.rs` | Add a focused server command module | Put server provisioning in root setup or site commands |
+| Site CLI orchestration | `commands/site/` | Add a focused site command module | Put site provisioning in server commands or root composition |
+| Root setup / doctor composition | `commands/setup.rs`, `cli/dispatch.rs` | Keep composition thin and delegate to server/site commands | Reimplement server or site behavior in the root commands |
+| Doctor / health checks | `bonesdeploy::commands/server/doctor.rs`, `bonesdeploy::commands/site/doctor.rs`, `bonesremote::commands/doctor/` | Add checks under the owning server, site, or remote doctor boundary | Probe system state from deploy/init commands |
 | Embedded static assets | `rust-embed` asset modules | Add to the appropriate asset collection | Check in loose files that the binary must read at runtime |
 
 ## 3. Where Does New Behavior Belong?
@@ -106,7 +109,9 @@ Need functionality that talks over SSH?
   → infra/ssh.rs (local CLI) or pyinfra/runner.py (provisioning)
 
 Need a new CLI command?
-  → Add a variant to the clap Command enum + a commands/<name>.rs handler
+  → Add a variant to the clap Command enum + a focused handler under the owning
+    command group (`commands/server/<name>.rs` or `commands/site/<name>.rs`)
+    Root, ungrouped commands use `commands/<name>.rs`.
 
 Need a new config field?
   → bonesdeploy-core config struct (global) or Runtime.extra (framework-specific)
@@ -145,7 +150,12 @@ Runtime.extra is a serde-flattened BTreeMap for framework-specific keys.
 
 Existing implementations:
 - Loaded from the project root `.env` via config::load()
-- Loaded remotely from the site root `.env` via config::load_runtime()
+- Projected into `RemoteDeploymentConfig` for deploy-time SSH transport
+- Reconstructed remotely with identity and paths derived from `--site`
+
+`bonesremote` does not load `shared/.env` as Bones configuration. That file is
+application runtime input only and is linked into each release. `secrets push`
+replaces it atomically from encrypted `infra/secrets/.env.gpg`.
 
 To add another:
 Add a field to the struct (global) or use Runtime.extra (framework-specific).
@@ -176,7 +186,7 @@ DeployContext (bonesinfra/python/.../config/context.py)
 template_data(ctx) flattens it for Jinja2 rendering.
 
 Existing implementations:
-- Built from the root `.env` by DeployContext.from_files()
+- Built from the typed provisioning request delivered as JSON on stdin (`DeployContext.from_request` in `config/request.py`); Python never parses the root `.env`.
 
 To add another:
 Extend AppConfig / RuntimeConfig dataclasses. Framework-specific values go in RuntimeConfig.data.
@@ -589,10 +599,11 @@ both systems by design.
 files. The `store` module migrates these to unified `SiteState` on first read
 and deletes the old files. The migration is one-way.
 
-**Cross-layer configuration and integration side doors.** Rust and Python have
-separate readers for the same root `.env` contract. BonesInfra provisioning
-receives the explicit `--env-file` path, while Git and SSH callers use their
-existing integration boundaries.
+**Cross-layer configuration and integration side doors.** Rust is the sole
+parser of the root `.env`; Python provisioning consumes typed JSON requests on
+stdin (`--request-stdin`), and the remote deployment lifecycle consumes the
+`RemoteDeploymentConfig` descriptor through the established `--config-stdin`
+protocol, so the two layers share one schema defined in `bonesdeploy-core`.
 
 **Framework and deployment side doors.** Framework identity, defaults, and
 assets cross Rust and Python boundaries, while release commands can reach state

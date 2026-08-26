@@ -19,6 +19,8 @@ from bonesinfra.manifest import (
     resolve_artifacts,
 )
 
+from .helpers import make_site_request
+
 
 class ProjectManifest:
     def artifacts(self, ctx):
@@ -31,22 +33,12 @@ class ProjectManifest:
         return "server"
 
 
-def _context(tmp_path: Path, *, ssl: bool = False, domain: str = "example.test"):
-    config = tmp_path / ".env"
-    config.write_text(
-        f"""PROJECT_NAME=example
-HOST=example.test
-SSL_ENABLED={str(ssl).lower()}
-DOMAIN={domain}
-TEMPLATE=custom
-SERVICES=
-"""
-    )
-    return DeployContext.from_files(str(config))
+def _context(*, ssl: bool = False, domain: str = "example.test"):
+    return DeployContext.from_request(make_site_request(project_name="example", ssl_enabled=ssl, domain=domain))
 
 
 def test_project_manifest_declarations_are_included(tmp_path: Path):
-    ctx = _context(tmp_path, ssl=True)
+    ctx = _context(ssl=True)
     project = ProjectManifest()
     artifacts = resolve_artifacts(ctx, project)
     names = {artifact.name for artifact in artifacts}
@@ -57,13 +49,13 @@ def test_project_manifest_declarations_are_included(tmp_path: Path):
 
 
 def test_vue_declares_nginx_socket_as_socket(tmp_path: Path):
-    ctx = _context(tmp_path)
+    ctx = _context()
     socket = next(entry for entry in vue_manifest.artifacts(ctx) if entry[0] == "runtime nginx socket")
     assert socket[2] == "socket"
 
 
 def test_resolve_artifacts_rejects_unknown_path_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    ctx = _context(tmp_path)
+    ctx = _context()
     monkeypatch.setattr(
         manifest,
         "COMMON_ARTIFACTS",
@@ -74,7 +66,7 @@ def test_resolve_artifacts_rejects_unknown_path_key(tmp_path: Path, monkeypatch:
 
 
 def test_inspection_reports_present_missing_and_wrong_kind_without_contents(tmp_path: Path):
-    ctx = _context(tmp_path)
+    ctx = _context()
     project = ProjectManifest()
 
     class FakeHost:
@@ -98,7 +90,7 @@ def test_inspection_reports_present_missing_and_wrong_kind_without_contents(tmp_
 
 
 def test_link_fact_is_reported_as_present(tmp_path: Path):
-    ctx = _context(tmp_path)
+    ctx = _context()
 
     class FakeHost:
         def get_fact(self, fact, path):
@@ -112,7 +104,7 @@ def test_link_fact_is_reported_as_present(tmp_path: Path):
 
 
 def test_socket_fact_is_reported_as_present(tmp_path: Path):
-    ctx = _context(tmp_path)
+    ctx = _context()
 
     class SocketManifest(ProjectManifest):
         def artifacts(self, _ctx):
@@ -130,21 +122,21 @@ def test_socket_fact_is_reported_as_present(tmp_path: Path):
 
 
 def test_acme_certificate_links_are_declared_as_links(tmp_path: Path):
-    artifacts = resolve_artifacts(_context(tmp_path, ssl=True), ProjectManifest())
+    artifacts = resolve_artifacts(_context(ssl=True), ProjectManifest())
     certificates = {artifact.name: artifact for artifact in artifacts if artifact.owner == "ssl"}
 
     assert certificates["ACME certificate"].kind == "link"
     assert certificates["ACME certificate key"].kind == "link"
 
 
-def test_quick_tunnel_is_expected_only_without_a_real_domain(tmp_path: Path):
-    services = collect_services(_context(tmp_path, domain=""), ProjectManifest())
+def test_quick_tunnel_is_expected_only_without_a_real_domain():
+    services = collect_services(_context(domain=""), ProjectManifest())
 
     assert any(service.unit == "example-cloudflared.service" for service in services)
 
 
 def test_services_are_inspected_without_mutations(tmp_path: Path):
-    ctx = _context(tmp_path)
+    ctx = _context()
 
     class FakeHost:
         def get_fact(self, fact, *, services):
@@ -160,7 +152,7 @@ def test_services_are_inspected_without_mutations(tmp_path: Path):
 
 
 def test_runner_inspection_uses_the_host_installed_by_pyinfra(tmp_path: Path):
-    ctx = _context(tmp_path)
+    ctx = _context()
 
     class FakeHost:
         def get_fact(self, fact, path=None, *, services=None):

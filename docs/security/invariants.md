@@ -50,7 +50,7 @@ Three identities, not two and not five. The `git` user owns the bare repo and is
 12. Shared paths are an explicit allowlist, never framework-wide guesses.
 ```
 
-Permissions are a provisioning-time contract, not a deployment-time repair. The ownership layout is established once during `bonesdeploy remote setup` and never rewritten by deploy commands. If you find yourself wanting to `chmod` during a deploy, you are fixing the wrong thing — fix the provisioning. `shared/` is owned by the runtime user; only the app writes there. `releases/` is owned by the runtime user while prepare runs, then sealed as `root:<site>` before activation. The setgid bit on `releases/` lets the runtime group inherit read access without a post-deploy `chown`.
+Permissions are a provisioning-time contract, not a deployment-time repair. The ownership layout is established by `bonesdeploy server setup` and site setup, and never rewritten by deploy commands. If you find yourself wanting to `chmod` during a deploy, you are fixing the wrong thing — fix the provisioning. `shared/` is owned by the runtime user; only the app writes there. `releases/` is owned by the runtime user while prepare runs, then sealed as `root:<site>` before activation. The setgid bit on `releases/` lets the runtime group inherit read access without a post-deploy `chown`.
 
 No shared groups with `660`/`770` everywhere — that pattern is a tangle of logic traps. No ACLs — they're opaque and unreadable. Ordinary Unix ownership, every time.
 
@@ -181,6 +181,14 @@ If a mutation can be delayed safely, it is delayed. If a mutation affects live s
 ## Doctor: the fail-closed audit
 
 `bonesdeploy doctor` is a read-only, fail-closed security audit. Required evidence that cannot be collected is reported as `UNVERIFIED` and causes doctor to fail rather than pass silently.
+
+Server doctor verifies the reusable baseline before any site is provisioned:
+
+- Debian or Ubuntu, Podman, and AppArmor support
+- the global deploy identity and root-controlled BonesRemote roots
+- the root-owned BonesRemote binary and valid global sudoers policy
+- the shared Podman image-store configuration and seeded base image
+- active UFW and fail2ban protection plus unattended-upgrades configuration
 
 Site doctor verifies:
 

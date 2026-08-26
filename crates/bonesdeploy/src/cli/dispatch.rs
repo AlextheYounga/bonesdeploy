@@ -1,9 +1,8 @@
 use anyhow::Result;
 
-use crate::cli::args::{Cli, Command, ManifestFormat, ReleasesCommand, RemoteCommand, SecretsCommand};
-use crate::commands::{
-    deploy, doctor, init, manifest, releases, remote, rollback, secrets, setup, skill, status, update, version,
-};
+use crate::cli::args::{Cli, Command, ManifestFormat, ReleasesCommand, SecretsCommand, ServerCommand, SiteCommand};
+use crate::commands::{deploy, init, rollback, secrets, server, setup, site, skill, update, version};
+
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Init {
@@ -33,17 +32,12 @@ pub async fn run(cli: &Cli) -> Result<()> {
             Ok(())
         }
         Command::Setup { yes } => setup::run(*yes).await,
-        Command::Doctor { local, verbose } => doctor::run(*local, *verbose).await.map(|_| ()),
-        Command::Status => status::run().await,
-        Command::Manifest { format } => manifest::run(match format {
-            ManifestFormat::Text => "text",
-            ManifestFormat::Json => "json",
-        }),
+        Command::Doctor { verbose } => run_doctor(*verbose).await,
+        Command::Server { command } => dispatch_server(command).await,
+        Command::Site { command } => dispatch_site(command).await,
         Command::Skill { command } => skill::dispatch(command.as_ref()).await,
-        Command::Guide { format } => skill::run_next(*format).await,
         Command::Secrets { command } => dispatch_secrets(command).await,
         Command::Deploy => deploy::run().await,
-        Command::Releases { command } => dispatch_releases(command).await,
         Command::Update { skip_local, skip_remote, continue_update } => {
             update::run(update::Options {
                 skip_local: *skip_local,
@@ -52,7 +46,6 @@ pub async fn run(cli: &Cli) -> Result<()> {
             })
             .await
         }
-        Command::Remote { command } => dispatch_remote(command),
         Command::Rollback => rollback::run().await,
         Command::Version => {
             version::run();
@@ -69,19 +62,66 @@ async fn dispatch_secrets(command: &SecretsCommand) -> Result<()> {
     }
 }
 
-async fn dispatch_releases(command: &Option<ReleasesCommand>) -> Result<()> {
+async fn dispatch_server(command: &ServerCommand) -> Result<()> {
     match command {
-        None => releases::list().await,
-        Some(ReleasesCommand::Kill { release }) => releases::kill(release).await,
+        ServerCommand::Setup { yes } => server::setup(*yes).await,
+        ServerCommand::Doctor { verbose } => server::doctor(*verbose).await,
+        ServerCommand::Helpers { yes } => server::helpers(*yes),
     }
 }
 
-fn dispatch_remote(command: &RemoteCommand) -> Result<()> {
+async fn dispatch_site(command: &SiteCommand) -> Result<()> {
     match command {
-        RemoteCommand::Bootstrap => remote::bootstrap::run(false, true),
-        RemoteCommand::Runtime { yes } => remote::runtime::run(*yes, true),
-        RemoteCommand::Ssl { yes, domain, email } => remote::ssl::run(*yes, domain.clone(), email.clone()),
-        RemoteCommand::Helpers { yes } => remote::helpers::run(*yes),
-        RemoteCommand::Services { yes } => remote::services::run(*yes, true),
+        SiteCommand::Setup { yes } => site::setup(*yes).await,
+        SiteCommand::Doctor { local, verbose } => site::doctor(*local, *verbose).await,
+        SiteCommand::Status => site::status().await,
+        SiteCommand::Manifest { format } => site::manifest(match format {
+            ManifestFormat::Text => "text",
+            ManifestFormat::Json => "json",
+        }),
+        SiteCommand::Releases { command } => dispatch_releases(command.as_ref()).await,
+        SiteCommand::Runtime { yes } => site::runtime(*yes),
+        SiteCommand::Ssl { yes, domain, email } => site::ssl(*yes, domain.clone(), email.clone()),
+        SiteCommand::Services { yes } => site::services(*yes),
+    }
+}
+
+async fn dispatch_releases(command: Option<&ReleasesCommand>) -> Result<()> {
+    site::releases(command).await
+}
+
+async fn run_doctor(verbose: bool) -> Result<()> {
+    let server_result = server::doctor(verbose).await;
+    let site_result = site::doctor(false, verbose).await;
+    aggregate_doctor_results(server_result, site_result)
+}
+
+fn aggregate_doctor_results(server_result: Result<()>, site_result: Result<()>) -> Result<()> {
+    match (server_result, site_result) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Err(server_error), Ok(())) => Err(server_error),
+        (Ok(()), Err(site_error)) => Err(site_error),
+        (Err(server_error), Err(site_error)) => {
+            Err(anyhow::anyhow!("Server doctor failed: {server_error:#}\nSite doctor failed: {site_error:#}"))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::aggregate_doctor_results;
+
+    #[test]
+    fn root_doctor_reports_both_failures() {
+        let result =
+            aggregate_doctor_results(Err(anyhow::anyhow!("server failed")), Err(anyhow::anyhow!("site failed")));
+        assert!(result.is_err(), "both doctor failures must fail the composed command");
+        let message = match result {
+            Err(error) => error.to_string(),
+            Ok(()) => String::new(),
+        };
+
+        assert!(message.contains("Server doctor failed: server failed"));
+        assert!(message.contains("Site doctor failed: site failed"));
     }
 }

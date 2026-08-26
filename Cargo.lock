@@ -84,14 +84,14 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy"
-version = "0.8.5"
+version = "0.8.7"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
  "bonesinfra",
  "clap",
  "console",
- "easy-tree",
+ "getrandom",
  "inquire",
  "openssh",
  "rust-embed",
@@ -100,22 +100,22 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml 1.1.4+spec-1.1.0",
- "toml_edit",
 ]
 
 [[package]]
 name = "bonesdeploy-core"
-version = "0.8.5"
+version = "0.8.7"
 dependencies = [
  "anyhow",
  "serde",
+ "serde_json",
  "tempfile",
  "toml 0.8.23",
 ]
 
 [[package]]
 name = "bonesinfra"
-version = "0.3.2"
+version = "0.3.4"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "bonesremote"
-version = "0.8.5"
+version = "0.8.7"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
@@ -135,6 +135,7 @@ dependencies = [
  "serde",
  "serde_json",
  "time",
+ "toml 0.8.23",
 ]
 
 [[package]]
@@ -310,16 +311,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctor"
-version = "1.0.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "914a755b7c2d4af2bdcff7ce1739e2db9a1b81a9b07123d8015786ae03c0980d"
-dependencies = [
- "link-section",
- "linktime-proc-macro",
-]
-
-[[package]]
 name = "deranged"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -387,17 +378,10 @@ name = "e2e"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "ctor",
  "dtor",
  "mdpack",
  "serde_json",
 ]
-
-[[package]]
-name = "easy-tree"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fe19fbb9a76b6acd96ed1ff3ab680675158b88a6b16f5eb988c475f2d584c84"
 
 [[package]]
 name = "encode_unicode"
@@ -538,12 +522,6 @@ name = "libc"
 version = "0.2.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
-
-[[package]]
-name = "link-section"
-version = "0.19.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39c29a617ce3df32c08497bdc1ab6e2376e0b17948ac166a2fbe5977c5954cd9"
 
 [[package]]
 name = "linktime-proc-macro"

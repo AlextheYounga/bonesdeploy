@@ -20,13 +20,13 @@ from bonesinfra.cli.output import (
     setup_output,
     stop_live_output,
 )
-from bonesinfra.config.context import DeployContext
+from bonesinfra.config.context import DeployContext, ServerContext
 
 
 def run(
     *,
-    ctx: DeployContext,
-    deploy: Callable[[DeployContext], object | None],
+    ctx: DeployContext | ServerContext,
+    deploy: Callable[[DeployContext | ServerContext], object | None],
     ssh_key: str | None = None,
     ssh_user_override: str | None = None,
     quiet: bool = False,
@@ -34,9 +34,10 @@ def run(
     if not quiet:
         setup_output()
 
-    hostname = ctx.app.server.host
-    ssh_user = ssh_user_override or ctx.app.server.ssh_user
-    ssh_port = int(ctx.app.server.port)
+    server = ctx if isinstance(ctx, ServerContext) else ctx.server
+    hostname = server.host
+    ssh_user = ssh_user_override or server.ssh_user
+    ssh_port = int(server.port)
 
     host_data: dict[str, object] = {
         "ssh_user": ssh_user,
