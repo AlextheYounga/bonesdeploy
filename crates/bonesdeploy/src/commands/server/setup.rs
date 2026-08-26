@@ -15,7 +15,7 @@ pub async fn run(yes: bool) -> Result<()> {
 
     println!("Setting up server baseline...");
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    let request = infra::provisioning_request(&cfg)?;
+    let request = infra::server_request(&cfg)?;
     bonesinfra::run_with_request(
         &["server", "apply", "--request-stdin", "--bonesremote-version", env!("CARGO_PKG_VERSION")],
         &request,
