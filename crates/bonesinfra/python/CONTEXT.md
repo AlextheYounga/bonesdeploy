@@ -8,7 +8,7 @@ It is not the public product interface. It is called by `bonesdeploy` to run pyi
 The user should normally never call `bonesinfra` directly, except for dev
 testing. The Rust `bonesinfra` crate embeds this Python tree into the
 `bonesdeploy` binary, materializes the complete distribution into
-`infra/bonesinfra.whl`, creates a project-scoped dependency virtualenv, and
+`infra/bonesinfra-<version>-py3-none-any.whl`, creates a project-scoped dependency virtualenv, and
 invokes that project-local package with `python -m bonesinfra`.
 
 ______________________________________________________________________

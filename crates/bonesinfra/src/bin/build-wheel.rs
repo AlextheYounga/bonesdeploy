@@ -34,12 +34,16 @@ fn build_wheel() -> Result<(), String> {
     let [wheel] = wheels.as_slice() else {
         return Err(format!("expected exactly one generated wheel in {}", assets.display()));
     };
-    fs::rename(wheel, assets.join("bonesinfra.whl"))
-        .map_err(|error| format!("failed to rename {}: {error}", wheel.display()))?;
+    println!("Built {}", wheel.display());
     Ok(())
 }
 
 fn remove_old_wheels(assets: &Path) -> Result<(), String> {
+    let previous_wheel = assets.join("bonesinfra.whl");
+    if previous_wheel.is_file() {
+        fs::remove_file(&previous_wheel)
+            .map_err(|error| format!("failed to remove {}: {error}", previous_wheel.display()))?;
+    }
     for wheel in generated_wheels(assets)? {
         fs::remove_file(&wheel).map_err(|error| format!("failed to remove {}: {error}", wheel.display()))?;
     }

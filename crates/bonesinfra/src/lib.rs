@@ -14,7 +14,7 @@ use zip::ZipArchive;
 
 #[derive(Embed)]
 #[folder = "assets/"]
-#[include = "bonesinfra.whl"]
+#[include = "bonesinfra-*.whl"]
 struct WheelAsset;
 
 #[derive(Embed)]
@@ -34,11 +34,13 @@ pub fn materialize_project_artifacts(project_root: &Path) -> Result<PathBuf> {
     let infra = project_root.join(paths::LOCAL_INFRA_DIR);
     fs::create_dir_all(&infra).with_context(|| format!("Failed to create {}", infra.display()))?;
 
+    let wheel_name = embedded_wheel_name()?;
     let wheel = embedded_wheel()?;
-    replace_file(&infra.join(paths::BONESINFRA_WHEEL_NAME), &wheel)?;
+    remove_project_wheels(&infra)?;
+    replace_file(&infra.join(&wheel_name), &wheel)?;
     replace_templates(&project_root.join(paths::LOCAL_INFRA_TEMPLATES_DIR))?;
     remove_path(&project_root.join(PREVIOUS_FRAMEWORK_PATH))?;
-    Ok(infra.join(paths::BONESINFRA_WHEEL_NAME))
+    Ok(infra.join(wheel_name))
 }
 
 /// Runs `python -m bonesinfra` from the current project's cached environment.
@@ -94,9 +96,18 @@ pub fn prepare_in(project_root: &Path) -> Result<()> {
 
 /// Returns the embedded wheel bytes.
 pub fn embedded_wheel() -> Result<Vec<u8>> {
-    let asset = WheelAsset::get(paths::BONESINFRA_WHEEL_NAME).context("embedded BonesInfra wheel is missing")?;
+    let asset = WheelAsset::get(&embedded_wheel_name()?).context("embedded BonesInfra wheel is missing")?;
     validate_wheel(asset.data.as_ref())?;
     Ok(asset.data.into_owned())
+}
+
+fn embedded_wheel_name() -> Result<String> {
+    let mut wheels = WheelAsset::iter().filter(|path| path.ends_with(".whl"));
+    let wheel = wheels.next().context("embedded BonesInfra wheel is missing")?.into_owned();
+    if wheels.next().is_some() {
+        bail!("multiple embedded BonesInfra wheels found");
+    }
+    Ok(wheel)
 }
 
 /// Returns the embedded template paths relative to the BonesInfra package.
@@ -108,10 +119,7 @@ fn ensure_available(project_root: &Path) -> Result<PathBuf> {
     let project_root = project_root
         .canonicalize()
         .with_context(|| format!("Failed to resolve project root {}", project_root.display()))?;
-    let wheel = project_root.join(paths::LOCAL_INFRA_WHEEL_FILE);
-    if !wheel.is_file() {
-        bail!("Project-local BonesInfra wheel is missing at {}. Run bonesdeploy init or update.", wheel.display());
-    }
+    let wheel = project_wheel(&project_root)?;
     let wheel_bytes = fs::read(&wheel).with_context(|| format!("Failed to read {}", wheel.display()))?;
     validate_wheel(&wheel_bytes)?;
 
@@ -193,6 +201,37 @@ fn replace_file(destination: &Path, bytes: &[u8]) -> Result<()> {
         .map(|_| ())
         .map_err(|error| error.error)
         .with_context(|| format!("Failed to replace {}", destination.display()))
+}
+
+fn project_wheel(project_root: &Path) -> Result<PathBuf> {
+    let infra = project_root.join(paths::LOCAL_INFRA_DIR);
+    let wheels = fs::read_dir(&infra)
+        .with_context(|| format!("Failed to read {}", infra.display()))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name().is_some_and(|name| name.to_string_lossy().starts_with("bonesinfra-"))
+                && path.extension().is_some_and(|extension| extension == "whl")
+        })
+        .collect::<Vec<_>>();
+    let [wheel] = wheels.as_slice() else {
+        bail!("Project-local BonesInfra wheel is missing at {}. Run bonesdeploy init or update.", infra.display());
+    };
+    Ok(wheel.clone())
+}
+
+fn remove_project_wheels(infra: &Path) -> Result<()> {
+    for entry in fs::read_dir(infra)? {
+        let path = entry?.path();
+        if path
+            .file_name()
+            .is_some_and(|name| name == "bonesinfra.whl" || name.to_string_lossy().starts_with("bonesinfra-"))
+            && path.extension().is_some_and(|extension| extension == "whl")
+        {
+            remove_path(&path)?;
+        }
+    }
+    Ok(())
 }
 
 fn setup_venv(environment: &Path, wheel: &Path) -> Result<()> {

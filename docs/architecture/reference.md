@@ -280,7 +280,7 @@ Declares what artifacts and services a framework owns (manifest) and how to prov
 
 **Framework discovery:**
 `project.py` reads `TEMPLATE` from the root `.env`. It loads the managed package
-from the installed `infra/bonesinfra.whl` environment and resolves managed
+from the installed versioned `infra/bonesinfra-*.whl` environment and resolves managed
 templates from `infra/templates/`, then composes the project-owned package from
 `infra/custom/`. Materialization keeps managed framework content separate from
 custom content.

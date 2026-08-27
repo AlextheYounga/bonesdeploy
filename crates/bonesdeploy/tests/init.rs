@@ -16,7 +16,12 @@ fn init_success(env: &TestEnv) -> Result<()> {
 
 fn assert_project_infra(repo: &Path) -> Result<()> {
     let infra = repo.join("infra");
-    assert!(infra.join("bonesinfra.whl").is_file());
+    assert!(fs::read_dir(&infra)?.any(|entry| {
+        entry.ok().is_some_and(|entry| {
+            entry.path().file_name().is_some_and(|name| name.to_string_lossy().starts_with("bonesinfra-"))
+                && entry.path().extension().is_some_and(|extension| extension == "whl")
+        })
+    }));
     assert!(infra.join("templates/shared/nginx/index.html.j2").is_file());
     assert!(infra.join("templates/frameworks/custom/app.service.j2").is_file());
     assert!(!infra.join(".framework").exists());

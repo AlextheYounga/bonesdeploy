@@ -77,7 +77,7 @@ deployment/
     └── 01_prepare.sh
 ```
 
-Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`). A generated pure-Python wheel is committed as `crates/bonesinfra/assets/bonesinfra.whl`, checked against the Python source by `crates/bonesinfra/build.rs`, embedded into the `bonesdeploy` binary, and installed into each project's project-scoped cached venv. Regenerate it with `cargo build-wheel` after Python changes. Managed templates are materialized under `infra/templates/`. See `crates/bonesinfra/src/lib.rs`.
+Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`). A generated pure-Python wheel is committed as `crates/bonesinfra/assets/bonesinfra-<version>-py3-none-any.whl`, checked against the Python source by `crates/bonesinfra/build.rs`, embedded into the `bonesdeploy` binary, and installed into each project's project-scoped cached venv. Regenerate it with `cargo build-wheel` after Python changes. Managed templates are materialized under `infra/templates/`. See `crates/bonesinfra/src/lib.rs`.
 
 ### Project Environment
 Rust is the sole parser of the project-root `.env`. It models two environments:
@@ -221,7 +221,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy server setup --yes` and `bonesdeploy site setup --yes` before first deploy.
   - Saves connection and site inputs to the root `.env`.
-  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/`, the committed BonesInfra wheel as `infra/bonesinfra.whl`, and managed templates under `infra/templates/`.
+  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/`, the committed versioned BonesInfra wheel as `infra/bonesinfra-<version>-py3-none-any.whl`, and managed templates under `infra/templates/`.
   - `--template <name>` selects a framework template non-interactively. `--framework-var <key=value>` (repeated) overrides template variables; answers are validated against the template's question schema before writing `.env`.
 
 - **doctor**

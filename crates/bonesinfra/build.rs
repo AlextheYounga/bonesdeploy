@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 use std::env;
 use std::fs;
 use std::io::{self, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::exit;
 
 use zip::ZipArchive;
@@ -10,7 +10,7 @@ use zip::ZipArchive;
 mod build_support;
 
 fn main() {
-    println!("cargo:rerun-if-changed=assets/bonesinfra.whl");
+    println!("cargo:rerun-if-changed=assets");
     println!("cargo:rerun-if-changed=python/pyproject.toml");
     println!("cargo:rerun-if-changed=python/src");
 
@@ -25,8 +25,8 @@ fn main() {
 }
 
 fn verify_wheel() -> io::Result<()> {
-    let wheel_path = Path::new("assets/bonesinfra.whl");
-    let wheel_bytes = fs::read(wheel_path).map_err(|error| {
+    let wheel_path = embedded_wheel_path()?;
+    let wheel_bytes = fs::read(&wheel_path).map_err(|error| {
         io::Error::new(error.kind(), format!("failed to read {}: {error}; run cargo build-wheel", wheel_path.display()))
     })?;
     let mut archive = ZipArchive::new(io::Cursor::new(wheel_bytes))
@@ -49,6 +49,21 @@ fn verify_wheel() -> io::Result<()> {
     }
 
     Ok(())
+}
+
+fn embedded_wheel_path() -> io::Result<PathBuf> {
+    let wheels = fs::read_dir("assets")?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name().is_some_and(|name| name.to_string_lossy().starts_with("bonesinfra-"))
+                && path.extension().is_some_and(|extension| extension == "whl")
+        })
+        .collect::<Vec<_>>();
+    let [wheel] = wheels.as_slice() else {
+        return Err(io::Error::other("expected exactly one versioned BonesInfra wheel; run cargo build-wheel"));
+    };
+    Ok(wheel.clone())
 }
 
 fn packaged_python_files<R: Read + io::Seek>(archive: &mut ZipArchive<R>) -> io::Result<BTreeMap<String, Vec<u8>>> {

@@ -48,7 +48,7 @@ And embeds a Python provisioning runtime:
 
 - **`bonesinfra`** — `crates/bonesinfra/python/`, embedded by the Rust `bonesinfra` crate
 
-Each initialized project receives a committed `infra/bonesinfra.whl` and the
+Each initialized project receives a committed versioned `infra/bonesinfra-<version>-py3-none-any.whl` and the
 managed templates under `infra/templates/`. Commands execute the wheel through a
 project-scoped dependency environment; `infra/custom/` remains project-owned
 and is preserved by updates. Managed templates are refreshed wholesale by
@@ -170,7 +170,7 @@ sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYo
 ```
 
 When building from a checkout, the Rust build verifies that the committed
-`crates/bonesinfra/assets/bonesinfra.whl` matches the Python source. If Python
+`crates/bonesinfra/assets/bonesinfra-<version>-py3-none-any.whl` matches the Python source. If Python
 source has changed, regenerate the wheel with `cargo build-wheel` before
 running `cargo build` or `cargo install --path`. The version script runs this
 command automatically after updating the Python version.
@@ -203,7 +203,7 @@ This creates:
 ├── .env.build              # committed, non-secret build inputs
 ├── deployment/             # committed build and prepare scripts
 └── infra/                  # committed project infrastructure
-    ├── bonesinfra.whl       # committed BonesInfra runtime
+    ├── bonesinfra-*.whl     # committed BonesInfra runtime
     ├── templates/           # committed managed templates
     ├── custom/             # project-owned provisioning extensions
     └── secrets/             # encrypted project secrets
@@ -245,7 +245,7 @@ bonesdeploy site setup --yes
 runtime, and site doctor. It does not push Git or secrets, configure SSL, or
 deploy a release.
 
-This runs the provisioning from your project's `infra/bonesinfra.whl`:
+This runs the provisioning from your project's versioned `infra/bonesinfra-*.whl`:
 framework services, per-site nginx, AppArmor, and your `infra/custom/` project
 extensions. Templates rendered by the managed framework come from
 `infra/templates/`.

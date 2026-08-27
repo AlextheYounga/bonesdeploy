@@ -40,10 +40,17 @@ impl SampleProject {
             }
         }
 
-        for path in ["infra/bonesinfra.whl", "infra/templates/shared/nginx/index.html.j2"] {
-            if !self.dir.join(path).is_file() {
-                bail!("{template} fixture is missing generated {path}");
-            }
+        let has_wheel = fs::read_dir(self.dir.join("infra"))?.any(|entry| {
+            entry.ok().is_some_and(|entry| {
+                entry.path().file_name().is_some_and(|name| name.to_string_lossy().starts_with("bonesinfra-"))
+                    && entry.path().extension().is_some_and(|extension| extension == "whl")
+            })
+        });
+        if !has_wheel {
+            bail!("{template} fixture is missing generated BonesInfra wheel");
+        }
+        if !self.dir.join("infra/templates/shared/nginx/index.html.j2").is_file() {
+            bail!("{template} fixture is missing generated infra/templates/shared/nginx/index.html.j2");
         }
 
         for entrypoint in ["__init__.py", "runtime.py", "manifest.py"] {

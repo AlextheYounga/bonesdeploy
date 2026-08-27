@@ -40,7 +40,7 @@ to the other two pieces. It does not execute deployments itself; it either
 provisions via `bonesinfra` or triggers `bonesremote` over SSH.
 
 **`bonesinfra`** — an embedded Python provisioning runtime. Its committed pure-
-Python wheel is materialized as `infra/bonesinfra.whl`, while managed templates
+Python wheel is materialized as `infra/bonesinfra-<version>-py3-none-any.whl`, while managed templates
 are materialized under `infra/templates/`; a project-scoped venv installs the
 wheel and its dependencies. It uses `pyinfra` to provision
 the remote server (users, packages, frameworks, databases, SSL, firewalls) and
@@ -252,7 +252,7 @@ Rust side (crates/bonesdeploy/src/frameworks/<fw>.rs), selected through
 └── defaults() -> FrameworkDefaults        # web root, language, permissions
 
 Python side (materialized under `infra/`):
-├── bonesinfra.whl → committed managed runtime package
+├── bonesinfra-*.whl → committed managed runtime package
 ├── templates/     → committed managed templates
 └── custom/        → project-owned package composed after the framework
     (`manifest.py`, `runtime.py`)
