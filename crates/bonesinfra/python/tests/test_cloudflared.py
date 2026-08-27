@@ -1,6 +1,29 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 from bonesinfra.services.linux import cloudflared
+
+
+def test_install_uses_conditional_atomic_key_download(monkeypatch):
+    calls = []
+
+    monkeypatch.setattr(cloudflared.files, "directory", lambda **kwargs: calls.append(("directory", kwargs)))
+    monkeypatch.setattr(cloudflared.files, "download", lambda **kwargs: calls.append(("download", kwargs)))
+    monkeypatch.setattr(cloudflared.files, "template", lambda **kwargs: calls.append(("template", kwargs)))
+    monkeypatch.setattr(cloudflared.apt, "packages", lambda **kwargs: calls.append(("packages", kwargs)))
+
+    cloudflared.install()
+
+    assert [operation for operation, _kwargs in calls] == ["directory", "download", "template", "packages"]
+    assert calls[1][1] == {
+        "name": "Install Cloudflare package signing key",
+        "src": "https://pkg.cloudflare.com/cloudflare-main.gpg",
+        "dest": "/etc/apt/keyrings/cloudflare-main.gpg",
+        "user": "root",
+        "group": "root",
+        "mode": "0644",
+        "_sudo": True,
+    }
 
 
 def test_quick_tunnel_setup_renders_project_service_for_nginx_socket(monkeypatch):
@@ -27,6 +50,19 @@ def test_quick_tunnel_setup_renders_project_service_for_nginx_socket(monkeypatch
     assert calls[0]["dest"] == "/etc/systemd/system/atlas-cloudflared.service"
     assert calls[0]["src"].endswith("systemd/cloudflared.service.j2")
     assert calls[1]["name"] == "cloudflared"
+
+
+def test_quick_tunnel_unit_orders_network_and_allows_only_required_families():
+    template = Path(cloudflared.ASSETS_DIR / "systemd/cloudflared.service.j2").read_text()
+
+    assert "After=network-online.target {{ project_name }}-nginx.service" in template
+    assert "Wants=network-online.target" in template
+    assert "StartLimitIntervalSec=0" in template
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6" in template
+    assert "ProtectClock=yes" in template
+    assert "ProtectKernelLogs=yes" in template
+    assert "RestrictSUIDSGID=yes" in template
+    assert "Restart=always" in template
 
 
 def test_quick_tunnel_removal_unregisters_and_deletes_the_project_unit(monkeypatch):

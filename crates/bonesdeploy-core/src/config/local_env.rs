@@ -33,10 +33,6 @@ mod keys {
 const BEGIN: &str = "# >>> BonesDeploy managed configuration >>>";
 const END: &str = "# <<< BonesDeploy managed configuration <<<";
 pub(crate) const MANAGED_PREFIX: &str = "BONES_";
-/// The removed `PREVIEW_DOMAIN` key is still accepted, in both flat and
-/// `BONES_` form, and then discarded: temporary preview ingress is derived at
-/// runtime, never stored.
-const PREVIEW_DOMAIN_INPUT: &str = "PREVIEW_DOMAIN";
 const MANAGED: &[&str] = &[
     keys::PROJECT_NAME,
     keys::REMOTE_NAME,
@@ -45,7 +41,6 @@ const MANAGED: &[&str] = &[
     keys::PORT,
     keys::BRANCH,
     keys::DOMAIN,
-    PREVIEW_DOMAIN_INPUT,
     keys::EMAIL,
     keys::SSL_ENABLED,
     keys::TEMPLATE,
@@ -306,7 +301,6 @@ fn is_project_key(key: &str) -> bool {
             | keys::PORT
             | keys::BRANCH
             | keys::DOMAIN
-            | PREVIEW_DOMAIN_INPUT
             | keys::EMAIL
             | keys::SSL_ENABLED
             | keys::TEMPLATE

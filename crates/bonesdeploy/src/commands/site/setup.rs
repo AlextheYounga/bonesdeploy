@@ -8,8 +8,6 @@ use crate::ui::output;
 use crate::ui::prompts;
 use crate::{config, infra};
 
-use console::style;
-
 pub async fn run(yes: bool) -> Result<()> {
     if !yes && !prompts::confirm_site_setup()? {
         println!("Skipped.");
@@ -44,10 +42,10 @@ async fn print_next_step(cfg: &config::Bones, pending_first_push: bool) {
         );
     } else if cfg.domain.is_empty() {
         match super::status::remote_status(cfg).await {
-            Ok(remote) => match remote.preview.and_then(|preview| preview.active.then_some(preview.url).flatten()) {
-                Some(url) => println!("{} {url}", style("Preview").dim()),
+            Ok(remote) => match super::status::render_preview_status(remote.preview.as_ref()) {
+                Some(line) => println!("{line}"),
                 None => println!(
-                    "{} Quick Tunnel is starting; run `bonesdeploy status` for its URL.",
+                    "{} Quick Tunnel is not active; run `bonesdeploy status` to inspect it.",
                     output::pending_marker()
                 ),
             },

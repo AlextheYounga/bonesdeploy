@@ -30,7 +30,6 @@ def test_template_data_contains_runtime_values():
     assert td["runtime_user"] == "lawsnipe"
     assert td["runtime_group"] == "lawsnipe"
     assert td["runtime_backend"] == "native"
-    assert "preview_domain" not in td
 
 
 def test_extras_are_forwarded_with_json_types():

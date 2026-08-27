@@ -9,12 +9,21 @@ from bonesinfra.services.linux import systemd as service
 
 def install():
     """Install cloudflared from Cloudflare's supported package repository."""
-    server.shell(
+    files.directory(
+        name="Ensure APT keyring directory exists",
+        path="/etc/apt/keyrings",
+        user="root",
+        group="root",
+        mode="0755",
+        _sudo=True,
+    )
+    files.download(
         name="Install Cloudflare package signing key",
-        commands=[
-            "install -d -m 0755 /etc/apt/keyrings",
-            "curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg -o /etc/apt/keyrings/cloudflare-main.gpg",
-        ],
+        src="https://pkg.cloudflare.com/cloudflare-main.gpg",
+        dest="/etc/apt/keyrings/cloudflare-main.gpg",
+        user="root",
+        group="root",
+        mode="0644",
         _sudo=True,
     )
     files.template(

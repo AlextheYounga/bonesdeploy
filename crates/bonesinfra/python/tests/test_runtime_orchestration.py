@@ -54,6 +54,43 @@ def test_runtime_orchestrate_starts_services_after_provisioning(monkeypatch):
     assert calls[1][1] is ctx
 
 
+def test_runtime_reconcile_removes_router_before_setting_up_quick_tunnel(monkeypatch):
+    calls = []
+    ctx = SimpleNamespace(paths_dict={"runtime": "paths"}, app=SimpleNamespace(dns=SimpleNamespace(domain="")))
+
+    monkeypatch.setattr(runtime.router, "remove_project_router", lambda paths: calls.append(("router-remove", paths)))
+    monkeypatch.setattr(
+        runtime.cloudflared,
+        "setup",
+        lambda current_ctx, paths: calls.append(("cloudflared-setup", current_ctx, paths)),
+    )
+
+    runtime.reconcile_ingress(ctx)
+
+    assert [call[0] for call in calls] == ["router-remove", "cloudflared-setup"]
+    assert calls[0][1] is ctx.paths_dict
+    assert calls[1][1:] == (ctx, ctx.paths_dict)
+
+
+def test_runtime_reconcile_removes_quick_tunnel_for_a_real_domain(monkeypatch):
+    calls = []
+    ctx = SimpleNamespace(
+        paths_dict={"runtime": "paths"}, app=SimpleNamespace(dns=SimpleNamespace(domain="example.test"))
+    )
+
+    monkeypatch.setattr(runtime.cloudflared, "remove", lambda current_ctx, paths: calls.append((current_ctx, paths)))
+    monkeypatch.setattr(runtime.router, "remove_project_router", lambda paths: calls.append(("router", paths)))
+    monkeypatch.setattr(
+        runtime.cloudflared,
+        "setup",
+        lambda current_ctx, paths: calls.append(("setup", current_ctx, paths)),
+    )
+
+    runtime.reconcile_ingress(ctx)
+
+    assert calls == [(ctx, ctx.paths_dict)]
+
+
 def test_generated_runtimes_include_host_lifecycle_operations():
     frameworks = Path(__file__).parents[1] / "src" / "bonesinfra" / "frameworks"
     for runtime_source in sorted(frameworks.glob("*/runtime.py")):

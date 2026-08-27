@@ -1,5 +1,6 @@
 """Typed provisioning request parsing at the Python process boundary."""
 
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -42,6 +43,11 @@ _RESERVED_PROJECT_NAMES = {
     "umount",
 }
 _FRAMEWORKS = {"custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"}
+_DOMAIN_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+_EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_MAX_DOMAIN_LENGTH = 253
+_MIN_DOMAIN_LABELS = 2
+_MAX_EMAIL_LENGTH = 254
 
 
 def reject_unknown(mapping: Mapping[str, Any], allowed: set[str], where: str) -> None:
@@ -60,7 +66,7 @@ def parse_server_connection(server: Mapping[str, Any]) -> ServerContext:
     return ServerContext(host=host, ssh_user=ssh_user, port=port)
 
 
-def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
+def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
     reject_unknown(body, {"server", "site", "services"}, "request")
     server = body.get("server")
     site = body.get("site")
@@ -109,6 +115,12 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
         raise TypeError("SERVICES must be a list")
     services = _database_services(services_value)
     credentials = _credentials(body.get("services", {}))
+    domain = _string(site.get("domain", ""), "site.domain")
+    email = _string(site.get("email", ""), "site.email")
+    if domain:
+        validate_domain(domain)
+    if email:
+        validate_email(email)
     return DeployContext(
         server=parse_server_connection(server),
         app=AppConfig(
@@ -116,8 +128,8 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
             f"{DEFAULT_REPO_PARENT}/{name}.git",
             f"{DEFAULT_PROJECT_ROOT_PARENT}/{name}",
             DnsConfig(
-                _string(site.get("domain", ""), "site.domain"),
-                _string(site.get("email", ""), "site.email"),
+                domain,
+                email,
                 ssl_enabled,
             ),
             DeployConfig(_string(site.get("branch", "main"), "site.branch")),
@@ -194,6 +206,23 @@ def _validate_project_name(value: str) -> None:
     ):
         return
     raise ValueError(f"Invalid project name: {value}")
+
+
+def validate_domain(value: str) -> str:
+    """Validate a DNS name before it reaches generated configuration or shell commands."""
+    if len(value) > _MAX_DOMAIN_LENGTH or value.endswith("."):
+        raise ValueError("site.domain must be a valid DNS name")
+    labels = value.split(".")
+    if len(labels) < _MIN_DOMAIN_LABELS or any(not _DOMAIN_LABEL.fullmatch(label) for label in labels):
+        raise ValueError("site.domain must be a valid DNS name")
+    return value
+
+
+def validate_email(value: str) -> str:
+    """Validate the basic email shape required by Certbot."""
+    if len(value) > _MAX_EMAIL_LENGTH or not value.isascii() or not _EMAIL.fullmatch(value):
+        raise ValueError("site.email must be a valid email address")
+    return value
 
 
 def _string(value: Any, name: str) -> str:

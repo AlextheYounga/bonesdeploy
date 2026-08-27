@@ -2,28 +2,22 @@
 
 ## Current behavior
 
-`crates/bonesdeploy-core/src/app.rs` models `preview_domain` as part of the
-site's DNS configuration. `crates/bonesdeploy-core/src/config.rs` derives an
-empty preview domain as `<project>-<host>.nip.io`, and the shared
-`bonesinfra_input` keys include `PREVIEW_DOMAIN`.
+The site's DNS configuration contains only explicitly configured real-domain
+values. Temporary ingress is selected at runtime when that domain is empty.
 
-`crates/bonesdeploy/src/commands/remote/data.rs` copies `preview_domain` into
-the data sent to BonesInfra. The default project scaffold in
-`crates/bonesdeploy/assets/kit/bones.toml` also exposes `preview_domain` under
-`[app.dns]`.
+The remote provisioning request and project scaffold do not contain temporary
+hostnames.
 
-BonesInfra reads that value into `DnsConfig` in
-`crates/bonesinfra/python/src/bonesinfra/config/context.py` and makes it
-available to templates. `services/linux/nginx/router.py` chooses
-`domain or preview_domain` as the public Nginx `server_name` and currently
-rejects a site that has neither. The router also owns creation of the per-site
+BonesInfra reads the real domain into `DnsConfig` in
+`crates/bonesinfra/python/src/bonesinfra/config/context.py`. The router uses
+that value as the public Nginx `server_name` and does not require a hostname for
+per-site Nginx. The router also owns creation of the per-site
 Nginx systemd service, its runtime directories, the root-managed public Nginx
 site, and the site target startup sequence.
 
-`assets/nginx/router.conf.j2` proxies the selected public hostname to the
-project's per-site Nginx Unix socket. When both a real domain and a distinct
-preview domain exist, it renders a redirect from the preview hostname to the
-real domain.
+`assets/nginx/router.conf.j2` proxies the configured public hostname to the
+project's per-site Nginx Unix socket. The Quick Tunnel connects directly to
+that socket and does not use the public router.
 
 The per-site Nginx configuration already listens on
 `paths.runtime_nginx_socket`. The socket is the stable local ingress boundary
@@ -32,8 +26,7 @@ provides a project-scoped lifecycle for `project-nginx.service` and other
 runtime services.
 
 `crates/bonesinfra/python/src/bonesinfra/manifest.py` treats site Nginx as a
-runtime-managed service and still considers `domain or preview_domain` when
-describing SSL artifacts.
+runtime-managed service and associates SSL artifacts only with a real domain.
 
 `crates/bonesremote/src/commands/status.rs` reports the current release, SSL
 state, and project services. `crates/bonesdeploy/src/commands/status.rs`
@@ -60,8 +53,8 @@ after the site's Nginx service so the origin socket exists before the tunnel
 starts.
 
 The root-managed public Nginx router is not required for a no-domain site.
-BonesInfra removes any project public-router config left from the old nip.io
-behavior while retaining the machine's default-deny Nginx configuration.
+BonesInfra removes any project public-router config when no real domain exists
+while retaining the machine's default-deny Nginx configuration.
 
 A site with a non-empty real domain uses the existing public Nginx route.
 Runtime reconciliation ensures the project Quick Tunnel unit is stopped,
@@ -77,19 +70,14 @@ service. `bonesdeploy status` renders that URL. Setup reuses the same remote
 status path to print the preview URL after runtime setup without persisting the
 hostname into project configuration.
 
-New configuration no longer contains `preview_domain`. Rust deserialization
-accepts the legacy key only for compatibility with existing project files and
-discards it. Saving configuration removes the legacy field. BonesInfra no
-longer carries `preview_domain` in its typed context or template data.
+New configuration contains no temporary hostname. BonesInfra does not carry a
+temporary hostname in its typed context or template data.
 
 ## Approach
 
-Remove preview-domain semantics from the shared configuration model. Delete the
-nip.io default derivation and `PREVIEW_DOMAIN` BonesInfra input. Keep an
-input-only legacy `preview_domain` field in Rust's file-deserialization shape
-so existing `bones.toml` files remain readable, but do not expose it on `App`
-or serialize it back out. Remove the field from the scaffold and from
-BonesInfra's `DnsConfig` and template context.
+Remove temporary-hostname semantics from the shared configuration model. Remove
+the field from the scaffold and from BonesInfra's `DnsConfig` and template
+context.
 
 Add a focused `bonesinfra.services.linux.cloudflared` module. It owns the
 Cloudflare package repository/package installation and the project Quick Tunnel
@@ -142,9 +130,8 @@ artifacts are associated only with a real domain.
 
 ## Responsibilities and boundaries
 
-`bonesdeploy-core` owns the persisted configuration contract. It removes
-`preview_domain` as live domain state while accepting the old key long enough
-to read existing configuration safely.
+`bonesdeploy-core` owns the persisted configuration contract and stores only
+real domain state.
 
 `bonesdeploy::commands::setup` remains the setup coordinator. It does not start
 or inspect cloudflared directly; it uses the runtime provisioning flow and the
@@ -176,8 +163,7 @@ not create, restart, or configure the tunnel.
 
 - `crates/bonesdeploy-core/src/app.rs`
 - `crates/bonesdeploy-core/src/config.rs`
-- Rust configuration tests covering legacy `preview_domain` input and
-  serialization
+- Rust configuration tests covering the real-domain configuration contract
 - `crates/bonesdeploy/assets/kit/bones.toml`
 - `crates/bonesdeploy/src/commands/remote/data.rs`
 - `crates/bonesdeploy/src/commands/setup.rs`
@@ -200,8 +186,8 @@ not create, restart, or configure the tunnel.
 
 ## Decisions
 
-- Cloudflare Quick Tunnels replace nip.io rather than becoming a second
-  configurable preview provider. The request is for a cleaner no-domain
+- Cloudflare Quick Tunnels provide no-domain ingress rather than becoming a
+  second configurable preview provider. The request is for a cleaner no-domain
   temporary URL, and a provider framework would add unsupported generality.
 - Temporary ingress is inferred from the absence of a real domain. No new
   `preview_enabled`, provider, hostname, token, or tunnel configuration is
@@ -216,9 +202,8 @@ not create, restart, or configure the tunnel.
   restart.
 - No generated URL state file is introduced. Remote status derives current
   state from the service that owns it, avoiding stale hostname persistence.
-- The old `preview_domain` key is accepted only as legacy input and omitted on
-  serialization. This prevents existing repositories from becoming unreadable
-  while ensuring nip.io is no longer live configuration.
+- Temporary ingress is never accepted as persisted configuration or serialized
+  project state.
 - The real-domain SSL flow disables the Quick Tunnel only after the HTTPS Nginx
   route is active, preserving temporary access during the handoff.
 - The `cloudflared` package remains installed after a site switches to a real
@@ -239,23 +224,20 @@ not create, restart, or configure the tunnel.
   under a user that cannot traverse or connect to the project's Nginx socket.
 - Incorrect systemd ordering can start cloudflared before the per-site Nginx
   socket exists and cause transient origin failures.
-- Reconciliation can leave a stale nip.io Nginx site enabled if the no-domain
+- Reconciliation can leave a stale Nginx site enabled if the no-domain
   path removes only the symlink or only the available config.
 - The real-domain handoff can create downtime if the Quick Tunnel is removed
   before certificate issuance, Nginx validation, and HTTPS reload have
   succeeded.
-- Existing configuration can break if the legacy `preview_domain` key is
-  removed from deserialization before projects have been rewritten.
 - Applications that require Server-Sent Events cannot be fully exercised
   through Quick Tunnels.
 
 ## Validation
 
-- Add Rust configuration tests proving a legacy `preview_domain` key still
-  loads, no nip.io hostname is derived, and serialization omits the legacy
-  field.
-- Add BonesInfra context tests proving `preview_domain` is no longer part of
-  the typed DNS/template context.
+- Add Rust configuration tests proving temporary hostnames are not part of
+  persisted configuration.
+- Add BonesInfra context tests proving temporary hostnames are not part of the
+  typed DNS/template context.
 - Add focused cloudflared provisioning tests proving a no-domain site installs
   and renders the project Quick Tunnel service, uses the per-site Nginx Unix
   socket, runs under the runtime user, orders after project Nginx, and
@@ -286,6 +268,6 @@ not create, restart, or configure the tunnel.
   `uv run pytest` from `crates/bonesinfra/python`, `cargo fmt`,
   `cargo clippy`, and `shfmt -w .`.
 - Do not run end-to-end tests.
-- Review the final diff to confirm nip.io behavior and live `preview_domain`
-  usage are gone, no provider framework or persistent generated-hostname state
+- Review the final diff to confirm temporary hostname behavior is gone, no
+  provider framework or persistent generated-hostname state
   was introduced, and the real-domain path remains Nginx/Certbot-owned.

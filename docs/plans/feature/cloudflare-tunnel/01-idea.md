@@ -2,8 +2,8 @@
 
 ## Request
 
-Replace BonesDeploy's current nip.io-based temporary preview URL with a
-Cloudflare Quick Tunnel for sites that do not yet have a real domain configured.
+Provide a Cloudflare Quick Tunnel for sites that do not yet have a real domain
+configured.
 
 The temporary URL must require no user-owned domain and no Cloudflare account.
 It should be created and managed as part of the site's existing runtime
@@ -12,12 +12,9 @@ output.
 
 ## Problem
 
-BonesDeploy currently derives `preview_domain` as
-`<project>-<host>.nip.io` and passes that value through Rust configuration,
-BonesInfra context, and the public Nginx router. This gives a newly provisioned
-site a usable hostname without requiring DNS setup, but it makes a third-party
-wildcard DNS convention part of the application's configuration and ingress
-model.
+Temporary preview access must not be represented as a configured hostname. It
+is runtime ingress and should not pass through project configuration or the
+public Nginx router.
 
 The preview hostname is deterministic configuration even though its purpose is
 temporary access before a real domain exists. It also requires the system Nginx
@@ -61,24 +58,20 @@ proxies the application through the project's Unix socket under `/run`.
 
 A newly configured BonesDeploy site with no real domain can be set up and
 reached through an automatically managed HTTPS `*.trycloudflare.com` URL
-without nip.io, DNS changes, a Cloudflare account, or a publicly exposed
-application port.
+without DNS changes, a Cloudflare account, or a publicly exposed application
+port.
 
 The Quick Tunnel runs as a project-scoped systemd service and proxies directly
 to the site's existing per-site Nginx Unix socket. `bonesdeploy status` reports
 the current preview URL, and setup output surfaces the URL when it is available.
 
 When a real domain is configured, BonesDeploy uses the existing public
-Nginx/Certbot ingress path instead of the Quick Tunnel. Existing configurations
-that still contain `preview_domain` remain readable, but the value no longer
-controls runtime behavior and is not written back to configuration.
+Nginx/Certbot ingress path instead of the Quick Tunnel. Temporary ingress is
+runtime state and is not written to project configuration.
 
 ## Scope
 
-- Remove nip.io hostname derivation and all runtime use of `preview_domain`.
-- Preserve read compatibility for existing `bones.toml` files containing the
-  legacy `preview_domain` key while omitting that key from newly written
-  configuration.
+- Remove configured temporary-hostname handling from all configuration layers.
 - Install `cloudflared` from Cloudflare's supported Debian/Ubuntu package
   repository when a site needs temporary preview ingress.
 - Run one project-scoped Quick Tunnel service for a site that has no real
@@ -114,7 +107,6 @@ controls runtime behavior and is not written back to configuration.
 - Quick Tunnels are development/testing infrastructure: they have no uptime
   SLA, currently limit a tunnel to 200 concurrent in-flight requests, and do
   not support Server-Sent Events.
-- Existing `bones.toml` files containing `preview_domain` must continue to load.
 - Do not run the repository end-to-end test suite.
 
 ## Exclusions

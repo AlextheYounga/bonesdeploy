@@ -68,17 +68,22 @@ fn preview_status(site: &str) -> Option<PreviewStatus> {
         .args(["--boot", "0", "--unit", &service, "--no-pager", "--output", "cat"])
         .output()
         .ok()?;
+    if !journal.status.success() {
+        return None;
+    }
     let output = String::from_utf8(journal.stdout).ok()?;
     Some(PreviewStatus { active: true, url: extract_preview_url(&output) })
 }
 
-fn extract_preview_url(journal: &str) -> Option<String> {
+pub(crate) fn extract_preview_url(journal: &str) -> Option<String> {
     journal
         .split_whitespace()
         .filter_map(|token| token.strip_prefix("https://"))
-        .filter_map(|host| host.strip_suffix(".trycloudflare.com").map(|_| host))
+        .filter_map(|host| host.strip_suffix(".trycloudflare.com"))
         .filter(|host| {
             !host.is_empty()
+                && !host.starts_with('-')
+                && !host.ends_with('-')
                 && host
                     .chars()
                     .all(|character| character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-')
@@ -131,4 +136,28 @@ fn services(project_name: &str) -> Vec<ServiceStatus> {
 
 fn target_service_names(target: &str) -> Vec<String> {
     systemd::required_services(target).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract_preview_url;
+
+    #[test]
+    fn extracts_the_newest_valid_preview_url() {
+        let journal = "old https://old.trycloudflare.com\nnoise https://new.trycloudflare.com";
+
+        assert_eq!(extract_preview_url(journal).as_deref(), Some("https://new.trycloudflare.com"));
+    }
+
+    #[test]
+    fn ignores_non_preview_urls_and_invalid_hosts() {
+        let journal = "https://example.com https://bad_host.trycloudflare.com https://valid-preview.trycloudflare.com";
+
+        assert_eq!(extract_preview_url(journal).as_deref(), Some("https://valid-preview.trycloudflare.com"));
+    }
+
+    #[test]
+    fn returns_none_without_a_valid_preview_url() {
+        assert_eq!(extract_preview_url("cloudflared started"), None);
+    }
 }

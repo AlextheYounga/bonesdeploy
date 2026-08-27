@@ -170,7 +170,7 @@ fn activate_deployment(mutation: &SiteMutation, prepared: &PreparedDeployment) -
     }
 
     stage("Restarting services");
-    if let Err(error) = service::run(mutation) {
+    if let Err(error) = service::run_for_release(mutation) {
         return finish_failed_activation(mutation, &prepared.previous_release, Some(&prepared.context_dir), error);
     }
     if let Err(error) = advance_phase(
@@ -272,7 +272,7 @@ fn finish_failed_activation(
         );
     }
 
-    let error = match service::run(mutation) {
+    let error = match service::run_for_release(mutation) {
         Ok(()) => error,
         Err(restart_error) => error.context(format!("Failed to restart the restored release: {restart_error:#}")),
     };

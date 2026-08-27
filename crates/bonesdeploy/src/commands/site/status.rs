@@ -52,10 +52,8 @@ pub async fn run() -> Result<()> {
             Ok(remote) => {
                 println!("{} {}", style("Release").dim(), style(&remote.current_release).bold());
                 println!("{} {}", style("SSL").dim(), ssl_state(&remote.ssl));
-                if let Some(preview) = remote.preview.as_ref().filter(|preview| preview.active) {
-                    if let Some(url) = &preview.url {
-                        println!("{} {}", style("Preview").dim(), url);
-                    }
+                if let Some(preview) = render_preview_status(remote.preview.as_ref()) {
+                    println!("{preview}");
                 }
                 if !remote.services.is_empty() {
                     println!();
@@ -100,10 +98,51 @@ fn ssl_state(ssl: &RemoteSslStatus) -> String {
     }
 }
 
+pub(crate) fn render_preview_status(preview: Option<&RemotePreviewStatus>) -> Option<String> {
+    let preview = preview.filter(|preview| preview.active)?;
+    match preview.url.as_deref() {
+        Some(url) => Some(format!("Preview: {url}")),
+        None => Some(format!(
+            "{} Quick Tunnel is starting; run `bonesdeploy status` for its URL.",
+            output::pending_marker()
+        )),
+    }
+}
+
 fn service_marker(state: &str) -> String {
     match state {
         "active" => output::success_marker(),
         "unknown" => output::pending_marker(),
         _ => output::failure_marker(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{RemotePreviewStatus, render_preview_status};
+
+    #[test]
+    fn renders_active_preview_url() {
+        let preview =
+            RemotePreviewStatus { active: true, url: Some(String::from("https://preview.trycloudflare.com")) };
+
+        assert_eq!(
+            render_preview_status(Some(&preview)).as_deref(),
+            Some("Preview: https://preview.trycloudflare.com")
+        );
+    }
+
+    #[test]
+    fn renders_starting_preview_without_url() {
+        let preview = RemotePreviewStatus { active: true, url: None };
+
+        assert!(render_preview_status(Some(&preview)).is_some_and(|line| line.contains("Quick Tunnel is starting")));
+    }
+
+    #[test]
+    fn does_not_render_inactive_preview() {
+        let preview = RemotePreviewStatus { active: false, url: None };
+
+        assert!(render_preview_status(Some(&preview)).is_none());
     }
 }

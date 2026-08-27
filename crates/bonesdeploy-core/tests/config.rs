@@ -97,19 +97,6 @@ fn dotenv_rejects_invalid_and_duplicate_keys() -> Result<()> {
 }
 
 #[test]
-fn stray_preview_domain_entries_are_discarded_on_load_and_save() -> Result<()> {
-    let dir = tempdir()?;
-    let path = dir.path().join(".env");
-    fs::write(&path, "PROJECT_NAME=atlas\nPREVIEW_DOMAIN=atlas.example.nip.io\n")?;
-
-    let loaded = config::load_local(&path)?;
-    config::write_local_environment(&loaded.environment, &path)?;
-
-    assert!(!fs::read_to_string(path)?.contains("PREVIEW_DOMAIN"));
-    Ok(())
-}
-
-#[test]
 fn dotenv_round_trips_framework_values() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join(".env");

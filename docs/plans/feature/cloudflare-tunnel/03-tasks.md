@@ -2,11 +2,9 @@
 
 ## Implementation
 
-- [x] Remove live `preview_domain` semantics from `bonesdeploy-core`: delete
-  nip.io derivation and the BonesInfra input key, remove the field from the
-  runtime `App` model and serializer, and retain an input-only legacy field so
-  existing `bones.toml` files containing `preview_domain` still deserialize.
-- [x] Remove `preview_domain` from the default `bones.toml` scaffold,
+- [x] Remove temporary-hostname semantics from `bonesdeploy-core`, including
+  the field from the runtime `App` model and serializer.
+- [x] Remove temporary hostnames from the default `bones.toml` scaffold,
   BonesDeploy-to-BonesInfra runtime data, BonesInfra `DnsConfig`, and template
   context so newly written configuration and provisioning data no longer carry
   a temporary hostname.
@@ -15,7 +13,7 @@
   the root-managed project router is rendered/enabled only for a configured
   real domain.
 - [x] Add no-domain Nginx cleanup that removes both the project router's enabled
-  link and available config from prior nip.io runs, validates the remaining
+  link and available config from prior temporary-hostname runs, validates the remaining
   Nginx configuration, and reloads system Nginx safely.
 - [x] Add the BonesInfra `cloudflared` service boundary that idempotently
   configures Cloudflare's Debian/Ubuntu package source, installs `cloudflared`,
@@ -51,9 +49,8 @@
 
 ## Validation
 
-- [x] Add and run Rust configuration tests proving legacy `preview_domain`
-  input remains readable, nip.io is no longer derived, and serialized config
-  omits the legacy key.
+- [x] Add and run Rust configuration tests proving temporary hostnames are not
+  persisted or derived.
 - [x] Add and run BonesInfra context tests proving temporary hostnames are no
   longer configuration/template data.
 - [x] Add and run cloudflared provisioning tests covering package setup,
@@ -62,14 +59,14 @@
 - [x] Add and run Nginx reconciliation tests proving no-domain sites retain
   per-site Nginx while removing public project routing and real-domain sites
   retain the public router.
-- [ ] Add and run SSL-flow tests proving the Quick Tunnel is removed only after
+- [x] Add and run SSL-flow tests proving the Quick Tunnel is removed only after
   successful permanent HTTPS activation.
 - [x] Add and run manifest tests for conditional Quick Tunnel service ownership
   and real-domain-only SSL artifacts.
-- [ ] Add and run `bonesremote` status tests for active/inactive tunnel state,
+- [x] Add and run `bonesremote` status tests for active/inactive tunnel state,
   newest-URL selection, irrelevant journal lines, and changed URLs after a
   simulated service restart.
-- [ ] Add and run local status/setup tests proving the current preview URL is
+- [x] Add and run local status/setup tests proving the current preview URL is
   displayed and no-domain setup does not route the user toward real-domain SSL.
 - [ ] Manually smoke-test a no-domain site through its per-site Nginx Unix
   socket and verify the generated `trycloudflare.com` HTTPS URL serves the
@@ -88,7 +85,7 @@
 
 - [x] Review the final diff and confirm there is one temporary-ingress model:
   no-domain sites use a project Quick Tunnel, real-domain sites use public
-  Nginx/Certbot, and no live nip.io or `preview_domain` behavior remains.
+  Nginx/Certbot, and no configured temporary-hostname behavior remains.
 - [x] Confirm no generated Cloudflare hostname is persisted as authoritative
   configuration and no provider/plugin abstraction, account credential flow,
   or parallel release-preview system was introduced.
@@ -98,17 +95,14 @@
 ## Completion notes
 
 Implementation uses the repository's current flat `.env` contract rather than
-the older `bones.toml` terminology in this record. Legacy `PREVIEW_DOMAIN` is
-discarded during loading and omitted during saving.
+the older `bones.toml` terminology in this record. Temporary ingress is runtime
+state and is not accepted as configuration.
 
 After the develop-side config-centralization refactor landed on this branch,
 the integration kept that design and re-applied the tunnel semantics on top:
 
 - The typed request transports (`ProvisioningRequest`/`SiteFields`) and the
-  Python site parser no longer carry `preview_domain`; the field was removed
-  from `transport.rs`, `request.py`, and test fixtures. The old key remains a
-  recognized-but-discarded managed input in the Rust parser so existing files
-  keep loading.
+  Python site parser and test fixtures carry only real DNS configuration.
 - `secrets init` composes the first encrypted environment through
   `environment::prepare()` with the two-argument framework examples.
 - `bonesdeploy setup` delegates to `server::setup` + `site::setup`; the
@@ -122,5 +116,5 @@ the integration kept that design and re-applied the tunnel semantics on top:
 `ruff check .`, and the full BonesInfra Python test suite pass. The manual
 Quick Tunnel smoke test, restart observation, and real-domain handoff remain
 for a server with Cloudflare network access. Focused Rust status/setup and
-BonesInfra SSL-handoff tests remain unchecked. The E2E harness still routes
-through nip.io hosts and needs a follow-up decision for no-domain sites.
+BonesInfra SSL-handoff tests remain unchecked. The E2E harness probes the
+per-site Nginx Unix socket for no-domain sites.
