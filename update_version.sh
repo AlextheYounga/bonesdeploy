@@ -51,18 +51,8 @@ update_python() {
 	echo "Updating $pyproject_toml package version to $new_python_version"
 	update_package_version "$pyproject_toml" "$new_python_version"
 
-	(
-		cd crates/bonesinfra/python
-		uv lock
-		uv build --wheel --out-dir ../assets
-		shopt -s nullglob
-		wheel=(../assets/bonesinfra-*.whl)
-		if [ "${#wheel[@]}" -ne 1 ]; then
-			echo "Expected exactly one generated BonesInfra wheel" >&2
-			exit 1
-		fi
-		mv "${wheel[0]}" ../assets/bonesinfra.whl
-	)
+	uv lock --directory crates/bonesinfra/python
+	cargo build-wheel
 }
 
 update_cargo

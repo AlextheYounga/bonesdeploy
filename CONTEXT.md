@@ -77,7 +77,7 @@ deployment/
     └── 01_prepare.sh
 ```
 
-Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`). A generated pure-Python wheel is committed as `crates/bonesinfra/assets/bonesinfra.whl`, embedded into the `bonesdeploy` binary, and installed into each project's project-scoped cached venv. Managed templates are materialized under `infra/templates/`. See `crates/bonesinfra/src/lib.rs`.
+Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`). A generated pure-Python wheel is committed as `crates/bonesinfra/assets/bonesinfra.whl`, checked against the Python source by `crates/bonesinfra/build.rs`, embedded into the `bonesdeploy` binary, and installed into each project's project-scoped cached venv. Regenerate it with `cargo build-wheel` after Python changes. Managed templates are materialized under `infra/templates/`. See `crates/bonesinfra/src/lib.rs`.
 
 ### Project Environment
 Rust is the sole parser of the project-root `.env`. It models two environments:

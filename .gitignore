@@ -41,6 +41,8 @@ __trash__
 .dylint
 bin
 !tests/**/bin
+!crates/bonesinfra/src/bin/
+!crates/bonesinfra/src/bin/build-wheel.rs
 __trash__
 .env
 !.env.build

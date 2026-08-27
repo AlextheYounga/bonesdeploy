@@ -169,6 +169,12 @@ Install the remote runner on the server:
 sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
+When building from a checkout, the Rust build verifies that the committed
+`crates/bonesinfra/assets/bonesinfra.whl` matches the Python source. If Python
+source has changed, regenerate the wheel with `cargo build-wheel` before
+running `cargo build` or `cargo install --path`. The version script runs this
+command automatically after updating the Python version.
+
 Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy server setup`.
 
 ## Start a Project
