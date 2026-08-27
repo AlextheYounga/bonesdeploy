@@ -69,6 +69,7 @@ pub const NGINX_SOCKET: &str = "nginx.sock";
 pub const NGINX_PID: &str = "nginx.pid";
 pub const PHP_FPM_SOCKET: &str = "php-fpm.sock";
 pub const DEFAULT_NGINX_SITE: &str = "default";
+pub const SYSTEMD_TARGET_SUFFIX: &str = ".target";
 pub const SYSTEMD_SERVICE_SUFFIX: &str = ".service";
 
 pub const HOOKS_DIR: &str = "hooks";

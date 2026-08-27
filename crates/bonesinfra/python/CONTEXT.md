@@ -352,8 +352,8 @@ class DeployContext:
 Typed fields read from the root `.env`:
 
 ```text
-`PROJECT_NAME`, derived repository and project roots, `BRANCH`, `PREVIEW_DOMAIN`,
-`SSL_ENABLED`, `DOMAIN`, and `EMAIL`.
+`PROJECT_NAME`, derived repository and project roots, `BRANCH`, `SSL_ENABLED`,
+`DOMAIN`, and `EMAIL`.
 ```
 
 ## RuntimeConfig
@@ -488,6 +488,12 @@ verify every required service remains active after restarting, because a
 `Type=simple` process can exit shortly after systemd reports a successful start.
 
 Runtime setup is separate from SSL.
+
+When `app.dns.domain` is empty, runtime setup installs and starts the
+project-scoped `cloudflared` Quick Tunnel service against the per-site Nginx
+Unix socket. The assigned `trycloudflare.com` URL is runtime state read from
+journald and can change after a restart. A real domain instead uses the public
+Nginx router and Certbot; successful SSL activation removes the Quick Tunnel.
 
 ______________________________________________________________________
 

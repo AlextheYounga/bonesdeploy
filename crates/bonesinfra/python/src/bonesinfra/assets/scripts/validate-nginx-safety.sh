@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-output=$(nginx -t 2>&1)
-status=$?
+if output=$(nginx -t 2>&1); then
+	status=0
+else
+	status=$?
+fi
 printf '%s\n' "$output"
 [ "$status" -eq 0 ] || exit "$status"
 

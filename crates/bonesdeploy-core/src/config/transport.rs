@@ -18,7 +18,6 @@ pub struct ServerConnection {
 pub struct SiteFields {
     pub project_name: String,
     pub domain: String,
-    pub preview_domain: String,
     pub email: String,
     pub ssl_enabled: bool,
     pub template: String,
@@ -97,7 +96,6 @@ impl ProvisioningRequest {
             site: Some(SiteFields {
                 project_name: config.project_name.clone(),
                 domain: config.domain.clone(),
-                preview_domain: config.preview_domain.clone(),
                 email: config.email.clone(),
                 ssl_enabled: config.ssl_enabled,
                 template: config.runtime.template.clone(),

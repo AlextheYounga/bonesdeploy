@@ -13,7 +13,7 @@ pub fn required_services(target: &str) -> Result<Vec<String>> {
 
 pub fn registered_services_in(target: &str, systemd_root: &Path) -> Result<Vec<String>> {
     let site = target
-        .strip_suffix(".target")
+        .strip_suffix(paths::SYSTEMD_TARGET_SUFFIX)
         .filter(|site| !site.is_empty() && !site.contains('/'))
         .with_context(|| format!("Invalid site target name: {target}"))?;
     let requires_dir = systemd_root.join(format!("{target}.requires"));

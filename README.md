@@ -244,6 +244,12 @@ framework services, per-site nginx, AppArmor, and your `infra/custom/` project
 extensions. Templates rendered by the managed framework come from
 `infra/templates/`.
 
+Sites without a configured domain receive a project-scoped Cloudflare Quick
+Tunnel. `bonesdeploy status` reports its account-less HTTPS
+`trycloudflare.com` preview URL. The URL changes whenever the tunnel restarts;
+Quick Tunnels are for development and review, have no uptime SLA, limit
+concurrent requests, and do not support Server-Sent Events.
+
 After editing the complete remote environment, explicitly publish it before the
 first deploy or whenever it changes:
 
@@ -265,7 +271,7 @@ Add SSL after DNS points at the server:
 bonesdeploy site ssl --domain app.example.com --email ops@example.com
 ```
 
-SSL is separate on purpose. Get the site working first. Add certificates after DNS is real.
+SSL is separate on purpose. Get the site working first. Add certificates after DNS is real. A real domain uses the existing public Nginx and Certbot path; it replaces the temporary Quick Tunnel only after HTTPS is active.
 
 ## Deploy
 

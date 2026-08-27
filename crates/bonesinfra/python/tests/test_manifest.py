@@ -33,8 +33,8 @@ class ProjectManifest:
         return "server"
 
 
-def _context(*, ssl: bool = False):
-    return DeployContext.from_request(make_site_request(project_name="example", ssl_enabled=ssl))
+def _context(*, ssl: bool = False, domain: str = "example.test"):
+    return DeployContext.from_request(make_site_request(project_name="example", ssl_enabled=ssl, domain=domain))
 
 
 def test_project_manifest_declarations_are_included(tmp_path: Path):
@@ -127,6 +127,12 @@ def test_acme_certificate_links_are_declared_as_links(tmp_path: Path):
 
     assert certificates["ACME certificate"].kind == "link"
     assert certificates["ACME certificate key"].kind == "link"
+
+
+def test_quick_tunnel_is_expected_only_without_a_real_domain():
+    services = collect_services(_context(domain=""), ProjectManifest())
+
+    assert any(service.unit == "example-cloudflared.service" for service in services)
 
 
 def test_services_are_inspected_without_mutations(tmp_path: Path):

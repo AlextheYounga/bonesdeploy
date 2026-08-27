@@ -1,23 +1,21 @@
 from pathlib import Path
 
-import pytest
-
 from bonesinfra.config.context import DeployContext
 from bonesinfra.services.linux.nginx import router as nginx_router, site as nginx_site
 
 from .helpers import make_site_request
 
 
-def _make_ctx(*, domain: str = "", preview_domain: str = "preview.example.com"):
-    return DeployContext.from_request(make_site_request(domain=domain, preview_domain=preview_domain))
+def _make_ctx(*, domain: str = ""):
+    return DeployContext.from_request(make_site_request(domain=domain))
 
 
 def _noop(*args, **kwargs):
     del args, kwargs
 
 
-def test_runtime_nginx_uses_preview_domain_when_domain_is_empty(tmp_path, monkeypatch):
-    ctx = _make_ctx(domain="", preview_domain="preview.example.com")
+def test_runtime_nginx_provisions_site_service_without_a_public_domain(monkeypatch):
+    ctx = _make_ctx(domain="")
     paths = ctx.paths_dict
     calls = []
 
@@ -37,27 +35,7 @@ def test_runtime_nginx_uses_preview_domain_when_domain_is_empty(tmp_path, monkey
 
     nginx_router.setup(ctx, paths)
 
-    router_call = next(call for _, call in calls if "nginx_server_name" in call)
-    assert router_call["nginx_server_name"] == "preview.example.com"
-    assert router_call["preview_domain"] == "preview.example.com"
-
-
-def test_runtime_nginx_requires_a_real_name(tmp_path, monkeypatch):
-    ctx = _make_ctx(domain="", preview_domain="")
-    paths = ctx.paths_dict
-
-    monkeypatch.setattr(nginx_router, "mkdir", _noop)
-    monkeypatch.setattr(nginx_router.service, "render_target", _noop)
-    monkeypatch.setattr(nginx_router.service, "register_service", _noop)
-    monkeypatch.setattr(nginx_router.files, "link", _noop)
-    monkeypatch.setattr(nginx_router.server, "shell", _noop)
-    monkeypatch.setattr(nginx_router.systemd, "daemon_reload", _noop)
-    monkeypatch.setattr(nginx_router, "install_default_deny_server", _noop)
-    monkeypatch.setattr(nginx_router, "validate_config", _noop)
-    monkeypatch.setattr(nginx_router, "render", _noop)
-
-    with pytest.raises(ValueError, match="domain or preview_domain"):
-        nginx_router.setup(ctx, paths)
+    assert all("nginx_server_name" not in kwargs for _, kwargs in calls)
 
 
 def test_runtime_nginx_migrates_site_service_to_target(monkeypatch):

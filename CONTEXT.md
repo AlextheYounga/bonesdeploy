@@ -87,7 +87,7 @@ Rust is the sole parser of the project-root `.env`. It models two environments:
 
 Build-only public settings live in the committed `.env.build`. Framework templates declare `NODE_VERSION`; when set, this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository. Provisioning defaults to `24.19.0`.
 
-`[services].services` is selected during init (or with repeated non-interactive `--service` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost and consumes credentials supplied by BonesDeploy in typed requests; it never generates application credentials or writes `shared/.env`. First initialization generates service credentials locally into the encrypted environment (service values override framework defaults), and later additions are made through `bonesdeploy secrets edit`. Redis and Valkey use separate per-project instances on port `6379` by default; provisioning fails when the requested port is occupied rather than selecting another. PostgreSQL, MariaDB, MySQL, and MongoDB use database-scoped accounts. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
+`SERVICES` (in the managed `BONES_*` block, so `BONES_SERVICES`) is selected during init (or with repeated non-interactive `--service` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost and consumes credentials supplied by BonesDeploy in typed requests; it never generates application credentials or writes `shared/.env`. First initialization generates service credentials locally into the encrypted environment (service values override framework defaults), and later additions are made through `bonesdeploy secrets edit`. Redis and Valkey use separate per-project instances on port `6379` by default; provisioning fails when the requested port is occupied rather than selecting another. PostgreSQL, MariaDB, MySQL, and MongoDB use database-scoped accounts. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
 
 Example `.env`:
 ```dotenv
@@ -102,7 +102,6 @@ BONES_HOST=deploy.example.com
 BONES_PORT=22
 BONES_BRANCH=main
 BONES_DOMAIN=app.example.com
-BONES_PREVIEW_DOMAIN=lawsnipe-deploy-example-com.nip.io
 BONES_EMAIL=ops@example.com
 BONES_SSL_ENABLED=false
 BONES_TEMPLATE=next
@@ -266,6 +265,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
    - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra runtime apply --request-stdin` against the configured host as the configured `ssh_user`, feeding the typed site request on stdin.
   - Imports and runs the project's `infra/runtime.py` (local vendored package) or the selected canonical BonesInfra framework package, which installs framework-specific packages and services.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
+  - The public project router is rendered only for a configured real domain. Sites without a domain receive a project-scoped Cloudflare Quick Tunnel (`<project>-cloudflared.service`) proxying to the per-site nginx Unix socket; `bonesdeploy status` reports its ephemeral `trycloudflare.com` preview URL, and real-domain SSL activation removes the tunnel.
   - Does not handle SSL; use `site ssl` for TLS configuration.
 
 - **site services**:

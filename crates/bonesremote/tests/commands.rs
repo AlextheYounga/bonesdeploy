@@ -32,5 +32,7 @@ mod release_prune;
 mod release_recover;
 #[path = "commands/root.rs"]
 mod root;
+#[path = "commands/service.rs"]
+mod service;
 #[path = "commands/status.rs"]
 mod status;

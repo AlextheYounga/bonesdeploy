@@ -79,7 +79,7 @@ and manage a site.
 Bones
 ├── app: App              # project_name, host, port, branch, domain, ssl, etc.
 │   ├── server             # SSH user, host, port
-│   ├── dns                # domain, preview domain, email, SSL
+│   ├── dns                # domain, email, SSL
 │   └── deploy             # branch, releases keep, repository path
 ├── runtime: Runtime      # template, web root, backend, versions, permissions, extra
 ├── services: Services    # service names (postgres, redis, etc.)

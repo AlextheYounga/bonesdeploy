@@ -27,11 +27,11 @@ pub async fn run(yes: bool) -> Result<()> {
     println!();
     println!("{} Site setup complete.", output::success_marker());
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    print_next_step(&cfg, pending_first_push);
+    print_next_step(&cfg, pending_first_push).await;
     Ok(())
 }
 
-fn print_next_step(cfg: &config::Bones, pending_first_push: bool) {
+async fn print_next_step(cfg: &config::Bones, pending_first_push: bool) {
     if pending_first_push {
         println!(
             "{}",
@@ -40,6 +40,18 @@ fn print_next_step(cfg: &config::Bones, pending_first_push: bool) {
                 "to publish the first deploy branch",
             )
         );
+    } else if cfg.domain.is_empty() {
+        match super::status::remote_status(cfg).await {
+            Ok(remote) => match super::status::render_preview_status(remote.preview.as_ref()) {
+                Some(line) => println!("{line}"),
+                None => println!(
+                    "{} Quick Tunnel is not active; run `bonesdeploy status` to inspect it.",
+                    output::pending_marker()
+                ),
+            },
+            Err(error) => println!("{} Preview status unavailable: {error:#}", output::pending_marker()),
+        }
+        println!("{}", output::next_step("bonesdeploy deploy"));
     } else if cfg.ssl_enabled {
         println!("{}", output::next_step("bonesdeploy deploy"));
     } else {

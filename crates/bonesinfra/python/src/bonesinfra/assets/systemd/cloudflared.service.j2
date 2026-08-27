@@ -1,0 +1,36 @@
+[Unit]
+Description=Cloudflare Quick Tunnel for {{ project_name }}
+After=network-online.target {{ project_name }}-nginx.service
+Wants=network-online.target
+Requires={{ project_name }}-nginx.service
+PartOf={{ project_name }}.target
+Before={{ project_name }}.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ runtime_user }}
+Group={{ runtime_group }}
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url unix:{{ paths.runtime_nginx_socket }}
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RestrictRealtime=yes
+SystemCallArchitectures=native
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+PrivateDevices=yes
+RestrictSUIDSGID=yes
+ProtectClock=yes
+ProtectKernelLogs=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+Restart=always
+RestartSec=5

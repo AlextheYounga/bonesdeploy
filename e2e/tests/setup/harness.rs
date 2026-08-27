@@ -198,10 +198,8 @@ impl Harness {
     }
 
     fn route_response(&self, site: &str) -> Result<String> {
-        let preview_host = format!("{}-{}.nip.io", site, self.host.replace('.', "-"));
-        self.exec(&format!(
-            "curl --silent --show-error --fail --max-time 10 --resolve {preview_host}:80:127.0.0.1 http://{preview_host}/"
-        ))
+        let socket = format!("/run/{site}/nginx/nginx.sock");
+        self.exec(&format!("curl --silent --show-error --fail --max-time 10 --unix-socket {socket} http://localhost/"))
     }
 }
 
