@@ -48,12 +48,11 @@ And embeds a Python provisioning runtime:
 
 - **`bonesinfra`** — `crates/bonesinfra/python/`, embedded by the Rust `bonesinfra` crate
 
-Each initialized project receives the complete BonesInfra distribution in
-`infra/.framework/`. Commands execute that committed managed framework through a
-project-scoped dependency environment; `infra/custom/` remains
-project-owned and is preserved by updates. The managed framework can be updated
-explicitly, while modified managed files are reported as conflicts instead of
-being silently overwritten.
+Each initialized project receives a committed `infra/bonesinfra.whl` and the
+managed templates under `infra/templates/`. Commands execute the wheel through a
+project-scoped dependency environment; `infra/custom/` remains project-owned
+and is preserved by updates. Managed templates are refreshed wholesale by
+`bonesdeploy update`.
 
 ## The Point
 
@@ -198,7 +197,8 @@ This creates:
 ├── .env.build              # committed, non-secret build inputs
 ├── deployment/             # committed build and prepare scripts
 └── infra/                  # committed project infrastructure
-    ├── .framework/         # BonesDeploy-managed BonesInfra snapshot
+    ├── bonesinfra.whl       # committed BonesInfra runtime
+    ├── templates/           # committed managed templates
     ├── custom/             # project-owned provisioning extensions
     └── secrets/             # encrypted project secrets
 ```
@@ -208,10 +208,10 @@ Edit them.
 Commit them.
 Read them when something breaks.
 
-The managed framework is executed when you invoke `bonesdeploy site runtime`.
-The project-owned `infra/custom/` package is composed after the managed
-framework. Edit custom provisioning and local templates as project
-infrastructure; use `bonesdeploy update` to refresh the managed snapshot.
+The managed wheel is executed when you invoke `bonesdeploy site runtime`. The
+project-owned `infra/custom/` package is composed after the managed framework.
+Edit custom provisioning and templates as project infrastructure; use
+`bonesdeploy update` to refresh managed templates.
 
 Deployment scripts run in filename order:
 
@@ -239,10 +239,10 @@ bonesdeploy site setup --yes
 runtime, and site doctor. It does not push Git or secrets, configure SSL, or
 deploy a release.
 
-This runs the provisioning in your project's `infra/.framework/` package:
+This runs the provisioning from your project's `infra/bonesinfra.whl`:
 framework services, per-site nginx, AppArmor, and your `infra/custom/` project
 extensions. Templates rendered by the managed framework come from
-`infra/.framework/src/bonesinfra/frameworks/<name>/templates/`.
+`infra/templates/`.
 
 After editing the complete remote environment, explicitly publish it before the
 first deploy or whenever it changes:

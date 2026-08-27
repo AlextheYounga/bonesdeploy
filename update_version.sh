@@ -54,6 +54,14 @@ update_python() {
 	(
 		cd crates/bonesinfra/python
 		uv lock
+		uv build --wheel --out-dir ../assets
+		shopt -s nullglob
+		wheel=(../assets/bonesinfra-*.whl)
+		if [ "${#wheel[@]}" -ne 1 ]; then
+			echo "Expected exactly one generated BonesInfra wheel" >&2
+			exit 1
+		fi
+		mv "${wheel[0]}" ../assets/bonesinfra.whl
 	)
 }
 

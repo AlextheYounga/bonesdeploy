@@ -10,9 +10,7 @@ from .helpers import make_site_request
 
 
 def _project(tmp_path: Path, *, template: str = "custom") -> DeployContext:
-    core = tmp_path / "infra/.framework/src/bonesinfra"
-    core.mkdir(parents=True)
-    (core / "__main__.py").write_text("")
+    (tmp_path / "infra/templates").mkdir(parents=True)
     return DeployContext.from_request(make_site_request(template=template))
 
 
@@ -32,12 +30,14 @@ def test_runtime_loader_supports_relative_imports_in_custom_provisioning(tmp_pat
     assert load_runtime(config).deploy(None) == 7
 
 
-def test_missing_project_local_core_is_rejected(tmp_path: Path, monkeypatch):
+def test_runtime_loader_uses_project_template_root(tmp_path: Path, monkeypatch):
     config = DeployContext.from_request(make_site_request(template="next"))
+    (tmp_path / "infra/templates").mkdir(parents=True)
     monkeypatch.chdir(tmp_path)
 
-    with pytest.raises(FileNotFoundError, match="project-local BonesInfra framework"):
-        load_runtime(config)
+    runtime = load_runtime(config)
+
+    assert str(runtime.TEMPLATES) == str(tmp_path / "infra/templates/frameworks/next")
 
 
 def test_runtime_loader_reports_custom_syntax_error_with_path(tmp_path: Path, monkeypatch):

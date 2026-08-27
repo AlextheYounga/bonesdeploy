@@ -1,70 +1,56 @@
-//! Embedded BonesInfra distribution materialized into project infrastructure.
+//! Embedded BonesInfra wheel and project template materialization.
 
-use std::borrow::Cow;
 use std::env;
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{Cursor, Read, Write};
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::paths;
 use rust_embed::Embed;
+use sha2::{Digest, Sha256};
+use zip::ZipArchive;
 
 #[derive(Embed)]
-#[folder = "python/"]
-#[exclude = ".venv/**"]
-#[exclude = "**/__pycache__/**"]
-#[exclude = "**/*.egg-info/**"]
-#[exclude = "docs/**"]
-#[exclude = "tests/**"]
-struct PythonSource;
+#[folder = "assets/"]
+#[include = "bonesinfra.whl"]
+struct WheelAsset;
 
-const FRAMEWORK_PATH: &str = "infra/.framework";
+#[derive(Embed)]
+#[folder = "python/src/bonesinfra/"]
+#[include = "assets/**"]
+#[include = "frameworks/**/templates/**"]
+struct TemplateAsset;
+
 const STAMP_FILE: &str = ".stamp";
+const PREVIOUS_FRAMEWORK_PATH: &str = "infra/.framework";
 
-/// Materializes the complete embedded BonesInfra distribution into a project.
+/// Writes the embedded wheel and all managed templates into a project.
 ///
 /// # Errors
-/// Fails when the managed framework cannot be atomically replaced.
-pub fn materialize_project_framework(project_root: &Path) -> Result<PathBuf> {
-    let framework = project_root.join(FRAMEWORK_PATH);
-    let infra = framework.parent().context("BonesInfra framework has no parent directory")?;
-    fs::create_dir_all(infra).with_context(|| format!("Failed to create {}", infra.display()))?;
+/// Fails when either managed artifact cannot be atomically replaced.
+pub fn materialize_project_artifacts(project_root: &Path) -> Result<PathBuf> {
+    let infra = project_root.join(paths::LOCAL_INFRA_DIR);
+    fs::create_dir_all(&infra).with_context(|| format!("Failed to create {}", infra.display()))?;
 
-    let staging = tempfile::Builder::new()
-        .prefix(".core.")
-        .tempdir_in(infra)
-        .with_context(|| format!("Failed to create managed framework staging directory in {}", infra.display()))?;
-    write_embedded_source(staging.path())?;
-
-    let previous = infra.join(".framework.previous");
-    remove_path(&previous)?;
-    if framework.exists() || framework.is_symlink() {
-        fs::rename(&framework, &previous)
-            .with_context(|| format!("Failed to stage existing managed framework at {}", framework.display()))?;
-    }
-    if let Err(error) = fs::rename(staging.path(), &framework) {
-        if previous.exists() {
-            let _ = fs::rename(&previous, &framework);
-        }
-        return Err(error).with_context(|| format!("Failed to replace managed framework at {}", framework.display()));
-    }
-    remove_path(&previous)?;
-    Ok(framework)
+    let wheel = embedded_wheel()?;
+    replace_file(&infra.join(paths::BONESINFRA_WHEEL_NAME), &wheel)?;
+    replace_templates(&project_root.join(paths::LOCAL_INFRA_TEMPLATES_DIR))?;
+    remove_path(&project_root.join(PREVIOUS_FRAMEWORK_PATH))?;
+    Ok(infra.join(paths::BONESINFRA_WHEEL_NAME))
 }
 
-/// Runs `python -m bonesinfra` from the current project's managed framework.
+/// Runs `python -m bonesinfra` from the current project's cached environment.
 ///
 /// # Errors
-/// Fails when the project core or dependency environment cannot be prepared or
-/// when the command exits non-zero.
+/// Fails when the project artifact or dependency environment cannot be prepared,
+/// or when the command exits non-zero.
 pub fn run(args: &[&str]) -> Result<()> {
     let project_root = env::current_dir().context("Failed to determine project directory")?;
     let executable = ensure_available(&project_root)?;
     let mut command = base_command(&executable, &project_root, args);
     command.stdin(Stdio::null());
-
     let status = command
         .spawn()
         .with_context(|| format!("Failed to run bonesinfra {}", args.join(" ")))?
@@ -76,10 +62,10 @@ pub fn run(args: &[&str]) -> Result<()> {
     Ok(())
 }
 
-/// Run one bonesinfra command feeding a typed provisioning request on stdin.
+/// Runs one BonesInfra command with a typed provisioning request on stdin.
 ///
 /// # Errors
-/// Returns an error when the child process exits nonzero.
+/// Returns an error when the child process exits non-zero.
 pub fn run_with_request(args: &[&str], request_body: &str) -> Result<()> {
     let project_root = env::current_dir().context("Failed to determine project directory")?;
     let executable = ensure_available(&project_root)?;
@@ -98,31 +84,36 @@ pub fn run_with_request(args: &[&str], request_body: &str) -> Result<()> {
     Ok(())
 }
 
-/// Prepares the dependency environment for a project. This is intended for
-/// command-test setup and does not materialize source.
+/// Prepares the dependency environment for a project.
 ///
 /// # Errors
-/// Fails when the project-local core is missing or dependencies cannot install.
+/// Fails when the project artifact is missing or dependencies cannot install.
 pub fn prepare_in(project_root: &Path) -> Result<()> {
     ensure_available(project_root).map(|_| ())
 }
 
-/// Returns the paths packaged in the embedded Python distribution.
-pub fn embedded_source_paths() -> impl Iterator<Item = Cow<'static, str>> {
-    PythonSource::iter()
+/// Returns the embedded wheel bytes.
+pub fn embedded_wheel() -> Result<Vec<u8>> {
+    let asset = WheelAsset::get(paths::BONESINFRA_WHEEL_NAME).context("embedded BonesInfra wheel is missing")?;
+    validate_wheel(asset.data.as_ref())?;
+    Ok(asset.data.into_owned())
+}
+
+/// Returns the embedded template paths relative to the BonesInfra package.
+pub fn embedded_template_paths() -> impl Iterator<Item = String> {
+    TemplateAsset::iter().map(|path| path.into_owned())
 }
 
 fn ensure_available(project_root: &Path) -> Result<PathBuf> {
     let project_root = project_root
         .canonicalize()
         .with_context(|| format!("Failed to resolve project root {}", project_root.display()))?;
-    let framework = project_root.join(FRAMEWORK_PATH);
-    if !framework.join("pyproject.toml").is_file() || !framework.join("src/bonesinfra/__main__.py").is_file() {
-        bail!(
-            "Project-local BonesInfra framework is missing at {}. Run bonesdeploy init or update.",
-            framework.display()
-        );
+    let wheel = project_root.join(paths::LOCAL_INFRA_WHEEL_FILE);
+    if !wheel.is_file() {
+        bail!("Project-local BonesInfra wheel is missing at {}. Run bonesdeploy init or update.", wheel.display());
     }
+    let wheel_bytes = fs::read(&wheel).with_context(|| format!("Failed to read {}", wheel.display()))?;
+    validate_wheel(&wheel_bytes)?;
 
     let environment = environment_dir(&project_root);
     fs::create_dir_all(&environment).with_context(|| format!("Failed to create {}", environment.display()))?;
@@ -137,12 +128,12 @@ fn ensure_available(project_root: &Path) -> Result<PathBuf> {
     lock.lock().with_context(|| format!("Failed to lock BonesInfra environment at {}", lock_path.display()))?;
 
     let python = environment.join(".venv/bin/python");
-    let stamp = package_version(&framework)?;
+    let stamp = wheel_stamp(&wheel_bytes);
     if python.is_file() && materialized_stamp(&environment).as_deref() == Some(stamp.as_str()) {
         return Ok(python);
     }
 
-    setup_venv(&environment, &framework)?;
+    setup_venv(&environment, &wheel)?;
     if !python.is_file() {
         bail!("BonesInfra setup finished at {}, but {} is missing.", environment.display(), python.display());
     }
@@ -152,58 +143,99 @@ fn ensure_available(project_root: &Path) -> Result<PathBuf> {
 }
 
 fn base_command(executable: &Path, project_root: &Path, args: &[&str]) -> Command {
-    let framework = project_root.join(FRAMEWORK_PATH);
     let mut command = Command::new(executable);
-    command.current_dir(project_root).env("PYTHONPATH", framework.join("src"));
-    command.args(["-m", "bonesinfra"]);
-    command.args(args);
+    command.current_dir(project_root).args(["-m", "bonesinfra"]).args(args);
     command
 }
 
-fn write_embedded_source(destination: &Path) -> Result<()> {
-    for file_path in embedded_source_paths() {
-        if should_skip_materialization(&file_path) {
-            continue;
-        }
-        let Some(asset) = PythonSource::get(&file_path) else {
+fn replace_templates(destination: &Path) -> Result<()> {
+    let parent = destination.parent().context("template directory has no parent")?;
+    let staging = tempfile::Builder::new().prefix(".templates.").tempdir_in(parent)?;
+    for relative_path in embedded_template_paths() {
+        let Some(asset) = TemplateAsset::get(&relative_path) else { continue };
+        let target = if relative_path.starts_with("assets/") {
+            staging.path().join("shared").join(relative_path.trim_start_matches("assets/"))
+        } else if let Some(path) = relative_path.strip_prefix("frameworks/") {
+            let Some((framework, template)) = path.split_once("/templates/") else { continue };
+            staging.path().join("frameworks").join(framework).join(template)
+        } else {
             continue;
         };
-        let target = destination.join(file_path.as_ref());
         if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
+            fs::create_dir_all(parent)?;
         }
-        fs::write(&target, asset.data.as_ref()).with_context(|| format!("Failed to write {}", target.display()))?;
+        fs::write(&target, asset.data.as_ref())?;
     }
-    Ok(())
+    replace_directory(destination, staging)
 }
 
-fn should_skip_materialization(file_path: &str) -> bool {
-    let path = Path::new(file_path);
-    path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
-        && path.file_name().is_some_and(|name| name != "README.md")
+fn replace_directory(destination: &Path, staging: tempfile::TempDir) -> Result<()> {
+    let previous = destination.with_extension("previous");
+    remove_path(&previous)?;
+    if destination.exists() || destination.is_symlink() {
+        fs::rename(destination, &previous)?;
+    }
+    if let Err(error) = fs::rename(staging.keep(), destination) {
+        if previous.exists() {
+            let _ = fs::rename(&previous, destination);
+        }
+        return Err(error).with_context(|| format!("Failed to replace {}", destination.display()));
+    }
+    remove_path(&previous)
 }
 
-fn setup_venv(environment: &Path, core: &Path) -> Result<()> {
+fn replace_file(destination: &Path, bytes: &[u8]) -> Result<()> {
+    let parent = destination.parent().context("wheel path has no parent")?;
+    let staging = tempfile::NamedTempFile::new_in(parent)?;
+    fs::write(staging.path(), bytes)?;
+    staging
+        .persist(destination)
+        .map(|_| ())
+        .map_err(|error| error.error)
+        .with_context(|| format!("Failed to replace {}", destination.display()))
+}
+
+fn setup_venv(environment: &Path, wheel: &Path) -> Result<()> {
     let python = environment.join(".venv/bin/python");
     if !python.is_file() {
-        let status = Command::new("python3")
-            .args(["-m", "venv", ".venv"])
-            .current_dir(environment)
-            .status()
-            .with_context(|| format!("Failed to create venv in {}", environment.display()))?;
+        let status = Command::new("python3").args(["-m", "venv", ".venv"]).current_dir(environment).status()?;
         if !status.success() {
             bail!("Failed to create venv in {}.", environment.display());
         }
     }
-    let status = Command::new(&python)
-        .args(["-m", "pip", "install", "-e"])
-        .arg(core)
-        .status()
-        .with_context(|| format!("Failed to install BonesInfra dependencies from {}", core.display()))?;
+    let status = Command::new(&python).args(["-m", "pip", "install", "--force-reinstall"]).arg(wheel).status()?;
     if !status.success() {
-        bail!("Failed to install BonesInfra dependencies from {}.", core.display());
+        bail!("Failed to install BonesInfra wheel from {}.", wheel.display());
     }
     Ok(())
+}
+
+fn validate_wheel(bytes: &[u8]) -> Result<()> {
+    if !bytes.starts_with(b"PK\x03\x04") {
+        bail!("embedded BonesInfra artifact is not a ZIP wheel");
+    }
+    let mut archive =
+        ZipArchive::new(Cursor::new(bytes)).context("embedded BonesInfra artifact is not a valid wheel archive")?;
+    let wheel_metadata = (0..archive.len())
+        .find_map(|index| {
+            let file = archive.by_index(index).ok()?;
+            file.name().ends_with(".dist-info/WHEEL").then(|| file.name().to_string())
+        })
+        .context("BonesInfra wheel has no WHEEL metadata")?;
+    let mut metadata = archive.by_name(&wheel_metadata).context("failed to read BonesInfra WHEEL metadata")?;
+    let mut contents = String::new();
+    metadata.read_to_string(&mut contents)?;
+    if !contents.lines().any(|line| line.trim() == "Root-Is-Purelib: true")
+        || !contents.lines().any(|line| line.trim() == "Tag: py3-none-any")
+    {
+        bail!("BonesInfra wheel is not a portable py3-none-any wheel");
+    }
+    Ok(())
+}
+
+fn wheel_stamp(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    digest.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 fn environment_dir(project_root: &Path) -> PathBuf {
@@ -216,16 +248,6 @@ fn environment_dir(project_root: &Path) -> PathBuf {
     environment
 }
 
-fn package_version(core: &Path) -> Result<String> {
-    fs::read_to_string(core.join("pyproject.toml"))
-        .with_context(|| format!("Failed to read project-local BonesInfra package metadata in {}", core.display()))?
-        .lines()
-        .find_map(|line| line.strip_prefix("version = \"")?.strip_suffix('"'))
-        .filter(|version| !version.is_empty())
-        .map(str::to_owned)
-        .ok_or_else(|| anyhow::anyhow!("Project-local BonesInfra pyproject.toml has no package version"))
-}
-
 fn materialized_stamp(directory: &Path) -> Option<String> {
     fs::read_to_string(directory.join(STAMP_FILE)).ok().map(|value| value.trim().to_string())
 }
@@ -233,9 +255,9 @@ fn materialized_stamp(directory: &Path) -> Option<String> {
 fn remove_path(path: &Path) -> Result<()> {
     if let Ok(metadata) = fs::symlink_metadata(path) {
         if metadata.file_type().is_dir() {
-            fs::remove_dir_all(path).with_context(|| format!("Failed to remove {}", path.display()))?;
+            fs::remove_dir_all(path)?;
         } else {
-            fs::remove_file(path).with_context(|| format!("Failed to remove {}", path.display()))?;
+            fs::remove_file(path)?;
         }
     }
     Ok(())

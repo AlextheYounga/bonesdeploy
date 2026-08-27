@@ -40,19 +40,19 @@ fn refresh_local_infrastructure_updates_managed_files_without_touching_custom() 
 }
 
 #[test]
-fn refresh_local_infrastructure_leaves_managed_framework_untouched() -> Result<()> {
+fn refresh_local_infrastructure_does_not_touch_project_owned_files() -> Result<()> {
     let temp = tempfile::tempdir()?;
     let source_dir = temp.path().join("source");
     let project_root = temp.path().join("project");
-    let framework_file = project_root.join("infra/.framework/runtime.py");
+    let infra_dir = project_root.join("infra");
     let deployment_file = project_root.join("infra/deployment/build/01_build.sh");
     write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/functions.sh"), "new functions")?;
     write(&source_dir.join("crates/bonesdeploy/assets/kit/deployment/build/01_build.sh"), "new deployment")?;
     write(&project_root.join(".env"), "TEMPLATE=custom\n")?;
-    write(&framework_file, "locally changed")?;
+    write(&infra_dir.join("templates/custom.txt"), "project template")?;
     write(&deployment_file, "locally preserved")?;
     refresh_local_infrastructure(&source_dir, &project_root, Some("custom"))?;
-    assert_eq!(fs::read_to_string(framework_file)?, "locally changed");
+    assert_eq!(fs::read_to_string(infra_dir.join("templates/custom.txt"))?, "project template");
     assert_eq!(fs::read_to_string(deployment_file)?, "new deployment");
     Ok(())
 }

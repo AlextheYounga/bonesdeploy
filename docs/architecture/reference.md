@@ -280,13 +280,14 @@ Declares what artifacts and services a framework owns (manifest) and how to prov
 
 **Framework discovery:**
 `project.py` reads `TEMPLATE` from the root `.env`. It loads the managed package
-from `infra/.framework/` and composes the project-owned package from
-`infra/custom/`. If the materialized packages are absent, it fails clearly.
-Materialization keeps managed framework content separate from custom content.
+from the installed `infra/bonesinfra.whl` environment and resolves managed
+templates from `infra/templates/`, then composes the project-owned package from
+`infra/custom/`. Materialization keeps managed framework content separate from
+custom content.
 
 **Extension model:**
 Add a built-in package under `frameworks/<name>/` with the core components above
-and preserve the core/custom materialization contract.
+and include its templates in the project `infra/templates/` snapshot.
 Register the name in `project.py`'s `BUILTIN_FRAMEWORKS` allowlist. Add
 corresponding Rust-side framework module and deployment assets.
 
@@ -483,7 +484,7 @@ Cli::Init
         │    ├─ infra/assets/kit.rs # scaffold deployment functions, .gitignore
         │    ├─ infra/assets/frameworks.rs  # scaffold per-framework .env defaults + scripts
         │    ├─ config.rs::save()   # write the root .env
-        │    └─ bonesinfra::run()   # execute infra/.framework + custom
+        │    └─ bonesinfra::run()   # execute wheel + templates + custom
        ├─ secrets/gpg.rs           # generate GPG key pair
        ├─ secrets/mod.rs           # create default .env.gpg
         └─ infra/git.rs             # inspect application Git remotes
@@ -579,7 +580,7 @@ Cli::Site::Runtime
    └─ commands/site/runtime.rs::run()
        ├─ bonesinfra::run("runtime", "apply", "--config", "...")
        │    └─ Python: project.load_runtime(config)
-        │         └─ loads materialized infra/.framework + custom packages
+        │         └─ loads installed wheel + project templates + custom packages
        │              └─ runtime.deploy(ctx)
        │                   ├─ linux/runtime.setup(ctx)     # AppArmor + nginx router
        │                   ├─ languages/<lang>.install()   # install language runtime
@@ -595,7 +596,7 @@ Cli::Site::Runtime
 
 | Need | Extend / reuse | Existing example | Location |
 |------|---------------|-----------------|----------|
-| Add a web framework | Rust framework contract plus built-in Python package materialized as `infra/.framework` and `infra/custom` | `laravel`, `django` | `crates/bonesdeploy/src/frameworks/` and `crates/bonesinfra/python/src/bonesinfra/frameworks/` |
+| Add a web framework | Rust framework contract plus installed Python wheel, project templates, and `infra/custom` | `laravel`, `django` | `crates/bonesdeploy/src/frameworks/` and `crates/bonesinfra/python/src/bonesinfra/frameworks/` |
 | Add a database service | Python: `services/runtime/<name>.py` + register in `SERVICES` dict | `postgres.py`, `redis.py` | `crates/bonesinfra/python/src/bonesinfra/services/runtime/` |
 | Add a language runtime | Python: `services/languages/<name>.py`, extend `LanguageRuntime` ABC | `php.py`, `python.py` | `crates/bonesinfra/python/src/bonesinfra/services/languages/` |
 | Add a CLI command (bonesdeploy) | Focused handler under the owning command group (`commands/server/<name>.rs`, `commands/site/<name>.rs`, or `commands/<name>.rs`) + variant in `cli/args.rs::Command` | `commands/site/status.rs` | `crates/bonesdeploy/src/commands/` |
@@ -674,7 +675,7 @@ Cli::Site::Runtime
 ### Framework convention
 - Rust owns framework questions, centralized validation, defaults, permission defaults, and build-environment generation.
 - Framework-specific values go through `Runtime.extra` (serde flatten).
-- Python provisioning uses managed `infra/.framework` and project-owned `infra/custom` packages composed together.
+- Python provisioning uses the installed wheel, managed `infra/templates`, and project-owned `infra/custom` packages composed together.
 
 ### Binary communication
 - `bonesdeploy` communicates with `bonesremote` via SSH command execution (not an API).

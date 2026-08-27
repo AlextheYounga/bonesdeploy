@@ -16,10 +16,10 @@ fn init_success(env: &TestEnv) -> Result<()> {
 
 fn assert_project_infra(repo: &Path) -> Result<()> {
     let infra = repo.join("infra");
-    assert!(infra.join(".framework/pyproject.toml").is_file());
-    assert!(infra.join(".framework/uv.lock").is_file());
-    assert!(infra.join(".framework/src/bonesinfra/__main__.py").is_file());
-    assert!(infra.join(".framework/src/bonesinfra/frameworks/custom/runtime.py").is_file());
+    assert!(infra.join("bonesinfra.whl").is_file());
+    assert!(infra.join("templates/shared/nginx/index.html.j2").is_file());
+    assert!(infra.join("templates/frameworks/custom/app.service.j2").is_file());
+    assert!(!infra.join(".framework").exists());
     assert!(infra.join("custom/__init__.py").is_file());
     assert!(infra.join("custom/runtime.py").is_file());
     assert_eq!(
@@ -67,7 +67,7 @@ fn materializes_base_bones_assets() -> Result<()> {
 }
 
 #[test]
-fn named_framework_materializes_project_infrastructure_snapshot() -> Result<()> {
+fn named_framework_materializes_project_template_snapshot() -> Result<()> {
     let framework = "laravel";
     let env = TestEnv::new()?;
     let output = env.run(&[
@@ -83,15 +83,12 @@ fn named_framework_materializes_project_infrastructure_snapshot() -> Result<()> 
     assert!(output.status.success(), "{framework} init failed: {}", String::from_utf8_lossy(&output.stderr));
     let infra = env.repo().join("infra");
     assert!(
-        infra.join(".framework/src/bonesinfra/frameworks/laravel/runtime.py").is_file(),
-        "{framework} is missing framework runtime"
+        infra.join("templates/frameworks/laravel/queue-worker.service.j2").is_file(),
+        "{framework} is missing framework templates"
     );
     assert!(infra.join("custom/runtime.py").is_file(), "{framework} is missing custom runtime");
     assert!(infra.join("deployment/functions.sh").is_file(), "{framework} is missing kit deployment functions");
-    assert!(
-        infra.join(".framework/src/bonesinfra/frameworks/laravel/templates").is_dir(),
-        "{framework} is missing infra templates"
-    );
+    assert!(infra.join("templates/frameworks/laravel").is_dir(), "{framework} is missing infra templates");
     let dotenv = fs::read_to_string(env.repo().join(".env"))?;
     assert!(dotenv.contains("APP_URL=https://atlas-deploy-example-com.nip.io\n"));
     assert!(dotenv.contains("DB_CONNECTION=sqlite\n"));
@@ -126,7 +123,7 @@ fn init_merges_framework_defaults_without_replacing_existing_environment_values(
 #[test]
 fn rerun_preserves_existing_bones_assets() -> Result<()> {
     let env = TestEnv::new()?;
-    let sentinel = env.repo().join("infra/.framework/src/bonesinfra/project.py");
+    let sentinel = env.repo().join("infra/templates/shared/nginx/index.html.j2");
 
     init_success(&env)?;
     let original = fs::read_to_string(&sentinel)?;

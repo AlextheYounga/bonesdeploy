@@ -1,15 +1,14 @@
 import hashlib
-from pathlib import Path
 from shlex import quote
 
 from pyinfra.operations import apt, files, server, systemd
 
 from bonesinfra.config.context import template_data
-from bonesinfra.config.paths import BUILD_USER_HOME_ROOT, RUNTIME_IMAGES_ROOT
+from bonesinfra.config.paths import BUILD_USER_HOME_ROOT, RUNTIME_IMAGES_ROOT, TEMPLATES_DIR
 from bonesinfra.services.linux import runtime_logs, systemd as service
 from bonesinfra.services.linux.nginx import site as nginx_site
 
-TEMPLATES = Path(__file__).parent / "templates"
+TEMPLATES = TEMPLATES_DIR / "frameworks/laravel"
 
 
 def deploy(ctx) -> None:

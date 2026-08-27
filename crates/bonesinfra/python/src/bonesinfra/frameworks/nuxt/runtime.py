@@ -1,11 +1,10 @@
-from pathlib import Path
-
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import TEMPLATES_DIR
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import NODE
 from bonesinfra.services.linux import application, runtime, shared
 
-TEMPLATES = Path(__file__).parent / "templates"
+TEMPLATES = TEMPLATES_DIR / "frameworks/nuxt"
 SHARED_DIRECTORIES = ()
 
 

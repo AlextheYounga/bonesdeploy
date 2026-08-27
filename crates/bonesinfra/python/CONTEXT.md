@@ -8,7 +8,7 @@ It is not the public product interface. It is called by `bonesdeploy` to run pyi
 The user should normally never call `bonesinfra` directly, except for dev
 testing. The Rust `bonesinfra` crate embeds this Python tree into the
 `bonesdeploy` binary, materializes the complete distribution into
-`infra/.framework/`, creates a project-scoped dependency virtualenv, and
+`infra/bonesinfra.whl`, creates a project-scoped dependency virtualenv, and
 invokes that project-local package with `python -m bonesinfra`.
 
 ______________________________________________________________________
@@ -376,12 +376,10 @@ Plan files receive `ctx` directly as a function parameter.
 
 # Runtime Catalog
 
-The installed runtime catalog no longer exists.
-
 Runtimes are selected by the user-facing Rust CLI during `bonesdeploy init`,
 which writes the chosen values into the root `.env` and scaffolds the project's
-`infra/.framework/` snapshot. BonesInfra then loads that project source at
-provisioning time via `project.load_runtime(env_file)` / `load_manifest(env_file)`.
+wheel and template snapshot. BonesInfra loads the selected installed framework
+module and resolves its managed templates from the project at provisioning time.
 
 Broken project infrastructure surfaces before SSH: missing entrypoints raise
 `FileNotFoundError`, import failures raise `ImportError` with the file path,
@@ -511,10 +509,10 @@ ______________________________________________________________________
 
 # Runtime-Specific Infrastructure
 
-Per-framework logic is maintained canonically in this package and copied into
-each project's `infra/.framework/` snapshot by `bonesdeploy init`. The copied files
-are project-owned snapshots and orchestrate framework services using neutral core
-helpers in `services/`:
+Per-framework logic is maintained canonically in this package and installed from
+the committed wheel. Each project's `infra/templates/` snapshot contains the
+managed template files; those files are project-owned snapshots used by framework
+services through neutral core helpers in `services/`:
 
 - `services/linux/application.py` — `deploy_server` / `deploy_static` building
   blocks shared by generated runtimes (AppArmor, systemd, nginx wiring)
@@ -524,10 +522,9 @@ helpers in `services/`:
   provisioning helpers
 - `services/languages/` — Python, Node, Ruby, PHP runtime installs
 
-Each generated runtime stays small and reads like a story against those
-primitives. Django, Rails, Node, Vue, etc. all follow the same `deploy(ctx)`
-interface, and each framework's templates live beside it in
-`infra/templates/`.
+Each runtime stays small and reads like a story against those primitives. Django,
+Rails, Node, Vue, etc. all follow the same `deploy(ctx)` interface, and each
+framework's templates live in the project's `infra/templates/`.
 
 ______________________________________________________________________
 

@@ -30,7 +30,7 @@ pub(super) fn materialize_project(cfg: &mut config::Bones, framework: FrameworkS
     println!("Framework template: {selected_framework}");
 
     framework_assets::scaffold_framework_project(&selected_framework.to_string(), infra_dir)?;
-    bonesinfra::materialize_project_framework(Path::new("."))?;
+    bonesinfra::materialize_project_artifacts(Path::new("."))?;
     scaffold_custom_provisioning(infra_dir)?;
     fs::create_dir_all(paths::LOCAL_INFRA_SECRETS_DIR)
         .with_context(|| format!("Failed to create {}", paths::LOCAL_INFRA_SECRETS_DIR))?;

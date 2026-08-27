@@ -40,15 +40,11 @@ impl SampleProject {
             }
         }
 
-        let framework = self.dir.join("infra/.framework");
-        for entrypoint in ["pyproject.toml", "uv.lock", "src/bonesinfra/__main__.py", "README.md"] {
-            let path = framework.join(entrypoint);
-            if !path.is_file() {
-                bail!("{template} fixture is missing generated {}", path.display());
+        for path in ["infra/bonesinfra.whl", "infra/templates/shared/nginx/index.html.j2"] {
+            if !self.dir.join(path).is_file() {
+                bail!("{template} fixture is missing generated {path}");
             }
         }
-
-        Self::assert_only_readme_markdown(&framework, template)?;
 
         for entrypoint in ["__init__.py", "runtime.py", "manifest.py"] {
             let path = self.dir.join("infra/custom").join(entrypoint);
@@ -74,20 +70,6 @@ impl SampleProject {
             bail!(".env.build does not contain an empty NODE_VERSION in {}", self.dir.display());
         }
         fs::write(&path, updated).with_context(|| format!("Failed to write {}", path.display()))?;
-        Ok(())
-    }
-
-    fn assert_only_readme_markdown(root: &Path, template: &str) -> Result<()> {
-        for entry in fs::read_dir(root).with_context(|| format!("Failed to read {}", root.display()))? {
-            let path = entry?.path();
-            if path.is_dir() {
-                Self::assert_only_readme_markdown(&path, template)?;
-            } else if path.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
-                && path.file_name().is_some_and(|name| name != "README.md")
-            {
-                bail!("{template} fixture materialized unexpected Markdown file {}", path.display());
-            }
-        }
         Ok(())
     }
 

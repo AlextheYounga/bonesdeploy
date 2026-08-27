@@ -72,7 +72,7 @@ def test_ruby_runtime_installs_supported_release_and_returns_versioned_binary(mo
     assert executable == f"{RUBY_ROOT}/{expected}/bin/ruby"
     assert len(calls) == 1
     assert calls[0]["name"] == f"Install Ruby {expected}"
-    assert calls[0]["src"].endswith("assets/scripts/install-ruby.sh")
+    assert calls[0]["src"].endswith("src/bonesinfra/assets/scripts/install-ruby.sh")
     assert calls[0]["args"] == (expected,)
     assert calls[0]["_sudo"] is True
 

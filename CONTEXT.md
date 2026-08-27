@@ -77,7 +77,7 @@ deployment/
     └── 01_prepare.sh
 ```
 
-Python infra scripts and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`) and are embedded into the `bonesdeploy` binary. The complete distribution is materialized into each project's `infra/.framework/`; a project-scoped cached venv holds only dependencies and editable-install metadata. See `crates/bonesinfra/src/lib.rs`.
+Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`). A generated pure-Python wheel is committed as `crates/bonesinfra/assets/bonesinfra.whl`, embedded into the `bonesdeploy` binary, and installed into each project's project-scoped cached venv. Managed templates are materialized under `infra/templates/`. See `crates/bonesinfra/src/lib.rs`.
 
 ### Project Environment
 Rust is the sole parser of the project-root `.env`. It models two environments:
@@ -196,7 +196,7 @@ bonesdeploy/
 ```
 
 ### Per-Framework Templates
-Framework templates ship starter overlays that `bonesdeploy init` uses when scaffolding a matching framework. BonesDeploy keeps framework defaults and deployment scripts under `crates/bonesdeploy/assets/frameworks/<fw>/`; canonical infrastructure source and templates live in BonesInfra and are materialized into `infra/.framework/`:
+Framework templates ship starter overlays that `bonesdeploy init` uses when scaffolding a matching framework. BonesDeploy keeps framework defaults and deployment scripts under `crates/bonesdeploy/assets/frameworks/<fw>/`; canonical infrastructure templates live in BonesInfra and are materialized into `infra/templates/`:
 
 - `frameworks/laravel/`    → Laravel (PHP + PHP-FPM)
 - `frameworks/django/`     → Django (Python + Gunicorn)
@@ -210,7 +210,7 @@ Django resolves its configured `python_version` minor to a BonesInfra-pinned CPy
 
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
 
-Projects materialize the complete BonesInfra distribution under `infra/.framework/` and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the project-local package and composes its selected framework runtime with custom provisioning; it has no cached-source fallback.
+Projects materialize the BonesInfra wheel and managed templates under `infra/` and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the installed wheel and composes its selected framework runtime with custom provisioning. Updates refresh managed templates wholesale.
 
 Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves (e.g. Next's `out/`). A static site only works if the app is configured to emit that directory: for `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
 
@@ -222,7 +222,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy server setup --yes` and `bonesdeploy site setup --yes` before first deploy.
   - Saves connection and site inputs to the root `.env`.
-  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/` and the complete BonesInfra distribution into `infra/.framework/`.
+  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/`, the committed BonesInfra wheel as `infra/bonesinfra.whl`, and managed templates under `infra/templates/`.
   - `--template <name>` selects a framework template non-interactively. `--framework-var <key=value>` (repeated) overrides template variables; answers are validated against the template's question schema before writing `.env`.
 
 - **doctor**

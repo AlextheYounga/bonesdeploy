@@ -11,7 +11,7 @@ from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.sveltekit.runtime import TEMPLATES as SVELTEKIT_TEMPLATES
 from bonesinfra.services.linux.apparmor import app as apparmor_app
 
-from .helpers import make_site_request
+from .helpers import SRC_DIR, make_site_request
 
 
 def _ctx() -> DeployContext:
@@ -46,7 +46,7 @@ def test_render_profile_forwards_template_context(tmp_path, monkeypatch):
     assert seen["data"]["apparmor_runtime"] == "next"
 
     rendered = (
-        jinja2.Environment(autoescape=True, loader=jinja2.FileSystemLoader(str(ASSETS_DIR)))
+        jinja2.Environment(autoescape=True, loader=jinja2.FileSystemLoader(str(SRC_DIR / "bonesinfra/assets")))
         .get_template("apparmor/app-profile.j2")
         .render(seen["data"])
     )
@@ -76,7 +76,10 @@ def test_sveltekit_profile_permits_reading_the_shared_environment(tmp_path, monk
     )
 
     rendered = (
-        jinja2.Environment(autoescape=True, loader=jinja2.FileSystemLoader(str(SVELTEKIT_TEMPLATES)))
+        jinja2.Environment(
+            autoescape=True,
+            loader=jinja2.FileSystemLoader(str(SRC_DIR / "bonesinfra/frameworks/sveltekit/templates")),
+        )
         .get_template("app-profile.j2")
         .render(seen["data"])
     )
