@@ -68,7 +68,7 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     apply_derived_defaults(&mut cfg);
     if !Path::new(paths::DOT_ENV).exists() {
         let framework = secrets::framework_for_secrets(&cfg.runtime.template)?;
-        if let Some(content) = framework.environment_example(&cfg.project_name, &cfg.domain, &cfg.preview_domain) {
+        if let Some(content) = framework.environment_example(&cfg.project_name, &cfg.domain) {
             fs::write(paths::DOT_ENV, content)?;
         }
     }

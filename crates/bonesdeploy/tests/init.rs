@@ -87,7 +87,7 @@ fn named_framework_materializes_project_template_snapshot() -> Result<()> {
     assert!(infra.join("deployment/functions.sh").is_file(), "{framework} is missing kit deployment functions");
     assert!(infra.join("templates/frameworks/laravel").is_dir(), "{framework} is missing infra templates");
     let dotenv = fs::read_to_string(env.repo().join(".env"))?;
-    assert!(dotenv.contains("APP_URL=https://atlas-deploy-example-com.nip.io\n"));
+    assert!(dotenv.contains("APP_URL=\n"));
     assert!(dotenv.contains("DB_CONNECTION=sqlite\n"));
     assert!(!env.repo().join(".bones").exists());
     Ok(())
