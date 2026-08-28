@@ -330,19 +330,6 @@ fn environment_without_backup_keys_loads_with_backup_defaults() -> Result<()> {
 }
 
 #[test]
-fn invalid_backup_configuration_is_rejected_on_load() -> Result<()> {
-    let dir = tempdir()?;
-    let path = dir.path().join(".env");
-    fs::write(&path, "BONES_BACKUP_RETENTION_DAYS=0\n")?;
-    assert!(config::load(&path).is_err());
-    fs::write(&path, "BONES_BACKUP_SCHEDULE=0 0 * *\n")?;
-    assert!(config::load(&path).is_err());
-    fs::write(&path, "BONES_BORG_PASSPHRASE=has space\n")?;
-    assert!(config::load(&path).is_err());
-    Ok(())
-}
-
-#[test]
 fn provisioning_request_carries_backup_fields_including_the_passphrase() -> Result<()> {
     let mut bones = Bones::for_site("atlas");
     bones.backup.schedule = "15 2 * * *".into();

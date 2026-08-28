@@ -66,7 +66,7 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     scaffold::update_gitignore()?;
     scaffold::ensure_env_build()?;
     apply_derived_defaults(&mut cfg);
-    bones_config::ensure_backup_passphrase(&mut cfg.backup, Path::new(paths::DOT_ENV))?;
+    ensure_backup_configuration(&mut cfg)?;
     if !Path::new(paths::DOT_ENV).exists() {
         let framework = secrets::framework_for_secrets(&cfg.runtime.template)?;
         if let Some(content) = framework.environment_example(&cfg.project_name, &cfg.domain) {
@@ -93,4 +93,24 @@ fn print_follow_up_hint() {
         "{}",
         output::next_step_with_detail("bonesdeploy server setup", "to provision the shared server baseline")
     );
+}
+
+/// Preserves the entire managed backup configuration from an existing `.env`
+/// and generates the Borg passphrase when absent, so re-initializing a project
+/// can neither orphan its provisioned Borg repository nor reset a customized
+/// schedule or retention window.
+fn ensure_backup_configuration(cfg: &mut bones_config::Bones) -> Result<()> {
+    if let Ok(existing) = bones_config::load(Path::new(paths::DOT_ENV)) {
+        cfg.backup = existing.backup;
+    }
+    if !cfg.backup.is_configured() {
+        cfg.backup.passphrase = generated_passphrase()?;
+    }
+    Ok(())
+}
+
+fn generated_passphrase() -> Result<String> {
+    let mut bytes = [0_u8; 24];
+    getrandom::fill(&mut bytes).map_err(|error| anyhow::anyhow!("Failed to generate the Borg passphrase: {error}"))?;
+    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
 }

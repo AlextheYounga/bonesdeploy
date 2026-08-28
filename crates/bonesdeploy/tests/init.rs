@@ -150,6 +150,47 @@ fn init_preserves_existing_env_build() -> Result<()> {
 }
 
 #[test]
+fn init_generates_a_borg_passphrase_when_none_exists() -> Result<()> {
+    let env = TestEnv::new()?;
+
+    init_success(&env)?;
+
+    let passphrase = managed_value(&env.repo().join(".env"), "BONES_BORG_PASSPHRASE")?;
+    assert_eq!(passphrase.len(), 48, "generated passphrases are 24-byte hex strings");
+    assert!(passphrase.chars().all(|ch| ch.is_ascii_hexdigit()));
+    Ok(())
+}
+
+#[test]
+fn rerun_preserves_the_existing_backup_configuration() -> Result<()> {
+    let env = TestEnv::new()?;
+    let passphrase = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    fs::write(
+        env.repo().join(".env"),
+        format!(
+            "BONES_BACKUP_SCHEDULE=30 3 * * 0\nBONES_BACKUP_RETENTION_DAYS=14\nBONES_BORG_PASSPHRASE={passphrase}\n"
+        ),
+    )?;
+
+    init_success(&env)?;
+
+    let dotenv = fs::read_to_string(env.repo().join(".env"))?;
+    assert!(dotenv.contains(&format!("BONES_BORG_PASSPHRASE={passphrase}\n")), "{dotenv}");
+    assert!(dotenv.contains("BONES_BACKUP_RETENTION_DAYS=14\n"), "{dotenv}");
+    assert!(dotenv.contains("BONES_BACKUP_SCHEDULE=30 3 * * 0\n"), "{dotenv}");
+    Ok(())
+}
+
+/// Reads one managed `BONES_*` value from the project `.env`.
+fn managed_value(dotenv: &Path, key: &str) -> Result<String> {
+    fs::read_to_string(dotenv)?
+        .lines()
+        .find_map(|line| line.strip_prefix(key).and_then(|rest| rest.strip_prefix('=')))
+        .map(str::to_string)
+        .ok_or_else(|| anyhow::anyhow!("{key} should be present in {}", dotenv.display()))
+}
+
+#[test]
 fn failure_before_completed_prompts_leaves_no_bones_assets() -> Result<()> {
     let env = TestEnv::new()?;
     let repo = env.repo();

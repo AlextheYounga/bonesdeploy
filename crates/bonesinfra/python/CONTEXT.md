@@ -532,10 +532,10 @@ Responsibilities (`services/linux/backup.py`):
 
 The typed `BackupConfig` arrives inside the site request
 (`site.backup`) and is validated at the parse boundary: five-field crontab
-syntax restricted to safe characters, positive integer retention, and a
-printable-ASCII passphrase without whitespace or template metacharacters. The
-passphrase flows through `files.put` from an in-memory source; it is never
-placed in `template_data`, `paths_dict`, or any rendered cron file.
+syntax restricted to safe characters and a positive integer retention. The
+passphrase is an opaque string that flows through `files.put` from an
+in-memory source; it is never placed in `template_data`, `paths_dict`, or any
+rendered cron file.
 
 Sites whose passphrase is empty are left untouched, so projects initialized
 before scheduled backups keep their previous behavior.

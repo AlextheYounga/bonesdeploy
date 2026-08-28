@@ -137,7 +137,6 @@ name = "bonesdeploy-core"
 version = "0.8.7"
 dependencies = [
  "anyhow",
- "getrandom",
  "serde",
  "serde_json",
  "tempfile",

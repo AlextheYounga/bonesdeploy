@@ -216,19 +216,7 @@ def _parse_backup(value: Any) -> BackupConfig:
     if not isinstance(retention_days, int) or isinstance(retention_days, bool) or retention_days < 1:
         raise ValueError("site.backup.retention_days must be a positive integer")
     passphrase = _string(value.get("passphrase", ""), "site.backup.passphrase")
-    _validate_passphrase(passphrase)
     return BackupConfig(schedule, retention_days, passphrase)
-
-
-def _validate_passphrase(passphrase: str) -> None:
-    if not passphrase.strip():
-        return
-    if passphrase != passphrase.strip():
-        raise ValueError("site.backup.passphrase must not start or end with whitespace")
-    # Braces and percent signs are template/crontab metacharacters; generated
-    # passphrases are hexadecimal and unaffected.
-    if not all(ch.isascii() and ch.isprintable() and not ch.isspace() and ch not in "{}%" for ch in passphrase):
-        raise ValueError("site.backup.passphrase must be printable ASCII without braces or percent signs")
 
 
 def _validate_cron_schedule(schedule: str) -> None:

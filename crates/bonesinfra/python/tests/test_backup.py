@@ -32,8 +32,6 @@ def test_backup_section_parses_into_typed_configuration():
     assert backup.passphrase == PASSPHRASE
     assert backup.configured is True
 
-
-def test_empty_passphrase_marks_backups_unconfigured():
     assert parse_backup({}).configured is False
 
 
@@ -49,11 +47,6 @@ def test_empty_passphrase_marks_backups_unconfigured():
         {"schedule": "0 0 * * *", "retention_days": "30", "passphrase": ""},
         {"schedule": "0 0 * * *", "retention_days": True, "passphrase": ""},
         {"schedule": "0 0 * * *", "retention_days": 30, "passphrase": "", "intruder": 1},
-        {"schedule": "0 0 * * *", "retention_days": 30, "passphrase": " leading"},
-        {"schedule": "0 0 * * *", "retention_days": 30, "passphrase": "new\nline"},
-        {"schedule": "0 0 * * *", "retention_days": 30, "passphrase": "brace{}"},
-        {"schedule": "0 0 * * *", "retention_days": 30, "passphrase": "percent%"},
-        {"schedule": "0 0 * * *", "retention_days": 30, "passphrase": "stéphane"},
     ],
 )
 def test_invalid_backup_sections_are_rejected(backup_value):

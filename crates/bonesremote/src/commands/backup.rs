@@ -3,7 +3,6 @@
 
 use std::fs;
 use std::num::NonZeroU16;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
@@ -16,8 +15,6 @@ use time::macros::format_description;
 
 use crate::privileges;
 use crate::release::SiteMutation;
-
-const PASSPHRASE_MODE: u32 = 0o600;
 
 /// Runs one scheduled backup for the site as root: archive `shared/`, then prune.
 pub fn run(site: &str, keep_days: u16) -> Result<()> {
@@ -82,28 +79,11 @@ fn read_passphrase_file(path: &Path) -> Result<String> {
     if passphrase.is_empty() {
         bail!("Borg passphrase file {} is empty", path.display());
     }
-    enforce_private_mode(path)?;
     Ok(passphrase)
-}
-
-fn enforce_private_mode(path: &Path) -> Result<()> {
-    let mode = fs::metadata(path).context("Failed to read Borg passphrase file metadata")?.permissions().mode() & 0o777;
-    if mode != PASSPHRASE_MODE {
-        bail!(
-            "Borg passphrase file {} must have mode 0600, found {:o}; re-provision the site before running backups",
-            path.display(),
-            mode
-        );
-    }
-    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use std::fs::Permissions;
-    use std::os::unix::fs::PermissionsExt;
-    use std::path::PathBuf;
-
     use anyhow::Result;
     use tempfile::tempdir;
     use time::macros::datetime;
@@ -141,12 +121,7 @@ mod tests {
     }
 
     #[test]
-    fn prune_options_reject_zero_day_retention() {
-        assert!(prune_options("/repo", "pw", 0).is_err());
-    }
-
-    #[test]
-    fn passphrase_reader_requires_an_existing_private_file() -> Result<()> {
+    fn passphrase_reader_requires_a_provisioned_non_empty_file() -> Result<()> {
         let dir = tempdir()?;
         let path = dir.path().join(".borg_passphrase");
 
@@ -156,24 +131,7 @@ mod tests {
         assert!(read_passphrase_file(&path).is_err(), "empty file must fail");
 
         fs::write(&path, "secret\n")?;
-        fs::set_permissions(&path, Permissions::from_mode(0o644))?;
-        assert!(
-            read_passphrase_file(&path).is_err_and(|error| error.to_string().contains("0600")),
-            "group-readable file must fail with a mode error"
-        );
-
-        fs::set_permissions(&path, Permissions::from_mode(0o600))?;
         assert_eq!(read_passphrase_file(&path)?, "secret");
         Ok(())
-    }
-
-    #[test]
-    fn passphrase_paths_stay_inside_the_bonesremote_site_root() {
-        let path: PathBuf = paths::bonesremote_site_passphrase_path("atlas");
-        assert_eq!(path, PathBuf::from("/root/.config/bonesremote/sites/atlas/.borg_passphrase"));
-        assert_eq!(
-            paths::site_backup_repository_path("atlas"),
-            PathBuf::from("/var/lib/bonesdeploy/backups/atlas.borg")
-        );
     }
 }

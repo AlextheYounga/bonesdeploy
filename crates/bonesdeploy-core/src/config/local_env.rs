@@ -1,20 +1,22 @@
 use std::collections::BTreeMap;
-use std::fs;
-use std::io::ErrorKind;
+use std::fs::{self, File, OpenOptions, Permissions};
+use std::io::{ErrorKind, Write};
 use std::path::Path;
+use std::process;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use anyhow::{Context, Result, bail};
 
-use super::atomic_write::atomic_write;
-use super::backup::validate_backup;
 use super::model::{
-    Bones, RuntimeBackend, default_node_version, default_repo_path_for, validate_database_services, validate_host,
-    validate_runtime,
+    BACKUP_RETENTION_DAYS_DEFAULT, BACKUP_SCHEDULE_DEFAULT, Bones, RuntimeBackend, default_node_version,
+    default_repo_path_for, validate_database_services, validate_host, validate_runtime,
 };
 use crate::paths;
 
 mod keys {
-    pub(super) use super::super::backup::{PASSPHRASE_KEY, RETENTION_DAYS_KEY, SCHEDULE_KEY};
+    pub(super) const BACKUP_SCHEDULE: &str = "BACKUP_SCHEDULE";
+    pub(super) const BACKUP_RETENTION_DAYS: &str = "BACKUP_RETENTION_DAYS";
+    pub(super) const BORG_PASSPHRASE: &str = "BORG_PASSPHRASE";
     /// Managed-key vocabulary for the root `.env` grammar.
     pub(super) use crate::config::variables::{PROJECT_NAME, WEB_ROOT};
     pub(super) const REMOTE_NAME: &str = "REMOTE_NAME";
@@ -49,9 +51,9 @@ const MANAGED: &[&str] = &[
     keys::WEB_ROOT,
     keys::NODE_VERSION,
     keys::SERVICES,
-    keys::SCHEDULE_KEY,
-    keys::RETENTION_DAYS_KEY,
-    keys::PASSPHRASE_KEY,
+    keys::BACKUP_SCHEDULE,
+    keys::BACKUP_RETENTION_DAYS,
+    keys::BORG_PASSPHRASE,
     "PHP_VERSION",
     "PYTHON_VERSION",
     "RUBY_VERSION",
@@ -169,12 +171,14 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
         .map(|v| v.split(',').filter(|s| !s.trim().is_empty()).map(|s| s.trim().into()).collect())
         .unwrap_or_default();
     config.backup.schedule =
-        values.get(keys::SCHEDULE_KEY).cloned().unwrap_or_else(|| super::backup::BACKUP_SCHEDULE_DEFAULT.to_string());
-    config.backup.retention_days = match values.get(keys::RETENTION_DAYS_KEY) {
-        Some(value) => value.parse().with_context(|| format!("Invalid {} value: {value}", keys::RETENTION_DAYS_KEY))?,
-        None => super::backup::BACKUP_RETENTION_DAYS_DEFAULT,
+        values.get(keys::BACKUP_SCHEDULE).cloned().unwrap_or_else(|| BACKUP_SCHEDULE_DEFAULT.to_string());
+    config.backup.retention_days = match values.get(keys::BACKUP_RETENTION_DAYS) {
+        Some(value) => {
+            value.parse().with_context(|| format!("Invalid {} value: {value}", keys::BACKUP_RETENTION_DAYS))?
+        }
+        None => BACKUP_RETENTION_DAYS_DEFAULT,
     };
-    config.backup.passphrase = values.get(keys::PASSPHRASE_KEY).cloned().unwrap_or_default();
+    config.backup.passphrase = values.get(keys::BORG_PASSPHRASE).cloned().unwrap_or_default();
     for (key, value) in values {
         if !is_project_key(key) {
             config.runtime.extra.insert(key.to_ascii_lowercase(), parse_runtime_value(value));
@@ -185,7 +189,6 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
     validate_host(&config.host)?;
     validate_runtime(&config.runtime)?;
     validate_database_services(&config.services.services)?;
-    validate_backup(&config.backup)?;
     Ok(LoadedLocal { environment: config, applications: parsed.applications })
 }
 
@@ -274,9 +277,9 @@ pub fn write_local_environment(config: &Bones, path: &Path) -> Result<()> {
         (keys::WEB_ROOT, config.runtime.web_root.clone()),
         (keys::NODE_VERSION, config.runtime.node_version.clone()),
         (keys::SERVICES, config.services.services.join(",")),
-        (keys::SCHEDULE_KEY, config.backup.schedule.clone()),
-        (keys::RETENTION_DAYS_KEY, config.backup.retention_days.to_string()),
-        (keys::PASSPHRASE_KEY, config.backup.passphrase.clone()),
+        (keys::BACKUP_SCHEDULE, config.backup.schedule.clone()),
+        (keys::BACKUP_RETENTION_DAYS, config.backup.retention_days.to_string()),
+        (keys::BORG_PASSPHRASE, config.backup.passphrase.clone()),
     ];
     for (key, value) in values {
         append_value(&mut output, key, &value)?;
@@ -305,27 +308,11 @@ fn append_value(output: &mut String, key: &str, value: &str) -> Result<()> {
     output.push('\n');
     Ok(())
 }
+/// Managed keys that map onto the canonical model; every other managed key is
+/// a passthrough that becomes a runtime framework extra.
 fn is_project_key(key: &str) -> bool {
-    matches!(
-        key,
-        keys::PROJECT_NAME
-            | keys::REMOTE_NAME
-            | keys::SSH_USER
-            | keys::HOST
-            | keys::PORT
-            | keys::BRANCH
-            | keys::DOMAIN
-            | keys::EMAIL
-            | keys::SSL_ENABLED
-            | keys::TEMPLATE
-            | keys::RUNTIME_BACKEND
-            | keys::WEB_ROOT
-            | keys::NODE_VERSION
-            | keys::SERVICES
-            | keys::SCHEDULE_KEY
-            | keys::RETENTION_DAYS_KEY
-            | keys::PASSPHRASE_KEY
-    )
+    MANAGED.contains(&key)
+        && !matches!(key, "PHP_VERSION" | "PYTHON_VERSION" | "RUBY_VERSION" | "IS_STATIC" | "INTERNAL_PORT")
 }
 fn parse_runtime_value(value: &str) -> toml::Value {
     match value {
@@ -364,3 +351,36 @@ fn format_dotenv_value(value: &str) -> String {
         value.into()
     }
 }
+static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+fn atomic_write(path: &Path, content: &[u8]) -> Result<()> {
+    let dir = path.parent().filter(|parent| !parent.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    let temp = dir.join(format!(".env.bones-{}-{}", process::id(), TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)));
+    let result = (|| {
+        let mut options = OpenOptions::new();
+        options.write(true).create_new(true);
+        let mut file =
+            options.open(&temp).with_context(|| format!("Failed to create temporary file {}", temp.display()))?;
+        if let Ok(metadata) = fs::metadata(path) {
+            preserve_mode(&file, &metadata.permissions());
+        }
+        file.write_all(content).context("Failed to write temporary environment file")?;
+        file.sync_all().context("Failed to sync temporary environment file")?;
+        fs::rename(&temp, path).with_context(|| format!("Failed to replace {}", path.display()))?;
+        File::open(dir)
+            .context("Failed to open environment directory")?
+            .sync_all()
+            .context("Failed to sync environment directory")?;
+        Ok::<(), anyhow::Error>(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result.with_context(|| format!("Failed to atomically write {}", path.display()))
+}
+#[cfg(unix)]
+fn preserve_mode(file: &File, permissions: &Permissions) {
+    use std::os::unix::fs::PermissionsExt;
+    let _ = file.set_permissions(Permissions::from_mode(permissions.mode()));
+}
+#[cfg(not(unix))]
+fn preserve_mode(_file: &File, _permissions: &Permissions) {}
