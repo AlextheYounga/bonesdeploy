@@ -14,7 +14,7 @@ def initialize():
     """Ensure /etc is an etckeeper-managed repository (idempotent)."""
     server.shell(
         name="Initialize etckeeper in /etc",
-        commands=["etckeeper", "init"],
+        commands=["etckeeper init"],
         _sudo=True,
     )
 
