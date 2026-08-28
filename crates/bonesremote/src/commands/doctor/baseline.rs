@@ -9,6 +9,7 @@ use crate::inspection::systemd;
 
 const APT_AUTO_UPGRADES: &str = "/etc/apt/apt.conf.d/20auto-upgrades";
 const APT_UNATTENDED_UPGRADES: &str = "/etc/apt/apt.conf.d/50unattended-upgrades";
+const ETCKEEPER_BIN: &str = "/usr/bin/etckeeper";
 
 pub(super) fn check(issues: &mut Vec<String>) {
     check_root_directory(paths::BONESREMOTE_CONFIG_DIR, issues);
@@ -24,6 +25,7 @@ pub(super) fn check(issues: &mut Vec<String>) {
     check_active_service("fail2ban", issues);
     check_root_file(APT_AUTO_UPGRADES, issues);
     check_root_file(APT_UNATTENDED_UPGRADES, issues);
+    check_etckeeper_executable(Path::new(ETCKEEPER_BIN), issues);
 }
 
 fn check_root_directory(path: &str, issues: &mut Vec<String>) {
@@ -41,6 +43,12 @@ fn check_root_file(path: &str, issues: &mut Vec<String>) {
 fn check_root_executable(path: &Path, issues: &mut Vec<String>) {
     if let Some(issue) = root_owned_path_issue(path, false, true) {
         issues.push(format!("server baseline BonesRemote binary {}: {issue}", path.display()));
+    }
+}
+
+pub fn check_etckeeper_executable(path: &Path, issues: &mut Vec<String>) {
+    if let Some(issue) = root_owned_path_issue(path, false, true) {
+        issues.push(format!("server baseline etckeeper executable {}: {issue}", path.display()));
     }
 }
 

@@ -498,11 +498,13 @@ Cli::Server::Setup
         ├─ bonesinfra::run_with_request(["server", "apply", "--request-stdin", ...], server_request)
          │    └─ Python: cli/commands/server::deploy_server_setup()
         │         ├─ packages.py and disable_algif_aead.py
+        │         ├─ services/linux/etckeeper.py initialize  # idempotent /etc init after packages
         │         ├─ services/linux/image_store.py
         │         ├─ firewall.py, fail2ban.py, unattended_upgrades.py
         │         ├─ users.py          # global deploy user and authorized key
         │         ├─ BonesRemote roots and binary
-        │         └─ sudoers.py        # write /etc/sudoers.d/bonesdeploy
+        │         ├─ sudoers.py        # write /etc/sudoers.d/bonesdeploy
+        │         └─ etckeeper.py commit_changes  # final /etc commit of this flow
         └─ SSH: bonesremote doctor     # host-mode baseline verification
 ```
 
@@ -516,13 +518,18 @@ Cli::Site::Setup
          │    └─ Python: cli/commands/site::deploy_site_setup()
         │         ├─ users.py          # site runtime and build identities
         │         ├─ directories.py    # one bare repo and one site layout
-        │         └─ placeholder.py    # initial current link only
+        │         ├─ placeholder.py    # initial current link only
+        │         └─ etckeeper.py commit_changes  # final /etc commit of this flow
         ├─ bonesinfra::run("services", "apply")
         ├─ bonesinfra::run("runtime", "apply")
         └─ SSH: bonesremote doctor --site <site>
 ```
 
 Site setup does not push Git or secrets, configure SSL, or deploy a release.
+Every mutating BonesInfra flow (server, site, services, runtime, SSL, helpers)
+queues `services/linux/etckeeper.py::commit_changes` as its final operation, so a
+failed flow never commits and a successful flow always records its `/etc`
+changes. Read-only `manifest` and patch flows do not commit.
 
 ### 4.4 `bonesdeploy deploy`
 
@@ -557,7 +564,7 @@ Cli::Doctor
        │    └─ SSH: bonesremote doctor
        │         ├─ doctor/system.rs      # distro, podman
        │         ├─ doctor/apparmor.rs    # AppArmor support
-       │         ├─ doctor/baseline.rs    # server roots, binary, sudoers, image store, hardening
+        │         ├─ doctor/baseline.rs    # server roots, binary, sudoers, image store, hardening, etckeeper
        │         └─ doctor/security/      # deploy identity and privileged paths
         └─ commands/site/doctor.rs::run()
                  ├─ Local checks:

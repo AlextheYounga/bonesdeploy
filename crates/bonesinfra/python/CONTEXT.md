@@ -416,7 +416,8 @@ prepares one project after that baseline is ready.
 
 Responsibilities:
 
-- `server apply` installs packages and hardening; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
+- `server apply` installs packages (including etckeeper) and hardening; initializes `/etc` as an etckeeper repository; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
+- Every mutating flow (`server`, `site`, `services`, `runtime`, `ssl`, `helpers`) queues `services/linux/etckeeper.py::commit_changes` as its final operation, so a failed flow never commits and a successful flow always records its `/etc` changes with etckeeper defaults. Read-only `manifest` and patch flows do not commit.
 - `site apply` creates runtime and build identities, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
 - `site apply` creates the shared directory but does not write `shared/.env`; that file is published only by `bonesdeploy secrets push` outside this crate.
 - `site apply` does not install services, configure the framework runtime, configure SSL, push Git or secrets, or deploy.
@@ -522,6 +523,8 @@ services through neutral core helpers in `services/`:
 
 - `services/linux/application.py` — `deploy_server` / `deploy_static` building
   blocks shared by generated runtimes (AppArmor, systemd, nginx wiring)
+- `services/linux/etckeeper.py` — `/etc` change recording: idempotent
+  initialization and the final etckeeper commit queued by every mutating flow
 - `services/linux/systemd.py`, `nginx/`, `apparmor/` — service lifecycle,
   per-site nginx, AppArmor profiles
 - `services/linux/runtime_paths.py`, `runtime_logs.py`, `validation.py` — shared

@@ -4,7 +4,7 @@ from pyinfra.operations import server
 
 from bonesinfra.config.request import validate_domain, validate_email
 from bonesinfra.pyinfra.operations import mkdir
-from bonesinfra.services.linux import cloudflared
+from bonesinfra.services.linux import cloudflared, etckeeper
 from bonesinfra.services.linux.nginx import router as nginx_router
 
 
@@ -26,6 +26,7 @@ def deploy_ssl(ctx):
     obtain_certificate(ctx, paths)
     nginx_router.render_router_config(ctx, paths, ssl_enabled=True, stage="SSL enable", validate=True, reload=True)
     cloudflared.remove(ctx, paths)
+    etckeeper.commit_changes("BonesInfra SSL provisioning")
 
 
 def obtain_certificate(ctx, paths):

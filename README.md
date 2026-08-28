@@ -235,6 +235,10 @@ Provision the reusable server baseline:
 bonesdeploy server setup --yes
 ```
 
+The baseline includes etckeeper: `/etc` is tracked in a root-owned Git
+repository with package defaults, and every successful provisioning run ends
+with an etckeeper commit recording its `/etc` changes.
+
 Provision the site, including its base, services, runtime, and doctor:
 
 ```sh

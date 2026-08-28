@@ -58,6 +58,10 @@ def test_ssl_handoff_removes_quick_tunnel_after_ssl_router_is_ready(monkeypatch)
         "bonesinfra.cli.commands.site.ssl.cloudflared.remove",
         lambda *_args: calls.append("cloudflared-remove"),
     )
+    monkeypatch.setattr(
+        "bonesinfra.cli.commands.site.ssl.etckeeper.commit_changes",
+        lambda *_args: calls.append("etckeeper-commit"),
+    )
 
     deploy_ssl(ctx)
 
@@ -68,6 +72,7 @@ def test_ssl_handoff_removes_quick_tunnel_after_ssl_router_is_ready(monkeypatch)
         "certificate",
         "router-SSL enable",
         "cloudflared-remove",
+        "etckeeper-commit",
     ]
 
 
