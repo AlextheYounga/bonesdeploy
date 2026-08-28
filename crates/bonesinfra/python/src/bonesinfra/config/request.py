@@ -8,6 +8,7 @@ from typing import Any
 # ruff: noqa: TRY004
 from bonesinfra.config.context import (
     AppConfig,
+    BackupConfig,
     DeployConfig,
     DeployContext,
     DnsConfig,
@@ -45,6 +46,9 @@ _RESERVED_PROJECT_NAMES = {
 _FRAMEWORKS = {"custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"}
 _DOMAIN_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+_CRON_FIELD = re.compile(r"^[0-9A-Za-z*/,\-]+$")
+_CRON_FIELD_COUNT = 5
+_MAX_CRON_FIELD_LENGTH = 64
 _MAX_DOMAIN_LENGTH = 253
 _MIN_DOMAIN_LABELS = 2
 _MAX_EMAIL_LENGTH = 254
@@ -87,6 +91,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
             "branch",
             "node_version",
             "services",
+            "backup",
             "extras",
         },
         "site",
@@ -114,6 +119,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
     if not isinstance(services_value, list) or not all(isinstance(name, str) for name in services_value):
         raise TypeError("SERVICES must be a list")
     services = _database_services(services_value)
+    backup = _parse_backup(site.get("backup"))
     credentials = _credentials(body.get("services", {}))
     domain = _string(site.get("domain", ""), "site.domain")
     email = _string(site.get("email", ""), "site.email")
@@ -138,6 +144,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
             backend, _string(site.get("web_root", ""), "site.web_root") or DEFAULT_WEB_ROOT, name, name, dict(extras)
         ),
         services=ServicesConfig(services),
+        backup=backup,
         service_credentials=credentials,
         template=template,
     )
@@ -196,6 +203,41 @@ def _database_services(values: list[str]) -> tuple[str, ...]:
     if len(set(values)) != len(values):
         raise ValueError("database services must not contain duplicates")
     return tuple(values)
+
+
+def _parse_backup(value: Any) -> BackupConfig:
+    """Validate the backup section before it reaches the cron file or Borg repository."""
+    if not isinstance(value, Mapping):
+        raise ValueError("site.backup is required and must be an object")
+    reject_unknown(value, {"schedule", "retention_days", "passphrase"}, "site.backup")
+    schedule = _string(value.get("schedule", ""), "site.backup.schedule")
+    _validate_cron_schedule(schedule)
+    retention_days = value.get("retention_days")
+    if not isinstance(retention_days, int) or isinstance(retention_days, bool) or retention_days < 1:
+        raise ValueError("site.backup.retention_days must be a positive integer")
+    passphrase = _string(value.get("passphrase", ""), "site.backup.passphrase")
+    _validate_passphrase(passphrase)
+    return BackupConfig(schedule, retention_days, passphrase)
+
+
+def _validate_passphrase(passphrase: str) -> None:
+    if not passphrase.strip():
+        return
+    if passphrase != passphrase.strip():
+        raise ValueError("site.backup.passphrase must not start or end with whitespace")
+    # Braces and percent signs are template/crontab metacharacters; generated
+    # passphrases are hexadecimal and unaffected.
+    if not all(ch.isascii() and ch.isprintable() and not ch.isspace() and ch not in "{}%" for ch in passphrase):
+        raise ValueError("site.backup.passphrase must be printable ASCII without braces or percent signs")
+
+
+def _validate_cron_schedule(schedule: str) -> None:
+    fields = schedule.split()
+    if len(fields) != _CRON_FIELD_COUNT:
+        raise ValueError("site.backup.schedule must be a five-field crontab expression")
+    for field in fields:
+        if len(field) > _MAX_CRON_FIELD_LENGTH or not _CRON_FIELD.fullmatch(field):
+            raise ValueError(f"site.backup.schedule field contains unsupported characters: {field!r}")
 
 
 def _validate_project_name(value: str) -> None:

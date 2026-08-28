@@ -15,6 +15,14 @@ pub struct ServerConnection {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct BackupFields {
+    pub schedule: String,
+    pub retention_days: u16,
+    pub passphrase: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SiteFields {
     pub project_name: String,
     pub domain: String,
@@ -26,6 +34,7 @@ pub struct SiteFields {
     pub branch: String,
     pub node_version: String,
     pub services: Vec<String>,
+    pub backup: BackupFields,
     pub extras: BTreeMap<String, serde_json::Value>,
 }
 
@@ -108,6 +117,11 @@ impl ProvisioningRequest {
                 branch: config.branch.clone(),
                 node_version: config.runtime.node_version.clone(),
                 services: config.services.services.clone(),
+                backup: BackupFields {
+                    schedule: config.backup.schedule.clone(),
+                    retention_days: config.backup.retention_days,
+                    passphrase: config.backup.passphrase.clone(),
+                },
                 extras,
             }),
             services: None,

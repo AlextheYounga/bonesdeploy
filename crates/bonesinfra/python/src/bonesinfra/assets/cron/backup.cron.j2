@@ -1,0 +1,5 @@
+# Managed by BonesDeploy. Do not edit.
+MAILTO=""
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+{{ backup_schedule }} root {{ bonesremote_path }} backup run --site {{ project_name }} --keep-days {{ backup_keep_days }} 2>&1 | /usr/bin/systemd-cat -t bonesdeploy-backup

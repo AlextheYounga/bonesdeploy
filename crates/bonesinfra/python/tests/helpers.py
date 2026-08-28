@@ -76,6 +76,11 @@ def make_site_request(**overrides):
             "branch": "main",
             "node_version": "22",
             "services": [],
+            "backup": {
+                "schedule": "0 0 * * *",
+                "retention_days": 30,
+                "passphrase": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            },
             "extras": {},
         },
         "services": {},

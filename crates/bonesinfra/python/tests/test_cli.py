@@ -21,6 +21,11 @@ def _run_no_input(*args, input_text=None):
     )
 
 
+def _minimal_site():
+    """Smallest site payload that parses, isolating the error under test."""
+    return {"project_name": "demo", "backup": {"schedule": "0 0 * * *", "retention_days": 30, "passphrase": ""}}
+
+
 def test_server_apply_rejects_missing_host():
     result = _run_no_input(
         "server", "apply", "--request-stdin", "--bonesremote-version", "0.7.3", input_text={"server": {}}
@@ -38,26 +43,20 @@ def test_setup_apply_command_is_removed():
 
 
 def test_runtime_apply_rejects_missing_host():
-    result = _run_no_input(
-        "runtime", "apply", "--request-stdin", input_text={"server": {}, "site": {"project_name": "demo"}}
-    )
+    result = _run_no_input("runtime", "apply", "--request-stdin", input_text={"server": {}, "site": _minimal_site()})
     assert result.returncode == 3, f"Expected exit 3 for missing host, got {result.returncode}"
     assert "missing host" in result.stderr.lower()
 
 
 def test_ssl_apply_rejects_missing_domain_email():
-    result = _run_no_input(
-        "ssl", "apply", "--request-stdin", input_text={"server": {}, "site": {"project_name": "demo"}}
-    )
+    result = _run_no_input("ssl", "apply", "--request-stdin", input_text={"server": {}, "site": _minimal_site()})
     assert result.returncode == 3, f"Expected exit 3 for missing domain/email, got {result.returncode}"
     assert "domain" in result.stderr.lower()
     assert "email" in result.stderr.lower()
 
 
 def test_helpers_apply_rejects_missing_host():
-    result = _run_no_input(
-        "helpers", "apply", "--request-stdin", input_text={"server": {}, "site": {"project_name": "demo"}}
-    )
+    result = _run_no_input("helpers", "apply", "--request-stdin", input_text={"server": {}, "site": _minimal_site()})
     assert result.returncode == 3, f"Expected exit 3 for missing host, got {result.returncode}"
     assert "missing host" in result.stderr.lower()
 

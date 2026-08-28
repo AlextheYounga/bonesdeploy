@@ -48,6 +48,11 @@ Three identities, not two and not five. The `git` user owns the bare repo and is
     AppArmor profiles, and privileged scripts.
 11. No root-executed PATH directory is writable by a runtime user.
 12. Shared paths are an explicit allowlist, never framework-wide guesses.
+13. Root owns the Borg repository and the per-site Borg passphrase file
+    (mode 0600); runtime users can neither read the passphrase nor write
+    backup state.
+14. The Borg passphrase never appears in process arguments, cron files,
+    logs, deployment descriptors, or the control-plane snapshot.
 ```
 
 Permissions are a provisioning-time contract, not a deployment-time repair. The ownership layout is established by `bonesdeploy server setup` and site setup, and never rewritten by deploy commands. If you find yourself wanting to `chmod` during a deploy, you are fixing the wrong thing — fix the provisioning. `shared/` is owned by the runtime user; only the app writes there. `releases/` is owned by the runtime user while prepare runs, then sealed as `root:<site>` before activation. The setgid bit on `releases/` lets the runtime group inherit read access without a post-deploy `chown`.

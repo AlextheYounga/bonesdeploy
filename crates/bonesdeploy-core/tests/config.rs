@@ -124,6 +124,7 @@ fn remote_deployment_config_excludes_identity_and_secrets() -> Result<()> {
     bones.port = "2222".to_string();
     bones.domain = "myapp.com".to_string();
     bones.ssl_enabled = true;
+    bones.backup.passphrase = "hex-passphrase".to_string();
 
     let descriptor = RemoteDeploymentConfig::from_bones(&bones);
 
@@ -137,6 +138,8 @@ fn remote_deployment_config_excludes_identity_and_secrets() -> Result<()> {
     assert!(!json.contains("repo_path"));
     assert!(!json.contains("project_root"));
     assert!(!json.contains("remote_name"));
+    assert!(!json.contains("passphrase"));
+    assert!(!json.contains("backup"));
     assert!(json.contains("\"branch\":\"main\""));
     assert!(json.contains("\"releases_keep\":3"));
     assert!(json.contains("\"backend\":\"docker\""));
@@ -284,6 +287,76 @@ fn provisioning_request_round_trips_through_json() -> Result<()> {
         )
         .is_err()
     );
+    Ok(())
+}
+
+#[test]
+fn dotenv_round_trips_backup_configuration() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    let mut config = Bones::default();
+    config.project_name = "atlas".into();
+    config.backup.schedule = "30 3 * * 0".into();
+    config.backup.retention_days = 14;
+    config.backup.passphrase = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".into();
+
+    config::write_local_environment(&config, &path)?;
+    let output = fs::read_to_string(&path)?;
+    assert!(output.contains("BONES_BORG_PASSPHRASE=0123456789abcdef"));
+    assert!(output.contains("BONES_BACKUP_SCHEDULE=30 3 * * 0"));
+    assert!(output.contains("BONES_BACKUP_RETENTION_DAYS=14"));
+    let loaded = config::load(&path)?;
+
+    assert_eq!(loaded.backup.schedule, "30 3 * * 0");
+    assert_eq!(loaded.backup.retention_days, 14);
+    assert_eq!(loaded.backup.passphrase, "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
+    assert!(loaded.backup.is_configured());
+    Ok(())
+}
+
+#[test]
+fn environment_without_backup_keys_loads_with_backup_defaults() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    fs::write(&path, "PROJECT_NAME=atlas\n")?;
+
+    let loaded = config::load(&path)?;
+
+    assert_eq!(loaded.backup.schedule, "0 0 * * *");
+    assert_eq!(loaded.backup.retention_days, 30);
+    assert!(loaded.backup.passphrase.is_empty());
+    assert!(!loaded.backup.is_configured());
+    Ok(())
+}
+
+#[test]
+fn invalid_backup_configuration_is_rejected_on_load() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    fs::write(&path, "BONES_BACKUP_RETENTION_DAYS=0\n")?;
+    assert!(config::load(&path).is_err());
+    fs::write(&path, "BONES_BACKUP_SCHEDULE=0 0 * *\n")?;
+    assert!(config::load(&path).is_err());
+    fs::write(&path, "BONES_BORG_PASSPHRASE=has space\n")?;
+    assert!(config::load(&path).is_err());
+    Ok(())
+}
+
+#[test]
+fn provisioning_request_carries_backup_fields_including_the_passphrase() -> Result<()> {
+    let mut bones = Bones::for_site("atlas");
+    bones.backup.schedule = "15 2 * * *".into();
+    bones.backup.retention_days = 21;
+    bones.backup.passphrase = "hex-passphrase".into();
+
+    let request = ProvisioningRequest::from_bones(&bones)?;
+    let json = serde_json::to_string(&request)?;
+
+    let site = request.site.expect("site request carries backup fields");
+    assert_eq!(site.backup.schedule, "15 2 * * *");
+    assert_eq!(site.backup.retention_days, 21);
+    assert_eq!(site.backup.passphrase, "hex-passphrase");
+    assert!(json.contains("passphrase"));
     Ok(())
 }
 

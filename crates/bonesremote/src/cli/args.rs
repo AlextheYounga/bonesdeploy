@@ -55,6 +55,11 @@ pub enum Command {
         #[command(subcommand)]
         command: RuntimeCommand,
     },
+    /// Scheduled shared-data backup operations (requires root)
+    Backup {
+        #[command(subcommand)]
+        command: BackupCommand,
+    },
     /// Print the version
     Version,
 }
@@ -128,5 +133,17 @@ pub enum ServiceCommand {
     Restart {
         #[arg(long)]
         site: String,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum BackupCommand {
+    /// Create a shared-data archive and prune archives outside the retention window
+    Run {
+        #[arg(long)]
+        site: String,
+        /// Age-based retention window in days
+        #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u16).range(1..))]
+        keep_days: u16,
     },
 }

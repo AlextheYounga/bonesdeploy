@@ -53,6 +53,7 @@ BonesInfra owns:
 - Ruby runtime installation from pinned, checksum-verified official source archives
 - runtime services
 - nginx/AppArmor/systemd provisioning details
+- scheduled Borg backup provisioning
 
 Setup provisioning gives each `<site>-build` user its own persistent home,
 distribution-allocated subordinate UID/GID mappings, and a lingering systemd
@@ -511,6 +512,38 @@ Responsibilities:
 - reload nginx
 
 SSL is intentionally separate from runtime setup.
+
+______________________________________________________________________
+
+# Backup Provisioning
+
+Backup provisioning schedules encrypted shared-data backups for the site.
+
+Responsibilities (`services/linux/backup.py`):
+
+- install the `borgbackup` package
+- create the root-only backup root `/var/lib/bonesdeploy/backups`
+- write the root-only passphrase file `.borg_passphrase` (mode `0600`) into the
+  site's BonesRemote state directory
+- create the `repokey-blake2` Borg repository once via a shell guard, with the
+  passphrase expanded inside the remote shell so it never reaches a command line
+- render `/etc/cron.d/bonesdeploy-<site>-backup` from
+  `assets/cron/backup.cron.j2` (mode `0644`)
+
+The typed `BackupConfig` arrives inside the site request
+(`site.backup`) and is validated at the parse boundary: five-field crontab
+syntax restricted to safe characters, positive integer retention, and a
+printable-ASCII passphrase without whitespace or template metacharacters. The
+passphrase flows through `files.put` from an in-memory source; it is never
+placed in `template_data`, `paths_dict`, or any rendered cron file.
+
+Sites whose passphrase is empty are left untouched, so projects initialized
+before scheduled backups keep their previous behavior.
+
+The cron entry pipes `bonesremote backup run --site <site> --keep-days <days>`
+into journald via `systemd-cat`; BonesRemote owns archive creation, naming, and
+retention. Backup provisioning ends with the standard etckeeper commit shared
+by every site flow.
 
 ______________________________________________________________________
 

@@ -82,7 +82,7 @@ Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinf
 ### Project Environment
 Rust is the sole parser of the project-root `.env`. It models two environments:
 
-- `LocalEnvironment` is the gitignored root `.env`, conceptually `.env.local`. Application-owned content (comments, values, order) survives byte-for-byte; it also carries exactly one BonesDeploy-managed, comment-delimited `BONES_*` configuration block holding project identity, SSH connection, deployment branch, domains, framework, web root, services, and framework-specific scalar settings.
+- `LocalEnvironment` is the gitignored root `.env`, conceptually `.env.local`. Application-owned content (comments, values, order) survives byte-for-byte; it also carries exactly one BonesDeploy-managed, comment-delimited `BONES_*` configuration block holding project identity, SSH connection, deployment branch, domains, framework, web root, services, scheduled-backup settings, and framework-specific scalar settings.
 - `ProductionEnvironment` is the decrypted `infra/secrets/.env.gpg`, conceptually `.env.production`, published to the host as `shared/.env` only by `bonesdeploy secrets push`. It contains application runtime keys and generated service credentials — never `BONES_*` keys.
 
 Build-only public settings live in the committed `.env.build`. Framework templates declare `NODE_VERSION`; when set, this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository. Provisioning defaults to `24.19.0`.
@@ -109,6 +109,9 @@ BONES_RUNTIME_BACKEND=native
 BONES_WEB_ROOT=public
 BONES_NODE_VERSION=24.19.0
 BONES_SERVICES=postgres
+BONES_BACKUP_SCHEDULE=0 0 * * *
+BONES_BACKUP_RETENTION_DAYS=30
+BONES_BORG_PASSPHRASE=<generated>
 # <<< BonesDeploy managed configuration <<<
 ```
 
@@ -147,6 +150,11 @@ Derived `BONES_*` values win over `.env.build` collisions because they represent
 
 ### Update Patches
 `bonesdeploy update` invokes the embedded `bonesinfra patches apply` command after each local or remote binary update. Python owns the ordered registry, version gates, local Git migrations, remote pyinfra operations, and per-project/per-scope completion markers. Completed patches are recorded per project and scope, so interrupted updates retry safely without rerunning successful patches. Local markers use the project data directory; remote markers use `/var/lib/bonesdeploy/patches/<site>/`. Remote patch plans connect as root through the local embedded BonesInfra runtime; Python is not installed on the deployment host. `--skip-local` and `--skip-remote` also skip their respective patches.
+
+### Scheduled Backups
+Newly initialized projects get one encrypted Borg repository per site at `/var/lib/bonesdeploy/backups/<site>.borg` (`repokey-blake2`). `bonesdeploy init` generates the Borg passphrase into the managed `.env` block as `BONES_BORG_PASSPHRASE` (only when absent, so re-initializing cannot orphan an existing repository). Site provisioning installs Borg, writes the passphrase to the root-only `/root/.config/bonesremote/sites/<site>/.borg_passphrase` (mode `0600`), creates the repository, and renders `/etc/cron.d/bonesdeploy-<site>-backup` from the configured schedule.
+
+The cron entry runs `bonesremote backup run --site <site> --keep-days <retention>` as root, piped to journald through `systemd-cat`; there is no user-facing backup command and no other trigger. Each run archives only the site's `shared/` directory under the site lock as `<site>_<YYYYMMDD_HHMMSS>` (UTC), then prunes archives older than the configured retention (default 30 days). Projects without a passphrase (initialized before this feature) keep their previous behavior. Backups are local to the deployment server: external replication, restoration workflows, and database dumps are the user's responsibility and are not automated.
 
 ### Deployment Folder
 This folder stores build and prepare scripts. Build scripts live in `deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order inside bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; other files, including `README.md`, are ignored. Bonesremote prepares the image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. Before scripts run, Bonesremote streams the deployment bundle into the container's disposable filesystem at `/workspace/deployment`; it does not bind-mount root-owned control-plane state. The build container receives the exported source tree and private persistent build cache at `/workspace/cache`; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or host BonesRemote control-plane files. The cache is provisioned by BonesInfra at `/var/lib/bonesdeploy/users/<site>-build/cache` and is used only for tool and package downloads. Prepare scripts live in `deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to a runtime-owned candidate release, and are the right place for migrations, cache warmups, and other runtime-state work.
@@ -254,6 +262,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Verifies server readiness before any site mutation.
   - Runs site base, services, runtime, and site doctor in that order.
   - Site base creates one bare repository, site identities, paths, root-owned control-plane state, and a placeholder release.
+  - For projects with a configured Borg passphrase, site base also provisions the scheduled backup: Borg package, root-only passphrase file, encrypted repository, and the `/etc/cron.d` schedule entry.
   - Does not push Git or secrets, configure SSL, or deploy a release.
 
 `bonesdeploy update` resolves the latest published GitHub release, validates that
@@ -328,7 +337,10 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 - **release rollback**
 	- Acquires the site deployment lock and requires an idle site, then repoints `current` to the previous release. It is transactional: after switching `current`, it restarts and verifies the target, and if verification fails it restores the original release and restarts it before returning an error.
 - **service restart**
-	- Restarts the per-site systemd lifecycle target (`<project>.target`), which restarts all registered site services. This is the only `bonesremote` command that requires root privileges.
+	- Restarts the per-site systemd lifecycle target (`<project>.target`), which restarts all registered site services. Requires root privileges.
+
+- **backup run**
+	- Cron-invoked internal operation (requires root) for scheduled backups. It acquires the site deployment lock, reads the root-only passphrase file, creates one Borg archive of the site's `shared/` directory named `<site>_<YYYYMMDD_HHMMSS>` (UTC), and prunes archives older than `--keep-days`. The passphrase is passed to Borg through its environment, never as a command argument, and is never logged. Not intended for manual use.
 
 BonesInfra owns site service membership. BonesRemote restarts exactly `<project>.target` for deploy and rollback.
 - **version**:

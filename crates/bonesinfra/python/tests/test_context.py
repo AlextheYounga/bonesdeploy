@@ -57,12 +57,19 @@ def test_unknown_runtime_backend_is_rejected():
 
 
 def test_missing_site_fields_use_defaults():
-    request = {"server": make_server_request()["server"], "site": {"project_name": "lawsnipe"}}
+    request = {
+        "server": make_server_request()["server"],
+        "site": {
+            "project_name": "lawsnipe",
+            "backup": {"schedule": "0 0 * * *", "retention_days": 30, "passphrase": ""},
+        },
+    }
     ctx = DeployContext.from_request(request)
     assert ctx.app.deploy.branch == "main"
     assert ctx.app.repo_path == "/home/git/lawsnipe.git"
     assert ctx.runtime.web_root == "public"
     assert ctx.runtime.runtime_user == "lawsnipe"
+    assert ctx.backup.configured is False
 
 
 def test_database_services_are_read_and_validated():

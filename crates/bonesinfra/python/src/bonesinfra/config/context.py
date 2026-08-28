@@ -16,6 +16,7 @@ class DeployContext:
     app: AppConfig
     runtime: RuntimeConfig
     services: ServicesConfig
+    backup: BackupConfig
     service_credentials: dict[str, dict[str, Any]] = field(default_factory=dict)
     template: str = "custom"
 
@@ -120,3 +121,20 @@ class RuntimeConfig:
 @dataclass(frozen=True)
 class ServicesConfig:
     services: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class BackupConfig:
+    """Scheduled Borg backup settings from the provisioning request.
+
+    An empty passphrase means backups are unconfigured and provisioning keeps
+    the site's previous behavior.
+    """
+
+    schedule: str
+    retention_days: int
+    passphrase: str
+
+    @property
+    def configured(self) -> bool:
+        return bool(self.passphrase)

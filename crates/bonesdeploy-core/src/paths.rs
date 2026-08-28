@@ -57,6 +57,8 @@ pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
 pub const BONESREMOTE_BINARY: &str = "bonesremote";
 pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
 pub const BONESREMOTE_SITES_DIR: &str = "sites";
+pub const BACKUPS_ROOT: &str = "/var/lib/bonesdeploy/backups";
+pub const BORG_PASSPHRASE_FILE: &str = ".borg_passphrase";
 pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
 pub const IMAGE_STORE_GRAPH_ROOT: &str = "/var/lib/bonesdeploy/image-store";
 pub const IMAGE_STORE_RUN_ROOT: &str = "/run/bonesdeploy/image-store";
@@ -134,6 +136,16 @@ pub fn bonesremote_tmp_builds_root(site: &str) -> PathBuf {
 #[must_use]
 pub fn bonesremote_site_logs(site: &str) -> PathBuf {
     bonesremote_site_root(site).join(LOGS_DIR)
+}
+
+#[must_use]
+pub fn site_backup_repository_path(site: &str) -> PathBuf {
+    Path::new(BACKUPS_ROOT).join(format!("{site}.borg"))
+}
+
+#[must_use]
+pub fn bonesremote_site_passphrase_path(site: &str) -> PathBuf {
+    bonesremote_site_root(site).join(BORG_PASSPHRASE_FILE)
 }
 
 #[must_use]

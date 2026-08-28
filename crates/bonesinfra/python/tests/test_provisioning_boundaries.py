@@ -48,11 +48,12 @@ def test_site_setup_runs_only_site_base_operations(monkeypatch):
     monkeypatch.setattr(site.users, "ensure_users_and_groups", lambda *_: calls.append("identities"))
     monkeypatch.setattr(site.directories, "setup_repo_and_project", lambda *_: calls.append("directories"))
     monkeypatch.setattr(site.placeholder, "seed", lambda *_: calls.append("placeholder"))
+    monkeypatch.setattr(site.backup, "provision", lambda *_: calls.append("backup"))
     monkeypatch.setattr(site.etckeeper, "commit_changes", lambda *_: calls.append("etckeeper-commit"))
 
     site.deploy_site_setup(ctx)
 
-    assert calls == ["identities", "directories", "placeholder", "etckeeper-commit"]
+    assert calls == ["identities", "directories", "placeholder", "backup", "etckeeper-commit"]
 
 
 def test_service_provisioning_records_changes_after_provisioning(monkeypatch):

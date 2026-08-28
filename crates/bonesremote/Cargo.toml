@@ -18,6 +18,10 @@ serde_json = "1.0.150"
 toml = "0.8.23"
 time = { version = "0.3.51", features = ["formatting", "macros"] }
 bonesdeploy-core = { version = "0.8.7", path = "../bonesdeploy-core" }
+borgbackup = "0.10"
+
+[dev-dependencies]
+tempfile = "3.27"
 
 [lints]
 workspace = true

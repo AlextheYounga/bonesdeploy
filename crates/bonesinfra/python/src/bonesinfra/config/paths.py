@@ -83,6 +83,8 @@ BONESDEPLOY_NGINX_DEFAULT_DENY_KEY = "bonesdeploy-default-deny.key"
 BONESREMOTE_CONFIG_DIR = "/root/.config/bonesremote"
 BONESREMOTE_SITES_DIR = "sites"
 BONESREMOTE_SITE_ROOT = f"{BONESREMOTE_CONFIG_DIR}/{BONESREMOTE_SITES_DIR}"
+BACKUPS_ROOT = "/var/lib/bonesdeploy/backups"
+BORG_PASSPHRASE_FILE = ".borg_passphrase"  # noqa: S105 - filename, not a secret
 
 BONESREMOTE_BINARY = "bonesremote"
 
@@ -135,6 +137,9 @@ class DeploymentPaths:
     runtime_php_fpm_socket: str
     site_log_dir: str
     acme_webroot: str
+    backup_repository: str
+    backup_passphrase_file: str
+    backup_cron_file: str
     sudoers_path: str
     usr_local_bin: str
     bonesremote_global_link: str
@@ -201,6 +206,9 @@ class DeploymentPaths:
             runtime_php_fpm_socket=str(runtime_socket_dir / PHP_FPM_SOCKET),
             site_log_dir=f"/var/log/bonesdeploy/{project_name}",
             acme_webroot=f"/var/www/{project_name}",
+            backup_repository=str(Path(BACKUPS_ROOT) / f"{project_name}.borg"),
+            backup_passphrase_file=str(Path(BONESREMOTE_SITE_ROOT) / project_name / BORG_PASSPHRASE_FILE),
+            backup_cron_file=f"/etc/cron.d/bonesdeploy-{project_name}-backup",
             sudoers_path=str(Path(ETC_SUDOERS_D) / "bonesdeploy"),
             usr_local_bin=USR_LOCAL_BIN,
             bonesremote_global_link=str(Path(USR_LOCAL_BIN) / BONESREMOTE_BINARY),

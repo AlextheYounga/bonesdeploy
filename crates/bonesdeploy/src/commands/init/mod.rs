@@ -66,6 +66,7 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     scaffold::update_gitignore()?;
     scaffold::ensure_env_build()?;
     apply_derived_defaults(&mut cfg);
+    bones_config::ensure_backup_passphrase(&mut cfg.backup, Path::new(paths::DOT_ENV))?;
     if !Path::new(paths::DOT_ENV).exists() {
         let framework = secrets::framework_for_secrets(&cfg.runtime.template)?;
         if let Some(content) = framework.environment_example(&cfg.project_name, &cfg.domain) {

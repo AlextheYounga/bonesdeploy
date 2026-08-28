@@ -359,6 +359,32 @@ Update the local and remote binaries:
 bonesdeploy update
 ```
 
+## Scheduled Backups
+
+Projects initialized by BonesDeploy get one encrypted Borg repository per site
+at `/var/lib/bonesdeploy/backups/<site>.borg`. A root-only cron entry runs
+nightly by default (configurable with `BONES_BACKUP_SCHEDULE`, a five-field
+crontab expression) and archives the site's `shared/` directory, then prunes
+archives older than the retention window (`BONES_BACKUP_RETENTION_DAYS`, 30
+days by default).
+
+- The Borg passphrase is generated during `bonesdeploy init` and stored in the
+  gitignored `.env` as `BONES_BORG_PASSPHRASE`; it is provisioned to the server
+  as a root-only file (`0600`) and never appears in logs or command lines.
+- Archives are named `<site>_<YYYYMMDD_HHMMSS>` (UTC) and contain only
+  `shared/`. Releases are reproducible from Git; application runtime secrets
+  live in `shared/.env`, which is included.
+- Output and failures are visible in journald:
+  `journalctl -t bonesdeploy-backup`.
+- There is no manual backup command. Restores use ordinary Borg tooling as root,
+  for example `borg list /var/lib/bonesdeploy/backups/<site>.borg` followed by
+  `borg extract`.
+- Backups live on the deployment server. Copying the repository off-site is
+  your responsibility; automated replication is not included.
+
+Projects initialized before this feature have no passphrase configured and
+keep their previous behavior.
+
 ## Config
 
 `bonesdeploy init` creates a project-root `.env` holding the application's

@@ -7,6 +7,7 @@ use std::ops::{Deref, DerefMut};
 use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 
+use super::backup::Backup;
 use crate::paths;
 
 pub const PROJECT_SETUP_ERROR: &str = "root .env and infra/ are required. Run `bonesdeploy init` first.";
@@ -56,6 +57,7 @@ pub struct Bones {
     pub runtime: Runtime,
     pub services: Services,
     pub build: Build,
+    pub backup: Backup,
 }
 
 impl Bones {
