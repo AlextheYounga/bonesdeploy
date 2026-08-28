@@ -79,7 +79,7 @@ and manage a site.
 Bones
 ├── app: App              # project_name, host, port, branch, domain, ssl, etc.
 │   ├── server             # SSH user, host, port
-│   ├── dns                # domain, preview domain, email, SSL
+│   ├── dns                # domain, email, SSL
 │   └── deploy             # branch, releases keep, repository path
 ├── runtime: Runtime      # template, web root, backend, versions, permissions, extra
 ├── services: Services    # service names (postgres, redis, etc.)
@@ -280,13 +280,14 @@ Declares what artifacts and services a framework owns (manifest) and how to prov
 
 **Framework discovery:**
 `project.py` reads `TEMPLATE` from the root `.env`. It loads the managed package
-from `infra/.framework/` and composes the project-owned package from
-`infra/custom/`. If the materialized packages are absent, it fails clearly.
-Materialization keeps managed framework content separate from custom content.
+from the installed versioned `infra/bonesinfra-*.whl` environment and resolves managed
+templates from `infra/templates/`, then composes the project-owned package from
+`infra/custom/`. Materialization keeps managed framework content separate from
+custom content.
 
 **Extension model:**
 Add a built-in package under `frameworks/<name>/` with the core components above
-and preserve the core/custom materialization contract.
+and include its templates in the project `infra/templates/` snapshot.
 Register the name in `project.py`'s `BUILTIN_FRAMEWORKS` allowlist. Add
 corresponding Rust-side framework module and deployment assets.
 
@@ -483,7 +484,7 @@ Cli::Init
         │    ├─ infra/assets/kit.rs # scaffold deployment functions, .gitignore
         │    ├─ infra/assets/frameworks.rs  # scaffold per-framework .env defaults + scripts
         │    ├─ config.rs::save()   # write the root .env
-        │    └─ bonesinfra::run()   # execute infra/.framework + custom
+        │    └─ bonesinfra::run()   # execute wheel + templates + custom
        ├─ secrets/gpg.rs           # generate GPG key pair
        ├─ secrets/mod.rs           # create default .env.gpg
         └─ infra/git.rs             # inspect application Git remotes
@@ -497,11 +498,13 @@ Cli::Server::Setup
         ├─ bonesinfra::run_with_request(["server", "apply", "--request-stdin", ...], server_request)
          │    └─ Python: cli/commands/server::deploy_server_setup()
         │         ├─ packages.py and disable_algif_aead.py
+        │         ├─ services/linux/etckeeper.py initialize  # idempotent /etc init after packages
         │         ├─ services/linux/image_store.py
         │         ├─ firewall.py, fail2ban.py, unattended_upgrades.py
         │         ├─ users.py          # global deploy user and authorized key
         │         ├─ BonesRemote roots and binary
-        │         └─ sudoers.py        # write /etc/sudoers.d/bonesdeploy
+        │         ├─ sudoers.py        # write /etc/sudoers.d/bonesdeploy
+        │         └─ etckeeper.py commit_changes  # final /etc commit of this flow
         └─ SSH: bonesremote doctor     # host-mode baseline verification
 ```
 
@@ -515,13 +518,18 @@ Cli::Site::Setup
          │    └─ Python: cli/commands/site::deploy_site_setup()
         │         ├─ users.py          # site runtime and build identities
         │         ├─ directories.py    # one bare repo and one site layout
-        │         └─ placeholder.py    # initial current link only
+        │         ├─ placeholder.py    # initial current link only
+        │         └─ etckeeper.py commit_changes  # final /etc commit of this flow
         ├─ bonesinfra::run("services", "apply")
         ├─ bonesinfra::run("runtime", "apply")
         └─ SSH: bonesremote doctor --site <site>
 ```
 
 Site setup does not push Git or secrets, configure SSL, or deploy a release.
+Every mutating BonesInfra flow (server, site, services, runtime, SSL, helpers)
+queues `services/linux/etckeeper.py::commit_changes` as its final operation, so a
+failed flow never commits and a successful flow always records its `/etc`
+changes. Read-only `manifest` and patch flows do not commit.
 
 ### 4.4 `bonesdeploy deploy`
 
@@ -556,7 +564,7 @@ Cli::Doctor
        │    └─ SSH: bonesremote doctor
        │         ├─ doctor/system.rs      # distro, podman
        │         ├─ doctor/apparmor.rs    # AppArmor support
-       │         ├─ doctor/baseline.rs    # server roots, binary, sudoers, image store, hardening
+        │         ├─ doctor/baseline.rs    # server roots, binary, sudoers, image store, hardening, etckeeper
        │         └─ doctor/security/      # deploy identity and privileged paths
         └─ commands/site/doctor.rs::run()
                  ├─ Local checks:
@@ -579,7 +587,7 @@ Cli::Site::Runtime
    └─ commands/site/runtime.rs::run()
        ├─ bonesinfra::run("runtime", "apply", "--config", "...")
        │    └─ Python: project.load_runtime(config)
-        │         └─ loads materialized infra/.framework + custom packages
+        │         └─ loads installed wheel + project templates + custom packages
        │              └─ runtime.deploy(ctx)
        │                   ├─ linux/runtime.setup(ctx)     # AppArmor + nginx router
        │                   ├─ languages/<lang>.install()   # install language runtime
@@ -595,7 +603,7 @@ Cli::Site::Runtime
 
 | Need | Extend / reuse | Existing example | Location |
 |------|---------------|-----------------|----------|
-| Add a web framework | Rust framework contract plus built-in Python package materialized as `infra/.framework` and `infra/custom` | `laravel`, `django` | `crates/bonesdeploy/src/frameworks/` and `crates/bonesinfra/python/src/bonesinfra/frameworks/` |
+| Add a web framework | Rust framework contract plus installed Python wheel, project templates, and `infra/custom` | `laravel`, `django` | `crates/bonesdeploy/src/frameworks/` and `crates/bonesinfra/python/src/bonesinfra/frameworks/` |
 | Add a database service | Python: `services/runtime/<name>.py` + register in `SERVICES` dict | `postgres.py`, `redis.py` | `crates/bonesinfra/python/src/bonesinfra/services/runtime/` |
 | Add a language runtime | Python: `services/languages/<name>.py`, extend `LanguageRuntime` ABC | `php.py`, `python.py` | `crates/bonesinfra/python/src/bonesinfra/services/languages/` |
 | Add a CLI command (bonesdeploy) | Focused handler under the owning command group (`commands/server/<name>.rs`, `commands/site/<name>.rs`, or `commands/<name>.rs`) + variant in `cli/args.rs::Command` | `commands/site/status.rs` | `crates/bonesdeploy/src/commands/` |
@@ -674,7 +682,7 @@ Cli::Site::Runtime
 ### Framework convention
 - Rust owns framework questions, centralized validation, defaults, permission defaults, and build-environment generation.
 - Framework-specific values go through `Runtime.extra` (serde flatten).
-- Python provisioning uses managed `infra/.framework` and project-owned `infra/custom` packages composed together.
+- Python provisioning uses the installed wheel, managed `infra/templates`, and project-owned `infra/custom` packages composed together.
 
 ### Binary communication
 - `bonesdeploy` communicates with `bonesremote` via SSH command execution (not an API).

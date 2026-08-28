@@ -35,7 +35,7 @@ pub fn rollback(site: &str) -> Result<()> {
     }
 
     let previous_name = releases[current_idx - 1].clone();
-    switch_and_verify(&cfg.project_root, &current_name, &previous_name, || service::run(&mutation))?;
+    switch_and_verify(&cfg.project_root, &current_name, &previous_name, || service::run_for_release(&mutation))?;
 
     println!("Rollback complete: {current_name} -> {previous_name}");
     Ok(())

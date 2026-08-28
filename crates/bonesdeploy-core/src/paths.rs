@@ -25,6 +25,7 @@ pub const USR_LOCAL_BIN: &str = "/usr/local/bin";
 pub const OLD_BONES_DIR: &str = ".bones";
 pub const LOCAL_INFRA_DIR: &str = "infra";
 pub const LOCAL_INFRA_DEPLOYMENT_DIR: &str = "infra/deployment";
+pub const LOCAL_INFRA_TEMPLATES_DIR: &str = "infra/templates";
 pub const LOCAL_INFRA_SECRETS_DIR: &str = "infra/secrets";
 pub const DOT_ENV: &str = ".env";
 pub const ENV_BUILD_FILE: &str = ".env.build";
@@ -66,6 +67,7 @@ pub const NGINX_SOCKET: &str = "nginx.sock";
 pub const NGINX_PID: &str = "nginx.pid";
 pub const PHP_FPM_SOCKET: &str = "php-fpm.sock";
 pub const DEFAULT_NGINX_SITE: &str = "default";
+pub const SYSTEMD_TARGET_SUFFIX: &str = ".target";
 pub const SYSTEMD_SERVICE_SUFFIX: &str = ".service";
 
 pub const HOOKS_DIR: &str = "hooks";

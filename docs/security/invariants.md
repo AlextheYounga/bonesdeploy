@@ -189,6 +189,7 @@ Server doctor verifies the reusable baseline before any site is provisioned:
 - the root-owned BonesRemote binary and valid global sudoers policy
 - the shared Podman image-store configuration and seeded base image
 - active UFW and fail2ban protection plus unattended-upgrades configuration
+- the installed etckeeper executable that records `/etc` provisioning changes
 
 Site doctor verifies:
 

@@ -77,7 +77,7 @@ deployment/
     └── 01_prepare.sh
 ```
 
-Python infra scripts and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`) and are embedded into the `bonesdeploy` binary. The complete distribution is materialized into each project's `infra/.framework/`; a project-scoped cached venv holds only dependencies and editable-install metadata. See `crates/bonesinfra/src/lib.rs`.
+Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`). A generated pure-Python wheel is committed as `crates/bonesinfra/assets/bonesinfra-<version>-py3-none-any.whl`, checked against the Python source by `crates/bonesinfra/build.rs`, embedded into the `bonesdeploy` binary, and installed into each project's project-scoped cached venv. Regenerate it with `cargo build-wheel` after Python changes. Managed templates are materialized under `infra/templates/`. See `crates/bonesinfra/src/lib.rs`.
 
 ### Project Environment
 Rust is the sole parser of the project-root `.env`. It models two environments:
@@ -87,7 +87,7 @@ Rust is the sole parser of the project-root `.env`. It models two environments:
 
 Build-only public settings live in the committed `.env.build`. Framework templates declare `NODE_VERSION`; when set, this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository. Provisioning defaults to `24.19.0`.
 
-`[services].services` is selected during init (or with repeated non-interactive `--service` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost and consumes credentials supplied by BonesDeploy in typed requests; it never generates application credentials or writes `shared/.env`. First initialization generates service credentials locally into the encrypted environment (service values override framework defaults), and later additions are made through `bonesdeploy secrets edit`. Redis and Valkey use separate per-project instances on port `6379` by default; provisioning fails when the requested port is occupied rather than selecting another. PostgreSQL, MariaDB, MySQL, and MongoDB use database-scoped accounts. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
+`SERVICES` (in the managed `BONES_*` block, so `BONES_SERVICES`) is selected during init (or with repeated non-interactive `--service` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost and consumes credentials supplied by BonesDeploy in typed requests; it never generates application credentials or writes `shared/.env`. First initialization generates service credentials locally into the encrypted environment (service values override framework defaults), and later additions are made through `bonesdeploy secrets edit`. Redis and Valkey use separate per-project instances on port `6379` by default; provisioning fails when the requested port is occupied rather than selecting another. PostgreSQL, MariaDB, MySQL, and MongoDB use database-scoped accounts. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
 
 Example `.env`:
 ```dotenv
@@ -102,7 +102,6 @@ BONES_HOST=deploy.example.com
 BONES_PORT=22
 BONES_BRANCH=main
 BONES_DOMAIN=app.example.com
-BONES_PREVIEW_DOMAIN=lawsnipe-deploy-example-com.nip.io
 BONES_EMAIL=ops@example.com
 BONES_SSL_ENABLED=false
 BONES_TEMPLATE=next
@@ -196,7 +195,7 @@ bonesdeploy/
 ```
 
 ### Per-Framework Templates
-Framework templates ship starter overlays that `bonesdeploy init` uses when scaffolding a matching framework. BonesDeploy keeps framework defaults and deployment scripts under `crates/bonesdeploy/assets/frameworks/<fw>/`; canonical infrastructure source and templates live in BonesInfra and are materialized into `infra/.framework/`:
+Framework templates ship starter overlays that `bonesdeploy init` uses when scaffolding a matching framework. BonesDeploy keeps framework defaults and deployment scripts under `crates/bonesdeploy/assets/frameworks/<fw>/`; canonical infrastructure templates live in BonesInfra and are materialized into `infra/templates/`:
 
 - `frameworks/laravel/`    → Laravel (PHP + PHP-FPM)
 - `frameworks/django/`     → Django (Python + Gunicorn)
@@ -210,7 +209,7 @@ Django resolves its configured `python_version` minor to a BonesInfra-pinned CPy
 
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
 
-Projects materialize the complete BonesInfra distribution under `infra/.framework/` and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the project-local package and composes its selected framework runtime with custom provisioning; it has no cached-source fallback.
+Projects materialize the BonesInfra wheel and managed templates under `infra/` and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the installed wheel and composes its selected framework runtime with custom provisioning. Updates refresh managed templates wholesale.
 
 Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves (e.g. Next's `out/`). A static site only works if the app is configured to emit that directory: for `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
 
@@ -222,7 +221,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.
   - Prints next-step guidance to run `bonesdeploy server setup --yes` and `bonesdeploy site setup --yes` before first deploy.
   - Saves connection and site inputs to the root `.env`.
-  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/` and the complete BonesInfra distribution into `infra/.framework/`.
+  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/`, the committed versioned BonesInfra wheel as `infra/bonesinfra-<version>-py3-none-any.whl`, and managed templates under `infra/templates/`.
   - `--template <name>` selects a framework template non-interactively. `--framework-var <key=value>` (repeated) overrides template variables; answers are validated against the template's question schema before writing `.env`.
 
 - **doctor**
@@ -231,7 +230,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
    - Site remote checks open a privileged SSH session, synchronize the sanitized control-plane snapshot to `/srv/conf/<site>/bones.json`, then run `bonesremote doctor --site <project>`.
     - `bonesremote doctor --site <project>` requires root and reads the synchronized `/srv/conf/<project>/bones.json` snapshot for runtime backend and branch (missing snapshot is reported as pending with guidance). It checks Podman availability, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo with an exact ref for the configured branch, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. Docker daemon and image checks run only when the synchronized descriptor declares the Docker backend — never inferred from `/run/<site>`. An empty bare repo is reported as pending until the configured branch is pushed.
     - The security audit is read-only and fail-closed. It verifies site identity isolation (unique UIDs/GIDs, no login shells, no cross-site group membership, deploy not in runtime groups), runtime sudo absence, privileged configuration root-control (recursively inspecting systemd, sudoers, nginx, AppArmor, and BonesRemote state plus their parent chains without following symlink targets), and release activation (current must be a valid symlink resolving inside the site's releases directory; active release roots and activation parents must be immutable to the runtime identity). `bonesremote doctor --site <project> --exhaustive` additionally inspects every entry in that active release for permission drift; this can take time on large releases. The exact deploy-user sudoers policy is rendered and validated by `bonesinfra` during provisioning rather than probed with fabricated commands during doctor. POSIX ACLs on protected paths are detected through extended attributes and reported as UNVERIFIED. Supplementary groups are collected through `id -G`. Required evidence that cannot be collected is reported as UNVERIFIED and causes doctor to fail.
-   - Server doctor verifies Debian/Ubuntu, Podman, AppArmor, deploy identity, BonesRemote roots and binary, sudoers, shared image store, firewall, fail2ban, and unattended-upgrades. `--verbose` prints successful remote reports.
+   - Server doctor verifies Debian/Ubuntu, Podman, AppArmor, deploy identity, BonesRemote roots and binary, sudoers, shared image store, firewall, fail2ban, unattended-upgrades, and the etckeeper installation. `--verbose` prints successful remote reports.
 
 - **site manifest**
   - Inspects every project-specific filesystem artifact and managed systemd service expected by the effective framework, service, and SSL strategy. Shared host-wide packages, daemons, and configuration are excluded.
@@ -247,6 +246,8 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 - **server setup**
   - Delegates to `python -m bonesinfra server apply --request-stdin`, feeding a connection-only request (SSH host, user, port) on stdin.
   - Provisions shared packages, hardening, firewall, image store, deploy identity, BonesRemote roots and binary, and sudoers.
+  - Installs etckeeper and initializes `/etc` as a Git-backed etckeeper repository using package defaults.
+  - Every successful mutating BonesInfra provisioning flow (server, site, services, runtime, SSL, helpers) ends with an etckeeper commit of its resulting `/etc` changes; read-only `manifest` and patch flows do not commit.
   - Does not read project runtime, service, framework, DNS, or release settings.
 
 - **site setup**
@@ -266,6 +267,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
    - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra runtime apply --request-stdin` against the configured host as the configured `ssh_user`, feeding the typed site request on stdin.
   - Imports and runs the project's `infra/runtime.py` (local vendored package) or the selected canonical BonesInfra framework package, which installs framework-specific packages and services.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
+  - The public project router is rendered only for a configured real domain. Sites without a domain receive a project-scoped Cloudflare Quick Tunnel (`<project>-cloudflared.service`) proxying to the per-site nginx Unix socket; `bonesdeploy status` reports its ephemeral `trycloudflare.com` preview URL, and real-domain SSL activation removes the tunnel.
   - Does not handle SSL; use `site ssl` for TLS configuration.
 
 - **site services**:

@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# etckeeper honors ETCKEEPER_DIR; tests use it to target a temporary tree.
+RECORD_DIR="${ETCKEEPER_DIR:-/etc}"
+MESSAGE="{{ message }}"
+
+if ! command -v etckeeper >/dev/null 2>&1; then
+    echo "ERROR: etckeeper is not installed; refusing to leave /etc changes unrecorded" >&2
+    exit 1
+fi
+
+# Idempotent: ensures /etc is an initialized etckeeper repository before committing.
+etckeeper init
+
+if [ ! -d "$RECORD_DIR/.git" ]; then
+    echo "ERROR: $RECORD_DIR is not a git-backed etckeeper repository" >&2
+    exit 1
+fi
+
+changes=$(git -C "$RECORD_DIR" status --porcelain)
+if [ -z "$changes" ]; then
+    exit 0
+fi
+
+etckeeper commit "$MESSAGE"

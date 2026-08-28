@@ -1,7 +1,40 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-ASSETS_DIR = Path(__file__).parent.parent / "assets"
+
+class _TemplatePath:
+    def __init__(self, *parts: str):
+        self.parts = parts
+
+    def __truediv__(self, part: str) -> "_TemplatePath":
+        return _TemplatePath(*self.parts, part)
+
+    def _path(self) -> Path:
+        project = Path.cwd() / "infra" / "templates"
+        if project.is_dir():
+            return project.joinpath(*self.parts)
+        package = Path(__file__).parent.parent
+        if self.parts and self.parts[0] == "shared":
+            return package / "assets" / Path(*self.parts[1:])
+        if len(self.parts) > 1 and self.parts[0] == "frameworks":
+            return package / "frameworks" / self.parts[1] / "templates" / Path(*self.parts[2:])
+        return package.joinpath(*self.parts)
+
+    def __fspath__(self) -> str:
+        return str(self._path())
+
+    def __str__(self) -> str:
+        return str(self._path())
+
+    def __eq__(self, other: object) -> bool:
+        return self._path() == other
+
+    def __hash__(self) -> int:
+        return hash(self.parts)
+
+
+TEMPLATES_DIR = _TemplatePath()
+ASSETS_DIR = TEMPLATES_DIR / "shared"
 SCRIPTS_DIR = ASSETS_DIR / "scripts"
 
 DEFAULT_REPO_PARENT = "/home/git"
@@ -90,6 +123,7 @@ class DeploymentPaths:
     nginx_default_deny_ssl_certificate_key: str
     nginx_default_site_enabled: str
     systemd_site_nginx_service: str
+    systemd_cloudflared_service: str
     systemd_site_nginx_requirement: str
     systemd_site_target: str
     systemd_site_target_requires: str
@@ -153,6 +187,7 @@ class DeploymentPaths:
             nginx_default_deny_ssl_certificate_key=str(Path(ETC_SSL_PRIVATE) / BONESDEPLOY_NGINX_DEFAULT_DENY_KEY),
             nginx_default_site_enabled=str(Path(ETC_NGINX_SITES_ENABLED) / DEFAULT_NGINX_SITE),
             systemd_site_nginx_service=str(Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}-nginx.service"),
+            systemd_cloudflared_service=str(Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}-cloudflared.service"),
             systemd_site_nginx_requirement=str(
                 Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}.target.requires/{project_name}-nginx.service"
             ),

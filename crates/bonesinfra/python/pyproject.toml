@@ -26,6 +26,9 @@ bonesinfra = [
     "frameworks/**/*",
 ]
 
+[tool.setuptools.exclude-package-data]
+"*" = ["__pycache__/*", "*.py[cod]"]
+
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",

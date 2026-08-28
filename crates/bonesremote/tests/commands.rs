@@ -2,6 +2,8 @@
 mod deploy_coordinator;
 #[path = "commands/deploy_rollback.rs"]
 mod deploy_rollback;
+#[path = "commands/doctor_baseline.rs"]
+mod doctor_baseline;
 #[path = "commands/doctor_security.rs"]
 mod doctor_security;
 #[path = "commands/doctor_security_collection_filesystem.rs"]
@@ -32,5 +34,7 @@ mod release_prune;
 mod release_recover;
 #[path = "commands/root.rs"]
 mod root;
+#[path = "commands/service.rs"]
+mod service;
 #[path = "commands/status.rs"]
 mod status;

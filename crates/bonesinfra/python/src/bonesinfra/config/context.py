@@ -64,7 +64,6 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
         "paths": paths,
         "ssl_domain": ctx.app.dns.domain,
         "ssl_email": ctx.app.dns.email,
-        "preview_domain": ctx.app.dns.preview_domain,
     }
 
     for key, value in ctx.runtime.data.items():
@@ -100,7 +99,6 @@ class ServerContext:
 @dataclass
 class DnsConfig:
     domain: str
-    preview_domain: str
     email: str
     ssl_enabled: bool
 

@@ -4,11 +4,12 @@ from shlex import quote
 from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import TEMPLATES_DIR
 from bonesinfra.pyinfra.operations import render
 from bonesinfra.services.languages import RUBY
 from bonesinfra.services.linux import application, runtime, shared, validation
 
-TEMPLATES = Path(__file__).parent / "templates"
+TEMPLATES = TEMPLATES_DIR / "frameworks/rails"
 SHARED_DIRECTORIES = ("tmp", "log", "storage")
 BUNDLER_PATH = "vendor/bundle"
 

@@ -1,27 +1,17 @@
-use std::collections::HashSet;
-
-use bonesinfra::embedded_source_paths;
+use anyhow::Result;
+use bonesinfra::{embedded_template_paths, embedded_wheel};
 
 #[test]
-fn distribution_contains_the_python_package_and_install_metadata() {
-    let paths = embedded_source_paths().collect::<HashSet<_>>();
-
-    assert!(paths.contains("pyproject.toml"));
-    assert!(paths.contains("README.md"), "pyproject readme reference must be embedded");
-    assert!(paths.contains("src/bonesinfra/__main__.py"));
-    assert!(paths.contains("src/bonesinfra/project.py"));
+fn distribution_contains_a_portable_wheel() -> Result<()> {
+    let wheel = embedded_wheel()?;
+    assert!(wheel.starts_with(b"PK\x03\x04"));
+    Ok(())
 }
 
 #[test]
-fn distribution_excludes_development_and_derived_trees() {
-    for file_path in embedded_source_paths() {
-        assert!(
-            !file_path.starts_with("docs/")
-                && !file_path.starts_with("tests/")
-                && !file_path.starts_with(".venv/")
-                && !file_path.contains("__pycache__")
-                && !file_path.contains(".egg-info"),
-            "unexpected embedded file: {file_path}"
-        );
-    }
+fn template_inventory_contains_shared_and_framework_assets() {
+    let paths = embedded_template_paths().collect::<Vec<_>>();
+    assert!(paths.iter().any(|path| path == "assets/nginx/index.html.j2"));
+    assert!(paths.iter().any(|path| path == "frameworks/laravel/templates/queue-worker.service.j2"));
+    assert!(!paths.iter().any(|path| path.starts_with("tests/") || path.contains("__pycache__")));
 }

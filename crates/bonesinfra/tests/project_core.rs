@@ -3,25 +3,30 @@ use std::fs;
 use anyhow::Result;
 
 #[test]
-fn materialized_framework_contains_complete_distribution_and_preserves_custom() -> Result<()> {
+fn materialized_artifacts_include_templates_and_preserve_custom() -> Result<()> {
     let project = tempfile::tempdir()?;
-    let framework = bonesinfra::materialize_project_framework(project.path())?;
-    assert!(framework.join("pyproject.toml").is_file());
-    assert!(framework.join("uv.lock").is_file());
-    assert!(framework.join("README.md").is_file());
-    assert!(!framework.join("AGENTS.md").exists());
-    assert!(!framework.join("CONTEXT.md").exists());
-    assert!(framework.join("src/bonesinfra/__main__.py").is_file());
+    bonesinfra::materialize_project_artifacts(project.path())?;
+    let infra = project.path().join("infra");
+    assert!(fs::read_dir(&infra)?.any(|entry| {
+        entry.ok().is_some_and(|entry| {
+            entry.path().file_name().is_some_and(|name| name.to_string_lossy().starts_with("bonesinfra-"))
+                && entry.path().extension().is_some_and(|extension| extension == "whl")
+        })
+    }));
+    assert!(infra.join("templates/shared/nginx/index.html.j2").is_file());
+    assert!(infra.join("templates/frameworks/laravel/queue-worker.service.j2").is_file());
+    assert!(!infra.join(".framework").exists());
 
     let custom = project.path().join("infra/custom/runtime.py");
     let custom_parent = custom.parent().ok_or_else(|| anyhow::anyhow!("custom runtime path has no parent"))?;
     fs::create_dir_all(custom_parent)?;
     fs::write(&custom, "project owned")?;
-    fs::write(framework.join("stale.py"), "stale")?;
+    fs::create_dir_all(infra.join(".framework"))?;
+    fs::write(infra.join(".framework/stale.py"), "stale")?;
 
-    bonesinfra::materialize_project_framework(project.path())?;
+    bonesinfra::materialize_project_artifacts(project.path())?;
 
     assert_eq!(fs::read_to_string(custom)?, "project owned");
-    assert!(!framework.join("stale.py").exists());
+    assert!(!infra.join(".framework").exists());
     Ok(())
 }

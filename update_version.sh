@@ -51,10 +51,8 @@ update_python() {
 	echo "Updating $pyproject_toml package version to $new_python_version"
 	update_package_version "$pyproject_toml" "$new_python_version"
 
-	(
-		cd crates/bonesinfra/python
-		uv lock
-	)
+	uv lock --directory crates/bonesinfra/python
+	cargo build-wheel
 }
 
 update_cargo

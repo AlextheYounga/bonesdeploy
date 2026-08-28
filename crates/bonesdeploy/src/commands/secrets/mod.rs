@@ -54,9 +54,8 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
 
     let env_path = Path::new(paths::DOT_ENV);
     let loaded = config::load_local(env_path)?;
-    let framework_content = framework
-        .environment_example(&effective_config.project_name, &effective_config.domain, &effective_config.preview_domain)
-        .unwrap_or_default();
+    let framework_content =
+        framework.environment_example(&effective_config.project_name, &effective_config.domain).unwrap_or_default();
     let plaintext = environment::prepare(env_path, &framework_content, &effective_config, &loaded)?;
 
     gpg::ensure_installed()?;

@@ -14,7 +14,7 @@ def test_setup_does_not_provision_the_shared_environment(monkeypatch):
         app=SimpleNamespace(
             project_name="atlas",
             deploy=SimpleNamespace(branch="main"),
-            dns=SimpleNamespace(domain="", preview_domain="atlas-192-0-2-1.nip.io", email="", ssl_enabled=False),
+            dns=SimpleNamespace(domain="", email="", ssl_enabled=False),
         ),
         runtime=SimpleNamespace(
             runtime_user="atlas", runtime_group="atlas", backend="native", web_root="public", data={}

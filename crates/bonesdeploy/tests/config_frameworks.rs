@@ -3,7 +3,7 @@ use std::fs;
 use anyhow::{Result, bail};
 use bonesdeploy::config::{Bones, bootstrap_ssh_user, load, write_local_environment};
 use bonesdeploy::frameworks::Framework;
-use bonesdeploy_core::config::{Runtime, RuntimeBackend, apply_derived_defaults};
+use bonesdeploy_core::config::{Runtime, RuntimeBackend};
 use serde_json::{Map, Value, json};
 
 fn sample_config(project_name: &str) -> Bones {
@@ -47,7 +47,6 @@ fn write_local_environment_round_trips_dotenv_values() -> Result<()> {
     let mut config = sample_config("phoenix");
     config.ssl_enabled = true;
     config.domain = String::from("app.example.com");
-    config.preview_domain = String::from("preview.example.com");
     config.email = String::from("ops@example.com");
     config.runtime.template = String::from("next");
     config.runtime.backend = RuntimeBackend::Docker;
@@ -67,7 +66,6 @@ fn write_local_environment_round_trips_dotenv_values() -> Result<()> {
     assert_eq!(loaded.port, "22");
     assert_eq!(loaded.branch, "master");
     assert!(loaded.ssl_enabled);
-    assert_eq!(loaded.preview_domain, "preview.example.com");
     assert_eq!(loaded.runtime.template, "next");
     assert_eq!(loaded.runtime.backend, RuntimeBackend::Docker);
     assert_eq!(loaded.runtime.web_root, "dist");
@@ -82,18 +80,6 @@ fn write_local_environment_writes_flat_local_input_file() -> Result<()> {
     write_local_environment(&sample_config("phoenix"), &path)?;
     assert!(fs::read_to_string(path)?.lines().all(|line| !line.starts_with('[')));
     Ok(())
-}
-
-#[test]
-fn derived_preview_domain_uses_project_and_host_without_overwriting_explicit_value() {
-    let mut config = sample_config("lawsnipe");
-    config.host = String::from("178.0.0.61");
-    apply_derived_defaults(&mut config);
-    assert_eq!(config.preview_domain, "lawsnipe-178-0-0-61.nip.io");
-
-    config.preview_domain = String::from("preview.example.com");
-    apply_derived_defaults(&mut config);
-    assert_eq!(config.preview_domain, "preview.example.com");
 }
 
 #[test]
@@ -112,7 +98,7 @@ fn framework_wire_values_parse_and_display() -> Result<()> {
 fn custom_is_the_empty_framework_fallback() -> Result<()> {
     assert!(Framework::Custom.questions().is_empty());
     assert!(Framework::Custom.validate_answers(&Map::new()).is_ok());
-    assert!(Framework::Custom.environment_example("atlas", "", "").is_none());
+    assert!(Framework::Custom.environment_example("atlas", "").is_none());
     assert!(Framework::Custom.build_environment_example(&Runtime::default()).is_none());
     assert!(Framework::Custom.runtime_defaults()?.is_none());
     Ok(())
@@ -121,17 +107,17 @@ fn custom_is_the_empty_framework_fallback() -> Result<()> {
 #[test]
 fn environment_examples_use_project_name_in_shared_paths() -> Result<()> {
     let laravel = Framework::Laravel
-        .environment_example("atlas", "example.com", "atlas.example.com")
+        .environment_example("atlas", "example.com")
         .ok_or_else(|| anyhow::anyhow!("missing Laravel environment defaults"))?;
     assert!(laravel.contains("/srv/sites/atlas/shared/storage"));
     assert!(laravel.contains("APP_URL=https://example.com"));
     assert!(!laravel.contains("<project>"));
     let django = Framework::Django
-        .environment_example("atlas", "", "atlas.example.com")
+        .environment_example("atlas", "")
         .ok_or_else(|| anyhow::anyhow!("missing Django environment defaults"))?;
     assert!(django.contains("/srv/sites/atlas/shared/database.sqlite"));
     let rails = Framework::Rails
-        .environment_example("atlas", "", "atlas.example.com")
+        .environment_example("atlas", "")
         .ok_or_else(|| anyhow::anyhow!("missing Rails environment defaults"))?;
     assert!(rails.contains("/srv/sites/atlas/shared/storage/production.sqlite3"));
     Ok(())

@@ -1,9 +1,8 @@
-from pathlib import Path
-
+from bonesinfra.config.paths import TEMPLATES_DIR
 from bonesinfra.services.linux import runtime, shared
 from bonesinfra.services.linux.application import deploy_static
 
-TEMPLATES = Path(__file__).parent / "templates"
+TEMPLATES = TEMPLATES_DIR / "frameworks/vue"
 SHARED_DIRECTORIES = ()
 
 

@@ -18,8 +18,8 @@ pub use model::{
     App, BUILD_TIMEOUT_SECONDS_DEFAULT, Bones, Build, DATABASE_SERVICES, LARAVEL_TEMPLATE, PROJECT_SETUP_ERROR,
     RUNTIME_PYTHON_VERSION, RUNTIME_RUBY_VERSION, Runtime, RuntimeBackend, Services, apply_derived_defaults,
     build_group_for, build_timeout_seconds, build_user_for, default_deploy_user, default_node_version,
-    default_preview_domain_for, default_repo_path_for, parse_port, runtime_group_for, runtime_user_for,
-    validate_database_services, validate_host, validate_runtime,
+    default_repo_path_for, parse_port, runtime_group_for, runtime_user_for, validate_database_services, validate_host,
+    validate_runtime,
 };
 pub use transport::{
     KeyValueCredentials, ProvisioningRequest, RemoteDeploymentConfig, ServerConnection, ServiceCredentials,

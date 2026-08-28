@@ -1,6 +1,5 @@
-from pathlib import Path
-
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import TEMPLATES_DIR
 from bonesinfra.pyinfra.operations import render
 from bonesinfra.services.languages import PHP
 from bonesinfra.services.linux import runtime, shared, systemd
@@ -8,7 +7,7 @@ from bonesinfra.services.linux.nginx import site
 
 from . import docker
 
-TEMPLATES = Path(__file__).parent / "templates"
+TEMPLATES = TEMPLATES_DIR / "frameworks/laravel"
 SHARED_DIRECTORIES = ("storage", "storage/framework/views", "cache", "uploads")
 
 

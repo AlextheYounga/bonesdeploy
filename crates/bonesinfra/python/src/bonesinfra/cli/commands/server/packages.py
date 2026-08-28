@@ -24,6 +24,7 @@ BASE_SYSTEM_PACKAGES: list[str] = [
     "unattended-upgrades",
     "certbot",
     "ufw",
+    "etckeeper",
 ]
 
 SUPPLEMENTARY_PACKAGES: list[str] = [

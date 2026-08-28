@@ -1,14 +1,14 @@
-from pathlib import Path
 from shlex import quote
 
 from pyinfra.operations import server
 
 from bonesinfra.config.context import template_data
+from bonesinfra.config.paths import TEMPLATES_DIR
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import NODE
 from bonesinfra.services.linux import application, runtime, shared, validation
 
-TEMPLATES = Path(__file__).parent / "templates"
+TEMPLATES = TEMPLATES_DIR / "frameworks/sveltekit"
 SHARED_DIRECTORIES = ()
 
 

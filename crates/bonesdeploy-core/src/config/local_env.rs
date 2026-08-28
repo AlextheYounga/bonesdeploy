@@ -8,8 +8,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::{Context, Result, bail};
 
 use super::model::{
-    Bones, RuntimeBackend, default_node_version, default_preview_domain_for, default_repo_path_for,
-    validate_database_services, validate_host, validate_runtime,
+    Bones, RuntimeBackend, default_node_version, default_repo_path_for, validate_database_services, validate_host,
+    validate_runtime,
 };
 use crate::paths;
 
@@ -22,7 +22,6 @@ mod keys {
     pub(super) const PORT: &str = "PORT";
     pub(super) const BRANCH: &str = "BRANCH";
     pub(super) const DOMAIN: &str = "DOMAIN";
-    pub(super) const PREVIEW_DOMAIN: &str = "PREVIEW_DOMAIN";
     pub(super) const EMAIL: &str = "EMAIL";
     pub(super) const SSL_ENABLED: &str = "SSL_ENABLED";
     pub(super) const TEMPLATE: &str = "TEMPLATE";
@@ -42,7 +41,6 @@ const MANAGED: &[&str] = &[
     keys::PORT,
     keys::BRANCH,
     keys::DOMAIN,
-    keys::PREVIEW_DOMAIN,
     keys::EMAIL,
     keys::SSL_ENABLED,
     keys::TEMPLATE,
@@ -153,7 +151,6 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
     config.port = values.get(keys::PORT).cloned().unwrap_or_else(|| "22".into());
     config.branch = values.get(keys::BRANCH).cloned().unwrap_or_else(|| "main".into());
     config.domain = values.get(keys::DOMAIN).cloned().unwrap_or_default();
-    config.preview_domain = values.get(keys::PREVIEW_DOMAIN).cloned().unwrap_or_default();
     config.email = values.get(keys::EMAIL).cloned().unwrap_or_default();
     config.ssl_enabled = values.get(keys::SSL_ENABLED).is_some_and(|v| v == "true");
     config.runtime.template = values.get(keys::TEMPLATE).cloned().unwrap_or_default();
@@ -175,9 +172,6 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
     }
     config.repo_path = default_repo_path_for(&project_name);
     config.project_root = paths::default_project_root_for(&project_name);
-    if config.preview_domain.is_empty() {
-        config.preview_domain = default_preview_domain_for(&project_name, &config.host);
-    }
     validate_host(&config.host)?;
     validate_runtime(&config.runtime)?;
     validate_database_services(&config.services.services)?;
@@ -256,7 +250,6 @@ pub fn write_local_environment(config: &Bones, path: &Path) -> Result<()> {
         (keys::PORT, config.port.clone()),
         (keys::BRANCH, config.branch.clone()),
         (keys::DOMAIN, config.domain.clone()),
-        (keys::PREVIEW_DOMAIN, config.preview_domain.clone()),
         (keys::EMAIL, config.email.clone()),
         (keys::SSL_ENABLED, config.ssl_enabled.to_string()),
         (keys::TEMPLATE, config.runtime.template.clone()),
@@ -308,7 +301,6 @@ fn is_project_key(key: &str) -> bool {
             | keys::PORT
             | keys::BRANCH
             | keys::DOMAIN
-            | keys::PREVIEW_DOMAIN
             | keys::EMAIL
             | keys::SSL_ENABLED
             | keys::TEMPLATE

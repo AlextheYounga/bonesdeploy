@@ -98,7 +98,9 @@ def test_mongodb_project_account_is_not_a_cluster_admin(monkeypatch):
     assert call["username"] == "atlas"
     assert call["password"] == "secret"  # noqa: S105
 
-    script = Path(call["src"]).read_text()
+    script = (
+        Path(__file__).parent.parent / "src/bonesinfra/assets/scripts/create-mongodb-project-user.sh.j2"
+    ).read_text()
     assert "updateUser" in script
     assert "process.env.PASSWORD" in script
     assert "--password" not in script

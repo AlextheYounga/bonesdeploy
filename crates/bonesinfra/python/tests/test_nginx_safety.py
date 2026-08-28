@@ -1,3 +1,7 @@
+import os
+import shutil
+import subprocess
+
 from bonesinfra.services.linux.nginx import router as nginx_router
 
 
@@ -13,6 +17,26 @@ def test_validate_config_rejects_conflicting_server_name_warning(monkeypatch):
 
     src = str(calls[0][1]["src"])
     assert "validate-nginx-safety.sh" in src
+
+
+def test_validate_nginx_safety_prints_failure_diagnostics_and_preserves_status(tmp_path):
+    nginx = tmp_path / "nginx"
+    nginx.write_text("#!/usr/bin/env bash\nprintf '%s\\n' 'nginx: invalid configuration' >&2\nexit 7\n")
+    nginx.chmod(0o755)
+    script = nginx_router.ASSETS_DIR / "scripts/validate-nginx-safety.sh"
+    bash = shutil.which("bash")
+    assert bash is not None
+
+    result = subprocess.run(
+        [bash, script],
+        env={**os.environ, "PATH": f"{tmp_path}:{os.environ['PATH']}"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 7
+    assert "nginx: invalid configuration" in result.stdout
 
 
 def test_install_default_deny_server_uses_dedicated_paths_and_disables_debian_default(monkeypatch, tmp_path):

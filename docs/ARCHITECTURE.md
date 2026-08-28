@@ -39,9 +39,10 @@ initialization, root `.env` authoring, SSH/Git/GPG integration, and delegation
 to the other two pieces. It does not execute deployments itself; it either
 provisions via `bonesinfra` or triggers `bonesremote` over SSH.
 
-**`bonesinfra`** — an embedded Python provisioning runtime. Its complete
-distribution is materialized into project `infra/.framework/`; a
-project-scoped venv contains dependencies only. It uses `pyinfra` to provision
+**`bonesinfra`** — an embedded Python provisioning runtime. Its committed pure-
+Python wheel is materialized as `infra/bonesinfra-<version>-py3-none-any.whl`, while managed templates
+are materialized under `infra/templates/`; a project-scoped venv installs the
+wheel and its dependencies. It uses `pyinfra` to provision
 the remote server (users, packages, frameworks, databases, SSL, firewalls) and
 owns *what gets installed* at provisioning time.
 
@@ -60,7 +61,7 @@ owner is canonical. Bypassing it creates a competing abstraction.
 | Deployment configuration | `Bones` (`bonesdeploy-core`), loaded from root `.env` | Extend the canonical config model via `Runtime.extra` | Invent parallel config structs in either binary or Python |
 | Product filesystem layout | `paths` / `DeploymentPaths` | Add path constants here | Scatter path literals in commands, templates, or scripts |
 | Framework-specific config questions | Framework Rust module (`frameworks/<fw>.rs`) | Add sibling module + register in `frameworks.rs` | Inline prompt logic in init command |
-| Framework provisioning | Materialized `infra/.framework` + `infra/custom` packages, loaded by `bonesinfra.project` | Extend managed framework or project-owned custom content | Special-case framework behavior in setup/runtime commands |
+| Framework provisioning | Installed BonesInfra wheel + `infra/templates` + `infra/custom`, loaded by `bonesinfra.project` | Extend managed framework or project-owned custom content | Special-case framework behavior in setup/runtime commands |
 | Language runtime installation | `LanguageRuntime` ABC | Add subclass in `services/languages/` | Install runtimes directly from framework `runtime.py` |
 | Database / server service provisioning | `RuntimeService` ABC + `SERVICE` registry | Add subclass + register in `SERVICE` dict | Put DB provisioning in framework code |
 | Remote site mutation | `SiteMutation` | Acquire it before any site state change | Create independent locking or config-validation paths |
@@ -251,14 +252,14 @@ Rust side (crates/bonesdeploy/src/frameworks/<fw>.rs), selected through
 └── defaults() -> FrameworkDefaults        # web root, language, permissions
 
 Python side (materialized under `infra/`):
-├── .framework/ → managed framework package (`manifest.py`, `runtime.py`, templates/)
-└── custom/     → project-owned package composed after the framework
+├── bonesinfra-*.whl → committed managed runtime package
+├── templates/     → committed managed templates
+└── custom/        → project-owned package composed after the framework
     (`manifest.py`, `runtime.py`)
 
 BonesDeploy owns framework selection, centralized validation, defaults,
 permission defaults, environment generation, and deployment assets. BonesInfra
-owns the managed framework source and materializes it into
-`infra/.framework/`. Project-owned extensions live in
+owns the managed wheel and template snapshot. Project-owned extensions live in
 `infra/custom/` and are composed after the framework package.
 
 The materialized framework/custom packages are used together. Managed framework content is
@@ -273,8 +274,8 @@ To add another:
 2. Add the built-in Python package under bonesinfra/frameworks/<name>/ with
    `__init__.py`, `manifest.py`, `runtime.py`, and templates.
 3. Add deployment assets and `.env.build` defaults under the embedded framework assets.
-4. Add the name to `BUILTIN_FRAMEWORKS` in `project.py` and preserve
-    materialization into `infra/.framework` plus `infra/custom`.
+4. Add the name to `BUILTIN_FRAMEWORKS` in `project.py` and include its templates
+   in the embedded `infra/templates` snapshot.
 
 Canonical example:
 frameworks/laravel/ (both Rust and Python sides)
@@ -548,8 +549,8 @@ candidate preparation must not be described as mutations of the active release.
 
 **Framework contract.** Rust owns framework questions, centralized validation,
 defaults, permission defaults, and build-environment generation. Python
-provisioning uses managed `infra/.framework` and project-owned
-`infra/custom` packages composed together. Framework-specific config
+provisioning uses the installed BonesInfra wheel, managed `infra/templates`, and
+project-owned `infra/custom` packages composed together. Framework-specific config
 goes through `Runtime.extra`.
 
 **Binary communication.** `bonesdeploy` ↔ `bonesremote` via SSH command execution.

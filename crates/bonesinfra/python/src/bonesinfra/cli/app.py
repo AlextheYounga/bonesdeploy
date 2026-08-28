@@ -15,6 +15,9 @@ from bonesinfra.manifest import inspect_for_runner, render
 from bonesinfra.patches import apply_local, apply_remote
 from bonesinfra.project import load_manifest, load_runtime
 from bonesinfra.pyinfra.runner import run
+from bonesinfra.services.linux import etckeeper
+
+RUNTIME_CHANGE_MESSAGE = "BonesInfra runtime provisioning"
 
 app = typer.Typer()
 runtime_app = typer.Typer()
@@ -67,7 +70,7 @@ def runtime_apply_cmd(
     ctx = _read_request(request_stdin)
     _validate_host(ctx)
     project_runtime = load_runtime(ctx)
-    run(ctx=ctx, deploy=project_runtime.deploy)
+    run(ctx=ctx, deploy=etckeeper.commit_changes_after(project_runtime.deploy, RUNTIME_CHANGE_MESSAGE))
 
 
 @server_app.command("apply")

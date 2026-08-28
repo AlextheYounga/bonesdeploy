@@ -48,12 +48,11 @@ And embeds a Python provisioning runtime:
 
 - **`bonesinfra`** — `crates/bonesinfra/python/`, embedded by the Rust `bonesinfra` crate
 
-Each initialized project receives the complete BonesInfra distribution in
-`infra/.framework/`. Commands execute that committed managed framework through a
-project-scoped dependency environment; `infra/custom/` remains
-project-owned and is preserved by updates. The managed framework can be updated
-explicitly, while modified managed files are reported as conflicts instead of
-being silently overwritten.
+Each initialized project receives a committed versioned `infra/bonesinfra-<version>-py3-none-any.whl` and the
+managed templates under `infra/templates/`. Commands execute the wheel through a
+project-scoped dependency environment; `infra/custom/` remains project-owned
+and is preserved by updates. Managed templates are refreshed wholesale by
+`bonesdeploy update`.
 
 ## The Point
 
@@ -170,6 +169,12 @@ Install the remote runner on the server:
 sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
+When building from a checkout, the Rust build verifies that the committed
+`crates/bonesinfra/assets/bonesinfra-<version>-py3-none-any.whl` matches the Python source. If Python
+source has changed, regenerate the wheel with `cargo build-wheel` before
+running `cargo build` or `cargo install --path`. The version script runs this
+command automatically after updating the Python version.
+
 Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy server setup`.
 
 ## Start a Project
@@ -198,7 +203,8 @@ This creates:
 ├── .env.build              # committed, non-secret build inputs
 ├── deployment/             # committed build and prepare scripts
 └── infra/                  # committed project infrastructure
-    ├── .framework/         # BonesDeploy-managed BonesInfra snapshot
+    ├── bonesinfra-*.whl     # committed BonesInfra runtime
+    ├── templates/           # committed managed templates
     ├── custom/             # project-owned provisioning extensions
     └── secrets/             # encrypted project secrets
 ```
@@ -208,10 +214,10 @@ Edit them.
 Commit them.
 Read them when something breaks.
 
-The managed framework is executed when you invoke `bonesdeploy site runtime`.
-The project-owned `infra/custom/` package is composed after the managed
-framework. Edit custom provisioning and local templates as project
-infrastructure; use `bonesdeploy update` to refresh the managed snapshot.
+The managed wheel is executed when you invoke `bonesdeploy site runtime`. The
+project-owned `infra/custom/` package is composed after the managed framework.
+Edit custom provisioning and templates as project infrastructure; use
+`bonesdeploy update` to refresh managed templates.
 
 Deployment scripts run in filename order:
 
@@ -229,6 +235,10 @@ Provision the reusable server baseline:
 bonesdeploy server setup --yes
 ```
 
+The baseline includes etckeeper: `/etc` is tracked in a root-owned Git
+repository with package defaults, and every successful provisioning run ends
+with an etckeeper commit recording its `/etc` changes.
+
 Provision the site, including its base, services, runtime, and doctor:
 
 ```sh
@@ -239,10 +249,16 @@ bonesdeploy site setup --yes
 runtime, and site doctor. It does not push Git or secrets, configure SSL, or
 deploy a release.
 
-This runs the provisioning in your project's `infra/.framework/` package:
+This runs the provisioning from your project's versioned `infra/bonesinfra-*.whl`:
 framework services, per-site nginx, AppArmor, and your `infra/custom/` project
 extensions. Templates rendered by the managed framework come from
-`infra/.framework/src/bonesinfra/frameworks/<name>/templates/`.
+`infra/templates/`.
+
+Sites without a configured domain receive a project-scoped Cloudflare Quick
+Tunnel. `bonesdeploy status` reports its account-less HTTPS
+`trycloudflare.com` preview URL. The URL changes whenever the tunnel restarts;
+Quick Tunnels are for development and review, have no uptime SLA, limit
+concurrent requests, and do not support Server-Sent Events.
 
 After editing the complete remote environment, explicitly publish it before the
 first deploy or whenever it changes:
@@ -265,7 +281,7 @@ Add SSL after DNS points at the server:
 bonesdeploy site ssl --domain app.example.com --email ops@example.com
 ```
 
-SSL is separate on purpose. Get the site working first. Add certificates after DNS is real.
+SSL is separate on purpose. Get the site working first. Add certificates after DNS is real. A real domain uses the existing public Nginx and Certbot path; it replaces the temporary Quick Tunnel only after HTTPS is active.
 
 ## Deploy
 

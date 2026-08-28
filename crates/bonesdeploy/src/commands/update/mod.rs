@@ -48,14 +48,11 @@ pub async fn run(options: Options) -> Result<()> {
         if current_local != release_versions.bonesdeploy {
             println!("{}", style("Updating bonesdeploy").cyan().bold());
             release::update_local_from_crates_io(&release_versions.bonesdeploy)?;
-            if !options.continue_update {
-                return continue_with_installed_binary(options);
-            }
-            updated = true;
+            return continue_with_installed_binary(options);
         }
 
         if Path::new(paths::DOT_ENV).exists() {
-            bonesinfra::materialize_project_framework(Path::new("."))?;
+            bonesinfra::materialize_project_artifacts(Path::new("."))?;
             let cfg = config::load(Path::new(paths::DOT_ENV))?;
             let request = infra::provisioning_request(&cfg)?;
             bonesinfra::run_with_request(

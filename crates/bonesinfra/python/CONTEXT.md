@@ -8,7 +8,7 @@ It is not the public product interface. It is called by `bonesdeploy` to run pyi
 The user should normally never call `bonesinfra` directly, except for dev
 testing. The Rust `bonesinfra` crate embeds this Python tree into the
 `bonesdeploy` binary, materializes the complete distribution into
-`infra/.framework/`, creates a project-scoped dependency virtualenv, and
+`infra/bonesinfra-<version>-py3-none-any.whl`, creates a project-scoped dependency virtualenv, and
 invokes that project-local package with `python -m bonesinfra`.
 
 ______________________________________________________________________
@@ -352,8 +352,8 @@ class DeployContext:
 Typed fields read from the root `.env`:
 
 ```text
-`PROJECT_NAME`, derived repository and project roots, `BRANCH`, `PREVIEW_DOMAIN`,
-`SSL_ENABLED`, `DOMAIN`, and `EMAIL`.
+`PROJECT_NAME`, derived repository and project roots, `BRANCH`, `SSL_ENABLED`,
+`DOMAIN`, and `EMAIL`.
 ```
 
 ## RuntimeConfig
@@ -376,12 +376,10 @@ Plan files receive `ctx` directly as a function parameter.
 
 # Runtime Catalog
 
-The installed runtime catalog no longer exists.
-
 Runtimes are selected by the user-facing Rust CLI during `bonesdeploy init`,
 which writes the chosen values into the root `.env` and scaffolds the project's
-`infra/.framework/` snapshot. BonesInfra then loads that project source at
-provisioning time via `project.load_runtime(env_file)` / `load_manifest(env_file)`.
+wheel and template snapshot. BonesInfra loads the selected installed framework
+module and resolves its managed templates from the project at provisioning time.
 
 Broken project infrastructure surfaces before SSH: missing entrypoints raise
 `FileNotFoundError`, import failures raise `ImportError` with the file path,
@@ -418,7 +416,8 @@ prepares one project after that baseline is ready.
 
 Responsibilities:
 
-- `server apply` installs packages and hardening; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
+- `server apply` installs packages (including etckeeper) and hardening; initializes `/etc` as an etckeeper repository; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
+- Every mutating flow (`server`, `site`, `services`, `runtime`, `ssl`, `helpers`) queues `services/linux/etckeeper.py::commit_changes` as its final operation, so a failed flow never commits and a successful flow always records its `/etc` changes with etckeeper defaults. Read-only `manifest` and patch flows do not commit.
 - `site apply` creates runtime and build identities, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
 - `site apply` creates the shared directory but does not write `shared/.env`; that file is published only by `bonesdeploy secrets push` outside this crate.
 - `site apply` does not install services, configure the framework runtime, configure SSL, push Git or secrets, or deploy.
@@ -491,6 +490,12 @@ verify every required service remains active after restarting, because a
 
 Runtime setup is separate from SSL.
 
+When `app.dns.domain` is empty, runtime setup installs and starts the
+project-scoped `cloudflared` Quick Tunnel service against the per-site Nginx
+Unix socket. The assigned `trycloudflare.com` URL is runtime state read from
+journald and can change after a restart. A real domain instead uses the public
+Nginx router and Certbot; successful SSL activation removes the Quick Tunnel.
+
 ______________________________________________________________________
 
 # SSL Provisioning
@@ -511,23 +516,24 @@ ______________________________________________________________________
 
 # Runtime-Specific Infrastructure
 
-Per-framework logic is maintained canonically in this package and copied into
-each project's `infra/.framework/` snapshot by `bonesdeploy init`. The copied files
-are project-owned snapshots and orchestrate framework services using neutral core
-helpers in `services/`:
+Per-framework logic is maintained canonically in this package and installed from
+the committed wheel. Each project's `infra/templates/` snapshot contains the
+managed template files; those files are project-owned snapshots used by framework
+services through neutral core helpers in `services/`:
 
 - `services/linux/application.py` — `deploy_server` / `deploy_static` building
   blocks shared by generated runtimes (AppArmor, systemd, nginx wiring)
+- `services/linux/etckeeper.py` — `/etc` change recording: idempotent
+  initialization and the final etckeeper commit queued by every mutating flow
 - `services/linux/systemd.py`, `nginx/`, `apparmor/` — service lifecycle,
   per-site nginx, AppArmor profiles
 - `services/linux/runtime_paths.py`, `runtime_logs.py`, `validation.py` — shared
   provisioning helpers
 - `services/languages/` — Python, Node, Ruby, PHP runtime installs
 
-Each generated runtime stays small and reads like a story against those
-primitives. Django, Rails, Node, Vue, etc. all follow the same `deploy(ctx)`
-interface, and each framework's templates live beside it in
-`infra/templates/`.
+Each runtime stays small and reads like a story against those primitives. Django,
+Rails, Node, Vue, etc. all follow the same `deploy(ctx)` interface, and each
+framework's templates live in the project's `infra/templates/`.
 
 ______________________________________________________________________
 

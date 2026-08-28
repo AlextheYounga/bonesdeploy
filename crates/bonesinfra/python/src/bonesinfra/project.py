@@ -31,10 +31,6 @@ def load_manifest(ctx: DeployContext) -> ModuleType:
 
 
 def _load_selected(ctx: DeployContext, filename: str, callable_name: str) -> tuple[ModuleType, ModuleType | None]:
-    core = _framework_path()
-    if not (core / "src/bonesinfra/__main__.py").is_file():
-        raise FileNotFoundError(f"project-local BonesInfra framework does not exist: {core}")
-
     framework = _selected_framework(ctx)
     try:
         module = importlib.import_module(f"bonesinfra.frameworks.{framework}.{filename[:-3]}")
@@ -110,11 +106,7 @@ def _selected_framework(ctx: DeployContext) -> str:
 
 
 def _module_path(module: ModuleType, filename: str) -> Path:
-    return Path(module.__file__) if module.__file__ else _framework_path() / filename
-
-
-def _framework_path() -> Path:
-    return Path.cwd() / "infra" / ".framework"
+    return Path(module.__file__) if module.__file__ else Path.cwd() / "infra" / filename
 
 
 def _custom_path() -> Path:
