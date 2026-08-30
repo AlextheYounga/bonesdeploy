@@ -439,19 +439,16 @@ The current model uses a single per-project identity:
 
 ## Sudoers Contract
 
-The deploy user runs the coordinator directly and can run only typed privileged
-transitions via sudo:
+The deploy user is ingress-only and receives no sudo grants. Every privileged
+`bonesremote` operation runs as root over the operator's own SSH session, so a
+compromised deploy key cannot run commands as root. Git push transports source
+only; deployment is explicitly started by `bonesdeploy deploy` over the
+operator's SSH session.
 
-```
-bonesremote service restart --site *
-bonesremote release rollback --site *
-bonesremote release drop-failed --site *
-bonesremote release prune --site *
-```
-
-No `sudo bonesremote deploy` rule is granted. Git push transports source only;
-deployment is explicitly started by `bonesdeploy deploy` over the `git` SSH
-session.
+If a future change introduces typed privileged transitions for the deploy user,
+each one must be allowlisted in the rendered sudoers drop-in as an exact,
+anchored command regex, and the deploy identity must never receive a general
+`bonesremote` grant.
 
 Source code must be pushed to the configured deployment branch before deploy can succeed. The bare repo's default branch (HEAD) is set via `git symbolic-ref HEAD refs/heads/<branch>` during provisioning.
 

@@ -23,7 +23,7 @@ use crate::release::state::{self, DeploymentLock, DeploymentRecord};
 pub struct SiteMutation {
     site: String,
     config: Bones,
-    _lock: DeploymentLock,
+    _lock: Option<DeploymentLock>,
 }
 
 impl SiteMutation {
@@ -33,7 +33,7 @@ impl SiteMutation {
         config::validate_site_name(site)?;
         let _lock = DeploymentLock::acquire(site)?;
         let config = Bones::for_site(site);
-        Ok(Self::new(site, config, _lock))
+        Ok(Self::new(site, config, Some(_lock)))
     }
 
     /// Acquires the serialization lock and applies a deployment descriptor
@@ -41,16 +41,24 @@ impl SiteMutation {
     pub(crate) fn acquire_with_config(site: &str, config: Bones) -> Result<Self> {
         config::validate_site_name(site)?;
         let _lock = DeploymentLock::acquire(site)?;
-        Ok(Self::new(site, config, _lock))
+        Ok(Self::new(site, config, Some(_lock)))
     }
 
     /// Adopts an already-held lock for cancellation, which must stop a live
     /// deployment process before the lock becomes available.
     pub fn adopt(site: &str, config: Bones, lock: DeploymentLock) -> Self {
-        Self::new(site, config, lock)
+        Self::new(site, config, Some(lock))
     }
 
-    fn new(site: &str, config: Bones, lock: DeploymentLock) -> Self {
+    /// Builds the site context for a root transition invoked by the
+    /// lock-holding coordinator. The transition must not acquire the lock a
+    /// second time because advisory locks are process-scoped.
+    pub(crate) fn for_transition(site: &str, config: Bones) -> Result<Self> {
+        config::validate_site_name(site)?;
+        Ok(Self::new(site, config, None))
+    }
+
+    fn new(site: &str, config: Bones, lock: Option<DeploymentLock>) -> Self {
         Self { site: site.to_string(), config, _lock: lock }
     }
 

@@ -1,16 +1,9 @@
-# Installed by bonesinfra
-#
-# Trust model: this rule assumes a SINGLE OPERATOR owns every project on this
-# host. The shared `deploy_user` account (default: git) is granted passwordless
-# sudo only for the typed transition commands listed below. Any compromise of
-# that account, or of any SSH key authorized for it, can affect every project
-# on the host.
-#
-# This rule is NOT a tenant-isolation boundary. Replacing `*` with literal site
-# names is insufficient while all projects still share the same Unix account and
-# the same authorized_keys file, because a key authenticated as `git` can still
-# target any project's repository path. To support multiple operators or
-# tenants on one host, provision a separate deploy identity (Unix account +
-# authorized_keys) per project, scope each sudoers rule to that identity and a
-# literal site name before relying on the per-site split.
-{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} ^service restart --site [a-z0-9-]+$, {{ bonesremote_path }} ^release rollback --site [a-z0-9-]+$, {{ bonesremote_path }} ^release drop-failed --site [a-z0-9-]+$, {{ bonesremote_path }} ^release prune --site [a-z0-9-]+$
+# Installed by bonesinfra. Requires sudo 1.9.10 or newer for command-line regex support.
+# The deploy identity may run only the coordinator's fixed privileged transitions.
+{{ deploy_user }} ALL=(root) NOPASSWD: \
+  {{ bonesremote_path }} ^config sync --site [a-z0-9-]+ --config-stdin$, \
+  {{ bonesremote_path }} ^deploy-transition begin --site [a-z0-9-]+ --revision [0-9A-Fa-f]{40}$, \
+  {{ bonesremote_path }} ^deploy-transition prepare --site [a-z0-9-]+ --release [0-9]{8}_[0-9]{6}-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}$, \
+  {{ bonesremote_path }} ^deploy-transition commit --site [a-z0-9-]+ --release [0-9]{8}_[0-9]{6}-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}$, \
+  {{ bonesremote_path }} ^deploy-transition complete --site [a-z0-9-]+ --release [0-9]{8}_[0-9]{6}-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}$, \
+  {{ bonesremote_path }} ^deploy-transition abort --site [a-z0-9-]+ --release [0-9]{8}_[0-9]{6}-[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}$

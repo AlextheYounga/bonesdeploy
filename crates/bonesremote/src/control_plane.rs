@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::fs::{self, File};
 use std::io::{ErrorKind, Read, Write, stdin};
 use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::chown;
 use std::path::PathBuf;
 use std::process;
 
@@ -31,9 +32,11 @@ impl Drop for ScopedConfRoot {
 }
 
 fn resolved_conf_root() -> PathBuf {
-    CONF_ROOT_OVERRIDE
-        .with(|slot| slot.borrow().clone())
-        .unwrap_or_else(|| PathBuf::from(paths::DEPLOYMENT_SNAPSHOT_ROOT))
+    CONF_ROOT_OVERRIDE.with(|slot| slot.borrow().clone()).unwrap_or_else(paths::bonesremote_snapshot_root)
+}
+
+fn control_plane_root_is_overridden() -> bool {
+    CONF_ROOT_OVERRIDE.with(|slot| slot.borrow().is_some())
 }
 
 pub fn read_stdin_descriptor() -> Result<RemoteDeploymentConfig> {
@@ -52,6 +55,21 @@ fn validate_descriptor(descriptor: &RemoteDeploymentConfig) -> Result<()> {
     config::validate_runtime(&descriptor.runtime)
 }
 
+fn deploy_group_gid() -> Result<u32> {
+    let group_file = fs::read_to_string(paths::ETC_GROUP)
+        .with_context(|| format!("Failed to read {} while resolving deploy group", paths::ETC_GROUP))?;
+    let group = group_file
+        .lines()
+        .find(|line| line.starts_with(&format!("{}:", paths::DEPLOY_USER)))
+        .context("Deploy group is missing from /etc/group")?;
+    group
+        .split(':')
+        .nth(2)
+        .context("Deploy group is missing a gid")?
+        .parse::<u32>()
+        .context("Deploy group gid is not a valid integer")
+}
+
 #[expect(clippy::panic, reason = "the required PathBuf API cannot return site validation errors")]
 pub fn snapshot_path(site: &str) -> PathBuf {
     if let Err(error) = config::validate_site_name(site) {
@@ -67,6 +85,11 @@ pub fn store(site: &str, descriptor: &RemoteDeploymentConfig) -> Result<()> {
     let parent = path.parent().context("Control-plane snapshot has no parent directory")?;
     fs::create_dir_all(parent)
         .with_context(|| format!("Failed to create control-plane directory {}", parent.display()))?;
+    if !control_plane_root_is_overridden() {
+        chown(parent, None, Some(deploy_group_gid()?)).with_context(|| {
+            format!("Failed to assign deploy group to control-plane directory {}", parent.display())
+        })?;
+    }
     fs::set_permissions(parent, fs::Permissions::from_mode(0o750))
         .with_context(|| format!("Failed to set control-plane directory permissions {}", parent.display()))?;
 
@@ -78,7 +101,11 @@ pub fn store(site: &str, descriptor: &RemoteDeploymentConfig) -> Result<()> {
         file.write_all(content.as_bytes()).with_context(|| format!("Failed to write {}", temp.display()))?;
         file.flush().with_context(|| format!("Failed to flush {}", temp.display()))?;
         file.sync_all().with_context(|| format!("Failed to sync {}", temp.display()))?;
-        fs::set_permissions(&temp, fs::Permissions::from_mode(0o644))
+        if !control_plane_root_is_overridden() {
+            chown(&temp, None, Some(deploy_group_gid()?))
+                .with_context(|| format!("Failed to assign deploy group to {}", temp.display()))?;
+        }
+        fs::set_permissions(&temp, fs::Permissions::from_mode(0o640))
             .with_context(|| format!("Failed to set permissions on {}", temp.display()))?;
     }
     fs::rename(&temp, &path).with_context(|| format!("Failed to install {}", path.display()))?;
@@ -142,12 +169,12 @@ mod tests {
     }
 
     #[test]
-    fn stored_snapshot_is_mode_0644_when_created_and_replaced() -> Result<()> {
+    fn stored_snapshot_is_mode_0640_when_created_and_replaced() -> Result<()> {
         let root = root("mode");
         let _scope = override_control_plane_root(root.clone());
         store("atlas", &descriptor("main", RuntimeBackend::Native))?;
         store("atlas", &descriptor("next", RuntimeBackend::Native))?;
-        assert_eq!(fs::metadata(snapshot_path("atlas"))?.permissions().mode() & 0o777, 0o644);
+        assert_eq!(fs::metadata(snapshot_path("atlas"))?.permissions().mode() & 0o777, 0o640);
         fs::remove_dir_all(root)?;
         Ok(())
     }

@@ -1,6 +1,6 @@
 use std::cell::RefCell;
-use std::fs;
 use std::fs::{File, OpenOptions, TryLockError};
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::PathBuf;
 use std::thread_local;
 
@@ -21,29 +21,43 @@ pub use releases::{
 pub use store::quarantine_candidates;
 
 thread_local! {
-    static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+    static STATE_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
+    static LOCK_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
 }
 
-/// Overrides the state root for the current thread until the returned scope is dropped.
+/// Overrides both state and lock roots for the current thread until dropped.
+///
+/// Tests use one temporary root for both domains; production always uses their
+/// separate root-owned directories.
 pub fn override_sites_root(root: PathBuf) -> ScopedSitesRoot {
-    let prev = SITES_ROOT_OVERRIDE.with(|slot| slot.replace(Some(root)));
-    ScopedSitesRoot(prev)
+    let previous_state = STATE_ROOT_OVERRIDE.with(|slot| slot.replace(Some(root.clone())));
+    let previous_lock = LOCK_ROOT_OVERRIDE.with(|slot| slot.replace(Some(root)));
+    ScopedSitesRoot { previous_state, previous_lock }
 }
 
 #[must_use = "the scope must be retained for the root override to remain active"]
-pub struct ScopedSitesRoot(Option<PathBuf>);
+pub struct ScopedSitesRoot {
+    previous_state: Option<PathBuf>,
+    previous_lock: Option<PathBuf>,
+}
 
 impl Drop for ScopedSitesRoot {
     fn drop(&mut self) {
-        let previous = self.0.take();
-        SITES_ROOT_OVERRIDE.with(|slot| {
-            slot.replace(previous);
+        STATE_ROOT_OVERRIDE.with(|slot| {
+            slot.replace(self.previous_state.take());
+        });
+        LOCK_ROOT_OVERRIDE.with(|slot| {
+            slot.replace(self.previous_lock.take());
         });
     }
 }
 
 pub fn resolved_sites_root() -> PathBuf {
-    SITES_ROOT_OVERRIDE.with(|slot| slot.borrow().clone()).unwrap_or_else(paths::bonesremote_sites_root)
+    STATE_ROOT_OVERRIDE.with(|slot| slot.borrow().clone()).unwrap_or_else(paths::bonesremote_state_root)
+}
+
+pub fn resolved_lock_root() -> PathBuf {
+    LOCK_ROOT_OVERRIDE.with(|slot| slot.borrow().clone()).unwrap_or_else(paths::bonesremote_lock_root)
 }
 
 pub fn resolved_site_root(site: &str) -> PathBuf {
@@ -54,13 +68,8 @@ pub fn recovery_dir(site: &str) -> PathBuf {
     resolved_site_root(site).join(paths::RECOVERY_DIR)
 }
 
-fn deployment_lock_path(site: &str) -> PathBuf {
-    let root = if SITES_ROOT_OVERRIDE.with(|slot| slot.borrow().is_some()) {
-        resolved_sites_root()
-    } else {
-        paths::bonesremote_lock_root()
-    };
-    root.join(format!(".{site}.{}", paths::DEPLOYMENT_LOCK_FILE))
+pub fn deployment_lock_path(site: &str) -> PathBuf {
+    resolved_lock_root().join(format!(".{site}.{}", paths::DEPLOYMENT_LOCK_FILE))
 }
 
 pub struct DeploymentLock(File);
@@ -68,18 +77,20 @@ pub struct DeploymentLock(File);
 impl DeploymentLock {
     pub fn acquire(site: &str) -> Result<Self> {
         let path = deployment_lock_path(site);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create deployment state directory {}", parent.display()))?;
+        let file = OpenOptions::new().read(true).custom_flags(libc::O_NOFOLLOW).open(&path).with_context(|| {
+            format!("Failed to open deployment lock {}. Run 'bonesdeploy site setup' to provision it.", path.display())
+        })?;
+        let metadata =
+            file.metadata().with_context(|| format!("Failed to inspect deployment lock {}", path.display()))?;
+        if !metadata.file_type().is_file() {
+            bail!("Deployment lock {} is not a regular file", path.display());
         }
-
-        let file = OpenOptions::new()
-            .create(true)
-            .read(true)
-            .write(true)
-            .truncate(false)
-            .open(&path)
-            .with_context(|| format!("Failed to open deployment lock {}", path.display()))?;
+        if metadata.permissions().mode() & 0o022 != 0 {
+            bail!("Deployment lock {} must not be group or world writable", path.display());
+        }
+        if unsafe { libc::geteuid() } == 0 && metadata.uid() != 0 {
+            bail!("Deployment lock {} must be owned by root", path.display());
+        }
         match file.try_lock() {
             Ok(()) => Ok(Self(file)),
             Err(TryLockError::WouldBlock) => {

@@ -27,6 +27,11 @@ pub enum Command {
         #[arg(long)]
         revision: Option<String>,
     },
+    /// Privileged deployment transitions used only by the git coordinator
+    DeployTransition {
+        #[command(subcommand)]
+        command: DeployTransitionCommand,
+    },
     /// Synchronize the sanitized site configuration snapshot
     Config {
         #[command(subcommand)]
@@ -69,6 +74,40 @@ pub enum ConfigCommand {
         site: String,
         #[arg(long, required = true)]
         config_stdin: bool,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum DeployTransitionCommand {
+    Begin {
+        #[arg(long)]
+        site: String,
+        #[arg(long)]
+        revision: String,
+    },
+    Prepare {
+        #[arg(long)]
+        site: String,
+        #[arg(long)]
+        release: String,
+    },
+    Commit {
+        #[arg(long)]
+        site: String,
+        #[arg(long)]
+        release: String,
+    },
+    Complete {
+        #[arg(long)]
+        site: String,
+        #[arg(long)]
+        release: String,
+    },
+    Abort {
+        #[arg(long)]
+        site: String,
+        #[arg(long)]
+        release: String,
     },
 }
 

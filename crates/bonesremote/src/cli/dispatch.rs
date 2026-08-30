@@ -1,6 +1,8 @@
 use anyhow::Result;
 
-use crate::cli::args::{BackupCommand, Cli, Command, ConfigCommand, ReleaseCommand, RuntimeCommand, ServiceCommand};
+use crate::cli::args::{
+    BackupCommand, Cli, Command, ConfigCommand, DeployTransitionCommand, ReleaseCommand, RuntimeCommand, ServiceCommand,
+};
 use crate::commands::{backup, config, deploy, doctor, drop_failed_release, release, service, status, version};
 use crate::release::SiteMutation;
 use crate::runtime::docker;
@@ -9,6 +11,13 @@ pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Doctor { site, exhaustive } => doctor::run(site.as_deref(), *exhaustive),
         Command::Deploy { site, revision } => deploy::run_full(site, revision.as_deref()),
+        Command::DeployTransition { command } => match command {
+            DeployTransitionCommand::Begin { site, revision } => deploy::transitions::begin(site, revision),
+            DeployTransitionCommand::Prepare { site, release } => deploy::transitions::prepare(site, release),
+            DeployTransitionCommand::Commit { site, release } => deploy::transitions::commit(site, release),
+            DeployTransitionCommand::Complete { site, release } => deploy::transitions::complete(site, release),
+            DeployTransitionCommand::Abort { site, release } => deploy::transitions::abort(site, release),
+        },
         Command::Config { command: ConfigCommand::Sync { site, config_stdin } } => config::sync(site, *config_stdin),
         Command::Status { site } => status::run(site),
         Command::Release { command } => match command {

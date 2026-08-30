@@ -35,7 +35,7 @@ Everything below is what "trusted" actually commits to. Linux can give you hard,
 5.  No shared Unix identity owns data belonging to multiple sites.
 ```
 
-Three identities, not two and not five. The `git` user owns the bare repo and runs the deployment coordinator. The `<site>` runtime user owns `shared/`, writable paths, and `/run/<site>` and mutates runtime state. `root` owns system units, config dirs, users, and sealed releases, and provisions or mediates typed transitions. The runtime user is dedicated per project — not `www-data`, not a shared `applications` user. One project, one user. Isolation is enforced by the kernel, not by your discipline.
+Three identities, not two and not five. The `git` user owns the bare repo and is ingress only. The `<site>` runtime user owns `shared/`, writable paths, and `/run/<site>` and mutates runtime state. `root` owns system units, config dirs, users, and sealed releases, and provisions, deploys, and restarts. The runtime user is dedicated per project — not `www-data`, not a shared `applications` user. One project, one user. Isolation is enforced by the kernel, not by your discipline.
 
 ## Filesystem
 
@@ -55,7 +55,7 @@ Three identities, not two and not five. The `git` user owns the bare repo and ru
     logs, deployment descriptors, or the control-plane snapshot.
 ```
 
-Permissions are a provisioning-time contract, not a deployment-time repair. The ownership layout is established by `bonesdeploy server setup` and site setup, and never rewritten by deploy commands. If you find yourself wanting to `chmod` during a deploy, you are fixing the wrong thing — fix the provisioning. `shared/` is owned by the runtime user; only the app writes there. The release namespace is root-controlled; a privileged transition creates one candidate for the coordinator, and the candidate is sealed as `root:<site>` before activation.
+Permissions are a provisioning-time contract, not a deployment-time repair. The ownership layout is established by `bonesdeploy server setup` and site setup, and never rewritten by deploy commands. If you find yourself wanting to `chmod` during a deploy, you are fixing the wrong thing — fix the provisioning. `shared/` is owned by the runtime user; only the app writes there. `releases/` is owned by the runtime user while prepare runs, then sealed as `root:<site>` before activation. The setgid bit on `releases/` lets the runtime group inherit read access without a post-deploy `chown`.
 
 No shared groups with `660`/`770` everywhere — that pattern is a tangle of logic traps. No ACLs — they're opaque and unreadable. Ordinary Unix ownership, every time.
 
@@ -181,7 +181,7 @@ If a mutation can be delayed safely, it is delayed. If a mutation affects live s
 
 ## Service restart
 
-`bonesremote service restart` restarts `<project>.target`, which restarts every registered site service. It is a typed privileged transition, not a general root shell. `bonesinfra` owns site service membership. `bonesremote` restarts exactly `<project>.target` for deploy and rollback — nothing more, nothing less.
+`bonesremote service restart` restarts `<project>.target`, which restarts every registered site service. It is the only `bonesremote` command that needs root. `bonesinfra` owns site service membership. `bonesremote` restarts exactly `<project>.target` for deploy and rollback — nothing more, nothing less.
 
 ## Doctor: the fail-closed audit
 

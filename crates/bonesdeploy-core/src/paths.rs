@@ -4,7 +4,6 @@ use std::path::{Path, PathBuf};
 pub const DEFAULT_REPO_PARENT: &str = "/home/git";
 pub const DEFAULT_PROJECT_ROOT_PARENT: &str = "/srv/sites";
 pub const DEFAULT_CONF_ROOT_PARENT: &str = "/srv/conf";
-pub const DEPLOYMENT_SNAPSHOT_ROOT: &str = "/var/lib/bonesdeploy/config";
 pub const DEFAULT_WEB_ROOT: &str = "public";
 
 pub const DEPLOY_USER: &str = "git";
@@ -58,8 +57,9 @@ pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
 pub const BONESREMOTE_BINARY: &str = "bonesremote";
 pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
 pub const BONESREMOTE_SITES_DIR: &str = "sites";
-pub const BONESREMOTE_STATE_DIR: &str = "/var/lib/bonesdeploy/state";
-pub const BONESREMOTE_LOCK_DIR: &str = "/var/lib/bonesdeploy/locks";
+pub const BONESDEPLOY_STATE_ROOT: &str = "/var/lib/bonesdeploy/state";
+pub const BONESDEPLOY_LOCK_ROOT: &str = "/var/lib/bonesdeploy/locks";
+pub const DEPLOYMENT_SNAPSHOT_ROOT: &str = "/var/lib/bonesdeploy/config";
 pub const BACKUPS_ROOT: &str = "/var/lib/bonesdeploy/backups";
 pub const BORG_PASSPHRASE_FILE: &str = ".borg_passphrase";
 pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
@@ -117,28 +117,48 @@ pub fn site_target_name(project_name: &str) -> String {
 }
 
 #[must_use]
-pub fn bonesremote_sites_root() -> PathBuf {
-    PathBuf::from(BONESREMOTE_STATE_DIR)
+pub fn bonesremote_secrets_root() -> PathBuf {
+    bonesremote_config_root().join(BONESREMOTE_SITES_DIR)
 }
 
 #[must_use]
-pub fn bonesremote_site_root(site: &str) -> PathBuf {
-    bonesremote_sites_root().join(site)
+pub fn bonesremote_secret_site_root(site: &str) -> PathBuf {
+    bonesremote_secrets_root().join(site)
 }
 
 #[must_use]
-pub fn bonesremote_staged_release_path(site: &str) -> PathBuf {
-    bonesremote_site_root(site).join(STAGED_RELEASE_FILE)
+pub fn bonesremote_state_root() -> PathBuf {
+    PathBuf::from(BONESDEPLOY_STATE_ROOT)
 }
 
 #[must_use]
-pub fn bonesremote_tmp_builds_root(site: &str) -> PathBuf {
-    bonesremote_site_root(site).join(TMP_BUILDS_DIR)
+pub fn bonesremote_state_site_root(site: &str) -> PathBuf {
+    bonesremote_state_root().join(site)
+}
+
+#[must_use]
+pub fn bonesremote_lock_root() -> PathBuf {
+    PathBuf::from(BONESDEPLOY_LOCK_ROOT)
+}
+
+#[must_use]
+pub fn bonesremote_deployment_lock_path(site: &str) -> PathBuf {
+    bonesremote_lock_root().join(format!(".{site}.{DEPLOYMENT_LOCK_FILE}"))
+}
+
+#[must_use]
+pub fn bonesremote_snapshot_root() -> PathBuf {
+    PathBuf::from(DEPLOYMENT_SNAPSHOT_ROOT)
+}
+
+#[must_use]
+pub fn bonesremote_snapshot_path(site: &str) -> PathBuf {
+    bonesremote_snapshot_root().join(site).join("bones.json")
 }
 
 #[must_use]
 pub fn bonesremote_site_logs(site: &str) -> PathBuf {
-    bonesremote_site_root(site).join(LOGS_DIR)
+    bonesremote_secret_site_root(site).join(LOGS_DIR)
 }
 
 #[must_use]
@@ -148,7 +168,7 @@ pub fn site_backup_repository_path(site: &str) -> PathBuf {
 
 #[must_use]
 pub fn bonesremote_site_passphrase_path(site: &str) -> PathBuf {
-    bonesremote_site_root(site).join(BORG_PASSPHRASE_FILE)
+    bonesremote_secret_site_root(site).join(BORG_PASSPHRASE_FILE)
 }
 
 #[must_use]
@@ -159,22 +179,6 @@ pub fn bonesdeploy_user_home(user: &str) -> PathBuf {
 #[must_use]
 pub fn bonesdeploy_user_cache(user: &str) -> PathBuf {
     bonesdeploy_user_home(user).join(BUILD_CACHE_DIR)
-}
-
-#[must_use]
-pub fn bonesremote_sites_root_resolved() -> PathBuf {
-    if let Some(root) = env::var_os("BONESREMOTE_SITES_ROOT") {
-        let raw = root.to_string_lossy().to_string();
-        if !raw.trim().is_empty() {
-            return PathBuf::from(raw);
-        }
-    }
-    bonesremote_sites_root()
-}
-
-#[must_use]
-pub fn bonesremote_lock_root() -> PathBuf {
-    PathBuf::from(BONESREMOTE_LOCK_DIR)
 }
 
 #[must_use]

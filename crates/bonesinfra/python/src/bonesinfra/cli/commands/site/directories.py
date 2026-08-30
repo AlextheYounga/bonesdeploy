@@ -13,18 +13,35 @@ def _user_env_command(user, command):
 
 
 def setup_repo_and_project(ctx, paths):
+    lock_path = quote(paths["lock_path"])
     mkdir(
-        name="Ensure private BonesRemote state directory exists",
+        name="Ensure control-plane site state directory exists",
+        path=paths["site_root"],
+        user="root",
+        group="root",
+        mode="0700",
+    )
+    mkdir(
+        name="Ensure coordinator state directory exists",
         path=paths["state_root"],
         user=DEPLOY_USER,
         group=DEPLOY_USER,
         mode="0700",
     )
-
+    mkdir(
+        name="Ensure deployment snapshot directory exists",
+        path=paths["snapshot_root"],
+        user="root",
+        group=DEPLOY_USER,
+        mode="0750",
+    )
     server.shell(
-        name="Ensure root-owned deployment lock exists",
-        commands=[f"install -o root -g {quote(DEPLOY_USER)} -m 0660 /dev/null {quote(paths['lock_path'])}"],
-        _sudo=True,
+        name="Ensure stable deployment lock exists",
+        commands=[
+            f"if [ -L {lock_path} ] || {{ [ -e {lock_path} ] && [ ! -f {lock_path} ]; }}; then exit 1; fi; "
+            f"if [ ! -e {lock_path} ]; then install -o root -g {DEPLOY_USER} -m 0640 /dev/null {lock_path}; "
+            f"else chown root:{DEPLOY_USER} {lock_path} && chmod 0640 {lock_path}; fi"
+        ],
     )
 
     mkdir(
@@ -61,6 +78,13 @@ def setup_repo_and_project(ctx, paths):
         user="root",
         group="root",
         mode="0751",
+    )
+    mkdir(
+        name="Ensure git-owned build workspace exists",
+        path=paths["tmp_builds_root"],
+        user=DEPLOY_USER,
+        group=DEPLOY_USER,
+        mode="0700",
     )
 
     mkdir(

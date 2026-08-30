@@ -5,7 +5,7 @@
 BonesDeploy is a remote release deployment tool for simple Debian/Ubuntu Linux servers. It produces two Rust binaries:
 
 - **`bonesdeploy`** — local CLI for setup, provisioning, deployment, and management. Runs on the developer's workstation.
-- **`bonesremote`** — server-side release lifecycle coordinator. Runs as `git`; root is reached only through exact, typed privileged transitions.
+- **`bonesremote`** — server-side release lifecycle executor. Runs as root on the deployment host and is the sole mutator of per-site deployment state.
 
 A third component, **`bonesinfra`**, is an embedded Python provisioning runtime (pyinfra-based) that handles server bootstrap, framework-specific provisioning, database services, SSL, and infrastructure migrations. It is compiled into the `bonesdeploy` binary via `rust-embed` and materialized on demand into a Python venv under `~/.cache/bonesdeploy/bonesinfra`.
 
@@ -717,9 +717,10 @@ Older versions stored deployment state in separate files (`active-deployment.jso
 ### Cross-layer configuration and integration side doors
 Rust (`bonesdeploy-core`) is the sole parser of the root `.env`. Python and
 remote consumers receive typed JSON requests on stdin: BonesInfra commands take
-`--request-stdin` bodies, and BonesRemote deploy/doctor/config sync take the
-`RemoteDeploymentConfig` descriptor through `--config-stdin`. The sanitized
-control-plane copy lives at `/srv/conf/<site>/bones.json`.
+`--request-stdin` bodies, and `bonesremote config sync` receives the
+`RemoteDeploymentConfig` descriptor through `--config-stdin`; `bonesremote
+deploy` and `bonesremote doctor` load the sanitized control-plane copy from
+`/srv/conf/<site>/bones.json`.
 
 ### Framework and deployment boundaries
 Framework identity, defaults, and assets are selected through the Rust framework

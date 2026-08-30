@@ -46,10 +46,10 @@ wheel and its dependencies. It uses `pyinfra` to provision
 the remote server (users, packages, frameworks, databases, SSL, firewalls) and
 owns *what gets installed* at provisioning time.
 
-**`bonesremote`** — the server-side binary whose deploy coordinator runs as
-`git`. It owns release coordination and delegates root-controlled staging,
-sealing, activation, rollback, and pruning to typed privileged transitions. It
-never calls `bonesinfra`.
+**`bonesremote`** — the server-side binary that runs as root on the deployment
+host. Owns the release lifecycle: staging, building, promoting, sealing,
+activating, rolling back, pruning. It is the sole mutator of per-site deployment
+state. It never calls `bonesinfra`.
 
 ## 2. Responsibility / Ownership Map
 
@@ -602,9 +602,10 @@ and deletes the old files. The migration is one-way.
 
 **Cross-layer configuration and integration side doors.** Rust is the sole
 parser of the root `.env`; Python provisioning consumes typed JSON requests on
-stdin (`--request-stdin`), and the remote deployment lifecycle consumes the
-`RemoteDeploymentConfig` descriptor through the established `--config-stdin`
-protocol, so the two layers share one schema defined in `bonesdeploy-core`.
+stdin (`--request-stdin`), `bonesremote config sync` receives the
+`RemoteDeploymentConfig` descriptor through `--config-stdin`, and deploy/doctor
+load the sanitized snapshot from `/srv/conf/<site>/bones.json`, so the layers
+share one schema defined in `bonesdeploy-core`.
 
 **Framework and deployment side doors.** Framework identity, defaults, and
 assets cross Rust and Python boundaries, while release commands can reach state

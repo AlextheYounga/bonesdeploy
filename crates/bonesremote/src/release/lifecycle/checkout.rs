@@ -2,21 +2,17 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::paths;
 
 use crate::git;
-use crate::privileges;
 
 fn resolved_tmp_root(site: &str) -> PathBuf {
     PathBuf::from(paths::default_project_root_for(site)).join(paths::TMP_BUILDS_DIR)
 }
 
 pub fn run(snapshot: &super::DeploymentSnapshot, context_dir: &Path) -> Result<()> {
-    privileges::ensure_root("bonesremote release checkout")?;
-
     let archive_output = git::archive(&snapshot.repo_path, &snapshot.revision)?;
     let mut archive = archive_output.as_slice();
 
@@ -50,13 +46,13 @@ pub fn run(snapshot: &super::DeploymentSnapshot, context_dir: &Path) -> Result<(
     Ok(())
 }
 
-pub fn ensure_build_context(snapshot: &super::DeploymentSnapshot) -> Result<PathBuf> {
+pub fn ensure_build_context(snapshot: &super::DeploymentSnapshot, release: &str) -> Result<PathBuf> {
     let root = resolved_tmp_root(&snapshot.site);
-    fs::create_dir_all(&root).with_context(|| format!("Failed to create tmp builds root: {}", root.display()))?;
-
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());
-    let context = root.join(format!("build-{}-{nanos}", snapshot.site));
-    fs::create_dir_all(&context).with_context(|| format!("Failed to create build context {}", context.display()))?;
+    if !root.is_dir() {
+        bail!("Build workspace {} is missing. Run 'bonesdeploy site setup' to provision it.", root.display());
+    }
+    let context = root.join(format!("build-{release}"));
+    fs::create_dir(&context).with_context(|| format!("Failed to create build context {}", context.display()))?;
     Ok(context)
 }
 
@@ -64,9 +60,6 @@ pub fn cleanup_build_context(site: &str, context: &Path) -> Result<()> {
     if context.exists() {
         fs::remove_dir_all(context).with_context(|| format!("Failed to remove build context {}", context.display()))?;
     }
-    let root = if let Some(parent) = context.parent() { parent.to_path_buf() } else { resolved_tmp_root(site) };
-    if root.exists() && fs::read_dir(&root)?.next().is_none() {
-        fs::remove_dir(&root).ok();
-    }
+    let _ = site;
     Ok(())
 }

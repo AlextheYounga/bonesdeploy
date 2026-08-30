@@ -13,11 +13,14 @@ const ETCKEEPER_BIN: &str = "/usr/bin/etckeeper";
 
 pub(super) fn check(issues: &mut Vec<String>) {
     check_root_directory(paths::BONESREMOTE_CONFIG_DIR, issues);
-    check_root_directory(&paths::bonesremote_sites_root().display().to_string(), issues);
+    check_root_directory(&paths::bonesremote_secrets_root().display().to_string(), issues);
     check_root_directory(paths::IMAGE_STORE_GRAPH_ROOT, issues);
     check_root_directory(paths::IMAGE_STORE_RUN_ROOT, issues);
     check_root_executable(&paths::bonesremote_global_link(), issues);
     check_root_file(paths::SUDOERS_PATH, issues);
+    check_coordinator_root(&paths::bonesremote_state_root(), issues);
+    check_coordinator_root(&paths::bonesremote_lock_root(), issues);
+    check_coordinator_root(&paths::bonesremote_snapshot_root(), issues);
     check_sudoers_syntax(issues);
     check_root_file(paths::IMAGE_STORE_STORAGE_CONF, issues);
     check_seeded_image(issues);
@@ -26,6 +29,23 @@ pub(super) fn check(issues: &mut Vec<String>) {
     check_root_file(APT_AUTO_UPGRADES, issues);
     check_root_file(APT_UNATTENDED_UPGRADES, issues);
     check_etckeeper_executable(Path::new(ETCKEEPER_BIN), issues);
+}
+
+fn check_coordinator_root(path: &Path, issues: &mut Vec<String>) {
+    let metadata = match fs::symlink_metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) => {
+            issues.push(format!("coordinator root {} is missing or inaccessible ({error})", path.display()));
+            return;
+        }
+    };
+    if !metadata.file_type().is_dir()
+        || metadata.file_type().is_symlink()
+        || metadata.uid() != 0
+        || metadata.mode() & 0o022 != 0
+    {
+        issues.push(format!("coordinator root {} must be a root-owned, non-group-writable directory", path.display()));
+    }
 }
 
 fn check_root_directory(path: &str, issues: &mut Vec<String>) {

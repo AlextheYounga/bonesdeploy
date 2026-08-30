@@ -8,10 +8,10 @@ from bonesinfra.cli.commands.server import (
 from bonesinfra.cli.commands.server.packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
 from bonesinfra.config.context import ServerContext
 from bonesinfra.config.paths import (
+    BONESDEPLOY_LOCK_ROOT,
+    BONESDEPLOY_STATE_ROOT,
     BONESREMOTE_CONFIG_DIR,
-    BONESREMOTE_LOCK_ROOT,
     BONESREMOTE_SITE_ROOT,
-    BONESREMOTE_STATE_ROOT,
     DEPLOYMENT_SNAPSHOT_ROOT,
 )
 from bonesinfra.pyinfra.operations import mkdir
@@ -43,31 +43,22 @@ def _ensure_bonesremote_roots():
         group="root",
         mode="0700",
     )
+    for name, path in (
+        ("deployment state", BONESDEPLOY_STATE_ROOT),
+        ("deployment lock", BONESDEPLOY_LOCK_ROOT),
+        ("deployment snapshot", DEPLOYMENT_SNAPSHOT_ROOT),
+    ):
+        mkdir(
+            name=f"Ensure {name} root exists",
+            path=path,
+            user="root",
+            group="git",
+            mode="0750",
+        )
     mkdir(
         name="Ensure BonesRemote sites root exists",
         path=BONESREMOTE_SITE_ROOT,
         user="root",
         group="root",
         mode="0700",
-    )
-    mkdir(
-        name="Ensure BonesRemote deployment state root exists",
-        path=BONESREMOTE_STATE_ROOT,
-        user="git",
-        group="git",
-        mode="0700",
-    )
-    mkdir(
-        name="Ensure deployment snapshot root exists",
-        path=DEPLOYMENT_SNAPSHOT_ROOT,
-        user="root",
-        group="git",
-        mode="0750",
-    )
-    mkdir(
-        name="Ensure BonesRemote deployment lock root exists",
-        path=BONESREMOTE_LOCK_ROOT,
-        user="root",
-        group="git",
-        mode="0770",
     )

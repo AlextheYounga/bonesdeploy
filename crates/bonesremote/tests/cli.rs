@@ -27,9 +27,13 @@ fn config_sync_requires_config_stdin() -> Result<()> {
 }
 
 #[test]
-fn deploy_accepts_a_site_without_a_config_descriptor() -> Result<()> {
+fn deploy_is_an_unprivileged_coordinator_without_a_config_descriptor() -> Result<()> {
     let output = common::run(&["deploy", "--site", "atlas"])?;
     assert_ne!(output.status.code(), Some(2), "deploy must not require config stdin");
+    assert!(
+        !String::from_utf8_lossy(&output.stderr).contains("must be run as root"),
+        "deploy must not require root; privileged transitions use sudo separately"
+    );
     Ok(())
 }
 

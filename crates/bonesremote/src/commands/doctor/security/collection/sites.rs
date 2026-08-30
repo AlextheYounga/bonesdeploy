@@ -10,7 +10,7 @@ use crate::commands::doctor::security::types::{Account, Site};
 use super::accounts::collect_identity_groups;
 
 pub(crate) fn collect_sites(accounts: &BTreeMap<String, Account>) -> Result<Vec<Site>, String> {
-    let root = paths::bonesremote_sites_root();
+    let root = paths::bonesremote_secrets_root();
     let entries = match fs::read_dir(&root) {
         Ok(entries) => entries,
         Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),

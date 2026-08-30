@@ -27,7 +27,7 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
         }
     };
 
-    if !paths::bonesremote_site_root(site).is_dir() {
+    if !paths::bonesremote_secret_site_root(site).is_dir() {
         pending.push(format!("first deployment is pending for {site}"));
         return;
     }

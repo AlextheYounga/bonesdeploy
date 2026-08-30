@@ -1,5 +1,5 @@
 use std::fs;
-use std::os::unix::fs::chown;
+use std::os::unix::fs::lchown;
 use std::path::Path;
 
 use anyhow::{Context, Result};
@@ -12,13 +12,14 @@ pub fn chown_tree_to_user(path: &Path, user: &str, group: &str) -> Result<()> {
 }
 
 fn chown_tree(path: &Path, uid: u32, gid: u32) -> Result<()> {
-    chown(path, Some(uid), Some(gid)).with_context(|| format!("Failed to chown {}", path.display()))?;
-
-    if fs::symlink_metadata(path)
+    let metadata = fs::symlink_metadata(path)
         .with_context(|| format!("Failed to inspect {} for chown", path.display()))?
-        .file_type()
-        .is_dir()
-    {
+        .file_type();
+    // Repository source may contain symlinks. lchown changes the link itself,
+    // never a target outside the exported workspace.
+    lchown(path, Some(uid), Some(gid)).with_context(|| format!("Failed to chown {}", path.display()))?;
+
+    if metadata.is_dir() {
         for entry in fs::read_dir(path).with_context(|| format!("Failed to read {} for chown", path.display()))? {
             let entry = entry?;
             chown_tree(&entry.path(), uid, gid)?;

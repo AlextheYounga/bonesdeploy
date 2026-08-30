@@ -19,6 +19,12 @@ const MAX_RELEASE_NAME_ATTEMPTS: u32 = 10;
 static RANDOM_FALLBACK_SEQUENCE: AtomicU32 = AtomicU32::new(0);
 
 pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Result<()> {
+    let release_name = create_candidate(snapshot)?;
+    mutation.set_staged_release(&release_name)?;
+    Ok(())
+}
+
+pub fn create_candidate(snapshot: &super::DeploymentSnapshot) -> Result<String> {
     privileges::ensure_root("bonesremote release stage")?;
 
     let project_root = &snapshot.project_root;
@@ -27,11 +33,7 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
     require_dir(&snapshot.project_root.join(paths::SHARED_DIR), "shared")?;
 
     let release_name = create_unique_release_dir(&snapshot.project_root.to_string_lossy(), &snapshot.revision)?;
-
-    mutation.set_staged_release(&release_name)?;
-
-    println!("Staged release: {release_name}");
-    Ok(())
+    Ok(release_name)
 }
 
 fn require_dir(path: &Path, label: &str) -> Result<()> {

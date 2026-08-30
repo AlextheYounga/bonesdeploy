@@ -9,6 +9,13 @@ from bonesinfra.pyinfra.operations import render
 
 def install():
     sudoers_path = f"{ETC_SUDOERS_D}/bonesdeploy"
+    server.shell(
+        name="Require sudo command regex support",
+        commands=[
+            "version=$(sudo -V | cut -d' ' -f3) && dpkg --compare-versions \"$version\" ge 1.9.10"
+        ],
+        _sudo=True,
+    )
     render(
         "Install BonesDeploy sudoers drop-in",
         ASSETS_DIR / "sudoers/bonesdeploy.j2",
