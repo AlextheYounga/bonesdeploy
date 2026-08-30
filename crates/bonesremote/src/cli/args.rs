@@ -26,9 +26,6 @@ pub enum Command {
         /// Exact revision to deploy (defaults to the configured branch)
         #[arg(long)]
         revision: Option<String>,
-        /// Read the deployment config descriptor as JSON from stdin
-        #[arg(long)]
-        config_stdin: bool,
     },
     /// Synchronize the sanitized site configuration snapshot
     Config {

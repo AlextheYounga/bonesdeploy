@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 pub const DEFAULT_REPO_PARENT: &str = "/home/git";
 pub const DEFAULT_PROJECT_ROOT_PARENT: &str = "/srv/sites";
 pub const DEFAULT_CONF_ROOT_PARENT: &str = "/srv/conf";
+pub const DEPLOYMENT_SNAPSHOT_ROOT: &str = "/var/lib/bonesdeploy/config";
 pub const DEFAULT_WEB_ROOT: &str = "public";
 
 pub const DEPLOY_USER: &str = "git";
@@ -57,6 +58,8 @@ pub const BONESDEPLOY_BINARY: &str = "bonesdeploy";
 pub const BONESREMOTE_BINARY: &str = "bonesremote";
 pub const BONESREMOTE_CONFIG_DIR: &str = "/root/.config/bonesremote";
 pub const BONESREMOTE_SITES_DIR: &str = "sites";
+pub const BONESREMOTE_STATE_DIR: &str = "/var/lib/bonesdeploy/state";
+pub const BONESREMOTE_LOCK_DIR: &str = "/var/lib/bonesdeploy/locks";
 pub const BACKUPS_ROOT: &str = "/var/lib/bonesdeploy/backups";
 pub const BORG_PASSPHRASE_FILE: &str = ".borg_passphrase";
 pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
@@ -115,7 +118,7 @@ pub fn site_target_name(project_name: &str) -> String {
 
 #[must_use]
 pub fn bonesremote_sites_root() -> PathBuf {
-    bonesremote_config_root().join(BONESREMOTE_SITES_DIR)
+    PathBuf::from(BONESREMOTE_STATE_DIR)
 }
 
 #[must_use]
@@ -167,6 +170,11 @@ pub fn bonesremote_sites_root_resolved() -> PathBuf {
         }
     }
     bonesremote_sites_root()
+}
+
+#[must_use]
+pub fn bonesremote_lock_root() -> PathBuf {
+    PathBuf::from(BONESREMOTE_LOCK_DIR)
 }
 
 #[must_use]

@@ -52,6 +52,7 @@ MONGODB_CONFIG = "/etc/mongod.conf"
 MONGODB_ADMIN_ENV = "/root/.config/bonesinfra/mongodb-admin.env"
 DEFAULT_PROJECT_ROOT_PARENT = "/srv/sites"
 DEFAULT_CONF_ROOT_PARENT = "/srv/conf"
+DEPLOYMENT_SNAPSHOT_ROOT = "/var/lib/bonesdeploy/config"
 DEFAULT_WEB_ROOT = "public"
 PYTHON_ROOT = "/opt/bonesdeploy/python"
 
@@ -83,6 +84,8 @@ BONESDEPLOY_NGINX_DEFAULT_DENY_KEY = "bonesdeploy-default-deny.key"
 BONESREMOTE_CONFIG_DIR = "/root/.config/bonesremote"
 BONESREMOTE_SITES_DIR = "sites"
 BONESREMOTE_SITE_ROOT = f"{BONESREMOTE_CONFIG_DIR}/{BONESREMOTE_SITES_DIR}"
+BONESREMOTE_STATE_ROOT = "/var/lib/bonesdeploy/state"
+BONESREMOTE_LOCK_ROOT = "/var/lib/bonesdeploy/locks"
 BACKUPS_ROOT = "/var/lib/bonesdeploy/backups"
 BORG_PASSPHRASE_FILE = ".borg_passphrase"  # noqa: S105 - filename, not a secret
 
@@ -106,6 +109,9 @@ class DeploymentPaths:
     repo_head: str
     site_nginx_config: str
     site_root: str
+    state_root: str
+    lock_path: str
+    snapshot_root: str
     conf_root: str
     project_root: str
     project_root_parent: str
@@ -171,6 +177,9 @@ class DeploymentPaths:
             repo_head=str(repo / GIT_HEAD),
             site_nginx_config=str(conf_root / NGINX_CONF),
             site_root=str(Path(BONESREMOTE_SITE_ROOT) / project_name),
+            state_root=str(Path(BONESREMOTE_STATE_ROOT) / project_name),
+            lock_path=str(Path(BONESREMOTE_LOCK_ROOT) / f".{project_name}.deployment.lock"),
+            snapshot_root=str(Path(DEPLOYMENT_SNAPSHOT_ROOT) / project_name),
             conf_root=str(conf_root),
             project_root=project_root,
             project_root_parent=_parent_or_default(project_root, DEFAULT_PROJECT_ROOT_PARENT),

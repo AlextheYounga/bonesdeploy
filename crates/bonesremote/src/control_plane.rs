@@ -33,7 +33,7 @@ impl Drop for ScopedConfRoot {
 fn resolved_conf_root() -> PathBuf {
     CONF_ROOT_OVERRIDE
         .with(|slot| slot.borrow().clone())
-        .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_CONF_ROOT_PARENT))
+        .unwrap_or_else(|| PathBuf::from(paths::DEPLOYMENT_SNAPSHOT_ROOT))
 }
 
 pub fn read_stdin_descriptor() -> Result<RemoteDeploymentConfig> {
@@ -67,7 +67,7 @@ pub fn store(site: &str, descriptor: &RemoteDeploymentConfig) -> Result<()> {
     let parent = path.parent().context("Control-plane snapshot has no parent directory")?;
     fs::create_dir_all(parent)
         .with_context(|| format!("Failed to create control-plane directory {}", parent.display()))?;
-    fs::set_permissions(parent, fs::Permissions::from_mode(0o755))
+    fs::set_permissions(parent, fs::Permissions::from_mode(0o750))
         .with_context(|| format!("Failed to set control-plane directory permissions {}", parent.display()))?;
 
     let mut content = serde_json::to_string_pretty(descriptor).context("Failed to serialize control-plane snapshot")?;

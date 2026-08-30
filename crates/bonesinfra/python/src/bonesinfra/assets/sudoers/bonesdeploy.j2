@@ -2,9 +2,9 @@
 #
 # Trust model: this rule assumes a SINGLE OPERATOR owns every project on this
 # host. The shared `deploy_user` account (default: git) is granted passwordless
-# sudo to invoke bonesremote for any site via `--site *`. Any compromise of that
-# account, or of any SSH key authorized for it, can restart, roll back, prune,
-# or manage releases for every project on the host.
+# sudo only for the typed transition commands listed below. Any compromise of
+# that account, or of any SSH key authorized for it, can affect every project
+# on the host.
 #
 # This rule is NOT a tenant-isolation boundary. Replacing `*` with literal site
 # names is insufficient while all projects still share the same Unix account and

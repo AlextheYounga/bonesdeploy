@@ -25,3 +25,17 @@ fn config_sync_requires_config_stdin() -> Result<()> {
     assert!(String::from_utf8_lossy(&output.stderr).contains("--config-stdin"));
     Ok(())
 }
+
+#[test]
+fn deploy_accepts_a_site_without_a_config_descriptor() -> Result<()> {
+    let output = common::run(&["deploy", "--site", "atlas"])?;
+    assert_ne!(output.status.code(), Some(2), "deploy must not require config stdin");
+    Ok(())
+}
+
+#[test]
+fn deploy_rejects_the_removed_config_stdin_option() -> Result<()> {
+    let output = common::run(&["deploy", "--site", "atlas", "--config-stdin"])?;
+    assert_eq!(output.status.code(), Some(2));
+    Ok(())
+}

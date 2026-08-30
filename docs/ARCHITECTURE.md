@@ -46,10 +46,10 @@ wheel and its dependencies. It uses `pyinfra` to provision
 the remote server (users, packages, frameworks, databases, SSL, firewalls) and
 owns *what gets installed* at provisioning time.
 
-**`bonesremote`** — the server-side binary that runs as root on the deployment
-host. Owns the release lifecycle: staging, building, promoting, sealing,
-activating, rolling back, pruning. It is the sole mutator of per-site deployment
-state. It never calls `bonesinfra`.
+**`bonesremote`** — the server-side binary whose deploy coordinator runs as
+`git`. It owns release coordination and delegates root-controlled staging,
+sealing, activation, rollback, and pruning to typed privileged transitions. It
+never calls `bonesinfra`.
 
 ## 2. Responsibility / Ownership Map
 

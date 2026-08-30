@@ -5,7 +5,7 @@
 BonesDeploy is a remote release deployment tool for simple Debian/Ubuntu Linux servers. It produces two Rust binaries:
 
 - **`bonesdeploy`** — local CLI for setup, provisioning, deployment, and management. Runs on the developer's workstation.
-- **`bonesremote`** — server-side release lifecycle executor. Runs as root on the deployment host and is the sole mutator of per-site deployment state.
+- **`bonesremote`** — server-side release lifecycle coordinator. Runs as `git`; root is reached only through exact, typed privileged transitions.
 
 A third component, **`bonesinfra`**, is an embedded Python provisioning runtime (pyinfra-based) that handles server bootstrap, framework-specific provisioning, database services, SSL, and infrastructure migrations. It is compiled into the `bonesdeploy` binary via `rust-embed` and materialized on demand into a Python venv under `~/.cache/bonesdeploy/bonesinfra`.
 

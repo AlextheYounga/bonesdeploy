@@ -23,6 +23,8 @@ def test_setup_does_not_provision_the_shared_environment(monkeypatch):
     )
     paths = {
         "site_root": "/root/.config/bonesremote/sites/atlas",
+        "state_root": "/var/lib/bonesdeploy/state/atlas",
+        "lock_path": "/var/lib/bonesdeploy/locks/.atlas.deployment.lock",
         "repo_parent": "/home/git",
         "repo": "/home/git/atlas.git",
         "project_root_parent": "/srv/sites",
@@ -35,10 +37,10 @@ def test_setup_does_not_provision_the_shared_environment(monkeypatch):
     directories.setup_repo_and_project(ctx, paths)
 
     assert created[0] == {
-        "name": "Ensure control-plane site state directory exists",
-        "path": "/root/.config/bonesremote/sites/atlas",
-        "user": "root",
-        "group": "root",
+        "name": "Ensure private BonesRemote state directory exists",
+        "path": "/var/lib/bonesdeploy/state/atlas",
+        "user": "git",
+        "group": "git",
         "mode": "0700",
     }
     assert script_calls == []
