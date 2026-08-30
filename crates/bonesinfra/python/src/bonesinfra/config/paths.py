@@ -62,6 +62,7 @@ ETC_APPARMOR_D = "/etc/apparmor.d"
 ETC_SSL_CERTS = "/etc/ssl/certs"
 ETC_SSL_PRIVATE = "/etc/ssl/private"
 ETC_SUDOERS_D = "/etc/sudoers.d"
+ETC_SSH_SSHD_CONFIG_D = "/etc/ssh/sshd_config.d"
 
 RUNTIME_SOCKET_PARENT = "/run"
 NGINX_CONF = "nginx.conf"

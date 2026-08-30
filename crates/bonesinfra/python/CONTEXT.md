@@ -44,6 +44,7 @@ BonesInfra owns:
 - pyinfra API integration
 - server baseline and site base provisioning
 - setup disables and unloads `algif_aead` to prevent Copy Fail (CVE-2026-31431) exploitation
+- setup disables SSH password login for root with a validated `/etc/ssh/sshd_config.d/99-bonesdeploy-root-login.conf` drop-in (`PermitRootLogin prohibit-password`); key-based root login keeps working
 - runtime provisioning
 - SSL provisioning
 - loading and running the project's `infra/` infrastructure
@@ -417,7 +418,7 @@ prepares one project after that baseline is ready.
 
 Responsibilities:
 
-- `server apply` installs packages (including etckeeper) and hardening; initializes `/etc` as an etckeeper repository; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
+- `server apply` installs packages (including etckeeper) and hardening; disables SSH password login for root; initializes `/etc` as an etckeeper repository; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
 - Every mutating flow (`server`, `site`, `services`, `runtime`, `ssl`, `helpers`) queues `services/linux/etckeeper.py::commit_changes` as its final operation, so a failed flow never commits and a successful flow always records its `/etc` changes with etckeeper defaults. Read-only `manifest` and patch flows do not commit.
 - `site apply` creates runtime and build identities, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
 - `site apply` creates the shared directory but does not write `shared/.env`; that file is published only by `bonesdeploy secrets push` outside this crate.

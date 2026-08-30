@@ -253,7 +253,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 
 - **server setup**
   - Delegates to `python -m bonesinfra server apply --request-stdin`, feeding a connection-only request (SSH host, user, port) on stdin.
-  - Provisions shared packages, hardening, firewall, image store, deploy identity, BonesRemote roots and binary, and sudoers.
+  - Provisions shared packages, hardening (including an sshd drop-in that disables password login for root), firewall, image store, deploy identity, BonesRemote roots and binary, and sudoers.
   - Installs etckeeper and initializes `/etc` as a Git-backed etckeeper repository using package defaults.
   - Every successful mutating BonesInfra provisioning flow (server, site, services, runtime, SSL, helpers) ends with an etckeeper commit of its resulting `/etc` changes; read-only `manifest` and patch flows do not commit.
   - Does not read project runtime, service, framework, DNS, or release settings.

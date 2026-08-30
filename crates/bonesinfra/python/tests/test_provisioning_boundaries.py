@@ -17,6 +17,7 @@ def test_server_setup_runs_only_server_operations(monkeypatch):
     monkeypatch.setattr(server.fail2ban, "configure", lambda *_: calls.append("fail2ban"))
     monkeypatch.setattr(server.unattended_upgrades, "configure", lambda: calls.append("upgrades"))
     monkeypatch.setattr(server.users, "ensure_deploy_user", lambda *_: calls.append("deploy-user"))
+    monkeypatch.setattr(server.sshd, "disable_root_password_login", lambda: calls.append("root-login-hardening"))
     monkeypatch.setattr(server, "_ensure_bonesremote_roots", lambda: calls.append("bonesremote-roots"))
     monkeypatch.setattr(server.bonesremote, "install", lambda *_: calls.append("bonesremote"))
     monkeypatch.setattr(server.sudoers, "install", lambda: calls.append("sudoers"))
@@ -35,6 +36,7 @@ def test_server_setup_runs_only_server_operations(monkeypatch):
         "fail2ban",
         "upgrades",
         "deploy-user",
+        "root-login-hardening",
         "bonesremote-roots",
         "bonesremote",
         "sudoers",

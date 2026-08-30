@@ -2,6 +2,7 @@ from bonesinfra.cli.commands.server import (
     bonesremote,
     disable_algif_aead,
     packages,
+    sshd,
     sudoers,
     users,
 )
@@ -23,6 +24,7 @@ def deploy_server_setup(ctx: ServerContext, bonesremote_version: str):
     fail2ban.configure(ctx)
     unattended_upgrades.configure()
     users.ensure_deploy_user(ctx)
+    sshd.disable_root_password_login()
     _ensure_bonesremote_roots()
     bonesremote.install(bonesremote_version)
     sudoers.install()
