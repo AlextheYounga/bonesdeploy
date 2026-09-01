@@ -1,52 +1,67 @@
-# Git-Owned Deployments
+# Git Deployment SSH Entry Point
 
 ## Request
 
-Run deployments as the `git` deploy identity instead of root. Root must only
-mediate narrowly defined, validated privileged transitions.
+Run `bonesdeploy deploy` through the `git` SSH identity instead of opening a
+root SSH session. Permit `git` to invoke only the exact BonesRemote commands
+required for deployment through passwordless, non-interactive sudo.
 
 ## Problem
 
-The local deploy command currently opens a privileged SSH session, passes a
-configuration directly to `bonesremote deploy`, and the remote deployment
-command rejects non-root callers. Lifecycle state is also stored below root's
-configuration directory. This violates the project's separation between the
-deploy identity, runtime identity, and provisioning identity.
+The deployment command currently connects to the server as the configured
+privileged SSH user, normally root. This gives routine deployments a root SSH
+entry point even though the server already has a dedicated `git` deploy
+identity and BonesRemote already constrains deployment behavior.
 
 ## Definitions
 
-**Deploy coordinator:** The `bonesremote deploy` process running as `git`. It
-loads the synchronized site snapshot, exports source, and coordinates lifecycle
-operations.
+**Deployment SSH identity:** The Unix account used by `bonesdeploy deploy` to
+open the remote SSH session. For this change it is `git`.
 
-**Privileged transition:** A small `bonesremote` operation authorized through
-exact sudoers rules. It derives paths and identities from a validated site and
-release name and never executes repository code as root.
+**Privileged deployment command:** One complete BonesRemote command executed as
+root through `sudo -n`: configuration sync or the existing full deployment
+lifecycle.
 
-**Control-plane snapshot:** The sanitized `RemoteDeploymentConfig` persisted by
-the root-only config-sync command and read by the deploy coordinator.
+**Deployment lifecycle:** The existing `bonesremote deploy` implementation,
+including its current state, lock, release ownership, activation, rollback, and
+cleanup behavior. This change does not split or replace that lifecycle.
 
 ## Desired outcome
 
-`bonesdeploy deploy` connects as `git`, synchronizes the snapshot through an
-exact root-only command, and runs `bonesremote deploy --site <site>` without
-sudo. The coordinator and deployment state are git-owned; release namespaces
-remain root-controlled; repository scripts run only as their designated build
-or runtime users.
+`bonesdeploy deploy` connects as `git`, runs the exact configuration-sync and
+deployment commands through `sudo -n`, and never opens a root SSH session.
+BonesRemote continues to execute the existing deployment lifecycle as root,
+while build scripts continue to run as `<site>-build` and prepare scripts
+continue to run as `<site>`.
 
 ## Scope
 
-This change covers deployment entrypoints, remote state and locking, privileged
-release transitions, sudoers, provisioning, tests, and related documentation.
+This change covers the deploy SSH entry point, the two direct sudo command
+invocations, the sudoers policy, denial tests, and documentation of the
+resulting security boundary.
 
 ## Constraints
 
-- Validate every site and release identifier at trust boundaries.
-- Keep one lock across deploy, rollback, cancellation, recovery, and backup.
-- Root must never execute repository-provided scripts.
-- Preserve the shared `git` identity's documented single-operator limitation.
-- Do not run E2E tests locally.
+- Config sync always reads its descriptor from stdin and writes the
+  site-derived `/srv/conf/<site>/bones.json` snapshot; deploy always loads that
+  snapshot.
+- Sudoers permits only direct config sync and deploy commands with one validated
+  site argument. It denies arbitrary BonesRemote subcommands, optional extra
+  arguments, reordered arguments, and trailing arguments.
+- The deployment host requires sudo 1.9.10 or newer for anchored argument
+  regular expressions.
+- Deployment state, locks, backup credentials, control-plane snapshots, release
+  ownership, and lifecycle sequencing remain unchanged.
+- Build scripts run only as `<site>-build`.
+- Prepare scripts run only as `<site>`.
+- Repository-provided scripts never execute as root.
+- The shared `git` identity retains its documented single-operator limitation.
+- E2E coverage may be added but is not run locally.
 
 ## Exclusions
 
-Changing root password-login policy is a separate server-hardening change.
+- Splitting the deployment lifecycle into privileged transition subcommands.
+- Moving deployment state, locks, snapshots, or backup credentials.
+- Changing root password-login policy or other server-hardening settings.
+- Changing rollback, cancellation, recovery, backup, or release-management SSH
+  entry points.

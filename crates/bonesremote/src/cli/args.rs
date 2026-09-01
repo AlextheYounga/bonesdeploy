@@ -63,12 +63,10 @@ pub enum Command {
 
 #[derive(Subcommand)]
 pub enum ConfigCommand {
-    /// Install a site configuration snapshot from stdin
+    /// Install a site configuration snapshot read from stdin
     Sync {
         #[arg(long)]
         site: String,
-        #[arg(long, required = true)]
-        config_stdin: bool,
     },
 }
 

@@ -5,7 +5,7 @@
 BonesDeploy is a remote release deployment tool for simple Debian/Ubuntu Linux servers. It produces two Rust binaries:
 
 - **`bonesdeploy`** — local CLI for setup, provisioning, deployment, and management. Runs on the developer's workstation.
-- **`bonesremote`** — server-side release lifecycle coordinator. Runs as `git`; root is reached only through exact, typed privileged transitions.
+- **`bonesremote`** — server-side release lifecycle executor. The deployment SSH session belongs to `git`, which may run only exact config-sync and deploy command forms through sudo; the existing lifecycle executes as root.
 
 A third component, **`bonesinfra`**, is an embedded Python provisioning runtime (pyinfra-based) that handles server bootstrap, framework-specific provisioning, database services, SSL, and infrastructure migrations. It is compiled into the `bonesdeploy` binary via `rust-embed` and materialized on demand into a Python venv under `~/.cache/bonesdeploy/bonesinfra`.
 
@@ -22,8 +22,9 @@ Developer workstation                           Deployment server
 │   (setup, runtime,      │                   │                            │
 │    services, ssl)       │                   │                            │
 │                         │                   │                            │
-│ bonesdeploy deploy      │── SSH ───────────▶│ bonesremote deploy         │
-│   (committed revision)  │                   │   └─ release lifecycle      │
+│ bonesdeploy deploy      │── SSH as git ─────▶│ sudo bonesremote config sync│
+│   (committed revision)  │                   │ sudo bonesremote deploy     │
+│                         │                   │   └─ release lifecycle      │
 │                         │                   │                            │
 │ bonesdeploy rollback    │                   │ bonesremote release ...    │
 │ bonesdeploy site releases│                   │ bonesremote doctor        │
@@ -537,7 +538,8 @@ changes. Read-only `manifest` and patch flows do not commit.
 Cli::Deploy
   └─ commands/deploy.rs::run()
        ├─ revision                    # deployment unit: committed repository revision
-       └─ SSH: bonesremote deploy --site <site>
+       ├─ SSH as git: sudo -n bonesremote config sync --site <site> (descriptor on stdin)
+       └─ SSH as git: sudo -n bonesremote deploy --site <site>
             └─ commands/deploy/lifecycle.rs::run_full()
                  ├─ SiteMutation::acquire(site)   # lock + validate config
                  ├─ ensure_site_idle(site)        # verify no in-flight deployment
@@ -631,7 +633,7 @@ Cli::Site::Runtime
 ### Config ownership
 
 - `bonesdeploy-core` defines the canonical `Bones` struct, all path constants, and validation functions.
-- `bonesdeploy` loads the local root `.env` and sends only `RemoteDeploymentConfig` over SSH stdin for deploys.
+- `bonesdeploy` loads the local root `.env` and sends only `RemoteDeploymentConfig` over SSH stdin to the allowlisted `config sync` command before deploy.
 - `bonesremote` derives identity and paths from `--site`; it never parses the application `shared/.env` as control-plane config.
 - Runtime secrets are saved encrypted by `bonesdeploy` and atomically published to `shared/.env` by `secrets push`.
 
@@ -717,9 +719,9 @@ Older versions stored deployment state in separate files (`active-deployment.jso
 ### Cross-layer configuration and integration side doors
 Rust (`bonesdeploy-core`) is the sole parser of the root `.env`. Python and
 remote consumers receive typed JSON requests on stdin: BonesInfra commands take
-`--request-stdin` bodies, and BonesRemote deploy/doctor/config sync take the
-`RemoteDeploymentConfig` descriptor through `--config-stdin`. The sanitized
-control-plane copy lives at `/srv/conf/<site>/bones.json`.
+`--request-stdin` bodies, and BonesRemote config sync always receives the
+`RemoteDeploymentConfig` descriptor on stdin. Deploy and doctor load the
+sanitized control-plane copy at `/srv/conf/<site>/bones.json`.
 
 ### Framework and deployment boundaries
 Framework identity, defaults, and assets are selected through the Rust framework

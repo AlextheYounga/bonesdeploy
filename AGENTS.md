@@ -18,7 +18,6 @@ Before writing code, consider these in order:
 
 Rules:
 
-- Prefer simple code, but never optimize for the fewest lines or files.
 - Prefer readability over compression, tricks, or hidden behavior.
 - Use precise domain names and explicit control flow.
 - Keep functions, classes, modules, and files focused.

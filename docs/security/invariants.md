@@ -35,7 +35,7 @@ Everything below is what "trusted" actually commits to. Linux can give you hard,
 5.  No shared Unix identity owns data belonging to multiple sites.
 ```
 
-Three identities, not two and not five. The `git` user owns the bare repo and runs the deployment coordinator. The `<site>` runtime user owns `shared/`, writable paths, and `/run/<site>` and mutates runtime state. `root` owns system units, config dirs, users, and sealed releases, and provisions or mediates typed transitions. The runtime user is dedicated per project — not `www-data`, not a shared `applications` user. One project, one user. Isolation is enforced by the kernel, not by your discipline.
+Three identities, not two and not five. The `git` user owns the bare repo and is the deployment SSH entry point. The `<site>` runtime user owns `shared/`, writable paths, and `/run/<site>` and mutates runtime state. `root` owns system units, config dirs, deployment state, and sealed releases, and runs the allowlisted BonesRemote lifecycle. The runtime user is dedicated per project — not `www-data`, not a shared `applications` user. One project, one user. Isolation is enforced by the kernel, not by your discipline.
 
 ## Filesystem
 
@@ -55,30 +55,34 @@ Three identities, not two and not five. The `git` user owns the bare repo and ru
     logs, deployment descriptors, or the control-plane snapshot.
 ```
 
-Permissions are a provisioning-time contract, not a deployment-time repair. The ownership layout is established by `bonesdeploy server setup` and site setup, and never rewritten by deploy commands. If you find yourself wanting to `chmod` during a deploy, you are fixing the wrong thing — fix the provisioning. `shared/` is owned by the runtime user; only the app writes there. The release namespace is root-controlled; a privileged transition creates one candidate for the coordinator, and the candidate is sealed as `root:<site>` before activation.
+Permissions are a provisioning-time contract, not a deployment-time repair. The ownership layout is established by `bonesdeploy server setup` and site setup, and never rewritten by deploy commands. If you find yourself wanting to `chmod` during a deploy, you are fixing the wrong thing — fix the provisioning. `shared/` is owned by the runtime user; only the app writes there. The existing root-owned lifecycle creates, prepares, seals, and activates release candidates without granting `git` write authority over the release namespace.
 
 No shared groups with `660`/`770` everywhere — that pattern is a tangle of logic traps. No ACLs — they're opaque and unreadable. Ordinary Unix ownership, every time.
 
 ## Privileged mediation
 
 ```text
-13. BonesRemote accepts typed operations, not arbitrary root shell commands.
+13. The deploy identity may sudo only exact BonesRemote config-sync and deploy commands.
 14. Site names and release IDs are validated before path construction.
 15. All generated paths are constrained beneath canonical site roots.
 16. Symlinks are rejected or safely resolved in privileged write operations.
 17. Deployment is requested explicitly; no Git hook performs deployment work.
-18. User-controlled deployment input is never executed as root.
+18. Repository-provided build and prepare scripts are never executed as root.
 19. Runtime users cannot modify configuration later consumed as code by root.
 ```
 
-BonesRemote is the privileged mediator. Its job is not to "run deployments" — its job is to constrain the deployer to a finite set of safe state transitions. It accepts narrow, typed operations like `activate_release(site="atlas", release="20260727_143200")`, never `run_as_root(command="...")` or `write_file(path="...", content="...")`.
+BonesRemote owns the complete privileged deployment lifecycle. Sudoers permits
+only the complete anchored argument forms `config sync --site <site>` and
+`deploy --site <site>` for the root-owned binary. Arbitrary subcommands,
+optional deployment arguments, reordered arguments, and trailing arguments are
+denied. The policy requires sudo 1.9.10 or newer for argument regular-expression
+support.
 
 Deployment is requested explicitly with `bonesdeploy deploy`. The application
 revision supplies the source and its `infra/deployment` scripts; there is no
 application Git hook, configuration repository, site import/export path, or
-deploy-on-push trigger. The sudoers policy is rendered and validated by
-BonesInfra at provisioning time with anchored site and revision arguments, so
-trailing or malformed arguments are denied.
+deploy-on-push trigger. BonesInfra validates the sudoers policy at provisioning
+time; anchored argument matching rejects trailing or malformed arguments.
 
 ## Process confinement
 
@@ -181,7 +185,7 @@ If a mutation can be delayed safely, it is delayed. If a mutation affects live s
 
 ## Service restart
 
-`bonesremote service restart` restarts `<project>.target`, which restarts every registered site service. It is a typed privileged transition, not a general root shell. `bonesinfra` owns site service membership. `bonesremote` restarts exactly `<project>.target` for deploy and rollback — nothing more, nothing less.
+Within the root-executed deployment lifecycle, BonesRemote restarts `<project>.target`, which restarts every registered site service. `bonesinfra` owns site service membership. BonesRemote restarts exactly `<project>.target` for deploy and rollback — nothing more, nothing less. The deploy identity does not receive a separate general service-management sudo grant.
 
 ## Doctor: the fail-closed audit
 

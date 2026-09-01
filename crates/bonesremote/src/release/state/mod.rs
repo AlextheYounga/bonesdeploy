@@ -55,12 +55,7 @@ pub fn recovery_dir(site: &str) -> PathBuf {
 }
 
 fn deployment_lock_path(site: &str) -> PathBuf {
-    let root = if SITES_ROOT_OVERRIDE.with(|slot| slot.borrow().is_some()) {
-        resolved_sites_root()
-    } else {
-        paths::bonesremote_lock_root()
-    };
-    root.join(format!(".{site}.{}", paths::DEPLOYMENT_LOCK_FILE))
+    resolved_sites_root().join(format!(".{site}.{}", paths::DEPLOYMENT_LOCK_FILE))
 }
 
 pub struct DeploymentLock(File);

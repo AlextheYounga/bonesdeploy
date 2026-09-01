@@ -18,6 +18,7 @@ fn build_wheel() -> Result<(), String> {
     let assets = root.join("assets");
 
     remove_python_caches(&python)?;
+    remove_wheel_build_directory(&python)?;
     remove_old_wheels(&assets)?;
 
     let status = Command::new("uv")
@@ -35,6 +36,14 @@ fn build_wheel() -> Result<(), String> {
         return Err(format!("expected exactly one generated wheel in {}", assets.display()));
     };
     println!("Built {}", wheel.display());
+    Ok(())
+}
+
+fn remove_wheel_build_directory(python: &Path) -> Result<(), String> {
+    let build = python.join("build");
+    if build.is_dir() {
+        fs::remove_dir_all(&build).map_err(|error| format!("failed to remove {}: {error}", build.display()))?;
+    }
     Ok(())
 }
 

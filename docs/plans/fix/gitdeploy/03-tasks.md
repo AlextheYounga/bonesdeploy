@@ -1,25 +1,35 @@
-# Git-Owned Deployments Tasks
+# Git Deployment SSH Entry Point Tasks
 
 ## Implementation
 
-- [ ] Make local deploy connect as `git`, sync config through exact sudo, and invoke deploy without stdin config.
-- [ ] Load synchronized snapshots in the remote coordinator and remove the root requirement from orchestration.
-- [ ] Move state and locking to the git-readable state boundary with legacy migration and root-protected lock provisioning.
-- [ ] Split lifecycle filesystem, service, cancellation, cleanup, and activation mutations into typed privileged operations.
-- [ ] Replace sudoers with the complete exact allowlist and add denial tests.
-- [ ] Update BonesInfra provisioning and regenerate its embedded wheel.
-- [ ] Update architecture, security, context, and README documentation.
+- [x] Change only `bonesdeploy deploy` to connect through the `git` deploy SSH identity.
+- [x] Remove `--config-stdin`; make config sync unconditionally consume stdin and deploy load `/srv/conf/<site>/bones.json`.
+- [x] Invoke the two fixed config-sync and deploy commands directly through sudo.
+- [x] Replace the wrapper policy with anchored direct BonesRemote sudoers rules.
+- [x] Preserve existing deployment state, lock, snapshot, backup-secret, release, and lifecycle behavior.
+- [x] Regenerate the embedded BonesInfra wheel after the sudoers template changes.
+- [x] Keep control-plane directory permissions at the provisioned `0750` mode and update deployment identity and sudo-boundary documentation.
 
 ## Validation
 
-- [ ] Run `cargo test --workspace --exclude e2e`.
-- [ ] Run `cargo clippy`, `cargo fmt`, `ruff check .`, `ruff format .`, `uv run pytest`, and `shfmt -w .`.
-- [ ] Review the final diff and confirm no E2E tests were run.
+- [x] Add Rust tests proving config sync and deploy have the fixed snapshot contract and local deploy uses both direct sudo commands.
+- [x] Add Python tests pinning the complete direct sudoers allowed command set.
+- [x] Add denial tests for arbitrary operations, missing/reordered arguments, optional deploy arguments, and trailing arguments.
+- [x] Confirm existing tests still prove build scripts run as `<site>-build` and prepare scripts run as `<site>`.
+- [x] Run `cargo test --workspace --exclude e2e`.
+- [x] Run `cargo clippy`, `cargo fmt`, `ruff check .`, `ruff format .`, `uv run pytest`, regenerate the wheel, and run `shfmt -w .`.
+- [x] Review the final diff and confirm no E2E tests were run locally.
 
 ## Completion notes
 
-The entrypoint now connects as `git`, config sync is the only sudoed deploy
-entrypoint operation, snapshots are persisted outside `/root`, and deployment
-state uses a git-owned root with pre-created root-owned locks. The lifecycle
-helper split, migration of existing servers, expanded sudoers allowlist, and
-transactional activation changes remain unfinished.
+The earlier unprivileged-coordinator and typed-transition approach is
+superseded. This change restricts the deployment SSH entry point to `git` while
+retaining the existing root-executed BonesRemote lifecycle behind a root-owned
+sudoers policy with two anchored direct command forms.
+
+The wheel builder now cleans Python's generated `build/` directory before
+packaging, so deleted assets cannot remain in the embedded wheel.
+
+Validation passed: `cargo test --workspace --exclude e2e`, `cargo clippy`,
+`cargo fmt`, `ruff check .`, `ruff format .`, `uv run pytest` (494 tests), wheel
+regeneration, and `shfmt -w .`. E2E tests were not run.

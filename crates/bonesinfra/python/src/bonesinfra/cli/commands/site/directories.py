@@ -14,17 +14,11 @@ def _user_env_command(user, command):
 
 def setup_repo_and_project(ctx, paths):
     mkdir(
-        name="Ensure private BonesRemote state directory exists",
-        path=paths["state_root"],
-        user=DEPLOY_USER,
-        group=DEPLOY_USER,
+        name="Ensure control-plane site state directory exists",
+        path=paths["site_root"],
+        user="root",
+        group="root",
         mode="0700",
-    )
-
-    server.shell(
-        name="Ensure root-owned deployment lock exists",
-        commands=[f"install -o root -g {quote(DEPLOY_USER)} -m 0660 /dev/null {quote(paths['lock_path'])}"],
-        _sudo=True,
     )
 
     mkdir(

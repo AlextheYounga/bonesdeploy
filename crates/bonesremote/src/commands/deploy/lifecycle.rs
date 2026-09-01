@@ -6,6 +6,7 @@ use bonesdeploy_core::config;
 use crate::commands::ensure_site_idle;
 use crate::control_plane;
 use crate::git;
+use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::lifecycle;
 use crate::release::lifecycle::build::ensure_build_user_ready;
@@ -13,6 +14,7 @@ use crate::release::lifecycle::build::ensure_build_user_ready;
 use super::coordinator::DeploymentLifecycleCoordinator;
 
 pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
+    privileges::ensure_root("bonesremote deploy")?;
     let bones = control_plane::load(site)?.into_site_config(site);
 
     let mutation = SiteMutation::acquire_with_config(site, bones)?;

@@ -432,6 +432,14 @@ deployment/
 Deployments are explicit: `bonesdeploy deploy` does not push application
 changes, synchronize a second repository, or trigger from Git hooks.
 
+Routine deployment SSH connects as the `git` deploy identity, not root. That
+session may invoke only direct configuration-sync and deployment BonesRemote
+commands through non-interactive sudo. Anchored sudoers argument rules deny
+other BonesRemote subcommands and extra or trailing arguments; they require
+sudo 1.9.10 or newer. The lifecycle retains the existing root-owned state,
+lock, and release boundaries; repository build scripts still run as the
+dedicated build user and prepare scripts still run as the site runtime user.
+
 Build scripts in `deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Each build script is capped at 300 seconds by default; a configured timeout of `0` disables that per-script limit. Bonesremote streams an ephemeral copy of the deployment bundle into the container at `/workspace/deployment`, so the build user never needs host access to control-plane files. BonesInfra provisions a private persistent cache for each build user; bonesremote mounts it at `/workspace/cache` and exposes `BUILD_CACHE_DIR`. The shared deployment functions use it for Node, Corepack, npm, pnpm, Yarn, Composer, and Bundler downloads. Installed dependency trees and build output remain disposable. Prepare scripts in `deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation. Bonesremote streams the shared functions into each prepare shell before the prepare script.
 
 Build scripts can set runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool. Beyond per-script timeouts, BonesInfra caps each build user's host-level slice at 80% CPU quota, 80% memory high/max, and `MemorySwapMax=0`, so a runaway build fails rather than exhausting host memory or swap.

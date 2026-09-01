@@ -33,7 +33,7 @@ impl Drop for ScopedConfRoot {
 fn resolved_conf_root() -> PathBuf {
     CONF_ROOT_OVERRIDE
         .with(|slot| slot.borrow().clone())
-        .unwrap_or_else(|| PathBuf::from(paths::DEPLOYMENT_SNAPSHOT_ROOT))
+        .unwrap_or_else(|| PathBuf::from(paths::DEFAULT_CONF_ROOT_PARENT))
 }
 
 pub fn read_stdin_descriptor() -> Result<RemoteDeploymentConfig> {
@@ -67,6 +67,7 @@ pub fn store(site: &str, descriptor: &RemoteDeploymentConfig) -> Result<()> {
     let parent = path.parent().context("Control-plane snapshot has no parent directory")?;
     fs::create_dir_all(parent)
         .with_context(|| format!("Failed to create control-plane directory {}", parent.display()))?;
+    // 0750 matches the provisioned /srv/conf/<site> mode (root, runtime group).
     fs::set_permissions(parent, fs::Permissions::from_mode(0o750))
         .with_context(|| format!("Failed to set control-plane directory permissions {}", parent.display()))?;
 
@@ -139,6 +140,23 @@ mod tests {
         assert_eq!(fs::read_dir(root.join("atlas"))?.count(), 1);
         fs::remove_dir_all(root)?;
         Ok(())
+    }
+
+    #[test]
+    fn stored_snapshot_directory_is_mode_0750() -> Result<()> {
+        let root = root("dir-mode");
+        let _scope = override_control_plane_root(root.clone());
+        store("atlas", &descriptor("main", RuntimeBackend::Native))?;
+        let snapshot = snapshot_path("atlas");
+        let site_dir = snapshot.parent().expect("snapshot has a parent directory");
+        assert_eq!(fs::metadata(site_dir)?.permissions().mode() & 0o777, 0o750);
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn snapshot_path_is_the_site_derived_control_plane_location() {
+        assert_eq!(snapshot_path("atlas"), PathBuf::from("/srv/conf/atlas/bones.json"));
     }
 
     #[test]

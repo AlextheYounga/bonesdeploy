@@ -9,7 +9,7 @@ pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Doctor { site, exhaustive } => doctor::run(site.as_deref(), *exhaustive),
         Command::Deploy { site, revision } => deploy::run_full(site, revision.as_deref()),
-        Command::Config { command: ConfigCommand::Sync { site, config_stdin } } => config::sync(site, *config_stdin),
+        Command::Config { command: ConfigCommand::Sync { site } } => config::sync(site),
         Command::Status { site } => status::run(site),
         Command::Release { command } => match command {
             ReleaseCommand::List { site: site_name } => release::list::run(site_name),

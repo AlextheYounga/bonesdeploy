@@ -19,10 +19,22 @@ fn exhaustive_doctor_accepts_a_site() -> Result<()> {
 }
 
 #[test]
-fn config_sync_requires_config_stdin() -> Result<()> {
+fn config_sync_rejects_the_removed_config_stdin_option() -> Result<()> {
+    let output = common::run(&["config", "sync", "--site", "atlas", "--config-stdin"])?;
+    assert_eq!(output.status.code(), Some(2), "clap usage errors should exit with code 2");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("--config-stdin"), "unknown-argument error should mention --config-stdin: {stderr}");
+    Ok(())
+}
+
+#[test]
+fn config_sync_accepts_a_site_argument() -> Result<()> {
     let output = common::run(&["config", "sync", "--site", "atlas"])?;
-    assert_eq!(output.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&output.stderr).contains("--config-stdin"));
+    assert_ne!(
+        output.status.code(),
+        Some(2),
+        "accepted arguments must not be a usage error; sync always reads its descriptor from stdin"
+    );
     Ok(())
 }
 
