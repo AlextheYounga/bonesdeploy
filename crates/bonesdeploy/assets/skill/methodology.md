@@ -6,9 +6,9 @@ Three identities. Not two, not five. Three.
 
 | Identity | Owns | Job |
 |----------|------|-----|
-| `git` (deploy user) | bare repo | ingress only |
+| `git` (deploy user) | bare repo | source ingress and deployment SSH entry point |
 | `<site>` (runtime user) | `shared/`, writable paths, `/run/<site>` | mutates runtime state |
-| `root` | system units, config dirs, users, releases | provisions, deploys, restarts |
+| `root` | system units, config dirs, state, releases | provisions and runs the allowlisted BonesRemote lifecycle |
 
 The runtime user is dedicated per project. Not `www-data`. Not a shared
 `applications` user. One project, one user. Isolation is enforced by the

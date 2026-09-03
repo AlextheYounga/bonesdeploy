@@ -418,7 +418,7 @@ prepares one project after that baseline is ready.
 
 Responsibilities:
 
-- `server apply` installs packages (including etckeeper) and hardening; disables SSH password login for root; initializes `/etc` as an etckeeper repository; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and validated sudoers.
+- `server apply` installs packages (including etckeeper) and hardening; disables SSH password login for root; initializes `/etc` as an etckeeper repository; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and the validated sudoers drop-in that permits exactly two BonesRemote argument forms.
 - Every mutating flow (`server`, `site`, `services`, `runtime`, `ssl`, `helpers`) queues `services/linux/etckeeper.py::commit_changes` as its final operation, so a failed flow never commits and a successful flow always records its `/etc` changes with etckeeper defaults. Read-only `manifest` and patch flows do not commit.
 - `site apply` creates runtime and build identities, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
 - `site apply` creates the shared directory but does not write `shared/.env`; that file is published only by `bonesdeploy secrets push` outside this crate.
@@ -440,27 +440,40 @@ The current model uses a single per-project identity:
 
 ## Sudoers Contract
 
-The deploy user can run only these narrow commands via sudo:
+The deploy user opens the routine deployment SSH session and can elevate only
+through the root-owned BonesRemote binary installed at
+`/usr/local/bin/bonesremote` (mode `0755`, owned `root:root`). The sudoers
+drop-in (`/etc/sudoers.d/bonesdeploy`, mode `0440`) grants passwordless sudo
+for exactly two anchored argument forms and is validated with `visudo -c` at
+install time (removed if validation fails):
 
 ```
-bonesremote hook post-receive --site *
-bonesremote service restart --site *
-bonesremote release rollback --site *
-bonesremote release drop-failed --site *
-bonesremote release prune --site *
+sudo -n /usr/local/bin/bonesremote config sync --site <site>
+sudo -n /usr/local/bin/bonesremote deploy --site <site>
 ```
 
-The hook command itself owns the privileged deploy orchestration. No broad `bonesremote deploy --site *` sudo is granted.
+Argument matching uses sudo's POSIX extended regular expressions, which
+require **sudo 1.9.10 or newer**; older sudo cannot parse the patterns, and
+that version floor is an accepted deployment requirement. The anchored
+`^...$` patterns allow exactly `config sync --site <site>` and
+`deploy --site <site>` where `<site>` is lowercase alphanumeric and hyphen.
+Every other BonesRemote subcommand, optional deploy argument, reordered or
+trailing argument is rejected by sudo. BonesRemote revalidates the site
+identifier and rejects reserved names after exec.
 
-## Post-Receive Hook
+The trust model assumes a single operator owns every project on the host:
+any compromise of the deploy account, or of any SSH key authorized for it,
+can deploy every project on the host. This is not a tenant-isolation
+boundary; supporting multiple operators requires a separate deploy identity
+(Unix account + authorized_keys) per project with the sudoers rule scoped to
+that identity.
 
-A thin bash script at `<repo>/hooks/post-receive` derives the site name from `$GIT_DIR` and delegates:
-
-```bash
-exec sudo bonesremote hook post-receive --site "$SITE"
-```
-
-Branch filtering and deploy policy belong in `bonesremote hook post-receive`, not in the shell hook.
+Config sync is the sole stdin consumer (the descriptor is read from stdin,
+which passes through sudo); deploy is the snapshot loader. Git push
+transports source only; deployment is explicitly started by `bonesdeploy
+deploy` over the `git` SSH session. The deploy lifecycle then runs as root,
+while repository build and prepare scripts continue to run as their dedicated
+build and runtime identities.
 
 Source code must be pushed to the configured deployment branch before deploy can succeed. The bare repo's default branch (HEAD) is set via `git symbolic-ref HEAD refs/heads/<branch>` during provisioning.
 

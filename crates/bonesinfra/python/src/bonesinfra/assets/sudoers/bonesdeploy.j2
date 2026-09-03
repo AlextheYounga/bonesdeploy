@@ -1,16 +1,26 @@
 # Installed by bonesinfra
 #
+# Requires sudo 1.9.10+ (command line argument matching with POSIX extended
+# regular expressions). Sudoers regexes must start with '^' and end with '$';
+# sudo matches the anchored expression against the command line arguments.
+#
 # Trust model: this rule assumes a SINGLE OPERATOR owns every project on this
 # host. The shared `deploy_user` account (default: git) is granted passwordless
-# sudo to invoke bonesremote for any site via `--site *`. Any compromise of that
-# account, or of any SSH key authorized for it, can restart, roll back, prune,
-# or manage releases for every project on the host.
+# sudo for exactly two anchored argument forms of the root-owned BonesRemote
+# binary. Any compromise of that account, or of any SSH key authorized for it,
+# can deploy every project on the host.
 #
-# This rule is NOT a tenant-isolation boundary. Replacing `*` with literal site
-# names is insufficient while all projects still share the same Unix account and
-# the same authorized_keys file, because a key authenticated as `git` can still
+# This rule is NOT a tenant-isolation boundary. Scoping the site identifier is
+# insufficient while all projects still share the same Unix account and the
+# same authorized_keys file, because a key authenticated as `git` can still
 # target any project's repository path. To support multiple operators or
 # tenants on one host, provision a separate deploy identity (Unix account +
-# authorized_keys) per project, scope each sudoers rule to that identity and a
-# literal site name before relying on the per-site split.
-{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} ^service restart --site [a-z0-9-]+$, {{ bonesremote_path }} ^release rollback --site [a-z0-9-]+$, {{ bonesremote_path }} ^release drop-failed --site [a-z0-9-]+$, {{ bonesremote_path }} ^release prune --site [a-z0-9-]+$
+# authorized_keys) per project and scope each sudoers rule to that identity
+# before relying on the per-site split.
+#
+# The anchored patterns allow exactly `config sync --site <site>` and
+# `deploy --site <site>` where <site> is lowercase ASCII letters, digits, and
+# hyphens. Every other BonesRemote subcommand, optional deploy argument,
+# reordered argument, and trailing argument is rejected by sudo. BonesRemote
+# revalidates the site identifier and rejects reserved names after exec.
+{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} ^config sync --site [a-z0-9-]+$, {{ bonesremote_path }} ^deploy --site [a-z0-9-]+$

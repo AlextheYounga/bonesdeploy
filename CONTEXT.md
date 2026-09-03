@@ -42,10 +42,10 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 | Identity | Owner of | Scope |
 |----------|----------|-------|
-| `git` (deploy user) | Application bare repo | Ingress only |
+| `git` (deploy user) | Application bare repo | Source ingress and deployment SSH entry point |
 | `root` | `.bones` bare repo and config state | Ingress and control-plane import |
 | `<site>` (runtime user) | Shared files, `/run/<site>`, writable paths | Mutates runtime state |
-| `root` | System units, config dirs, users/groups, sealed releases | Provisions, deploys, and restarts services |
+| `root` | System units, config dirs, deployment state, sealed releases | Provisions and runs the allowlisted BonesRemote lifecycle |
 
 **Key mechanics:**
 
@@ -53,8 +53,8 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 - `shared/` is owned by the runtime user (`<site>:<site>`) — only the app writes here.
 - Build input is temporary and disposable; build scripts run in Podman with the source mounted at `/workspace/source`.
 - Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed.
-- Git hooks only trigger `bonesremote`; they do not check out source, run builds, write releases, or restart services.
-- `bonesremote` is the privileged mediator for promotion, activation, and service restart.
+- Git push transports source only; no Git hook starts a deployment.
+- The `git` SSH session may sudo only exact config-sync and deploy commands; BonesRemote retains ownership of promotion, activation, and service restart.
 
 ### Release Visibility and Cancellation
 
@@ -237,7 +237,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - `bonesdeploy site doctor --local` checks only the local root `.env`, `infra/`, and numbered deployment scripts.
    - Site remote checks open a privileged SSH session, synchronize the sanitized control-plane snapshot to `/srv/conf/<site>/bones.json`, then run `bonesremote doctor --site <project>`.
     - `bonesremote doctor --site <project>` requires root and reads the synchronized `/srv/conf/<project>/bones.json` snapshot for runtime backend and branch (missing snapshot is reported as pending with guidance). It checks Podman availability, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo with an exact ref for the configured branch, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. Docker daemon and image checks run only when the synchronized descriptor declares the Docker backend — never inferred from `/run/<site>`. An empty bare repo is reported as pending until the configured branch is pushed.
-    - The security audit is read-only and fail-closed. It verifies site identity isolation (unique UIDs/GIDs, no login shells, no cross-site group membership, deploy not in runtime groups), runtime sudo absence, privileged configuration root-control (recursively inspecting systemd, sudoers, nginx, AppArmor, and BonesRemote state plus their parent chains without following symlink targets), and release activation (current must be a valid symlink resolving inside the site's releases directory; active release roots and activation parents must be immutable to the runtime identity). `bonesremote doctor --site <project> --exhaustive` additionally inspects every entry in that active release for permission drift; this can take time on large releases. The exact deploy-user sudoers policy is rendered and validated by `bonesinfra` during provisioning rather than probed with fabricated commands during doctor. POSIX ACLs on protected paths are detected through extended attributes and reported as UNVERIFIED. Supplementary groups are collected through `id -G`. Required evidence that cannot be collected is reported as UNVERIFIED and causes doctor to fail.
+    - The security audit is read-only and fail-closed. It verifies site identity isolation (unique UIDs/GIDs, no login shells, no cross-site group membership, deploy not in runtime groups), runtime sudo absence, privileged configuration root-control (recursively inspecting systemd, sudoers, nginx, AppArmor, and BonesRemote state plus their parent chains without following symlink targets), and release activation (current must be a valid symlink resolving inside the site's releases directory; active release roots and activation parents must be immutable to the runtime identity). `bonesremote doctor --site <project> --exhaustive` additionally inspects every entry in that active release for permission drift; this can take time on large releases. BonesInfra renders and validates the deploy-user sudoers policy during provisioning rather than probing with fabricated commands during doctor. POSIX ACLs on protected paths are detected through extended attributes and reported as UNVERIFIED. Supplementary groups are collected through `id -G`. Required evidence that cannot be collected is reported as UNVERIFIED and causes doctor to fail.
    - Server doctor verifies Debian/Ubuntu, Podman, AppArmor, deploy identity, BonesRemote roots and binary, sudoers, shared image store, firewall, fail2ban, unattended-upgrades, and the etckeeper installation. `--verbose` prints successful remote reports.
 
 - **site manifest**
@@ -247,7 +247,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Reports present, missing, and wrong-kind paths, plus active and enabled state for managed services. `--format json` is intended for automation and never includes file contents or secrets.
 
 - **deploy**
-  - SSHes into the configured host, first synchronizes the sanitized control-plane snapshot (`bonesremote config sync --site <project> --config-stdin` writing `/srv/conf/<site>/bones.json` atomically), then runs `bonesremote deploy --site <project> --config-stdin`, sending the deployment descriptor over stdin.
+  - SSHes into the configured host as `git`, synchronizes the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <project>`, then runs the existing root-required lifecycle through `sudo -n bonesremote deploy --site <project>`.
   - Does not modify the remote environment. Run `bonesdeploy secrets push` explicitly to replace `shared/.env` from the encrypted local source.
   - Omits the `--revision` flag, so `bonesremote deploy` uses the branch from the local descriptor.
 
@@ -313,23 +313,23 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 - **Release commands** live under `bonesremote release ...`
 - **Service commands** live under `bonesremote service ...`
 - **config sync**:
-  - `--site <name> --config-stdin` receives the sanitized control-plane descriptor as JSON on stdin, validates it, and atomically installs root-owned `/srv/conf/<site>/bones.json`. BonesDeploy synchronizes it before every config-dependent remote action.
+  - `--site <name>` receives the sanitized control-plane descriptor as JSON on stdin, validates it, and atomically installs root-owned `/srv/conf/<site>/bones.json`. BonesDeploy invokes it through sudo before deploy.
 - **deploy**:
-  - Runs the full deployment lifecycle as a single command (the primary entrypoint used by both `post-receive` hook and `bonesdeploy deploy`).
+  - Runs the full deployment lifecycle as root after the `git` SSH identity invokes the exact allowed command through sudo. Git push transports source only; it does not invoke deployment.
   - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → runtime-writable candidate release → shared wiring → prepare scripts as the site user → seal release → activate → restart `<site>.target` → post-deploy pruning.
   - Before activation, validates the site's nginx configuration with `nginx -t -c /srv/conf/<site>/nginx.conf`. On failure before activation, automatically drops the staged release. If the service restart fails after activation,
     restores and restarts the previous release before dropping the failed release.
-  - `--site <name>`: imported site identifier used to load root-owned registry state
+  - `--site <name>`: validated site identifier used to load the synchronized control-plane snapshot and existing root-owned deployment state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
 - **doctor**:
   - Host mode checks `bonesremote` in `PATH`, Podman, AppArmor support, and the deploy-user sudoers drop-in.
   - `--site <name>` loads `/srv/conf/<name>/bones.json` for explicit runtime backend and branch, checks the imported site boundary: validated control-plane state, bare repo with an exact ref for the configured branch, runtime identity constraints, `shared/` and `releases/` layout, and `<site>.target`. Docker daemon/image checks run only for a Docker backend; a missing snapshot is pending guidance.
 - **release stage**
-	- Creates a staged release tree under `releases/`, ensures `build/workspace` and `shared/`, then writes staged release state before checkout. Release directories are created exclusively: the identity embeds the resolved source commit plus a random suffix (for example `20260804_190321-46a0b75c-a7f2`), and a second deployment staged within the same second retries with a fresh name instead of reusing or erasing an existing release directory.
+  - Creates one exclusively named candidate in the existing root-owned lifecycle; the candidate is sealed as `root:<site>` before activation.
 - **release wire**
 	- Wires shared paths into `build/workspace` after checkout, replacing any existing build workspace paths with symlinks to the shared directory.
 - **release activate**
-	- Atomically switches `current` to the staged release and clears staged release state. Activation refuses to promote into a nonempty release directory.
+  - Atomically validates and switches `current` to the staged release, restarts services, and restores the previous release if verification fails.
 - **release drop-failed**
 	- Deletes a failed staged release and clears staged release state.
 - **release recover**
@@ -367,8 +367,8 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 
 ### Primary Deploy Flow
 
-1. `bonesdeploy deploy` SSHes into the configured host, synchronizes the sanitized control-plane snapshot to `/srv/conf/<site>/bones.json`, then runs `bonesremote deploy --site <site> --config-stdin` with the deployment descriptor on stdin.
-2. `bonesremote deploy` orchestrates the full pipeline:
+1. `bonesdeploy deploy` SSHes into the configured host as `git`, synchronizes the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <site>`, then runs `sudo -n bonesremote deploy --site <site>`.
+2. `bonesremote deploy`, running as root through the exact sudoers grant, loads the synchronized snapshot and orchestrates the existing pipeline:
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
     - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed into a mode-0600 temporary env file and passed to Podman with `--env-file`, keeping its values out of process argv.

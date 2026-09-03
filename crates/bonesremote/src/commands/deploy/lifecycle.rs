@@ -13,13 +13,9 @@ use crate::release::lifecycle::build::ensure_build_user_ready;
 
 use super::coordinator::DeploymentLifecycleCoordinator;
 
-pub fn run_full(site: &str, revision: Option<&str>, config_stdin: bool) -> Result<()> {
+pub fn run_full(site: &str, revision: Option<&str>) -> Result<()> {
     privileges::ensure_root("bonesremote deploy")?;
-
-    if !config_stdin {
-        anyhow::bail!("bonesremote deploy requires --config-stdin");
-    }
-    let bones = control_plane::read_stdin_descriptor()?.into_site_config(site);
+    let bones = control_plane::load(site)?.into_site_config(site);
 
     let mutation = SiteMutation::acquire_with_config(site, bones)?;
     ensure_site_idle(&mutation)?;
