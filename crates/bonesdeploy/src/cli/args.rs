@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
-#[command(name = "bonesdeploy", about = "Remote release deployment tool")]
+#[command(name = "bonesdeploy", about = "Remote release deployment tool", version)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,

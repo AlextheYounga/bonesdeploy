@@ -259,7 +259,7 @@ extensions. Templates rendered by the managed framework come from
 `infra/templates/`.
 
 Sites without a configured domain receive a project-scoped Cloudflare Quick
-Tunnel. `bonesdeploy status` reports its account-less HTTPS
+Tunnel. `bonesdeploy site status` reports its account-less HTTPS
 `trycloudflare.com` preview URL. The URL changes whenever the tunnel restarts;
 Quick Tunnels are for development and review, have no uptime SLA, limit
 concurrent requests, and do not support Server-Sent Events.

@@ -303,7 +303,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - `bonesdeploy skill` prints the orientation doc (`SKILL.md`) baked into the binary.
   - `bonesdeploy skill list` prints the names of every embedded topic doc.
   - `bonesdeploy skill doc <name>` prints a specific topic doc (`commands`, `workflows`, `methodology`).
-   - `bonesdeploy skill next [--format text|json]` inspects `.env` and the remote host, then suggests the next prompt-free command across `uninitialized`, `server_missing`, `site_missing`, `ssl_missing`, and `ready` states.
+   - `bonesdeploy skill next [--format text|json]` inspects `.env` and the remote host, then suggests the next prompt-free command across `uninitialized`, `server_missing`, `site_missing`, `ssl_missing`, and `ready` states. Domainless sites use their Quick Tunnel and proceed directly to deploy instead of entering the SSL state.
   - Topic docs are markdown files under `crates/bonesdeploy/assets/skill/` and are embedded with `rust-embed` alongside `kit/` and `frameworks/`.
 - **version**:
   - Echoes the installed `bonesdeploy` version.

@@ -133,7 +133,7 @@ pub(crate) fn render_preview_status(preview: Option<&RemotePreviewStatus>) -> Op
     match preview.url.as_deref() {
         Some(url) => Some(format!("Preview: {url}")),
         None => Some(format!(
-            "{} Quick Tunnel is starting; run `bonesdeploy status` for its URL.",
+            "{} Quick Tunnel is starting; run `bonesdeploy site status` for its URL.",
             output::pending_marker()
         )),
     }
@@ -174,7 +174,10 @@ mod tests {
     fn renders_starting_preview_without_url() {
         let preview = RemotePreviewStatus { active: true, url: None };
 
-        assert!(render_preview_status(Some(&preview)).is_some_and(|line| line.contains("Quick Tunnel is starting")));
+        assert_eq!(
+            render_preview_status(Some(&preview)).as_deref(),
+            Some("• Quick Tunnel is starting; run `bonesdeploy site status` for its URL.")
+        );
     }
 
     #[test]

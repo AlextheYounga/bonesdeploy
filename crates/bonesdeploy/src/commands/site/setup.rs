@@ -44,7 +44,7 @@ async fn print_next_step(cfg: &config::Bones, pending_first_push: bool) {
             Ok(remote) => match super::status::render_preview_status(remote.preview.as_ref()) {
                 Some(line) => println!("{line}"),
                 None => println!(
-                    "{} Quick Tunnel is not active; run `bonesdeploy status` to inspect it.",
+                    "{} Quick Tunnel is not active; run `bonesdeploy site status` to inspect it.",
                     output::pending_marker()
                 ),
             },

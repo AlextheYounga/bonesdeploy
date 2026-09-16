@@ -3,6 +3,16 @@ mod common;
 use anyhow::Result;
 
 #[test]
+fn version_flag_prints_the_package_version() -> Result<()> {
+    let env = common::TestEnv::new()?;
+    let output = env.run(&["--version"])?;
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), concat!("bonesdeploy ", env!("CARGO_PKG_VERSION")));
+    Ok(())
+}
+
+#[test]
 fn doctor_accepts_verbose_flag() -> Result<()> {
     let env = common::TestEnv::new()?;
     let output = env.run(&["site", "doctor", "--local", "--verbose"])?;
