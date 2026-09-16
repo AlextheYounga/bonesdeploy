@@ -5,7 +5,7 @@ use bonesdeploy_core::config;
 use bonesdeploy_core::config::BUILD_TIMEOUT_SECONDS_DEFAULT;
 use bonesdeploy_core::config::{
     App, Bones, Build, ParsedDotEnv, ProvisioningRequest, RemoteDeploymentConfig, Runtime, RuntimeBackend,
-    build_timeout_seconds, production_application_keys, validate_host, validate_runtime,
+    build_timeout_seconds, parse_port, production_application_keys, validate_host, validate_runtime,
 };
 use bonesdeploy_core::paths;
 use std::collections::BTreeMap;
@@ -35,6 +35,14 @@ fn validate_host_accepts_hostnames_and_ips() {
 #[test]
 fn validate_host_rejects_shell_metacharacters() {
     assert!(validate_host("deploy.example.com;rm -rf /").is_err());
+}
+
+#[test]
+fn parse_port_rejects_zero_and_values_outside_tcp_range() {
+    assert_eq!(parse_port("22").ok(), Some(22));
+    assert!(parse_port("0").is_err());
+    assert!(parse_port("65536").is_err());
+    assert!(parse_port("not-a-port").is_err());
 }
 
 #[test]

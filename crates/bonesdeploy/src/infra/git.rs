@@ -76,6 +76,17 @@ pub fn branch_exists_at(repo: &Path, branch: &str) -> Result<bool> {
     Ok(output.status.success())
 }
 
+pub fn validate_branch(branch: &str) -> Result<()> {
+    let output = Command::new("git")
+        .args(["check-ref-format", "--branch", branch])
+        .output()
+        .context("Failed to validate Git branch")?;
+    if !output.status.success() {
+        bail!("Invalid Git branch: {branch}");
+    }
+    Ok(())
+}
+
 pub fn clone_repository(url: &str, branch: &str, destination: &Path) -> Result<()> {
     let status = Command::new("git")
         .args(["clone", "--depth", "1", "--branch", branch, url])

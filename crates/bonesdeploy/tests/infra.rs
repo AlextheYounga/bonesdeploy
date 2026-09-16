@@ -10,6 +10,13 @@ fn branch_exists_reports_missing_branch_without_error() {
 }
 
 #[test]
+fn branch_validation_uses_git_reference_rules() {
+    assert!(git::validate_branch("release/production").is_ok());
+    assert!(git::validate_branch("release..production").is_err());
+    assert!(git::validate_branch("-production").is_err());
+}
+
+#[test]
 fn server_request_contains_only_connection_fields() -> Result<()> {
     let mut config = Bones::default();
     config.host = "example.com".into();

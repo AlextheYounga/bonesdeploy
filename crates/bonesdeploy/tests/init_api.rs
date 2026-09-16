@@ -100,3 +100,59 @@ fn non_interactive_config_requires_host_when_not_inferred() -> Result<()> {
     assert!(error.to_string().contains("--host is required"));
     Ok(())
 }
+
+#[test]
+fn non_interactive_config_rejects_invalid_connection_and_identity_values() {
+    let mut args = args_non_interactive(None, &[]);
+    args.project_name = Some(String::from("shop_admin"));
+    assert!(
+        collect_non_interactive("workspace", None, &args)
+            .is_err_and(|error| error.to_string().contains("Invalid project name"))
+    );
+
+    let mut args = args_non_interactive(None, &[]);
+    args.port = Some(String::from("not-a-port"));
+    assert!(
+        collect_non_interactive("workspace", None, &args)
+            .is_err_and(|error| error.to_string().contains("Invalid port"))
+    );
+
+    let mut args = args_non_interactive(None, &[]);
+    args.port = Some(String::from("0"));
+    assert!(
+        collect_non_interactive("workspace", None, &args)
+            .is_err_and(|error| error.to_string().contains("Invalid port"))
+    );
+
+    let mut args = args_non_interactive(None, &[]);
+    args.branch = Some(String::from("release..production"));
+    assert!(
+        collect_non_interactive("workspace", None, &args)
+            .is_err_and(|error| error.to_string().contains("Invalid Git branch"))
+    );
+
+    let mut args = args_non_interactive(None, &[]);
+    args.host = Some(String::from("deploy.example.com; reboot"));
+    assert!(
+        collect_non_interactive("workspace", None, &args)
+            .is_err_and(|error| error.to_string().contains("Invalid host"))
+    );
+}
+
+#[test]
+fn non_interactive_config_trims_cli_values_before_validation() -> Result<()> {
+    let mut args = args_non_interactive(None, &[]);
+    args.project_name = Some(String::from("  atlas  "));
+    args.remote = Some(String::from("  production  "));
+    args.host = Some(String::from("  deploy.example.com  "));
+    args.port = Some(String::from("  2222  "));
+    args.branch = Some(String::from("  release/production  "));
+
+    let config = collect_non_interactive("workspace", None, &args)?;
+    assert_eq!(config.project_name, "atlas");
+    assert_eq!(config.remote_name, "production");
+    assert_eq!(config.host, "deploy.example.com");
+    assert_eq!(config.port, "2222");
+    assert_eq!(config.branch, "release/production");
+    Ok(())
+}

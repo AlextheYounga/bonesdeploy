@@ -227,6 +227,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 ### BonesDeploy CLI Commands
 - **init**:
   - Loads the root `.env` or collects user input via prompts.
+  - Validates the project name, host, SSH port, and Git branch before writing project configuration or scaffolding.
   - For fresh init, waits until prompts complete before writing the root `.env`, committed `.env.build`, `deployment/`, and `infra/`.
   - Updates `.gitignore` to keep `.env` local while leaving `.env.build` trackable.
   - Creates local deployment remote if missing using `{deploy_user}@{host}:{repo_path}`, constructed from the production VPS target configured during prompts.

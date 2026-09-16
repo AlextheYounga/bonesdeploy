@@ -130,7 +130,11 @@ pub fn default_deploy_user() -> String {
 /// # Errors
 /// Returns an error when `port` is not a valid TCP port number.
 pub fn parse_port(port: &str) -> Result<u16> {
-    port.parse().with_context(|| format!("Invalid port: {port}"))
+    let port = port.parse().with_context(|| format!("Invalid port: {port}"))?;
+    if port == 0 {
+        bail!("Invalid port: 0");
+    }
+    Ok(port)
 }
 
 /// # Errors

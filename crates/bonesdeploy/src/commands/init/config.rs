@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use bonesdeploy_core::{
-    config::{RuntimeBackend, validate_host},
+    config::{RuntimeBackend, parse_port, validate_host, validate_project_name},
     paths,
 };
 
@@ -58,6 +58,7 @@ fn collect_from_existing(
         (None, None) => parse_runtime_backend(&prompts::prompt_runtime_backend(None)?)?,
     };
     apply_existing_fields(&mut cfg, existing_config);
+    validate_init_config(&cfg)?;
     Ok(cfg)
 }
 
@@ -66,9 +67,9 @@ fn cli_or_prompt(
     existing_value: Option<String>,
     prompt: impl FnOnce() -> Result<String>,
 ) -> Result<String> {
-    match cli_value {
-        Some(v) if !v.is_empty() => Ok(v.trim().to_string()),
-        _ => existing_value.map_or_else(prompt, Ok),
+    match cli_value.and_then(|value| non_empty(value)) {
+        Some(value) => Ok(value),
+        None => existing_value.map_or_else(prompt, Ok),
     }
 }
 
@@ -83,8 +84,6 @@ pub fn collect_non_interactive(
     let host = resolve_host(args, existing_config, inferred_remote.as_ref())?;
     let branch = resolve_branch(args, existing_config);
     let port = resolve_port(args, existing_config, inferred_remote.as_ref());
-    validate_host(&host)?;
-
     let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
     let project_root = existing_path_override(
         existing_config,
@@ -103,7 +102,15 @@ pub fn collect_non_interactive(
     cfg.project_root = project_root;
     cfg.runtime.backend = resolve_runtime_backend(args, existing_config)?;
     apply_existing_fields(&mut cfg, existing_config);
+    validate_init_config(&cfg)?;
     Ok(cfg)
+}
+
+fn validate_init_config(cfg: &config::Bones) -> Result<()> {
+    validate_project_name(&cfg.project_name)?;
+    validate_host(&cfg.host)?;
+    parse_port(&cfg.port)?;
+    git::validate_branch(&cfg.branch)
 }
 
 fn resolve_project_name(
@@ -112,13 +119,10 @@ fn resolve_project_name(
     project_name_hint: &str,
 ) -> Result<String> {
     args.project_name
-        .clone()
-        .filter(|v| !v.is_empty())
+        .as_deref()
+        .and_then(non_empty)
         .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.project_name)))
-        .or_else(|| {
-            let name = project_name_hint.to_string();
-            (!name.is_empty()).then_some(name)
-        })
+        .or_else(|| non_empty(project_name_hint))
         .ok_or_else(|| {
             anyhow!(
                 "{} --project-name is required in non-interactive mode.\n\
@@ -131,8 +135,8 @@ fn resolve_project_name(
 
 fn resolve_remote_name(args: &super::Args, existing_config: Option<&config::Bones>) -> String {
     args.remote
-        .clone()
-        .filter(|v| !v.is_empty())
+        .as_deref()
+        .and_then(non_empty)
         .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.remote_name)))
         .unwrap_or_else(|| String::from("production"))
 }
@@ -147,8 +151,8 @@ fn resolve_host(
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> Result<String> {
     args.host
-        .clone()
-        .filter(|v| !v.is_empty())
+        .as_deref()
+        .and_then(non_empty)
         .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.host)))
         .or_else(|| inferred_remote.map(|details| details.host.clone()))
         .ok_or_else(|| {
@@ -163,8 +167,8 @@ fn resolve_host(
 
 fn resolve_branch(args: &super::Args, existing_config: Option<&config::Bones>) -> String {
     args.branch
-        .clone()
-        .filter(|v| !v.is_empty())
+        .as_deref()
+        .and_then(non_empty)
         .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.branch)))
         .unwrap_or_else(|| String::from("main"))
 }
@@ -175,8 +179,8 @@ fn resolve_port(
     inferred_remote: Option<&git::RemoteConnectionDetails>,
 ) -> String {
     args.port
-        .clone()
-        .filter(|v| !v.is_empty())
+        .as_deref()
+        .and_then(non_empty)
         .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.port)))
         .or_else(|| inferred_remote.map(|details| details.port.clone()))
         .unwrap_or_else(|| String::from("22"))

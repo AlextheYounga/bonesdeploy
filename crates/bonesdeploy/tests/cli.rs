@@ -44,3 +44,24 @@ fn init_rejects_removed_service_selection() -> Result<()> {
     assert!(String::from_utf8_lossy(&output.stderr).contains("unexpected argument '--service'"));
     Ok(())
 }
+
+#[test]
+fn init_rejects_invalid_config_before_writing_project_files() -> Result<()> {
+    let env = common::TestEnv::new()?;
+    let output = env.run(&[
+        "init",
+        "--non-interactive",
+        "--project-name",
+        "shop_admin",
+        "--host",
+        "deploy.example.com",
+        "--template",
+        "none",
+    ])?;
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Invalid project name"));
+    assert!(!env.repo().join(".env").exists());
+    assert!(!env.repo().join("infra").exists());
+    Ok(())
+}
