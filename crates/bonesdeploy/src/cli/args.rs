@@ -143,6 +143,12 @@ pub enum SiteCommand {
         #[arg(long)]
         yes: bool,
     },
+    /// Permanently remove this project's remote site resources
+    Delete {
+        /// Skip the exact project-name confirmation prompt
+        #[arg(long)]
+        yes: bool,
+    },
     /// Check one project's local and remote health
     Doctor {
         /// Skip remote checks

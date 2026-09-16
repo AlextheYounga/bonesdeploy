@@ -105,6 +105,8 @@ The private command shapes currently used by the Rust CLI are:
 bonesinfra helpers apply --request-stdin
 bonesinfra server apply --request-stdin --bonesremote-version <version>
 bonesinfra site apply --request-stdin
+bonesinfra site preflight --request-stdin
+bonesinfra site delete --request-stdin
 bonesinfra runtime apply --request-stdin
 bonesinfra ssl apply --request-stdin
 bonesinfra services apply --request-stdin
@@ -112,6 +114,12 @@ bonesinfra manifest show --request-stdin
 ```
 
 `ssh_user` comes from the server request (default `"root"`) instead of a CLI flag.
+
+`site preflight` emits the JSON deletion plan supported by the current manifest.
+`site delete` stops the declared site services before removing those validated
+artifacts. This Python-only boundary currently covers manifest filesystem paths
+and systemd services; BonesRemote persistence, coordination, and resources not
+represented by the manifest remain outside it.
 
 This command surface is an internal contract with `bonesdeploy`. Runtime
 questions are owned by the Rust runtime definitions under

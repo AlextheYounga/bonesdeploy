@@ -45,7 +45,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     }
 
     let lock = DeploymentLock::acquire(site)?;
-    let mutation = SiteMutation::adopt(site, config.clone(), lock);
+    let mutation = SiteMutation::adopt(site, config.clone(), lock)?;
     let current = mutation.active()?;
     if current.as_ref().is_some_and(|deployment| deployment.release() != release) {
         bail!("Active deployment changed while cancelling {release}; no cleanup was performed.");

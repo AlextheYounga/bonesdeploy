@@ -38,6 +38,7 @@ global roots, and sudoers. They do not read site runtime or framework state.
 ## site
 
 `bonesdeploy site setup [--yes]`
+`bonesdeploy site delete [--yes]`
 `bonesdeploy site doctor [--local] [--verbose]`
 `bonesdeploy site status`
 `bonesdeploy site manifest [--format text|json]`
@@ -47,7 +48,9 @@ global roots, and sudoers. They do not read site runtime or framework state.
 `bonesdeploy site ssl [--yes] [--domain <d>] [--email <e>]`
 
 Site commands operate on one project. `site setup` does not push Git or
-secrets, configure SSL, or deploy a release.
+secrets, configure SSL, or deploy a release. `site delete` permanently removes
+the remote manifest inventory after exact project-name confirmation; it retains
+local project files and blocks deployment until deletion finishes.
 
 ## skill
 

@@ -1,3 +1,5 @@
+#[path = "commands/decommission.rs"]
+mod decommission;
 #[path = "commands/deploy_coordinator.rs"]
 mod deploy_coordinator;
 #[path = "commands/deploy_rollback.rs"]

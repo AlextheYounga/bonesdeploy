@@ -344,6 +344,18 @@ The manifest reports present, missing, and wrong-kind paths, plus active and
 enabled state for project-managed services. JSON is intended for automation;
 neither format prints file contents or secrets.
 
+Remove the remote resources declared by that manifest:
+
+```sh
+bonesdeploy site delete
+bonesdeploy site delete --yes
+```
+
+Deletion is irreversible. Without `--yes`, you must type the configured project
+name exactly. It preserves local source, Git configuration, secrets, and
+BonesInfra caches, while persisting remote decommissioning state so an
+interrupted deletion remains blocked from deployment and can be rerun safely.
+
 Embedded documentation for AI agents lives under the `skill` command:
 
 ```sh

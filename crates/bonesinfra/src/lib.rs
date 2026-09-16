@@ -69,21 +69,32 @@ pub fn run(args: &[&str]) -> Result<()> {
 /// # Errors
 /// Returns an error when the child process exits non-zero.
 pub fn run_with_request(args: &[&str], request_body: &str) -> Result<()> {
+    run_with_request_output(args, request_body).map(|_| ())
+}
+
+/// Runs one BonesInfra command with a typed provisioning request and returns its
+/// standard output.
+///
+/// # Errors
+/// Returns an error when the child process exits non-zero.
+pub fn run_with_request_output(args: &[&str], request_body: &str) -> Result<String> {
     let project_root = env::current_dir().context("Failed to determine project directory")?;
     let executable = ensure_available(&project_root)?;
     let mut command = base_command(&executable, &project_root, args);
     command.stdin(Stdio::piped());
+    command.stdout(Stdio::piped());
     let mut child = command.spawn().with_context(|| format!("Failed to run bonesinfra {}", args.join(" ")))?;
     let mut stdin = child.stdin.take().context("bonesinfra stdin was not piped")?;
     stdin
         .write_all(request_body.as_bytes())
         .with_context(|| format!("Failed to write request to bonesinfra {}", args.join(" ")))?;
     drop(stdin);
-    let status = child.wait().with_context(|| format!("Failed to wait on bonesinfra {}", args.join(" ")))?;
-    if !status.success() {
+    let output =
+        child.wait_with_output().with_context(|| format!("Failed to wait on bonesinfra {}", args.join(" ")))?;
+    if !output.status.success() {
         bail!("bonesinfra {} failed", args.join(" "));
     }
-    Ok(())
+    String::from_utf8(output.stdout).context("bonesinfra emitted non-UTF-8 output")
 }
 
 /// Prepares the dependency environment for a project.

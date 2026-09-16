@@ -31,7 +31,7 @@ fn pre_commit_active_deployment_blocks_site_mutation() -> Result<()> {
     let root = temp_root("pre_commit")?;
     let _guard = release_state::override_sites_root(root.clone());
     let mutation =
-        SiteMutation::adopt("unitapp", Default::default(), release_state::DeploymentLock::acquire("unitapp")?);
+        SiteMutation::adopt("unitapp", Default::default(), release_state::DeploymentLock::acquire("unitapp")?)?;
 
     release_state::write_active_deployment("unitapp", &record(DeploymentPhase::Prepared))?;
 
@@ -45,7 +45,7 @@ fn committed_deployment_is_serialization_idle() -> Result<()> {
     let root = temp_root("committed")?;
     let _guard = release_state::override_sites_root(root.clone());
     let mutation =
-        SiteMutation::adopt("unitapp", Default::default(), release_state::DeploymentLock::acquire("unitapp")?);
+        SiteMutation::adopt("unitapp", Default::default(), release_state::DeploymentLock::acquire("unitapp")?)?;
 
     release_state::write_active_deployment("unitapp", &record(DeploymentPhase::CleanupPending))?;
 
@@ -59,7 +59,7 @@ fn staged_release_without_committed_deployment_blocks_site_mutation() -> Result<
     let root = temp_root("staged")?;
     let _guard = release_state::override_sites_root(root.clone());
     let mutation =
-        SiteMutation::adopt("unitapp", Default::default(), release_state::DeploymentLock::acquire("unitapp")?);
+        SiteMutation::adopt("unitapp", Default::default(), release_state::DeploymentLock::acquire("unitapp")?)?;
 
     release_state::write_staged_release("unitapp", "20260804_190321-46a0b75c-a7f2")?;
 

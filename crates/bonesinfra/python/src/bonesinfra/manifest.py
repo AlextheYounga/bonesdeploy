@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any, Literal
 
 from pyinfra.context import ctx_host
@@ -55,6 +57,33 @@ class ResolvedService:
     owner: str
     running: bool
     enabled: bool
+
+
+@dataclass(frozen=True)
+class DeletionArtifact:
+    """A validated site-owned artifact that may be removed."""
+
+    name: str
+    path: str
+    kind: ArtifactKind
+    owner: str
+
+
+@dataclass(frozen=True)
+class DeletionService:
+    """A validated site-owned systemd service that must stop before teardown."""
+
+    name: str
+    unit: str
+    owner: str
+
+
+@dataclass(frozen=True)
+class DeletionPlan:
+    """The secret-free deletion inventory supported by the current manifest."""
+
+    artifacts: tuple[DeletionArtifact, ...]
+    services: tuple[DeletionService, ...]
 
 
 COMMON_ARTIFACTS = (
@@ -113,6 +142,44 @@ def resolve_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifa
     for artifact in collect_artifacts(ctx, project_manifest):
         _artifact_path(paths, artifact)
     return collect_artifacts(ctx, project_manifest)
+
+
+def resolve_deletion_plan(ctx: DeployContext, project_manifest: Any) -> DeletionPlan:
+    """Resolve the current manifest into the supported, safe deletion inventory."""
+    artifacts = tuple(
+        DeletionArtifact(artifact.name, _artifact_path(ctx.paths, artifact), artifact.kind, artifact.owner)
+        for artifact in collect_artifacts(ctx, project_manifest)
+    )
+    services = tuple(
+        DeletionService(service.name, service.unit, service.owner)
+        for service in collect_services(ctx, project_manifest)
+    )
+    for artifact in artifacts:
+        _validate_deletion_artifact(ctx, artifact)
+    for service in services:
+        _validate_deletion_service(ctx, service)
+    return DeletionPlan(artifacts, services)
+
+
+def render_deletion_plan(plan: DeletionPlan) -> str:
+    """Render a deletion preflight in the stable JSON format consumed by BonesDeploy."""
+    return json.dumps(asdict(plan), sort_keys=True)
+
+
+def parse_deletion_plan(value: str, ctx: DeployContext) -> DeletionPlan:
+    """Parse and validate the opaque, persisted plan returned by BonesRemote."""
+    try:
+        data = json.loads(value)
+        artifacts = tuple(DeletionArtifact(**entry) for entry in data["artifacts"])
+        services = tuple(DeletionService(**entry) for entry in data["services"])
+    except (KeyError, TypeError, json.JSONDecodeError) as error:
+        raise ValueError("invalid persisted deletion plan") from error
+    plan = DeletionPlan(artifacts, services)
+    for artifact in plan.artifacts:
+        _validate_deletion_artifact(ctx, artifact)
+    for service in plan.services:
+        _validate_deletion_service(ctx, service)
+    return plan
 
 
 def inspect_artifacts(ctx: DeployContext, host: Any, project_manifest: Any) -> list[ResolvedArtifact]:
@@ -218,6 +285,80 @@ def _artifact_path(paths: Any, artifact: Artifact) -> str:
     if not isinstance(value, str):
         raise TypeError(f"manifest artifact {artifact.name!r} references unknown path key {artifact.path_key!r}")
     return value
+
+
+def _validate_deletion_artifact(ctx: DeployContext, artifact: DeletionArtifact) -> None:
+    if artifact.kind not in {"file", "directory", "link", "socket"}:
+        raise ValueError(f"unsupported deletion artifact kind: {artifact.kind}")
+    path = Path(artifact.path)
+    if not path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"unsafe deletion artifact path: {artifact.path}")
+    if not any(_is_within(path, root) for root in _deletion_roots(ctx)) and not _is_derived_system_path(ctx, path):
+        raise ValueError(f"deletion artifact is outside site-owned paths: {artifact.path}")
+
+
+def _validate_deletion_service(ctx: DeployContext, service: DeletionService) -> None:
+    project = ctx.app.project_name
+    if not re.fullmatch(rf"{re.escape(project)}-[a-z0-9][a-z0-9_-]*\.service", service.unit):
+        raise ValueError(f"unsafe deletion service: {service.unit}")
+
+
+def _deletion_roots(ctx: DeployContext) -> tuple[Path, ...]:
+    paths = ctx.paths
+    return tuple(
+        Path(path)
+        for path in (
+            paths.repo,
+            paths.project_root,
+            paths.conf_root,
+            paths.site_root,
+            paths.runtime_socket_dir,
+            paths.site_log_dir,
+            paths.acme_webroot,
+            paths.backup_repository,
+        )
+    )
+
+
+def _is_within(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents
+
+
+def _is_derived_system_path(ctx: DeployContext, path: Path) -> bool:
+    project = ctx.app.project_name
+    value = str(path)
+    allowed = {
+        ctx.paths.nginx_site_available,
+        ctx.paths.nginx_site_enabled,
+        ctx.paths.systemd_site_target,
+        ctx.paths.systemd_site_target_requires,
+        ctx.paths.systemd_site_nginx_service,
+        ctx.paths.systemd_site_nginx_requirement,
+        ctx.paths.nginx_apparmor_profile,
+        ctx.paths.backup_cron_file,
+    }
+    if value in allowed or _is_within(path, Path(ctx.paths.systemd_site_target_requires)):
+        return True
+    if value in letsencrypt_cert_paths(ctx.app.dns.domain):
+        return True
+    if any(
+        value.startswith(prefix)
+        for prefix in (
+            f"/etc/systemd/system/{project}-",
+            f"/etc/apparmor.d/bonesdeploy-{project}-",
+            f"/etc/bonesinfra/services/{project}-",
+        )
+    ):
+        return True
+    escaped_project = re.escape(project)
+    if re.fullmatch(rf"/etc/php/[0-9]+(?:\.[0-9]+)?/fpm/pool\.d/{escaped_project}\.conf", value):
+        return True
+    if re.fullmatch(rf"/run/php/php[0-9]+(?:\.[0-9]+)?-fpm-{escaped_project}\.sock", value):
+        return True
+    return any(_is_within(path, Path(f"/var/lib/{service}/{project}")) for service in _RUNTIME_DATA_SERVICES)
+
+
+_RUNTIME_DATA_SERVICES = ("mysql", "mariadb", "mongodb", "redis", "valkey")
 
 
 def _deduplicate(artifacts: list[Artifact]) -> tuple[Artifact, ...]:

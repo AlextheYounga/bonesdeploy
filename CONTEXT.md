@@ -244,7 +244,12 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Inspects every project-specific filesystem artifact and managed systemd service expected by the effective framework, service, and SSL strategy. Shared host-wide packages, daemons, and configuration are excluded.
    - Delegates to the embedded BonesInfra runtime as `python -m bonesinfra manifest show --request-stdin --format <format>`, feeding the typed site request on stdin.
   - Uses typed Python declarations inside BonesInfra, resolves path keys through `DeploymentPaths`, and performs read-only PyInfra fact checks.
-  - Reports present, missing, and wrong-kind paths, plus active and enabled state for managed services. `--format json` is intended for automation and never includes file contents or secrets.
+   - Reports present, missing, and wrong-kind paths, plus active and enabled state for managed services. `--format json` is intended for automation and never includes file contents or secrets.
+
+- **site delete**
+  - Runs a local, read-only manifest preflight before any remote mutation and requires the exact configured project name unless `--yes` is supplied.
+  - Persists the validated, secret-free inventory in BonesRemote before stopping declared services and removing declared artifacts. A retry uses that persisted plan, while normal deployment mutations remain blocked by decommissioning or tombstone state.
+  - Retains local project source, Git configuration, secrets, and caches. It does not remove shared host packages or daemons.
 
 - **deploy**
   - SSHes into the configured host as `git`, synchronizes the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <project>`, then runs the existing root-required lifecycle through `sudo -n bonesremote deploy --site <project>`.
@@ -263,7 +268,8 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Runs site base, services, runtime, and site doctor in that order.
   - Site base creates one bare repository, site identities, paths, root-owned control-plane state, and a placeholder release.
   - For projects with a configured Borg passphrase, site base also provisions the scheduled backup: Borg package, root-only passphrase file, encrypted repository, and the `/etc/cron.d` schedule entry.
-  - Does not push Git or secrets, configure SSL, or deploy a release.
+   - Does not push Git or secrets, configure SSL, or deploy a release.
+   - Clears a verified deletion tombstone only after provisioning succeeds; an unverified tombstone remains blocked until deletion is rerun.
 
 `bonesdeploy update` resolves the latest published GitHub release, validates that
 its `v<version>` tag matches both package manifests, clones that exact tag for

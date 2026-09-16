@@ -98,6 +98,9 @@ fn server_and_site_commands_parse_under_their_scopes() -> Result<()> {
 
     let site = Cli::try_parse_from(["bonesdeploy", "site", "doctor", "--local"])?;
     assert!(matches!(site.command, Command::Site { command: SiteCommand::Doctor { local: true, .. } }));
+
+    let delete = Cli::try_parse_from(["bonesdeploy", "site", "delete", "--yes"])?;
+    assert!(matches!(delete.command, Command::Site { command: SiteCommand::Delete { yes: true } }));
     Ok(())
 }
 

@@ -95,6 +95,10 @@ pub async fn stream_cmd(session: &Session, cmd: &str) -> Result<()> {
 }
 
 pub async fn run_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[u8]) -> Result<()> {
+    run_cmd_with_stdin_output(session, cmd, stdin_bytes).await.map(|_| ())
+}
+
+pub async fn run_cmd_with_stdin_output(session: &Session, cmd: &str, stdin_bytes: &[u8]) -> Result<String> {
     let mut child = session
         .command("bash")
         .arg("-c")
@@ -116,7 +120,7 @@ pub async fn run_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[u8]
         bail!("{}", remote_command_failure(cmd, &output.stdout, &output.stderr));
     }
 
-    Ok(())
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
 }
 
 pub async fn stream_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[u8]) -> Result<()> {

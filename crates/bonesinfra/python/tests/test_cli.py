@@ -72,3 +72,10 @@ def test_commands_expose_request_stdin_instead_of_env_file():
     assert result.returncode == 0
     assert "--request-stdin" in result.stdout
     assert "--env-file" not in result.stdout
+
+
+def test_site_deletion_commands_expose_typed_request_input():
+    for command in ("preflight", "delete"):
+        result = _run_no_input("site", command, "--help")
+        assert result.returncode == 0
+        assert "--request-stdin" in result.stdout

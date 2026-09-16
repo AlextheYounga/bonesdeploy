@@ -148,7 +148,9 @@ mod tests {
         let _scope = override_control_plane_root(root.clone());
         store("atlas", &descriptor("main", RuntimeBackend::Native))?;
         let snapshot = snapshot_path("atlas");
-        let site_dir = snapshot.parent().expect("snapshot has a parent directory");
+        let Some(site_dir) = snapshot.parent() else {
+            bail!("snapshot path has no parent directory: {}", snapshot.display());
+        };
         assert_eq!(fs::metadata(site_dir)?.permissions().mode() & 0o777, 0o750);
         fs::remove_dir_all(root)?;
         Ok(())

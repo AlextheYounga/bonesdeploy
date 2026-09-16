@@ -7,11 +7,18 @@ import typer
 from bonesinfra.cli.commands.server import deploy_server_setup
 from bonesinfra.cli.commands.server.helpers import deploy_helpers
 from bonesinfra.cli.commands.site import deploy_site_setup
+from bonesinfra.cli.commands.site.delete import deploy_site_delete
 from bonesinfra.cli.commands.site.services import deploy_services
 from bonesinfra.cli.commands.site.ssl import deploy_ssl
 from bonesinfra.config.context import DeployContext, ServerContext
 from bonesinfra.config.request import parse_request
-from bonesinfra.manifest import inspect_for_runner, render
+from bonesinfra.manifest import (
+    inspect_for_runner,
+    parse_deletion_plan,
+    render,
+    render_deletion_plan,
+    resolve_deletion_plan,
+)
 from bonesinfra.patches import apply_local, apply_remote
 from bonesinfra.project import load_manifest, load_runtime
 from bonesinfra.pyinfra.runner import run
@@ -103,6 +110,35 @@ def site_apply_cmd(
     ctx = _read_request(request_stdin)
     _validate_host(ctx)
     run(ctx=ctx, deploy=deploy_site_setup)
+
+
+@site_app.command("preflight")
+def site_preflight_cmd(
+    request_stdin: bool = typer.Option(
+        False,  # noqa: FBT003
+        "--request-stdin",
+        help="Read the typed JSON provisioning request from stdin",
+    ),
+):
+    """Print the validated deletion plan without connecting to the host."""
+    ctx = _read_request(request_stdin)
+    print(render_deletion_plan(resolve_deletion_plan(ctx, load_manifest(ctx))))
+
+
+@site_app.command("delete")
+def site_delete_cmd(
+    request_stdin: bool = typer.Option(
+        False,  # noqa: FBT003
+        "--request-stdin",
+        help="Read the typed JSON provisioning request from stdin",
+    ),
+    plan_json: str | None = typer.Option(None, "--plan-json", help="Validated deletion plan returned by BonesRemote"),
+):
+    """Remove only the persisted, validated site deletion plan."""
+    ctx = _read_request(request_stdin)
+    _validate_host(ctx)
+    plan = parse_deletion_plan(plan_json, ctx) if plan_json else resolve_deletion_plan(ctx, load_manifest(ctx))
+    run(ctx=ctx, deploy=lambda current_ctx: deploy_site_delete(current_ctx, plan))
 
 
 @ssl_app.command("apply")

@@ -30,7 +30,7 @@ fn mutation_for(root: &PathBuf, release: &str) -> Result<SiteMutation> {
     config.runtime.web_root = String::from("public");
     let release_dir = release_dir(&config.app.project_root, release);
     fs::create_dir_all(release_dir.join("public"))?;
-    Ok(SiteMutation::adopt("unitapp", config, lock))
+    SiteMutation::adopt("unitapp", config, lock)
 }
 
 #[test]

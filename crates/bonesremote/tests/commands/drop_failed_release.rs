@@ -23,7 +23,7 @@ fn active_release_cannot_be_dropped() -> Result<()> {
 
     let mut config = Bones::for_site("demo");
     config.project_root = root.to_string_lossy().into_owned();
-    let mutation = SiteMutation::adopt("demo", config, DeploymentLock::acquire("demo")?);
+    let mutation = SiteMutation::adopt("demo", config, DeploymentLock::acquire("demo")?)?;
     assert!(ensure_release_not_active(&mutation, "active-release").is_err());
 
     fs::remove_dir_all(root)?;
@@ -39,7 +39,7 @@ fn cleanup_requires_a_readable_active_release() -> Result<()> {
 
     let mut config = Bones::for_site("demo");
     config.project_root = root.to_string_lossy().into_owned();
-    let mutation = SiteMutation::adopt("demo", config, DeploymentLock::acquire("demo")?);
+    let mutation = SiteMutation::adopt("demo", config, DeploymentLock::acquire("demo")?)?;
     assert!(ensure_release_not_active(&mutation, "candidate").is_err());
 
     fs::remove_dir_all(root)?;

@@ -51,3 +51,12 @@ fn deploy_rejects_the_removed_config_stdin_option() -> Result<()> {
     assert_eq!(output.status.code(), Some(2));
     Ok(())
 }
+
+#[test]
+fn decommission_protocol_commands_accept_a_site_argument() -> Result<()> {
+    for command in ["begin", "complete", "verify", "reactivate"] {
+        let output = common::run(&["decommission", command, "--site", "atlas"])?;
+        assert_ne!(output.status.code(), Some(2), "{command} must accept --site");
+    }
+    Ok(())
+}

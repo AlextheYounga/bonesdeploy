@@ -73,6 +73,7 @@ async fn dispatch_server(command: &ServerCommand) -> Result<()> {
 async fn dispatch_site(command: &SiteCommand) -> Result<()> {
     match command {
         SiteCommand::Setup { yes } => site::setup(*yes).await,
+        SiteCommand::Delete { yes } => site::delete(*yes).await,
         SiteCommand::Doctor { local, verbose } => site::doctor(*local, *verbose).await,
         SiteCommand::Status => site::status().await,
         SiteCommand::Manifest { format } => site::manifest(match format {

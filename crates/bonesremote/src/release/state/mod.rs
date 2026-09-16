@@ -18,7 +18,7 @@ pub use record::{DeploymentPhase, DeploymentRecord, ProcessIdentity};
 pub use releases::{
     current_release_dir, current_release_name, list_releases_sorted, point_symlink_atomically, release_dir, shared_dir,
 };
-pub use store::quarantine_candidates;
+pub use store::{DeletionPlan, quarantine_candidates};
 
 thread_local! {
     static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
@@ -138,4 +138,70 @@ pub fn clear_staged_release(site: &str) -> Result<()> {
     let state = store::read_state(site)?;
     let state = state.with_staged_release(None);
     store::write_state(site, &state).with_context(|| format!("Failed to clear staged release state for {site}"))
+}
+
+/// Begins deletion protection, retaining the first accepted plan for retries.
+pub fn begin_decommission(site: &str, plan: DeletionPlan) -> Result<DeletionPlan> {
+    let state = store::read_state(site)?;
+    if let Some(plan) = state.decommissioning() {
+        return Ok(plan.clone());
+    }
+    if let Some(tombstone) = state.tombstone() {
+        return Ok(tombstone.plan().clone());
+    }
+    if state.active().is_some_and(|active| !active.phase().is_committed()) {
+        bail!("A deployment is active or interrupted; resolve it before decommissioning {site}");
+    }
+    if state.staged_release().is_some() && state.active().is_none() {
+        bail!("A staged release is interrupted; resolve it before decommissioning {site}");
+    }
+
+    store::write_state(site, &state.with_decommissioning(Some(plan.clone())))?;
+    Ok(plan)
+}
+
+/// Replaces mutable deployment state with an unverified tombstone.
+pub fn complete_decommission(site: &str) -> Result<()> {
+    let state = store::read_state(site)?;
+    if state.tombstone().is_some() {
+        return Ok(());
+    }
+    let plan = state.decommissioning().cloned().context("Site is not decommissioning")?;
+    let tombstone = store::DeletionTombstone::new(plan);
+    let state =
+        state.with_active(None).with_staged_release(None).with_decommissioning(None).with_tombstone(Some(tombstone));
+    store::write_state(site, &state)
+}
+
+/// Marks a completed tombstone verified without ever reopening site mutations.
+pub fn verify_decommission(site: &str) -> Result<()> {
+    let state = store::read_state(site)?;
+    let tombstone = state.tombstone().cloned().context("Site deletion state has not been completed")?;
+    if tombstone.verified() {
+        return Ok(());
+    }
+    store::write_state(site, &state.with_tombstone(Some(tombstone.verify())))
+}
+
+/// Clears deletion protection only after final deletion verification succeeded.
+pub fn reactivate_decommission(site: &str) -> Result<()> {
+    let state = store::read_state(site)?;
+    let Some(tombstone) = state.tombstone() else {
+        return Ok(());
+    };
+    if !tombstone.verified() {
+        bail!("Site deletion has not been verified; refusing to reactivate {site}");
+    }
+    store::write_state(site, &state.with_tombstone(None))
+}
+
+pub fn ensure_site_mutable(site: &str) -> Result<()> {
+    let state = store::read_state(site)?;
+    if state.decommissioning().is_some() {
+        bail!("Site {site} is decommissioning; normal site mutations are blocked");
+    }
+    if state.tombstone().is_some() {
+        bail!("Site {site} has been deleted; normal site mutations are blocked");
+    }
+    Ok(())
 }

@@ -28,9 +28,13 @@ pub fn sync_control_plane_command(site: &str) -> String {
     format!("sudo -n bonesremote config sync --site {}", ssh::shell_quote(site))
 }
 
+pub fn decommission_command(action: &str, site: &str) -> String {
+    format!("sudo -n bonesremote decommission {action} --site {}", ssh::shell_quote(site))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{deploy_command, sync_control_plane_command};
+    use super::{decommission_command, deploy_command, sync_control_plane_command};
 
     #[test]
     fn deploy_command_runs_the_no_flag_lifecycle_through_sudo() {
@@ -49,5 +53,10 @@ mod tests {
     #[test]
     fn sync_command_is_the_other_sudoed_deploy_command() {
         assert_eq!(sync_control_plane_command("demo"), "sudo -n bonesremote config sync --site 'demo'");
+    }
+
+    #[test]
+    fn decommission_command_runs_a_sudoed_remote_transition() {
+        assert_eq!(decommission_command("begin", "demo"), "sudo -n bonesremote decommission begin --site 'demo'");
     }
 }
