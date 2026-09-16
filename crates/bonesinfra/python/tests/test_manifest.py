@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from pyinfra.context import ctx_host
 from pyinfra.facts.files import Directory, Link, Socket
+from pyinfra.facts.server import Command, Which
 from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra import manifest
@@ -133,6 +134,86 @@ def test_quick_tunnel_is_expected_only_without_a_real_domain():
     services = collect_services(_context(domain=""), ProjectManifest())
 
     assert any(service.unit == "example-cloudflared.service" for service in services)
+
+
+def test_compose_manifest_reports_runtime_contract_without_claiming_native_security():
+    ctx = DeployContext.from_request(
+        make_site_request(backend="docker", project_name="example", domain="", ssl_enabled=False, compose_port=None)
+    )
+
+    data = report(ctx, [], [], ProjectManifest())
+
+    assert data["compose"]["project_name"] == "bonesdeploy-example"
+    assert data["compose"]["security_mode"] == "reduced-guarantee"
+    assert "not rolled back" in data["compose"]["persistent_data"]
+    services = collect_services(ctx, ProjectManifest())
+    assert not any(service.unit == "example-cloudflared.service" for service in services)
+
+
+def test_compose_manifest_includes_secret_free_remote_runtime_status():
+    ctx = DeployContext.from_request(
+        make_site_request(backend="docker", project_name="example", domain="", ssl_enabled=False, compose_port=None)
+    )
+
+    class FakeHost:
+        def get_fact(self, fact, path=None, *, services=None, command=None):
+            if fact is Which:
+                return "/usr/bin/docker"
+            if fact is Command and command.startswith("docker compose version"):
+                return "available"
+            if fact is Command and command.startswith("bonesremote status"):
+                return '{"compose":{"project_name":"bonesdeploy-example","files":["compose.yaml"],"services":[]}}'
+            if fact is SystemdStatus:
+                return {services: True}
+            if fact is SystemdEnabled:
+                return {services: True}
+            return None
+
+    with ctx_host.use(FakeHost()):
+        data = inspect_for_runner(ctx, ProjectManifest())
+
+    assert data["compose"]["engine_available"] is True
+    assert data["compose"]["plugin_available"] is True
+    assert data["compose"]["files"] == ["compose.yaml"]
+    assert ".env" not in render(data, "json")
+
+
+@pytest.mark.parametrize(
+    ("engine", "plugin", "status", "expected_error"),
+    [
+        (None, "unavailable", None, "bonesremote status is unavailable"),
+        ("/usr/bin/docker", "available", "not-json", "bonesremote returned invalid Compose status"),
+        (
+            "/usr/bin/docker",
+            "available",
+            '{"compose":{"error":"Failed to inspect Compose stack"}}',
+            "Failed to inspect Compose stack",
+        ),
+    ],
+)
+def test_compose_manifest_reports_runtime_inspection_failures(engine, plugin, status, expected_error):
+    ctx = DeployContext.from_request(
+        make_site_request(backend="docker", project_name="example", domain="", ssl_enabled=False, compose_port=None)
+    )
+
+    class FakeHost:
+        def get_fact(self, fact, path=None, *, services=None, command=None):
+            if fact is Which:
+                return engine
+            if fact is Command and command.startswith("docker compose version"):
+                return plugin
+            if fact is Command and command.startswith("bonesremote status"):
+                return status
+            if fact in {SystemdStatus, SystemdEnabled}:
+                return {services: True}
+            return None
+
+    with ctx_host.use(FakeHost()):
+        data = inspect_for_runner(ctx, ProjectManifest())
+
+    assert data["compose"]["engine_available"] is bool(engine)
+    assert data["compose"]["plugin_available"] is (plugin == "available")
+    assert data["compose"]["error"] == expected_error
 
 
 def test_services_are_inspected_without_mutations(tmp_path: Path):

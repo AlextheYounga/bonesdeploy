@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from shlex import quote
 from typing import Any, Literal
 
 from pyinfra.context import ctx_host
 from pyinfra.facts.files import Directory, File, Link, Socket
+from pyinfra.facts.server import Command, Which
 from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra.config.context import DeployContext
 from bonesinfra.pyinfra.operations import letsencrypt_cert_paths
-from bonesinfra.services.runtime import get_service
 
 ArtifactKind = Literal["file", "directory", "link", "socket"]
 ArtifactState = Literal["present", "missing", "wrong-kind"]
@@ -70,16 +71,11 @@ COMMON_ARTIFACTS = (
     Artifact("project configuration directory", "conf_root", "directory", "runtime"),
 )
 
-COMMON_SERVICES = (ManagedService("site nginx", "{project}-nginx.service", "runtime"),)
-
 
 def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifact, ...]:
     """Return the artifacts expected for the context's deployment strategy."""
     artifacts = list(COMMON_ARTIFACTS)
     artifacts.extend(Artifact.at_path(*spec) for spec in project_manifest.artifacts(ctx))
-
-    for name in ctx.services.services:
-        artifacts.extend(Artifact.at_path(*spec) for spec in get_service(name).manifest_artifacts(ctx))
 
     if ctx.app.dns.ssl_enabled and ctx.app.dns.domain:
         artifacts.append(Artifact("ACME webroot", "acme_webroot", "directory", "ssl"))
@@ -92,17 +88,14 @@ def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifa
 
 def collect_services(ctx: DeployContext, project_manifest: Any) -> tuple[ManagedService, ...]:
     """Return the project-specific systemd services managed by BonesInfra."""
-    services = [
-        ManagedService(entry.name, entry.unit.format(project=ctx.app.project_name), entry.owner)
-        for entry in COMMON_SERVICES
-    ]
+    services = []
+    if ctx.runtime.backend != "docker" or ctx.runtime.compose_port is not None:
+        services.append(ManagedService("site nginx", f"{ctx.app.project_name}-nginx.service", "runtime"))
     services.extend(
         ManagedService(name, unit.format(project=ctx.app.project_name), owner)
         for name, unit, owner in project_manifest.services(ctx)
     )
-    for name in ctx.services.services:
-        services.extend(ManagedService(*spec) for spec in get_service(name).manifest_services(ctx))
-    if not ctx.app.dns.domain:
+    if not ctx.app.dns.domain and (ctx.runtime.backend != "docker" or ctx.runtime.compose_port is not None):
         services.append(ManagedService("quick tunnel", f"{ctx.app.project_name}-cloudflared.service", "runtime"))
     return _deduplicate_services(services)
 
@@ -132,20 +125,40 @@ def report(
     entries: list[ResolvedArtifact],
     services: list[ResolvedService],
     project_manifest: Any,
+    compose_runtime: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     template = ctx.runtime.data.get("template")
 
-    return {
+    data = {
         "strategy": {
             "backend": ctx.runtime.backend,
             "framework": template or "none",
             "mode": project_manifest.mode(ctx),
-            "services": list(ctx.services.services),
             "ssl": ctx.app.dns.ssl_enabled,
         },
         "entries": [asdict(entry) for entry in entries],
         "managed_services": [asdict(service) for service in services],
     }
+    if ctx.runtime.backend == "docker":
+        data["compose"] = {
+            "project_name": f"bonesdeploy-{ctx.app.project_name}",
+            "files": [],
+            "services": [],
+            "engine_available": None,
+            "plugin_available": None,
+            "ingress_port": ctx.runtime.compose_port,
+            "wait_timeout": ctx.runtime.compose_wait_timeout,
+            "security_mode": "reduced-guarantee",
+            "security_warning": (
+                "The project Compose file is trusted privileged input; native runtime isolation is not guaranteed. "
+                "BonesDeploy does not add a Docker socket mount."
+            ),
+            "persistent_data": (
+                "Compose named volumes persist across deploy and rollback; their data is not rolled back."
+            ),
+            **(compose_runtime or {}),
+        }
+    return data
 
 
 def render_text(data: dict[str, Any]) -> str:
@@ -153,7 +166,6 @@ def render_text(data: dict[str, Any]) -> str:
     lines = [
         f"Framework: {strategy['framework']} ({strategy['mode']})",
         f"Runtime backend: {strategy['backend']}",
-        f"Services: {', '.join(strategy['services']) or 'none'}",
         f"SSL: {'enabled' if strategy['ssl'] else 'disabled'}",
         "",
         "Manifest:",
@@ -166,6 +178,20 @@ def render_text(data: dict[str, Any]) -> str:
         state = "running" if service["running"] else "stopped"
         enabled = "enabled" if service["enabled"] else "disabled"
         lines.append(f"- [{state}, {enabled}] {service['unit']} {service['owner']}")
+    if compose := data.get("compose"):
+        lines.extend(
+            [
+                "",
+                f"Compose project: {compose['project_name']}",
+                f"Compose files: {', '.join(compose['files']) or 'not available'}",
+                f"Compose security: {compose['security_mode']}",
+                f"Warning: {compose['security_warning']}",
+                f"Persistent data: {compose['persistent_data']}",
+            ]
+        )
+        lines.extend(f"- [{service['condition']}] {service['service']}" for service in compose["services"])
+        if compose.get("error"):
+            lines.append(f"- [error] {compose['error']}")
     return "\n".join(lines)
 
 
@@ -184,7 +210,31 @@ def inspect_for_runner(ctx: DeployContext, project_manifest: Any) -> dict[str, A
         inspect_artifacts(ctx, host, project_manifest),
         inspect_services(ctx, host, project_manifest),
         project_manifest,
+        _inspect_compose_runtime(ctx, host),
     )
+
+
+def _inspect_compose_runtime(ctx: DeployContext, host: Any) -> dict[str, Any] | None:
+    if ctx.runtime.backend != "docker":
+        return None
+    engine = host.get_fact(Which, command="docker")
+    plugin = host.get_fact(
+        Command,
+        command="docker compose version >/dev/null 2>&1 && printf available || printf unavailable",
+    )
+    status = host.get_fact(Command, command=f"bonesremote status --site {quote(ctx.app.project_name)}")
+    if not status:
+        compose = {"error": "bonesremote status is unavailable"}
+    else:
+        try:
+            compose = json.loads(status).get("compose") or {}
+        except (TypeError, json.JSONDecodeError):
+            compose = {"error": "bonesremote returned invalid Compose status"}
+    return {
+        "engine_available": bool(engine),
+        "plugin_available": plugin == "available",
+        **compose,
+    }
 
 
 def _inspect_one(host: Any, artifact: Artifact, path: str) -> ResolvedArtifact:

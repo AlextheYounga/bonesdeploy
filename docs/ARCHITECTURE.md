@@ -18,7 +18,7 @@ bonesdeploy-core            bonesdeploy
         │                          ▼
         │                      bonesinfra
         │                        Machine provisioning
-        │                        Frameworks, runtimes, services
+        │                        Frameworks, runtimes, Compose
         │                        system configuration (pyinfra)
         │
         ▲
@@ -30,7 +30,7 @@ bonesdeploy-core            bonesdeploy
 
 **`bonesdeploy-core`** — the shared vocabulary of the system. Defines the
 canonical configuration schema (`Bones`), every product-owned filesystem path,
-and the validation rules for project/site names and services. A leaf crate with
+and the validation rules for project/site names and runtime configuration. A leaf crate with
 no workspace dependencies. Both binaries and the Python provisioning layer
 depend on it.
 
@@ -43,7 +43,7 @@ provisions via `bonesinfra` or triggers `bonesremote` over SSH.
 Python wheel is materialized as `infra/bonesinfra-<version>-py3-none-any.whl`, while managed templates
 are materialized under `infra/templates/`; a project-scoped venv installs the
 wheel and its dependencies. It uses `pyinfra` to provision
-the remote server (users, packages, frameworks, databases, SSL, firewalls) and
+the remote server (users, packages, frameworks, Docker Compose, SSL, firewalls) and
 owns *what gets installed* at provisioning time.
 
 **`bonesremote`** — the server-side binary that owns the existing root-required
@@ -63,7 +63,8 @@ owner is canonical. Bypassing it creates a competing abstraction.
 | Framework-specific config questions | Framework Rust module (`frameworks/<fw>.rs`) | Add sibling module + register in `frameworks.rs` | Inline prompt logic in init command |
 | Framework provisioning | Installed BonesInfra wheel + `infra/templates` + `infra/custom`, loaded by `bonesinfra.project` | Extend managed framework or project-owned custom content | Special-case framework behavior in setup/runtime commands |
 | Language runtime installation | `LanguageRuntime` ABC | Add subclass in `services/languages/` | Install runtimes directly from framework `runtime.py` |
-| Database / server service provisioning | `RuntimeService` ABC + `SERVICE` registry | Add subclass + register in `SERVICE` dict | Put DB provisioning in framework code |
+| Compose host provisioning | `services/linux/compose.py` | Install Docker and render the generic site unit/optional nginx ingress | Interpret project Compose files in BonesInfra |
+| Compose deployment runtime | `bonesremote::runtime::docker` | Reuse explicit Compose discovery, commands, and inspection | Create a second release lifecycle or parse Compose internally |
 | Remote site mutation | `SiteMutation` | Acquire it before any site state change | Create independent locking or config-validation paths |
 | Deployment lifecycle stages | Lifecycle modules (`release/lifecycle/`) | Add behavior to existing stage | Create a separate deployment flow |
 | Per-site persisted state | `SiteState` + `state/` store | Read/write through the store API | Touch state files directly |
@@ -85,8 +86,8 @@ Before adding code, classify the responsibility.
 Need another programming language?
   → LanguageRuntime
 
-Need another database / server service?
-  → RuntimeService
+Need a database, cache, worker, or supporting container?
+  → Declare it in the project Compose file, or manage it externally for native sites
 
 Need another supported application framework?
   → Framework contract (Rust questions + Python package in bonesinfra/frameworks/<fw>/)
@@ -143,8 +144,7 @@ Reading, writing, or validating project deployment config.
 Contract:
 Bones (bonesdeploy-core/src/config.rs)
 ├── app: App            # project_name, host, port, branch, domain, ssl, repo_path
-├── runtime: Runtime    # template, web_root, backend, node_version, shared, extra
-├── services: Services  # services: Vec<String>
+├── runtime: Runtime    # template, web_root, backend, Compose settings, extra
 └── build: Build        # timeout_seconds
 
 Runtime.extra is a serde-flattened BTreeMap for framework-specific keys.
@@ -318,38 +318,6 @@ Do not:
 - Install language runtimes directly from framework runtime.py code
 - Create a second language-installation mechanism
 - Reimplement version selection logic per framework
-```
-
-```text
-### RuntimeService
-
-Represents: A server-side service BonesDeploy can provision (database, cache, ...).
-
-Use when:
-Adding PostgreSQL-, Redis-, MongoDB-like infrastructure.
-
-Contract:
-RuntimeService ABC (services/runtime/base.py)
-├── provision(ctx)                # install, create user/db, seed shared/.env
-├── manifest_artifacts(ctx)       # declare paths for manifest inspection
-└── manifest_services(ctx)        # declare systemd units for manifest inspection
-
-Registered in the SERVICES dict in services/runtime/__init__.py.
-Activated by the service names parsed from the root `.env`.
-
-Existing implementations:
-- PostgresService, RedisService, MariaDBService, MysqlService, MongodbService, ValkeyService
-
-To add another:
-Subclass RuntimeService in services/runtime/<name>.py; add entry to SERVICES dict.
-
-Canonical example:
-services/runtime/postgres.py
-
-Do not:
-- Provision databases directly from framework runtime.py
-- Create another service registry
-- Reimplement shared provisioning behavior (user creation, credential generation)
 ```
 
 ```text

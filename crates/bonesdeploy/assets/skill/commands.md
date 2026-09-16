@@ -5,7 +5,7 @@ not real. Do not invent.
 
 ## init
 
-`bonesdeploy init [--non-interactive] [--project-name <name>] [--branch <b>] [--remote <r>] [--host <h>] [--port <p>] [--template <t>] [--framework-var <key=value>]...`
+`bonesdeploy init [--non-interactive] [--project-name <name>] [--branch <b>] [--remote <r>] [--host <h>] [--port <p>] [--template <t>] [--runtime-backend native|docker] [--framework-var <key=value>]...`
 
 Initializes one project and writes the canonical `.env`. It does not provision
 the server or site.
@@ -15,8 +15,8 @@ the server or site.
 `bonesdeploy setup [--yes]`
 
 Composes `server setup --yes` followed by `site setup --yes`. Site setup first
-checks server readiness, then runs site base provisioning, services, runtime,
-and doctor. Both setup paths are idempotent.
+checks server readiness, then runs site base provisioning, runtime, and doctor.
+Both setup paths are idempotent.
 
 ## doctor
 
@@ -43,7 +43,6 @@ global roots, and sudoers. They do not read site runtime or framework state.
 `bonesdeploy site manifest [--format text|json]`
 `bonesdeploy site releases [kill <release>]`
 `bonesdeploy site runtime [--yes]`
-`bonesdeploy site services [--yes]`
 `bonesdeploy site ssl [--yes] [--domain <d>] [--email <e>]`
 
 Site commands operate on one project. `site setup` does not push Git or

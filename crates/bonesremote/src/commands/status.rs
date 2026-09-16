@@ -4,12 +4,14 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::Result;
-use bonesdeploy_core::config::validate_site_name;
+use bonesdeploy_core::config::{RuntimeBackend, validate_site_name};
 use bonesdeploy_core::paths;
 use serde::Serialize;
 
 use crate::inspection::systemd;
 use crate::release::state as release_state;
+use crate::runtime::docker::command::{ComposeServiceStatus, ComposeStackStatus};
+use crate::{control_plane, runtime::docker};
 
 #[derive(Debug, Serialize)]
 struct Report {
@@ -17,6 +19,7 @@ struct Report {
     ssl: SslStatus,
     preview: Option<PreviewStatus>,
     services: Vec<ServiceStatus>,
+    compose: Option<ComposeReport>,
 }
 
 #[derive(Debug, Serialize)]
@@ -39,6 +42,24 @@ struct ServiceStatus {
     enabled: String,
 }
 
+#[derive(Debug, Serialize)]
+struct ComposeReport {
+    project_name: String,
+    files: Vec<String>,
+    services: Vec<ComposeServiceReport>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ComposeServiceReport {
+    name: String,
+    service: String,
+    condition: String,
+    state: String,
+    health: Option<String>,
+    exit_code: i64,
+}
+
 pub fn run(site: &str) -> Result<()> {
     validate_site_name(site)?;
     let report = build_report(site);
@@ -56,6 +77,49 @@ fn build_report(site: &str) -> Report {
         ssl: ssl_status(&nginx_site_available),
         preview: preview_status(site),
         services: services(site),
+        compose: compose_status(site, Path::new(&project_root)),
+    }
+}
+
+fn compose_status(site: &str, project_root: &Path) -> Option<ComposeReport> {
+    let descriptor = control_plane::load(site).ok()?;
+    if descriptor.runtime.backend != RuntimeBackend::Docker {
+        return None;
+    }
+
+    Some(match docker::command::active_status(site, project_root) {
+        Ok(status) => ComposeReport::from(status),
+        Err(error) => ComposeReport {
+            project_name: docker::command::project_name(site).unwrap_or_else(|_| String::from("unknown")),
+            files: Vec::new(),
+            services: Vec::new(),
+            error: Some(format!("{error:#}")),
+        },
+    })
+}
+
+impl From<ComposeStackStatus> for ComposeReport {
+    fn from(status: ComposeStackStatus) -> Self {
+        Self {
+            project_name: status.project_name,
+            files: status.files,
+            services: status.services.into_iter().map(ComposeServiceReport::from).collect(),
+            error: None,
+        }
+    }
+}
+
+impl From<ComposeServiceStatus> for ComposeServiceReport {
+    fn from(status: ComposeServiceStatus) -> Self {
+        let condition = status.condition().to_string();
+        Self {
+            name: status.name,
+            service: status.service,
+            condition,
+            state: status.state,
+            health: status.health,
+            exit_code: status.exit_code,
+        }
     }
 }
 

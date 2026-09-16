@@ -7,7 +7,6 @@ import typer
 from bonesinfra.cli.commands.server import deploy_server_setup
 from bonesinfra.cli.commands.server.helpers import deploy_helpers
 from bonesinfra.cli.commands.site import deploy_site_setup
-from bonesinfra.cli.commands.site.services import deploy_services
 from bonesinfra.cli.commands.site.ssl import deploy_ssl
 from bonesinfra.config.context import DeployContext, ServerContext
 from bonesinfra.config.request import parse_request
@@ -25,7 +24,6 @@ server_app = typer.Typer()
 site_app = typer.Typer()
 ssl_app = typer.Typer()
 helpers_app = typer.Typer()
-services_app = typer.Typer()
 manifest_app = typer.Typer()
 patches_app = typer.Typer()
 app.add_typer(runtime_app, name="runtime", help="Runtime operations")
@@ -33,7 +31,6 @@ app.add_typer(server_app, name="server", help="Server baseline operations")
 app.add_typer(site_app, name="site", help="Site base provisioning operations")
 app.add_typer(ssl_app, name="ssl", help="SSL operations")
 app.add_typer(helpers_app, name="helpers", help="Helper tool operations")
-app.add_typer(services_app, name="services", help="Service operations")
 app.add_typer(manifest_app, name="manifest", help="Manifest inspection")
 app.add_typer(patches_app, name="patches", help="Update patches")
 
@@ -132,24 +129,6 @@ def helpers_apply_cmd(
     ctx = _read_request(request_stdin)
     _validate_host(ctx)
     run(ctx=ctx, deploy=deploy_helpers)
-
-
-@services_app.command("apply")
-def services_apply_cmd(
-    request_stdin: bool = typer.Option(
-        False,  # noqa: FBT003
-        "--request-stdin",
-        help="Read the typed JSON provisioning request from stdin",
-    ),
-):
-    ctx = _read_request(request_stdin)
-    _validate_host(ctx)
-    for name in ctx.services.services:
-        creds = ctx.service_credentials.get(name)
-        if not creds or not creds.get("password"):
-            print(f"Error: credentials for {name} are required; use bonesdeploy secrets edit", file=sys.stderr)
-            sys.exit(3)
-    run(ctx=ctx, deploy=deploy_services)
 
 
 @manifest_app.command("show")

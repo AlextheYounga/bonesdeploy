@@ -31,9 +31,13 @@ def load_manifest(ctx: DeployContext) -> ModuleType:
 
 
 def _load_selected(ctx: DeployContext, filename: str, callable_name: str) -> tuple[ModuleType, ModuleType | None]:
-    framework = _selected_framework(ctx)
+    framework = "custom" if ctx.runtime.backend == "docker" else _selected_framework(ctx)
     try:
-        module = importlib.import_module(f"bonesinfra.frameworks.{framework}.{filename[:-3]}")
+        module = (
+            importlib.import_module("bonesinfra.services.linux.compose")
+            if ctx.runtime.backend == "docker"
+            else importlib.import_module(f"bonesinfra.frameworks.{framework}.{filename[:-3]}")
+        )
     except Exception as error:
         raise ImportError(f"failed to import project framework infrastructure for {framework}: {error}") from error
     _require_callable(module, callable_name, Path(module.__file__ or filename))

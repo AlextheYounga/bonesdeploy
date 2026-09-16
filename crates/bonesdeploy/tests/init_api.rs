@@ -1,9 +1,7 @@
 use anyhow::{Result, bail};
 use bonesdeploy::commands::init::Args;
 use bonesdeploy::commands::init::config::collect_non_interactive;
-use bonesdeploy::commands::init::framework::{
-    collect_database_services, collect_framework_config, parse_framework_var,
-};
+use bonesdeploy::commands::init::framework::{collect_framework_config, parse_framework_var};
 use bonesdeploy::config::Bones;
 use bonesdeploy_core::config::RuntimeBackend;
 use bonesdeploy_core::paths;
@@ -20,7 +18,6 @@ fn args_non_interactive(template: Option<&str>, framework_vars: &[&str]) -> Args
         template: template.map(String::from),
         runtime_backend: None,
         framework_vars: framework_vars.iter().map(|value| String::from(*value)).collect(),
-        services: Vec::new(),
     }
 }
 
@@ -63,18 +60,6 @@ fn framework_config_validates_vars_and_template_fallbacks() -> Result<()> {
     assert_eq!(custom.template.as_deref(), Some("custom"));
     assert_eq!(custom.config.get("template"), Some(&Value::String("custom".into())));
     assert!(collect_framework_config(&args_non_interactive(None, &[]))?.template.is_none());
-    Ok(())
-}
-
-#[test]
-fn non_interactive_database_services_are_validated() -> Result<()> {
-    let mut args = args_non_interactive(None, &[]);
-    args.services = vec![String::from("postgres"), String::from("valkey")];
-    assert_eq!(collect_database_services(&args)?, args.services);
-    args.services = vec![String::from("unknown")];
-    assert!(collect_database_services(&args).is_err());
-    args.services = vec![String::from("postgres"), String::from("postgres")];
-    assert!(collect_database_services(&args).is_err());
     Ok(())
 }
 

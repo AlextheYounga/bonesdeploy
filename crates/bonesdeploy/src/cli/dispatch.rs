@@ -15,7 +15,6 @@ pub async fn run(cli: &Cli) -> Result<()> {
             template,
             runtime_backend,
             framework_vars,
-            services,
         } => {
             init::run(&init::Args {
                 non_interactive: *non_interactive,
@@ -27,7 +26,6 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 template: template.clone(),
                 runtime_backend: runtime_backend.clone(),
                 framework_vars: framework_vars.clone(),
-                services: services.clone(),
             })?;
             Ok(())
         }
@@ -82,7 +80,6 @@ async fn dispatch_site(command: &SiteCommand) -> Result<()> {
         SiteCommand::Releases { command } => dispatch_releases(command.as_ref()).await,
         SiteCommand::Runtime { yes } => site::runtime(*yes),
         SiteCommand::Ssl { yes, domain, email } => site::ssl(*yes, domain.clone(), email.clone()),
-        SiteCommand::Services { yes } => site::services(*yes),
     }
 }
 

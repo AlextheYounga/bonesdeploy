@@ -1,0 +1,12 @@
+[Unit]
+Description=Docker Compose stack for {{ project_name }}
+After=docker.service network-online.target
+Requires=docker.service
+PartOf={{ project_name }}.target
+Before={{ project_name }}.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart={{ paths.bonesremote_global_link }} runtime start --site {{ project_name }}
+ExecStop={{ paths.bonesremote_global_link }} runtime stop --site {{ project_name }}

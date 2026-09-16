@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from bonesinfra.cli.commands import server, site
 from bonesinfra.cli.commands.server import helpers as server_helpers
-from bonesinfra.cli.commands.site import services as site_services, ssl as site_ssl
+from bonesinfra.cli.commands.site import ssl as site_ssl
 
 
 def test_server_setup_runs_only_server_operations(monkeypatch):
@@ -56,21 +56,6 @@ def test_site_setup_runs_only_site_base_operations(monkeypatch):
     site.deploy_site_setup(ctx)
 
     assert calls == ["identities", "directories", "placeholder", "backup", "etckeeper-commit"]
-
-
-def test_service_provisioning_records_changes_after_provisioning(monkeypatch):
-    calls = []
-    ctx = SimpleNamespace(services=SimpleNamespace(services=("postgres", "valkey")))
-    monkeypatch.setattr(
-        site_services,
-        "get_service",
-        lambda name: SimpleNamespace(provision=lambda _ctx: calls.append(f"provision-{name}")),
-    )
-    monkeypatch.setattr(site_services.etckeeper, "commit_changes", lambda *_: calls.append("etckeeper-commit"))
-
-    site_services.deploy_services(ctx)
-
-    assert calls == ["provision-postgres", "provision-valkey", "etckeeper-commit"]
 
 
 def test_ssl_provisioning_records_changes_after_ssl_operations(monkeypatch):

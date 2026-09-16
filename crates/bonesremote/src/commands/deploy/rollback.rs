@@ -49,7 +49,7 @@ pub fn switch_and_verify(
     project_root: &str,
     current_name: &str,
     previous_name: &str,
-    restart: impl Fn() -> Result<()>,
+    mut restart: impl FnMut() -> Result<()>,
 ) -> Result<()> {
     let current_link = PathBuf::from(project_root).join(paths::CURRENT_LINK);
     let previous_dir = release_state::release_dir(project_root, previous_name);

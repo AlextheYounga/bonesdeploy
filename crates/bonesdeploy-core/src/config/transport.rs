@@ -25,34 +25,10 @@ pub struct SiteFields {
     pub web_root: String,
     pub branch: String,
     pub node_version: String,
-    pub services: Vec<String>,
+    pub compose_port: Option<u16>,
+    pub compose_wait_timeout: u16,
     pub backup: Backup,
     pub extras: BTreeMap<String, serde_json::Value>,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ServiceCredentials {
-    pub password: String,
-    pub username: String,
-    pub database: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct KeyValueCredentials {
-    pub password: String,
-    pub port: String,
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct ServicesRequest {
-    pub postgres: Option<ServiceCredentials>,
-    pub mysql: Option<ServiceCredentials>,
-    pub mongodb: Option<ServiceCredentials>,
-    pub valkey: Option<KeyValueCredentials>,
-    pub redis: Option<KeyValueCredentials>,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -61,8 +37,6 @@ pub struct ProvisioningRequest {
     pub server: ServerConnection,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub site: Option<SiteFields>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub services: Option<ServicesRequest>,
 }
 
 impl ProvisioningRequest {
@@ -108,11 +82,11 @@ impl ProvisioningRequest {
                 web_root: config.runtime.web_root.clone(),
                 branch: config.branch.clone(),
                 node_version: config.runtime.node_version.clone(),
-                services: config.services.services.clone(),
+                compose_port: config.runtime.compose_port,
+                compose_wait_timeout: config.runtime.compose_wait_timeout,
                 backup: config.backup.clone(),
                 extras,
             }),
-            services: None,
         })
     }
 
@@ -121,7 +95,6 @@ impl ProvisioningRequest {
         Self {
             server: ServerConnection { host: host.into(), ssh_user: ssh_user.into(), port: port.into() },
             site: None,
-            services: None,
         }
     }
 }
@@ -133,8 +106,6 @@ pub struct RemoteDeploymentConfig {
     pub releases_keep: usize,
     pub runtime: super::model::Runtime,
     pub build: super::model::Build,
-    #[serde(default)]
-    pub services: Vec<String>,
 }
 
 impl RemoteDeploymentConfig {
@@ -145,7 +116,6 @@ impl RemoteDeploymentConfig {
             releases_keep: config.releases_keep,
             runtime: config.runtime.clone(),
             build: config.build.clone(),
-            services: config.services.services.clone(),
         }
     }
 
@@ -156,7 +126,6 @@ impl RemoteDeploymentConfig {
         config.releases_keep = self.releases_keep;
         config.runtime = self.runtime;
         config.build = self.build;
-        config.services.services = self.services;
         config
     }
 }

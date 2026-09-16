@@ -116,9 +116,44 @@ impl Harness {
         Ok(project)
     }
 
+    pub fn provision_compose(&self, site: &str, port: u16) -> Result<SampleProject> {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/compose.md");
+        let project = SampleProject::from_fixture(&self.session, &fixture)?;
+        project.bonesdeploy(
+            &self.session,
+            &self.artifacts.bonesdeploy,
+            &[
+                "init",
+                "--non-interactive",
+                "--project-name",
+                site,
+                "--branch",
+                "main",
+                "--host",
+                &self.host,
+                "--template",
+                "none",
+                "--runtime-backend",
+                "docker",
+            ],
+        )?;
+        project.configure_compose_port(port)?;
+        project.assert_infrastructure("compose")?;
+        project.commit(&self.session, "bonesdeploy init")?;
+        self.setup_server(&project)?;
+        project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, SITE_SETUP_ARGS)?;
+        project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["secrets", "push"])?;
+        self.assert_site(site)?;
+        Ok(project)
+    }
+
     pub fn deploy(&self, project: &SampleProject) -> Result<()> {
         project.push(&self.session, "production", "main")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["deploy"])
+    }
+
+    pub fn commit(&self, project: &SampleProject, message: &str) -> Result<()> {
+        project.commit(&self.session, message)
     }
 
     fn setup_server(&self, project: &SampleProject) -> Result<()> {
@@ -193,7 +228,7 @@ impl Harness {
         Ok(())
     }
 
-    fn exec(&self, script: &str) -> Result<String> {
+    pub fn exec(&self, script: &str) -> Result<String> {
         self.container.exec(script)
     }
 

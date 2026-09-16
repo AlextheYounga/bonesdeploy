@@ -5,6 +5,7 @@ import pytest
 from bonesinfra.config.context import DeployContext
 from bonesinfra.frameworks.custom import manifest as core_manifest, runtime as core_runtime
 from bonesinfra.project import load_manifest, load_runtime
+from bonesinfra.services.linux import compose
 
 from .helpers import make_site_request
 
@@ -113,3 +114,30 @@ def mode(_ctx):
     assert manifest.artifacts(None) == ["managed artifact", "custom artifact"]
     assert manifest.services(None) == ["managed service", "custom service"]
     assert manifest.mode(None) == "custom"
+
+
+def test_docker_backend_uses_generic_compose_and_preserves_custom_infrastructure(tmp_path: Path, monkeypatch):
+    config = DeployContext.from_request(make_site_request(backend="docker", template="laravel", compose_port=8080))
+    monkeypatch.chdir(tmp_path)
+    _custom(tmp_path, "runtime.py", "def deploy(_ctx):\n    return 'custom'\n")
+    _custom(
+        tmp_path,
+        "manifest.py",
+        """def artifacts(_ctx):
+    return [(\"custom artifact\", \"/custom\", \"file\", \"custom\")]
+
+def services(_ctx):
+    return [(\"custom service\", \"{project}-custom.service\", \"custom\")]
+
+def mode(_ctx):
+    return \"custom\"
+""",
+    )
+
+    runtime = load_runtime(config)
+    manifest = load_manifest(config)
+
+    assert runtime.deploy.__closure__[0].cell_contents is compose
+    assert manifest.mode(config) == "custom"
+    assert manifest.artifacts(config)[0][0] == "Compose runtime service"
+    assert manifest.services(config)[0][1] == "{project}-compose.service"

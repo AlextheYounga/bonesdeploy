@@ -11,7 +11,7 @@ bonesdeploy deploy
 ```
 
 Root setup composes server setup and site setup. Site setup performs the
-readiness check, site base, services, runtime, and doctor sequence.
+readiness check, site base, runtime, and doctor sequence.
 
 ## First-time setup, the explicit path
 
@@ -36,6 +36,12 @@ git push production main
 bonesdeploy deploy
 ```
 
+For a Compose site, commit exactly one conventional base Compose file and at
+most one conventional override. Compose performs image pull/build and waits for
+declared health checks. `shared/.env` is available for interpolation but is not
+injected unless the Compose file references it. Numbered BonesDeploy build and
+prepare scripts are native-only.
+
 ## Secrets, end to end
 
 ```text
@@ -58,6 +64,10 @@ Bad deploy:
 bonesdeploy rollback
 ```
 
+Compose rollback reconciles the previous release's Compose definition under the
+same `bonesdeploy-<site>` project. Named volumes remain in place, so rollback
+does not reverse database migrations, volume contents, or external side effects.
+
 Stuck build:
 
 ```text
@@ -65,11 +75,10 @@ bonesdeploy site releases
 bonesdeploy site releases kill <stuck-release>
 ```
 
-Wrong runtime or services:
+Wrong runtime:
 
 ```text
 bonesdeploy site runtime --yes
-bonesdeploy site services --yes
 ```
 
 Wrong SSL:

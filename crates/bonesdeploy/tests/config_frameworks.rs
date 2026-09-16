@@ -51,7 +51,8 @@ fn write_local_environment_round_trips_dotenv_values() -> Result<()> {
     config.runtime.template = String::from("next");
     config.runtime.backend = RuntimeBackend::Docker;
     config.runtime.web_root = String::from("dist");
-    config.services.services = vec![String::from("postgres"), String::from("redis")];
+    config.runtime.compose_port = Some(8080);
+    config.runtime.compose_wait_timeout = 240;
 
     write_local_environment(&config, &path)?;
     let content = fs::read_to_string(&path)?;
@@ -69,7 +70,8 @@ fn write_local_environment_round_trips_dotenv_values() -> Result<()> {
     assert_eq!(loaded.runtime.template, "next");
     assert_eq!(loaded.runtime.backend, RuntimeBackend::Docker);
     assert_eq!(loaded.runtime.web_root, "dist");
-    assert_eq!(loaded.services.services, ["postgres", "redis"]);
+    assert_eq!(loaded.runtime.compose_port, Some(8080));
+    assert_eq!(loaded.runtime.compose_wait_timeout, 240);
     Ok(())
 }
 

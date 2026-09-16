@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::config::RuntimeBackend;
 use bonesdeploy_core::paths;
 
 use crate::release::SiteMutation;
@@ -13,6 +14,9 @@ use crate::release::state::release_dir;
 /// exists, so we never cut over to a release that cannot be reached or whose
 /// nginx configuration would reload a broken daemon.
 pub fn validate_ready(mutation: &SiteMutation, release: &str, nginx_test: impl Fn() -> Result<()>) -> Result<()> {
+    if mutation.config().runtime.backend == RuntimeBackend::Docker {
+        return Ok(());
+    }
     let web_root = release_web_root(mutation, release);
     if !web_root.is_dir() {
         bail!("New release web root does not exist: {}", web_root.display());

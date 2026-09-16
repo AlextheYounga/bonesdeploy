@@ -106,7 +106,7 @@ def _prepare_shim(tmp_path: Path) -> Path:
 def _run_record_script(script: Path, tmp_path: Path, bin_dir: Path | None, *, commit_fails: bool = False):
     env = {
         **os.environ,
-        "PATH": f"{bin_dir}:/usr/bin:/bin" if bin_dir else "/usr/bin:/bin",
+        "PATH": f"{bin_dir}:/usr/bin:/bin" if bin_dir else str(tmp_path / "empty-bin"),
         "ETCKEEPER_DIR": str(tmp_path / "etc"),
         "SHIM_LOG": str(tmp_path / "shim.log"),
         "GIT_CONFIG_NOSYSTEM": "1",

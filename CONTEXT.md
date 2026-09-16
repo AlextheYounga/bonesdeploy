@@ -68,7 +68,7 @@ Deployment state files (`active-deployment.json` and `staged-release`) are writt
 ```
 .env                      # gitignored local environment + managed BONES_* configuration block
 .env.build                # committed, non-secret build inputs
-infra/secrets/.env.gpg    # encrypted production environment (application + service credentials)
+infra/secrets/.env.gpg    # encrypted production application environment
 deployment/
 ├── build/
 │   ├── 01_install_build_deps.sh
@@ -82,12 +82,14 @@ Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinf
 ### Project Environment
 Rust is the sole parser of the project-root `.env`. It models two environments:
 
-- `LocalEnvironment` is the gitignored root `.env`, conceptually `.env.local`. Application-owned content (comments, values, order) survives byte-for-byte; it also carries exactly one BonesDeploy-managed, comment-delimited `BONES_*` configuration block holding project identity, SSH connection, deployment branch, domains, framework, web root, services, scheduled-backup settings, and framework-specific scalar settings.
-- `ProductionEnvironment` is the decrypted `infra/secrets/.env.gpg`, conceptually `.env.production`, published to the host as `shared/.env` only by `bonesdeploy secrets push`. It contains application runtime keys and generated service credentials — never `BONES_*` keys.
+- `LocalEnvironment` is the gitignored root `.env`, conceptually `.env.local`. Application-owned content (comments, values, order) survives byte-for-byte; it also carries exactly one BonesDeploy-managed, comment-delimited `BONES_*` configuration block holding project identity, SSH connection, deployment branch, domains, framework, web root, runtime backend, Compose settings, scheduled-backup settings, and framework-specific scalar settings.
+- `ProductionEnvironment` is the decrypted `infra/secrets/.env.gpg`, conceptually `.env.production`, published to the host as `shared/.env` only by `bonesdeploy secrets push`. It contains application runtime keys and never `BONES_*` keys.
 
 Build-only public settings live in the committed `.env.build`. Framework templates declare `NODE_VERSION`; when set, this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository. Provisioning defaults to `24.19.0`.
 
-`SERVICES` (in the managed `BONES_*` block, so `BONES_SERVICES`) is selected during init (or with repeated non-interactive `--service` flags). Supported values are `postgres`, `mariadb`, `mysql`, `mongodb`, `valkey`, and `redis`. Database provisioning binds every listener to localhost and consumes credentials supplied by BonesDeploy in typed requests; it never generates application credentials or writes `shared/.env`. First initialization generates service credentials locally into the encrypted environment (service values override framework defaults), and later additions are made through `bonesdeploy secrets edit`. Redis and Valkey use separate per-project instances on port `6379` by default; provisioning fails when the requested port is occupied rather than selecting another. PostgreSQL, MariaDB, MySQL, and MongoDB use database-scoped accounts. Remote workstation access uses ordinary SSH port forwarding; no tunnel information is stored. MariaDB and MySQL are mutually exclusive server implementations.
+BonesDeploy does not select or provision built-in databases and caches. Native
+sites use independently managed services. Compose sites declare supporting
+services in their Compose file.
 
 Example `.env`:
 ```dotenv
@@ -108,7 +110,8 @@ BONES_TEMPLATE=next
 BONES_RUNTIME_BACKEND=native
 BONES_WEB_ROOT=public
 BONES_NODE_VERSION=24.19.0
-BONES_SERVICES=postgres
+BONES_COMPOSE_PORT=
+BONES_COMPOSE_WAIT_TIMEOUT=120
 BONES_BACKUP_SCHEDULE=0 0 * * *
 BONES_BACKUP_RETENTION_DAYS=30
 BONES_BORG_PASSPHRASE=<generated>
@@ -260,7 +263,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 
 - **site setup**
   - Verifies server readiness before any site mutation.
-  - Runs site base, services, runtime, and site doctor in that order.
+  - Runs site base, runtime, and site doctor in that order.
   - Site base creates one bare repository, site identities, paths, root-owned control-plane state, and a placeholder release.
   - For projects with a configured Borg passphrase, site base also provisions the scheduled backup: Borg package, root-only passphrase file, encrypted repository, and the `/etc/cron.d` schedule entry.
   - Does not push Git or secrets, configure SSL, or deploy a release.
@@ -274,14 +277,10 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 - **site runtime**:
   - Reapplies the configured runtime settings from the root `.env` to the host and provisions the selected framework's runtime.
    - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra runtime apply --request-stdin` against the configured host as the configured `ssh_user`, feeding the typed site request on stdin.
-  - Imports and runs the project's `infra/runtime.py` (local vendored package) or the selected canonical BonesInfra framework package, which installs framework-specific packages and services.
+  - Native sites run project and framework provisioning. Compose sites configure Docker's official Debian/Ubuntu apt repository, install Docker Engine and the Compose plugin, render the generic Compose systemd unit, and optionally configure nginx for `BONES_COMPOSE_PORT`.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
-  - The public project router is rendered only for a configured real domain. Sites without a domain receive a project-scoped Cloudflare Quick Tunnel (`<project>-cloudflared.service`) proxying to the per-site nginx Unix socket; `bonesdeploy status` reports its ephemeral `trycloudflare.com` preview URL, and real-domain SSL activation removes the tunnel.
+  - Native sites without a domain receive a project-scoped Cloudflare Quick Tunnel. Compose sites receive managed nginx/tunnel ingress only when `BONES_COMPOSE_PORT` is configured; otherwise their Compose stack owns port exposure.
   - Does not handle SSL; use `site ssl` for TLS configuration.
-
-- **site services**:
-  - Provisions the services selected in `[services]`; `bonesdeploy site setup` runs this after server readiness and site base provisioning.
-  - Keeps all database listeners loopback-only and does not publish credentials into the remote control-plane dataset.
 
 - **site ssl**
   - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra ssl apply --request-stdin` against the configured host as root, feeding the typed site request on stdin.
@@ -295,7 +294,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 - **secrets**
   - Subcommands: `init`, `edit`, `push`.
   - Manages the GPG-encrypted production environment at `infra/secrets/.env.gpg`.
-  - First initialization merges missing framework keys and blank local service keys into the root `.env` (application-owned values are never replaced), generates service credentials and framework-native settings, validates, and encrypts the result. If the encrypted file already exists it is returned untouched; later additions go through `secrets edit`.
+  - First initialization merges missing framework keys into the production environment, generates framework-native settings, validates, and encrypts the result. If the encrypted file already exists it is returned untouched; later additions go through `secrets edit`.
   - `secrets edit` decrypts `infra/secrets/.env.gpg` for editing and re-encrypts on save.
   - `secrets push` atomically replaces remote `shared/.env` with the decrypted content. It does not read, merge, or upload the local root `.env`.
 
@@ -316,14 +315,14 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - `--site <name>` receives the sanitized control-plane descriptor as JSON on stdin, validates it, and atomically installs root-owned `/srv/conf/<site>/bones.json`. BonesDeploy invokes it through sudo before deploy.
 - **deploy**:
   - Runs the full deployment lifecycle as root after the `git` SSH identity invokes the exact allowed command through sudo. Git push transports source only; it does not invoke deployment.
-  - Orchestrates: stage release → source export from the bare repo into a temp build context → build scripts → runtime-writable candidate release → shared wiring → prepare scripts as the site user → seal release → activate → restart `<site>.target` → post-deploy pruning.
-  - Before activation, validates the site's nginx configuration with `nginx -t -c /srv/conf/<site>/nginx.conf`. On failure before activation, automatically drops the staged release. If the service restart fails after activation,
+  - Orchestrates one shared lifecycle: stage release → source export from the bare repo into a temp build context → backend build → candidate release → shared wiring → backend preparation → seal release → activate → restart `<site>.target` → post-deploy pruning. Native sites run numbered Podman build scripts and host prepare scripts. Compose sites run `config --quiet`, `pull`, and `build`, then skip numbered prepare scripts.
+  - Native preflight validates nginx. Compose activation reconciles the stack from `current` with `up --detach --build --remove-orphans --wait`. On failure before activation, automatically drops the staged release. If the service restart fails after activation,
     restores and restarts the previous release before dropping the failed release.
   - `--site <name>`: validated site identifier used to load the synchronized control-plane snapshot and existing root-owned deployment state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
 - **doctor**:
   - Host mode checks `bonesremote` in `PATH`, Podman, AppArmor support, and the deploy-user sudoers drop-in.
-  - `--site <name>` loads `/srv/conf/<name>/bones.json` for explicit runtime backend and branch, checks the imported site boundary: validated control-plane state, bare repo with an exact ref for the configured branch, runtime identity constraints, `shared/` and `releases/` layout, and `<site>.target`. Docker daemon/image checks run only for a Docker backend; a missing snapshot is pending guidance.
+  - `--site <name>` loads `/srv/conf/<name>/bones.json` for explicit runtime backend and branch, checks the imported site boundary, and validates `<site>.target`. Compose checks include Docker Engine/plugin availability, Compose configuration, container health, optional loopback ingress, and one reduced-guarantee warning.
 - **release stage**
   - Creates one exclusively named candidate in the existing root-owned lifecycle; the candidate is sealed as `root:<site>` before activation.
 - **release wire**
@@ -351,8 +350,7 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 - No broader sudo privileges are granted — the deploy user cannot run arbitrary commands as root, read root-owned files, or write outside their owned directories.
 - All release artifacts are created with the setgid bit on `releases/` so the runtime group inherits read access without needing a post-deploy chown.
 - The build workspace (`build/`) is private to the deploy user (`0700`), invisible to other processes.
-- Runtime processes are sandboxed via systemd `ProtectSystem=strict`, `NoNewPrivileges=yes`, `PrivateTmp=yes`, and AppArmor profiles — limiting blast radius even if a service is compromised.
-- Per-project systemd services run as the dedicated runtime user, not a shared `www-data` — so service isolation is enforced at the OS level, not just the application level.
+- Native runtime processes are sandboxed via systemd, AppArmor, and dedicated runtime identities. Compose files are trusted privileged input and may select container authority outside that model; BonesDeploy does not automatically mount the Docker socket.
 
 ## Flow
 - User runs `bonesdeploy init`, and the procedures outlined above are executed.
@@ -371,12 +369,12 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 2. `bonesremote deploy`, running as root through the exact sudoers grant, loads the synchronized snapshot and orchestrates the existing pipeline:
    - **stage_release** — Create timestamped release state
    - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
-    - **release_build** — Run `deployment/build/*.sh` inside bonesremote's `buildpack-deps:bookworm` container at `/workspace/source`. `.env.build` from the exported source tree is parsed into a mode-0600 temporary env file and passed to Podman with `--env-file`, keeping its values out of process argv.
+    - **release_build** — Native: run `deployment/build/*.sh` in rootless Podman. Compose: validate the candidate, pull referenced images, and build project Dockerfiles with Docker Compose.
     - **release_promote** — Copy safe artifacts into a runtime-owned candidate release
     - **wire_shared** — Symlink declared shared paths into the candidate release
-    - **release_prepare** — Run `deployment/prepare/*.sh` as the site runtime user
+    - **release_prepare** — Native: run `deployment/prepare/*.sh` as the site runtime user. Compose: skip numbered prepare scripts; migrations belong in the stack.
     - **release_finalize** — Seal the prepared release as `root:<site>`
     - **activate_release** — Atomically repoint `current`
-    - **restart_services** — Restart `<site>.target`, which restarts all registered site services
+    - **restart_services** — Restart `<site>.target`. The Compose unit reconciles the stable `bonesdeploy-<site>` project from `current` and waits for readiness.
     - **post_deploy** — Prune old releases beyond `releases`
-    - On failure: **drop_failed_release** — Clean up staged release
+    - On failure: **drop_failed_release** — Clean up staged release. Activation failure restores the previous release definition; Compose named volumes persist and their data is not rolled back.

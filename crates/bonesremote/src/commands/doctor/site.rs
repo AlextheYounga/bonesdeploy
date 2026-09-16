@@ -6,13 +6,26 @@ use bonesdeploy_core::config::RemoteDeploymentConfig;
 use bonesdeploy_core::{config, paths};
 
 use crate::control_plane;
-use crate::inspection::accounts;
+use crate::inspection::{accounts, systemd};
 use crate::release::lifecycle::build::validate_build_cache;
 use crate::runtime::docker;
+use crate::runtime::docker::command::ComposeStackStatus;
 
 use super::services;
 
-pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
+struct ComposeFindings<'a> {
+    issues: &'a mut Vec<String>,
+    pending: &'a mut Vec<String>,
+    warnings: &'a mut Vec<String>,
+}
+
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct ComposeRuntimeFindings {
+    pub issues: Vec<String>,
+    pub warnings: Vec<String>,
+}
+
+pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>, warnings: &mut Vec<String>) {
     if let Err(error) = config::validate_site_name(site) {
         issues.push(format!("Invalid site name for doctor: {error}"));
         return;
@@ -26,6 +39,12 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
             return;
         }
     };
+
+    if docker_checks_required(&descriptor) {
+        warnings.push(String::from(
+            "Compose uses trusted privileged project input and does not provide native runtime guarantees for images, users, mounts, capabilities, namespaces, networks, or published ports; BonesDeploy does not add a Docker socket mount.",
+        ));
+    }
 
     if !paths::bonesremote_site_root(site).is_dir() {
         pending.push(format!("first deployment is pending for {site}"));
@@ -71,7 +90,8 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
     services::check_target(site, issues);
 
     if docker_checks_required(&descriptor) {
-        check_docker_runtime(site, issues);
+        let mut findings = ComposeFindings { issues, pending, warnings };
+        check_docker_runtime(site, Path::new(&project_root), descriptor.runtime.compose_port, &mut findings);
     }
 }
 
@@ -80,27 +100,97 @@ pub fn docker_checks_required(descriptor: &RemoteDeploymentConfig) -> bool {
     descriptor.runtime.backend == config::RuntimeBackend::Docker
 }
 
-fn check_docker_runtime(site: &str, issues: &mut Vec<String>) {
+fn check_docker_runtime(
+    site: &str,
+    project_root: &Path,
+    compose_port: Option<u16>,
+    findings: &mut ComposeFindings<'_>,
+) {
     match Command::new("docker").arg("info").output() {
         Ok(output) if output.status.success() => {}
         Ok(output) => {
-            issues.push(format!("Docker daemon is unavailable: {}", String::from_utf8_lossy(&output.stderr).trim()));
+            findings
+                .issues
+                .push(format!("Docker daemon is unavailable: {}", String::from_utf8_lossy(&output.stderr).trim()));
         }
-        Err(error) => issues.push(format!("Docker is unavailable: {error}")),
+        Err(error) => findings.issues.push(format!("Docker is unavailable: {error}")),
     }
 
-    let image = match docker::command::image_name(site) {
-        Ok(image) => image,
+    match Command::new("docker").args(["compose", "version"]).output() {
+        Ok(output) if output.status.success() => {}
+        Ok(output) => findings
+            .issues
+            .push(format!("Docker Compose plugin is unavailable: {}", String::from_utf8_lossy(&output.stderr).trim())),
+        Err(error) => findings.issues.push(format!("Docker Compose plugin is unavailable: {error}")),
+    }
+
+    let current = project_root.join(paths::CURRENT_LINK);
+    if !current.exists() {
+        findings.pending.push(format!("first Compose deployment is pending for {site}"));
+        return;
+    }
+    if let Err(error) = docker::command::validate_active_configuration(site, project_root) {
+        findings.issues.push(format!("active Compose configuration is invalid: {error:#}"));
+        return;
+    }
+
+    let compose_unit = format!("{site}-compose.service");
+    let target = paths::site_target_name(site);
+    match systemd::required_services(&target) {
+        Ok(services) if services.iter().any(|service| service == &compose_unit) => {}
+        Ok(_) => findings.issues.push(format!("Compose service is not registered in {target}: {compose_unit}")),
         Err(error) => {
-            issues.push(format!("Docker runtime image name is invalid: {error}"));
+            findings.issues.push(format!("could not inspect Compose service registration in {target} ({error})"));
+        }
+    }
+
+    let status = match docker::command::active_status(site, project_root) {
+        Ok(status) => status,
+        Err(error) => {
+            findings.issues.push(format!("could not inspect active Compose stack: {error:#}"));
             return;
         }
     };
-    match Command::new("docker").args(["image", "inspect", &image]).status() {
-        Ok(status) if status.success() => {}
-        Ok(_) => issues.push(format!("Docker runtime image is missing: {image}")),
-        Err(error) => issues.push(format!("could not inspect Docker runtime image {image}: {error}")),
+    let runtime_findings = classify_compose_runtime(&status, compose_port);
+    findings.issues.extend(runtime_findings.issues);
+    findings.warnings.extend(runtime_findings.warnings);
+}
+
+#[must_use]
+pub fn classify_compose_runtime(status: &ComposeStackStatus, compose_port: Option<u16>) -> ComposeRuntimeFindings {
+    let mut findings = ComposeRuntimeFindings::default();
+    if status.services.is_empty() {
+        findings.issues.push(String::from("active Compose stack has no containers"));
+        return findings;
     }
+
+    for service in &status.services {
+        let name = if service.service.is_empty() { &service.name } else { &service.service };
+        match service.condition() {
+            "healthy" | "completed" => {}
+            "running" => findings.warnings.push(format!(
+                "Compose service {name} is running without a health check; application readiness is not proven"
+            )),
+            "starting" => findings.issues.push(format!("Compose service {name} has not become healthy")),
+            "unhealthy" => findings.issues.push(format!("Compose service {name} is unhealthy")),
+            _ => findings.issues.push(format!(
+                "Compose service {name} failed (state {}, exit code {})",
+                service.state, service.exit_code
+            )),
+        }
+    }
+
+    if let Some(port) = compose_port
+        && !status.services.iter().any(|service| service.publishes_loopback_port(port))
+    {
+        findings.issues.push(format!("Compose ingress port {port} is not published on 127.0.0.1"));
+    }
+    if status.services.iter().any(docker::command::ComposeServiceStatus::publishes_public_port) {
+        findings.warnings.push(String::from(
+            "Compose publishes one or more ports outside loopback; that traffic bypasses BonesDeploy-managed ingress",
+        ));
+    }
+    findings
 }
 
 fn check_build_user(build_user: &str, passwd: &str, issues: &mut Vec<String>) {

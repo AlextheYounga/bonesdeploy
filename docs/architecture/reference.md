@@ -401,20 +401,25 @@ Abstracts the installation and configuration of programming language runtimes (R
 
 ---
 
-### 3.16 Database Services
+### 3.16 Compose Runtime
 
 **Responsibility:**
-Provisions database engines (PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, Redis) on the deployment server. Each is a `RuntimeService` subclass.
+Configures Docker's official Debian/Ubuntu apt repository, installs Docker
+Engine, Buildx, and the Compose plugin, provisions the generic per-site systemd
+unit and optional nginx ingress, and executes project-owned Compose stacks
+through BonesRemote. Compose-only diagnostics do not require the native Podman
+build runtime.
 
 **Lives in:**
-`crates/bonesinfra/python/src/bonesinfra/services/runtime/`
+`crates/bonesinfra/python/src/bonesinfra/services/linux/compose.py` and
+`crates/bonesremote/src/runtime/docker/`
 
-**Contract:**
-`provision(ctx)` — installs, creates user/database, seeds connection values to `shared/.env`.
-`manifest_artifacts(ctx)` / `manifest_services(ctx)` — declares paths and systemd units for manifest inspection.
-
-Registered in the `SERVICES` dict in `__init__.py`. Activated by the service
-names parsed from the root `.env`.
+**Contract:** One conventional base file and at most one override are selected
+from the immutable release. Every command supplies explicit file, project,
+directory, and environment-file arguments. The stable project identity is
+`bonesdeploy-<site>`. Native sites use externally managed supporting services;
+Compose sites declare their own databases, caches, workers, networks, and
+volumes.
 
 ---
 
@@ -431,7 +436,10 @@ an owner (`framework`, `runtime`, `setup`, `ssl`, `docker`).
 
 **Inspection:** Uses pyinfra facts (`File`, `Directory`, `Link`, `SystemdStatus`, `SystemdEnabled`) to resolve actual state during an SSH session. Reports as text (human-readable) or JSON.
 
-Artifacts and services are collected by merging: common artifacts, framework-specific artifacts from `manifest.py`, database service artifacts, and SSL artifacts.
+Artifacts and services are collected by merging common artifacts,
+framework/Compose-specific declarations, project custom declarations, and SSL
+artifacts. Compose manifests also report the reduced-guarantee contract and
+runtime status without rendering resolved Compose configuration.
 
 ---
 
@@ -445,7 +453,9 @@ Validates server environment, per-site configuration, and security posture. Read
 
 **Check categories:**
 - `system.rs` — Debian/Ubuntu distribution, Podman availability
-- `site.rs` — config state, bare repo, branch ref, thin hook, user/group identities, directory layout
+- `site.rs` — config state, bare repo, branch ref, user/group identities,
+  directory layout, Compose engine/plugin/configuration, container health, and
+  optional loopback ingress
 - `services.rs` — systemd target membership and service active state
 - `apparmor.rs` — kernel support and service
 - `security/` — identity isolation (unique UID/GID per site, no login shells, no cross-site group membership), runtime sudo absence, privileged config root-control, release activation immutability, POSIX ACL detection

@@ -4,6 +4,13 @@ Runs bonesdeploy against real Incus system containers. Unlike Docker, Incus
 containers boot a full systemd as PID 1, so `systemd-run`, `systemctl`,
 AppArmor, and fail2ban behave like they do on an actual VPS.
 
+The ignored `docker_compose` scenario runs nested rootful Docker in the Incus
+guest. It covers a custom project Dockerfile, base plus override files,
+web/database/worker services, multiple networks, health-gated startup, direct
+ports plus loopback nginx ingress, persistent named volumes across a second deployment,
+and restoration of the previous release after an unhealthy activation. It is
+not part of ordinary local test runs.
+
 ## One-time host setup
 
 ```sh

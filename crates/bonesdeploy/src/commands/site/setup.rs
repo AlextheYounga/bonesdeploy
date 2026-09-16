@@ -19,7 +19,6 @@ pub async fn run(yes: bool) -> Result<()> {
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
     let request = infra::provisioning_request(&cfg)?;
     bonesinfra::run_with_request(&["site", "apply", "--request-stdin"], &request)?;
-    super::services::apply()?;
     super::runtime::apply()?;
 
     let pending_first_push =

@@ -126,7 +126,6 @@ mod tests {
             releases_keep: 5,
             runtime: Runtime { backend, ..Runtime::default() },
             build: Build::default(),
-            services: vec!["postgres".to_string()],
         }
     }
 
@@ -148,7 +147,7 @@ mod tests {
         let _scope = override_control_plane_root(root.clone());
         store("atlas", &descriptor("main", RuntimeBackend::Native))?;
         let snapshot = snapshot_path("atlas");
-        let site_dir = snapshot.parent().expect("snapshot has a parent directory");
+        let site_dir = snapshot.parent().ok_or_else(|| anyhow::anyhow!("snapshot has no parent directory"))?;
         assert_eq!(fs::metadata(site_dir)?.permissions().mode() & 0o777, 0o750);
         fs::remove_dir_all(root)?;
         Ok(())

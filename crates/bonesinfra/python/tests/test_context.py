@@ -46,14 +46,21 @@ def test_ssl_enabled_accepts_boolean_string_for_request_compatibility():
 
 
 def test_docker_runtime_backend_is_preserved():
-    ctx = DeployContext.from_request(make_site_request(backend="docker"))
+    ctx = DeployContext.from_request(make_site_request(backend="docker", compose_port=8080, compose_wait_timeout=60))
     assert ctx.runtime.backend == "docker"
     assert "backend" not in ctx.runtime.data
+    assert ctx.runtime.compose_port == 8080
+    assert ctx.runtime.compose_wait_timeout == 60
 
 
 def test_unknown_runtime_backend_is_rejected():
     with pytest.raises(ValueError, match="RUNTIME_BACKEND"):
         DeployContext.from_request(make_site_request(backend="compose"))
+
+
+def test_docker_with_managed_ingress_requires_compose_port():
+    with pytest.raises(ValueError, match="compose_port is required"):
+        DeployContext.from_request(make_site_request(backend="docker"))
 
 
 def test_missing_site_fields_use_defaults():
@@ -72,25 +79,16 @@ def test_missing_site_fields_use_defaults():
     assert ctx.backup.configured is False
 
 
-def test_database_services_are_read_and_validated():
-    ctx = DeployContext.from_request(make_site_request(site_services=["postgres", "valkey"]))
-    assert ctx.services.services == ("postgres", "valkey")
+@pytest.mark.parametrize("compose_port", [0, 65536, True, "8080"])
+def test_invalid_compose_port_is_rejected(compose_port):
+    with pytest.raises(ValueError, match="compose_port"):
+        DeployContext.from_request(make_site_request(compose_port=compose_port))
 
 
-def test_service_credentials_are_supplied_separately():
-    request = make_site_request(site_services=["postgres"], service_credentials={"postgres": {"password": "secret"}})
-    ctx = DeployContext.from_request(request)
-    assert ctx.service_credentials == {"postgres": {"password": "secret"}}
-
-
-def test_conflicting_mysql_implementations_are_rejected():
-    with pytest.raises(ValueError, match="cannot be provisioned together"):
-        DeployContext.from_request(make_site_request(site_services=["mariadb", "mysql"]))
-
-
-def test_duplicate_database_services_are_rejected():
-    with pytest.raises(ValueError, match="must not contain duplicates"):
-        DeployContext.from_request(make_site_request(site_services=["postgres", "postgres"]))
+@pytest.mark.parametrize("compose_wait_timeout", [0, 3601, True, "120"])
+def test_invalid_compose_wait_timeout_is_rejected(compose_wait_timeout):
+    with pytest.raises(ValueError, match="compose_wait_timeout"):
+        DeployContext.from_request(make_site_request(compose_wait_timeout=compose_wait_timeout))
 
 
 def test_unknown_request_fields_are_rejected():
@@ -126,9 +124,8 @@ def test_server_request_rejects_unknown_fields():
         parse_request({"server": {"host": "example.com", "invalid": True}}, server_only=True)
 
 
-def test_null_and_absent_service_credentials_are_equivalent():
-    absent = DeployContext.from_request(make_site_request(site_services=["postgres"]))
-    null = DeployContext.from_request(
-        make_site_request(site_services=["postgres"], service_credentials={"postgres": None})
-    )
-    assert absent.service_credentials == null.service_credentials == {}
+def test_service_request_fields_are_rejected():
+    request = make_site_request()
+    request["services"] = {}
+    with pytest.raises(ValueError, match="unknown request field 'services'"):
+        DeployContext.from_request(request)

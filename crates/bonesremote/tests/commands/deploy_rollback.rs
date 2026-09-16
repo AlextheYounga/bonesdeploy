@@ -53,3 +53,30 @@ fn rollback_restores_original_release_when_restart_fails() -> Result<()> {
     fs::remove_dir_all(root)?;
     Ok(())
 }
+
+#[test]
+fn failed_rollback_reconciles_the_previous_then_restored_release() -> Result<()> {
+    let root = temp_root("bonesremote_rollback_reconcile")?;
+    let current_link = root.join("current");
+    let current_dir = root.join("releases/20260102_000000");
+    let previous_dir = root.join("releases/20260101_000000");
+    fs::create_dir_all(&previous_dir)?;
+    fs::create_dir_all(&current_dir)?;
+    symlink(&current_dir, &current_link)?;
+    let mut reconciled = Vec::new();
+
+    let project_root = root.to_string_lossy().into_owned();
+    let result = switch_and_verify(&project_root, "20260102_000000", "20260101_000000", || {
+        reconciled.push(fs::read_link(&current_link)?);
+        if reconciled.len() == 1 {
+            anyhow::bail!("simulated previous release failure");
+        }
+        Ok(())
+    });
+
+    assert!(result.is_err());
+    assert_eq!(reconciled, [previous_dir, current_dir.clone()]);
+    assert_eq!(fs::read_link(&current_link)?, current_dir);
+    fs::remove_dir_all(root)?;
+    Ok(())
+}

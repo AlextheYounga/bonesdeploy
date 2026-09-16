@@ -24,31 +24,12 @@ def artifacts(ctx):
         ("nginx site", paths.nginx_site_available, "file", "runtime"),
         ("enabled nginx site", paths.nginx_site_enabled, "link", "runtime"),
     ]
-    if ctx.runtime.backend == "docker":
-        entries.extend(
-            [
-                (
-                    "Docker runtime socket",
-                    paths.runtime_php_fpm_socket,
-                    "socket",
-                    "docker",
-                ),
-                (
-                    "Docker runtime service",
-                    paths.systemd_service("docker"),
-                    "file",
-                    "docker",
-                ),
-            ]
-        )
     entries.append(("Laravel queue worker service", paths.systemd_service("worker"), "file", "framework"))
     return entries
 
 
-def services(ctx):
+def services(_ctx):
     entries = [("site nginx", "{project}-nginx.service", "runtime")]
-    if ctx.runtime.backend == "docker":
-        entries.append(("Docker application", "{project}-docker.service", "docker"))
     entries.append(("Laravel queue worker", "{project}-worker.service", "framework"))
     return entries
 

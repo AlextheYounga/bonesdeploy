@@ -24,3 +24,13 @@ fn site_manifest_accepts_json_format_and_reports_missing_config() -> Result<()> 
     assert!(stderr.contains("root .env and infra/ are required"), "unexpected stderr: {stderr}");
     Ok(())
 }
+
+#[test]
+fn init_rejects_removed_service_selection() -> Result<()> {
+    let env = common::TestEnv::new()?;
+    let output = env.run(&["init", "--service", "postgres"])?;
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unexpected argument '--service'"));
+    Ok(())
+}
