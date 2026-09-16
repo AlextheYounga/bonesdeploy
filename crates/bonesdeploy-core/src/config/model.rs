@@ -1,5 +1,5 @@
-//! Canonical configuration model: identity, runtime, services, and build
-//! sections plus their derivation and validation helpers.
+//! Canonical configuration model: identity, runtime, and build sections plus
+//! their derivation and validation helpers.
 
 use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
@@ -14,6 +14,7 @@ pub const RUNTIME_PYTHON_VERSION: &str = "python_version";
 pub const RUNTIME_RUBY_VERSION: &str = "ruby_version";
 pub const BACKUP_SCHEDULE_DEFAULT: &str = "0 0 * * *";
 pub const BACKUP_RETENTION_DAYS_DEFAULT: u16 = 30;
+pub const COMPOSE_WAIT_TIMEOUT_DEFAULT: u16 = 120;
 
 /// Per-site scheduled backup settings: the crontab schedule, the age-based
 /// retention window, and the managed Borg repository passphrase.
@@ -90,7 +91,6 @@ impl Default for App {
 pub struct Bones {
     pub app: App,
     pub runtime: Runtime,
-    pub services: Services,
     pub build: Build,
     pub backup: Backup,
 }
@@ -185,6 +185,10 @@ pub struct Runtime {
     pub node_version: String,
     #[serde(default)]
     pub permissions: Option<toml::Value>,
+    #[serde(default)]
+    pub compose_port: Option<u16>,
+    #[serde(default = "default_compose_wait_timeout")]
+    pub compose_wait_timeout: u16,
     #[serde(flatten)]
     pub extra: BTreeMap<String, toml::Value>,
 }
@@ -197,6 +201,8 @@ impl Default for Runtime {
             web_root: paths::default_web_root(),
             node_version: default_node_version(),
             permissions: None,
+            compose_port: None,
+            compose_wait_timeout: COMPOSE_WAIT_TIMEOUT_DEFAULT,
             extra: BTreeMap::new(),
         }
     }
@@ -213,12 +219,6 @@ pub enum RuntimeBackend {
 #[must_use]
 pub fn default_node_version() -> String {
     String::from("24.19.0")
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
-#[serde(default)]
-pub struct Services {
-    pub services: Vec<String>,
 }
 
 pub const BUILD_TIMEOUT_SECONDS_DEFAULT: u64 = 300;
@@ -245,31 +245,13 @@ fn default_build_timeout_seconds() -> u64 {
     BUILD_TIMEOUT_SECONDS_DEFAULT
 }
 
+fn default_compose_wait_timeout() -> u16 {
+    COMPOSE_WAIT_TIMEOUT_DEFAULT
+}
+
 #[must_use]
 pub fn build_timeout_seconds(config: &Bones) -> Option<u64> {
     (config.build.timeout_seconds != 0).then_some(config.build.timeout_seconds)
-}
-
-pub const DATABASE_SERVICES: &[&str] = &["postgres", "mariadb", "mysql", "mongodb", "valkey", "redis"];
-
-/// # Errors
-/// Returns an error when a configured database service is unsupported.
-pub fn validate_database_services(services: &[String]) -> Result<()> {
-    for service in services {
-        if !DATABASE_SERVICES.contains(&service.as_str()) {
-            bail!("unsupported database service: {service}");
-        }
-    }
-    if services.iter().any(|service| service == "mariadb") && services.iter().any(|service| service == "mysql") {
-        bail!("mariadb and mysql cannot be provisioned together; select one server implementation");
-    }
-    let mut unique = services.to_vec();
-    unique.sort();
-    unique.dedup();
-    if unique.len() != services.len() {
-        bail!("database services must not contain duplicates");
-    }
-    Ok(())
 }
 
 /// Reject the removed shared-path configuration instead of silently ignoring it.
@@ -284,6 +266,12 @@ pub fn validate_runtime(runtime: &Runtime) -> Result<()> {
         bail!(
             "runtime.shared is no longer supported; shared/.env and framework directories are provisioned automatically"
         );
+    }
+    if runtime.compose_port == Some(0) {
+        bail!("compose_port must be between 1 and 65535")
+    }
+    if !(1..=3600).contains(&runtime.compose_wait_timeout) {
+        bail!("compose_wait_timeout must be between 1 and 3600")
     }
     Ok(())
 }

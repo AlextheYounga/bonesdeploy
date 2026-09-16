@@ -22,7 +22,6 @@ fn server_request_contains_only_connection_fields() -> Result<()> {
     assert_eq!(request["server"]["ssh_user"], "deploy");
     assert_eq!(request["server"]["port"], "2222");
     assert!(request.get("site").is_none());
-    assert!(request.get("services").is_none());
     Ok(())
 }
 

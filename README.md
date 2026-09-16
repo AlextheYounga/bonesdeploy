@@ -18,7 +18,7 @@ Coolify is impressive software, and it serves developers who want a flexible, Do
 
 BonesDeploy is batteries included. It supports a deliberate set of modern web frameworks, makes the important decisions for you, and runs directly on the operating system wherever possible. There is less to configure, less to understand, and less sitting between your application and the machine you paid for.
 
-Docker is remarkable technology. It is also frequently overkill for deploying a small web application. You inherit a daemon, container networking, volumes, port mappings, Compose files, and another security model layered on top of Linux. Get one port binding wrong and a private database can become a public one. BonesDeploy avoids that entire class of mistake by refusing unsafe configurations and keeping private services private by default.
+Docker is remarkable technology. It is also frequently overkill for deploying a small web application. Native BonesDeploy sites avoid its daemon, container networking, volumes, port mappings, and additional security model. Compose deployments deliberately accept those tradeoffs when a project needs a container-defined stack.
 
 Containers still have their place. BonesDeploy uses rootless Podman for isolated builds, where the boundary is genuinely useful. The build runs inside a constrained environment, produces a release, and then disappears.
 
@@ -73,7 +73,7 @@ That is what BonesDeploy is for.
 
 This is the part I care about.
 
-BonesDeploy treats each site as its own thing on the server. Each site gets its own isolated services via systemd.
+Native BonesDeploy sites receive isolated services via systemd. Compose sites instead use a stable, site-scoped Compose project and the security settings declared by the project.
 
 Each site can get its own:
 
@@ -107,9 +107,7 @@ BonesDeploy takes the other trade.
 
 It assumes the server is the deployment target, and then does the annoying work of centralizing the Linux setup per site.
 
-You can still use Docker with BonesDeploy. Put `docker compose` in your deploy scripts.
-
-Docker just is not the foundation.
+You can use Docker Compose as an explicit runtime backend. Docker remains optional and is not the native deployment foundation.
 
 ## Runtime Backends
 
@@ -121,19 +119,25 @@ the default. Select the backend during initialization or set
 RUNTIME_BACKEND=docker
 ```
 
-Docker mode keeps the existing release lifecycle and rootless Podman build
-pipeline. Docker is used only for the application runtime: BonesDeploy owns
-the container command and mounts, the active release is read-only, shared
-paths remain writable, and host Nginx and TLS remain the public ingress.
+Docker mode executes one conventional project-owned Compose file from each
+immutable release. Compose owns Dockerfiles, images, services, health checks,
+networks, and named volumes. BonesDeploy validates, pulls, and builds the
+candidate stack, then reconciles the stable `bonesdeploy-<site>` project with
+`docker compose up --wait` after switching `current`. Numbered BonesDeploy
+build and prepare scripts are native-only.
 
-Docker runtime mode uses the conventional privileged Docker daemon. It does
-not grant Docker access to the deploy, build, runtime, or git users, does not
-execute project Compose files, and does not mount the Docker socket into an
-application. This is a different security tradeoff from native mode because a
-privileged daemon is part of the runtime control plane.
+Set `BONES_COMPOSE_PORT` when host nginx should proxy to a loopback-published
+Compose port. Without it, the stack owns ingress and may publish ports directly.
+`BONES_COMPOSE_WAIT_TIMEOUT` controls readiness waiting and defaults to 120
+seconds.
 
-Laravel Docker runtime selection is currently the supported containerized
-runtime. Other frameworks continue to use the native backend.
+Compose mode uses the conventional rootful Docker daemon and is a
+**reduced-guarantee mode**. The project Compose file is trusted privileged
+input and may select images, users, mounts, capabilities, namespaces, networks,
+and public ports outside the native security model. BonesDeploy does not add a
+Docker socket mount. Named volumes survive deployments, rollback, and release
+pruning; rollback restores the previous Compose definition but does not reverse
+volume data or external side effects.
 
 ## Runtime Templates
 
@@ -239,14 +243,14 @@ The baseline includes etckeeper: `/etc` is tracked in a root-owned Git
 repository with package defaults, and every successful provisioning run ends
 with an etckeeper commit recording its `/etc` changes.
 
-Provision the site, including its base, services, runtime, and doctor:
+Provision the site, including its base, runtime, and doctor:
 
 ```sh
 bonesdeploy site setup --yes
 ```
 
-`site setup` runs exactly server readiness, site base provisioning, services,
-runtime, and site doctor. It does not push Git or secrets, configure SSL, or
+`site setup` runs exactly server readiness, site base provisioning, runtime,
+and site doctor. It does not push Git or secrets, configure SSL, or
 deploy a release.
 
 This runs the provisioning from your project's versioned `infra/bonesinfra-*.whl`:
@@ -255,7 +259,7 @@ extensions. Templates rendered by the managed framework come from
 `infra/templates/`.
 
 Sites without a configured domain receive a project-scoped Cloudflare Quick
-Tunnel. `bonesdeploy status` reports its account-less HTTPS
+Tunnel. `bonesdeploy site status` reports its account-less HTTPS
 `trycloudflare.com` preview URL. The URL changes whenever the tunnel restarts;
 Quick Tunnels are for development and review, have no uptime SLA, limit
 concurrent requests, and do not support Server-Sent Events.
@@ -267,13 +271,9 @@ first deploy or whenever it changes:
 bonesdeploy secrets push
 ```
 
-Database services selected at init are provisioned by `bonesdeploy site setup`, or later with:
-
-```sh
-bonesdeploy site services --yes
-```
-
-Supported services are PostgreSQL, MariaDB, MySQL, MongoDB, Valkey, and Redis. They listen only on localhost; Redis and Valkey use separate per-project instances on port `6379` by default, while the SQL/Mongo services use database-scoped accounts. Use an SSH tunnel for workstation access. Credentials are generated locally into the encrypted `infra/secrets/.env.gpg` during first initialization and reach the host as protected remote `shared/.env` through `bonesdeploy secrets push`, never in Git. MariaDB and MySQL are alternatives and cannot share one host.
+Native sites connect to independently managed databases and caches. Compose
+sites declare databases, caches, workers, networks, and volumes directly in the
+project Compose file.
 
 Add SSL after DNS points at the server:
 

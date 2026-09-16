@@ -86,6 +86,10 @@ pub async fn build_report() -> Result<Report> {
         return Ok(site_missing_report(cfg));
     }
 
+    if cfg.domain.trim().is_empty() {
+        return Ok(ready_report(cfg));
+    }
+
     let ssl_enabled =
         cfg.ssl_enabled || remote_ssl_enabled(&cfg).await.context("Unable to determine remote SSL status")?;
 
@@ -111,12 +115,8 @@ fn uninitialized_report(project: &str) -> Report {
 
 fn server_missing_report(cfg: config::Bones) -> Report {
     let command = String::from("bonesdeploy server setup --yes");
-    let commands = vec![
-        command.clone(),
-        String::from("bonesdeploy site setup --yes"),
-        ssl_command(&cfg),
-        String::from("bonesdeploy deploy"),
-    ];
+    let mut commands = vec![command.clone(), String::from("bonesdeploy site setup --yes")];
+    append_deploy_commands(&mut commands, &cfg);
     Report {
         project: cfg.project_name.clone(),
         state: String::from("server_missing"),
@@ -130,7 +130,8 @@ fn server_missing_report(cfg: config::Bones) -> Report {
 
 fn site_missing_report(cfg: config::Bones) -> Report {
     let command = String::from("bonesdeploy site setup --yes");
-    let commands = vec![command.clone(), ssl_command(&cfg), String::from("bonesdeploy deploy")];
+    let mut commands = vec![command.clone()];
+    append_deploy_commands(&mut commands, &cfg);
     Report {
         project: cfg.project_name.clone(),
         state: String::from("site_missing"),
@@ -143,7 +144,7 @@ fn site_missing_report(cfg: config::Bones) -> Report {
 }
 
 fn ssl_missing_report(cfg: config::Bones) -> Report {
-    let command = ssl_command(&cfg);
+    let command = String::from("bonesdeploy site ssl --yes");
     let commands = vec![command.clone(), String::from("bonesdeploy deploy")];
     Report {
         project: cfg.project_name.clone(),
@@ -174,10 +175,11 @@ fn next_command(command: &str, mutates: bool, contacts_remote: bool) -> NextComm
     NextCommand { command: command.to_string(), mutates, contacts_remote, prompt_free_command: command.to_string() }
 }
 
-fn ssl_command(cfg: &config::Bones) -> String {
-    let domain = if cfg.domain.is_empty() { String::from("<domain>") } else { cfg.domain.clone() };
-    let email = if cfg.email.is_empty() { String::from("<email>") } else { cfg.email.clone() };
-    format!("bonesdeploy site ssl --yes --domain {domain} --email {email}")
+fn append_deploy_commands(commands: &mut Vec<String>, cfg: &config::Bones) {
+    if !cfg.domain.trim().is_empty() {
+        commands.push(String::from("bonesdeploy site ssl --yes"));
+    }
+    commands.push(String::from("bonesdeploy deploy"));
 }
 
 fn print_text(report: &Report) {
@@ -253,7 +255,9 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::{ready_report, server_missing_report, site_missing_report, ssl_missing_report, uninitialized_report};
+    use crate::cli::args::Cli;
     use crate::config;
+    use clap::Parser;
 
     fn config() -> config::Bones {
         let mut cfg = config::Bones::default();
@@ -279,13 +283,40 @@ mod tests {
 
         let ssl_missing = ssl_missing_report(config());
         assert_eq!(ssl_missing.state, "ssl_missing");
-        assert_eq!(
-            ssl_missing.next.command,
-            "bonesdeploy site ssl --yes --domain atlas.example.com --email ops@example.com"
-        );
+        assert_eq!(ssl_missing.next.command, "bonesdeploy site ssl --yes");
 
         let ready = ready_report(config());
         assert_eq!(ready.state, "ready");
         assert_eq!(ready.next.command, "bonesdeploy deploy");
+    }
+
+    #[test]
+    fn domainless_reports_skip_ssl_setup() {
+        let mut cfg = config();
+        cfg.domain.clear();
+        cfg.email.clear();
+
+        let server_missing = server_missing_report(cfg.clone());
+        assert_eq!(
+            server_missing.commands,
+            ["bonesdeploy server setup --yes", "bonesdeploy site setup --yes", "bonesdeploy deploy"]
+        );
+
+        let site_missing = site_missing_report(cfg.clone());
+        assert_eq!(site_missing.commands, ["bonesdeploy site setup --yes", "bonesdeploy deploy"]);
+
+        let ready = ready_report(cfg);
+        assert_eq!(ready.next.command, "bonesdeploy deploy");
+    }
+
+    #[test]
+    fn configured_report_commands_are_valid_cli_commands() {
+        for report in [server_missing_report(config()), site_missing_report(config()), ssl_missing_report(config())] {
+            for command in report.commands {
+                let argv: Vec<&str> = command.split_whitespace().collect();
+                let parsed = Cli::try_parse_from(argv);
+                assert!(parsed.is_ok(), "guided command should parse: {command}");
+            }
+        }
     }
 }

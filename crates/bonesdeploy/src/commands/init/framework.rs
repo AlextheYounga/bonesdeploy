@@ -1,5 +1,4 @@
 use anyhow::{Context, Result, anyhow};
-use bonesdeploy_core::config::{DATABASE_SERVICES, validate_database_services};
 use serde_json::Value;
 
 use super::{Args, FrameworkSelection};
@@ -24,14 +23,6 @@ pub fn collect_framework_config(args: &Args) -> Result<FrameworkSelection> {
         collect_interactive_answers(framework, &defaults)?
     };
     Ok(FrameworkSelection { template: Some(template_name), config: map })
-}
-
-pub fn collect_database_services(args: &Args) -> Result<Vec<String>> {
-    if args.non_interactive {
-        validate_database_services(&args.services)?;
-        return Ok(args.services.clone());
-    }
-    prompts::choose_services(DATABASE_SERVICES)
 }
 
 fn resolve_template(args: &Args) -> Result<Option<String>> {

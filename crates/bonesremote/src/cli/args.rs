@@ -52,7 +52,7 @@ pub enum Command {
         #[command(subcommand)]
         command: ServiceCommand,
     },
-    /// Manage a BonesDeploy-generated application runtime (requires root)
+    /// Manage a Docker Compose runtime (requires root)
     Runtime {
         #[command(subcommand)]
         command: RuntimeCommand,
@@ -101,12 +101,12 @@ pub enum DecommissionCommand {
 
 #[derive(Subcommand)]
 pub enum RuntimeCommand {
-    /// Start the configured Docker application runtime
+    /// Start the configured Docker Compose stack
     Start {
         #[arg(long)]
         site: String,
     },
-    /// Stop the configured Docker application runtime
+    /// Stop the configured Docker Compose stack without removing volumes
     Stop {
         #[arg(long)]
         site: String,

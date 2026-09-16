@@ -8,8 +8,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::{Context, Result, bail};
 
 use super::model::{
-    BACKUP_RETENTION_DAYS_DEFAULT, BACKUP_SCHEDULE_DEFAULT, Bones, RuntimeBackend, default_node_version,
-    default_repo_path_for, validate_database_services, validate_host, validate_runtime,
+    BACKUP_RETENTION_DAYS_DEFAULT, BACKUP_SCHEDULE_DEFAULT, Bones, COMPOSE_WAIT_TIMEOUT_DEFAULT, RuntimeBackend,
+    default_node_version, default_repo_path_for, validate_host, validate_runtime,
 };
 use crate::paths;
 
@@ -29,8 +29,9 @@ mod keys {
     pub(super) const SSL_ENABLED: &str = "SSL_ENABLED";
     pub(super) const TEMPLATE: &str = "TEMPLATE";
     pub(super) const RUNTIME_BACKEND: &str = "RUNTIME_BACKEND";
-    pub(super) const SERVICES: &str = "SERVICES";
     pub(super) const NODE_VERSION: &str = "NODE_VERSION";
+    pub(super) const COMPOSE_PORT: &str = "COMPOSE_PORT";
+    pub(super) const COMPOSE_WAIT_TIMEOUT: &str = "COMPOSE_WAIT_TIMEOUT";
 }
 
 const BEGIN: &str = "# >>> BonesDeploy managed configuration >>>";
@@ -50,7 +51,8 @@ const MANAGED: &[&str] = &[
     keys::RUNTIME_BACKEND,
     keys::WEB_ROOT,
     keys::NODE_VERSION,
-    keys::SERVICES,
+    keys::COMPOSE_PORT,
+    keys::COMPOSE_WAIT_TIMEOUT,
     keys::BACKUP_SCHEDULE,
     keys::BACKUP_RETENTION_DAYS,
     keys::BORG_PASSPHRASE,
@@ -125,6 +127,9 @@ pub fn parse_dotenv(content: &str) -> Result<ParsedDotEnv> {
         } else {
             (key.to_string(), false)
         };
+        if managed && logical == "SERVICES" {
+            bail!("BONES_SERVICES is no longer supported; define supporting services outside BonesDeploy")
+        }
         let target = if managed { &mut parsed.managed } else { &mut parsed.applications };
         if target.insert(logical, value).is_some() {
             bail!("Duplicate .env key `{key}` on line {}", number + 1);
@@ -166,10 +171,16 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
         "docker" => RuntimeBackend::Docker,
         value => bail!("Invalid RUNTIME_BACKEND: {value}"),
     };
-    config.services.services = values
-        .get(keys::SERVICES)
-        .map(|v| v.split(',').filter(|s| !s.trim().is_empty()).map(|s| s.trim().into()).collect())
-        .unwrap_or_default();
+    config.runtime.compose_port = values
+        .get(keys::COMPOSE_PORT)
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| value.parse().with_context(|| format!("Invalid {} value: {value}", keys::COMPOSE_PORT)))
+        .transpose()?;
+    config.runtime.compose_wait_timeout = values
+        .get(keys::COMPOSE_WAIT_TIMEOUT)
+        .map(|value| value.parse().with_context(|| format!("Invalid {} value: {value}", keys::COMPOSE_WAIT_TIMEOUT)))
+        .transpose()?
+        .unwrap_or(COMPOSE_WAIT_TIMEOUT_DEFAULT);
     config.backup.schedule =
         values.get(keys::BACKUP_SCHEDULE).cloned().unwrap_or_else(|| BACKUP_SCHEDULE_DEFAULT.to_string());
     config.backup.retention_days = match values.get(keys::BACKUP_RETENTION_DAYS) {
@@ -188,7 +199,6 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
     config.project_root = paths::default_project_root_for(&project_name);
     validate_host(&config.host)?;
     validate_runtime(&config.runtime)?;
-    validate_database_services(&config.services.services)?;
     Ok(LoadedLocal { environment: config, applications: parsed.applications })
 }
 
@@ -276,7 +286,8 @@ pub fn write_local_environment(config: &Bones, path: &Path) -> Result<()> {
         ),
         (keys::WEB_ROOT, config.runtime.web_root.clone()),
         (keys::NODE_VERSION, config.runtime.node_version.clone()),
-        (keys::SERVICES, config.services.services.join(",")),
+        (keys::COMPOSE_PORT, config.runtime.compose_port.map_or_else(String::new, |port| port.to_string())),
+        (keys::COMPOSE_WAIT_TIMEOUT, config.runtime.compose_wait_timeout.to_string()),
         (keys::BACKUP_SCHEDULE, config.backup.schedule.clone()),
         (keys::BACKUP_RETENTION_DAYS, config.backup.retention_days.to_string()),
         (keys::BORG_PASSPHRASE, config.backup.passphrase.clone()),

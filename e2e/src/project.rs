@@ -91,6 +91,20 @@ impl SampleProject {
         Ok(())
     }
 
+    pub fn configure_compose_port(&self, port: u16) -> Result<()> {
+        let path = self.dir.join(".env");
+        let source = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+        let updated = source.replace("BONES_COMPOSE_PORT=\n", &format!("BONES_COMPOSE_PORT={port}\n"));
+        if updated == source {
+            bail!(".env does not contain an empty BONES_COMPOSE_PORT in {}", self.dir.display());
+        }
+        fs::write(&path, updated).with_context(|| format!("Failed to write {}", path.display()))
+    }
+
+    pub fn write(&self, path: &str, content: &str) -> Result<()> {
+        fs::write(self.dir.join(path), content).with_context(|| format!("Failed to write {path}"))
+    }
+
     pub fn push(&self, session: &Session, remote: &str, branch: &str) -> Result<()> {
         self.git(session, &["push", remote, branch])
     }

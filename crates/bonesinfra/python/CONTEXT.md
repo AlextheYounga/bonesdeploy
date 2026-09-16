@@ -489,7 +489,8 @@ ______________________________________________________________________
 
 # Runtime Provisioning
 
-Runtime provisioning prepares per-site services.
+Runtime provisioning prepares the selected native framework runtime or the
+generic Compose backend.
 
 Responsibilities:
 
@@ -502,6 +503,16 @@ Responsibilities:
 - provision declared `[shared].paths` under `shared/`
 - run runtime-specific deploy operations
 
+Compose provisioning configures Docker's official repository for the detected
+Debian or Ubuntu release, replaces conflicting distribution Docker packages,
+installs Docker Engine, Buildx, and the Compose plugin, renders a generic
+`<project>-compose.service`, and optionally renders loopback nginx ingress for
+`BONES_COMPOSE_PORT`. It bypasses framework-native runtime assets while
+preserving project-owned `infra/custom` provisioning. Switching an existing
+site to Compose removes stale managed framework units, ingress, PHP-FPM pools,
+and former Laravel Docker runtime artifacts. The project owns its Compose
+services, images, networks, health checks, and volumes.
+
 BonesInfra owns site service membership. Every generated site service participates
 in `<project>.target`; BonesRemote must restart exactly `<project>.target` for
 deploy and rollback (`systemctl restart <project>.target`). It must not discover
@@ -513,11 +524,13 @@ verify every required service remains active after restarting, because a
 
 Runtime setup is separate from SSL.
 
-When `app.dns.domain` is empty, runtime setup installs and starts the
+For native sites, when `app.dns.domain` is empty, runtime setup installs and starts the
 project-scoped `cloudflared` Quick Tunnel service against the per-site Nginx
 Unix socket. The assigned `trycloudflare.com` URL is runtime state read from
 journald and can change after a restart. A real domain instead uses the public
 Nginx router and Certbot; successful SSL activation removes the Quick Tunnel.
+Compose sites use that managed ingress path only when a Compose port is
+configured; otherwise the stack owns its published ports.
 
 ______________________________________________________________________
 

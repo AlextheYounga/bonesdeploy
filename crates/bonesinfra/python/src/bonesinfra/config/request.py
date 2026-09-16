@@ -14,11 +14,9 @@ from bonesinfra.config.context import (
     DnsConfig,
     RuntimeConfig,
     ServerContext,
-    ServicesConfig,
 )
 from bonesinfra.config.paths import DEFAULT_PROJECT_ROOT_PARENT, DEFAULT_REPO_PARENT, DEFAULT_WEB_ROOT
 
-SUPPORTED_DATABASE_SERVICES = frozenset({"postgres", "mariadb", "mysql", "mongodb", "valkey", "redis"})
 _RESERVED_PROJECT_NAMES = {
     "basic",
     "default",
@@ -52,6 +50,8 @@ _MAX_CRON_FIELD_LENGTH = 64
 _MAX_DOMAIN_LENGTH = 253
 _MIN_DOMAIN_LABELS = 2
 _MAX_EMAIL_LENGTH = 254
+_MAX_PORT = 65535
+_MAX_COMPOSE_WAIT_TIMEOUT = 3600
 
 
 def reject_unknown(mapping: Mapping[str, Any], allowed: set[str], where: str) -> None:
@@ -71,7 +71,7 @@ def parse_server_connection(server: Mapping[str, Any]) -> ServerContext:
 
 
 def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
-    reject_unknown(body, {"server", "site", "services"}, "request")
+    reject_unknown(body, {"server", "site"}, "request")
     server = body.get("server")
     site = body.get("site")
     if not isinstance(server, Mapping):
@@ -90,7 +90,8 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
             "web_root",
             "branch",
             "node_version",
-            "services",
+            "compose_port",
+            "compose_wait_timeout",
             "backup",
             "extras",
         },
@@ -115,18 +116,16 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
     for key, value in extras.items():
         if isinstance(value, (list, dict)):
             raise ValueError(f"site.extras.{key} must be a scalar")
-    services_value = site.get("services", [])
-    if not isinstance(services_value, list) or not all(isinstance(name, str) for name in services_value):
-        raise TypeError("SERVICES must be a list")
-    services = _database_services(services_value)
     backup = _parse_backup(site.get("backup"))
-    credentials = _credentials(body.get("services", {}))
     domain = _string(site.get("domain", ""), "site.domain")
     email = _string(site.get("email", ""), "site.email")
+    compose_port = _optional_port(site.get("compose_port"))
     if domain:
         validate_domain(domain)
     if email:
         validate_email(email)
+    if backend == "docker" and (domain or ssl_enabled) and compose_port is None:
+        raise ValueError("site.compose_port is required for Docker sites with managed ingress")
     return DeployContext(
         server=parse_server_connection(server),
         app=AppConfig(
@@ -141,22 +140,24 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
             DeployConfig(_string(site.get("branch", "main"), "site.branch")),
         ),
         runtime=RuntimeConfig(
-            backend, _string(site.get("web_root", ""), "site.web_root") or DEFAULT_WEB_ROOT, name, name, dict(extras)
+            backend,
+            _string(site.get("web_root", ""), "site.web_root") or DEFAULT_WEB_ROOT,
+            name,
+            name,
+            compose_port,
+            _compose_wait_timeout(site.get("compose_wait_timeout", 120)),
+            dict(extras),
         ),
-        services=ServicesConfig(services),
         backup=backup,
-        service_credentials=credentials,
         template=template,
     )
 
 
 def parse_request(body: Mapping[str, Any], *, server_only: bool = False) -> DeployContext | ServerContext:
-    reject_unknown(body, {"server", "site", "services"}, "request")
+    reject_unknown(body, {"server", "site"}, "request")
     if server_only:
         if "site" in body:
             raise ValueError("unknown request field 'site'")
-        if "services" in body:
-            raise ValueError("unknown request field 'services'")
         server = body.get("server")
         if not isinstance(server, Mapping):
             raise ValueError("server is required")
@@ -164,45 +165,18 @@ def parse_request(body: Mapping[str, Any], *, server_only: bool = False) -> Depl
     return parse_site(body)
 
 
-def _credentials(value: Any) -> dict[str, dict[str, Any]]:  # noqa: C901
+def _optional_port(value: Any) -> int | None:
     if value is None:
-        return {}
-    if not isinstance(value, Mapping):
-        raise ValueError("services must be an object")
-    result = {}
-    for name, creds in value.items():
-        if name not in SUPPORTED_DATABASE_SERVICES:
-            raise ValueError(f"unsupported database service credentials: {name}")
-        if creds is None:
-            continue
-        if not isinstance(creds, Mapping):
-            raise ValueError(f"services.{name} must be an object or null")
-        allowed = {"password", "username", "database", "port"}
-        reject_unknown(creds, allowed, f"services.{name}")
-        result[name] = dict(creds)
-        password = result[name].get("password")
-        if password is not None and (
-            not isinstance(password, str)
-            or not password
-            or any(c in password for c in "'\\")
-            or not all(c.isascii() and c.isprintable() for c in password)
-        ):
-            raise ValueError(f"services.{name}.password must be printable ASCII without quotes or backslashes")
-        port = result[name].get("port")
-        if port is not None and (not isinstance(port, str) or not port.isdigit()):
-            raise ValueError(f"services.{name}.port must contain only digits")
-    return result
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= _MAX_PORT:
+        raise ValueError("site.compose_port must be an integer from 1 through 65535")
+    return value
 
 
-def _database_services(values: list[str]) -> tuple[str, ...]:
-    unsupported = set(values) - SUPPORTED_DATABASE_SERVICES
-    if unsupported:
-        raise ValueError(f"unsupported database services: {', '.join(sorted(unsupported))}")
-    if "mariadb" in values and "mysql" in values:
-        raise ValueError("mariadb and mysql cannot be provisioned together")
-    if len(set(values)) != len(values):
-        raise ValueError("database services must not contain duplicates")
-    return tuple(values)
+def _compose_wait_timeout(value: Any) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= _MAX_COMPOSE_WAIT_TIMEOUT:
+        raise ValueError("site.compose_wait_timeout must be an integer from 1 through 3600")
+    return value
 
 
 def _parse_backup(value: Any) -> BackupConfig:

@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow, bail};
 use console::style;
-use inquire::{Confirm, MultiSelect, Select, Text};
+use inquire::{Confirm, Select, Text};
 use serde_json::Value;
 
 use crate::config::Bones;
@@ -90,14 +90,6 @@ pub fn choose_template(available_templates: &[String]) -> Result<Option<String>>
     Ok(Some(template_name))
 }
 
-pub fn choose_services(services: &[&str]) -> Result<Vec<String>> {
-    MultiSelect::new("Services:", services.to_vec())
-        .with_help_message("All services listen on localhost; use SSH port forwarding for remote access.")
-        .prompt()
-        .map(|selected| selected.into_iter().map(str::to_string).collect())
-        .map_err(|err| anyhow!(err))
-}
-
 pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bones>) -> Result<String> {
     let default_project_name = config_default(existing_config, |cfg| cfg.project_name.as_str(), project_name_hint);
     Text::new("Project name:")
@@ -108,7 +100,7 @@ pub fn prompt_project_name(project_name_hint: &str, existing_config: Option<&Bon
 }
 
 pub fn prompt_runtime_backend(existing_config: Option<&Bones>) -> Result<String> {
-    let options = vec![String::from("Native"), String::from("Docker")];
+    let options = vec![String::from("Native"), String::from("Docker Compose")];
     let default = existing_config.map_or(0, |cfg| match cfg.runtime.backend {
         RuntimeBackend::Native => 0,
         RuntimeBackend::Docker => 1,
@@ -254,10 +246,6 @@ pub fn confirm_site_ssl() -> Result<bool> {
 
 pub fn confirm_server_helpers() -> Result<bool> {
     confirm_prompt("Install server helper tools?", "Helper tools install shell and editor utilities on the server.")
-}
-
-pub fn confirm_site_services() -> Result<bool> {
-    confirm_prompt("Provision services?", "Services will be bound to localhost and credentials written to shared/.env.")
 }
 
 fn confirm_prompt(prompt: &str, message: &str) -> Result<bool> {

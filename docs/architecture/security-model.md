@@ -224,7 +224,13 @@ This covers systemd units, sudoers files, cron definitions, shell hooks, nginx i
 
 > **Derived rule:** anything read as executable instructions by a privileged component must be owned and writable only by a more trusted identity.
 
-This is also why unrestricted user-provided Docker Compose files undermine a controlled deployment model. Compose fields are instructions to the daemon about mounts, namespaces, devices, capabilities, and networking. Runtime definitions are generated from project-local infrastructure instead.
+Native runtime definitions remain generated and protected under this rule. A
+Compose deployment is an explicit reduced-guarantee exception: its project-owned
+Compose file is trusted privileged deployment input interpreted by the rootful
+Docker daemon. It may request mounts, namespaces, devices, capabilities, users,
+networks, and public ports outside the native policy. Only a trusted project
+operator may authorize such a deployment, and BonesDeploy never adds a Docker
+socket mount automatically.
 
 ### 11. `no_new_privs` closes the exec-based escalation path
 

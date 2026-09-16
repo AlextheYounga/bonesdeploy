@@ -3,10 +3,9 @@
 You're an AI agent. You're about to operate a deployment tool. Read this first.
 Then run `bonesdeploy skill next` and let the tool tell you what to do.
 
-BonesDeploy ships releases to plain Debian/Ubuntu servers. Not Kubernetes. Not
-ECS. Not Nomad. A real Linux box, a dedicated runtime user per project, systemd,
-nginx, and a rootless Podman build container. That's the whole stage. Everything
-else is a recovery or inspection move.
+BonesDeploy ships releases to plain Debian/Ubuntu servers. Native sites use a
+dedicated runtime user, systemd, nginx, and rootless Podman builds. Compose
+sites use a project-owned stack through rootful Docker Compose.
 
 The beauty is in the constraints. There are exactly six moves that matter.
 Everything else is recovery or inspection. Learn the moves and you can operate
@@ -22,7 +21,7 @@ any bonesdeploy project without reading a single line of YAML.
    packages, hardening, image store, deploy identity, BonesRemote, and sudoers.
    It is independent of every site's framework and runtime settings.
 3. `bonesdeploy site setup --yes` — verify server readiness, then provision one
-   site in this exact order: site base, services, runtime, and doctor. It never
+    site in this exact order: site base, runtime, and doctor. It never
    pushes Git or secrets, configures SSL, or deploys a release.
 4. `git push <remote> <branch>` — publish the source so `bonesremote` has
    something to build. Required once, before the first deploy.
@@ -45,8 +44,12 @@ A root `.env` holds local connection and site inputs. `infra/` holds the
 committed project infrastructure, and `deployment/{build,prepare}/NN_*.sh`
 holds the ordered build and prepare scripts.
 
-That's it. You don't write Kubernetes YAML. You don't write Dockerfiles. You
-write shell scripts, numbered, in lexical order. The constraint is the feature.
+Native projects use numbered shell scripts in lexical order. Docker Compose
+projects own their Compose file, Dockerfiles, and supporting services.
+Compose is reduced-guarantee mode: its file is trusted privileged input, and
+BonesDeploy does not enforce native isolation for project-selected images,
+mounts, capabilities, networks, users, or ports. It never adds a Docker socket
+mount. Named volumes persist across rollback, but their data is not rolled back.
 
 ## How to read state
 
@@ -80,8 +83,8 @@ secrets via `bonesdeploy secrets push`.
   happen at the last responsible moment. That's not preference; it's doctrine.
   Read `bonesdeploy skill doc methodology` before you "fix" a permissions
   problem by chmodding everything.
-- Will not run as a shared `www-data` user. Each project gets its own runtime
-  user. Isolation is at the OS level, not just the application level.
+- Will not run native applications as a shared `www-data` user. Compose
+  container users and isolation are controlled by the project.
 - Will not silently reset Podman. A broken build namespace is reported, not
   papered over.
 - Will not deploy to non-Debian/Ubuntu hosts. Don't ask.

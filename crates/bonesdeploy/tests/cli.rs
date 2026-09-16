@@ -3,6 +3,16 @@ mod common;
 use anyhow::Result;
 
 #[test]
+fn version_flag_prints_the_package_version() -> Result<()> {
+    let env = common::TestEnv::new()?;
+    let output = env.run(&["--version"])?;
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), concat!("bonesdeploy ", env!("CARGO_PKG_VERSION")));
+    Ok(())
+}
+
+#[test]
 fn doctor_accepts_verbose_flag() -> Result<()> {
     let env = common::TestEnv::new()?;
     let output = env.run(&["site", "doctor", "--local", "--verbose"])?;
@@ -22,5 +32,15 @@ fn site_manifest_accepts_json_format_and_reports_missing_config() -> Result<()> 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("root .env and infra/ are required"), "unexpected stderr: {stderr}");
+    Ok(())
+}
+
+#[test]
+fn init_rejects_removed_service_selection() -> Result<()> {
+    let env = common::TestEnv::new()?;
+    let output = env.run(&["init", "--service", "postgres"])?;
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unexpected argument '--service'"));
     Ok(())
 }

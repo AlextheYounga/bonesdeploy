@@ -20,7 +20,6 @@ pub async fn run(yes: bool) -> Result<()> {
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
     let request = infra::provisioning_request(&cfg)?;
     bonesinfra::run_with_request(&["site", "apply", "--request-stdin"], &request)?;
-    super::services::apply()?;
     super::runtime::apply()?;
 
     let session = ssh::connect_privileged(&cfg).await?;
@@ -51,7 +50,7 @@ async fn print_next_step(cfg: &config::Bones, pending_first_push: bool) {
             Ok(remote) => match super::status::render_preview_status(remote.preview.as_ref()) {
                 Some(line) => println!("{line}"),
                 None => println!(
-                    "{} Quick Tunnel is not active; run `bonesdeploy status` to inspect it.",
+                    "{} Quick Tunnel is not active; run `bonesdeploy site status` to inspect it.",
                     output::pending_marker()
                 ),
             },

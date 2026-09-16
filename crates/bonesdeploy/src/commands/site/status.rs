@@ -13,6 +13,7 @@ pub(crate) struct RemoteReport {
     ssl: RemoteSslStatus,
     pub(crate) preview: Option<RemotePreviewStatus>,
     services: Vec<RemoteServiceStatus>,
+    compose: Option<RemoteComposeStatus>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,6 +33,20 @@ struct RemoteServiceStatus {
     name: String,
     state: String,
     enabled: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct RemoteComposeStatus {
+    project_name: String,
+    files: Vec<String>,
+    services: Vec<RemoteComposeServiceStatus>,
+    error: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RemoteComposeServiceStatus {
+    service: String,
+    condition: String,
 }
 
 pub async fn run() -> Result<()> {
@@ -65,6 +80,21 @@ pub async fn run() -> Result<()> {
                             service.name,
                             style(&service.state).dim(),
                             style(&service.enabled).dim(),
+                        );
+                    }
+                }
+                if let Some(compose) = &remote.compose {
+                    println!();
+                    println!("{} {} ({})", style("Compose").dim(), compose.project_name, compose.files.join(", "));
+                    if let Some(error) = &compose.error {
+                        println!("  {} {error}", output::failure_marker());
+                    }
+                    for service in &compose.services {
+                        println!(
+                            "  {} {}  {}",
+                            compose_marker(&service.condition),
+                            service.service,
+                            style(&service.condition).dim(),
                         );
                     }
                 }
@@ -103,7 +133,7 @@ pub(crate) fn render_preview_status(preview: Option<&RemotePreviewStatus>) -> Op
     match preview.url.as_deref() {
         Some(url) => Some(format!("Preview: {url}")),
         None => Some(format!(
-            "{} Quick Tunnel is starting; run `bonesdeploy status` for its URL.",
+            "{} Quick Tunnel is starting; run `bonesdeploy site status` for its URL.",
             output::pending_marker()
         )),
     }
@@ -113,6 +143,14 @@ fn service_marker(state: &str) -> String {
     match state {
         "active" => output::success_marker(),
         "unknown" => output::pending_marker(),
+        _ => output::failure_marker(),
+    }
+}
+
+fn compose_marker(condition: &str) -> String {
+    match condition {
+        "healthy" | "running" | "completed" => output::success_marker(),
+        "starting" => output::pending_marker(),
         _ => output::failure_marker(),
     }
 }
@@ -136,7 +174,10 @@ mod tests {
     fn renders_starting_preview_without_url() {
         let preview = RemotePreviewStatus { active: true, url: None };
 
-        assert!(render_preview_status(Some(&preview)).is_some_and(|line| line.contains("Quick Tunnel is starting")));
+        assert_eq!(
+            render_preview_status(Some(&preview)).as_deref(),
+            Some("• Quick Tunnel is starting; run `bonesdeploy site status` for its URL.")
+        );
     }
 
     #[test]

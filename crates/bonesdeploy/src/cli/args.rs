@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
-#[command(name = "bonesdeploy", about = "Remote release deployment tool")]
+#[command(name = "bonesdeploy", about = "Remote release deployment tool", version)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
@@ -32,15 +32,12 @@ pub enum Command {
         /// Framework template (laravel, django, next, nuxt, rails, sveltekit, vue, or none)
         #[arg(long)]
         template: Option<String>,
-        /// Application runtime backend (native or docker; default: native)
+        /// Application runtime backend (native or Docker Compose; default: native)
         #[arg(long, value_parser = ["native", "docker"])]
         runtime_backend: Option<String>,
         /// Framework variable override, repeated (e.g. `--framework-var php_version=8.5`)
         #[arg(long = "framework-var", value_name = "KEY=VALUE")]
         framework_vars: Vec<String>,
-        /// Optional service to provision, repeated (postgres, mariadb, mysql, mongodb, valkey, redis)
-        #[arg(long = "service", value_name = "SERVICE")]
-        services: Vec<String>,
     },
     /// Run server setup followed by site setup
     Setup {
@@ -137,7 +134,7 @@ pub enum ServerCommand {
 
 #[derive(Subcommand)]
 pub enum SiteCommand {
-    /// Provision one project's base, services, runtime, and diagnostics
+    /// Provision one project's base, runtime, and diagnostics
     Setup {
         /// Skip setup confirmation prompts
         #[arg(long)]
@@ -188,12 +185,6 @@ pub enum SiteCommand {
         /// Email used for Let's Encrypt registration and notices
         #[arg(long)]
         email: Option<String>,
-    },
-    /// Provision configured services (bound to localhost only)
-    Services {
-        /// Skip service setup confirmation prompt
-        #[arg(long)]
-        yes: bool,
     },
 }
 

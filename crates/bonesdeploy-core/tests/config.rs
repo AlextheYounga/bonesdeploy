@@ -38,24 +38,6 @@ fn validate_host_rejects_shell_metacharacters() {
 }
 
 #[test]
-fn runtime_backend_defaults_to_native() -> Result<(), Error> {
-    let runtime: Runtime = toml::from_str("")?;
-
-    assert_eq!(runtime.backend, RuntimeBackend::Native);
-    Ok(())
-}
-
-#[test]
-fn runtime_backend_serializes_as_lowercase_toml() -> Result<()> {
-    let runtime = Runtime { backend: RuntimeBackend::Docker, ..Runtime::default() };
-
-    let value = toml::to_string(&runtime)?;
-
-    assert!(value.lines().any(|line| line == "backend = \"docker\""));
-    Ok(())
-}
-
-#[test]
 fn removed_runtime_shared_configuration_is_rejected() {
     let runtime = Runtime {
         extra: BTreeMap::from([(String::from("shared"), toml::Value::Table(Map::new()))]),
@@ -118,6 +100,8 @@ fn remote_deployment_config_excludes_identity_and_secrets() -> Result<()> {
     bones.releases_keep = 3;
     bones.runtime.backend = RuntimeBackend::Docker;
     bones.runtime.web_root = "public".to_string();
+    bones.runtime.compose_port = Some(8080);
+    bones.runtime.compose_wait_timeout = 240;
     bones.build.timeout_seconds = 120;
     bones.host = "example.com".to_string();
     bones.ssh_user = "root".to_string();
@@ -132,7 +116,7 @@ fn remote_deployment_config_excludes_identity_and_secrets() -> Result<()> {
     assert!(!json.contains("project_name"));
     assert!(!json.contains("host"));
     assert!(!json.contains("ssh_user"));
-    assert!(!json.contains("port"));
+    assert!(!json.contains("\"port\":"));
     assert!(!json.contains("domain"));
     assert!(!json.contains("ssl_enabled"));
     assert!(!json.contains("repo_path"));
@@ -145,6 +129,8 @@ fn remote_deployment_config_excludes_identity_and_secrets() -> Result<()> {
     assert!(json.contains("\"backend\":\"docker\""));
     assert!(json.contains("\"web_root\":\"public\""));
     assert!(json.contains("\"timeout_seconds\":120"));
+    assert!(json.contains("\"compose_port\":8080"));
+    assert!(json.contains("\"compose_wait_timeout\":240"));
     Ok(())
 }
 
@@ -221,11 +207,15 @@ fn managed_block_delimiters_replaced_atomically_preserving_application_content()
 fn flat_configuration_absorbed_into_managed_block_on_load() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join(".env");
-    fs::write(&path, "PROJECT_NAME=atlas\nHOST=192.0.2.1\nSSL_ENABLED=true\nSERVICES=postgres\nIS_STATIC=true\n")?;
+    fs::write(
+        &path,
+        "PROJECT_NAME=atlas\nHOST=192.0.2.1\nSSL_ENABLED=true\nCOMPOSE_PORT=8080\nCOMPOSE_WAIT_TIMEOUT=240\nIS_STATIC=true\n",
+    )?;
     let loaded = config::load_local(&path)?;
     assert_eq!(loaded.environment.project_name, "atlas");
     assert!(loaded.environment.ssl_enabled);
-    assert_eq!(loaded.environment.services.services, vec!["postgres"]);
+    assert_eq!(loaded.environment.runtime.compose_port, Some(8080));
+    assert_eq!(loaded.environment.runtime.compose_wait_timeout, 240);
     assert!(loaded.environment.runtime.extra.contains_key("is_static"));
     let parsed = config::parse_dotenv(&fs::read_to_string(&path)?)?;
     assert!(parsed.needs_rewrite);
@@ -234,6 +224,12 @@ fn flat_configuration_absorbed_into_managed_block_on_load() -> Result<()> {
     assert!(output.contains("BONES_IS_STATIC=true\n"));
     assert!(!output.lines().any(|line| line == "PROJECT_NAME=atlas"));
     Ok(())
+}
+
+#[test]
+fn dotenv_rejects_removed_built_in_service_configuration() {
+    let content = "# >>> BonesDeploy managed configuration >>>\nBONES_SERVICES=postgres\n# <<< BonesDeploy managed configuration <<<\n";
+    assert!(config::validate_dotenv(content).is_err());
 }
 
 #[test]
@@ -322,8 +318,7 @@ fn environment_without_backup_keys_loads_with_backup_defaults() -> Result<()> {
 
     let loaded = config::load(&path)?;
 
-    assert_eq!(loaded.backup.schedule, "0 0 * * *");
-    assert_eq!(loaded.backup.retention_days, 30);
+    assert_eq!((loaded.backup.schedule.as_str(), loaded.backup.retention_days), ("0 0 * * *", 30));
     assert!(loaded.backup.passphrase.is_empty());
     assert!(!loaded.backup.is_configured());
     Ok(())
@@ -340,9 +335,10 @@ fn provisioning_request_carries_backup_fields_including_the_passphrase() -> Resu
     let json = serde_json::to_string(&request)?;
 
     let site = request.site.expect("site request carries backup fields");
-    assert_eq!(site.backup.schedule, "15 2 * * *");
-    assert_eq!(site.backup.retention_days, 21);
-    assert_eq!(site.backup.passphrase, "hex-passphrase");
+    assert_eq!(
+        (site.backup.schedule.as_str(), site.backup.retention_days, site.backup.passphrase.as_str()),
+        ("15 2 * * *", 21, "hex-passphrase")
+    );
     assert!(json.contains("passphrase"));
     Ok(())
 }

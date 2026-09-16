@@ -5,8 +5,6 @@ from bonesinfra.services.languages import PHP
 from bonesinfra.services.linux import runtime, shared, systemd
 from bonesinfra.services.linux.nginx import site
 
-from . import docker
-
 TEMPLATES = TEMPLATES_DIR / "frameworks/laravel"
 SHARED_DIRECTORIES = ("storage", "storage/framework/views", "cache", "uploads")
 
@@ -15,9 +13,6 @@ def deploy(ctx):
     def provision(current_ctx):
         paths = current_ctx.paths_dict
         shared.ensure_directories(current_ctx, paths, SHARED_DIRECTORIES)
-        if current_ctx.runtime.backend == "docker":
-            docker.deploy(current_ctx)
-            return
         php_executable = PHP.install(current_ctx)
         socket = PHP.configure_fpm_pool(current_ctx, paths=paths)
         site.render_php_fpm(

@@ -15,9 +15,7 @@ class DeployContext:
     server: ServerContext
     app: AppConfig
     runtime: RuntimeConfig
-    services: ServicesConfig
     backup: BackupConfig
-    service_credentials: dict[str, dict[str, Any]] = field(default_factory=dict)
     template: str = "custom"
 
     @classmethod
@@ -115,12 +113,9 @@ class RuntimeConfig:
     web_root: str
     runtime_user: str
     runtime_group: str
+    compose_port: int | None = None
+    compose_wait_timeout: int = 120
     data: dict[str, Any] = field(default_factory=dict)
-
-
-@dataclass(frozen=True)
-class ServicesConfig:
-    services: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

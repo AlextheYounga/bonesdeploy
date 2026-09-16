@@ -2,7 +2,6 @@ import json
 import os
 import subprocess
 import sys
-from collections.abc import Mapping
 from copy import deepcopy
 from functools import cache
 from pathlib import Path
@@ -75,7 +74,6 @@ def make_site_request(**overrides):
             "web_root": "dist",
             "branch": "main",
             "node_version": "22",
-            "services": [],
             "backup": {
                 "schedule": "0 0 * * *",
                 "retention_days": 30,
@@ -83,21 +81,11 @@ def make_site_request(**overrides):
             },
             "extras": {},
         },
-        "services": {},
     }
-    credentials = overrides.pop("service_credentials", None)
-    if credentials is not None:
-        request["services"] = deepcopy(credentials)
-    site_services = overrides.pop("site_services", None)
-    if site_services is not None:
-        request["site"]["services"] = deepcopy(site_services)
     for section in ("server", "site"):
         values = overrides.pop(section, None)
         if values is not None:
             request[section].update(deepcopy(values))
-    values = overrides.pop("services", None)
-    if isinstance(values, Mapping):
-        request["services"].update(deepcopy(values))
     request["site"].update(deepcopy(overrides))
     return request
 

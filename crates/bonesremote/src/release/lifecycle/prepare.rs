@@ -13,7 +13,6 @@ use bonesdeploy_core::paths;
 use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::output;
-use crate::runtime::docker;
 
 struct PrepareScriptEnv<'a> {
     project_name: &'a str,
@@ -29,6 +28,10 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
     privileges::ensure_root("bonesremote release prepare")?;
 
     let cfg = &snapshot.config;
+    if cfg.runtime.backend == RuntimeBackend::Docker {
+        println!("Compose deployment; skipping numbered prepare scripts.");
+        return Ok(());
+    }
     let deployment_dir = &snapshot.deployment_dir;
     let scripts_dir = deployment_dir.join(paths::DEPLOYMENT_PREPARE_DIR);
     if !scripts_dir.is_dir() {
@@ -68,21 +71,6 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
         ruby_version: cfg.runtime.extra.get(RUNTIME_RUBY_VERSION).and_then(|version| version.as_str()),
         shared_functions: &shared_functions,
     };
-
-    if cfg.runtime.backend == RuntimeBackend::Docker {
-        let image = docker::command::image_name(&cfg.project_name)?;
-        docker::prepare::run_scripts(&docker::prepare::PrepareRequest {
-            project: &cfg.project_name,
-            project_root: &snapshot.project_root,
-            release: &release_dir,
-            runtime_user: &runtime_user,
-            image: &image,
-            scripts: &scripts,
-            functions: &shared_functions,
-            logs_dir: &logs_dir,
-        })?;
-        return Ok(());
-    }
 
     for script in scripts {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");

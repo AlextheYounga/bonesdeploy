@@ -97,6 +97,9 @@ more, nothing less.
 
 ## Runtime sandboxing
 
-Systemd `ProtectSystem=strict`, `NoNewPrivileges=yes`, `PrivateTmp=yes`,
-and AppArmor profiles. Per-project services run as the dedicated runtime
-user. Blast radius is bounded by the kernel, not by your hope.
+Native services use systemd `ProtectSystem=strict`, `NoNewPrivileges=yes`,
+`PrivateTmp=yes`, AppArmor profiles, and a dedicated runtime user. Compose is
+an explicit reduced-guarantee mode: the trusted project file controls container
+users, mounts, capabilities, namespaces, networks, and ports through the
+rootful Docker daemon. BonesDeploy does not automatically mount the Docker
+socket into a service.

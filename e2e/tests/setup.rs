@@ -3,6 +3,8 @@
 
 use anyhow::Result;
 
+#[path = "setup/compose.rs"]
+mod compose;
 #[path = "setup/django.rs"]
 mod django;
 #[path = "setup/harness.rs"]
@@ -27,6 +29,13 @@ fn django() -> Result<()> {
     let project = django::provision(&h)?;
     django::assert_running(&h)?;
     django::deploy(&h, &project)
+}
+
+#[test]
+#[ignore = "requires a running Incus daemon with nested Docker; see e2e/README.md"]
+fn docker_compose() -> Result<()> {
+    let h = harness::shared_harness()?;
+    compose::run(&h)
 }
 
 #[test]

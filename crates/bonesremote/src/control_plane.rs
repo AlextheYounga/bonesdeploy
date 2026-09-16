@@ -126,7 +126,6 @@ mod tests {
             releases_keep: 5,
             runtime: Runtime { backend, ..Runtime::default() },
             build: Build::default(),
-            services: vec!["postgres".to_string()],
         }
     }
 

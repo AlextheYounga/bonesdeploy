@@ -19,7 +19,6 @@ pub struct Args {
     pub template: Option<String>,
     pub runtime_backend: Option<String>,
     pub framework_vars: Vec<String>,
-    pub services: Vec<String>,
 }
 
 use crate::commands::secrets;
@@ -57,7 +56,6 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
     let mut cfg = config::collect_fresh_config(args)?;
     let framework_selection = if is_fresh { Some(framework::collect_framework_config(args)?) } else { None };
     if is_fresh {
-        cfg.services.services = framework::collect_database_services(args)?;
         if let Some(framework) = framework_selection {
             scaffold::materialize_project(&mut cfg, framework)?;
         }
