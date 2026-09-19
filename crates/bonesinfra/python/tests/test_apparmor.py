@@ -8,6 +8,7 @@ import jinja2
 
 from bonesinfra.config.context import DeployContext
 from bonesinfra.config.paths import ASSETS_DIR
+from bonesinfra.frameworks.rails.runtime import TEMPLATES as RAILS_TEMPLATES
 from bonesinfra.frameworks.sveltekit.runtime import TEMPLATES as SVELTEKIT_TEMPLATES
 from bonesinfra.services.linux.apparmor import app as apparmor_app
 
@@ -102,7 +103,7 @@ def test_rails_profile_permits_reading_managed_ruby_libraries(tmp_path, monkeypa
         ctx,
         paths=paths,
         runtime="rails",
-        template_src=ASSETS_DIR / "apparmor/app-profile.j2",
+        template_src=RAILS_TEMPLATES / "app-profile.j2",
         apparmor_exec_paths=[
             "/opt/bonesdeploy/ruby/3.4.8/bin/ruby",
             "/opt/bonesdeploy/ruby/3.4.8/bin/bundle",
@@ -111,10 +112,14 @@ def test_rails_profile_permits_reading_managed_ruby_libraries(tmp_path, monkeypa
     )
 
     rendered = (
-        jinja2.Environment(autoescape=True, loader=jinja2.FileSystemLoader(str(SRC_DIR / "bonesinfra/assets")))
-        .get_template("apparmor/app-profile.j2")
+        jinja2.Environment(
+            autoescape=True,
+            loader=jinja2.FileSystemLoader(str(SRC_DIR / "bonesinfra/frameworks/rails/templates")),
+        )
+        .get_template("app-profile.j2")
         .render(seen["data"])
     )
     assert "/opt/bonesdeploy/ruby/3.4.8/bin/ruby mrix," in rendered
     assert "/opt/bonesdeploy/ruby/3.4.8/bin/bundle mrix," in rendered
+    assert "/opt/bonesdeploy/ruby/ r," in rendered
     assert "/opt/bonesdeploy/ruby/** r," in rendered
