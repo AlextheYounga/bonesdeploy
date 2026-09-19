@@ -79,6 +79,12 @@ def test_missing_site_fields_use_defaults():
     assert ctx.backup.configured is False
 
 
+def test_empty_template_uses_custom_framework():
+    ctx = DeployContext.from_request(make_site_request(template=""))
+
+    assert ctx.template == "custom"
+
+
 @pytest.mark.parametrize("compose_port", [0, 65536, True, "8080"])
 def test_invalid_compose_port_is_rejected(compose_port):
     with pytest.raises(ValueError, match="compose_port"):
