@@ -28,11 +28,11 @@ def test_paths_include_site_target_and_requires_directory():
     assert paths.systemd_site_target_requires == "/etc/systemd/system/shop.target.requires"
 
 
-def test_template_path_falls_back_to_package_when_cwd_is_inaccessible(monkeypatch):
-    def inaccessible_cwd():
-        raise PermissionError("cwd is inaccessible")
+def test_template_path_falls_back_to_package_when_project_templates_are_inaccessible(monkeypatch):
+    def inaccessible_project(_path):
+        raise PermissionError("project templates are inaccessible")
 
-    monkeypatch.setattr(Path, "cwd", inaccessible_cwd)
+    monkeypatch.setattr(Path, "is_dir", inaccessible_project)
 
     template = config_paths.TEMPLATES_DIR / "frameworks" / "django" / "app.service.j2"
 
