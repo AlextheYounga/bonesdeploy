@@ -74,6 +74,7 @@ async fn dispatch_site(command: &SiteCommand) -> Result<()> {
         SiteCommand::Delete { yes } => site::delete(*yes).await,
         SiteCommand::Doctor { local, verbose } => site::doctor(*local, *verbose).await,
         SiteCommand::Status => site::status().await,
+        SiteCommand::Export { output } => site::export(output.as_deref()).await,
         SiteCommand::Manifest { format } => site::manifest(match format {
             ManifestFormat::Text => "text",
             ManifestFormat::Json => "json",

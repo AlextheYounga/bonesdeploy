@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser)]
@@ -157,6 +159,12 @@ pub enum SiteCommand {
     },
     /// Show the current deployment state and next steps
     Status,
+    /// Download the remote shared directory as a ZIP archive
+    Export {
+        /// Local archive filename or existing destination directory
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     /// Inspect project-owned remote deployment artifacts
     Manifest {
         /// Output format

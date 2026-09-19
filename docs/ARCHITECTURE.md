@@ -37,7 +37,8 @@ depend on it.
 **`bonesdeploy`** — the local CLI binary the developer runs. Owns interactive
 initialization, root `.env` authoring, SSH/Git/GPG integration, and delegation
 to the other two pieces. It does not execute deployments itself; it either
-provisions via `bonesinfra` or triggers `bonesremote` over SSH.
+provisions via `bonesinfra`, triggers `bonesremote` over SSH, or performs local
+administrative exports through the configured root SSH connection.
 
 **`bonesinfra`** — an embedded Python provisioning runtime. Its committed pure-
 Python wheel is materialized as `infra/bonesinfra-<version>-py3-none-any.whl`, while managed templates

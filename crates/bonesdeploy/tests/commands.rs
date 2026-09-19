@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use anyhow::Result;
 use bonesdeploy::cli::args::{Cli, Command, ServerCommand, SiteCommand};
 use bonesdeploy::commands::{secrets, site, skill, update};
@@ -74,6 +76,21 @@ fn removed_guide_command_is_rejected() {
 #[test]
 fn removed_remote_command_is_rejected() {
     assert!(Cli::try_parse_from(["bonesdeploy", "remote", "bootstrap"]).is_err());
+}
+
+#[test]
+fn site_export_accepts_an_optional_output_path() -> Result<()> {
+    let parsed = Cli::try_parse_from(["bonesdeploy", "site", "export", "--output", "exports/atlas.zip"])?;
+    assert!(matches!(
+        parsed.command,
+        Command::Site {
+            command: SiteCommand::Export { output: Some(path) }
+        } if path == Path::new("exports/atlas.zip")
+    ));
+
+    let parsed = Cli::try_parse_from(["bonesdeploy", "site", "export"])?;
+    assert!(matches!(parsed.command, Command::Site { command: SiteCommand::Export { output: None } }));
+    Ok(())
 }
 
 #[test]

@@ -1,5 +1,6 @@
 mod delete;
 mod doctor;
+mod export;
 mod manifest;
 mod readiness;
 mod releases;
@@ -11,6 +12,7 @@ mod status;
 pub use crate::ui::output::{render_remote_doctor_output, strip_ansi};
 pub use delete::run as delete;
 pub use doctor::run as doctor;
+pub use export::run as export;
 pub use manifest::run as manifest;
 pub use releases::run as releases;
 pub use runtime::run as runtime;

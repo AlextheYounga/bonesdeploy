@@ -55,6 +55,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 - Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed.
 - Git push transports source only; no Git hook starts a deployment.
 - The `git` SSH session may sudo only exact config-sync and deploy commands; BonesRemote retains ownership of promotion, activation, and service restart.
+- `bonesdeploy site export` is separate local administration: it connects as the configured root SSH user and streams a read-only ZIP of `shared/` directly to a private local file. It does not use `git`, sudo, or BonesRemote.
 
 ### Release Visibility and Cancellation
 
@@ -254,6 +255,11 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Runs a local, read-only manifest preflight before any remote mutation and requires the exact configured project name unless `--yes` is supplied.
   - Persists the validated, secret-free inventory in BonesRemote before stopping declared services and removing declared artifacts. A retry uses that persisted plan, while normal deployment mutations remain blocked by decommissioning or tombstone state.
   - Retains local project source, Git configuration, secrets, and caches. It does not remove shared host packages or daemons.
+
+- **site export**
+  - Uses the configured root SSH identity to run a fixed `zip -q -r -y - shared` command from the canonical site root and streams the result to the workstation.
+  - Includes hidden files such as `shared/.env`, stores symbolic links without following them, and writes a `0600` local ZIP atomically without overwriting an existing path.
+  - Is a live best-effort view, does not acquire the deployment lock or stop services, and is not a Borg backup operation.
 
 - **deploy**
   - SSHes into the configured host as `git`, synchronizes the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <project>`, then runs the existing root-required lifecycle through `sudo -n bonesremote deploy --site <project>`.

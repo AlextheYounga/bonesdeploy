@@ -371,6 +371,27 @@ Update the local and remote binaries:
 bonesdeploy update
 ```
 
+## Export Shared Data
+
+Download the configured site's complete remote `shared/` directory as a ZIP:
+
+```sh
+bonesdeploy site export
+bonesdeploy site export --output ./exports
+bonesdeploy site export --output ./atlas-shared.zip
+```
+
+Without `--output`, or when it names an existing directory, the archive is
+written as `<site>-shared-<YYYYMMDD_HHMMSS>.zip` using UTC. An otherwise
+nonexistent path is treated as the archive filename. Existing files are never
+overwritten, and the local archive is created with mode `0600`.
+
+The archive has a top-level `shared/` directory and includes hidden files such
+as `shared/.env`. Treat it as sensitive. This is a live, best-effort export: it
+does not stop the application, so files changed during transfer are not a
+point-in-time snapshot. It uses the configured root SSH connection directly and
+is separate from scheduled Borg backups.
+
 ## Scheduled Backups
 
 Projects initialized by BonesDeploy get one encrypted Borg repository per site

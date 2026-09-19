@@ -1,6 +1,8 @@
+use std::io;
+
 use anyhow::{Context, Result, bail};
 use openssh::{Session, SessionBuilder, Stdio};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{self as tokio_io, AsyncBufReadExt, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 
 use crate::config::Bones;
 use bonesdeploy_core::config::{default_deploy_user, parse_port};
@@ -89,6 +91,45 @@ pub async fn stream_cmd(session: &Session, cmd: &str) -> Result<()> {
 
     if !status.success() {
         bail!("Remote command failed: {cmd}");
+    }
+
+    Ok(())
+}
+
+pub async fn download_cmd<W>(session: &Session, cmd: &str, destination: &mut W) -> Result<()>
+where
+    W: AsyncWrite + Unpin,
+{
+    let mut child = session
+        .command("bash")
+        .arg("-c")
+        .arg(cmd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .await
+        .with_context(|| format!("Failed to execute remote command: {cmd}"))?;
+
+    let mut stdout = child.stdout().take().ok_or_else(|| anyhow::anyhow!("stdout was not piped"))?;
+    let mut stderr = child.stderr().take().ok_or_else(|| anyhow::anyhow!("stderr was not piped"))?;
+    let stderr_task = tokio::spawn(async move {
+        let mut bytes = Vec::new();
+        stderr.read_to_end(&mut bytes).await?;
+        Ok::<_, io::Error>(bytes)
+    });
+
+    if let Err(error) = tokio_io::copy(&mut stdout, destination).await {
+        drop(stdout);
+        let _ = child.disconnect().await;
+        let _ = stderr_task.await;
+        return Err(error).context("Failed to write the remote download");
+    }
+    drop(stdout);
+
+    let stderr = stderr_task.await.context("Failed to join remote stderr reader")??;
+    let status = child.wait().await.context("Failed to wait for remote command")?;
+    if !status.success() {
+        bail!("{}", remote_command_failure(cmd, &[], &stderr));
     }
 
     Ok(())
