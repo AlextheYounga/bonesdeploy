@@ -4,7 +4,7 @@ from pyinfra.facts.server import LinuxDistribution
 from bonesinfra.config.context import DeployContext
 from bonesinfra.services.linux import compose
 
-from .helpers import make_site_request
+from .helpers import SRC_DIR, make_site_request, read
 
 
 def test_compose_provisioning_installs_plugin_registers_unit_and_renders_loopback_nginx(monkeypatch):
@@ -77,6 +77,12 @@ def test_compose_without_ingress_does_not_configure_nginx(monkeypatch):
     monkeypatch.setattr(compose.runtime, "setup", lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError()))
 
     compose.deploy(ctx)
+
+
+def test_compose_service_waits_for_the_first_release():
+    template = read(SRC_DIR / "bonesinfra/assets/systemd/compose.service.j2")
+
+    assert "ConditionPathExists={{ paths.current }}/compose.yaml" in template
 
 
 def test_compose_manifest_omits_nginx_without_a_loopback_port():

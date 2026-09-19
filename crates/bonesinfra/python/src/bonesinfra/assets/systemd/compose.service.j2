@@ -4,6 +4,7 @@ After=docker.service network-online.target
 Requires=docker.service
 PartOf={{ project_name }}.target
 Before={{ project_name }}.target
+ConditionPathExists={{ paths.current }}/compose.yaml
 
 [Service]
 Type=oneshot
