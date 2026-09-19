@@ -69,6 +69,28 @@ fn materializes_base_bones_assets() -> Result<()> {
 }
 
 #[test]
+fn init_preserves_selected_runtime_backend_when_applying_framework_defaults() -> Result<()> {
+    let env = TestEnv::new()?;
+    let output = env.run(&[
+        "init",
+        "--non-interactive",
+        "--project-name",
+        "atlas",
+        "--host",
+        "deploy.example.com",
+        "--template",
+        "none",
+        "--runtime-backend",
+        "docker",
+    ])?;
+
+    assert!(output.status.success(), "init failed: {}", String::from_utf8_lossy(&output.stderr));
+    assert!(fs::read_to_string(env.repo().join(".env"))?.contains("BONES_RUNTIME_BACKEND=docker\n"));
+
+    Ok(())
+}
+
+#[test]
 fn named_framework_materializes_project_template_snapshot() -> Result<()> {
     let framework = "laravel";
     let env = TestEnv::new()?;
