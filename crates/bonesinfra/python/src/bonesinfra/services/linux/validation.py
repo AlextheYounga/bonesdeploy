@@ -11,7 +11,7 @@ def run_as_runtime_user(ctx, name, command):
     q_user = quote(user)
     home = f"$(getent passwd {q_user} | cut -d: -f6)"
     wrapped = f"HOME={home} XDG_CONFIG_HOME={home}/.config {command}"
-    server.shell(name=name, commands=[wrapped], _sudo=True, _sudo_user=user)
+    server.shell(name=name, commands=[wrapped], _sudo=True, _sudo_user=user, _chdir=ctx.paths.current)
 
 
 def verify_profile_attached(service_name, profile_name, *, name=None):

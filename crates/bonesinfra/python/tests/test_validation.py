@@ -1,4 +1,17 @@
+from bonesinfra.config.context import DeployContext
 from bonesinfra.services.linux import validation
+
+from .helpers import make_site_request
+
+
+def test_runtime_user_validation_uses_the_current_release_as_its_working_directory(monkeypatch):
+    calls = []
+    monkeypatch.setattr(validation.server, "shell", lambda **kwargs: calls.append(kwargs))
+    ctx = DeployContext.from_request(make_site_request())
+
+    validation.run_as_runtime_user(ctx, "Validate runtime", "true")
+
+    assert calls[0]["_chdir"] == ctx.paths.current
 
 
 def test_verify_profile_attached_retries_before_diagnostics(monkeypatch):
