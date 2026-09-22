@@ -102,7 +102,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
     backend = site.get("backend", "native")
     if backend not in {"native", "docker"}:
         raise ValueError("RUNTIME_BACKEND must be 'native' or 'docker'")
-    template = _string(site.get("template", "custom"), "site.template")
+    template = _string(site.get("template", "custom"), "site.template") or "custom"
     if template not in _FRAMEWORKS:
         raise ValueError(f"unknown framework infrastructure: {template}")
     ssl_enabled = site.get("ssl_enabled", False)
