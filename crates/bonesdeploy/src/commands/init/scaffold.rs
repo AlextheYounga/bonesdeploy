@@ -13,7 +13,9 @@ use crate::infra::git;
 use bonesdeploy_core::config::build_env;
 
 pub(super) fn materialize_project(cfg: &mut config::Bones, framework: FrameworkSelection) -> Result<()> {
+    let backend = cfg.runtime.backend;
     cfg.runtime = serde_json::from_value(serde_json::Value::Object(framework.config))?;
+    cfg.runtime.backend = backend;
     let infra_dir = Path::new(paths::LOCAL_INFRA_DIR);
     fs::create_dir_all(infra_dir)?;
 
