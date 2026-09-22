@@ -1,5 +1,8 @@
 """Deployment paths should match the v1 host layout."""
 
+from pathlib import Path
+
+from bonesinfra.config import paths as config_paths
 from bonesinfra.config.paths import DeploymentPaths
 
 
@@ -23,3 +26,16 @@ def test_paths_include_site_target_and_requires_directory():
 
     assert paths.systemd_site_target == "/etc/systemd/system/shop.target"
     assert paths.systemd_site_target_requires == "/etc/systemd/system/shop.target.requires"
+
+
+def test_template_path_falls_back_to_package_when_project_templates_are_inaccessible(monkeypatch):
+    def inaccessible_project(_path):
+        raise PermissionError("project templates are inaccessible")
+
+    monkeypatch.setattr(Path, "is_dir", inaccessible_project)
+
+    template = config_paths.TEMPLATES_DIR / "frameworks" / "django" / "app.service.j2"
+
+    assert str(template) == str(
+        Path(config_paths.__file__).parent.parent / "frameworks/django/templates/app.service.j2"
+    )

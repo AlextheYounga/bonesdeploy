@@ -10,9 +10,12 @@ class _TemplatePath:
         return _TemplatePath(*self.parts, part)
 
     def _path(self) -> Path:
-        project = Path.cwd() / "infra" / "templates"
-        if project.is_dir():
-            return project.joinpath(*self.parts)
+        try:
+            project = Path.cwd() / "infra" / "templates"
+            if project.is_dir():
+                return project.joinpath(*self.parts)
+        except PermissionError:
+            pass
         package = Path(__file__).parent.parent
         if self.parts and self.parts[0] == "shared":
             return package / "assets" / Path(*self.parts[1:])
