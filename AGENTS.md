@@ -52,8 +52,6 @@ Prefer code that reads as a vocabulary of the system, not a sequence of implemen
 
 Prefer using bash commands when appropriate over rewriting entire documents to save tokens. 
 
-**YOU DO NOT COMMIT ANY CHANGES**
-
 When you are done working, please run and address all warnings/errors:
 - `cargo clippy`
 - `cargo fmt`
@@ -63,8 +61,6 @@ And finally, please update any related documentation **if necessary, use your be
 - `CONTEXT.md`
 - `crates/bonesinfra/python/CONTEXT.md`
 - `README.md`
-
-Please DO NOT run the e2e tests yourself. They are way too long. 
 
 Useful documents
 `docs/ARCHITECTURE.md`
