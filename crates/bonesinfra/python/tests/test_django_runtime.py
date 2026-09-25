@@ -47,3 +47,21 @@ def test_django_rejects_unsafe_wsgi_modules(module):
 
     with pytest.raises(ValueError, match=r"package\.module:callable"):
         django._wsgi_module(ctx)
+
+
+def test_gunicorn_uses_its_runtime_directory_for_worker_temp(monkeypatch):
+    captured = {}
+    ctx = SimpleNamespace(runtime=SimpleNamespace(data={}), paths_dict={})
+    paths = {
+        "current": "/srv/sites/example/current",
+        "runtime_socket_dir": "/run/example",
+    }
+
+    monkeypatch.setattr(django.runtime, "orchestrate", lambda current_ctx, provision: provision(current_ctx))
+    monkeypatch.setattr(django.shared, "ensure_directories", lambda *_args: None)
+    monkeypatch.setattr(django.application, "deploy_server", lambda _ctx, **kwargs: captured.update(kwargs))
+
+    django.deploy(ctx)
+
+    command = captured["command"](ctx, paths, None)
+    assert "--worker-tmp-dir /run/example/gunicorn" in command

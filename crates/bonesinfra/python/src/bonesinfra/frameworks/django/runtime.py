@@ -68,7 +68,8 @@ def deploy(ctx):
             module, _ = _wsgi_module(current_ctx)
             return (
                 f"{paths['current']}/.venv/bin/gunicorn {quote(module)} "
-                f"--bind unix:{paths['runtime_socket_dir']}/gunicorn/gunicorn.sock"
+                f"--bind unix:{paths['runtime_socket_dir']}/gunicorn/gunicorn.sock "
+                f"--worker-tmp-dir {paths['runtime_socket_dir']}/gunicorn"
             )
 
         application.deploy_server(
