@@ -1,3 +1,4 @@
+from pathlib import PurePosixPath
 from shlex import quote
 
 from pyinfra.operations import server
@@ -12,12 +13,24 @@ TEMPLATES = TEMPLATES_DIR / "frameworks/django"
 SHARED_DIRECTORIES = ("media",)
 
 
+def _wsgi_module(ctx):
+    module = ctx.runtime.data.get("wsgi_module", "config.wsgi:application")
+    if not isinstance(module, str):
+        raise TypeError("wsgi_module must be a string")
+    import_name, separator, callable_name = module.partition(":")
+    import_parts = import_name.split(".")
+    if not separator or not callable_name.isidentifier() or not all(part.isidentifier() for part in import_parts):
+        raise ValueError("wsgi_module must use the form package.module:callable")
+    return module, PurePosixPath(*import_parts).with_suffix(".py")
+
+
 def deploy(ctx):
     def provision(current_ctx):
         shared.ensure_directories(current_ctx, current_ctx.paths_dict, SHARED_DIRECTORIES)
 
         def seed_placeholder(current_ctx, paths, python_binary):
             placeholder = paths["placeholder_release"]
+            _, module_path = _wsgi_module(current_ctx)
             server.shell(
                 name="Create placeholder venv with gunicorn",
                 commands=[
@@ -27,7 +40,7 @@ def deploy(ctx):
             )
             mkdir(
                 name="Ensure placeholder config directory exists",
-                path=f"{placeholder}/config",
+                path=f"{placeholder}/{module_path.parent}",
                 user="root",
                 group=current_ctx.runtime.runtime_group,
                 mode="0750",
@@ -35,7 +48,7 @@ def deploy(ctx):
             render(
                 "Seed placeholder WSGI application",
                 TEMPLATES / "django/placeholder-wsgi.py.j2",
-                f"{placeholder}/config/wsgi.py",
+                f"{placeholder}/{module_path}",
                 user="root",
                 group=current_ctx.runtime.runtime_group,
                 mode="0640",
@@ -44,15 +57,17 @@ def deploy(ctx):
 
         def validate(current_ctx, paths, _python_binary):
             gunicorn = f"{paths['current']}/.venv/bin/gunicorn"
-            module = current_ctx.runtime.data.get("wsgi_module", "config.wsgi:application")
+            module, _ = _wsgi_module(current_ctx)
             validation.run_as_runtime_user(
-                current_ctx, "Validate Gunicorn configuration as runtime user", f"{gunicorn} --check-config {module}"
+                current_ctx,
+                "Validate Gunicorn configuration as runtime user",
+                f"{gunicorn} --check-config {quote(module)}",
             )
 
         def command(current_ctx, paths, _python_binary):
-            module = current_ctx.runtime.data.get("wsgi_module", "config.wsgi:application")
+            module, _ = _wsgi_module(current_ctx)
             return (
-                f"{paths['current']}/.venv/bin/gunicorn {module} "
+                f"{paths['current']}/.venv/bin/gunicorn {quote(module)} "
                 f"--bind unix:{paths['runtime_socket_dir']}/gunicorn/gunicorn.sock"
             )
 
