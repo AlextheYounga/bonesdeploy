@@ -20,14 +20,17 @@ use crate::{keep_artifacts, scratch_dir, status_ok, unique_suffix};
 
 pub struct Session {
     home: PathBuf,
+    state_home: PathBuf,
     keep: bool,
 }
 
 impl Session {
     pub fn create() -> Result<Self> {
         let home = scratch_dir().join(format!("home-{}", unique_suffix()));
+        let state_home = PathBuf::from("/tmp").join(format!("bones-e2e-state-{}", unique_suffix()));
         let ssh_dir = home.join(".ssh");
         fs::create_dir_all(&ssh_dir).with_context(|| format!("Failed to create {}", ssh_dir.display()))?;
+        fs::create_dir_all(&state_home).with_context(|| format!("Failed to create {}", state_home.display()))?;
 
         let keygen = Command::new("ssh-keygen")
             .args(["-q", "-t", "ed25519", "-N", "", "-C", "bones-e2e", "-f"])
@@ -58,7 +61,7 @@ impl Session {
         fs::set_permissions(&shim_path, fs::Permissions::from_mode(0o755))
             .context("Failed to make ssh shim executable")?;
 
-        Ok(Self { home, keep: keep_artifacts() })
+        Ok(Self { home, state_home, keep: keep_artifacts() })
     }
 
     pub fn home(&self) -> &Path {
@@ -90,6 +93,7 @@ impl Session {
             .env("XDG_CONFIG_HOME", self.home.join(".config"))
             .env("XDG_DATA_HOME", self.home.join(".local/share"))
             .env("XDG_CACHE_HOME", self.home.join(".cache"))
+            .env("XDG_STATE_HOME", &self.state_home)
             .env("PATH", path)
             .env_remove("SSH_AUTH_SOCK");
         command
@@ -100,10 +104,37 @@ impl Drop for Session {
     fn drop(&mut self) {
         if self.keep {
             eprintln!("{}: keeping session home {} for inspection", crate::KEEP_ENV, self.home.display());
+            eprintln!("{}: keeping session state {} for inspection", crate::KEEP_ENV, self.state_home.display());
             return;
         }
         if let Err(err) = fs::remove_dir_all(&self.home) {
             eprintln!("Failed to clean up session home {}: {err}", self.home.display());
         }
+        if let Err(err) = fs::remove_dir_all(&self.state_home) {
+            eprintln!("Failed to clean up session state {}: {err}", self.state_home.display());
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn command_uses_a_short_isolated_state_home() -> Result<()> {
+        let session = Session::create()?;
+        let command = session.command("true");
+        let state_home = command
+            .get_envs()
+            .find_map(|(name, value)| (name == "XDG_STATE_HOME").then_some(value).flatten())
+            .context("XDG_STATE_HOME was not set")?;
+
+        assert_eq!(state_home, session.state_home);
+        assert_eq!(session.state_home.parent(), Some(Path::new("/tmp")));
+        assert!(
+            session.state_home.file_name().is_some_and(|name| name.to_string_lossy().starts_with("bones-e2e-state-"))
+        );
+        assert!(session.state_home.as_os_str().len() < 64);
+        Ok(())
     }
 }

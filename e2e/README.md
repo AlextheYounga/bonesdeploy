@@ -81,8 +81,9 @@ Test names: `django`, `laravel`, `next_server`, `next_static`, `nuxt_server`,
 - **Isolated session** — each run gets a throwaway `HOME` under `target/e2e/`
   with its own SSH keypair, ssh config, and gitconfig. Your real `~/.ssh` is
   never read or written. The XDG config, data, and cache roots point under
-  `target/e2e/`, so project state, keyrings, and the materialized bonesinfra
-  venv are isolated from the host.
+  `target/e2e/`; the XDG state root uses a short, isolated `/tmp` path so SSH
+  control sockets stay within Unix path limits. Project state, keyrings, and
+  the materialized bonesinfra venv are isolated from the host.
 - **Local binaries** — `bonesdeploy` is built for the host; `bonesremote` is
   built as a static musl binary and pre-seeded into the container, so
   bootstrap's `command -v bonesremote` guard skips the
