@@ -46,7 +46,7 @@ fn scaffold_custom_provisioning(infra_dir: &Path) -> Result<()> {
     fs::write(custom.join("runtime.py"), "def deploy(_ctx):\n    pass\n")?;
     fs::write(
         custom.join(paths::GITIGNORE_FILE),
-        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../bonesinfra/python/.gitignore")),
+        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/kit/.gitignore")),
     )?;
     fs::write(
         custom.join("manifest.py"),
