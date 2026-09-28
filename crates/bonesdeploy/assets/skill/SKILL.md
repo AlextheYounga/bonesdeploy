@@ -17,12 +17,13 @@ any bonesdeploy project without reading a single line of YAML.
    framework template. Non-interactive agents: pass `--template <name>` and
    `--framework-var key=value` (see `bonesdeploy skill doc templates` for
    every template and every variable).
-2. `bonesdeploy server setup --yes` — provision the shared host baseline once:
+2. `bonesdeploy server setup --yes` — provision the shared host baseline once
+   per host, not once per project:
    packages, hardening, image store, deploy identity, BonesRemote, and sudoers.
    It is independent of every site's framework and runtime settings.
-3. `bonesdeploy site setup --yes` — verify server readiness, then provision one
-    site in this exact order: site base, runtime, and doctor. It never
-   pushes Git or secrets, configures SSL, or deploys a release.
+3. `bonesdeploy site setup --yes` — once per project, verify server readiness,
+   then provision that site in this exact order: site base, runtime, and doctor.
+   It never pushes Git or secrets, configures SSL, or deploys a release.
 4. `git push <remote> <branch>` — publish the source so `bonesremote` has
    something to build. Required once, before the first deploy.
 5. `bonesdeploy site ssl --yes --domain app.example.com --email ops@example.com`
@@ -33,9 +34,10 @@ any bonesdeploy project without reading a single line of YAML.
 That's a deployment. In between, you repeat move five. Nothing else matters
 until move five works.
 
-`bonesdeploy setup --yes` remains an idempotent convenience command that runs
-server setup and site setup in sequence. On an already prepared shared host,
-start directly with site setup. Run
+`bonesdeploy setup --yes` remains an idempotent convenience command for a first
+project on a fresh host. It runs server setup and site setup in sequence. For
+every additional project on that host, run only `bonesdeploy site setup --yes`.
+Do not run host-wide server setup concurrently from multiple projects. Run
 `bonesdeploy site runtime --yes` separately when reapplying an existing site.
 
 ## What you actually own

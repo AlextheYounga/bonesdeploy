@@ -41,7 +41,10 @@ pub enum Command {
         #[arg(long = "framework-var", value_name = "KEY=VALUE")]
         framework_vars: Vec<String>,
     },
-    /// Run server setup followed by site setup
+    /// Set up a fresh host and this project
+    ///
+    /// Runs host-wide server setup, then project-scoped site setup. For an
+    /// additional project on a prepared host, run `bonesdeploy site setup`.
     Setup {
         /// Skip setup confirmation prompts
         #[arg(long)]
@@ -114,7 +117,7 @@ pub enum ReleasesCommand {
 
 #[derive(Subcommand)]
 pub enum ServerCommand {
-    /// Provision the shared server baseline
+    /// Provision the shared server baseline once per host
     Setup {
         /// Skip setup confirmation prompts
         #[arg(long)]
@@ -136,7 +139,7 @@ pub enum ServerCommand {
 
 #[derive(Subcommand)]
 pub enum SiteCommand {
-    /// Provision one project's base, runtime, and diagnostics
+    /// Provision one project's base, runtime, and diagnostics once per project
     Setup {
         /// Skip setup confirmation prompts
         #[arg(long)]

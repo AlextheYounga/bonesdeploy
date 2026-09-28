@@ -13,6 +13,29 @@ fn version_flag_prints_the_package_version() -> Result<()> {
 }
 
 #[test]
+fn setup_help_distinguishes_fresh_host_and_project_scopes() -> Result<()> {
+    let env = common::TestEnv::new()?;
+
+    let root = env.run(&["--help"])?;
+    assert!(root.status.success());
+    assert!(String::from_utf8_lossy(&root.stdout).contains("Set up a fresh host and this project"));
+
+    let combined = env.run(&["setup", "--help"])?;
+    assert!(combined.status.success());
+    assert!(String::from_utf8_lossy(&combined.stdout).contains("additional project on a prepared host"));
+
+    let server = env.run(&["server", "setup", "--help"])?;
+    assert!(server.status.success());
+    assert!(String::from_utf8_lossy(&server.stdout).contains("once per host"));
+
+    let site = env.run(&["site", "setup", "--help"])?;
+    assert!(site.status.success());
+    assert!(String::from_utf8_lossy(&site.stdout).contains("once per project"));
+
+    Ok(())
+}
+
+#[test]
 fn doctor_accepts_verbose_flag() -> Result<()> {
     let env = common::TestEnv::new()?;
     let output = env.run(&["site", "doctor", "--local", "--verbose"])?;

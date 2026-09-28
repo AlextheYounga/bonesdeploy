@@ -87,10 +87,8 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
 
 fn print_follow_up_hint() {
     println!();
-    println!(
-        "{}",
-        output::next_step_with_detail("bonesdeploy server setup", "to provision the shared server baseline")
-    );
+    println!("{}", output::next_step_with_detail("bonesdeploy setup", "to set up a fresh host and this project"));
+    println!("Prepared host: {} for this project instead.", output::run_command("bonesdeploy site setup"));
 }
 
 /// Preserves the entire managed backup configuration from an existing `.env`

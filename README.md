@@ -233,7 +233,7 @@ Deployment scripts run in filename order:
 
 ## Set Up the Server
 
-Provision the reusable server baseline:
+Provision the reusable server baseline once per host:
 
 ```sh
 bonesdeploy server setup --yes
@@ -243,7 +243,7 @@ The baseline includes etckeeper: `/etc` is tracked in a root-owned Git
 repository with package defaults, and every successful provisioning run ends
 with an etckeeper commit recording its `/etc` changes.
 
-Provision the site, including its base, runtime, and doctor:
+Then provision each project once, including its base, runtime, and doctor:
 
 ```sh
 bonesdeploy site setup --yes
@@ -252,6 +252,17 @@ bonesdeploy site setup --yes
 `site setup` runs exactly server readiness, site base provisioning, runtime,
 and site doctor. It does not push Git or secrets, configure SSL, or
 deploy a release.
+
+For additional projects on an already prepared host, do not repeat server setup.
+Initialize the project and run only its project-scoped setup:
+
+```sh
+bonesdeploy init
+bonesdeploy site setup --yes
+```
+
+Do not run server setup concurrently from multiple projects. It mutates shared
+host resources such as package indexes and the image store.
 
 This runs the provisioning from your project's versioned `infra/bonesinfra-*.whl`:
 framework services, per-site nginx, AppArmor, and your `infra/custom/` project
