@@ -14,6 +14,21 @@ fn init_success(env: &TestEnv) -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn init_distinguishes_fresh_and_prepared_host_setup_commands() -> Result<()> {
+    let env = TestEnv::new()?;
+    let output = env.run(INIT_ARGS)?;
+
+    assert!(output.status.success(), "init failed: {}", String::from_utf8_lossy(&output.stderr));
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("bonesdeploy setup"), "missing fresh-host setup guidance: {stdout}");
+    assert!(stdout.contains("fresh host and this project"), "missing fresh-host scope: {stdout}");
+    assert!(stdout.contains("bonesdeploy site setup"), "missing prepared-host setup guidance: {stdout}");
+    assert!(stdout.contains("Prepared host:"), "missing prepared-host scope: {stdout}");
+
+    Ok(())
+}
+
 fn assert_project_infra(repo: &Path) -> Result<()> {
     let infra = repo.join("infra");
     assert!(fs::read_dir(&infra)?.any(|entry| {

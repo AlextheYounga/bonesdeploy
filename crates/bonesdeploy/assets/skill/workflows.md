@@ -11,7 +11,8 @@ bonesdeploy deploy
 ```
 
 Root setup composes server setup and site setup. Site setup performs the
-readiness check, site base, runtime, and doctor sequence.
+readiness check, site base, runtime, and doctor sequence. Use this convenience
+path for the first project on a fresh host.
 
 ## First-time setup, the explicit path
 
@@ -28,6 +29,19 @@ bonesdeploy deploy
 Use the explicit path when diagnosing a host or provisioning multiple sites on
 one server. Server setup is performed once per host; site setup is performed
 once per project.
+
+## Additional project on a prepared host
+
+```text
+bonesdeploy init
+bonesdeploy site setup --yes
+git push production main
+bonesdeploy deploy
+```
+
+Do not repeat `bonesdeploy server setup` for each project and do not run it
+concurrently from multiple projects. The existing host baseline is shared;
+every project still requires its own site setup.
 
 ## The daily deploy
 

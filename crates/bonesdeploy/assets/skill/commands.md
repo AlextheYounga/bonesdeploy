@@ -14,9 +14,9 @@ the server or site.
 
 `bonesdeploy setup [--yes]`
 
-Composes `server setup --yes` followed by `site setup --yes`. Site setup first
-checks server readiness, then runs site base provisioning, runtime, and doctor.
-Both setup paths are idempotent.
+Convenience command for a first project on a fresh host. It composes host-wide
+`server setup --yes` followed by project-scoped `site setup --yes`. For an
+additional project on a prepared host, run only `bonesdeploy site setup --yes`.
 
 ## doctor
 
@@ -31,9 +31,10 @@ either check fails. Use scoped doctor commands for focused checks.
 `bonesdeploy server doctor [--verbose]`
 `bonesdeploy server helpers [--yes]`
 
-Server commands establish and inspect the reusable host baseline: packages,
-hardening, firewall, shared image store, global deploy identity, BonesRemote,
-global roots, and sudoers. They do not read site runtime or framework state.
+Server commands establish and inspect the reusable, once-per-host baseline:
+packages, hardening, firewall, shared image store, global deploy identity,
+BonesRemote, global roots, and sudoers. They do not read site runtime or
+framework state. Do not run server setup concurrently from multiple projects.
 
 ## site
 
@@ -50,7 +51,8 @@ global roots, and sudoers. They do not read site runtime or framework state.
 `bonesdeploy site runtime [--yes]`
 `bonesdeploy site ssl [--yes] [--domain <d>] [--email <e>]`
 
-Site commands operate on one project. `site setup` does not push Git or
+Site commands operate on one project. Run `site setup` once per project after
+the server baseline is ready. It does not push Git or
 secrets, configure SSL, or deploy a release. `site delete` permanently removes
 the remote manifest inventory after exact project-name confirmation; it retains
 local project files and blocks deployment until deletion finishes.
