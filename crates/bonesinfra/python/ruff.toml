@@ -92,7 +92,7 @@ combine-as-imports = true
   "ARG001",  # paths arg kept for consistent call signature
 ]
 "src/bonesinfra/services/linux/nginx/router.py" = [
-  "PLR0913", # render_router_config() accepts many keyword-only args naturally
+  "PLR0913", # deploy_router_config() accepts many keyword-only args naturally
 ]
 "src/bonesinfra/services/runtime/__init__.py" = ["T20"]
 "src/bonesinfra/cli/commands/server/bonesremote.py" = [

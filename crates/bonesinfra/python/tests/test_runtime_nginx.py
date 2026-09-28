@@ -17,7 +17,7 @@ def _noop(*args, **kwargs):
 def test_runtime_nginx_provisions_site_service_without_a_public_domain(monkeypatch):
     ctx = _make_ctx(domain="")
     paths = ctx.paths_dict
-    calls = []
+    deploy_calls = []
 
     monkeypatch.setattr(nginx_router, "mkdir", _noop)
     monkeypatch.setattr(nginx_router.service, "render_target", _noop)
@@ -27,15 +27,65 @@ def test_runtime_nginx_provisions_site_service_without_a_public_domain(monkeypat
     monkeypatch.setattr(nginx_router.systemd, "daemon_reload", _noop)
     monkeypatch.setattr(nginx_router, "install_default_deny_server", _noop)
     monkeypatch.setattr(nginx_router, "validate_config", _noop)
-
-    def fake_render(*args, **kwargs):
-        calls.append((args, kwargs))
-
-    monkeypatch.setattr(nginx_router, "render", fake_render)
+    monkeypatch.setattr(nginx_router, "render", _noop)
+    monkeypatch.setattr(
+        nginx_router,
+        "deploy_router_config",
+        lambda *_args, **_kwargs: deploy_calls.append("router"),
+    )
 
     nginx_router.setup(ctx, paths)
 
-    assert all("nginx_server_name" not in kwargs for _, kwargs in calls)
+    assert deploy_calls == []
+
+
+def test_deploy_router_config_activates_before_validation_and_reload(monkeypatch):
+    ctx = _make_ctx(domain="example.com")
+    paths = ctx.paths_dict
+    calls = []
+
+    monkeypatch.setattr(nginx_router, "render", lambda *_args, **_kwargs: calls.append("render"))
+
+    def record_link(**kwargs):
+        calls.append("link")
+        assert kwargs["path"] == paths["nginx_site_enabled"]
+        assert kwargs["target"] == paths["nginx_site_available"]
+        assert kwargs["force"] is True
+        assert kwargs["_sudo"] is True
+
+    monkeypatch.setattr(nginx_router.files, "link", record_link)
+    monkeypatch.setattr(nginx_router, "validate_config", lambda *_args: calls.append("validate"))
+    monkeypatch.setattr(nginx_router.systemd, "service", lambda **_kwargs: calls.append("reload"))
+
+    nginx_router.deploy_router_config(ctx, paths, ssl_enabled=False, validate=True, reload=True)
+
+    assert calls == ["render", "link", "validate", "reload"]
+
+
+def test_runtime_nginx_deploys_public_router_for_a_real_domain(monkeypatch):
+    ctx = _make_ctx(domain="example.com")
+    paths = ctx.paths_dict
+    deploy_calls = []
+    link_calls = []
+
+    monkeypatch.setattr(nginx_router, "mkdir", _noop)
+    monkeypatch.setattr(nginx_router.service, "render_target", _noop)
+    monkeypatch.setattr(nginx_router.service, "register_service", _noop)
+    monkeypatch.setattr(nginx_router.systemd, "daemon_reload", _noop)
+    monkeypatch.setattr(nginx_router.files, "link", lambda **kwargs: link_calls.append(kwargs))
+    monkeypatch.setattr(nginx_router, "install_default_deny_server", _noop)
+    monkeypatch.setattr(nginx_router, "validate_config", _noop)
+    monkeypatch.setattr(nginx_router, "render", _noop)
+    monkeypatch.setattr(
+        nginx_router,
+        "deploy_router_config",
+        lambda *_args, **kwargs: deploy_calls.append(kwargs),
+    )
+
+    nginx_router.setup(ctx, paths)
+
+    assert deploy_calls == [{"ssl_enabled": ctx.app.dns.ssl_enabled, "validate": True}]
+    assert link_calls == []
 
 
 def test_runtime_nginx_migrates_site_service_to_target(monkeypatch):

@@ -38,8 +38,9 @@ def test_ssl_flow_rejects_invalid_values_before_side_effects(monkeypatch):
     assert mkdir_calls == []
 
 
-def test_ssl_flow_does_not_manage_quick_tunnel(monkeypatch):
+def test_ssl_flow_deploys_challenge_router_before_certificate_and_https_afterward(monkeypatch):
     calls = []
+    router_calls = []
     ctx = parse_request(make_site_request(domain="example.com"))
 
     monkeypatch.setattr("bonesinfra.cli.commands.site.ssl.mkdir", lambda **_kwargs: calls.append("webroot"))
@@ -47,9 +48,14 @@ def test_ssl_flow_does_not_manage_quick_tunnel(monkeypatch):
         "bonesinfra.cli.commands.site.ssl.nginx_router.install_default_deny_server",
         lambda _paths: calls.append("default-deny"),
     )
+
+    def record_router_deployment(*_args, **kwargs):
+        router_calls.append(kwargs)
+        calls.append(f"router-{kwargs['stage']}")
+
     monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.nginx_router.render_router_config",
-        lambda *_args, **kwargs: calls.append(f"router-{kwargs['stage']}"),
+        "bonesinfra.cli.commands.site.ssl.nginx_router.deploy_router_config",
+        record_router_deployment,
     )
     monkeypatch.setattr(
         "bonesinfra.cli.commands.site.ssl.obtain_certificate", lambda *_args: calls.append("certificate")
@@ -69,9 +75,13 @@ def test_ssl_flow_does_not_manage_quick_tunnel(monkeypatch):
         "router-SSL enable",
         "etckeeper-commit",
     ]
+    assert router_calls == [
+        {"ssl_enabled": False, "stage": "certbot challenge", "validate": True, "reload": True},
+        {"ssl_enabled": True, "stage": "SSL enable", "validate": True, "reload": True},
+    ]
 
 
-def test_ssl_failure_does_not_manage_quick_tunnel(monkeypatch):
+def test_ssl_failure_leaves_only_the_challenge_router_deployed(monkeypatch):
     calls = []
     ctx = parse_request(make_site_request(domain="example.com"))
 
@@ -81,7 +91,7 @@ def test_ssl_failure_does_not_manage_quick_tunnel(monkeypatch):
         lambda _paths: calls.append("default-deny"),
     )
     monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.nginx_router.render_router_config",
+        "bonesinfra.cli.commands.site.ssl.nginx_router.deploy_router_config",
         lambda *_args, **kwargs: calls.append(f"router-{kwargs['stage']}"),
     )
 

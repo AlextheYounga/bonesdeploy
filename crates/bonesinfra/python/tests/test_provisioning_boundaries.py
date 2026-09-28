@@ -68,7 +68,7 @@ def test_ssl_provisioning_records_changes_after_ssl_operations(monkeypatch):
     monkeypatch.setattr(site_ssl.nginx_router, "install_default_deny_server", lambda *_: calls.append("default-deny"))
     monkeypatch.setattr(
         site_ssl.nginx_router,
-        "render_router_config",
+        "deploy_router_config",
         lambda *_args, **kwargs: calls.append(f"router:{kwargs['stage']}"),
     )
     monkeypatch.setattr(site_ssl, "obtain_certificate", lambda *_: calls.append("certbot"))

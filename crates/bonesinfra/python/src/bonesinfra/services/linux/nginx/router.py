@@ -48,7 +48,7 @@ def validate_config(name="Validate nginx configuration"):
     )
 
 
-def render_router_config(ctx, paths, *, ssl_enabled, stage=None, validate=False, reload=False):
+def deploy_router_config(ctx, paths, *, ssl_enabled, stage=None, validate=False, reload=False):
     nginx_server_name = ctx.app.dns.domain
     if not nginx_server_name:
         raise ValueError("domain is required for public nginx routing")
@@ -63,6 +63,13 @@ def render_router_config(ctx, paths, *, ssl_enabled, stage=None, validate=False,
         nginx_ssl_certificate_path=cert_path,
         nginx_ssl_certificate_key_path=key_path,
         **template_data(ctx, paths=paths),
+    )
+    files.link(
+        name=f"Enable router nginx site{label}",
+        path=paths["nginx_site_enabled"],
+        target=paths["nginx_site_available"],
+        force=True,
+        _sudo=True,
     )
     if validate:
         validate_config(f"Validate nginx configuration{label}")
@@ -117,15 +124,7 @@ def setup(ctx, paths, *, nginx_address_families="AF_UNIX", nginx_ip_loopback_onl
     if ctx.app.dns.domain:
         # SSL state comes from the project config; certificate lifecycle is owned
         # by `ssl apply`, not runtime provisioning.
-        render_router_config(ctx, paths, ssl_enabled=ctx.app.dns.ssl_enabled)
-        files.link(
-            name="Enable router nginx site",
-            path=paths["nginx_site_enabled"],
-            target=paths["nginx_site_available"],
-            force=True,
-            _sudo=True,
-        )
-        validate_config("Validate nginx configuration")
+        deploy_router_config(ctx, paths, ssl_enabled=ctx.app.dns.ssl_enabled, validate=True)
 
 
 def remove_project_router(paths):
