@@ -292,7 +292,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
    - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra runtime apply --request-stdin` against the configured host as the configured `ssh_user`, feeding the typed site request on stdin.
   - Native sites run project and framework provisioning. Compose sites configure Docker's official Debian/Ubuntu apt repository, install Docker Engine and the Compose plugin, render the generic Compose systemd unit, and optionally configure nginx for `BONES_COMPOSE_PORT`.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
-  - Native sites without a domain receive a project-scoped Cloudflare Quick Tunnel. Compose sites receive managed nginx/tunnel ingress only when `BONES_COMPOSE_PORT` is configured; otherwise their Compose stack owns port exposure.
+  - Does not install, configure, or start Cloudflare Quick Tunnels. Temporary public ingress is an explicit `site tunnel` lifecycle.
   - Does not handle SSL; use `site ssl` for TLS configuration.
 
 - **site ssl**
@@ -300,6 +300,12 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
   - Separate from `site runtime` to keep certificate management decoupled from app runtime concerns.
+
+- **site tunnel**
+  - `start [--yes]` explicitly installs Cloudflared, creates a loopback-only root-nginx route to the per-site nginx Unix socket, and enables/starts `<site>-cloudflared.service` independently of `<site>.target`.
+  - `status` reports the active ephemeral `trycloudflare.com` URL from the service journal, reports startup while the URL is pending, or reports that the tunnel is stopped.
+  - `stop [--yes]` stops/disables the service and removes its unit and nginx route. The server-wide Cloudflared package remains installed for other sites.
+  - Native sites are supported. Compose sites require `BONES_COMPOSE_PORT` so nginx remains the origin; application containers are never exposed directly by this feature.
 
 - **rollback**
   - SSHes into the configured host and runs `bonesremote release rollback --site <project>`, which acquires the site lock and repoints `current` to the previous release without rebuilding, then restarts `<project>.target`. If the restart fails, the original release is restored and restarted.
@@ -316,7 +322,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - `bonesdeploy skill` prints the orientation doc (`SKILL.md`) baked into the binary.
   - `bonesdeploy skill list` prints the names of every embedded topic doc.
   - `bonesdeploy skill doc <name>` prints a specific topic doc (`commands`, `workflows`, `methodology`).
-   - `bonesdeploy skill next [--format text|json]` inspects `.env` and the remote host, then suggests the next prompt-free command across `uninitialized`, `server_missing`, `site_missing`, `ssl_missing`, and `ready` states. Domainless sites use their Quick Tunnel and proceed directly to deploy instead of entering the SSL state.
+  - `bonesdeploy skill next [--format text|json]` inspects `.env` and the remote host, then suggests the next prompt-free command across `uninitialized`, `server_missing`, `site_missing`, `ssl_missing`, and `ready` states. A Quick Tunnel is optional and does not affect readiness.
   - Topic docs are markdown files under `crates/bonesdeploy/assets/skill/` and are embedded with `rust-embed` alongside `kit/` and `frameworks/`.
 - **version**:
   - Echoes the installed `bonesdeploy` version.

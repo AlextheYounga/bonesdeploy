@@ -258,11 +258,28 @@ framework services, per-site nginx, AppArmor, and your `infra/custom/` project
 extensions. Templates rendered by the managed framework come from
 `infra/templates/`.
 
-Sites without a configured domain receive a project-scoped Cloudflare Quick
-Tunnel. `bonesdeploy site status` reports its account-less HTTPS
-`trycloudflare.com` preview URL. The URL changes whenever the tunnel restarts;
-Quick Tunnels are for development and review, have no uptime SLA, limit
-concurrent requests, and do not support Server-Sent Events.
+Site setup and runtime provisioning do not install or start Cloudflare. To
+explicitly expose a site through an accountless Quick Tunnel, run:
+
+```sh
+bonesdeploy site tunnel start
+bonesdeploy site tunnel status
+```
+
+The tunnel uses a loopback-only nginx HTTP origin, which proxies to the site's
+existing nginx Unix socket. Application processes are not exposed directly, and
+Cloudflared is not part of the normal site target. The service is enabled after
+explicit startup and restarts on failure or host reboot until removed with:
+
+```sh
+bonesdeploy site tunnel stop
+```
+
+The `trycloudflare.com` URL can change whenever Cloudflared restarts. Quick
+Tunnels are for development and review, have no uptime SLA, limit concurrent
+requests, and do not support Server-Sent Events. A deterministic per-site
+loopback port is used; startup fails safely during nginx validation if that port
+collides with another local listener.
 
 After editing the complete remote environment, explicitly publish it before the
 first deploy or whenever it changes:
@@ -281,7 +298,10 @@ Add SSL after DNS points at the server:
 bonesdeploy site ssl --domain app.example.com --email ops@example.com
 ```
 
-SSL is separate on purpose. Get the site working first. Add certificates after DNS is real. A real domain uses the existing public Nginx and Certbot path; it replaces the temporary Quick Tunnel only after HTTPS is active.
+SSL is separate on purpose. Get the site working first. Add certificates after
+DNS is real. A real domain uses the existing public Nginx and Certbot path. If a
+Quick Tunnel is running, remove it explicitly with `bonesdeploy site tunnel
+stop` after the real domain is ready.
 
 ## Deploy
 

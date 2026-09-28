@@ -8,6 +8,7 @@ mod runtime;
 mod setup;
 mod ssl;
 mod status;
+mod tunnel;
 
 pub use crate::ui::output::{render_remote_doctor_output, strip_ansi};
 pub use delete::run as delete;
@@ -19,3 +20,4 @@ pub use runtime::run as runtime;
 pub use setup::run as setup;
 pub use ssl::run as ssl;
 pub use status::run as status;
+pub use tunnel::{start as tunnel_start, status as tunnel_status, stop as tunnel_stop};

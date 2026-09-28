@@ -124,8 +124,6 @@ def collect_services(ctx: DeployContext, project_manifest: Any) -> tuple[Managed
         ManagedService(name, unit.format(project=ctx.app.project_name), owner)
         for name, unit, owner in project_manifest.services(ctx)
     )
-    if not ctx.app.dns.domain and (ctx.runtime.backend != "docker" or ctx.runtime.compose_port is not None):
-        services.append(ManagedService("quick tunnel", f"{ctx.app.project_name}-cloudflared.service", "runtime"))
     return _deduplicate_services(services)
 
 
@@ -139,13 +137,23 @@ def resolve_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifa
 
 def resolve_deletion_plan(ctx: DeployContext, project_manifest: Any) -> DeletionPlan:
     """Resolve the current manifest into the supported, safe deletion inventory."""
-    artifacts = tuple(
-        DeletionArtifact(artifact.name, _artifact_path(ctx.paths, artifact), artifact.kind, artifact.owner)
-        for artifact in collect_artifacts(ctx, project_manifest)
+    artifacts = (
+        *(
+            DeletionArtifact(artifact.name, _artifact_path(ctx.paths, artifact), artifact.kind, artifact.owner)
+            for artifact in collect_artifacts(ctx, project_manifest)
+        ),
+        DeletionArtifact("quick tunnel service", ctx.paths.systemd_cloudflared_service, "file", "tunnel"),
+        DeletionArtifact("quick tunnel nginx route", ctx.paths.nginx_cloudflared_site_available, "file", "tunnel"),
+        DeletionArtifact(
+            "enabled quick tunnel nginx route", ctx.paths.nginx_cloudflared_site_enabled, "link", "tunnel"
+        ),
     )
-    services = tuple(
-        DeletionService(service.name, service.unit, service.owner)
-        for service in collect_services(ctx, project_manifest)
+    services = (
+        *(
+            DeletionService(service.name, service.unit, service.owner)
+            for service in collect_services(ctx, project_manifest)
+        ),
+        DeletionService("quick tunnel", f"{ctx.app.project_name}-cloudflared.service", "tunnel"),
     )
     for artifact in artifacts:
         _validate_deletion_artifact(ctx, artifact)
@@ -384,6 +392,9 @@ def _is_derived_system_path(ctx: DeployContext, path: Path) -> bool:
         ctx.paths.systemd_site_target_requires,
         ctx.paths.systemd_site_nginx_service,
         ctx.paths.systemd_site_nginx_requirement,
+        ctx.paths.systemd_cloudflared_service,
+        ctx.paths.nginx_cloudflared_site_available,
+        ctx.paths.nginx_cloudflared_site_enabled,
         ctx.paths.nginx_apparmor_profile,
         ctx.paths.backup_cron_file,
     }

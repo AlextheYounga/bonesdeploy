@@ -38,7 +38,7 @@ def test_ssl_flow_rejects_invalid_values_before_side_effects(monkeypatch):
     assert mkdir_calls == []
 
 
-def test_ssl_handoff_removes_quick_tunnel_after_ssl_router_is_ready(monkeypatch):
+def test_ssl_flow_does_not_manage_quick_tunnel(monkeypatch):
     calls = []
     ctx = parse_request(make_site_request(domain="example.com"))
 
@@ -55,10 +55,6 @@ def test_ssl_handoff_removes_quick_tunnel_after_ssl_router_is_ready(monkeypatch)
         "bonesinfra.cli.commands.site.ssl.obtain_certificate", lambda *_args: calls.append("certificate")
     )
     monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.cloudflared.remove",
-        lambda *_args: calls.append("cloudflared-remove"),
-    )
-    monkeypatch.setattr(
         "bonesinfra.cli.commands.site.ssl.etckeeper.commit_changes",
         lambda *_args: calls.append("etckeeper-commit"),
     )
@@ -71,12 +67,11 @@ def test_ssl_handoff_removes_quick_tunnel_after_ssl_router_is_ready(monkeypatch)
         "router-certbot challenge",
         "certificate",
         "router-SSL enable",
-        "cloudflared-remove",
         "etckeeper-commit",
     ]
 
 
-def test_ssl_handoff_preserves_quick_tunnel_when_certificate_acquisition_fails(monkeypatch):
+def test_ssl_failure_does_not_manage_quick_tunnel(monkeypatch):
     calls = []
     ctx = parse_request(make_site_request(domain="example.com"))
 
@@ -95,11 +90,6 @@ def test_ssl_handoff_preserves_quick_tunnel_when_certificate_acquisition_fails(m
         raise RuntimeError("certbot failed")
 
     monkeypatch.setattr("bonesinfra.cli.commands.site.ssl.obtain_certificate", fail_to_obtain_certificate)
-    monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.cloudflared.remove",
-        lambda *_args: calls.append("cloudflared-remove"),
-    )
-
     with pytest.raises(RuntimeError, match="certbot failed"):
         deploy_ssl(ctx)
 

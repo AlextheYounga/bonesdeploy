@@ -1,4 +1,3 @@
-from bonesinfra.services.linux import cloudflared
 from bonesinfra.services.linux.apparmor import nginx as apparmor
 from bonesinfra.services.linux.nginx import router
 
@@ -15,8 +14,6 @@ def setup(ctx, *, uses_tcp=False):
         nginx_address_families=address_families,
         nginx_ip_loopback_only=uses_tcp,
     )
-    if not ctx.app.dns.domain:
-        cloudflared.install()
 
 
 def orchestrate(ctx, provision, *, uses_tcp=False):
@@ -28,14 +25,9 @@ def orchestrate(ctx, provision, *, uses_tcp=False):
 
 def start_services(ctx):
     router.start_services(ctx, ctx.paths_dict)
-    if not ctx.app.dns.domain:
-        cloudflared.start(ctx)
 
 
 def reconcile_ingress(ctx):
     paths = ctx.paths_dict
-    if ctx.app.dns.domain:
-        cloudflared.remove(ctx, paths)
-    else:
+    if not ctx.app.dns.domain:
         router.remove_project_router(paths)
-        cloudflared.setup(ctx, paths)

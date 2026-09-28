@@ -87,6 +87,14 @@ Wrong SSL:
 bonesdeploy site ssl --yes --domain app.example.com --email ops@example.com
 ```
 
+Temporary public preview:
+
+```text
+bonesdeploy site tunnel start --yes
+bonesdeploy site tunnel status
+bonesdeploy site tunnel stop --yes
+```
+
 ## Inspecting state
 
 ```text

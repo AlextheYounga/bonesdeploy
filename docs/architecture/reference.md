@@ -609,6 +609,32 @@ Cli::Site::Runtime
        └─ SSH: bonesremote doctor --site <site>
 ```
 
+Normal runtime application does not install, configure, start, or remove a
+Cloudflare Quick Tunnel.
+
+### 4.7 `bonesdeploy site tunnel`
+
+```text
+Cli::Site::Tunnel
+   ├─ start
+   │    └─ BonesInfra: tunnel start --request-stdin
+   │         ├─ install Cloudflared package
+   │         ├─ render loopback-only root-nginx route to per-site nginx socket
+   │         ├─ render independent <site>-cloudflared.service
+   │         └─ enable/start service outside <site>.target
+   ├─ status
+   │    └─ SSH: bonesremote status --site <site>
+   │         └─ active service journal → current trycloudflare.com URL
+   └─ stop
+        └─ BonesInfra: tunnel stop --request-stdin
+             └─ stop/disable service and remove unit + nginx route
+```
+
+Cloudflared uses a supported `http://127.0.0.1:<port>` origin. Root nginx
+adapts that loopback request to the existing per-site nginx Unix socket, so the
+application process is never exposed directly. The generated URL is ephemeral
+runtime state and is not persisted in project configuration.
+
 ---
 
 ## 5. Extension Points

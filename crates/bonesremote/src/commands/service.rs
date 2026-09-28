@@ -10,22 +10,20 @@ use crate::privileges;
 use crate::release::SiteMutation;
 
 pub fn run(mutation: &SiteMutation) -> Result<()> {
-    run_with_options(mutation, true, false)
+    run_with_options(mutation, true)
 }
 
-/// Restart services during release activation without making a transient
-/// project tunnel failure block the release.
 pub fn run_for_release(mutation: &SiteMutation) -> Result<()> {
-    run_with_options(mutation, false, true)
+    run_with_options(mutation, false)
 }
 
-fn run_with_options(mutation: &SiteMutation, start_target: bool, exclude_tunnel: bool) -> Result<()> {
+fn run_with_options(mutation: &SiteMutation, start_target: bool) -> Result<()> {
     privileges::ensure_root("bonesremote service restart")?;
 
     let site = mutation.site();
     let target_name = paths::site_target_name(site);
     let registered = systemd::required_services(&target_name)?;
-    let services = if exclude_tunnel { services_for_release(&target_name, &registered) } else { registered };
+    let services = registered;
     if services.is_empty() {
         bail!("Site target {target_name} has no registered services");
     }
@@ -49,11 +47,6 @@ fn run_with_options(mutation: &SiteMutation, start_target: bool, exclude_tunnel:
 
     println!("Restarted {target_name}: {}", services.join(", "));
     Ok(())
-}
-
-pub fn services_for_release(target: &str, services: &[String]) -> Vec<String> {
-    let tunnel = format!("{}-cloudflared.service", target.trim_end_matches(paths::SYSTEMD_TARGET_SUFFIX));
-    services.iter().filter(|service| *service != &tunnel).cloned().collect()
 }
 
 fn restart_service(service: &str) -> Result<()> {

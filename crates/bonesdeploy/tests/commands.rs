@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use anyhow::Result;
-use bonesdeploy::cli::args::{Cli, Command, ServerCommand, SiteCommand};
+use bonesdeploy::cli::args::{Cli, Command, ServerCommand, SiteCommand, TunnelCommand};
 use bonesdeploy::commands::{secrets, site, skill, update};
 use bonesdeploy::frameworks::Framework;
 use clap::Parser;
@@ -118,6 +118,28 @@ fn server_and_site_commands_parse_under_their_scopes() -> Result<()> {
 
     let delete = Cli::try_parse_from(["bonesdeploy", "site", "delete", "--yes"])?;
     assert!(matches!(delete.command, Command::Site { command: SiteCommand::Delete { yes: true } }));
+    Ok(())
+}
+
+#[test]
+fn quick_tunnel_commands_parse_under_the_site_scope() -> Result<()> {
+    let start = Cli::try_parse_from(["bonesdeploy", "site", "tunnel", "start", "--yes"])?;
+    assert!(matches!(
+        start.command,
+        Command::Site { command: SiteCommand::Tunnel { command: TunnelCommand::Start { yes: true } } }
+    ));
+
+    let stop = Cli::try_parse_from(["bonesdeploy", "site", "tunnel", "stop", "--yes"])?;
+    assert!(matches!(
+        stop.command,
+        Command::Site { command: SiteCommand::Tunnel { command: TunnelCommand::Stop { yes: true } } }
+    ));
+
+    let status = Cli::try_parse_from(["bonesdeploy", "site", "tunnel", "status"])?;
+    assert!(matches!(
+        status.command,
+        Command::Site { command: SiteCommand::Tunnel { command: TunnelCommand::Status } }
+    ));
     Ok(())
 }
 

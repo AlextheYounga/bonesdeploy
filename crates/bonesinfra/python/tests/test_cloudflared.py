@@ -1,84 +1,98 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from bonesinfra.services.linux import cloudflared
 
 
-def test_install_uses_conditional_atomic_key_download(monkeypatch):
-    calls = []
-
-    monkeypatch.setattr(cloudflared.files, "directory", lambda **kwargs: calls.append(("directory", kwargs)))
-    monkeypatch.setattr(cloudflared.files, "download", lambda **kwargs: calls.append(("download", kwargs)))
-    monkeypatch.setattr(cloudflared.files, "template", lambda **kwargs: calls.append(("template", kwargs)))
-    monkeypatch.setattr(cloudflared.apt, "packages", lambda **kwargs: calls.append(("packages", kwargs)))
-
-    cloudflared.install()
-
-    assert [operation for operation, _kwargs in calls] == ["directory", "download", "template", "packages"]
-    assert calls[1][1] == {
-        "name": "Install Cloudflare package signing key",
-        "src": "https://pkg.cloudflare.com/cloudflare-main.gpg",
-        "dest": "/etc/apt/keyrings/cloudflare-main.gpg",
-        "user": "root",
-        "group": "root",
-        "mode": "0644",
-        "_sudo": True,
-    }
-
-
-def test_quick_tunnel_setup_renders_project_service_for_nginx_socket(monkeypatch):
-    calls = []
-    ctx = SimpleNamespace(
+def _context(backend="native", compose_port=8080):
+    return SimpleNamespace(
         app=SimpleNamespace(project_name="atlas"),
+        runtime=SimpleNamespace(backend=backend, compose_port=compose_port),
         paths_dict={
             "systemd_cloudflared_service": "/etc/systemd/system/atlas-cloudflared.service",
+            "nginx_cloudflared_site_available": "/etc/nginx/sites-available/bonesdeploy-cloudflared-atlas.conf",
+            "nginx_cloudflared_site_enabled": "/etc/nginx/sites-enabled/bonesdeploy-cloudflared-atlas.conf",
             "runtime_nginx_socket": "/run/atlas/nginx/nginx.sock",
+            "systemd_site_target_requires": "/etc/systemd/system/atlas.target.requires",
         },
     )
 
-    monkeypatch.setattr(cloudflared.files, "template", lambda **kwargs: calls.append(kwargs))
-    monkeypatch.setattr(cloudflared.service, "register_service", lambda *_args, **kwargs: calls.append(kwargs))
-    monkeypatch.setattr(cloudflared.systemd, "daemon_reload", lambda **kwargs: calls.append(kwargs))
+
+def test_port_for_project_is_stable_and_unprivileged():
+    assert cloudflared.port_for("atlas") == cloudflared.port_for("atlas")
+    assert 1024 < cloudflared.port_for("atlas") < 65536
+
+
+def test_quick_tunnel_rejects_compose_without_managed_nginx():
+    with pytest.raises(ValueError, match="managed nginx ingress"):
+        cloudflared.validate_supported(_context(backend="docker", compose_port=None))
+
+
+def test_quick_tunnel_start_installs_loopback_route_and_independent_service(monkeypatch):
+    calls = []
+    ctx = _context()
+    monkeypatch.setattr(cloudflared, "install", lambda: calls.append("install"))
     monkeypatch.setattr(
         cloudflared,
-        "template_data",
-        lambda _ctx, *, paths: {"project_name": "atlas", "runtime_user": "atlas", "paths": paths},
+        "render",
+        lambda _name, _src, dest, **kwargs: calls.append(("render", {"dest": dest, **kwargs})),
     )
+    monkeypatch.setattr(cloudflared.server, "script", lambda **kwargs: calls.append(("script", kwargs)))
+    monkeypatch.setattr(cloudflared.systemd, "service", lambda **kwargs: calls.append(("service", kwargs)))
+    monkeypatch.setattr(cloudflared.systemd, "daemon_reload", lambda **_: calls.append("reload-systemd"))
+    monkeypatch.setattr(cloudflared.server, "shell", lambda **kwargs: calls.append(("shell", kwargs)))
+    monkeypatch.setattr(cloudflared, "template_data", lambda _ctx, *, paths: {"project_name": "atlas", "paths": paths})
+    monkeypatch.setattr(cloudflared.files, "template", lambda **kwargs: calls.append(("template", kwargs)))
 
-    cloudflared.setup(ctx, ctx.paths_dict)
+    cloudflared.start(ctx, ctx.paths_dict)
 
-    assert calls[0]["dest"] == "/etc/systemd/system/atlas-cloudflared.service"
-    assert calls[0]["src"].endswith("systemd/cloudflared.service.j2")
-    assert calls[1]["name"] == "cloudflared"
+    assert calls[0] == "install"
+    route = next(call for call in calls if call[0] == "render")
+    assert route[1]["dest"] == ctx.paths_dict["nginx_cloudflared_site_available"]
+    assert route[1]["cloudflared_port"] == cloudflared.port_for("atlas")
+    activation = next(call[1] for call in calls if call[0] == "script")
+    assert activation["args"] == (
+        ctx.paths_dict["nginx_cloudflared_site_available"],
+        ctx.paths_dict["nginx_cloudflared_site_enabled"],
+    )
+    assert "register_service" not in str(calls)
+    target_cleanup = next(call[1]["commands"][0] for call in calls if call[0] == "shell")
+    assert "atlas.target.requires/atlas-cloudflared.service" in target_cleanup
+    start = [call for call in calls if call[0] == "service"][-1][1]
+    assert start["enabled"] is True
+    assert start["restarted"] is True
 
 
-def test_quick_tunnel_unit_orders_network_and_allows_only_required_families():
+def test_quick_tunnel_unit_uses_supported_loopback_http_origin_and_orders_nginx():
     template = Path(cloudflared.ASSETS_DIR / "systemd/cloudflared.service.j2").read_text()
 
-    assert "After=network-online.target {{ project_name }}-nginx.service" in template
-    assert "Wants=network-online.target" in template
-    assert "StartLimitIntervalSec=0" in template
-    assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6" in template
-    assert "ProtectClock=yes" in template
-    assert "ProtectKernelLogs=yes" in template
-    assert "RestrictSUIDSGID=yes" in template
-    assert "Restart=always" in template
+    assert "After=network-online.target nginx.service {{ project_name }}-nginx.service" in template
+    assert "Requires=nginx.service {{ project_name }}-nginx.service" in template
+    assert "--url http://127.0.0.1:{{ cloudflared_port }}" in template
+    assert "PartOf={{ project_name }}.target" not in template
+    assert "{{ project_name }}.target.requires" not in template
+
+    route = Path(cloudflared.ASSETS_DIR / "nginx/cloudflared.conf.j2").read_text()
+    assert "listen 127.0.0.1:{{ cloudflared_port }} default_server;" in route
+    assert "proxy_pass http://unix:{{ paths.runtime_nginx_socket }};" in route
+    assert "proxy_set_header X-Forwarded-Proto https;" in route
 
 
-def test_quick_tunnel_removal_unregisters_and_deletes_the_project_unit(monkeypatch):
+def test_quick_tunnel_stop_removes_unit_and_both_route_paths(monkeypatch):
     calls = []
-    ctx = SimpleNamespace(app=SimpleNamespace(project_name="atlas"))
-    paths = {
-        "systemd_site_target_requires": "/etc/systemd/system/atlas.target.requires",
-        "systemd_cloudflared_service": "/etc/systemd/system/atlas-cloudflared.service",
-    }
+    ctx = _context()
+    monkeypatch.setattr(cloudflared.systemd, "service", lambda **kwargs: calls.append(("service", kwargs)))
+    monkeypatch.setattr(cloudflared.server, "shell", lambda **kwargs: calls.append(("shell", kwargs)))
+    monkeypatch.setattr(cloudflared.systemd, "daemon_reload", lambda **_: calls.append("reload-systemd"))
+    monkeypatch.setattr(cloudflared, "validate_config", lambda *_: calls.append("validate"))
 
-    monkeypatch.setattr(cloudflared.systemd, "service", lambda **kwargs: calls.append(kwargs))
-    monkeypatch.setattr(cloudflared.server, "shell", lambda **kwargs: calls.append(kwargs))
-    monkeypatch.setattr(cloudflared.systemd, "daemon_reload", lambda **kwargs: calls.append(kwargs))
+    cloudflared.stop(ctx, ctx.paths_dict)
 
-    cloudflared.remove(ctx, paths)
-
-    assert calls[0]["service"] == "atlas-cloudflared.service"
-    assert "atlas.target.requires/atlas-cloudflared.service" in calls[1]["commands"][0]
-    assert "atlas-cloudflared.service" in calls[1]["commands"][1]
+    command = next(call[1]["commands"][0] for call in calls if call[0] == "shell")
+    assert "systemctl disable --now" in command
+    assert ctx.paths_dict["systemd_cloudflared_service"] in command
+    assert ctx.paths_dict["nginx_cloudflared_site_available"] in command
+    assert ctx.paths_dict["nginx_cloudflared_site_enabled"] in command
+    assert "atlas.target.requires/atlas-cloudflared.service" in command

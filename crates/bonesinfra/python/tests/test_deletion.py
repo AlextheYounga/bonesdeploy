@@ -36,6 +36,8 @@ def test_deletion_plan_serializes_only_validated_manifest_resources():
 
     assert '"path": "/home/git/example.git"' in data
     assert '"unit": "example-app.service"' in data
+    assert '"unit": "example-cloudflared.service"' in data
+    assert "bonesdeploy-cloudflared-example.conf" in data
     assert "password" not in data
 
 
@@ -86,3 +88,37 @@ def test_deletion_stops_services_before_removing_artifacts(monkeypatch: pytest.M
         ("file", "/srv/sites/example/config"),
         ("directory", "/srv/sites/example"),
     ]
+
+
+def test_deletion_reloads_systemd_and_nginx_after_optional_tunnel_cleanup(monkeypatch: pytest.MonkeyPatch):
+    calls = []
+    monkeypatch.setattr(delete.systemd, "service", lambda **kwargs: calls.append(("service", kwargs)))
+    monkeypatch.setattr(delete.systemd, "daemon_reload", lambda **kwargs: calls.append(("daemon-reload", kwargs)))
+    monkeypatch.setattr(delete.server, "shell", lambda **kwargs: calls.append(("shell", kwargs)))
+    monkeypatch.setattr(delete.files, "file", lambda **kwargs: calls.append(("file", kwargs)))
+    monkeypatch.setattr(delete.files, "link", lambda **kwargs: calls.append(("link", kwargs)))
+    plan = DeletionPlan(
+        artifacts=(
+            DeletionArtifact(
+                "quick tunnel service", "/etc/systemd/system/example-cloudflared.service", "file", "tunnel"
+            ),
+            DeletionArtifact(
+                "quick tunnel nginx route",
+                "/etc/nginx/sites-enabled/bonesdeploy-cloudflared-example.conf",
+                "link",
+                "tunnel",
+            ),
+        ),
+        services=(DeletionService("quick tunnel", "example-cloudflared.service", "tunnel"),),
+    )
+
+    delete.deploy_site_delete(_context(), plan)
+
+    assert any(operation == "daemon-reload" for operation, _kwargs in calls)
+    tunnel_stop = next(kwargs for operation, kwargs in calls if operation == "shell")
+    assert "systemctl cat" in tunnel_stop["commands"][0]
+    assert "systemctl disable --now" in tunnel_stop["commands"][0]
+    assert any(
+        operation == "service" and kwargs.get("service") == "nginx" and kwargs.get("reloaded") is True
+        for operation, kwargs in calls
+    )

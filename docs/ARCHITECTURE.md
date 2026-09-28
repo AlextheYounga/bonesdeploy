@@ -75,6 +75,7 @@ owner is canonical. Bypassing it creates a competing abstraction.
 | GPG / secrets | `commands/secrets/gpg.rs` | Use the isolated keyring + helpers | Import GPG state from elsewhere |
 | Server CLI orchestration | `commands/server/{setup,doctor,helpers}.rs` | Add a focused server command module | Put server provisioning in root setup or site commands |
 | Site CLI orchestration | `commands/site/` | Add a focused site command module | Put site provisioning in server commands or root composition |
+| Optional Quick Tunnel lifecycle | `commands/site/tunnel.rs` + BonesInfra `services/linux/cloudflared.py` | Keep public UX in BonesDeploy and provisioning in BonesInfra | Register Cloudflared with the normal site target or expose an application process directly |
 | Root setup / doctor composition | `commands/setup.rs`, `cli/dispatch.rs` | Keep composition thin and delegate to server/site commands | Reimplement server or site behavior in the root commands |
 | Doctor / health checks | `bonesdeploy::commands/server/doctor.rs`, `bonesdeploy::commands/site/doctor.rs`, `bonesremote::commands/doctor/` | Add checks under the owning server, site, or remote doctor boundary | Probe system state from deploy/init commands |
 | Embedded static assets | `rust-embed` asset modules | Add to the appropriate asset collection | Check in loose files that the binary must read at runtime |

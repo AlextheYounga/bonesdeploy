@@ -79,3 +79,10 @@ def test_site_deletion_commands_expose_typed_request_input():
         result = _run_no_input("site", command, "--help")
         assert result.returncode == 0
         assert "--request-stdin" in result.stdout
+
+
+def test_tunnel_lifecycle_commands_expose_typed_request_input():
+    for command in ("start", "stop"):
+        result = _run_no_input("tunnel", command, "--help")
+        assert result.returncode == 0
+        assert "--request-stdin" in result.stdout

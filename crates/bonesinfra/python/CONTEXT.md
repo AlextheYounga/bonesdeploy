@@ -108,6 +108,8 @@ bonesinfra site apply --request-stdin
 bonesinfra site preflight --request-stdin
 bonesinfra site delete --request-stdin
 bonesinfra runtime apply --request-stdin
+bonesinfra tunnel start --request-stdin
+bonesinfra tunnel stop --request-stdin
 bonesinfra ssl apply --request-stdin
 bonesinfra services apply --request-stdin
 bonesinfra manifest show --request-stdin
@@ -524,13 +526,14 @@ verify every required service remains active after restarting, because a
 
 Runtime setup is separate from SSL.
 
-For native sites, when `app.dns.domain` is empty, runtime setup installs and starts the
-project-scoped `cloudflared` Quick Tunnel service against the per-site Nginx
-Unix socket. The assigned `trycloudflare.com` URL is runtime state read from
-journald and can change after a restart. A real domain instead uses the public
-Nginx router and Certbot; successful SSL activation removes the Quick Tunnel.
-Compose sites use that managed ingress path only when a Compose port is
-configured; otherwise the stack owns its published ports.
+Runtime setup never installs, configures, starts, or removes Cloudflared. Quick
+Tunnels are an explicit private `tunnel start|stop` provisioning flow invoked by
+the public BonesDeploy site command. Start creates a loopback-only root-nginx
+route that proxies HTTP to the per-site nginx Unix socket, then enables an
+independent project Cloudflared unit with the loopback URL. The unit is not a
+member of `<project>.target`. Stop removes the unit and route while retaining the
+shared package. Compose sites require a configured Compose ingress port so the
+tunnel continues to use managed nginx rather than exposing a container directly.
 
 ______________________________________________________________________
 

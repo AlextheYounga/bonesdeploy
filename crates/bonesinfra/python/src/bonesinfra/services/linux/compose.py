@@ -10,7 +10,6 @@ from bonesinfra.services.linux import runtime, systemd as site_systemd
 from bonesinfra.services.linux.nginx import site as nginx_site
 
 _STALE_SERVICES = (
-    "cloudflared",
     "docker",
     "nginx",
     "worker",

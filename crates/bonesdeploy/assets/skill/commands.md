@@ -41,6 +41,9 @@ global roots, and sudoers. They do not read site runtime or framework state.
 `bonesdeploy site delete [--yes]`
 `bonesdeploy site doctor [--local] [--verbose]`
 `bonesdeploy site status`
+`bonesdeploy site tunnel start [--yes]`
+`bonesdeploy site tunnel stop [--yes]`
+`bonesdeploy site tunnel status`
 `bonesdeploy site export [--output <path>]`
 `bonesdeploy site manifest [--format text|json]`
 `bonesdeploy site releases [kill <release>]`
@@ -53,6 +56,8 @@ the remote manifest inventory after exact project-name confirmation; it retains
 local project files and blocks deployment until deletion finishes.
 `site export` downloads the complete remote `shared/` directory as a private ZIP;
 it includes `shared/.env` and is a live view rather than a consistent snapshot.
+`site tunnel` explicitly manages an optional ephemeral Cloudflare preview. Site
+setup and runtime do not install or start it.
 
 ## skill
 

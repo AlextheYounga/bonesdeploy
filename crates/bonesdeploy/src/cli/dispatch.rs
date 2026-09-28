@@ -1,6 +1,8 @@
 use anyhow::Result;
 
-use crate::cli::args::{Cli, Command, ManifestFormat, ReleasesCommand, SecretsCommand, ServerCommand, SiteCommand};
+use crate::cli::args::{
+    Cli, Command, ManifestFormat, ReleasesCommand, SecretsCommand, ServerCommand, SiteCommand, TunnelCommand,
+};
 use crate::commands::{deploy, init, rollback, secrets, server, setup, site, skill, update, version};
 
 pub async fn run(cli: &Cli) -> Result<()> {
@@ -74,6 +76,11 @@ async fn dispatch_site(command: &SiteCommand) -> Result<()> {
         SiteCommand::Delete { yes } => site::delete(*yes).await,
         SiteCommand::Doctor { local, verbose } => site::doctor(*local, *verbose).await,
         SiteCommand::Status => site::status().await,
+        SiteCommand::Tunnel { command } => match command {
+            TunnelCommand::Start { yes } => site::tunnel_start(*yes).await,
+            TunnelCommand::Stop { yes } => site::tunnel_stop(*yes),
+            TunnelCommand::Status => site::tunnel_status().await,
+        },
         SiteCommand::Export { output } => site::export(output.as_deref()).await,
         SiteCommand::Manifest { format } => site::manifest(match format {
             ManifestFormat::Text => "text",

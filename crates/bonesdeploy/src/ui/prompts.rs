@@ -240,6 +240,20 @@ pub fn confirm_site_runtime() -> Result<bool> {
     confirm_prompt("Apply runtime setup?", "Runtime setup installs app services for this project.")
 }
 
+pub fn confirm_site_tunnel_start() -> Result<bool> {
+    confirm_prompt(
+        "Start a Cloudflare Quick Tunnel?",
+        "This installs cloudflared and exposes the site through an ephemeral public URL.",
+    )
+}
+
+pub fn confirm_site_tunnel_stop() -> Result<bool> {
+    confirm_prompt(
+        "Stop and remove the Cloudflare Quick Tunnel?",
+        "The current trycloudflare.com URL will stop working.",
+    )
+}
+
 pub fn confirm_site_ssl() -> Result<bool> {
     confirm_prompt("Configure HTTPS?", "HTTPS requires DNS to point at this server.")
 }

@@ -79,6 +79,7 @@ DEFAULT_NGINX_SITE = "default"
 BONESDEPLOY_NGINX_DEFAULT_DENY_SITE = "00-bonesdeploy-default-deny.conf"
 BONESDEPLOY_NGINX_DEFAULT_DENY_CERT = "bonesdeploy-default-deny.crt"
 BONESDEPLOY_NGINX_DEFAULT_DENY_KEY = "bonesdeploy-default-deny.key"
+BONESDEPLOY_NGINX_CLOUDFLARED_SITE = "bonesdeploy-cloudflared-{project}.conf"
 
 BONESREMOTE_CONFIG_DIR = "/root/.config/bonesremote"
 BONESREMOTE_SITES_DIR = "sites"
@@ -124,6 +125,8 @@ class DeploymentPaths:
     nginx_default_deny_ssl_certificate: str
     nginx_default_deny_ssl_certificate_key: str
     nginx_default_site_enabled: str
+    nginx_cloudflared_site_available: str
+    nginx_cloudflared_site_enabled: str
     systemd_site_nginx_service: str
     systemd_cloudflared_service: str
     systemd_site_nginx_requirement: str
@@ -191,6 +194,12 @@ class DeploymentPaths:
             nginx_default_deny_ssl_certificate=str(Path(ETC_SSL_CERTS) / BONESDEPLOY_NGINX_DEFAULT_DENY_CERT),
             nginx_default_deny_ssl_certificate_key=str(Path(ETC_SSL_PRIVATE) / BONESDEPLOY_NGINX_DEFAULT_DENY_KEY),
             nginx_default_site_enabled=str(Path(ETC_NGINX_SITES_ENABLED) / DEFAULT_NGINX_SITE),
+            nginx_cloudflared_site_available=str(
+                Path(ETC_NGINX_SITES_AVAILABLE) / BONESDEPLOY_NGINX_CLOUDFLARED_SITE.format(project=project_name)
+            ),
+            nginx_cloudflared_site_enabled=str(
+                Path(ETC_NGINX_SITES_ENABLED) / BONESDEPLOY_NGINX_CLOUDFLARED_SITE.format(project=project_name)
+            ),
             systemd_site_nginx_service=str(Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}-nginx.service"),
             systemd_cloudflared_service=str(Path(ETC_SYSTEMD_SYSTEM) / f"{project_name}-cloudflared.service"),
             systemd_site_nginx_requirement=str(

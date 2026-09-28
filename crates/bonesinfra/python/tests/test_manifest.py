@@ -130,10 +130,10 @@ def test_acme_certificate_links_are_declared_as_links(tmp_path: Path):
     assert certificates["ACME certificate key"].kind == "link"
 
 
-def test_quick_tunnel_is_expected_only_without_a_real_domain():
+def test_quick_tunnel_is_not_a_required_manifest_service():
     services = collect_services(_context(domain=""), ProjectManifest())
 
-    assert any(service.unit == "example-cloudflared.service" for service in services)
+    assert not any(service.unit == "example-cloudflared.service" for service in services)
 
 
 def test_compose_manifest_reports_runtime_contract_without_claiming_native_security():

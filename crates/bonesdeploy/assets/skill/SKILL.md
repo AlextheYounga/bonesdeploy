@@ -57,6 +57,7 @@ mount. Named volumes persist across rollback, but their data is not rolled back.
   compass. It knows whether you're uninitialized, half-provisioned, missing
   TLS, or ready to ship. Ask it first. Ask it often.
 - `bonesdeploy site status` — the live picture: current release, SSL, services.
+- `bonesdeploy site tunnel status` — the optional Quick Tunnel state and current ephemeral URL.
 - `bonesdeploy doctor` — server + site health. Exit code tells you everything.
 - `bonesdeploy site releases` — what's on the box: `active`, `previous`, `building`,
   `preparing`, `interrupted`.

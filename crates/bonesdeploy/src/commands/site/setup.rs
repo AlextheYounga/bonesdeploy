@@ -46,17 +46,8 @@ async fn print_next_step(cfg: &config::Bones, pending_first_push: bool) {
             )
         );
     } else if cfg.domain.is_empty() {
-        match super::status::remote_status(cfg).await {
-            Ok(remote) => match super::status::render_preview_status(remote.preview.as_ref()) {
-                Some(line) => println!("{line}"),
-                None => println!(
-                    "{} Quick Tunnel is not active; run `bonesdeploy site status` to inspect it.",
-                    output::pending_marker()
-                ),
-            },
-            Err(error) => println!("{} Preview status unavailable: {error:#}", output::pending_marker()),
-        }
         println!("{}", output::next_step("bonesdeploy deploy"));
+        println!("Optional public preview: run `bonesdeploy site tunnel start` to create an ephemeral Cloudflare URL.");
     } else if cfg.ssl_enabled {
         println!("{}", output::next_step("bonesdeploy deploy"));
     } else {

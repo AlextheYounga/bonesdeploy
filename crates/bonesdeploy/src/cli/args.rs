@@ -113,6 +113,24 @@ pub enum ReleasesCommand {
 }
 
 #[derive(Subcommand)]
+pub enum TunnelCommand {
+    /// Install, enable, and start an optional Cloudflare Quick Tunnel
+    Start {
+        /// Skip tunnel startup confirmation
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Stop and remove this project's Cloudflare Quick Tunnel
+    Stop {
+        /// Skip tunnel removal confirmation
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Show the current Quick Tunnel state and ephemeral URL
+    Status,
+}
+
+#[derive(Subcommand)]
 pub enum ServerCommand {
     /// Provision the shared server baseline
     Setup {
@@ -159,6 +177,11 @@ pub enum SiteCommand {
     },
     /// Show the current deployment state and next steps
     Status,
+    /// Manage the optional Cloudflare Quick Tunnel
+    Tunnel {
+        #[command(subcommand)]
+        command: TunnelCommand,
+    },
     /// Download the remote shared directory as a ZIP archive
     Export {
         /// Local archive filename or existing destination directory

@@ -9,6 +9,7 @@ from bonesinfra.cli.commands.server.helpers import deploy_helpers
 from bonesinfra.cli.commands.site import deploy_site_setup
 from bonesinfra.cli.commands.site.delete import deploy_site_delete
 from bonesinfra.cli.commands.site.ssl import deploy_ssl
+from bonesinfra.cli.commands.site.tunnel import deploy_tunnel_start, deploy_tunnel_stop
 from bonesinfra.config.context import DeployContext, ServerContext
 from bonesinfra.config.request import parse_request
 from bonesinfra.manifest import (
@@ -22,6 +23,7 @@ from bonesinfra.patches import apply_local, apply_remote
 from bonesinfra.project import load_manifest, load_runtime
 from bonesinfra.pyinfra.runner import run
 from bonesinfra.services.linux import etckeeper
+from bonesinfra.services.linux.cloudflared import validate_supported as validate_tunnel_request
 
 RUNTIME_CHANGE_MESSAGE = "BonesInfra runtime provisioning"
 
@@ -29,6 +31,7 @@ app = typer.Typer()
 runtime_app = typer.Typer()
 server_app = typer.Typer()
 site_app = typer.Typer()
+tunnel_app = typer.Typer(help="Optional Cloudflare Quick Tunnel operations")
 ssl_app = typer.Typer()
 helpers_app = typer.Typer()
 manifest_app = typer.Typer()
@@ -36,6 +39,7 @@ patches_app = typer.Typer()
 app.add_typer(runtime_app, name="runtime", help="Runtime operations")
 app.add_typer(server_app, name="server", help="Server baseline operations")
 app.add_typer(site_app, name="site", help="Site base provisioning operations")
+app.add_typer(tunnel_app, name="tunnel")
 app.add_typer(ssl_app, name="ssl", help="SSL operations")
 app.add_typer(helpers_app, name="helpers", help="Helper tool operations")
 app.add_typer(manifest_app, name="manifest", help="Manifest inspection")
@@ -136,6 +140,37 @@ def site_delete_cmd(
     _validate_host(ctx)
     plan = parse_deletion_plan(plan_json, ctx) if plan_json else resolve_deletion_plan(ctx, load_manifest(ctx))
     run(ctx=ctx, deploy=lambda current_ctx: deploy_site_delete(current_ctx, plan))
+
+
+@tunnel_app.command("start")
+def tunnel_start_cmd(
+    request_stdin: bool = typer.Option(
+        False,  # noqa: FBT003
+        "--request-stdin",
+        help="Read the typed JSON provisioning request from stdin",
+    ),
+):
+    ctx = _read_request(request_stdin)
+    _validate_host(ctx)
+    try:
+        validate_tunnel_request(ctx)
+    except ValueError as error:
+        print(f"Error: {error}", file=sys.stderr)
+        sys.exit(3)
+    run(ctx=ctx, deploy=deploy_tunnel_start)
+
+
+@tunnel_app.command("stop")
+def tunnel_stop_cmd(
+    request_stdin: bool = typer.Option(
+        False,  # noqa: FBT003
+        "--request-stdin",
+        help="Read the typed JSON provisioning request from stdin",
+    ),
+):
+    ctx = _read_request(request_stdin)
+    _validate_host(ctx)
+    run(ctx=ctx, deploy=deploy_tunnel_stop)
 
 
 @ssl_app.command("apply")

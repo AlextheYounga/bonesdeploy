@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 from bonesinfra.cli.commands import server, site
 from bonesinfra.cli.commands.server import helpers as server_helpers
-from bonesinfra.cli.commands.site import ssl as site_ssl
+from bonesinfra.cli.commands.site import ssl as site_ssl, tunnel as site_tunnel
 
 
 def test_server_setup_runs_only_server_operations(monkeypatch):
@@ -72,7 +72,6 @@ def test_ssl_provisioning_records_changes_after_ssl_operations(monkeypatch):
         lambda *_args, **kwargs: calls.append(f"router:{kwargs['stage']}"),
     )
     monkeypatch.setattr(site_ssl, "obtain_certificate", lambda *_: calls.append("certbot"))
-    monkeypatch.setattr(site_ssl.cloudflared, "remove", lambda *_: calls.append("tunnel-remove"))
     monkeypatch.setattr(site_ssl.etckeeper, "commit_changes", lambda *_: calls.append("etckeeper-commit"))
 
     site_ssl.deploy_ssl(ctx)
@@ -83,9 +82,25 @@ def test_ssl_provisioning_records_changes_after_ssl_operations(monkeypatch):
         "router:certbot challenge",
         "certbot",
         "router:SSL enable",
-        "tunnel-remove",
         "etckeeper-commit",
     ]
+
+
+def test_tunnel_lifecycle_records_changes_after_cloudflared_operations(monkeypatch):
+    calls = []
+    ctx = SimpleNamespace(paths_dict={})
+    monkeypatch.setattr(site_tunnel.cloudflared, "start", lambda *_: calls.append("tunnel-start"))
+    monkeypatch.setattr(site_tunnel.cloudflared, "stop", lambda *_: calls.append("tunnel-stop"))
+
+    def record_commit(message):
+        calls.append(message)
+
+    monkeypatch.setattr(site_tunnel.etckeeper, "commit_changes", record_commit)
+
+    site_tunnel.deploy_tunnel_start(ctx)
+    site_tunnel.deploy_tunnel_stop(ctx)
+
+    assert calls == ["tunnel-start", "BonesInfra Quick Tunnel start", "tunnel-stop", "BonesInfra Quick Tunnel stop"]
 
 
 def test_helper_provisioning_records_changes_after_helper_installation(monkeypatch):
