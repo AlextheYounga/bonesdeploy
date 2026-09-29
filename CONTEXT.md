@@ -142,7 +142,8 @@ Rules:
 The build environment consists of:
 1. Existing generic variables (`PROJECT_NAME`, `WEB_ROOT`, etc.).
 2. Values from committed `.env.build`.
-3. Derived `BONES_*` values projected from the sanitized `RemoteDeploymentConfig` descriptor sent over SSH stdin.
+3. Safe derived `BONES_*` values projected directly from local `Bones`
+   configuration.
 4. Fixed internal values such as `BUILD_CACHE_DIR`.
 
 Laravel builds use Composer `2.8.12` by default. Set `COMPOSER_VERSION` in
@@ -150,7 +151,14 @@ Laravel builds use Composer `2.8.12` by default. Set `COMPOSER_VERSION` in
 the selected PHP version. Builds download the pinned PHAR directly with curl,
 verify its SHA-256 checksum, and use bounded network timeouts.
 
-Derived `BONES_*` values win over `.env.build` collisions because they represent canonical Bones configuration. During deploy they are built from a small local `RemoteDeploymentConfig` descriptor sent over SSH stdin. The encrypted `infra/secrets/.env.gpg` is the source of truth for the complete remote `shared/.env`; `bonesdeploy secrets push` atomically replaces that file without reading or merging another environment file. The remote environment is application runtime data, not BonesRemote control-plane configuration.
+Derived `BONES_*` values win over `.env.build` collisions because they represent
+canonical local Bones configuration. Separately, config sync sends a narrow
+`RemoteDeploymentConfig` containing release retention and only the selected
+backend's remotely consumed values. The encrypted `infra/secrets/.env.gpg` is
+the source of truth for the complete remote `shared/.env`; `bonesdeploy secrets
+push` atomically replaces that file without reading or merging another
+environment file. The remote environment is application runtime data, not
+BonesRemote control-plane configuration.
 
 ### Update Patches
 `bonesdeploy update` invokes the embedded `bonesinfra patches apply` command after each local or remote binary update. Python owns the ordered registry, version gates, local Git migrations, remote pyinfra operations, and per-project/per-scope completion markers. Completed patches are recorded per project and scope, so interrupted updates retry safely without rerunning successful patches. Local markers use the project data directory; remote markers use `/var/lib/bonesdeploy/patches/<site>/`. Remote patch plans connect as root through the local embedded BonesInfra runtime; Python is not installed on the deployment host. `--skip-local` and `--skip-remote` also skip their respective patches.
@@ -264,8 +272,8 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 - **doctor**
   - Root `bonesdeploy doctor` runs both `server doctor` and `site doctor`, reporting both failures when necessary.
   - `bonesdeploy site doctor --local` checks only the local root `.env`, `infra/`, and numbered deployment scripts.
-   - Site remote checks open a privileged SSH session, synchronize the sanitized control-plane snapshot to `/srv/conf/<site>/bones.json`, then run `bonesremote doctor --site <project>`.
-    - `bonesremote doctor --site <project>` requires root and reads the synchronized `/srv/conf/<project>/bones.json` snapshot for the runtime backend (missing snapshot is reported as pending with guidance). It checks AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. Docker daemon and image checks run only when the synchronized descriptor declares the Docker backend — never inferred from `/run/<site>`.
+   - Site remote checks open a privileged SSH session, synchronize the narrow backend-specific control-plane snapshot to `/srv/conf/<site>/bones.json`, then run `bonesremote doctor --site <project>`.
+    - `bonesremote doctor --site <project>` requires root and reads the synchronized `/srv/conf/<project>/bones.json` snapshot for the runtime backend and Docker ingress port (missing snapshot is reported as pending with guidance). It checks AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. Docker daemon and image checks run only when the synchronized descriptor declares the Docker backend — never inferred from `/run/<site>`.
     - The security audit is read-only and fail-closed. It verifies site identity isolation (unique UIDs/GIDs, no login shells, no cross-site group membership, deploy not in runtime groups), runtime sudo absence, privileged configuration root-control (recursively inspecting systemd, sudoers, nginx, AppArmor, and BonesRemote state plus their parent chains without following symlink targets), and release activation (current must be a valid symlink resolving inside the site's releases directory; active release roots and activation parents must be immutable to the runtime identity). `bonesremote doctor --site <project> --exhaustive` additionally inspects every entry in that active release for permission drift; this can take time on large releases. BonesInfra renders and validates the deploy-user sudoers policy during provisioning rather than probing with fabricated commands during doctor. POSIX ACLs on protected paths are detected through extended attributes and reported as UNVERIFIED. Supplementary groups are collected through `id -G`. Required evidence that cannot be collected is reported as UNVERIFIED and causes doctor to fail.
    - Server doctor verifies Debian 12+ or Ubuntu 24.04+ on `x86_64`, AppArmor, deploy identity, BonesRemote roots and binary, sudoers, firewall, fail2ban, unattended-upgrades, and the etckeeper installation. `--verbose` prints successful remote reports.
 
@@ -286,7 +294,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Is a live best-effort view, does not acquire the deployment lock or stop services, and is not a Borg backup operation.
 
 - **deploy**
-  - SSHes into the configured host as `git`, synchronizes the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <project>`, then runs the existing root-required lifecycle through `sudo -n bonesremote deploy --site <project>`.
+  - SSHes into the configured host as `git`, synchronizes the narrow backend-specific control-plane snapshot through `sudo -n bonesremote config sync --site <project>`, then runs the existing root-required lifecycle through `sudo -n bonesremote deploy --site <project>`.
   - Does not modify the remote environment. Run `bonesdeploy secrets push` explicitly to replace `shared/.env` from the encrypted local source.
   - Sends the artifact built from the configured local branch; production does not resolve a source branch.
 

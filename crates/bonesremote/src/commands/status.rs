@@ -83,7 +83,7 @@ fn build_report(site: &str) -> Report {
 
 fn compose_status(site: &str, project_root: &Path) -> Option<ComposeReport> {
     let descriptor = control_plane::load(site).ok()?;
-    if descriptor.runtime.backend != RuntimeBackend::Docker {
+    if descriptor.runtime.backend() != RuntimeBackend::Docker {
         return None;
     }
 

@@ -79,13 +79,13 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>, wa
 
     if docker_checks_required(&descriptor) {
         let mut findings = ComposeFindings { issues, pending, warnings };
-        check_docker_runtime(site, Path::new(&project_root), descriptor.runtime.compose_port, &mut findings);
+        check_docker_runtime(site, Path::new(&project_root), descriptor.runtime.compose_port(), &mut findings);
     }
 }
 
 #[must_use]
 pub fn docker_checks_required(descriptor: &RemoteDeploymentConfig) -> bool {
-    descriptor.runtime.backend == config::RuntimeBackend::Docker
+    descriptor.runtime.backend() == config::RuntimeBackend::Docker
 }
 
 fn check_docker_runtime(

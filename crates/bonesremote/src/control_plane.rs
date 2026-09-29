@@ -46,7 +46,7 @@ pub fn read_stdin_descriptor() -> Result<RemoteDeploymentConfig> {
 }
 
 fn validate_descriptor(descriptor: &RemoteDeploymentConfig) -> Result<()> {
-    config::validate_runtime(&descriptor.runtime)
+    descriptor.validate()
 }
 
 #[expect(clippy::panic, reason = "the required PathBuf API cannot return site validation errors")]
@@ -108,7 +108,7 @@ pub fn load(site: &str) -> Result<RemoteDeploymentConfig> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bonesdeploy_core::config::{Runtime, RuntimeBackend};
+    use bonesdeploy_core::config::{RemoteRuntime, RuntimeBackend};
     use std::env;
 
     fn root(name: &str) -> PathBuf {
@@ -118,7 +118,11 @@ mod tests {
     }
 
     fn descriptor(backend: RuntimeBackend) -> RemoteDeploymentConfig {
-        RemoteDeploymentConfig { releases_keep: 5, runtime: Runtime { backend, ..Runtime::default() } }
+        let runtime = match backend {
+            RuntimeBackend::Native => RemoteRuntime::Native { web_root: String::from("public"), ruby_version: None },
+            RuntimeBackend::Docker => RemoteRuntime::Docker { compose_port: None, compose_wait_timeout: 120 },
+        };
+        RemoteDeploymentConfig { releases_keep: 5, runtime }
     }
 
     #[test]
@@ -127,7 +131,7 @@ mod tests {
         let _scope = override_control_plane_root(root.clone());
         store("atlas", &descriptor(RuntimeBackend::Native))?;
         store("atlas", &descriptor(RuntimeBackend::Docker))?;
-        assert_eq!(load("atlas")?.runtime.backend, RuntimeBackend::Docker);
+        assert_eq!(load("atlas")?.runtime.backend(), RuntimeBackend::Docker);
         assert_eq!(fs::read_dir(root.join("atlas"))?.count(), 1);
         fs::remove_dir_all(root)?;
         Ok(())
@@ -183,22 +187,39 @@ mod tests {
         let path = snapshot_path("atlas");
         let Some(parent) = path.parent() else { return Ok(()) };
         fs::create_dir_all(parent)?;
-        fs::write(path, r#"{"releases_keep":5,"runtime":{},"bogus":true}"#)?;
+        fs::write(path, r#"{"releases_keep":5,"runtime":{"backend":"native","web_root":"public"},"bogus":true}"#)?;
         assert!(load("atlas").is_err());
         fs::remove_dir_all(root)?;
         Ok(())
     }
 
     #[test]
-    fn load_round_trips_backend_and_runtime_extra() -> Result<()> {
+    fn load_round_trips_narrow_docker_runtime() -> Result<()> {
         let root = root("round-trip");
         let _scope = override_control_plane_root(root.clone());
-        let mut expected = descriptor(RuntimeBackend::Docker);
-        expected.runtime.extra.insert("workers".to_string(), toml::Value::Integer(3));
+        let expected = RemoteDeploymentConfig {
+            releases_keep: 3,
+            runtime: RemoteRuntime::Docker { compose_port: Some(8080), compose_wait_timeout: 240 },
+        };
         store("atlas", &expected)?;
         let actual = load("atlas")?;
-        assert_eq!(actual.runtime.backend, RuntimeBackend::Docker);
-        assert_eq!(actual.runtime.extra.get("workers"), Some(&toml::Value::Integer(3)));
+        assert_eq!(actual, expected);
+        fs::remove_dir_all(root)?;
+        Ok(())
+    }
+
+    #[test]
+    fn load_rejects_broad_runtime_fields() -> Result<()> {
+        let root = root("broad-runtime");
+        let _scope = override_control_plane_root(root.clone());
+        let path = snapshot_path("atlas");
+        let Some(parent) = path.parent() else { return Ok(()) };
+        fs::create_dir_all(parent)?;
+        fs::write(
+            path,
+            r#"{"releases_keep":5,"runtime":{"backend":"native","web_root":"public","template":"rails"}}"#,
+        )?;
+        assert!(load("atlas").is_err());
         fs::remove_dir_all(root)?;
         Ok(())
     }

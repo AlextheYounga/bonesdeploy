@@ -681,7 +681,11 @@ runtime state and is not persisted in project configuration.
 ### Config ownership
 
 - `bonesdeploy-core` defines the canonical `Bones` struct, all path constants, and validation functions.
-- `bonesdeploy` loads the local root `.env` and sends only `RemoteDeploymentConfig` over SSH stdin to the allowlisted `config sync` command before deploy.
+- `bonesdeploy` loads the local root `.env` and projects only release retention
+  plus backend-specific remote values into `RemoteDeploymentConfig`: native web
+  root and optional Rails Ruby version, or Docker ingress port and startup
+  timeout. It sends that descriptor over SSH stdin to the allowlisted `config
+  sync` command before deploy.
 - `bonesremote` derives identity and paths from `--site`; it never parses the application `shared/.env` as control-plane config.
 - Runtime secrets are saved encrypted by `bonesdeploy` and atomically published to `shared/.env` by `secrets push`.
 
@@ -769,7 +773,9 @@ Rust (`bonesdeploy-core`) is the sole parser of the root `.env`. Python and
 remote consumers receive typed JSON requests on stdin: BonesInfra commands take
 `--request-stdin` bodies, and BonesRemote config sync always receives the
 `RemoteDeploymentConfig` descriptor on stdin. Deploy and doctor load the
-sanitized control-plane copy at `/srv/conf/<site>/bones.json`.
+sanitized control-plane copy at `/srv/conf/<site>/bones.json`. The snapshot does
+not contain framework identity, local build versions, permission defaults, or
+arbitrary runtime extras; old broad snapshot shapes are intentionally rejected.
 
 ### Framework and deployment boundaries
 Framework identity, defaults, and assets are selected through the Rust framework

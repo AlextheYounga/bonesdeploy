@@ -155,7 +155,10 @@ Runtime.extra is a serde-flattened BTreeMap for framework-specific keys.
 
 Existing implementations:
 - Loaded from the project root `.env` via config::load()
-- Projected into `RemoteDeploymentConfig` for deploy-time SSH transport
+- Projected into a backend-specific `RemoteDeploymentConfig` for deploy-time SSH
+  transport. Native carries `web_root` and optional Rails `ruby_version`; Docker
+  carries `compose_port` and `compose_wait_timeout`. Local build and arbitrary
+  framework fields do not cross this boundary.
 - Reconstructed remotely with identity and paths derived from `--site`
 
 `bonesremote` does not load `shared/.env` as Bones configuration. That file is
@@ -588,8 +591,9 @@ and deletes the old files. The migration is one-way.
 parser of the root `.env`; Python provisioning consumes typed JSON requests on
 stdin (`--request-stdin`), and BonesRemote config sync consumes the
 `RemoteDeploymentConfig` descriptor from stdin before deploy loads its
-site-derived stored copy. The layers share one schema defined in
-`bonesdeploy-core`.
+site-derived stored copy. This descriptor contains release retention and only
+the selected backend's remotely consumed runtime values. The layers share one
+schema defined in `bonesdeploy-core`.
 
 **Framework and deployment side doors.** Framework identity, defaults, and
 assets cross Rust and Python boundaries, while release commands can reach state

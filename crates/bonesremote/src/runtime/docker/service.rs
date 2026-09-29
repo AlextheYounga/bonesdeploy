@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use bonesdeploy_core::config::validate_site_name;
 use bonesdeploy_core::paths;
 
@@ -16,7 +16,10 @@ pub(crate) fn start(site: &str) -> Result<()> {
     validate_site_name(site)?;
     let project_root = paths::default_project_root_for(site);
     let descriptor = control_plane::load(site)?;
-    command::active_start(site, project_root.as_ref(), u64::from(descriptor.runtime.compose_wait_timeout))
+    let Some(wait_timeout) = descriptor.runtime.compose_wait_timeout() else {
+        bail!("Docker runtime service cannot start for native site {site}")
+    };
+    command::active_start(site, project_root.as_ref(), u64::from(wait_timeout))
         .with_context(|| format!("Failed to start Docker Compose runtime for {site}"))
 }
 

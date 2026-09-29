@@ -487,9 +487,11 @@ at `infra/secrets/.env.gpg`, and explicitly sent as the complete protected
 remote `shared/.env` with `bonesdeploy secrets push`. The push atomically
 replaces the remote file; it does not read, merge, or upload the local root
 `.env`. `bonesdeploy deploy` does not push environment values. The local managed
-block supplies BonesRemote's deployment descriptor at deploy time and is
-mirrored to `/srv/conf/<site>/bones.json` on the host for remote-only commands;
-the encrypted file contains only values the application needs at runtime.
+block supplies the values used to derive BonesRemote's narrow deployment
+descriptor at deploy time. Only release retention and the selected backend's
+remotely consumed settings are mirrored to `/srv/conf/<site>/bones.json` for
+remote-only commands; the encrypted file contains only values the application
+needs at runtime.
 
 ## Project Structure
 
