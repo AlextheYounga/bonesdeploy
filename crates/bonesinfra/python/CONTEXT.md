@@ -56,24 +56,18 @@ BonesInfra owns:
 - nginx/AppArmor/systemd provisioning details
 - scheduled Borg backup provisioning
 
-Remote-build site provisioning gives each `<site>-build` user its own persistent
-home, distribution-allocated subordinate UID/GID mappings, and a lingering
-systemd user manager for rootless Podman. Local-build native sites retain the
-runtime user and site layout but do not create per-site build identities or
-their rootless Podman resources. Runtime application users remain home-less and
-non-login.
+Native site provisioning creates only the runtime identity and release layout.
+Application builds occur locally and arrive as release artifacts, so production
+hosts do not receive build users, build caches, rootless Podman state, or native
+builder images. Runtime application users remain home-less and non-login.
 
 Repository and site paths are derived from `project_name`: `repo_path` defaults to `/home/git/<project>.git` and `project_root` defaults to `/srv/sites/<project>`.
 
-Each remote build user's outer `user-<UID>.slice` is limited by root-owned
-systemd resource control at 80% CPU quota, 80% memory high, and 80% memory max,
-plus `MemorySwapMax=0` so a runaway build cannot thrash host swap. Local-build
-native sites do not receive this per-site slice, cache, storage configuration,
-linger, or Podman readiness verification.
-CPUQuota is that percentage of each online CPU; MemoryHigh is the soft
-reclaim/throttling threshold, while MemoryMax is the hard cgroup ceiling, so
-exceeding it fails the build rather than starving the host. These are
-host-level limits, not rootless Podman delegation.
+Production hosts are supported only when `/etc/os-release` reports literal
+`ID=debian` with `VERSION_ID` 12 or newer, or literal `ID=ubuntu` with
+`VERSION_ID` 24.04 or newer, and the machine architecture is `x86_64`.
+Provisioning and diagnostics reject missing, malformed, and unsupported host
+identity before planning operations.
 
 BonesInfra does not own:
 
@@ -432,9 +426,9 @@ prepares one project after that baseline is ready.
 
 Responsibilities:
 
-- `server apply` installs packages (including etckeeper) and hardening; disables SSH password login for root; initializes `/etc` as an etckeeper repository; configures the shared image store, firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and the validated sudoers drop-in that permits exactly two BonesRemote argument forms.
+- `server apply` installs packages (including etckeeper) and hardening; disables SSH password login for root; initializes `/etc` as an etckeeper repository; configures firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and the validated sudoers drop-in.
 - Every mutating flow (`server`, `site`, `services`, `runtime`, `ssl`, `helpers`) queues `services/linux/etckeeper.py::commit_changes` as its final operation, so a failed flow never commits and a successful flow always records its `/etc` changes with etckeeper defaults. Read-only `manifest` and patch flows do not commit.
-- `site apply` creates runtime and build identities, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
+- `site apply` creates the runtime identity, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
 - `site apply` creates the shared directory but does not write `shared/.env`; that file is published only by `bonesdeploy secrets push` outside this crate.
 - `site apply` does not install services, configure the framework runtime, configure SSL, push Git or secrets, or deploy.
 
@@ -486,8 +480,7 @@ Config sync is the sole stdin consumer (the descriptor is read from stdin,
 which passes through sudo); deploy is the snapshot loader. Git push
 transports source only; deployment is explicitly started by `bonesdeploy
 deploy` over the `git` SSH session. The deploy lifecycle then runs as root,
-while repository build and prepare scripts continue to run as their dedicated
-build and runtime identities.
+while server-side prepare scripts run as the runtime identity.
 
 Source code must be pushed to the configured deployment branch before deploy can succeed. The bare repo's default branch (HEAD) is set via `git symbolic-ref HEAD refs/heads/<branch>` during provisioning.
 

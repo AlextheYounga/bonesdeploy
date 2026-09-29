@@ -3,9 +3,10 @@
 You're an AI agent. You're about to operate a deployment tool. Read this first.
 Then run `bonesdeploy skill next` and let the tool tell you what to do.
 
-BonesDeploy ships releases to plain Debian/Ubuntu servers. Native sites use a
-dedicated runtime user, systemd, nginx, and rootless Podman builds. Compose
-sites use a project-owned stack through rootful Docker Compose.
+BonesDeploy ships releases to Debian 12+ and Ubuntu 24.04+ `x86_64` servers.
+Native sites use a dedicated runtime user, systemd, nginx, and local Docker
+artifact builds. Compose sites use a project-owned stack through rootful Docker
+Compose.
 
 The beauty is in the constraints. There are exactly six moves that matter.
 Everything else is recovery or inspection. Learn the moves and you can operate
@@ -19,7 +20,7 @@ any bonesdeploy project without reading a single line of YAML.
    every template and every variable).
 2. `bonesdeploy server setup --yes` — provision the shared host baseline once
    per host, not once per project:
-   packages, hardening, image store, deploy identity, BonesRemote, and sudoers.
+    packages, hardening, deploy identity, BonesRemote, and sudoers.
    It is independent of every site's framework and runtime settings.
 3. `bonesdeploy site setup --yes` — once per project, verify server readiness,
    then provision that site in this exact order: site base, runtime, and doctor.
@@ -88,9 +89,9 @@ secrets via `bonesdeploy secrets push`.
   problem by chmodding everything.
 - Will not run native applications as a shared `www-data` user. Compose
   container users and isolation are controlled by the project.
-- Will not silently reset Podman. A broken build namespace is reported, not
-  papered over.
-- Will not deploy to non-Debian/Ubuntu hosts. Don't ask.
+- Will not run native application builds on production or fall back to a server
+  build when a local Docker build fails.
+- Will not deploy to hosts outside Debian 12+/Ubuntu 24.04+ on `x86_64`. Don't ask.
 
 ## Going deeper
 

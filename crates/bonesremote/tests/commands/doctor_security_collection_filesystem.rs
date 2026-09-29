@@ -24,7 +24,7 @@ fn site(root: &Path) -> Site {
         shell: "/usr/sbin/nologin".to_string(),
         groups: BTreeSet::from([1001]),
     };
-    Site { name: "atlas".to_string(), project_root: root.to_path_buf(), runtime: account.clone(), build: Some(account) }
+    Site { name: "atlas".to_string(), project_root: root.to_path_buf(), runtime: account }
 }
 
 #[test]

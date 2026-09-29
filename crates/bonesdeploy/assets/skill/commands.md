@@ -32,9 +32,10 @@ either check fails. Use scoped doctor commands for focused checks.
 `bonesdeploy server helpers [--yes]`
 
 Server commands establish and inspect the reusable, once-per-host baseline:
-packages, hardening, firewall, shared image store, global deploy identity,
-BonesRemote, global roots, and sudoers. They do not read site runtime or
-framework state. Do not run server setup concurrently from multiple projects.
+packages, hardening, firewall, global deploy identity, BonesRemote, global
+roots, and sudoers. They require Debian 12+ or Ubuntu 24.04+ on `x86_64`, do not
+read site runtime or framework state, and must not run concurrently from
+multiple projects.
 
 ## site
 
@@ -74,8 +75,9 @@ command based on `uninitialized`, `server_missing`, `site_missing`,
 
 `bonesdeploy deploy`
 
-Runs the BonesRemote release pipeline: stage, checkout, build, promote, wire,
-prepare, seal, activate, restart, and prune.
+Builds the configured committed native revision locally in Docker, then sends
+the artifact to BonesRemote for receipt, promote, wire, prepare, seal, activate,
+restart, and prune. Compose remains a separate Docker Compose runtime pipeline.
 
 ## rollback
 

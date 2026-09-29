@@ -53,30 +53,9 @@ def test_docker_runtime_backend_is_preserved():
     assert ctx.runtime.compose_wait_timeout == 60
 
 
-def test_missing_build_mode_defaults_to_remote():
-    request = make_site_request()
-    del request["site"]["build_mode"]
-
-    ctx = DeployContext.from_request(request)
-
-    assert ctx.app.deploy.build_mode == "remote"
-
-
-@pytest.mark.parametrize("build_mode", ["local", "remote"])
-def test_explicit_build_mode_is_preserved(build_mode):
-    ctx = DeployContext.from_request(make_site_request(build_mode=build_mode))
-
-    assert ctx.app.deploy.build_mode == build_mode
-
-
-def test_local_build_mode_requires_native_runtime():
-    with pytest.raises(ValueError, match="requires the native runtime backend"):
-        DeployContext.from_request(make_site_request(build_mode="local", backend="docker", compose_port=8080))
-
-
-def test_unknown_build_mode_is_rejected():
-    with pytest.raises(ValueError, match=r"site\.build_mode"):
-        DeployContext.from_request(make_site_request(build_mode="elsewhere"))
+def test_build_mode_is_rejected():
+    with pytest.raises(ValueError, match="unknown site field 'build_mode'"):
+        DeployContext.from_request(make_site_request(build_mode="remote"))
 
 
 def test_unknown_runtime_backend_is_rejected():

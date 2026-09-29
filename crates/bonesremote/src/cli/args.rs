@@ -18,15 +18,12 @@ pub enum Command {
         #[arg(long, requires = "site")]
         exhaustive: bool,
     },
-    /// Run the full remote deployment lifecycle
+    /// Deploy a Docker Compose source revision or receive a native artifact
     Deploy {
         /// Site identifier (must match a provisioned site directory)
         #[arg(long)]
         site: String,
-        /// Exact revision to deploy (defaults to the configured branch)
-        #[arg(long, conflicts_with = "artifact_stdin")]
-        revision: Option<String>,
-        /// Receive a framed local-build artifact from standard input
+        /// Receive a framed local-build artifact from standard input for native sites
         #[arg(long)]
         artifact_stdin: bool,
     },

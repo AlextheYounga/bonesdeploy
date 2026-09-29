@@ -19,11 +19,7 @@ impl Container {
     /// Launches a fresh container from `image` with a unique harness name.
     pub fn launch(image: &str) -> Result<Self> {
         let name = format!("{CONTAINER_PREFIX}-{}", unique_suffix());
-        // Rootless podman inside the container needs nested user namespaces
-        // (security.nesting) and an idmap big enough to hold the build user's
-        // subuid range (~165536-231071); Incus only maps the first 65536 uids
-        // by default. Requires the host to delegate a matching range to root
-        // in /etc/subuid and /etc/subgid — see e2e/README.md.
+        // The Compose scenario runs Docker inside the disposable guest.
         incus(&[
             "launch",
             image,
@@ -35,7 +31,6 @@ impl Container {
             "--config",
             "security.nesting=true",
             "--config",
-            "security.idmap.size=10000000",
         ])?;
         Ok(Self { name, keep: keep_artifacts() })
     }
@@ -135,17 +130,6 @@ impl Container {
              && printf '%s\\n' '{key}' > /root/.ssh/authorized_keys \
              && chmod 600 /root/.ssh/authorized_keys"
         ))?;
-        Ok(())
-    }
-
-    /// Debian's rootless Podman defaults to pasta, which crashes inside our
-    /// nested Incus test containers. This affects only disposable e2e guests.
-    pub fn use_slirp4netns(&self) -> Result<()> {
-        self.exec(
-            "install -d -m 0755 /etc/containers/containers.conf.d \
-             && printf '%s\\n' '[network]' 'default_rootless_network_cmd = \"slirp4netns\"' \
-                > /etc/containers/containers.conf.d/99-bonesdeploy-e2e.conf",
-        )?;
         Ok(())
     }
 

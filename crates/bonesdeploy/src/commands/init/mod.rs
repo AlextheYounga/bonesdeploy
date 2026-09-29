@@ -18,7 +18,6 @@ pub struct Args {
     pub port: Option<String>,
     pub template: Option<String>,
     pub runtime_backend: Option<String>,
-    pub build_mode: Option<String>,
     pub framework_vars: Vec<String>,
 }
 

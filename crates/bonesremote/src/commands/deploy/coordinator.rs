@@ -13,6 +13,7 @@ use crate::release::SiteMutation;
 use crate::release::lifecycle;
 use crate::release::lifecycle::preflight;
 use crate::release::state as release_state;
+use crate::runtime::docker;
 
 struct PreparedDeployment {
     snapshot: lifecycle::DeploymentSnapshot,
@@ -24,41 +25,24 @@ struct PreparedDeployment {
 pub struct DeploymentLifecycleCoordinator<'a> {
     mutation: &'a SiteMutation,
     snapshot: lifecycle::DeploymentSnapshot,
-    source: RemoteSource,
 }
 
-/// The two trusted deployment inputs converge once a complete build context exists.
-#[derive(Clone, Copy)]
-pub enum RemoteSource {
-    Repository,
-    LocalArtifact,
-}
-
-struct DeploymentInput<'a> {
-    source: RemoteSource,
-    reader: Option<&'a mut dyn Read>,
+enum DeploymentInput<'a> {
+    Artifact(&'a mut dyn Read),
+    ComposeSource,
 }
 
 impl<'a> DeploymentLifecycleCoordinator<'a> {
     pub fn new(mutation: &'a SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Self {
-        Self { mutation, snapshot, source: RemoteSource::Repository }
-    }
-
-    pub fn run(self) -> Result<()> {
-        run_staged_deployment(self.mutation, self.snapshot, DeploymentInput { source: self.source, reader: None })
-    }
-
-    pub fn local_artifact(mut self) -> Self {
-        self.source = RemoteSource::LocalArtifact;
-        self
+        Self { mutation, snapshot }
     }
 
     pub fn run_with_artifact(self, reader: &mut dyn Read) -> Result<()> {
-        run_staged_deployment(
-            self.mutation,
-            self.snapshot,
-            DeploymentInput { source: self.source, reader: Some(reader) },
-        )
+        run_staged_deployment(self.mutation, self.snapshot, DeploymentInput::Artifact(reader))
+    }
+
+    pub fn run_with_source(self) -> Result<()> {
+        run_staged_deployment(self.mutation, self.snapshot, DeploymentInput::ComposeSource)
     }
 }
 
@@ -119,8 +103,8 @@ fn start_release(
         return finish_abort(mutation, None, error);
     }
 
-    stage("Exporting source");
-    let context_dir = match lifecycle::checkout::ensure_build_context(&snapshot) {
+    stage("Creating candidate");
+    let context_dir = match lifecycle::context::create(&snapshot) {
         Ok(context) => context,
         Err(error) => return finish_abort(mutation, None, error),
     };
@@ -134,7 +118,7 @@ fn start_release(
 
 #[expect(
     clippy::too_many_arguments,
-    reason = "the coordinator's one source-to-promotion boundary keeps both input forms explicit"
+    reason = "each deployment input converges on the same shared lifecycle state at this boundary"
 )]
 fn build_and_prepare(
     mutation: &SiteMutation,
@@ -143,12 +127,12 @@ fn build_and_prepare(
     deployment: &mut release_state::DeploymentRecord,
     input: DeploymentInput<'_>,
 ) -> Result<()> {
-    let source_result = match input.source {
-        RemoteSource::Repository => lifecycle::checkout::run(snapshot, context_dir),
-        RemoteSource::LocalArtifact => match input.reader {
-            Some(reader) => lifecycle::artifact::receive(reader, &snapshot.site, &snapshot.revision, context_dir),
-            None => Err(anyhow::anyhow!("artifact deployment has no standard input")),
-        },
+    let compose_source = matches!(&input, DeploymentInput::ComposeSource);
+    let source_result = match input {
+        DeploymentInput::Artifact(reader) => {
+            lifecycle::artifact::receive(reader, &snapshot.site, &snapshot.revision, context_dir)
+        }
+        DeploymentInput::ComposeSource => lifecycle::context::materialize_repository(snapshot, context_dir),
     };
     if let Err(error) = source_result {
         return finish_abort(mutation, Some(context_dir), error);
@@ -159,12 +143,13 @@ fn build_and_prepare(
         return finish_abort(mutation, Some(context_dir), error);
     }
 
-    if matches!(input.source, RemoteSource::Repository) {
-        stage("Building release");
-        if let Err(error) = lifecycle::build::run(mutation, snapshot, context_dir) {
+    if compose_source {
+        stage("Building Compose release");
+        if let Err(error) = docker::command::prepare_candidate(&snapshot.site, &snapshot.project_root, context_dir) {
             return finish_abort(mutation, Some(context_dir), error);
         }
     }
+
     if let Err(error) =
         advance_phase(mutation, deployment, Some(release_state::DeploymentPhase::Built), Some(context_dir))
     {
@@ -345,7 +330,7 @@ fn deployment_started_at() -> Result<String> {
 
 fn cleanup(mutation: &SiteMutation, context: Option<&Path>) -> Result<()> {
     if let Some(context) = context {
-        lifecycle::checkout::cleanup_build_context(mutation.site(), context)?;
+        lifecycle::context::cleanup(mutation.site(), context)?;
     }
     Ok(())
 }

@@ -55,7 +55,7 @@ fn append_tree<W: Write>(archive: &mut tar::Builder<W>, root: &Path, relative: &
         let entry = entry?;
         let name = entry.file_name();
         let child = relative.join(&name);
-        if child == Path::new(paths::DOT_ENV) {
+        if child == Path::new(paths::DOT_ENV) || child == Path::new(paths::ENV_BUILD_FILE) {
             continue;
         }
         let source = root.join(&child);
@@ -177,12 +177,13 @@ mod tests {
     use flate2::read::GzDecoder;
 
     #[test]
-    fn package_preserves_directories_executables_and_safe_symlinks_but_excludes_root_env() -> Result<()> {
+    fn package_preserves_directories_executables_and_safe_symlinks_but_excludes_root_env_files() -> Result<()> {
         let context = tempfile::tempdir()?;
         fs::create_dir(context.path().join("nested"))?;
         fs::write(context.path().join("nested/run.sh"), "#!/bin/sh\n")?;
         fs::set_permissions(context.path().join("nested/run.sh"), Permissions::from_mode(0o755))?;
         fs::write(context.path().join(".env"), "SECRET=no")?;
+        fs::write(context.path().join(".env.build"), "NODE_VERSION=24")?;
         symlink("run.sh", context.path().join("nested/current"))?;
         let build = BuildContext::from_tempdir(context, "a".repeat(40));
 
@@ -198,6 +199,7 @@ mod tests {
         assert!(names.iter().any(|(path, mode)| path == Path::new("nested/run.sh") && mode & 0o111 != 0));
         assert!(names.iter().any(|(path, _)| path == Path::new("nested/current")));
         assert!(!names.iter().any(|(path, _)| path == Path::new(".env")));
+        assert!(!names.iter().any(|(path, _)| path == Path::new(".env.build")));
         assert_eq!(artifact.manifest.artifact_length, fs::metadata(artifact.path())?.len());
         Ok(())
     }

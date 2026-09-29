@@ -39,9 +39,9 @@ fn config_sync_accepts_a_site_argument() -> Result<()> {
 }
 
 #[test]
-fn deploy_accepts_a_site_without_a_config_descriptor() -> Result<()> {
+fn deploy_accepts_the_compose_source_form() -> Result<()> {
     let output = common::run(&["deploy", "--site", "atlas"])?;
-    assert_ne!(output.status.code(), Some(2), "deploy must not require config stdin");
+    assert_ne!(output.status.code(), Some(2), "Compose source deployment must be accepted by clap");
     Ok(())
 }
 
@@ -60,7 +60,7 @@ fn deploy_accepts_the_exact_artifact_stdin_form() -> Result<()> {
 }
 
 #[test]
-fn deploy_rejects_artifact_stdin_with_a_revision() -> Result<()> {
+fn deploy_rejects_the_removed_revision_option() -> Result<()> {
     let output = common::run(&["deploy", "--site", "atlas", "--revision", "main", "--artifact-stdin"])?;
     assert_eq!(output.status.code(), Some(2));
     Ok(())

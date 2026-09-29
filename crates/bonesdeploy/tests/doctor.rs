@@ -3,8 +3,18 @@ mod common;
 use anyhow::Result;
 use common::TestEnv;
 
-const INIT_ARGS: &[&str] =
-    &["init", "--non-interactive", "--project-name", "atlas", "--host", "deploy.example.com", "--branch", "master"];
+const INIT_ARGS: &[&str] = &[
+    "init",
+    "--non-interactive",
+    "--project-name",
+    "atlas",
+    "--host",
+    "deploy.example.com",
+    "--branch",
+    "master",
+    "--runtime-backend",
+    "docker",
+];
 
 #[test]
 fn deployment_script_check_accepts_nested_build_and_prepare_layout() -> Result<()> {

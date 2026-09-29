@@ -4,7 +4,7 @@ use std::path::Path;
 use anyhow::Result;
 use bonesdeploy_core::{
     build_contract::TARGET_PLATFORM_NAME,
-    config::{BuildMode, is_numbered_shell_script},
+    config::{RuntimeBackend, is_numbered_shell_script},
     paths,
 };
 
@@ -31,21 +31,21 @@ pub(super) async fn run_with_pending(local_only: bool, verbose: bool) -> Result<
         Some(String::from("rename it with a numeric prefix, like 01_build.sh")),
     );
 
-    if cfg.as_ref().is_some_and(|config| config.build.mode == BuildMode::Local) {
+    if cfg.as_ref().is_some_and(|config| config.runtime.backend == RuntimeBackend::Native) {
         issues += print_check(
-            "local Podman",
-            check_local_podman(),
-            Some(String::from("install and configure rootless Podman")),
+            "local Docker",
+            check_local_docker(),
+            Some(String::from("install and start Docker with Linux containers enabled")),
         );
         issues += print_check(
             "local builder image",
             check_local_builder_image(),
-            Some(format!("run `podman pull --platform {TARGET_PLATFORM_NAME}` for the configured builder image")),
+            Some(format!("run `docker pull --platform {TARGET_PLATFORM_NAME}` for the configured builder image")),
         );
         issues += print_check(
             "local target execution",
             check_local_target_execution(),
-            Some(format!("install compatible Podman emulation for {TARGET_PLATFORM_NAME}")),
+            Some(format!("install compatible Docker emulation for {TARGET_PLATFORM_NAME}")),
         );
         issues += print_check(
             "local build cache",
@@ -203,7 +203,7 @@ fn check_local_branch_at(repo: &Path, cfg: &config::Bones) -> Option<String> {
     if cfg.branch.is_empty() {
         return None;
     }
-    if cfg.build.mode == BuildMode::Local {
+    if cfg.runtime.backend == RuntimeBackend::Native {
         return git::resolve_branch_commit(repo, &cfg.branch)
             .map(|_| ())
             .err()
@@ -222,8 +222,6 @@ mod tests {
     use std::path::Path;
     use std::process::Command;
 
-    use bonesdeploy_core::config::BuildMode;
-
     use super::check_local_branch_at;
     use crate::config::Bones;
 
@@ -238,8 +236,6 @@ mod tests {
         run_git(repo.path(), ["commit", "-m", "initial"])?;
         let mut config = Bones::default();
         config.branch = String::from("main");
-        config.build.mode = BuildMode::Local;
-
         assert_eq!(check_local_branch_at(repo.path(), &config), None);
         config.branch = String::from("missing");
         assert!(check_local_branch_at(repo.path(), &config).is_some());
@@ -253,12 +249,12 @@ mod tests {
     }
 }
 
-fn check_local_podman() -> Option<String> {
-    local_build::podman_available_rootless().err().map(|error| error.to_string())
+fn check_local_docker() -> Option<String> {
+    local_build::docker_available_linux().err().map(|error| error.to_string())
 }
 
 fn check_local_builder_image() -> Option<String> {
-    match local_build::podman_image_available() {
+    match local_build::docker_image_available() {
         Ok(true) => None,
         Ok(false) => Some(String::from("Pinned local builder image is not available")),
         Err(error) => Some(error.to_string()),

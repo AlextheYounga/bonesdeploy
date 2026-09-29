@@ -22,21 +22,6 @@ pub struct HarnessRef {
     _guard: MutexGuard<'static, Option<Harness>>,
 }
 
-#[derive(Clone, Copy)]
-pub enum BuildMode {
-    Remote,
-    Local,
-}
-
-impl BuildMode {
-    fn argument(self) -> &'static str {
-        match self {
-            Self::Remote => "remote",
-            Self::Local => "local",
-        }
-    }
-}
-
 impl Deref for HarnessRef {
     type Target = Harness;
 
@@ -118,7 +103,6 @@ impl Harness {
 
         let container = Container::launch(&base)?;
         container.wait_ready()?;
-        container.use_slirp4netns()?;
         container.authorize_root_key(&session.public_key()?)?;
         container.wait_active("ssh")?;
         // Pre-seed the locally built bonesremote so bootstrap uses this working tree.
@@ -128,16 +112,7 @@ impl Harness {
         Ok(Self { artifacts, container, host, session, server_setup_complete: Mutex::new(false) })
     }
 
-    // Keep the matrix inputs together so framework scenarios can opt into a
-    // build mode without duplicating the provisioning path.
-    #[allow(clippy::too_many_arguments)]
-    pub fn provision(
-        &self,
-        site: &str,
-        template: &str,
-        framework_vars: &[&str],
-        build_mode: BuildMode,
-    ) -> Result<SampleProject> {
+    pub fn provision(&self, site: &str, template: &str, framework_vars: &[&str]) -> Result<SampleProject> {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures").join(format!("{template}.md"));
         let project = SampleProject::from_fixture(&self.session, &fixture)?;
         let mut init_args = vec![
@@ -151,8 +126,6 @@ impl Harness {
             &self.host,
             "--template",
             template,
-            "--build-mode",
-            build_mode.argument(),
         ];
         for framework_var in framework_vars {
             init_args.extend(["--framework-var", *framework_var]);

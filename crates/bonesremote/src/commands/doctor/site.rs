@@ -2,12 +2,11 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use bonesdeploy_core::config::{BuildMode, RemoteDeploymentConfig};
+use bonesdeploy_core::config::RemoteDeploymentConfig;
 use bonesdeploy_core::{config, paths};
 
 use crate::control_plane;
 use crate::inspection::{accounts, systemd};
-use crate::release::lifecycle::build::validate_build_cache;
 use crate::runtime::docker;
 use crate::runtime::docker::command::ComposeStackStatus;
 
@@ -56,7 +55,6 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>, wa
     let releases_root = Path::new(&project_root).join(paths::RELEASES_DIR);
     let runtime_user = config::runtime_user_for(site);
     let runtime_group = config::runtime_group_for(site);
-    let build_user = config::build_user_for(site);
     let repo_path = paths::default_repo_path_for(site);
 
     let shared_env = shared_root.join(paths::DOT_ENV);
@@ -78,9 +76,6 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>, wa
     match fs::read_to_string(paths::ETC_PASSWD) {
         Ok(passwd) => {
             check_runtime_identity(&runtime_user, &runtime_group, &passwd, issues);
-            if descriptor.build.mode == BuildMode::Remote {
-                check_build_user(&build_user, &passwd, issues);
-            }
         }
         Err(error) => {
             issues.push(format!("could not read {} to validate user accounts ({error})", paths::ETC_PASSWD));
@@ -193,26 +188,6 @@ pub fn classify_compose_runtime(status: &ComposeStackStatus, compose_port: Optio
         ));
     }
     findings
-}
-
-fn check_build_user(build_user: &str, passwd: &str, issues: &mut Vec<String>) {
-    if !accounts::account_exists(passwd, build_user) {
-        issues.push(format!("build user does not exist: {build_user}"));
-        return;
-    }
-
-    let expected_home = paths::bonesdeploy_user_home(build_user);
-    if accounts::account_home(passwd, build_user).is_none_or(|home| Path::new(home) != expected_home) {
-        issues.push(format!("build user home must be {}: {build_user}", expected_home.display()));
-    }
-
-    let Some((uid, gid)) = accounts::account_identity(passwd, build_user) else {
-        issues.push(format!("build user has invalid passwd identity: {build_user}"));
-        return;
-    };
-    if let Err(error) = validate_build_cache(&paths::bonesdeploy_user_cache(build_user), uid, gid) {
-        issues.push(error.to_string());
-    }
 }
 
 fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {

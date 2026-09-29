@@ -1,17 +1,17 @@
 use anyhow::Result;
 use e2e::project::SampleProject;
 
-use super::harness::{BuildMode, Harness};
+use super::harness::Harness;
 
 const STATIC_SITE: &str = "e2enextstatic";
 const SERVER_SITE: &str = "e2enextserver";
 
-pub fn provision_static(harness: &Harness, build_mode: BuildMode) -> Result<SampleProject> {
-    harness.provision(STATIC_SITE, "next", &["is_static=true"], build_mode)
+pub fn provision_static(harness: &Harness) -> Result<SampleProject> {
+    harness.provision(STATIC_SITE, "next", &["is_static=true"])
 }
 
-pub fn provision_server(harness: &Harness, build_mode: BuildMode) -> Result<SampleProject> {
-    harness.provision(SERVER_SITE, "next", &["is_static=false"], build_mode)
+pub fn provision_server(harness: &Harness) -> Result<SampleProject> {
+    harness.provision(SERVER_SITE, "next", &["is_static=false"])
 }
 
 pub fn assert_static_running(harness: &Harness) -> Result<()> {

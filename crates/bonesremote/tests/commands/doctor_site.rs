@@ -1,7 +1,5 @@
 use std::{env, fs, process, process::Command};
 
-use bonesdeploy_core::config::RuntimeBackend;
-use bonesremote::commands::doctor::podman_check_required;
 use bonesremote::commands::doctor::site::{check_branch_ref, classify_compose_runtime};
 use bonesremote::runtime::docker::command::{ComposePublisher, ComposeServiceStatus, ComposeStackStatus};
 
@@ -19,13 +17,6 @@ fn empty_bare_repo_is_pending_before_first_push() {
     let _ = fs::remove_dir_all(root);
     assert!(issues.is_empty());
     assert_eq!(pending.len(), 1);
-}
-
-#[test]
-fn compose_sites_skip_the_native_podman_prerequisite() {
-    assert!(!podman_check_required(Some(RuntimeBackend::Docker)));
-    assert!(podman_check_required(Some(RuntimeBackend::Native)));
-    assert!(podman_check_required(None));
 }
 
 #[test]

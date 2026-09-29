@@ -207,7 +207,6 @@ def report(
     data = {
         "strategy": {
             "backend": ctx.runtime.backend,
-            "build_mode": ctx.app.deploy.build_mode,
             "framework": template or "none",
             "mode": project_manifest.mode(ctx),
             "ssl": ctx.app.dns.ssl_enabled,
@@ -242,7 +241,6 @@ def render_text(data: dict[str, Any]) -> str:
     lines = [
         f"Framework: {strategy['framework']} ({strategy['mode']})",
         f"Runtime backend: {strategy['backend']}",
-        f"Build mode: {strategy['build_mode']}",
         f"SSL: {'enabled' if strategy['ssl'] else 'disabled'}",
         "",
         "Manifest:",

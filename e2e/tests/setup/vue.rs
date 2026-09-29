@@ -1,12 +1,12 @@
 use anyhow::Result;
 use e2e::project::SampleProject;
 
-use super::harness::{BuildMode, Harness};
+use super::harness::Harness;
 
 const SITE: &str = "e2evue";
 
-pub fn provision(harness: &Harness, build_mode: BuildMode) -> Result<SampleProject> {
-    harness.provision(SITE, "vue", &[], build_mode)
+pub fn provision(harness: &Harness) -> Result<SampleProject> {
+    harness.provision(SITE, "vue", &[])
 }
 
 pub fn assert_running(harness: &Harness) -> Result<()> {

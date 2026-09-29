@@ -10,7 +10,7 @@ from bonesinfra.cli.commands.server.packages import BASE_SYSTEM_PACKAGES, SUPPLE
 from bonesinfra.config.context import ServerContext
 from bonesinfra.config.paths import BONESREMOTE_CONFIG_DIR, BONESREMOTE_SITE_ROOT
 from bonesinfra.pyinfra.operations import mkdir
-from bonesinfra.services.linux import apparmor, etckeeper, fail2ban, firewall, image_store, unattended_upgrades
+from bonesinfra.services.linux import apparmor, etckeeper, fail2ban, firewall, unattended_upgrades
 
 
 def deploy_server_setup(ctx: ServerContext, bonesremote_version: str):
@@ -18,8 +18,6 @@ def deploy_server_setup(ctx: ServerContext, bonesremote_version: str):
     etckeeper.initialize()
     apparmor.ensure_service()
     disable_algif_aead.configure()
-    image_store.ensure_shared_store()
-    image_store.seed_base_image()
     firewall.configure(ctx)
     fail2ban.configure(ctx)
     unattended_upgrades.configure()

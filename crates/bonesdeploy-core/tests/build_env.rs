@@ -1,6 +1,8 @@
 //! `.env.build` parsing and loading for the `bonesdeploy-core` library.
 
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::symlink;
 
 use anyhow::Result;
 use bonesdeploy_core::config::build_env;
@@ -75,6 +77,31 @@ fn load_reads_env_build_from_directory() -> Result<()> {
     let map = build_env::load(dir.path())?;
     assert_eq!(map.get("API_URL").map(String::as_str), Some("https://api.example.com"));
     assert_eq!(map.get("SITE_NAME").map(String::as_str), Some("Test"));
+    Ok(())
+}
+
+#[test]
+#[cfg(unix)]
+fn load_rejects_env_build_symlink_without_following_it() -> Result<()> {
+    let dir = TempDir::new()?;
+    let outside = TempDir::new()?;
+    fs::write(outside.path().join("env.build"), "OUTSIDE=read")?;
+    symlink(outside.path().join("env.build"), dir.path().join(".env.build"))?;
+
+    let error = build_env::load(dir.path()).expect_err("symlinked .env.build must be rejected");
+
+    assert!(error.to_string().contains("unsupported file type"));
+    Ok(())
+}
+
+#[test]
+fn load_rejects_unsupported_env_build_file_types() -> Result<()> {
+    let dir = TempDir::new()?;
+    fs::create_dir(dir.path().join(".env.build"))?;
+
+    let error = build_env::load(dir.path()).expect_err("directory .env.build must be rejected");
+
+    assert!(error.to_string().contains("unsupported file type"));
     Ok(())
 }
 

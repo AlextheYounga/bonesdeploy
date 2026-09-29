@@ -29,10 +29,9 @@ Everything below is what "trusted" actually commits to. Linux can give you hard,
 
 ```text
 1.  Every site has a unique runtime UID and GID.
-2.  Every site build environment has a separate build UID.
-3.  Runtime users have no login shell, password, or sudo rights.
-4.  Runtime users are not members of cross-site supplementary groups.
-5.  No shared Unix identity owns data belonging to multiple sites.
+2.  Runtime users have no login shell, password, or sudo rights.
+3.  Runtime users are not members of cross-site supplementary groups.
+4.  No shared Unix identity owns data belonging to multiple sites.
 ```
 
 Three identities, not two and not five. The `git` user owns the bare repo and is the deployment SSH entry point. The `<site>` runtime user owns `shared/`, writable paths, and `/run/<site>` and mutates runtime state. `root` owns system units, config dirs, deployment state, and sealed releases, and runs the allowlisted BonesRemote lifecycle. The runtime user is dedicated per project — not `www-data`, not a shared `applications` user. One project, one user. Isolation is enforced by the kernel, not by your discipline.
@@ -141,7 +140,7 @@ substitute for authentication.
 ## Containers
 
 ```text
-41. Native application builds are rootless and associated with the site's build UID.
+41. Native application builds run locally in unprivileged Docker containers.
 42. Native runtime definitions are generated and protected by BonesDeploy.
 43. Compose definitions are trusted privileged input with reduced guarantees.
 44. BonesDeploy does not automatically mount an engine socket into containers.
@@ -151,7 +150,7 @@ substitute for authentication.
 48. Release rollback does not roll back persistent data or external side effects.
 ```
 
-Containers still share a kernel trust boundary. Rootless execution reduces the consequence of many escapes because the outer host identity is unprivileged, but it does not remove the common kernel from the trusted computing base. BonesDeploy uses rootless Podman for isolated builds where the boundary is genuinely useful: the build runs inside a constrained environment, produces a release, and disappears. The build container gets the exported source tree and a private persistent build cache at `/workspace/cache`; it does **not** get `.env`, `shared/`, `current/`, `releases/`, the bare repo, or host `bonesremote` control-plane files. Build input is disposable. Build output is what gets promoted.
+Containers still share a kernel trust boundary. Local Docker execution does not remove the common kernel from the trusted computing base. BonesDeploy uses an unprivileged local Docker container for native builds: it receives the exported committed source tree, a scoped local cache at `/workspace/cache`, fixed public metadata, and committed public `.env.build` values. It does **not** get the root `.env`, runtime secrets, `shared/`, `current/`, `releases/`, the bare repo, host home, SSH agent, credential stores, or Docker socket. Build input is disposable. Build output is the artifact BonesRemote verifies before promotion.
 
 For Compose sites, the conventional rootful Docker daemon executes the
 project-owned Compose definition. BonesDeploy constrains its own control plane,
@@ -159,22 +158,20 @@ release paths, locking, and privileged entry points, but does not certify the
 container settings chosen by that file. Directly published ports can bypass
 managed nginx and firewall assumptions.
 
-For native sites, `bonesremote` runs each build script through the build user's
-systemd user manager with `systemd-run --machine=<site>-build@ --user`, not
-`runuser`. The transient rootless Podman build receives exported source and its
-private cache, never the protected runtime environment or control-plane files.
+For native sites, BonesRemote verifies the artifact's site, pushed revision,
+builder identity, length, digest, paths, entry types, symlinks, file count, and
+extracted size before promotion. It never runs application build scripts.
 
 ## Availability
 
 ```text
 50. Every runtime service has memory and task limits.
-51. Every build has stricter memory, CPU, process, and time limits.
-52. Logs and build caches have size bounds.
-53. Databases have connection and role limits.
-54. One site cannot consume every host port, inode, process, or byte of disk.
+51. Local builds have bounded cache and per-script time limits.
+52. Databases have connection and role limits.
+53. One site cannot consume every host port, inode, process, or byte of disk.
 ```
 
-Resource exhaustion is a distinct security dimension. Good confidentiality does not imply good availability: site A may be unable to read site B and still allocate all host memory until site B is killed by system pressure. Every untrusted site and build has resource boundaries — `MemoryMax`, `TasksMax`, `CPUQuota` or `CPUWeight`, file-descriptor limits, build timeout, disk or filesystem quota, log-size policy. Beyond per-script timeouts, BonesInfra caps each build user's host-level slice at 80% CPU quota, 80% memory high/max, and `MemorySwapMax=0`, so a runaway build fails rather than exhausting host memory or swap.
+Resource exhaustion is a distinct security dimension. Good confidentiality does not imply good availability: site A may be unable to read site B and still allocate all host memory until site B is killed by system pressure. Runtime services have cgroup-backed memory, process, CPU, and I/O controls. Local builds use a scoped cache and per-script timeout; production never provides native build resources.
 
 ## Just-in-time mutations
 
@@ -190,7 +187,7 @@ If a mutation can be delayed safely, it is delayed. If a mutation affects live s
 
 ## The lock
 
-`bonesremote` holds one OS-backed deployment lock per site. Deploys, cancellations, rollbacks, and recovery all take it. Nothing stages or overwrites state while a release is building, preparing, or interrupted. The lock lives outside replaceable site data. Before staging, BonesRemote starts and verifies the build user's systemd manager and checks rootless Podman readiness. A damaged rootless Podman namespace is reported before any release state is created — deploy does not silently reset Podman, because that operation stops the build user's containers.
+`bonesremote` holds one OS-backed deployment lock per site. Deploys, cancellations, rollbacks, and recovery all take it. Nothing stages or overwrites state while a release is building, preparing, or interrupted. The lock lives outside replaceable site data. Before staging, BonesRemote verifies and safely receives the artifact; it does not create or run a native build environment.
 
 ## Service restart
 
@@ -202,10 +199,9 @@ Within the root-executed deployment lifecycle, BonesRemote restarts `<project>.t
 
 Server doctor verifies the reusable baseline before any site is provisioned:
 
-- Debian or Ubuntu, Podman, and AppArmor support
+- Debian 12+ or Ubuntu 24.04+ on `x86_64`, and AppArmor support
 - the global deploy identity and root-controlled BonesRemote roots
 - the root-owned BonesRemote binary and valid global sudoers policy
-- the shared Podman image-store configuration and seeded base image
 - active UFW and fail2ban protection plus unattended-upgrades configuration
 - the installed etckeeper executable that records `/etc` provisioning changes
 

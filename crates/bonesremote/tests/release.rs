@@ -1,15 +1,9 @@
 #[path = "release/lifecycle.rs"]
 mod lifecycle;
-#[path = "release/lifecycle_build_container.rs"]
-mod lifecycle_build_container;
 #[path = "release/lifecycle_build_ownership.rs"]
 mod lifecycle_build_ownership;
-#[path = "release/lifecycle_build_scripts.rs"]
-mod lifecycle_build_scripts;
 #[path = "release/lifecycle_build_tree.rs"]
 mod lifecycle_build_tree;
-#[path = "release/lifecycle_build_user.rs"]
-mod lifecycle_build_user;
 #[path = "release/lifecycle_preflight.rs"]
 mod lifecycle_preflight;
 #[path = "release/lifecycle_prepare.rs"]

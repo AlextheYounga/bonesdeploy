@@ -111,10 +111,6 @@ time. Build-only values such as `NODE_VERSION` come directly from `.env.build`.
 `docker`). `Runtime.permissions` carries framework permission defaults and
 overrides; both are part of the canonical runtime configuration.
 
-`Build.mode` selects the native build location (`remote` by default or
-`local`). It is managed in the root `.env` as `BONES_BUILD_MODE`, transported
-in the site descriptor, and accepted as `local` only with the native runtime.
-
 ---
 
 ### 3.2 Path Constants (`paths` module)
@@ -411,8 +407,7 @@ Abstracts the installation and configuration of programming language runtimes (R
 Configures Docker's official Debian/Ubuntu apt repository, installs Docker
 Engine, Buildx, and the Compose plugin, provisions the generic per-site systemd
 unit and optional nginx ingress, and executes project-owned Compose stacks
-through BonesRemote. Compose-only diagnostics do not require the native Podman
-build runtime.
+through BonesRemote. This is separate from local Docker native artifact builds.
 
 **Lives in:**
 `crates/bonesinfra/python/src/bonesinfra/services/linux/compose.py` and
@@ -456,7 +451,7 @@ Validates server environment, per-site configuration, and security posture. Read
 `crates/bonesremote/src/commands/doctor/`
 
 **Check categories:**
-- `system.rs` — Debian/Ubuntu distribution, Podman availability
+- `system.rs` — Debian 12+/Ubuntu 24.04+ `x86_64` platform
 - `site.rs` — config state, bare repo, branch ref, user/group identities,
   directory layout, Compose engine/plugin/configuration, container health, and
   optional loopback ingress
@@ -558,9 +553,7 @@ Cli::Deploy
                  ├─ SiteMutation::acquire(site)   # lock + validate config
                  ├─ ensure_site_idle(site)        # verify no in-flight deployment
                  ├─ run_staged_deployment()
-                 │    ├─ Stage:    stage::run()         → Created
-                 │    ├─ Export:   checkout::run()       → SourceExported
-                 │    ├─ Build:    build::run()          → Built
+                 │    ├─ Receipt:  artifact::receive()   → SourceExported, Built
                  │    ├─ Promote:  build::promote()      → Promoted
                  │    ├─ Prepare:  wire_shared + prepare → Prepared
                  │    ├─ Seal:     build::finalize()     → Sealed
@@ -571,18 +564,19 @@ Cli::Deploy
                   └─ (on failure) abort / rollback / cleanup_pending
 ```
 
-With `BONES_BUILD_MODE=local`, the local CLI resolves the configured branch to
-one full Git commit, exports that committed tree, runs numbered native build
-scripts in rootless Podman using the pinned `linux/amd64` builder, and packages
-the complete post-build tree as a streamed `tar.gz`. The artifact manifest names
-the site, exact revision, builder digest, compressed length, and SHA-256.
-Bonesremote independently resolves the configured branch in the bare repository,
-requires the revision to match, verifies the complete payload digest and bounds,
-and safely extracts only relative paths, ordinary files/directories, and safe
-relative symlinks. It then enters at `Promote`; prepare, sealing, activation,
-verification, pruning, and rollback are the same as remote mode. Local mode is
-native-only and failures do not fall back to remote builds. Django prepare still
-installs `requirements.txt` dependencies on the server.
+For every native deploy, the local CLI resolves the configured branch to one
+full Git commit, exports that committed tree, runs numbered scripts in Docker
+using the pinned `linux/amd64` builder, and packages the complete post-build tree
+as a streamed `tar.gz`. The build receives only fixed public contract metadata
+and committed public `.env.build` values. The artifact manifest names the site,
+exact revision, builder digest, compressed length, and SHA-256. BonesRemote
+independently resolves the configured branch in the bare repository, requires the
+revision to match, verifies the complete payload digest and bounds, and safely
+extracts only relative paths, ordinary files/directories, and safe relative
+symlinks. It then promotes, prepares, seals, activates, verifies, prunes, or
+rolls back through one lifecycle. Native failures never fall back to production
+build execution. Django prepare still installs `requirements.txt` dependencies
+on the server.
 
 ### 4.5 `bonesdeploy doctor`
 
@@ -591,9 +585,9 @@ Cli::Doctor
    └─ cli/dispatch.rs::run_doctor()
         ├─ commands/server/doctor.rs::run()
        │    └─ SSH: bonesremote doctor
-       │         ├─ doctor/system.rs      # distro, podman
+       │         ├─ doctor/system.rs      # supported distro and architecture
        │         ├─ doctor/apparmor.rs    # AppArmor support
-        │         ├─ doctor/baseline.rs    # server roots, binary, sudoers, image store, hardening, etckeeper
+       │         ├─ doctor/baseline.rs    # server roots, binary, sudoers, hardening, etckeeper
        │         └─ doctor/security/      # deploy identity and privileged paths
         └─ commands/site/doctor.rs::run()
                  ├─ Local checks:
@@ -700,7 +694,7 @@ runtime state and is not persisted in project configuration.
 
 - Provisioning-time contract: shared ownership is established during `server setup` and site ownership during `site setup`; deploy commands never rewrite either layout.
 - Three identity classes: `git` (application repository access), `<site>` (runtime user, shared files, `/run/<site>`), `root` (sealed releases, system units, config dirs).
-- Remote build scripts run in Podman as an unprivileged server build user; local builds run in rootless workstation Podman. Prepare scripts run as the runtime user. Only `bonesremote` (running as root) promotes, activates, and restarts services.
+- Native scripts run locally in Docker against an exported committed revision. The container receives no ambient or runtime secrets. Prepare scripts run as the runtime user. Only `bonesremote` (running as root) receives, promotes, activates, and restarts services.
 
 ### State ownership
 
@@ -728,7 +722,7 @@ runtime state and is not persisted in project configuration.
 - Release directories use the format `{timestamp}-{commit}-{suffix}` for uniqueness.
 
 ### Just-in-time mutation principle
-- Pre-deploy steps (doctor, stage, checkout, wire) validate and prepare isolated state, not mutate live state.
+- Pre-deploy steps (doctor, artifact receipt, stage, wire) validate and prepare isolated state, not mutate live state.
 - Build steps operate on isolated workspace state.
 - Activation concerns happen at activation time.
 - Permission hardening happens after successful activation, not before.

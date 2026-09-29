@@ -79,6 +79,11 @@ fn removed_remote_command_is_rejected() {
 }
 
 #[test]
+fn removed_build_mode_option_is_rejected() {
+    assert!(Cli::try_parse_from(["bonesdeploy", "init", "--build-mode", "local"]).is_err());
+}
+
+#[test]
 fn site_export_accepts_an_optional_output_path() -> Result<()> {
     let parsed = Cli::try_parse_from(["bonesdeploy", "site", "export", "--output", "exports/atlas.zip"])?;
     assert!(matches!(

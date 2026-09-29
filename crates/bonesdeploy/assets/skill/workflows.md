@@ -56,6 +56,12 @@ declared health checks. `shared/.env` is available for interpolation but is not
 injected unless the Compose file references it. Numbered BonesDeploy build and
 prepare scripts are native-only.
 
+For a native site, `bonesdeploy deploy` builds the committed revision locally in
+Docker for `linux/amd64` and uploads one complete artifact. Production receives,
+prepares, and activates that artifact; it never runs native application build
+scripts. `.env.build` contains committed public build inputs only. Runtime
+secrets require `bonesdeploy secrets push` and never enter the build.
+
 ## Secrets, end to end
 
 ```text
@@ -65,11 +71,13 @@ bonesdeploy secrets push
 bonesdeploy deploy
 ```
 
-`.env.build` at the project root holds committed, non-secret build-time values
+`.env.build` at the project root holds committed, public build-time values
 (e.g. `NEXT_PUBLIC_API_URL=https://api.example.com`). Runtime secrets come from
 `shared/.env` via `bonesdeploy secrets push`. The explicit push atomically
 replaces the complete remote environment; it does not merge any `.env` files.
-`bones.toml` is committed; `shared/.env` is not. That's the contract.
+The root `.env`, ambient host variables, credentials, and `shared/.env` are not
+build inputs. There is no migration or server-build fallback guarantee for
+earlier installations. That's the contract.
 ## Recovery
 
 Bad deploy:

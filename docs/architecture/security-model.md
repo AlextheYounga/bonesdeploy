@@ -61,7 +61,9 @@ The kernel evaluates the process that actually makes the syscall. It does not ca
 
 > **Derived rule:** two services running under the same UID are not meaningfully isolated by ordinary filesystem permissions. To the discretionary access-control system, they are the same principal.
 
-For BonesDeploy: one site = one unique runtime UID. One build environment = a separate build UID. This is a real security boundary, not organizational neatness.
+For BonesDeploy: one site = one unique runtime UID. Native builds run locally in
+Docker and never receive a production host identity. This is a real security
+boundary, not organizational neatness.
 
 ### 2. Filesystem access is governed by every directory in the path
 

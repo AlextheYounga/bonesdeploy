@@ -14,7 +14,7 @@ A concern should only be handled at the last responsible moment: immediately bef
 
 This principle exists to keep deployment behavior coherent and safe:
 
-- the pre-deploy steps (doctor, stage, checkout, wire) should validate and prepare isolated state, not mutate live state.
+- the pre-deploy steps (doctor, artifact receipt, stage, wire) should validate and prepare isolated state, not mutate live state.
 - build steps should operate on isolated workspace state whenever possible.
 - activation concerns should happen at activation time.
 - permission hardening should happen after a successful activation, not before.
@@ -51,8 +51,8 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 - `releases/` contains candidates owned by the runtime user while prepare runs, then sealed as `root:<site>` before activation.
 - `shared/` is owned by the runtime user (`<site>:<site>`) — only the app writes here.
-- Build input is temporary and disposable. Remote build scripts run in Podman with the source mounted at `/workspace/source`; local mode runs the same native contract in rootless workstation Podman and uploads a complete post-build artifact.
-- Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed, regardless of build mode. Django prepare still installs `requirements.txt` dependencies into the release virtualenv.
+- Build input is temporary and disposable. Native scripts run only in local Docker against the exported committed source and upload one complete post-build artifact. Production never executes native application build scripts.
+- Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed. Django prepare still installs `requirements.txt` dependencies into the release virtualenv.
 - Git push transports source only; no Git hook starts a deployment.
 - The `git` SSH session may sudo only exact config-sync and deploy commands; BonesRemote retains ownership of promotion, activation, and service restart.
 - `bonesdeploy site export` is separate local administration: it connects as the configured root SSH user and streams a read-only ZIP of `shared/` directly to a private local file. It does not use `git`, sudo, or BonesRemote.
@@ -61,7 +61,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 `bonesdeploy site releases` asks `bonesremote` for the site's release state and renders the returned JSON locally; it stores no release state on the workstation. Releases are `active`, `previous`, `building`, `preparing`, or `interrupted`. A `building` or `interrupted` release can be cancelled with `bonesdeploy site releases kill <release>`; cancellation removes only that release's build container, temporary context, staged-release state, and transient deployment metadata.
 
-BonesRemote holds one OS-backed deployment lock per site. Deploys, cancellations, and site imports use the same stable lock, which lives outside the replaceable site dataset. A deploy or import must not stage or overwrite state while a release is building, preparing, or interrupted. Before staging, BonesRemote starts and verifies the build user's systemd manager and checks rootless Podman readiness. A damaged rootless Podman namespace is reported before any release state is created; deploy does not silently reset Podman because that operation stops the build user's containers.
+BonesRemote holds one OS-backed deployment lock per site. Deploys, cancellations, and site imports use the same stable lock, which lives outside the replaceable site dataset. A deploy or import must not stage or overwrite state while a release is building, preparing, or interrupted. Before staging, BonesRemote verifies the artifact's pushed revision and safely receives it before any release state is created.
 
 Deployment state files (`active-deployment.json` and `staged-release`) are written atomically (temp file, fsync, rename, directory fsync) so a crash or disk-full condition never leaves truncated state that status, cancellation, or idle checks cannot parse. If malformed state is ever found, `bonesremote release recover --site <site>` quarantines it after proving no deployment is running.
 
@@ -109,7 +109,6 @@ BONES_EMAIL=ops@example.com
 BONES_SSL_ENABLED=false
 BONES_TEMPLATE=next
 BONES_RUNTIME_BACKEND=native
-BONES_BUILD_MODE=remote
 BONES_WEB_ROOT=public
 BONES_NODE_VERSION=24.19.0
 BONES_COMPOSE_PORT=
@@ -161,25 +160,26 @@ Newly initialized projects get one encrypted Borg repository per site at `/var/l
 
 The cron entry runs `bonesremote backup run --site <site> --keep-days <retention>` as root, piped to journald through `systemd-cat`; there is no user-facing backup command and no other trigger. Each run archives only the site's `shared/` directory under the site lock as `<site>_<YYYYMMDD_HHMMSS>` (UTC), then prunes archives older than the configured retention (default 30 days). Projects without a passphrase (initialized before this feature) keep their previous behavior. Backups are local to the deployment server: external replication, restoration workflows, and database dumps are the user's responsibility and are not automated.
 
-### Build Modes
-`BONES_BUILD_MODE` is managed in the root `.env` and defaults to `remote` for
-compatibility. `bonesdeploy init --build-mode local` opts a project into local
-native builds. Local mode resolves the configured branch to one exact committed
-revision, exports it, and runs the shared native build contract in rootless
-Podman using the pinned `linux/amd64` builder. It is rejected for the Docker
-runtime and never falls back to a remote build.
+### Native Artifact Build
+Every native deploy resolves the configured branch to one exact committed
+revision, exports it, and runs the numbered build scripts locally in Docker with
+the pinned `linux/amd64` builder. Docker is the only local build engine. The
+build receives fixed public contract metadata and values explicitly declared in
+the committed `.env.build`; it does not inherit ambient variables or receive the
+root `.env`, runtime environment, credentials, host home, SSH agent, or Docker
+socket.
 
 The local build packages the complete post-build context as a `tar.gz` and
-streams it over SSH with a manifest. Bonesremote checks the site, exact branch
+streams it over SSH with a manifest. BonesRemote checks the site, exact branch
 commit, pinned builder identity, compressed length, and SHA-256 digest before
-extracting bounded relative paths and safe relative symlinks. Remote mode keeps
-the server-side build user, rootless Podman manager, cache, and resource limits;
-local mode does not provision those server-side build resources. Both modes
-continue through the same promote, prepare, seal, activation, restart, pruning,
-and rollback lifecycle.
+extracting bounded relative paths and safe relative symlinks. It then promotes,
+wires shared paths, prepares, seals, activates, restarts, prunes, or rolls back
+through the one shared lifecycle. Production hosts create no native build user,
+cache, rootless container state, or image store, and no failure falls back to a
+server-side build.
 
 ### Deployment Folder
-This folder stores build and prepare scripts. Build scripts live in `deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order. Remote mode uses bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; local mode runs the same contract in rootless workstation Podman. Other files, including `README.md`, are ignored. Bonesremote prepares the remote image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived remote build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. Before remote scripts run, BonesRemote streams the deployment bundle into the container's disposable filesystem at `/workspace/deployment`; it does not bind-mount root-owned control-plane state. The remote build container receives the exported source tree and private persistent build cache at `/workspace/cache`; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or host BonesRemote control-plane files. The cache is provisioned by BonesInfra at `/var/lib/bonesdeploy/users/<site>-build/cache` and is used only for tool and package downloads. Prepare scripts live in `deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to a runtime-owned candidate release, and are the right place for migrations, cache warmups, and other runtime-state work.
+This folder stores build and prepare scripts. Build scripts live in `deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order in local Docker with `cwd=/workspace/source`. Other files, including `README.md`, are ignored. The build container receives the exported source tree, scoped local cache, fixed public contract metadata, and committed public `.env.build` values. It does not receive the root `.env`, runtime secrets, `shared/`, `current`, `releases/`, the bare repo, host home, SSH agent, credential stores, or Docker socket. Prepare scripts live in `deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to a runtime-owned candidate release, and are the right place for migrations, cache warmups, and other runtime-state work.
 
 ## Crate Structure
 This Cargo workspace has four crates under `crates/`:
@@ -259,9 +259,9 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Root `bonesdeploy doctor` runs both `server doctor` and `site doctor`, reporting both failures when necessary.
   - `bonesdeploy site doctor --local` checks only the local root `.env`, `infra/`, and numbered deployment scripts.
    - Site remote checks open a privileged SSH session, synchronize the sanitized control-plane snapshot to `/srv/conf/<site>/bones.json`, then run `bonesremote doctor --site <project>`.
-    - `bonesremote doctor --site <project>` requires root and reads the synchronized `/srv/conf/<project>/bones.json` snapshot for runtime backend and branch (missing snapshot is reported as pending with guidance). It checks Podman availability, AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the build user's existence and home, the bare repo with an exact ref for the configured branch, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. Docker daemon and image checks run only when the synchronized descriptor declares the Docker backend — never inferred from `/run/<site>`. An empty bare repo is reported as pending until the configured branch is pushed.
+    - `bonesremote doctor --site <project>` requires root and reads the synchronized `/srv/conf/<project>/bones.json` snapshot for runtime backend and branch (missing snapshot is reported as pending with guidance). It checks AppArmor availability, imported control-plane state under `/root/.config/bonesremote/sites/<project>/`, the bare repo with an exact ref for the configured branch, runtime user/group constraints, `shared/` and `releases/` layout, and `<project>-nginx.service`. Docker daemon and image checks run only when the synchronized descriptor declares the Docker backend — never inferred from `/run/<site>`. An empty bare repo is reported as pending until the configured branch is pushed.
     - The security audit is read-only and fail-closed. It verifies site identity isolation (unique UIDs/GIDs, no login shells, no cross-site group membership, deploy not in runtime groups), runtime sudo absence, privileged configuration root-control (recursively inspecting systemd, sudoers, nginx, AppArmor, and BonesRemote state plus their parent chains without following symlink targets), and release activation (current must be a valid symlink resolving inside the site's releases directory; active release roots and activation parents must be immutable to the runtime identity). `bonesremote doctor --site <project> --exhaustive` additionally inspects every entry in that active release for permission drift; this can take time on large releases. BonesInfra renders and validates the deploy-user sudoers policy during provisioning rather than probing with fabricated commands during doctor. POSIX ACLs on protected paths are detected through extended attributes and reported as UNVERIFIED. Supplementary groups are collected through `id -G`. Required evidence that cannot be collected is reported as UNVERIFIED and causes doctor to fail.
-   - Server doctor verifies Debian/Ubuntu, Podman, AppArmor, deploy identity, BonesRemote roots and binary, sudoers, shared image store, firewall, fail2ban, unattended-upgrades, and the etckeeper installation. `--verbose` prints successful remote reports.
+   - Server doctor verifies Debian 12+ or Ubuntu 24.04+ on `x86_64`, AppArmor, deploy identity, BonesRemote roots and binary, sudoers, firewall, fail2ban, unattended-upgrades, and the etckeeper installation. `--verbose` prints successful remote reports.
 
 - **site manifest**
   - Inspects every project-specific filesystem artifact and managed systemd service expected by the effective framework, service, and SSL strategy. Shared host-wide packages, daemons, and configuration are excluded.
@@ -286,7 +286,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 
 - **server setup**
   - Delegates to `python -m bonesinfra server apply --request-stdin`, feeding a connection-only request (SSH host, user, port) on stdin.
-  - Provisions shared packages, hardening (including an sshd drop-in that disables password login for root), firewall, image store, deploy identity, BonesRemote roots and binary, and sudoers.
+  - Provisions shared packages, hardening (including an sshd drop-in that disables password login for root), firewall, deploy identity, BonesRemote roots and binary, and sudoers.
   - Installs etckeeper and initializes `/etc` as a Git-backed etckeeper repository using package defaults.
   - Every successful mutating BonesInfra provisioning flow (server, site, services, runtime, SSL, helpers) ends with an etckeeper commit of its resulting `/etc` changes; read-only `manifest` and patch flows do not commit.
   - Does not read project runtime, service, framework, DNS, or release settings.
@@ -352,18 +352,18 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - `--site <name>` receives the sanitized control-plane descriptor as JSON on stdin, validates it, and atomically installs root-owned `/srv/conf/<site>/bones.json`. BonesDeploy invokes it through sudo before deploy.
 - **deploy**:
   - Runs the full deployment lifecycle as root after the `git` SSH identity invokes the exact allowed command through sudo. Git push transports source only; it does not invoke deployment.
-  - Orchestrates one shared lifecycle: stage release → source export from the bare repo into a temp build context → backend build → candidate release → shared wiring → backend preparation → seal release → activate → restart `<site>.target` → post-deploy pruning. Native sites run numbered Podman build scripts and host prepare scripts. Compose sites run `config --quiet`, `pull`, and `build`, then skip numbered prepare scripts.
+  - Orchestrates one shared lifecycle: artifact receipt → candidate release → shared wiring → backend preparation → seal release → activate → restart `<site>.target` → post-deploy pruning. Native sites receive a verified local Docker artifact and run host prepare scripts. Compose sites run `config --quiet`, `pull`, and `build`, then skip numbered prepare scripts.
   - Native preflight validates nginx. Compose activation reconciles the stack from `current` with `up --detach --build --remove-orphans --wait`. On failure before activation, automatically drops the staged release. If the service restart fails after activation,
     restores and restarts the previous release before dropping the failed release.
   - `--site <name>`: validated site identifier used to load the synchronized control-plane snapshot and existing root-owned deployment state
   - `--revision <rev>`: optional exact commit to check out; defaults to configured branch
 - **doctor**:
-  - Host mode checks `bonesremote` in `PATH`, Podman, AppArmor support, and the deploy-user sudoers drop-in.
+  - Host mode checks `bonesremote` in `PATH`, the supported Debian 12+/Ubuntu 24.04+ `x86_64` platform, AppArmor support, and the deploy-user sudoers drop-in.
   - `--site <name>` loads `/srv/conf/<name>/bones.json` for explicit runtime backend and branch, checks the imported site boundary, and validates `<site>.target`. Compose checks include Docker Engine/plugin availability, Compose configuration, container health, optional loopback ingress, and one reduced-guarantee warning.
 - **release stage**
   - Creates one exclusively named candidate in the existing root-owned lifecycle; the candidate is sealed as `root:<site>` before activation.
 - **release wire**
-	- Wires shared paths into `build/workspace` after checkout, replacing any existing build workspace paths with symlinks to the shared directory.
+	- Wires shared paths into the promoted candidate release, replacing declared paths with symlinks to the shared directory.
 - **release activate**
   - Atomically validates and switches `current` to the staged release, restarts services, and restores the previous release if verification fails.
 - **release drop-failed**
@@ -405,9 +405,8 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 1. `bonesdeploy deploy` SSHes into the configured host as `git`, synchronizes the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <site>`, then runs `sudo -n bonesremote deploy --site <site>`.
 2. `bonesremote deploy`, running as root through the exact sudoers grant, loads the synchronized snapshot and orchestrates the existing pipeline:
    - **stage_release** — Create timestamped release state
-   - **release_checkout** — Export the configured branch revision from the bare repo via `git archive` (a clean tar stream without `.git` metadata); the stream is extracted into a temporary build context
-    - **release_build** — Native: run `deployment/build/*.sh` in rootless Podman. Compose: validate the candidate, pull referenced images, and build project Dockerfiles with Docker Compose.
-    - **release_promote** — Copy safe artifacts into a runtime-owned candidate release
+   - **artifact_receipt** — Verify the configured branch revision, manifest, digest, and bounded archive before extracting it into a temporary context
+   - **release_promote** — Copy verified artifact contents into a runtime-owned candidate release
     - **wire_shared** — Symlink declared shared paths into the candidate release
     - **release_prepare** — Native: run `deployment/prepare/*.sh` as the site runtime user. Compose: skip numbered prepare scripts; migrations belong in the stack.
     - **release_finalize** — Seal the prepared release as `root:<site>`

@@ -1,7 +1,7 @@
 pub mod activate;
 pub mod artifact;
 pub mod build;
-pub mod checkout;
+pub mod context;
 pub mod preflight;
 pub mod prepare;
 pub mod stage;

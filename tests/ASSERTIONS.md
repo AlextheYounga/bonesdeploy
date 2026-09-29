@@ -192,23 +192,6 @@
 ## `crates/bonesremote/tests/release/lifecycle.rs`
 - snapshot uses convention paths and one revision. (snapshot_uses_convention_paths_and_one_revision)
 
-## `crates/bonesremote/tests/release/lifecycle_build_container.rs`
-- build env values use a private env file instead of command arguments. (build_env_values_use_a_private_env_file_instead_of_command_arguments)
-
-## `crates/bonesremote/tests/release/lifecycle_build_ownership.rs`
-- parse user uid reads uid field. (parse_user_uid_reads_uid_field)
-
-## `crates/bonesremote/tests/release/lifecycle_build_scripts.rs`
-- build env includes env build values. (build_env_includes_env_build_values)
-- build timeout setting is denied in build env. (build_timeout_setting_is_denied_in_build_env)
-- container contract values cannot be overridden by env build. (container_contract_values_cannot_be_overridden_by_env_build)
-- denied values remain absent in build env. (denied_values_remain_absent_in_build_env)
-- derived bones values are present in build env. (derived_bones_values_are_present_in_build_env)
-- derived bones values cannot be overridden by env build. (derived_bones_values_cannot_be_overridden_by_env_build)
-- derived environment exports scalars but not operational config. (derived_environment_exports_scalars_but_not_operational_config)
-- list scripts only includes numbered shell scripts. (list_scripts_only_includes_numbered_shell_scripts)
-- missing env build is not an error. (missing_env_build_is_not_an_error)
-
 ## `crates/bonesremote/tests/release/lifecycle_build_tree.rs`
 - candidate tree is writable by its temporary owner. (candidate_tree_is_writable_by_its_temporary_owner)
 - empty release directory passes the nonempty guard. (empty_release_directory_passes_the_nonempty_guard)
@@ -216,12 +199,6 @@
 - normalize relative path rejects escape. (normalize_relative_path_rejects_escape)
 - promote refuses nonempty release directory. (promote_refuses_nonempty_release_directory)
 - validate symlink target rejects absolute and escaping targets. (validate_symlink_target_rejects_absolute_and_escaping_targets)
-
-## `crates/bonesremote/tests/release/lifecycle_build_user.rs`
-- build cache validation requires private owned directory. (build_cache_validation_requires_private_owned_directory)
-- build script command includes runtime max sec. (build_script_command_includes_runtime_max_sec)
-- build script command runs as the build user machine. (build_script_command_runs_as_the_build_user_machine)
-- plain build user command has no runtime max sec. (plain_build_user_command_has_no_runtime_max_sec)
 
 ## `crates/bonesremote/tests/release/lifecycle_preflight.rs`
 - site nginx config uses the registered sites configuration. (site_nginx_config_uses_the_registered_sites_configuration)

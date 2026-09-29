@@ -50,25 +50,21 @@ deploy that fails into a security incident.
 - **No ACLs.** Opaque. Unreadable. We use ordinary Unix ownership.
 - **No inotify systems.** Cumbersome, fragile, invisible. We use systemd
   services and explicit restart.
-- **No silent Podman reset.** A damaged rootless Podman namespace is
-  reported before any release state is created. Resetting it would stop
-  the build user's containers, so we don't do it behind your back.
+- **No production-native build fallback.** A local Docker build failure leaves
+  the server untouched; it never causes application build scripts to run there.
 - **No `chown -R` on shared state during deploy.** Narrow, local changes
   beat recursive ownership rewrites.
 
 ## The build container
 
-Build scripts run in the project-pinned `buildpack-deps:bookworm` image with `cwd=/workspace/source`.
-The container gets the exported source tree and a private persistent build
-cache at `/workspace/cache`. It does *not* get `.env`, `shared/`,
-`current/`, `releases/`, the bare repo, or host `bonesremote` control-plane
-files. Build input is disposable. Build output is what gets promoted.
-
-`bonesremote` runs each script through the build user's systemd user
-manager with `systemd-run --machine=<site>-build@ --user`, not `runuser`.
-The long-lived build container is a transient user service that tracks
-Podman's monitor process; each script streams its output through
-foreground `podman exec`.
+Build scripts run locally in the project-pinned `buildpack-deps:bookworm` Docker
+image with `cwd=/workspace/source`, targeting `linux/amd64`. The container gets
+the exported committed source tree, a scoped local cache at `/workspace/cache`,
+fixed public build metadata, and committed public `.env.build` values. It does
+*not* get the root `.env`, runtime secrets, `shared/`, `current/`, `releases/`,
+the bare repo, host home, SSH agent, credential stores, or Docker socket. Build
+input is disposable. Build output becomes the checksummed artifact BonesRemote
+receives before promotion.
 
 ## Prepare scripts
 

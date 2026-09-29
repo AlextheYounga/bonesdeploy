@@ -111,7 +111,7 @@ pub fn load(site: &str) -> Result<RemoteDeploymentConfig> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bonesdeploy_core::config::{Build, Runtime, RuntimeBackend};
+    use bonesdeploy_core::config::{Runtime, RuntimeBackend};
     use std::env;
 
     fn root(name: &str) -> PathBuf {
@@ -125,7 +125,6 @@ mod tests {
             branch: branch.to_string(),
             releases_keep: 5,
             runtime: Runtime { backend, ..Runtime::default() },
-            build: Build::default(),
         }
     }
 

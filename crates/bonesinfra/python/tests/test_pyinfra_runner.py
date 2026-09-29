@@ -45,6 +45,7 @@ def test_run_passes_ssh_auth_through_inventory(monkeypatch):
     monkeypatch.setattr(runner, "stop_live_output", lambda: None)
     monkeypatch.setattr(runner, "activity", _noop_activity)
     monkeypatch.setattr(runner, "run_ops", _noop_run_ops)
+    monkeypatch.setattr(runner, "validate_supported_host", lambda: None)
     monkeypatch.setattr(pyinfra_ssh, "get_private_key", _noop_get_private_key)
 
     def fake_connect_all(state):
@@ -74,6 +75,7 @@ def test_run_can_override_ssh_user_for_update_patches(monkeypatch, tmp_path):
         lambda state: seen.update(user=next(iter(state.inventory)).data.ssh_user),
     )
     monkeypatch.setattr(runner, "run_ops", _noop_run_ops)
+    monkeypatch.setattr(runner, "validate_supported_host", lambda: None)
 
     runner.run(
         ctx=ctx,
@@ -83,3 +85,16 @@ def test_run_can_override_ssh_user_for_update_patches(monkeypatch, tmp_path):
     )
 
     assert seen["user"] == "root"
+
+
+def test_run_validates_host_before_planning_deploy_operations(monkeypatch):
+    ctx = ServerContext.from_request(make_server_request())
+    calls = []
+
+    monkeypatch.setattr(runner, "connect_all", lambda _state: None)
+    monkeypatch.setattr(runner, "run_ops", _noop_run_ops)
+    monkeypatch.setattr(runner, "validate_supported_host", lambda: calls.append("validate"))
+
+    runner.run(ctx=ctx, deploy=lambda _ctx: calls.append("deploy"), quiet=True)
+
+    assert calls == ["validate", "deploy"]

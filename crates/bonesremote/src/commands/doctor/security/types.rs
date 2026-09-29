@@ -36,8 +36,6 @@ pub struct Site {
     pub name: String,
     pub project_root: PathBuf,
     pub runtime: Account,
-    /// Local artifact sites intentionally have no server-side build identity.
-    pub build: Option<Account>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

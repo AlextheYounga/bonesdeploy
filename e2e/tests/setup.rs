@@ -23,22 +23,22 @@ mod sveltekit;
 #[path = "setup/vue.rs"]
 mod vue;
 
-use harness::{BuildMode, Harness};
+use harness::Harness;
 
-fn run_local(
+fn run_native(
     site: &str,
-    provision: fn(&Harness, BuildMode) -> Result<SampleProject>,
+    provision: fn(&Harness) -> Result<SampleProject>,
     assert_running: fn(&Harness) -> Result<()>,
     deploy: fn(&Harness, &SampleProject) -> Result<()>,
 ) -> Result<()> {
     let h = harness::shared_harness()?;
-    let project = provision(&h, BuildMode::Local)?;
+    let project = provision(&h)?;
     assert_running(&h)?;
     deploy(&h, &project)?;
 
     let first_release = h.current_release(site)?;
     project.write("e2e-release-marker.txt", "second release\n")?;
-    h.commit(&project, "second local artifact release")?;
+    h.commit(&project, "second artifact release")?;
     h.deploy(&project)?;
     let second_release = h.current_release(site)?;
     if second_release == first_release {
@@ -46,7 +46,7 @@ fn run_local(
     }
 
     project.write("e2e-release-marker.txt", "failed release\n")?;
-    h.commit(&project, "failed local artifact release")?;
+    h.commit(&project, "failed artifact release")?;
     let failed_deploy = {
         let _sabotage = h.sabotage_nginx(site)?;
         h.deploy(&project)
@@ -66,10 +66,7 @@ fn run_local(
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn django() -> Result<()> {
-    let h = harness::shared_harness()?;
-    let project = django::provision(&h, BuildMode::Remote)?;
-    django::assert_running(&h)?;
-    django::deploy(&h, &project)
+    run_native("e2edjango", django::provision, django::assert_running, django::deploy)
 }
 
 #[test]
@@ -82,125 +79,47 @@ fn docker_compose() -> Result<()> {
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn laravel() -> Result<()> {
-    let h = harness::shared_harness()?;
-    let project = laravel::provision(&h, BuildMode::Remote)?;
-    laravel::assert_running(&h)?;
-    laravel::deploy(&h, &project)
+    run_native("e2elaravel", laravel::provision, laravel::assert_running, laravel::deploy)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn next_server() -> Result<()> {
-    let h = harness::shared_harness()?;
-    let project = next::provision_server(&h, BuildMode::Remote)?;
-    next::assert_server_running(&h)?;
-    next::deploy_server(&h, &project)
+    run_native("e2enextserver", next::provision_server, next::assert_server_running, next::deploy_server)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn next_static() -> Result<()> {
-    let h = harness::shared_harness()?;
-    let project = next::provision_static(&h, BuildMode::Remote)?;
-    next::assert_static_running(&h)?;
-    next::deploy_static(&h, &project)
+    run_native("e2enextstatic", next::provision_static, next::assert_static_running, next::deploy_static)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn nuxt_server() -> Result<()> {
-    let h = harness::shared_harness()?;
-    let project = nuxt::provision_server(&h, BuildMode::Remote)?;
-    nuxt::assert_server_running(&h)?;
-    nuxt::deploy_server(&h, &project)
+    run_native("e2enuxtserver", nuxt::provision_server, nuxt::assert_server_running, nuxt::deploy_server)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn nuxt_static() -> Result<()> {
-    let h = harness::shared_harness()?;
-    let project = nuxt::provision_static(&h, BuildMode::Remote)?;
-    nuxt::assert_static_running(&h)?;
-    nuxt::deploy_static(&h, &project)
+    run_native("e2enuxtstatic", nuxt::provision_static, nuxt::assert_static_running, nuxt::deploy_static)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn rails() -> Result<()> {
-    let h = harness::shared_harness()?;
-    let project = rails::provision(&h, BuildMode::Remote)?;
-    rails::assert_running(&h)?;
-    rails::deploy(&h, &project)
+    run_native("e2erails", rails::provision, rails::assert_running, rails::deploy)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn sveltekit() -> Result<()> {
-    let h = harness::shared_harness()?;
-    let project = sveltekit::provision(&h, BuildMode::Remote)?;
-    sveltekit::assert_running(&h)?;
-    sveltekit::deploy(&h, &project)
+    run_native("e2esveltekit", sveltekit::provision, sveltekit::assert_running, sveltekit::deploy)
 }
 
 #[test]
 #[ignore = "requires a running Incus daemon; see e2e/README.md"]
 fn vue() -> Result<()> {
-    let h = harness::shared_harness()?;
-    let project = vue::provision(&h, BuildMode::Remote)?;
-    vue::assert_running(&h)?;
-    vue::deploy(&h, &project)
-}
-
-#[test]
-#[ignore = "requires a running Incus daemon and local-build Podman; see e2e/README.md"]
-fn django_local() -> Result<()> {
-    run_local("e2edjango", django::provision, django::assert_running, django::deploy)
-}
-
-#[test]
-#[ignore = "requires a running Incus daemon and local-build Podman; see e2e/README.md"]
-fn laravel_local() -> Result<()> {
-    run_local("e2elaravel", laravel::provision, laravel::assert_running, laravel::deploy)
-}
-
-#[test]
-#[ignore = "requires a running Incus daemon and local-build Podman; see e2e/README.md"]
-fn next_server_local() -> Result<()> {
-    run_local("e2enextserver", next::provision_server, next::assert_server_running, next::deploy_server)
-}
-
-#[test]
-#[ignore = "requires a running Incus daemon and local-build Podman; see e2e/README.md"]
-fn next_static_local() -> Result<()> {
-    run_local("e2enextstatic", next::provision_static, next::assert_static_running, next::deploy_static)
-}
-
-#[test]
-#[ignore = "requires a running Incus daemon and local-build Podman; see e2e/README.md"]
-fn nuxt_server_local() -> Result<()> {
-    run_local("e2enuxtserver", nuxt::provision_server, nuxt::assert_server_running, nuxt::deploy_server)
-}
-
-#[test]
-#[ignore = "requires a running Incus daemon and local-build Podman; see e2e/README.md"]
-fn nuxt_static_local() -> Result<()> {
-    run_local("e2enuxtstatic", nuxt::provision_static, nuxt::assert_static_running, nuxt::deploy_static)
-}
-
-#[test]
-#[ignore = "requires a running Incus daemon and local-build Podman; see e2e/README.md"]
-fn rails_local() -> Result<()> {
-    run_local("e2erails", rails::provision, rails::assert_running, rails::deploy)
-}
-
-#[test]
-#[ignore = "requires a running Incus daemon and local-build Podman; see e2e/README.md"]
-fn sveltekit_local() -> Result<()> {
-    run_local("e2esveltekit", sveltekit::provision, sveltekit::assert_running, sveltekit::deploy)
-}
-
-#[test]
-#[ignore = "requires a running Incus daemon and local-build Podman; see e2e/README.md"]
-fn vue_local() -> Result<()> {
-    run_local("e2evue", vue::provision, vue::assert_running, vue::deploy)
+    run_native("e2evue", vue::provision, vue::assert_running, vue::deploy)
 }

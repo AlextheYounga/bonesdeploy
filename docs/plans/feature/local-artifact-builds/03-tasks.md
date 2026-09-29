@@ -118,50 +118,90 @@ deliberately deferred.
 
 ### Implementation
 
-- [ ] Remove `BuildMode`, `--build-mode`, mode transport fields, remote defaults,
+- [x] Remove `BuildMode`, `--build-mode`, mode transport fields, remote defaults,
   mixed-mode validation, and native remote-build selection from Rust and Python
   configuration boundaries.
-- [ ] Replace the local Podman runner and doctor checks with one Docker runner
+- [x] Replace the local Podman runner and doctor checks with one Docker runner
   that verifies a Linux engine and `linux/amd64` execution, uses the pinned
   builder digest, passes no secret or ambient environment, and retains scoped
   cache, timeout, output streaming, and unconditional cleanup behavior.
-- [ ] Retain committed `.env.build` as the explicit non-secret project build
+- [x] Retain committed `.env.build` as the explicit non-secret project build
   input alongside fixed public workspace metadata; preserve reserved-name
   validation and prove ambient host, runtime, backup, and credential variables
   are absent.
-- [ ] Route every native deploy through local build, packaging, and artifact
+- [x] Route every native deploy through local build, packaging, and artifact
   upload; remove the ordinary native source-deploy form and any fallback path.
-- [ ] Remove BonesRemote native checkout/build coordinator inputs, build-user and
+- [x] Remove BonesRemote native checkout/build coordinator inputs, build-user and
   Podman readiness, native build cancellation branches, and build-only modules
   while preserving revision verification and the shared post-receipt lifecycle.
-- [ ] Remove BonesInfra native build users, linger, build slices, rootless
+- [x] Remove BonesInfra native build users, linger, build slices, rootless
   storage, caches, Podman verification, and native builder image-store state;
   preserve runtime ownership and regenerate the packaged wheel.
-- [ ] Enforce Debian 12+ and Ubuntu 24.04+ production support consistently in
+- [x] Enforce Debian 12+ and Ubuntu 24.04+ production support consistently in
   provisioning and remote diagnostics, rejecting older, malformed, and other
   distribution identities before mutation.
-- [ ] Update ignored native framework E2E definitions and all user,
+- [x] Update ignored native framework E2E definitions and all user,
   architecture, security, support, and upgrade documentation for Docker-only
   local artifacts and the breaking production-host contract.
 
 ### Validation
 
-- [ ] Run focused tests for Docker command safety, fixed public build metadata,
+- [x] Run focused tests for Docker command safety, fixed public build metadata,
   unconditional artifact deployment, remote-build removal, production OS
   version boundaries, and mode-free provisioning transport.
-- [ ] Compile but do not execute ignored E2E scenarios covering first deploy,
+- [x] Compile but do not execute ignored E2E scenarios covering first deploy,
   second release, and failed-activation rollback across the native framework
   matrix.
-- [ ] Run all non-E2E Rust and Python tests, Clippy with warnings denied,
+- [x] Run all non-E2E Rust and Python tests, Clippy with warnings denied,
   Rustfmt, shfmt, Ruff checks and formatting, generated-wheel validation, and
   `git diff --check`; resolve every warning or failure.
 
 ### Completion
 
-- [ ] Review the final diff for remaining Podman, remote native build,
+- [x] Review the final diff for remaining Podman, remote native build,
   build-mode, accidental `.env.build` secret semantics, unsupported
   production-host, secret exposure, broad Docker access, and stale compatibility
   behavior.
-- [ ] Record implementation deviations, exact validation evidence, and any
+- [x] Record implementation deviations, exact validation evidence, and any
   deliberately deferred Compose, migration, build-host portability, artifact
   pruning, credential, signing, or resumable-upload work.
+
+## Breaking Follow-Up Completion Notes
+
+Implemented the breaking local-only native build contract. Native projects now
+always export the configured commit, build it in local Docker, and upload a
+framed artifact. Build mode configuration and native production build users,
+Podman state, caches, image stores, checkout, and build execution were removed.
+The separate Compose runtime keeps its existing source export and server-side
+Compose `config`, `pull`, and `build` path; it cannot act as a native fallback.
+
+Docker executes the pinned `linux/amd64` builder with no privileged mode, Docker
+socket, host home, runtime environment, or ambient variable injection. The
+committed `.env.build` remains explicit public build configuration. It must be a
+regular file, is consumed before packaging, and is excluded from the release
+artifact together with the root `.env`. Rootful Docker output ownership is
+restored from inside the container before forced cleanup on success and failure.
+
+Provisioning and remote diagnostics accept only Debian 12+ or Ubuntu 24.04+ on
+`x86_64`. The packaged BonesInfra wheel was regenerated after removing native
+server build resources.
+
+Validation completed successfully:
+
+- `cargo test --workspace --exclude e2e`
+- `cargo clippy --workspace --exclude e2e --all-targets -- -D warnings`
+- `cargo check -p e2e --tests`
+- `cargo clippy -p e2e --tests --no-deps -- -D warnings`
+- `cargo fmt --all -- --check`
+- `shfmt -d .` after `shfmt -w .`
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `uv run pytest` (`504 passed`)
+- `git diff --check`
+- Two independent final reviews reported no remaining correctness or security
+  findings after follow-up fixes.
+
+Ignored E2E scenarios were compiled but not executed. Compose artifact
+transport, migration support, broader native build-host portability, artifact
+pruning, private dependency credentials, signing, and resumable uploads remain
+deliberately deferred.

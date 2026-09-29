@@ -14,13 +14,9 @@ const ETCKEEPER_BIN: &str = "/usr/bin/etckeeper";
 pub(super) fn check(issues: &mut Vec<String>) {
     check_root_directory(paths::BONESREMOTE_CONFIG_DIR, issues);
     check_root_directory(&paths::bonesremote_sites_root().display().to_string(), issues);
-    check_root_directory(paths::IMAGE_STORE_GRAPH_ROOT, issues);
-    check_root_directory(paths::IMAGE_STORE_RUN_ROOT, issues);
     check_root_executable(&paths::bonesremote_global_link(), issues);
     check_root_file(paths::SUDOERS_PATH, issues);
     check_sudoers_syntax(issues);
-    check_root_file(paths::IMAGE_STORE_STORAGE_CONF, issues);
-    check_seeded_image(issues);
     check_ufw(issues);
     check_active_service("fail2ban", issues);
     check_root_file(APT_AUTO_UPGRADES, issues);
@@ -78,20 +74,6 @@ fn check_sudoers_syntax(issues: &mut Vec<String>) {
         Ok(status) if status.success() => {}
         Ok(status) => issues.push(format!("server baseline sudoers policy is invalid (visudo exited {status})")),
         Err(error) => issues.push(format!("could not validate server baseline sudoers policy: {error}")),
-    }
-}
-
-fn check_seeded_image(issues: &mut Vec<String>) {
-    match Command::new("podman")
-        .env("CONTAINERS_STORAGE_CONF", paths::IMAGE_STORE_STORAGE_CONF)
-        .args(["image", "exists", paths::IMAGE_STORE_BASE_IMAGE])
-        .status()
-    {
-        Ok(status) if status.success() => {}
-        Ok(_) => {
-            issues.push(format!("server baseline shared image store is missing {}", paths::IMAGE_STORE_BASE_IMAGE));
-        }
-        Err(error) => issues.push(format!("could not inspect server baseline shared image store: {error}")),
     }
 }
 

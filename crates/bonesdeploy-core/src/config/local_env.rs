@@ -8,8 +8,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::{Context, Result, bail};
 
 use super::model::{
-    BACKUP_RETENTION_DAYS_DEFAULT, BACKUP_SCHEDULE_DEFAULT, Bones, BuildMode, COMPOSE_WAIT_TIMEOUT_DEFAULT,
-    RuntimeBackend, default_node_version, default_repo_path_for, validate_host, validate_runtime,
+    BACKUP_RETENTION_DAYS_DEFAULT, BACKUP_SCHEDULE_DEFAULT, Bones, COMPOSE_WAIT_TIMEOUT_DEFAULT, RuntimeBackend,
+    default_node_version, default_repo_path_for, validate_host, validate_runtime,
 };
 use crate::paths;
 
@@ -69,6 +69,9 @@ pub fn parse_dotenv(content: &str) -> Result<ParsedDotEnv> {
         if !is_valid_env_name(key) {
             bail!("Invalid .env key on line {}", number + 1);
         }
+        if matches!(key, "BUILD_MODE" | "BONES_BUILD_MODE") {
+            bail!("{key} is no longer supported; native deployments always build local artifacts")
+        }
         let value = strip_quotes(value.trim()).to_string();
         let (logical, managed) = if let Some(logical) = key.strip_prefix(keys::MANAGED_PREFIX) {
             if !in_block && !keys::MANAGED.contains(&logical) {
@@ -126,11 +129,6 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
         "docker" => RuntimeBackend::Docker,
         value => bail!("Invalid RUNTIME_BACKEND: {value}"),
     };
-    config.build.mode = match values.get(keys::BUILD_MODE).map_or("remote", String::as_str) {
-        "local" => BuildMode::Local,
-        "remote" => BuildMode::Remote,
-        value => bail!("Invalid BUILD_MODE: {value}"),
-    };
     config.runtime.compose_port = values
         .get(keys::COMPOSE_PORT)
         .filter(|value| !value.trim().is_empty())
@@ -159,7 +157,6 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
     config.project_root = paths::default_project_root_for(&project_name);
     validate_host(&config.host)?;
     validate_runtime(&config.runtime)?;
-    super::model::validate_build_mode(&config.runtime, &config.build)?;
     Ok(LoadedLocal { environment: config, applications: parsed.applications })
 }
 
@@ -243,13 +240,6 @@ pub fn write_local_environment(config: &Bones, path: &Path) -> Result<()> {
             match config.runtime.backend {
                 RuntimeBackend::Native => "native".into(),
                 RuntimeBackend::Docker => "docker".into(),
-            },
-        ),
-        (
-            keys::BUILD_MODE,
-            match config.build.mode {
-                BuildMode::Local => "local".into(),
-                BuildMode::Remote => "remote".into(),
             },
         ),
         (keys::WEB_ROOT, config.runtime.web_root.clone()),

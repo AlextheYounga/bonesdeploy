@@ -1,9 +1,41 @@
+import re
 from shlex import quote
 
+from pyinfra.context import ctx_host
+from pyinfra.facts.server import Arch, LinuxDistribution
 from pyinfra.operations import server
 
 PROFILE_CHECK_ATTEMPTS = 20
 PROFILE_CHECK_INTERVAL_SECONDS = "0.1"
+SUPPORTED_HOST_MESSAGE = "production hosts must be Debian 12+ or Ubuntu 24.04+ on x86_64"
+MINIMUM_DEBIAN_VERSION = (12,)
+MINIMUM_UBUNTU_VERSION = (24, 4)
+_VERSION = re.compile(r"^\d+(?:\.\d+)*$")
+
+
+def validate_supported_host() -> None:
+    host = ctx_host.get()
+    validate_supported_host_facts(host.get_fact(LinuxDistribution), host.get_fact(Arch))
+
+
+def validate_supported_host_facts(distribution: object, architecture: object) -> None:
+    release = distribution.get("release_meta") if isinstance(distribution, dict) else None
+    if not isinstance(release, dict) or architecture != "x86_64":
+        raise ValueError(SUPPORTED_HOST_MESSAGE)
+
+    distribution_id = release.get("ID")
+    version = _parse_version(release.get("VERSION_ID"))
+    if distribution_id == "debian" and version is not None and version >= MINIMUM_DEBIAN_VERSION:
+        return
+    if distribution_id == "ubuntu" and version is not None and version >= MINIMUM_UBUNTU_VERSION:
+        return
+    raise ValueError(SUPPORTED_HOST_MESSAGE)
+
+
+def _parse_version(value: object) -> tuple[int, ...] | None:
+    if not isinstance(value, str) or not _VERSION.fullmatch(value):
+        return None
+    return tuple(int(part) for part in value.split("."))
 
 
 def run_as_runtime_user(ctx, name, command):

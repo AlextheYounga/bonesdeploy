@@ -19,15 +19,6 @@ sudo incus admin init --minimal
 sudo usermod -aG incus-admin $USER   # then re-login
 ```
 
-Root needs a subordinate uid/gid range wide enough for nested user
-namespaces (rootless podman runs inside the test container, and its build
-user's subuids sit above the first 65536 ids):
-
-```sh
-echo "root:100000:1000000000" | sudo tee /etc/subuid /etc/subgid
-sudo systemctl restart incus
-```
-
 If the host firewall default-denies input, allow DHCP/DNS on the Incus
 bridge or containers never get an IPv4 address:
 
@@ -39,6 +30,8 @@ sudo ufw route allow out on incusbr0
 
 The musl target for the container-side `bonesremote` binary is installed
 automatically on first run (`rustup target add x86_64-unknown-linux-musl`).
+Native scenarios also require the host Docker daemon: they build artifacts on
+the test workstation, not inside the Incus guest.
 
 ## Running
 
@@ -62,21 +55,17 @@ the server; the rest reuse it). Run a subset by passing a test-name filter:
 # Single framework
 cargo test -p e2e --test setup -- vue --ignored --test-threads=1 --nocapture
 
-# Multiple remote-build frameworks
+# Multiple native artifact frameworks
 cargo test -p e2e --test setup -- vue laravel --ignored --test-threads=1 --nocapture
 
-# Every local-artifact framework scenario
-cargo test -p e2e --test setup -- _local --ignored --test-threads=1 --nocapture
-
-# One local-artifact framework scenario
-cargo test -p e2e --test setup -- laravel_local --ignored --test-threads=1 --nocapture
+# One native artifact framework scenario
+cargo test -p e2e --test setup -- laravel --ignored --test-threads=1 --nocapture
 ```
 
 Test names: `django`, `laravel`, `next_server`, `next_static`, `nuxt_server`,
-`nuxt_static`, `rails`, `sveltekit`, `vue`, plus `_local` variants for every
-native framework scenario. Each local-artifact scenario covers first deploy,
-a second release, and failed activation rollback after the nginx service
-restart phase.
+`nuxt_static`, `rails`, `sveltekit`, and `vue`. Every native artifact scenario
+covers first deploy, a second release, and failed activation rollback after the
+nginx service restart phase.
 
 ## How it works
 
@@ -97,9 +86,9 @@ restart phase.
   built as a static musl binary and pre-seeded into the container, so
   bootstrap's `command -v bonesremote` guard skips the
   cargo-install-from-GitHub path and the container runs your working tree.
-- **Rootless build networking** — each disposable guest selects Podman's
-  `slirp4netns` backend. Debian's default `pasta` backend crashes in nested
-  Incus containers; production provisioning is not changed.
+- **Native artifact builds** — native scenarios build the committed revision
+  locally with Docker and upload the complete artifact. The guest receives it
+  only through BonesRemote's receipt path; it does not run application builds.
 - **Framework fixtures** — `fixtures/*.md` are mdpack archives of real
   framework projects. Each scenario expands its archive into a disposable Git
   repository, pushes `main`, and runs `bonesdeploy deploy`. Project setup creates

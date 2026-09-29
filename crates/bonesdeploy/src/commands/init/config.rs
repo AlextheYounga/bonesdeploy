@@ -1,6 +1,6 @@
 use anyhow::{Result, anyhow};
 use bonesdeploy_core::{
-    config::{BuildMode, RuntimeBackend, parse_port, validate_build_mode, validate_host, validate_project_name},
+    config::{RuntimeBackend, parse_port, validate_host, validate_project_name},
     paths,
 };
 
@@ -57,7 +57,6 @@ fn collect_from_existing(
         (None, Some(existing)) => existing.runtime.backend,
         (None, None) => parse_runtime_backend(&prompts::prompt_runtime_backend(None)?)?,
     };
-    cfg.build.mode = resolve_build_mode(args, existing_config)?;
     apply_existing_fields(&mut cfg, existing_config);
     validate_init_config(&cfg)?;
     Ok(cfg)
@@ -102,7 +101,6 @@ pub fn collect_non_interactive(
     cfg.repo_path = repo_path;
     cfg.project_root = project_root;
     cfg.runtime.backend = resolve_runtime_backend(args, existing_config)?;
-    cfg.build.mode = resolve_build_mode(args, existing_config)?;
     apply_existing_fields(&mut cfg, existing_config);
     validate_init_config(&cfg)?;
     Ok(cfg)
@@ -113,7 +111,7 @@ fn validate_init_config(cfg: &config::Bones) -> Result<()> {
     validate_host(&cfg.host)?;
     parse_port(&cfg.port)?;
     git::validate_branch(&cfg.branch)?;
-    validate_build_mode(&cfg.runtime, &cfg.build)
+    Ok(())
 }
 
 fn resolve_project_name(
@@ -209,15 +207,6 @@ fn parse_runtime_backend(value: &str) -> Result<RuntimeBackend> {
         "native" => Ok(RuntimeBackend::Native),
         "docker" => Ok(RuntimeBackend::Docker),
         _ => anyhow::bail!("unsupported runtime backend: {value}"),
-    }
-}
-
-fn resolve_build_mode(args: &super::Args, existing_config: Option<&config::Bones>) -> Result<BuildMode> {
-    match args.build_mode.as_deref() {
-        Some("local") => Ok(BuildMode::Local),
-        Some("remote") => Ok(BuildMode::Remote),
-        Some(value) => anyhow::bail!("unsupported build mode: {value}"),
-        None => Ok(existing_config.map_or(BuildMode::Remote, |cfg| cfg.build.mode)),
     }
 }
 

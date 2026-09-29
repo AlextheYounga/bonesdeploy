@@ -15,7 +15,6 @@ pub(super) const EMAIL: &str = "EMAIL";
 pub(super) const SSL_ENABLED: &str = "SSL_ENABLED";
 pub(super) const TEMPLATE: &str = "TEMPLATE";
 pub(super) const RUNTIME_BACKEND: &str = "RUNTIME_BACKEND";
-pub(super) const BUILD_MODE: &str = "BUILD_MODE";
 pub(super) const NODE_VERSION: &str = "NODE_VERSION";
 pub(super) const COMPOSE_PORT: &str = "COMPOSE_PORT";
 pub(super) const COMPOSE_WAIT_TIMEOUT: &str = "COMPOSE_WAIT_TIMEOUT";
@@ -39,7 +38,6 @@ pub(super) const MANAGED: &[&str] = &[
     SSL_ENABLED,
     TEMPLATE,
     RUNTIME_BACKEND,
-    BUILD_MODE,
     WEB_ROOT,
     NODE_VERSION,
     COMPOSE_PORT,

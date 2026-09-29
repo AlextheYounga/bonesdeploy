@@ -1,4 +1,4 @@
-//! Shared native build contract used by local and remote build runners.
+//! Shared local native build contract.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,7 +10,7 @@ use serde_json::Value;
 use crate::config::{Bones, build_env, is_numbered_shell_script, variables};
 use crate::paths;
 
-/// The immutable builder image used by both build locations.
+/// The immutable builder image used by local builds.
 pub const BUILDER_IMAGE: &str = paths::IMAGE_STORE_BASE_IMAGE;
 pub const BUILDER_IMAGE_DIGEST: &str = paths::IMAGE_STORE_BASE_IMAGE_DIGEST;
 
@@ -102,7 +102,6 @@ const DERIVED_ENV_DENYLIST: &[&str] = &[
     "app.dns",
     "backup",
     "build.timeout_seconds",
-    "build.mode",
 ];
 
 /// Projects safe derived configuration and committed `.env.build` values.

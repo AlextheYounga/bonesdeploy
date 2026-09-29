@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::ErrorKind;
 use std::path::Path;
 
 use anyhow::{Context, Result, bail};
@@ -32,11 +33,15 @@ pub fn default_content() -> &'static str {
 /// invalid keys, duplicate keys, or reserved `BONES_*` keys.
 pub fn load(dir: &Path) -> Result<BTreeMap<String, String>> {
     let path = dir.join(paths::ENV_BUILD_FILE);
-    if !path.exists() {
-        return Ok(BTreeMap::new());
+    match fs::symlink_metadata(&path) {
+        Ok(metadata) if metadata.file_type().is_file() => {
+            let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+            parse(&content)
+        }
+        Ok(metadata) => bail!("{} has unsupported file type: {:?}", path.display(), metadata.file_type()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(BTreeMap::new()),
+        Err(error) => Err(error).with_context(|| format!("Failed to inspect {}", path.display())),
     }
-    let content = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
-    parse(&content)
 }
 
 /// Parses `.env.build` content without shell evaluation.

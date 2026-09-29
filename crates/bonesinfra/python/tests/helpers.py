@@ -73,7 +73,6 @@ def make_site_request(**overrides):
             "backend": "native",
             "web_root": "dist",
             "branch": "main",
-            "build_mode": "remote",
             "node_version": "22",
             "backup": {
                 "schedule": "0 0 * * *",

@@ -1,8 +1,6 @@
 use anyhow::Result;
-use bonesdeploy_core::config::RuntimeBackend;
 use bonesdeploy_core::paths;
 
-use crate::control_plane;
 use crate::privileges;
 use crate::ui;
 
@@ -22,10 +20,6 @@ pub fn run(site: Option<&str>, exhaustive: bool) -> Result<()> {
     let mut warnings: Vec<String> = Vec::new();
 
     system::check_supported_distribution(&mut issues);
-    let backend = site.and_then(|site| control_plane::load(site).ok().map(|descriptor| descriptor.runtime.backend));
-    if podman_check_required(backend) {
-        system::check_podman_available(&mut issues);
-    }
     apparmor::check_support(&mut issues);
     if site.is_none() {
         baseline::check(&mut issues);
@@ -72,9 +66,4 @@ pub fn run(site: Option<&str>, exhaustive: bool) -> Result<()> {
         }
         anyhow::bail!("Doctor found {} issue{}", issues.len(), if issues.len() == 1 { "" } else { "s" });
     }
-}
-
-#[must_use]
-pub fn podman_check_required(backend: Option<RuntimeBackend>) -> bool {
-    backend != Some(RuntimeBackend::Docker)
 }

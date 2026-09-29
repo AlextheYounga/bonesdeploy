@@ -3,7 +3,7 @@ use bonesdeploy::commands::init::Args;
 use bonesdeploy::commands::init::config::collect_non_interactive;
 use bonesdeploy::commands::init::framework::{collect_framework_config, parse_framework_var};
 use bonesdeploy::config::Bones;
-use bonesdeploy_core::config::{BuildMode, RuntimeBackend};
+use bonesdeploy_core::config::RuntimeBackend;
 use bonesdeploy_core::paths;
 use serde_json::Value;
 
@@ -17,7 +17,6 @@ fn args_non_interactive(template: Option<&str>, framework_vars: &[&str]) -> Args
         port: None,
         template: template.map(String::from),
         runtime_backend: None,
-        build_mode: None,
         framework_vars: framework_vars.iter().map(|value| String::from(*value)).collect(),
     }
 }
@@ -84,16 +83,6 @@ fn non_interactive_config_records_and_validates_runtime_backend() -> Result<()> 
     args.runtime_backend = Some(String::from("docker"));
     assert_eq!(collect_non_interactive("workspace", None, &args)?.runtime.backend, RuntimeBackend::Docker);
     args.runtime_backend = Some(String::from("compose"));
-    assert!(collect_non_interactive("workspace", None, &args).is_err());
-    Ok(())
-}
-
-#[test]
-fn non_interactive_config_records_local_build_mode_and_rejects_compose() -> Result<()> {
-    let mut args = args_non_interactive(None, &[]);
-    args.build_mode = Some(String::from("local"));
-    assert_eq!(collect_non_interactive("workspace", None, &args)?.build.mode, BuildMode::Local);
-    args.runtime_backend = Some(String::from("docker"));
     assert!(collect_non_interactive("workspace", None, &args).is_err());
     Ok(())
 }

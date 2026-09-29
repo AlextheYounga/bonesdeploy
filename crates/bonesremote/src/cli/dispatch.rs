@@ -12,11 +12,11 @@ use crate::runtime::docker;
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Doctor { site, exhaustive } => doctor::run(site.as_deref(), *exhaustive),
-        Command::Deploy { site, revision, artifact_stdin } => {
+        Command::Deploy { site, artifact_stdin } => {
             if *artifact_stdin {
                 deploy::run_artifact(site)
             } else {
-                deploy::run_full(site, revision.as_deref())
+                deploy::run_source(site)
             }
         }
         Command::Config { command: ConfigCommand::Sync { site } } => config::sync(site),

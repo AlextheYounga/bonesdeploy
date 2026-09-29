@@ -64,7 +64,7 @@ fn build_timeout_defaults_to_five_minutes() {
 
 #[test]
 fn build_timeout_of_zero_disables_the_timeout() {
-    let config = Bones { build: Build { timeout_seconds: 0, ..Build::default() }, ..Bones::default() };
+    let config = Bones { build: Build { timeout_seconds: 0 }, ..Bones::default() };
     assert_eq!(build_timeout_seconds(&config), None);
 }
 
@@ -136,7 +136,7 @@ fn remote_deployment_config_excludes_identity_and_secrets() -> Result<()> {
     assert!(json.contains("\"releases_keep\":3"));
     assert!(json.contains("\"backend\":\"docker\""));
     assert!(json.contains("\"web_root\":\"public\""));
-    assert!(json.contains("\"timeout_seconds\":120"));
+    assert!(!json.contains("\"timeout_seconds\""));
     assert!(json.contains("\"compose_port\":8080"));
     assert!(json.contains("\"compose_wait_timeout\":240"));
     Ok(())
@@ -149,8 +149,6 @@ fn remote_deployment_config_round_trips_through_json() -> Result<()> {
     bones.releases_keep = 7;
     bones.runtime.web_root = "dist".to_string();
     bones.runtime.backend = RuntimeBackend::Native;
-    bones.build.timeout_seconds = 600;
-
     let descriptor = RemoteDeploymentConfig::from_bones(&bones);
     let json = serde_json::to_string(&descriptor)?;
     let restored: RemoteDeploymentConfig = serde_json::from_str(&json)?;
@@ -159,7 +157,6 @@ fn remote_deployment_config_round_trips_through_json() -> Result<()> {
     assert_eq!(restored.releases_keep, 7);
     assert_eq!(restored.runtime.web_root, "dist");
     assert_eq!(restored.runtime.backend, RuntimeBackend::Native);
-    assert_eq!(restored.build.timeout_seconds, 600);
     Ok(())
 }
 
@@ -186,7 +183,7 @@ fn remote_deployment_config_into_site_config_derives_identity_from_site() {
 
 #[test]
 fn remote_deployment_config_rejects_unknown_fields() {
-    let json = r#"{"branch":"main","releases_keep":5,"runtime":{"backend":"native","template":"","web_root":"public","node_version":"24.19.0"},"build":{"timeout_seconds":300},"extra_field":"bad"}"#;
+    let json = r#"{"branch":"main","releases_keep":5,"runtime":{"backend":"native","template":"","web_root":"public","node_version":"24.19.0"},"extra_field":"bad"}"#;
     let result: Result<RemoteDeploymentConfig, _> = serde_json::from_str(json);
     assert!(result.is_err());
 }

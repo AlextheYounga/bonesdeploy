@@ -20,7 +20,7 @@ pub async fn sync_control_plane(session: &openssh::Session, config: &Bones) -> R
     ssh::stream_cmd_with_stdin(session, &command, body.as_bytes()).await
 }
 
-pub fn deploy_command(site: &str) -> String {
+pub fn compose_deploy_command(site: &str) -> String {
     format!("sudo -n bonesremote deploy --site {}", ssh::shell_quote(site))
 }
 
@@ -38,11 +38,11 @@ pub fn decommission_command(action: &str, site: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{artifact_deploy_command, decommission_command, deploy_command, sync_control_plane_command};
+    use super::{artifact_deploy_command, compose_deploy_command, decommission_command, sync_control_plane_command};
 
     #[test]
-    fn deploy_command_runs_the_no_flag_lifecycle_through_sudo() {
-        let command = deploy_command("demo");
+    fn compose_deploy_command_runs_the_no_flag_lifecycle_through_sudo() {
+        let command = compose_deploy_command("demo");
 
         assert_eq!(command, "sudo -n bonesremote deploy --site 'demo'");
         assert!(!command.contains("config-stdin"));
@@ -50,8 +50,8 @@ mod tests {
     }
 
     #[test]
-    fn deploy_command_quotes_the_site() {
-        assert_eq!(deploy_command("site name"), "sudo -n bonesremote deploy --site 'site name'");
+    fn compose_deploy_command_quotes_the_site() {
+        assert_eq!(compose_deploy_command("site name"), "sudo -n bonesremote deploy --site 'site name'");
     }
 
     #[test]

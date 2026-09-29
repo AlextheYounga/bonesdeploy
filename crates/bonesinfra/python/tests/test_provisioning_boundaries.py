@@ -11,8 +11,6 @@ def test_server_setup_runs_only_server_operations(monkeypatch):
     monkeypatch.setattr(server.etckeeper, "initialize", lambda: calls.append("etckeeper-init"))
     monkeypatch.setattr(server.apparmor, "ensure_service", lambda: calls.append("apparmor"))
     monkeypatch.setattr(server.disable_algif_aead, "configure", lambda: calls.append("hardening"))
-    monkeypatch.setattr(server.image_store, "ensure_shared_store", lambda: calls.append("image-store"))
-    monkeypatch.setattr(server.image_store, "seed_base_image", lambda: calls.append("base-image"))
     monkeypatch.setattr(server.firewall, "configure", lambda *_: calls.append("firewall"))
     monkeypatch.setattr(server.fail2ban, "configure", lambda *_: calls.append("fail2ban"))
     monkeypatch.setattr(server.unattended_upgrades, "configure", lambda: calls.append("upgrades"))
@@ -30,8 +28,6 @@ def test_server_setup_runs_only_server_operations(monkeypatch):
         "etckeeper-init",
         "apparmor",
         "hardening",
-        "image-store",
-        "base-image",
         "firewall",
         "fail2ban",
         "upgrades",

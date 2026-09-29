@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 use std::io::{self, BufRead, BufReader, ErrorKind, Write};
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command, Stdio};
 use std::thread;
@@ -60,13 +60,17 @@ pub fn build(config: &Bones) -> Result<BuildContext> {
         config,
         environment: &environment,
     };
-    let mut container = PodmanContainer::start(&input)?;
-    for script in scripts {
-        let name = script.file_name().and_then(|value| value.to_str()).unwrap_or("<unknown>");
-        println!("Running local build script {name}...");
-        container.run_script(&script, build_timeout_seconds(config))?;
-    }
-    container.remove()?;
+    let mut container = DockerContainer::start(&input)?;
+    let build_result = (|| {
+        for script in scripts {
+            let name = script.file_name().and_then(|value| value.to_str()).unwrap_or("<unknown>");
+            println!("Running local build script {name}...");
+            container.run_script(&script, build_timeout_seconds(config))?;
+        }
+        Ok(())
+    })();
+    let cleanup_result = container.remove();
+    finish_with_cleanup(build_result, cleanup_result)?;
     Ok(BuildContext { context, revision })
 }
 
@@ -106,27 +110,32 @@ pub fn local_cache_path(site: &str) -> PathBuf {
     build_contract::cache_path(&paths::bones_cache_root().join("build"), site)
 }
 
-pub fn podman_available_rootless() -> Result<()> {
-    let output = Command::new("podman")
-        .args(["info", "--format", "{{.Host.Security.Rootless}}"])
-        .output()
-        .context("Failed to run podman info")?;
-    if !output.status.success() || String::from_utf8_lossy(&output.stdout).trim() != "true" {
-        bail!("Podman must be available in rootless mode for local builds");
+pub fn docker_available_linux() -> Result<()> {
+    let output = docker_info_command().output().context("Failed to run docker info")?;
+    if !output.status.success() || String::from_utf8_lossy(&output.stdout).trim() != "linux" {
+        bail!("Docker must be reachable and configured for Linux containers for local builds");
     }
     Ok(())
 }
 
-pub fn podman_image_available() -> Result<bool> {
-    let status = Command::new("podman")
-        .args(["image", "exists", BUILDER_IMAGE])
+pub fn docker_info_command() -> Command {
+    let mut command = Command::new("docker");
+    command.arg("info").args(["--format", "{{.OSType}}"]);
+    command
+}
+
+pub fn docker_image_available() -> Result<bool> {
+    let status = Command::new("docker")
+        .args(["image", "inspect", BUILDER_IMAGE])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .context("Failed to inspect local builder image")?;
     Ok(status.success())
 }
 
 pub fn target_probe_command() -> Command {
-    let mut command = Command::new("podman");
+    let mut command = Command::new("docker");
     command.args(["run", "--rm", "--pull=never", "--platform", TARGET_PLATFORM_NAME]).arg(BUILDER_IMAGE).arg("true");
     command
 }
@@ -135,7 +144,7 @@ pub fn probe_target_execution() -> Result<()> {
     let status = target_probe_command().status().context("Failed to probe local builder target execution")?;
     if !status.success() {
         bail!(
-            "Pinned builder image cannot execute for target {TARGET_PLATFORM_NAME}; install compatible Podman emulation (for example binfmt/QEMU) or use a compatible host"
+            "Pinned builder image cannot execute for target {TARGET_PLATFORM_NAME}; install compatible Docker emulation (for example binfmt/QEMU) or use a compatible host"
         );
     }
     Ok(())
@@ -150,7 +159,7 @@ pub struct ContainerStart<'a> {
 }
 
 pub fn create_command(input: &ContainerStart<'_>, name: &str, environment_file: &Path) -> Command {
-    let mut command = Command::new("podman");
+    let mut command = Command::new("docker");
     command
         .arg("run")
         .args(["-d", "--pull=never", "--platform", TARGET_PLATFORM_NAME, "--security-opt=no-new-privileges"])
@@ -172,17 +181,20 @@ pub fn create_command(input: &ContainerStart<'_>, name: &str, environment_file: 
     command
 }
 
-struct PodmanContainer {
+struct DockerContainer {
     source: PathBuf,
+    source_ownership: MountOwnership,
     name: String,
     _environment_file: NamedTempFile,
     removed: bool,
 }
 
-impl PodmanContainer {
+impl DockerContainer {
     fn start(input: &ContainerStart<'_>) -> Result<Self> {
-        podman_available_rootless()?;
-        let pull_status = Command::new("podman")
+        let source_ownership = mount_ownership(input.source)?;
+        // Use the fresh source identity to repair an already-contaminated cache too.
+        docker_available_linux()?;
+        let pull_status = Command::new("docker")
             .args(["pull", "--platform", TARGET_PLATFORM_NAME, BUILDER_IMAGE])
             .status()
             .context("Failed to pull local builder image")?;
@@ -196,21 +208,26 @@ impl PodmanContainer {
             .status()
             .with_context(|| format!("Failed to start local build container {name}"))?;
         if !status.success() {
-            let _ = remove_container(input.source, &name);
+            let _ = force_remove_container(input.source, &name);
             bail!("Failed to start local build container {name}: {status}");
         }
-        let container =
-            Self { source: input.source.to_path_buf(), name, _environment_file: environment_file, removed: false };
-        if let Err(error) = container.copy_deployment_tree(input.deployment) {
-            return Err(error);
+        let mut container = Self {
+            source: input.source.to_path_buf(),
+            source_ownership,
+            name,
+            _environment_file: environment_file,
+            removed: false,
+        };
+        match container.copy_deployment_tree(input.deployment) {
+            Ok(()) => Ok(container),
+            Err(error) => finish_with_cleanup(Err(error), container.remove()).map(|()| container),
         }
-        Ok(container)
     }
 
     fn run_script(&self, script: &Path, timeout: Option<u64>) -> Result<()> {
         let input =
             fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
-        let mut child = Command::new("podman")
+        let mut child = Command::new("docker")
             .current_dir(&self.source)
             .args(["exec", "-i", &self.name, "bash", "-c", "umask 0002; exec bash -s"])
             .stdin(Stdio::from(input))
@@ -218,8 +235,8 @@ impl PodmanContainer {
             .stderr(Stdio::piped())
             .spawn()
             .with_context(|| format!("Failed to execute build script {}", script.display()))?;
-        let stdout = child.stdout.take().context("Podman stdout was not piped")?;
-        let stderr = child.stderr.take().context("Podman stderr was not piped")?;
+        let stdout = child.stdout.take().context("Docker stdout was not piped")?;
+        let stderr = child.stderr.take().context("Docker stderr was not piped")?;
         let stdout_thread = thread::spawn(move || stream_output(stdout, false));
         let stderr_thread = thread::spawn(move || stream_output(stderr, true));
         let started = Instant::now();
@@ -249,7 +266,7 @@ impl PodmanContainer {
             .spawn()
             .with_context(|| format!("Failed to archive deployment files from {}", deployment.display()))?;
         let archive_stdout = archive.stdout.take().context("Deployment archive stdout was not piped")?;
-        let extract_status = Command::new("podman")
+        let extract_status = Command::new("docker")
             .current_dir(&self.source)
             .args(["exec", "-i", &self.name, "sh", "-c", &deployment_tar_extract_command()])
             .stdin(Stdio::from(archive_stdout))
@@ -266,16 +283,16 @@ impl PodmanContainer {
         if self.removed {
             return Ok(());
         }
-        remove_container(&self.source, &self.name)?;
+        remove_container(&self.name, &self.source, self.source_ownership)?;
         self.removed = true;
         Ok(())
     }
 }
 
-impl Drop for PodmanContainer {
+impl Drop for DockerContainer {
     fn drop(&mut self) {
         if !self.removed {
-            let _ = remove_container(&self.source, &self.name);
+            let _ = remove_container(&self.name, &self.source, self.source_ownership);
         }
     }
 }
@@ -292,16 +309,71 @@ fn write_environment_file(environment: &[(String, String)]) -> Result<NamedTempF
     Ok(file)
 }
 
-fn remove_container(source: &Path, name: &str) -> Result<()> {
-    let status = Command::new("podman")
+#[derive(Clone, Copy)]
+struct MountOwnership {
+    uid: u32,
+    gid: u32,
+}
+
+fn mount_ownership(path: &Path) -> Result<MountOwnership> {
+    let metadata = fs::symlink_metadata(path)
+        .with_context(|| format!("Failed to inspect local build mount {}", path.display()))?;
+    Ok(MountOwnership { uid: metadata.uid(), gid: metadata.gid() })
+}
+
+fn normalize_mount_ownership_command(name: &str, ownership: MountOwnership) -> Command {
+    let mut command = Command::new("docker");
+    let ownership = format!("{}:{}", ownership.uid, ownership.gid);
+    command
+        .args(["exec", "--user", "0:0", name, "sh", "-c"])
+        .arg(format!("find -P {SOURCE_MOUNT} {CACHE_MOUNT} -exec chown -h {ownership} {{}} +"));
+    command
+}
+
+fn remove_container(name: &str, source: &Path, ownership: MountOwnership) -> Result<()> {
+    let ownership_result = normalize_mount_ownership_command(name, ownership)
+        .status()
+        .with_context(|| format!("Failed to restore local build mount ownership in container {name}"))
+        .and_then(|status| {
+            if status.success() {
+                Ok(())
+            } else {
+                bail!("Failed to restore local build mount ownership in container {name}: {status}")
+            }
+        });
+    let removal_result = force_remove_container(source, name);
+    if let Err(error) = ownership_result {
+        return Err(error);
+    }
+    removal_result
+}
+
+fn force_remove_container(source: &Path, name: &str) -> Result<()> {
+    let status = force_remove_command(name)
         .current_dir(source)
-        .args(["rm", "--force", "--time", "0", "--ignore", name])
         .status()
         .with_context(|| format!("Failed to remove local build container {name}"))?;
     if !status.success() {
         bail!("Failed to remove local build container {name}: {status}");
     }
     Ok(())
+}
+
+fn force_remove_command(name: &str) -> Command {
+    let mut command = Command::new("docker");
+    command.args(["rm", "--force", "--time", "0", "--ignore", name]);
+    command
+}
+
+fn finish_with_cleanup(primary: Result<()>, cleanup: Result<()>) -> Result<()> {
+    match (primary, cleanup) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Ok(()), Err(error)) => Err(error.context("Failed to clean up local build container")),
+        (Err(error), Ok(())) => Err(error),
+        (Err(error), Err(cleanup_error)) => {
+            Err(error.context(format!("Local build container cleanup also failed: {cleanup_error:#}")))
+        }
+    }
 }
 
 fn unique_container_name(project: &str) -> String {

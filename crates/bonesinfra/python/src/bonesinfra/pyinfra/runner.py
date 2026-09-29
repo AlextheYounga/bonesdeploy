@@ -21,6 +21,7 @@ from bonesinfra.cli.output import (
     stop_live_output,
 )
 from bonesinfra.config.context import DeployContext, ServerContext
+from bonesinfra.services.linux.validation import validate_supported_host
 
 
 def run(
@@ -90,6 +91,7 @@ def _plan(ctx, deploy, state, config, inventory, target_host, quiet):
         ctx_host.use(target_host),
         activity("planning deploy operations") if not quiet else nullcontext(),
     ):
+        validate_supported_host()
         return deploy(ctx)
 
 

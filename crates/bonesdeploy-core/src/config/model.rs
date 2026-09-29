@@ -233,11 +233,7 @@ pub const LARAVEL_TEMPLATE: &str = "laravel";
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Build {
-    /// Selects whether application build scripts run on the deploy host or
-    /// before the artifact is uploaded.
-    #[serde(default)]
-    pub mode: BuildMode,
-    /// Maximum seconds each build script may run before systemd terminates it.
+    /// Maximum seconds each local build script may run before it is terminated.
     /// `0` disables the timeout.
     #[serde(default = "default_build_timeout_seconds")]
     pub timeout_seconds: u64,
@@ -245,19 +241,8 @@ pub struct Build {
 
 impl Default for Build {
     fn default() -> Self {
-        Self { mode: BuildMode::Remote, timeout_seconds: BUILD_TIMEOUT_SECONDS_DEFAULT }
+        Self { timeout_seconds: BUILD_TIMEOUT_SECONDS_DEFAULT }
     }
-}
-
-/// Where the native build contract is executed.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum BuildMode {
-    /// Build after source export on the remote host.
-    #[default]
-    Remote,
-    /// Build locally and send the resulting release context to the host.
-    Local,
 }
 
 fn default_build_timeout_seconds() -> u64 {
@@ -291,20 +276,6 @@ pub fn validate_runtime(runtime: &Runtime) -> Result<()> {
     }
     if !(1..=3600).contains(&runtime.compose_wait_timeout) {
         bail!("compose_wait_timeout must be between 1 and 3600")
-    }
-    Ok(())
-}
-
-/// Validates the combination of runtime backend and build mode.
-///
-/// Local artifacts require the native runtime because Compose owns its own
-/// image build and deployment lifecycle.
-///
-/// # Errors
-/// Returns an error when local builds are selected for the Docker backend.
-pub fn validate_build_mode(runtime: &Runtime, build: &Build) -> Result<()> {
-    if build.mode == BuildMode::Local && runtime.backend == RuntimeBackend::Docker {
-        bail!("local build mode requires the native runtime backend")
     }
     Ok(())
 }
