@@ -2,203 +2,262 @@
 
 ## Current Behavior
 
-The completed artifact foundation supports `BuildMode::Remote` and
-`BuildMode::Local`, with omitted mode defaulting to remote. Local mode exports a
-configured branch commit, removes the root `.env`, runs numbered scripts in a
-rootless Podman container, packages a strict gzip tar artifact, and streams it
-to BonesRemote. Remote mode preserves server checkout and rootless-Podman build
-execution.
+Native deployment resolves and exports the configured local branch commit,
+builds numbered scripts in local Docker, packages the complete resulting tree,
+synchronizes deployment configuration, and streams a framed artifact to
+BonesRemote. The Docker runner uses a pinned Linux `x86_64` image, scoped cache,
+explicit public build environment, per-script timeout, detached container,
+repeated Docker preflight, and ownership-restoring cleanup.
 
-BonesRemote accepts ordinary source deployments and framed artifact deployments.
-Both converge on `DeploymentLifecycleCoordinator` for promotion, shared-state
-wiring, prepare, sealing, preflight, activation, restart, rollback, pruning, and
-cleanup. Artifact receipt validates manifest identity, revision, target, builder,
-length, digest, paths, entry types, symlinks, file count, and extracted size.
+BonesRemote still resolves the configured branch in a production bare
+repository before accepting a native artifact and rejects an artifact whose
+revision does not match that separately pushed ref. Docker Compose deployment
+still takes the ordinary no-artifact path: BonesRemote exports the pushed source
+revision, runs Compose `config`, `pull`, and `build` on production, then promotes
+and activates the release.
 
-BonesInfra provisions build users, linger, cgroup limits, rootless storage,
-caches, and the shared Podman image store for remote-mode sites. Local-mode sites
-omit per-site build resources, but mixed-mode support keeps server-wide builder
-dependencies and mode-aware diagnostics.
+Both paths converge on `DeploymentLifecycleCoordinator` for staging, candidate
+materialization, shared-state wiring, prepare, sealing, preflight, activation,
+restart, rollback, pruning, cancellation, and cleanup. The persisted phases
+still use source-export and build terminology even when those operations already
+happened locally.
 
-Production system diagnostics currently recognize Debian and Ubuntu but do not
-express the settled Debian 12+ and Ubuntu 24.04+ minimum-version contract.
+BonesInfra provisions no native build users, caches, Podman state, or builder
+image store. It still provisions a bare repository for every site and carries
+repository and branch fields through paths, contexts, manifests, deletion, and
+diagnostics. It provisions the production runtime, services, security policy,
+backups, and operational infrastructure required after a release arrives.
+
+Framework artifacts are complete only inconsistently. Laravel installs Composer
+dependencies locally, while Django installs application requirements during
+remote prepare. Node-based artifacts retain build-time dependency trees and
+caches even when their production runtime needs only compiled or standalone
+output.
 
 ## Intended Behavior
 
-Native deployment has one path. `bonesdeploy deploy` resolves and exports the
-configured branch commit, runs its build scripts locally in Docker, creates the
-release artifact, synchronizes deployment configuration, and streams the framed
-artifact to BonesRemote. There is no build-mode setting and no remote source
-deployment path to select or fall back to.
+All application builds happen locally. `bonesdeploy deploy` resolves and exports
+the configured branch commit once, constructs the selected runtime's complete
+artifact with local Docker, synchronizes deployment configuration, and streams
+one framed deployment to BonesRemote. Production never checks out application
+source, resolves an application Git ref, downloads application dependencies,
+pulls Compose images, or builds application code or images.
 
-The Docker runner uses the pinned Linux `x86_64` Debian builder image, fixed
-`/workspace` paths, project- and contract-scoped cache, ordered scripts,
-per-script timeout, streamed output, and unconditional container cleanup. It
-passes fixed non-secret build-contract metadata and values explicitly declared
-in the committed `.env.build` file. It does not inherit the host environment or
-expose host credentials, home directories, production configuration, privileged
-mode, devices, or the Docker socket. `.env.build` is public build configuration,
-not a secret channel.
+Native artifacts contain a complete runnable release tree. Framework build
+scripts install dependencies and compile all deterministic output locally, then
+remove build-only dependency trees, caches, and numbered build scripts that the
+runtime does not need. Remote prepare performs only production-state operations
+such as shared-path setup, migrations, production-secret-based configuration,
+and runtime validation.
 
-BonesRemote accepts the artifact form as the only native deployment input. It
-retains exact pushed-revision verification, bounded safe receipt, persisted
-deployment phases, promotion, prepare, activation, rollback, pruning,
-cancellation, and cleanup. Native deployment no longer checks out or builds
-source on production.
+Compose artifacts contain the committed release tree, a generated BonesDeploy
+override, an image inventory, and a bounded Docker image archive. BonesDeploy
+runs Compose validation, pull, and build locally for `linux/amd64` with the same
+stable project name used remotely. It discovers every resulting service image,
+assigns an immutable tag derived from site, service, and revision, and writes an
+override selecting those tags. Production validates and loads the archive and
+starts the stack with `--no-build --pull never`.
 
-BonesInfra provisions only runtime identities and release infrastructure for
-native sites. It does not install native builder images or create application
-build users, linger sessions, rootless container storage, or server build caches.
+The production release directory retains the original Compose files for
+operational inspection and bind-mounted release content. The generated override
+is always passed last and is owned by the release protocol, not the project.
+Rollback activates the previous release directory and its immutable image tags.
+Failed-release cleanup and release pruning remove tags owned solely by the
+discarded release while allowing Docker to retain shared layers still referenced
+by another release.
 
-Provisioning and diagnostics require Debian 12 or newer or Ubuntu 24.04 or newer
-for production hosts. Unsupported systems fail with an explicit supported-host
-message before site mutation proceeds.
+Local Git is authoritative for source selection. The full commit hash remains in
+the artifact manifest, release name, deployment state, status, and logs as audit
+metadata. Production does not maintain an application repository or require a
+first push. Compose and native sites use the same artifact-only BonesRemote
+deploy entry point.
+
+The local Docker runner provides a clean compatible build environment rather
+than production tenant isolation. It retains the pinned image and platform,
+explicit environment, absence of production secrets and ambient variables,
+narrow project/cache inputs, timeout, streamed output, and reliable cleanup. Its
+command lifecycle is simplified where direct foreground Docker execution can
+replace detached containers, redundant probes, copied deployment trees, and
+ownership-repair machinery without weakening those guarantees.
+
+BonesRemote treats all artifact bytes as untrusted privileged input. It retains
+strict framing, identity, digest, path, entry-type, symlink, conflict, file-count,
+compressed-size, and expanded-size enforcement. The manifest identifies artifact
+kind and enforceable payload contents. It does not claim that a client-supplied
+builder image identifier proves build provenance.
+
+BonesInfra provisions the production machine and execution environment only. It
+retains supported-system validation, server hardening, deploy/runtime identities,
+BonesRemote and constrained sudo, release/shared/configuration paths, language
+runtimes, Nginx, systemd, AppArmor, Docker Engine and Compose runtime, backups,
+SSL, tunnels, manifests, deletion, and patches. It removes application bare
+repositories and repository-derived configuration, readiness, and inventory.
 
 ## Approach
 
-Remove `BuildMode` from canonical configuration, deployment transport,
-provisioning requests, initialization arguments, generated environment files,
-and diagnostics. Delete remote-default deserialization and mixed-mode branches
-rather than retaining compatibility aliases. Route native deployment directly
-through the artifact path.
+Extend the artifact protocol with an explicit native or Compose artifact kind
+and kind-specific validated metadata. Keep the common framed manifest, declared
+length, SHA-256, and safe filesystem extraction. Add a bounded Compose image
+payload and image inventory whose service names and release tags are validated
+against the site and revision before invoking Docker.
 
-Replace the Podman command implementation in the local build module with a
-focused Docker implementation. Verify that Docker is reachable, uses Linux
-containers, can pull the exact pinned image, and can execute the required
-`linux/amd64` target. Continue to use `--pull=never` after the verified pull and
-retain `no-new-privileges`, narrow mounts, timeout handling, output streaming,
-and unconditional cleanup. Do not introduce a generic multi-engine abstraction.
+Refactor local source export into the common start of every deployment. Native
+projects execute their numbered build scripts and package the pruned result.
+Compose projects execute Docker Compose against the exported context with
+controlled `linux/amd64` defaults and `.env.build`, collect both locally built
+and pulled service images, add immutable release tags, generate the protected
+override, and save those exact tags into the artifact. Production `.env` remains
+absent from every local build.
 
-Retain the shared `.env.build` parser and project its explicitly declared values
-alongside fixed public contract values owned by `bonesdeploy-core`. Continue to
-reject reserved container-controlled names and never merge the ambient host or
-root runtime environment. Build scripts that require private dependency
-credentials are unsupported by this release.
+Make framework build and prepare scripts obey the complete-artifact boundary.
+Move Django dependency installation into local build output. Preserve remote
+migrations and environment-dependent framework work. Add framework-specific
+pruning after successful builds, including removal of Laravel root
+`node_modules`, Next/Nuxt/SvelteKit/Vue build caches and unnecessary dependency
+trees according to their runtime output, and numbered native build scripts.
 
-Remove the remote-source coordinator input and native checkout/build stages.
-Keep Git revision resolution on the server solely to prove that the uploaded
-artifact corresponds to the configured pushed branch. Preserve artifact safety
-checks and all lifecycle behavior after validated receipt.
+Replace BonesRemote's source/artifact input split with one artifact input.
+Receive and validate the payload, materialize the release tree, load and verify
+Compose images when present, promote the candidate, wire shared state, run
+native prepare where applicable, seal, preflight, activate, and restart. Remove
+server repository resolution, archive export, Compose pull/build, and source
+deployment routing. Start Compose with builds and pulls disabled.
 
-Remove BonesInfra native build-user creation, linger, cgroup slice, rootless
-storage, cache, Podman readiness, and native builder image-store requirements.
-Retain runtime users, shared state, service configuration, release ownership,
-and every resource required after artifact import. Rebuild the packaged
-BonesInfra wheel after Python changes.
+Rename persisted phases and coordinator operations around remote facts rather
+than historical source/build operations. Preserve compatibility only with state
+written by the current breaking-release branch where concrete recovery requires
+it; do not retain obsolete application build behavior.
 
-Make supported production distributions a shared explicit policy in BonesInfra
-provisioning and BonesRemote system diagnostics. Parse distribution identity and
-major version, accept Debian major versions at least 12 and Ubuntu releases at
-least 24.04, and reject all others with the same documented support statement.
+Remove repository fields and resources from canonical remote/provisioning
+transports and BonesInfra. Site setup creates control-plane, project, release,
+shared, placeholder, backup, and runtime resources without a bare repository.
+Local initialization no longer creates a deployment Git remote, and setup and
+doctor no longer instruct users to make a first push.
 
-Update ignored native framework E2E setup to use the sole artifact path without
-mode configuration. Preserve first deployment, second release, and failed
-activation rollback scenarios. Do not execute ignored E2E tests during agent
-implementation.
+Keep the existing deploy SSH principal and narrowly anchored sudo policy, but
+rename Git-specific terminology where it describes artifact transport rather
+than source hosting. Rebuild the packaged BonesInfra wheel after Python changes.
 
 ## Responsibilities And Boundaries
 
-`bonesdeploy-core` owns the fixed build contract, builder identity, target
-platform, artifact manifest, and framing types. It contains no build-mode or
-container-engine selection.
+`bonesdeploy-core` owns artifact framing, enforceable manifest types, target
+platform, explicit build environment vocabulary, and shared validation. It does
+not model server application repositories or unverifiable build attestation.
 
-`bonesdeploy` owns clean local Git export, Docker preflight and execution, local
-cache, artifact packaging, progress and failures, and SSH upload. Docker is a
-local execution dependency, not a production dependency.
+`bonesdeploy` owns local committed-source selection, native and Compose build
+execution, build cache, framework pruning, Compose image collection and immutable
+tagging, artifact packaging, progress, failures, and SSH upload.
 
-`bonesremote` owns pushed-revision verification, privileged artifact receipt,
-safe extraction, site locking, lifecycle state, promotion, prepare, activation,
-rollback, pruning, cancellation, and cleanup. It never executes native build
-scripts.
+`bonesremote` owns privileged artifact receipt, safe extraction, Compose image
+loading, site locking, lifecycle state, promotion, production preparation,
+activation, rollback, image/release pruning, cancellation, and cleanup. It never
+builds application source or pulls application images.
 
-BonesInfra owns production operating-system validation and the runtime resources
-required to host imported artifacts. It does not provision native build
-resources.
+BonesInfra owns production operating-system policy and resources required to run
+imported releases. It installs runtime interpreters and services but does not
+install application dependencies into a release or provision source/build
+infrastructure.
 
-Framework build scripts own compilation and dependency production without
-secret inputs. Prepare scripts own environment-dependent runtime preparation
-and persistent-state transitions.
+Framework build scripts own application dependency installation, compilation,
+runtime artifact layout, and removal of build-only content. Prepare scripts own
+production-state transitions and environment-dependent runtime preparation.
 
 ## Affected Areas
 
-- Build configuration and transport models in `bonesdeploy-core`, including
-  removal of `BuildMode` while retaining explicit `.env.build` projection.
-- BonesDeploy init, deploy, doctor, local build, Git, artifact, and tests.
-- BonesRemote deploy entry points, coordinator inputs, native checkout/build
-  modules, doctor, cancellation, security collection, and tests.
-- BonesInfra request/context models, user and image provisioning, manifests,
-  supported-system validation, sudoers assets, tests, and generated wheel.
-- Ignored native framework E2E setup and validation documentation.
-- README, context, architecture, security, support, and upgrade documentation.
+- Artifact and configuration contracts in `bonesdeploy-core`, including artifact
+  kind, Compose image inventory, repository-field removal, and lifecycle terms.
+- BonesDeploy init, deploy, doctor, local Docker execution, Git export, native
+  packaging, Compose build/image export, progress, and tests.
+- Framework build/prepare assets for complete runtime output and pruning.
+- BonesRemote deploy CLI and coordinator, artifact receipt, Compose image load,
+  runtime start, rollback, failed-release cleanup, pruning, doctor, state, and
+  tests.
+- BonesInfra request/context/path models, site directories, manifests, deletion,
+  runtime provisioning, packages, tests, and generated wheel.
+- E2E setup and scenarios for artifact-only native and Compose first deploy,
+  subsequent deploy, failed activation, rollback, and pruning.
+- README, context, architecture, security, framework, and operational docs.
 
 ## Decisions
 
-- This is a breaking release. Compatibility with remote-build configuration and
-  previously provisioned native build resources is not retained.
-- Docker is the only local build engine. Podman is not an alternative or
-  fallback, and no container-engine abstraction is introduced.
-- Local native artifacts are the only native deployment input. Production hosts
-  never build native application source.
-- Build scripts receive fixed public contract metadata and committed
-  `.env.build` values only. Ambient host variables, production variables, and
-  credentials are excluded, and `.env.build` is documented as non-secret.
-- Docker's local daemon trust is accepted. The build container still receives no
-  privileged mode, Docker socket, host home directory, or credential mounts.
-- Git remains authoritative for revision provenance, and server-side branch
-  comparison remains mandatory before artifact promotion.
-- Production support is exactly Debian 12+ and Ubuntu 24.04+. Broader Linux
-  support is not inferred from Docker build-host portability.
-- Compose artifact support and previous-installation migration are separate
-  future changes, not compatibility requirements for this release.
+- Native and Docker Compose releases build locally and deploy only through the
+  artifact protocol.
+- Production application bare repositories and first-push workflows are removed.
+- Local committed Git state is the sole source-selection boundary; revision is
+  retained as audit metadata rather than compared with a production ref.
+- Compose service images travel over SSH in the deployment artifact. A registry
+  is not part of this change.
+- Compose images use immutable release-specific tags, and remote Compose start
+  disables both builds and pulls so rollback remains release-correct.
+- `.env.build` is public build configuration for native tools and Compose build
+  interpolation. Production `.env` and ambient host variables remain excluded.
+- Complete artifacts include application dependencies. Remote prepare cannot
+  install or compile them.
+- Framework-specific artifact pruning is required, not deferred.
+- Local Docker is a compatibility/reproducibility dependency, not a production
+  isolation boundary. Secret exclusion and narrow tool-owned inputs remain
+  mandatory.
+- Artifact receipt remains a strict privileged trust boundary.
+- BonesInfra remains the runtime and machine provisioner; friendly public CLI
+  commands and operational inspection remain in scope and are not cleanup
+  targets.
+- Production support remains Debian 12+ or Ubuntu 24.04+ on `x86_64`.
+- Previous-installation migration, registries, private build credentials,
+  signing, SBOMs, and resumable upload remain separate changes.
 
 ## Risks
 
-- Docker daemon access is highly privileged on Linux. Command construction must
-  never expose the socket or permit project-controlled Docker arguments.
-- Supply-chain code can read source, mutate artifacts, use the network, consume
-  resources, and poison persistent caches. Secret exclusion limits credential
-  theft but does not make application dependencies trustworthy.
-- A project can mistakenly commit a secret to `.env.build`, where build scripts
-  and dependencies can read or exfiltrate it. Generated content, documentation,
-  and diagnostics must state that every value is public build configuration;
-  private dependency credentials remain unsupported.
-- Docker Desktop and non-`x86_64` machines depend on Linux VM and emulation
-  behavior. Passing the execution probe establishes target capability but does
-  not constitute native Windows support.
-- Removing server build resources can accidentally delete helpers still used
-  for runtime release ownership or Compose. Final dependency review must
-  distinguish native build-only behavior from shared lifecycle behavior.
-- Distribution version parsing errors can reject supported hosts or accept
-  unsupported hosts. Tests must cover exact boundaries and malformed metadata.
-- Complete artifacts remain large. Docker does not change upload, temporary
-  storage, or remote extraction pressure.
+- Compose image archives can be substantially larger than native filesystem
+  artifacts. Limits must remain explicit while accommodating a realistic
+  multi-service release, and interrupted uploads must leave removable state.
+- Compose files can vary topology through interpolation and profiles. Public
+  build inputs must determine the complete image topology; production secrets
+  cannot select an image that was absent from the artifact.
+- Mutable Compose tags would silently break rollback. Generated overrides,
+  remote start commands, pruning, and tests must prove release-specific image
+  identity end to end.
+- Loading images mutates Docker state before activation. Abort and pruning paths
+  must remove release-owned tags without deleting layers or images used by the
+  active or previous release.
+- Framework pruning can remove runtime-required dependencies. Each framework
+  needs observable runtime-output tests rather than a universal exclusion rule.
+- Locally built native extensions must be compatible with the supported runtime
+  and production ABI. Builder runtimes and production runtime versions must stay
+  aligned.
+- Simplifying Docker execution can regress timeout, output, cache, ownership, or
+  cleanup behavior. Tests must preserve outcomes rather than the detached
+  container implementation.
+- Removing repository state touches provisioning, deletion, doctor, setup,
+  configuration, and recovery assumptions across Rust and Python.
 
 ## Validation
 
-- Core and configuration tests prove there is no build-mode field, default, or
-  remote compatibility path and that build environment projection contains only
-  fixed public contract values and explicitly declared `.env.build` entries,
-  never ambient, runtime, backup, or credential variables.
-- Local build tests prove Docker commands use the pinned digest and
-  `linux/amd64`, reject unavailable or non-Linux Docker engines, expose no Docker
-  socket or secret-bearing paths, apply timeouts, stream output, scope caches,
-  and remove containers and protected temporary files on every path.
-- Deploy tests prove every native deployment builds before SSH, uploads the
-  framed artifact, and has no remote-build fallback or ordinary native source
-  deploy command.
-- BonesRemote tests prove artifact deployment retains revision verification,
-  bounded safe receipt, lifecycle phases, prepare, activation rollback,
-  cancellation, and cleanup without build-user, Podman, or checkout readiness.
-- BonesInfra tests prove native sites have runtime resources but no build user,
-  linger, build slice, rootless storage, build cache, Podman verification, or
-  builder image-store requirement.
-- Production-platform tests accept Debian 12 and newer and Ubuntu 24.04 and newer
-  while rejecting older versions, other distributions, missing identity, and
-  malformed versions before mutation.
-- Ignored E2E definitions cover first deploy, second release, and failed
-  activation rollback for the supported native framework matrix. They compile
-  but are not agent-executed.
-- Run focused Rust and Python tests, the full non-E2E suites, Clippy, Rustfmt,
-  shfmt, Ruff checks and formatting, regenerate and validate the BonesInfra
-  wheel, run `git diff --check`, and review the final diff for obsolete remote or
-  Podman behavior, secret exposure, unsafe receipt, and unsupported-host drift.
+- Core protocol tests round-trip native and Compose manifests and reject wrong
+  kinds, sites, revisions, lengths, digests, image inventories, tags, paths,
+  entry types, conflicts, symlinks, and resource-limit violations.
+- Native build tests prove complete dependency output, framework-specific
+  pruning, explicit build variables, secret exclusion, target compatibility,
+  timeout, output, cache, ownership, and cleanup.
+- Compose tests prove local `config`, pull, and build use the exported commit,
+  controlled environment, stable project name, and `linux/amd64`; every service
+  image is inventoried, immutably tagged, saved, loaded, and selected by the
+  generated override.
+- Remote Compose tests prove deployment and service restart use `--no-build
+  --pull never`, perform no network pull or build, preserve release-specific
+  rollback, and remove only pruned or failed release tags.
+- Lifecycle tests prove both artifact kinds share receipt, locking, promotion,
+  activation, failure rollback, cancellation, pruning, and cleanup without
+  source-export or production-build phases.
+- BonesInfra tests prove no backend provisions or declares a bare repository,
+  branch ref, build user, builder cache, builder image, or application build
+  operation while all runtime, service, security, backup, SSL, manifest, and
+  deletion responsibilities remain intact.
+- CLI and documentation tests prove initialization, setup, doctor, and deploy no
+  longer create a deployment Git remote or require a first push, while public
+  operational commands remain available.
+- Ignored E2E definitions cover native and Compose first deploy, second release,
+  failed activation, rollback, and old-release/image pruning. They compile but
+  are not agent-executed.
+- Run focused Rust and Python tests, full non-E2E suites, Clippy with warnings
+  denied, Rustfmt, shfmt, Ruff checks and formatting, generated-wheel validation,
+  `git diff --check`, and final architecture/security review.
