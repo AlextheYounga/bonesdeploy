@@ -7,6 +7,10 @@ next breaking release. The local BonesDeploy CLI builds the committed
 application in Docker and uploads the completed native release or Compose image
 artifact. BonesRemote does not retain a server-side application build path.
 
+Synchronize only the release and backend-specific runtime values BonesRemote
+still consumes. Local build configuration and arbitrary framework settings do
+not belong in the remote control-plane snapshot.
+
 Support only Debian 12 or newer and Ubuntu 24.04 or newer as production host
 operating systems. Existing installations and configuration formats do not
 constrain this breaking release; migration support can be designed separately.
@@ -103,6 +107,8 @@ run prepared images.
   trees, caches, and scripts that the selected production runtime does not use.
 - Retain one BonesRemote artifact receipt and release lifecycle for native and
   Compose releases.
+- Replace the complete local runtime model in config sync with a narrow native
+  or Docker remote runtime descriptor, and remove unused remote prepare inputs.
 - Enforce and document Debian 12+ and Ubuntu 24.04+ production support in
   provisioning and diagnostics.
 - Update focused, regression, ignored E2E, architecture, security, and user
@@ -127,6 +133,8 @@ run prepared images.
 - Artifact input remains untrusted at the privileged boundary. BonesRemote
   retains framing, size, digest, path, entry-type, symlink, file-count, and
   extracted-size enforcement before promotion.
+- BonesInfra provisioning requests and production `shared/.env` secrets remain
+  separate from the narrow BonesRemote deployment configuration contract.
 - Prepare remains server-side with its current runtime identity and shared-state
   access, but may not install application dependencies or compile the release.
 - Compose images are built for `linux/amd64`, receive immutable release-specific

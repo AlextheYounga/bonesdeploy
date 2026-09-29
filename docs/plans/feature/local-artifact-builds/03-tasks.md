@@ -7,6 +7,38 @@ Clarification `06-unified-local-artifact-lifecycle-clarity.md` now supersedes
 production Git revision comparison, Compose source builds, and deferred
 framework pruning. Its pending follow-up is the authoritative remaining
 execution state.
+Clarification `07-narrow-remote-config-clarity.md` narrows the completed
+artifact lifecycle's control-plane sync to values BonesRemote still consumes.
+
+## Narrow Remote Configuration Follow-Up
+
+### Implementation
+
+- [ ] Replace the complete `Runtime` in `RemoteDeploymentConfig` with a tagged
+  native or Docker descriptor that carries only backend-specific remote values.
+- [ ] Update BonesRemote lifecycle, runtime, status, and doctor consumers to use
+  the narrow descriptor while deriving only the minimal internal site config.
+- [ ] Remove Python version and arbitrary runtime-extra handling from remote
+  prepare and control-plane persistence; retain the Rails Ruby migration input.
+- [ ] Remove obsolete tests, imports, and direct dependencies exposed by the
+  narrowed control-plane contract, and update architecture documentation where
+  it describes config sync.
+
+### Validation
+
+- [ ] Add focused serialization tests proving native and Docker config sync omit
+  local build, framework, permission, secret, and unrelated backend values and
+  reject the old broad snapshot shape.
+- [ ] Run focused core, BonesDeploy, and BonesRemote tests, then all non-E2E Rust
+  and Python tests without executing E2E scenarios.
+- [ ] Run `cargo clippy`, `cargo fmt`, `shfmt -w .`, Python Ruff checks and
+  formatting, generated-wheel validation when applicable, and `git diff --check`.
+
+### Completion
+
+- [ ] Review the final diff for stale remote-build configuration, accidental
+  provisioning or secret coupling, compatibility code, dead dependencies, and
+  documentation drift; record validation evidence and any deliberate remainder.
 
 ## Implementation
 

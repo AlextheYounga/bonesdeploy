@@ -43,6 +43,14 @@ one framed deployment to BonesRemote. Production never checks out application
 source, resolves an application Git ref, downloads application dependencies,
 pulls Compose images, or builds application code or images.
 
+Deployment configuration contains only release retention and the selected
+backend's remotely consumed values. Native configuration carries the web root
+and optional Ruby version needed by remote Rails migrations. Docker
+configuration carries the optional ingress port used by diagnostics and the
+Compose startup timeout. Framework identity, Node and Python build versions,
+permission defaults, and arbitrary runtime extras remain local or in the
+separate BonesInfra provisioning request.
+
 Native artifacts contain a complete runnable release tree. Framework build
 scripts install dependencies and compile all deterministic output locally, then
 remove build-only dependency trees, caches, and numbered build scripts that the
@@ -123,6 +131,13 @@ native prepare where applicable, seal, preflight, activate, and restart. Remove
 server repository resolution, archive export, Compose pull/build, and source
 deployment routing. Start Compose with builds and pulls disabled.
 
+Replace the control-plane snapshot's complete local `Runtime` value with one
+serde-tagged remote runtime enum. Convert it back into the minimal site runtime
+state required by the existing release lifecycle at the BonesRemote boundary.
+Remove the unused Python-version prepare environment and tests that preserve
+arbitrary runtime extras. Reject old broad snapshots under the breaking-release
+compatibility policy rather than retaining a legacy parser.
+
 Rename persisted phases and coordinator operations around remote facts rather
 than historical source/build operations. Preserve compatibility only with state
 written by the current breaking-release branch where concrete recovery requires
@@ -142,7 +157,8 @@ than source hosting. Rebuild the packaged BonesInfra wheel after Python changes.
 
 `bonesdeploy-core` owns artifact framing, enforceable manifest types, target
 platform, explicit build environment vocabulary, and shared validation. It does
-not model server application repositories or unverifiable build attestation.
+not model server application repositories or unverifiable build attestation. It
+also owns the narrow backend-specific remote deployment descriptor.
 
 `bonesdeploy` owns local committed-source selection, native and Compose build
 execution, build cache, framework pruning, Compose image collection and immutable
@@ -165,7 +181,8 @@ production-state transitions and environment-dependent runtime preparation.
 ## Affected Areas
 
 - Artifact and configuration contracts in `bonesdeploy-core`, including artifact
-  kind, Compose image inventory, repository-field removal, and lifecycle terms.
+  kind, Compose image inventory, repository-field removal, narrow remote runtime
+  configuration, and lifecycle terms.
 - BonesDeploy init, deploy, doctor, local Docker execution, Git export, native
   packaging, Compose build/image export, progress, and tests.
 - Framework build/prepare assets for complete runtime output and pruning.
@@ -193,6 +210,8 @@ production-state transitions and environment-dependent runtime preparation.
   interpolation. Production `.env` and ambient host variables remain excluded.
 - Complete artifacts include application dependencies. Remote prepare cannot
   install or compile them.
+- BonesRemote config sync carries only values with current remote consumers;
+  BonesInfra provisioning and production secrets remain separate contracts.
 - Framework-specific artifact pruning is required, not deferred.
 - Local Docker is a compatibility/reproducibility dependency, not a production
   isolation boundary. Secret exclusion and narrow tool-owned inputs remain
@@ -229,6 +248,13 @@ production-state transitions and environment-dependent runtime preparation.
   container implementation.
 - Removing repository state touches provisioning, deletion, doctor, setup,
   configuration, and recovery assumptions across Rust and Python.
+- Narrowing the persisted control-plane snapshot can expose files written by a
+  pre-breaking-release binary. This is intentional under the no-compatibility
+  policy; every deployment synchronizes the new descriptor before invoking the
+  artifact lifecycle.
+- Omitting a remotely consumed backend value would break prepare, preflight,
+  Compose startup, or diagnostics. Focused consumer and serialization tests must
+  cover every retained field and prove unrelated fields are absent.
 
 ## Validation
 
@@ -255,6 +281,11 @@ production-state transitions and environment-dependent runtime preparation.
 - CLI and documentation tests prove initialization, setup, doctor, and deploy no
   longer create a deployment Git remote or require a first push, while public
   operational commands remain available.
+- Remote configuration tests prove native and Docker descriptors carry exactly
+  their backend-specific values, omit local build and provisioning data, derive
+  the required internal site runtime, and reject old broad snapshot shapes.
+- Remote prepare tests prove Rails still receives its Ruby version while no
+  Python build version or arbitrary runtime extra is projected remotely.
 - Ignored E2E definitions cover native and Compose first deploy, second release,
   failed activation, rollback, and old-release/image pruning. They compile but
   are not agent-executed.
