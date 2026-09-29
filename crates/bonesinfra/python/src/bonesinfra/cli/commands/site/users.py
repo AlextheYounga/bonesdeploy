@@ -215,6 +215,15 @@ def _configure_build_user(ctx, build_user, cpu_quota, staged_dropin):
 
 
 def _verify_build_user(build_user, build_home):
+    server.shell(
+        name=f"Verify cgroup kill control for {build_user}",
+        commands=[
+            f"uid=$(id -u {quote(build_user)}); "
+            'test -w "/sys/fs/cgroup/user.slice/user-${uid}.slice/cgroup.kill" '
+            "|| (echo 'ERROR: cgroup v2 kill control unavailable for build user' >&2; false)",
+        ],
+        _sudo=True,
+    )
     server.script_template(
         name=f"Verify rootless Podman for {build_user}",
         src=str(SCRIPTS_DIR / "verify-rootless-podman.sh.j2"),

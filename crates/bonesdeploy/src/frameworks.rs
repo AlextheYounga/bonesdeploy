@@ -8,6 +8,7 @@ use serde_json::Value;
 
 /// Shared question keys used by more than one template.
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
+const NEXT_NUXT_NODE_VERSION: &str = "25.9.0";
 mod django;
 mod laravel;
 mod next;
@@ -103,7 +104,7 @@ impl Framework {
         let mut values = serde_json::Map::new();
         values.insert("template".into(), Value::String(defaults.template.into()));
         values.insert("web_root".into(), Value::String(defaults.web_root.into()));
-        values.insert("node_version".into(), Value::String(default_node_version()));
+        values.insert("node_version".into(), Value::String(self.default_node_version()));
         if let Some((name, version)) = defaults.language {
             values.insert(name.into(), Value::String(version.into()));
         }
@@ -116,6 +117,13 @@ impl Framework {
             Self::Next => next::configure(cfg),
             Self::Nuxt => nuxt::configure(cfg),
             _ => {}
+        }
+    }
+
+    fn default_node_version(self) -> String {
+        match self {
+            Self::Next | Self::Nuxt => NEXT_NUXT_NODE_VERSION.to_string(),
+            _ => default_node_version(),
         }
     }
 
@@ -137,8 +145,8 @@ impl Framework {
         Some(match self {
             Self::Django => django::build_environment_example(runtime),
             Self::Laravel => laravel::build_environment_example(runtime),
-            Self::Next => next::build_environment_example(),
-            Self::Nuxt => nuxt::build_environment_example(),
+            Self::Next => next::build_environment_example(runtime),
+            Self::Nuxt => nuxt::build_environment_example(runtime),
             Self::Rails => rails::build_environment_example(runtime),
             Self::SvelteKit => sveltekit::build_environment_example(),
             Self::Vue => vue::build_environment_example(),

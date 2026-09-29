@@ -8,11 +8,19 @@ use anyhow::{Context, Result, bail};
 use bonesdeploy_core::config::variables;
 use bonesdeploy_core::paths;
 
-use super::build_user::{BuildScriptEnv, build_script_command, build_user_command, build_user_control_command};
+use super::build_user::{
+    BuildScriptEnv, build_script_command, build_script_result, build_script_timed_out, build_script_unit,
+    build_user_command, build_user_control_command, reset_build_script_unit, terminate_build_user,
+};
 use super::ownership;
 use crate::release::output;
 
 pub const BUILD_IMAGE: &str = paths::IMAGE_STORE_BASE_IMAGE;
+
+pub enum BuildScriptOutcome {
+    Exited(ExitStatus),
+    TimedOut,
+}
 
 pub fn service_command(build_user: &str, container_name: &str) -> Command {
     let mut command = Command::new("systemd-run");
@@ -31,6 +39,7 @@ pub struct BuildContainer<'a> {
     name: String,
     build_env_file: Option<PathBuf>,
     removed: bool,
+    session_available: bool,
 }
 
 impl<'a> BuildContainer<'a> {
@@ -61,17 +70,28 @@ impl<'a> BuildContainer<'a> {
             bail!("Failed to start build container {name}: {status}");
         }
 
-        let container = Self { env, source_root, name, build_env_file: Some(build_env_file), removed: false };
+        let container = Self {
+            env,
+            source_root,
+            name,
+            build_env_file: Some(build_env_file),
+            removed: false,
+            session_available: true,
+        };
         container.copy_deployment_tree()?;
         Ok(container)
     }
 
-    pub fn run_script(&self, script: &Path, log_path: &Path) -> Result<ExitStatus> {
+    pub fn run_script(&mut self, script: &Path, script_ordinal: usize, log_path: &Path) -> Result<BuildScriptOutcome> {
         let script_file =
             fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
         let description = format!("podman build script {}", script.display());
+        let script_unit = build_script_unit(self.env.project_name, script_ordinal);
         let mut command = match self.env.script_timeout_seconds {
-            Some(timeout) => build_script_command(self.env.build_user, timeout),
+            Some(timeout) => {
+                reset_build_script_unit(self.env.build_user, &script_unit);
+                build_script_command(self.env.build_user, &script_unit, timeout)
+            }
             None => build_user_command(self.env.build_user),
         };
         configure_exec(&mut command, self.source_root, &self.name);
@@ -81,7 +101,27 @@ impl<'a> BuildContainer<'a> {
             .stderr(Stdio::piped())
             .spawn()
             .with_context(|| format!("Failed to execute {description} in podman"))?;
-        output::stream_child_output(&mut child, log_path, &description)
+        let status = output::stream_child_output(&mut child, log_path, &description)?;
+        if status.success() || self.env.script_timeout_seconds.is_none() {
+            return Ok(BuildScriptOutcome::Exited(status));
+        }
+
+        match build_script_result(self.env.build_user, &script_unit) {
+            Ok(result) if build_script_timed_out(&result) => {
+                self.session_available = false;
+                terminate_build_user(self.env.build_user)?;
+                Ok(BuildScriptOutcome::TimedOut)
+            }
+            Ok(_) => {
+                reset_build_script_unit(self.env.build_user, &script_unit);
+                Ok(BuildScriptOutcome::Exited(status))
+            }
+            Err(error) => {
+                self.session_available = false;
+                terminate_build_user(self.env.build_user)?;
+                Err(error.context("Could not classify failed build script; the build-user cgroup was terminated"))
+            }
+        }
     }
 
     pub fn remove(&mut self) -> Result<()> {
@@ -137,7 +177,8 @@ impl<'a> BuildContainer<'a> {
 
 impl Drop for BuildContainer<'_> {
     fn drop(&mut self) {
-        if self.removed {
+        if self.removed || !self.session_available {
+            self.remove_build_env_file();
             return;
         }
         let mut command = build_user_control_command(self.env.build_user);
@@ -256,17 +297,6 @@ pub fn configure_remove(command: &mut Command, source_root: &Path, container_nam
 
 pub fn container_name(project_name: &str) -> String {
     format!("bonesdeploy-build-{project_name}")
-}
-
-pub fn remove_build_container(build_user: &str, project_name: &str, working_dir: &Path) -> Result<()> {
-    let name = container_name(project_name);
-    let mut remove = build_user_control_command(build_user);
-    configure_remove(&mut remove, working_dir, &name);
-    let status = remove.status().with_context(|| format!("Failed to remove build container {name}"))?;
-    if !status.success() {
-        bail!("Failed to remove build container {name}: {status}");
-    }
-    Ok(())
 }
 
 pub fn remove_existing(source_root: &Path, env: &BuildScriptEnv<'_>, container_name: &str) -> Result<()> {

@@ -9,7 +9,7 @@ use bonesdeploy_core::paths;
 use serde_json::Value;
 
 use super::build_user::BuildScriptEnv;
-use super::container::BuildContainer;
+use super::container::{BuildContainer, BuildScriptOutcome};
 use super::ownership;
 
 pub fn run(snapshot: &super::super::DeploymentSnapshot, context: &Path) -> Result<()> {
@@ -56,16 +56,22 @@ pub fn run(snapshot: &super::super::DeploymentSnapshot, context: &Path) -> Resul
     let logs_dir = paths::bonesremote_site_logs(&snapshot.site);
     fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;
 
-    for script in scripts {
+    for (script_index, script) in scripts.into_iter().enumerate() {
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
         println!("Running build script {script_name}...");
 
-        let status = container
-            .run_script(&script, &logs_dir.join(format!("{script_name}.log")))
+        let outcome = container
+            .run_script(&script, script_index + 1, &logs_dir.join(format!("{script_name}.log")))
             .with_context(|| format!("Failed to execute build script {}", script.display()))?;
 
-        if !status.success() {
-            bail!("Build script {script_name} exited with status {status}");
+        match outcome {
+            BuildScriptOutcome::Exited(status) if !status.success() => {
+                bail!("Build script {script_name} exited with status {status}");
+            }
+            BuildScriptOutcome::TimedOut => {
+                bail!("Build script {script_name} timed out; its build-user cgroup was terminated");
+            }
+            BuildScriptOutcome::Exited(_) => {}
         }
     }
 

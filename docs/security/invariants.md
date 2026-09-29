@@ -174,7 +174,7 @@ private cache, never the protected runtime environment or control-plane files.
 54. One site cannot consume every host port, inode, process, or byte of disk.
 ```
 
-Resource exhaustion is a distinct security dimension. Good confidentiality does not imply good availability: site A may be unable to read site B and still allocate all host memory until site B is killed by system pressure. Every untrusted site and build has resource boundaries — `MemoryMax`, `TasksMax`, `CPUQuota` or `CPUWeight`, file-descriptor limits, build timeout, disk or filesystem quota, log-size policy. Beyond per-script timeouts, BonesInfra caps each build user's host-level slice at 80% CPU quota, 80% memory high/max, and `MemorySwapMax=0`, so a runaway build fails rather than exhausting host memory or swap.
+Resource exhaustion is a distinct security dimension. Good confidentiality does not imply good availability: site A may be unable to read site B and still allocate all host memory until site B is killed by system pressure. Every untrusted site and build has resource boundaries — `MemoryMax`, `TasksMax`, `CPUQuota` or `CPUWeight`, file-descriptor limits, build timeout, disk or filesystem quota, log-size policy. Beyond per-script timeouts, BonesInfra caps each build user's host-level slice at 80% CPU quota, 80% memory high/max, and `MemorySwapMax=0`. A native script timeout is not considered contained merely because its `systemd-run` client stopped: BonesRemote writes cgroup v2's `cgroup.kill` for the complete dedicated build-user slice and verifies that it is absent or reports `populated 0`. Provisioning rejects hosts that cannot expose this root-owned control.
 
 ## Just-in-time mutations
 

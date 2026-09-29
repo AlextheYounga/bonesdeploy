@@ -1,9 +1,16 @@
+use std::error::Error as StdError;
+use std::fmt;
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::ErrorKind;
+use std::io::Write;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Error, Result, bail};
 use bonesdeploy_core::paths;
 
 use crate::inspection::systemd;
@@ -21,19 +28,68 @@ pub struct BuildScriptEnv<'a> {
     pub script_timeout_seconds: Option<u64>,
 }
 
+const CGROUP_ROOT: &str = "/sys/fs/cgroup";
+const CGROUP_TERMINATION_TIMEOUT: Duration = Duration::from_secs(5);
+const CGROUP_POLL_INTERVAL: Duration = Duration::from_millis(100);
+
+#[derive(Debug)]
+pub struct BuildContainmentError;
+
+impl fmt::Display for BuildContainmentError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("build-user containment failed")
+    }
+}
+
+impl StdError for BuildContainmentError {}
+
+pub fn is_build_containment_error(error: &Error) -> bool {
+    error.downcast_ref::<BuildContainmentError>().is_some()
+}
+
 pub fn build_user_command(build_user: &str) -> Command {
     let mut command = Command::new("systemd-run");
     command.arg(format!("--machine={build_user}@")).args(["--quiet", "--user", "--collect", "--pipe", "--wait"]);
     command
 }
 
-/// A `build_user_command` that systemd terminates after `timeout_seconds`.
-/// This bounds runaway build scripts without depending on Podman or the build
-/// user's manager to cooperate: systemd enforces the deadline and kills the
-/// script's whole process tree.
-pub fn build_script_command(build_user: &str, timeout_seconds: u64) -> Command {
-    let mut command = build_user_command(build_user);
-    command.arg(format!("--property=RuntimeMaxSec={timeout_seconds}s"));
+/// A named build command whose systemd result remains available for timeout
+/// classification after `systemd-run --wait` returns.
+pub fn build_script_command(build_user: &str, unit: &str, timeout_seconds: u64) -> Command {
+    let mut command = Command::new("systemd-run");
+    command
+        .arg(format!("--machine={build_user}@"))
+        .args(["--quiet", "--user", "--pipe", "--wait", "--unit", unit])
+        .arg(format!("--property=RuntimeMaxSec={timeout_seconds}s"));
+    command
+}
+
+pub fn build_script_unit(project_name: &str, script_ordinal: usize) -> String {
+    format!("bonesdeploy-build-{project_name}-script-{script_ordinal}.service")
+}
+
+pub fn build_script_result(build_user: &str, unit: &str) -> Result<String> {
+    let output = build_user_systemctl_command(build_user)
+        .args(["show", "--property=Result", "--value", "--no-pager", "--", unit])
+        .output()
+        .with_context(|| format!("Failed to inspect build script unit {unit}"))?;
+    if !output.status.success() {
+        bail!("Failed to inspect build script unit {unit}");
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+pub fn build_script_timed_out(result: &str) -> bool {
+    result == "timeout"
+}
+
+pub fn reset_build_script_unit(build_user: &str, unit: &str) {
+    let _ = build_user_systemctl_command(build_user).args(["reset-failed", "--", unit]).status();
+}
+
+fn build_user_systemctl_command(build_user: &str) -> Command {
+    let mut command = Command::new("systemctl");
+    command.arg(format!("--machine={build_user}@")).arg("--user");
     command
 }
 
@@ -74,6 +130,98 @@ pub fn ensure_build_user_ready(build_user: &str, working_dir: &Path) -> Result<(
     }
 
     Ok(())
+}
+
+pub fn terminate_build_user(build_user: &str) -> Result<()> {
+    let result = (|| {
+        let uid = identity_id(build_user, "-u", "UID")?;
+        BuildUserCgroup::new(CGROUP_ROOT, uid, CGROUP_TERMINATION_TIMEOUT).terminate_with(stop_user_manager)
+    })();
+    result.map_err(|error| Error::new(BuildContainmentError).context(format!("{error:#}")))
+}
+
+fn stop_user_manager(uid: u32) -> Result<()> {
+    let unit = format!("user@{uid}.service");
+    let status = Command::new("systemctl")
+        .args(["stop", "--no-block", "--", &unit])
+        .status()
+        .with_context(|| format!("Failed to request stop for {unit}"))?;
+    if !status.success() {
+        bail!("Failed to request stop for {unit}: {status}");
+    }
+    Ok(())
+}
+
+pub struct BuildUserCgroup {
+    path: PathBuf,
+    uid: u32,
+    verification_timeout: Duration,
+}
+
+impl BuildUserCgroup {
+    pub fn new(cgroup_root: impl AsRef<Path>, uid: u32, verification_timeout: Duration) -> Self {
+        let path = cgroup_root.as_ref().join("user.slice").join(format!("user-{uid}.slice"));
+        Self { path, uid, verification_timeout }
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
+    pub fn terminate_with(&self, stop_manager: impl FnOnce(u32) -> Result<()>) -> Result<()> {
+        if !self.exists()? {
+            return Ok(());
+        }
+
+        let kill = self.path.join("cgroup.kill");
+        let kill_result = OpenOptions::new().write(true).open(&kill).and_then(|mut file| file.write_all(b"1"));
+        if let Err(error) = kill_result {
+            if error.kind() == ErrorKind::NotFound && !self.exists()? {
+                return Ok(());
+            }
+            return Err(error).with_context(|| format!("Failed to kill build-user cgroup {}", self.path.display()));
+        }
+        stop_manager(self.uid)?;
+        self.verify_empty()
+    }
+
+    fn verify_empty(&self) -> Result<()> {
+        let started = Instant::now();
+        loop {
+            if !self.exists()? {
+                return Ok(());
+            }
+
+            match fs::read_to_string(self.path.join("cgroup.events")) {
+                Ok(events) if cgroup_is_empty(&events) => return Ok(()),
+                Ok(_) => {}
+                Err(error) if error.kind() == ErrorKind::NotFound && !self.exists()? => return Ok(()),
+                Err(error) => {
+                    return Err(error)
+                        .with_context(|| format!("Failed to inspect build-user cgroup {}", self.path.display()));
+                }
+            }
+
+            if started.elapsed() >= self.verification_timeout {
+                bail!("Build-user cgroup {} remained populated after termination", self.path.display());
+            }
+            thread::sleep(CGROUP_POLL_INTERVAL.min(self.verification_timeout.saturating_sub(started.elapsed())));
+        }
+    }
+
+    fn exists(&self) -> Result<bool> {
+        match fs::metadata(&self.path) {
+            Ok(_) => Ok(true),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(false),
+            Err(error) => {
+                Err(error).with_context(|| format!("Failed to inspect build-user cgroup {}", self.path.display()))
+            }
+        }
+    }
+}
+
+fn cgroup_is_empty(events: &str) -> bool {
+    events.lines().any(|line| line.split_whitespace().eq(["populated", "0"]))
 }
 
 pub fn identity_id(build_user: &str, flag: &str, label: &str) -> Result<u32> {

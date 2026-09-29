@@ -5,13 +5,13 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{Bones, build_user_for, validate_site_name};
+use bonesdeploy_core::config::{Bones, RuntimeBackend, build_user_for, validate_site_name};
 use bonesdeploy_core::paths;
 
 use crate::commands::{drop_failed_release, release::list};
 use crate::privileges;
 use crate::release::SiteMutation;
-use crate::release::lifecycle::build::{ensure_build_user_ready, remove_build_container};
+use crate::release::lifecycle::build::terminate_build_user;
 use crate::release::lifecycle::checkout;
 use crate::release::state::{self as release_state, DeploymentLock, DeploymentRecord};
 
@@ -37,11 +37,17 @@ pub fn run(site: &str, release: &str) -> Result<()> {
                 "Release {release} is preparing and cannot be cancelled because prepare scripts may change runtime state."
             );
         }
-        if list::process_matches(active) {
-            terminate_deployment(active)?;
-        }
     } else if release_state::read_staged_release(site).ok().as_deref() != Some(release) {
         bail!("Release {release} is not building or interrupted. Run 'bonesdeploy site releases' to inspect releases.");
+    }
+
+    if config.runtime.backend == RuntimeBackend::Native {
+        terminate_build_user(&build_user_for(site))?;
+    }
+    if let Some(active) = &active
+        && list::process_matches(active)
+    {
+        terminate_deployment(active)?;
     }
 
     let lock = DeploymentLock::acquire(site)?;
@@ -50,11 +56,6 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     if current.as_ref().is_some_and(|deployment| deployment.release() != release) {
         bail!("Active deployment changed while cancelling {release}; no cleanup was performed.");
     }
-
-    let build_user = build_user_for(site);
-    let working_dir = Path::new(&config.project_root);
-    ensure_build_user_ready(&build_user, working_dir)?;
-    remove_build_container(&build_user, site, working_dir)?;
 
     if let Some(context) = current.as_ref().and_then(|deployment| deployment.context()) {
         let context = Path::new(context);

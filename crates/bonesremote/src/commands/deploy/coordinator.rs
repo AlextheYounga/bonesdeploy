@@ -114,6 +114,9 @@ fn build_and_prepare(
 
     stage("Building release");
     if let Err(error) = lifecycle::build::run(mutation, snapshot, context_dir) {
+        if lifecycle::build::is_build_containment_error(&error) {
+            return Err(error);
+        }
         return finish_abort(mutation, Some(context_dir), error);
     }
     if let Err(error) =
