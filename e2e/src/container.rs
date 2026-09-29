@@ -30,7 +30,6 @@ impl Container {
             "limits.cpu=1",
             "--config",
             "security.nesting=true",
-            "--config",
         ])?;
         Ok(Self { name, keep: keep_artifacts() })
     }
