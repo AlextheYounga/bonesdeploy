@@ -1,4 +1,5 @@
 pub mod activate;
+pub mod artifact;
 pub mod build;
 pub mod checkout;
 pub mod preflight;

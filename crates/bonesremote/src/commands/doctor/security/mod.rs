@@ -10,6 +10,7 @@ pub mod types;
 
 use bonesdeploy_core::paths;
 use std::collections::BTreeSet;
+use std::iter::once;
 use std::path::PathBuf;
 
 use crate::ui;
@@ -87,7 +88,7 @@ pub fn audit(site_name: Option<&str>, exhaustive: bool) -> Report {
         evaluate_runtime_sudo(&evidence)
     }));
 
-    let mut untrusted: Vec<_> = sites.iter().flat_map(|site| [&site.runtime, &site.build]).collect();
+    let mut untrusted: Vec<_> = sites.iter().flat_map(|site| once(&site.runtime).chain(site.build.iter())).collect();
     untrusted.push(&deploy);
     for path in protected_paths() {
         match collect_path_tree(&path, false) {

@@ -8,60 +8,15 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use anyhow::{Context, Result, bail};
 
 use super::model::{
-    BACKUP_RETENTION_DAYS_DEFAULT, BACKUP_SCHEDULE_DEFAULT, Bones, COMPOSE_WAIT_TIMEOUT_DEFAULT, RuntimeBackend,
-    default_node_version, default_repo_path_for, validate_host, validate_runtime,
+    BACKUP_RETENTION_DAYS_DEFAULT, BACKUP_SCHEDULE_DEFAULT, Bones, BuildMode, COMPOSE_WAIT_TIMEOUT_DEFAULT,
+    RuntimeBackend, default_node_version, default_repo_path_for, validate_host, validate_runtime,
 };
 use crate::paths;
 
-mod keys {
-    pub(super) const BACKUP_SCHEDULE: &str = "BACKUP_SCHEDULE";
-    pub(super) const BACKUP_RETENTION_DAYS: &str = "BACKUP_RETENTION_DAYS";
-    pub(super) const BORG_PASSPHRASE: &str = "BORG_PASSPHRASE";
-    /// Managed-key vocabulary for the root `.env` grammar.
-    pub(super) use crate::config::variables::{PROJECT_NAME, WEB_ROOT};
-    pub(super) const REMOTE_NAME: &str = "REMOTE_NAME";
-    pub(super) const SSH_USER: &str = "SSH_USER";
-    pub(super) const HOST: &str = "HOST";
-    pub(super) const PORT: &str = "PORT";
-    pub(super) const BRANCH: &str = "BRANCH";
-    pub(super) const DOMAIN: &str = "DOMAIN";
-    pub(super) const EMAIL: &str = "EMAIL";
-    pub(super) const SSL_ENABLED: &str = "SSL_ENABLED";
-    pub(super) const TEMPLATE: &str = "TEMPLATE";
-    pub(super) const RUNTIME_BACKEND: &str = "RUNTIME_BACKEND";
-    pub(super) const NODE_VERSION: &str = "NODE_VERSION";
-    pub(super) const COMPOSE_PORT: &str = "COMPOSE_PORT";
-    pub(super) const COMPOSE_WAIT_TIMEOUT: &str = "COMPOSE_WAIT_TIMEOUT";
-}
+pub(crate) mod keys;
 
 const BEGIN: &str = "# >>> BonesDeploy managed configuration >>>";
 const END: &str = "# <<< BonesDeploy managed configuration <<<";
-pub(crate) const MANAGED_PREFIX: &str = "BONES_";
-const MANAGED: &[&str] = &[
-    keys::PROJECT_NAME,
-    keys::REMOTE_NAME,
-    keys::SSH_USER,
-    keys::HOST,
-    keys::PORT,
-    keys::BRANCH,
-    keys::DOMAIN,
-    keys::EMAIL,
-    keys::SSL_ENABLED,
-    keys::TEMPLATE,
-    keys::RUNTIME_BACKEND,
-    keys::WEB_ROOT,
-    keys::NODE_VERSION,
-    keys::COMPOSE_PORT,
-    keys::COMPOSE_WAIT_TIMEOUT,
-    keys::BACKUP_SCHEDULE,
-    keys::BACKUP_RETENTION_DAYS,
-    keys::BORG_PASSPHRASE,
-    "PHP_VERSION",
-    "PYTHON_VERSION",
-    "RUBY_VERSION",
-    "IS_STATIC",
-    "INTERNAL_PORT",
-];
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ParsedDotEnv {
@@ -115,12 +70,12 @@ pub fn parse_dotenv(content: &str) -> Result<ParsedDotEnv> {
             bail!("Invalid .env key on line {}", number + 1);
         }
         let value = strip_quotes(value.trim()).to_string();
-        let (logical, managed) = if let Some(logical) = key.strip_prefix(MANAGED_PREFIX) {
-            if !in_block && !MANAGED.contains(&logical) {
+        let (logical, managed) = if let Some(logical) = key.strip_prefix(keys::MANAGED_PREFIX) {
+            if !in_block && !keys::MANAGED.contains(&logical) {
                 bail!("Reserved .env key `{key}`; place it in the BonesDeploy managed block");
             }
             (logical.to_string(), true)
-        } else if MANAGED.contains(&key) {
+        } else if keys::MANAGED.contains(&key) {
             (key.to_string(), true)
         } else if in_block {
             bail!("Managed block key `{key}` must start with BONES_");
@@ -134,7 +89,7 @@ pub fn parse_dotenv(content: &str) -> Result<ParsedDotEnv> {
         if target.insert(logical, value).is_some() {
             bail!("Duplicate .env key `{key}` on line {}", number + 1);
         }
-        if managed && !key.starts_with(MANAGED_PREFIX) {
+        if managed && !key.starts_with(keys::MANAGED_PREFIX) {
             parsed.needs_rewrite = true;
         }
     }
@@ -171,6 +126,11 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
         "docker" => RuntimeBackend::Docker,
         value => bail!("Invalid RUNTIME_BACKEND: {value}"),
     };
+    config.build.mode = match values.get(keys::BUILD_MODE).map_or("remote", String::as_str) {
+        "local" => BuildMode::Local,
+        "remote" => BuildMode::Remote,
+        value => bail!("Invalid BUILD_MODE: {value}"),
+    };
     config.runtime.compose_port = values
         .get(keys::COMPOSE_PORT)
         .filter(|value| !value.trim().is_empty())
@@ -199,6 +159,7 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
     config.project_root = paths::default_project_root_for(&project_name);
     validate_host(&config.host)?;
     validate_runtime(&config.runtime)?;
+    super::model::validate_build_mode(&config.runtime, &config.build)?;
     Ok(LoadedLocal { environment: config, applications: parsed.applications })
 }
 
@@ -224,7 +185,7 @@ pub fn production_application_keys(parsed: &ParsedDotEnv) -> Result<BTreeMap<Str
     Ok(parsed
         .applications
         .iter()
-        .filter(|(key, _)| !MANAGED.contains(&key.as_str()))
+        .filter(|(key, _)| !keys::MANAGED.contains(&key.as_str()))
         .map(|(k, v)| (k.clone(), v.clone()))
         .collect())
 }
@@ -255,7 +216,7 @@ pub fn write_local_environment(config: &Bones, path: &Path) -> Result<()> {
             continue;
         }
         if let Some((key, _)) = raw.trim_end_matches('\n').trim_end_matches('\r').trim().split_once('=') {
-            if MANAGED.contains(&key.trim().strip_prefix(MANAGED_PREFIX).unwrap_or(key.trim())) {
+            if keys::MANAGED.contains(&key.trim().strip_prefix(keys::MANAGED_PREFIX).unwrap_or(key.trim())) {
                 continue;
             }
         }
@@ -282,6 +243,13 @@ pub fn write_local_environment(config: &Bones, path: &Path) -> Result<()> {
             match config.runtime.backend {
                 RuntimeBackend::Native => "native".into(),
                 RuntimeBackend::Docker => "docker".into(),
+            },
+        ),
+        (
+            keys::BUILD_MODE,
+            match config.build.mode {
+                BuildMode::Local => "local".into(),
+                BuildMode::Remote => "remote".into(),
             },
         ),
         (keys::WEB_ROOT, config.runtime.web_root.clone()),
@@ -312,7 +280,7 @@ fn append_value(output: &mut String, key: &str, value: &str) -> Result<()> {
     if value.contains(['\n', '\r']) {
         bail!(".env values must not contain newlines");
     }
-    output.push_str(MANAGED_PREFIX);
+    output.push_str(keys::MANAGED_PREFIX);
     output.push_str(key);
     output.push('=');
     output.push_str(&format_dotenv_value(value));
@@ -322,8 +290,7 @@ fn append_value(output: &mut String, key: &str, value: &str) -> Result<()> {
 /// Managed keys that map onto the canonical model; every other managed key is
 /// a passthrough that becomes a runtime framework extra.
 fn is_project_key(key: &str) -> bool {
-    MANAGED.contains(&key)
-        && !matches!(key, "PHP_VERSION" | "PYTHON_VERSION" | "RUBY_VERSION" | "IS_STATIC" | "INTERNAL_PORT")
+    keys::MANAGED.contains(&key) && !keys::FRAMEWORK_KEYS.contains(&key)
 }
 fn parse_runtime_value(value: &str) -> toml::Value {
     match value {

@@ -2,10 +2,15 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::Result;
-use bonesdeploy_core::{config::is_numbered_shell_script, paths};
+use bonesdeploy_core::{
+    build_contract::TARGET_PLATFORM_NAME,
+    config::{BuildMode, is_numbered_shell_script},
+    paths,
+};
 
 use crate::config;
 use crate::infra::{self, git, ssh};
+use crate::local_build;
 use crate::ui::output;
 
 pub async fn run(local_only: bool, verbose: bool) -> Result<()> {
@@ -25,6 +30,29 @@ pub(super) async fn run_with_pending(local_only: bool, verbose: bool) -> Result<
         check_deployment_scripts(),
         Some(String::from("rename it with a numeric prefix, like 01_build.sh")),
     );
+
+    if cfg.as_ref().is_some_and(|config| config.build.mode == BuildMode::Local) {
+        issues += print_check(
+            "local Podman",
+            check_local_podman(),
+            Some(String::from("install and configure rootless Podman")),
+        );
+        issues += print_check(
+            "local builder image",
+            check_local_builder_image(),
+            Some(format!("run `podman pull --platform {TARGET_PLATFORM_NAME}` for the configured builder image")),
+        );
+        issues += print_check(
+            "local target execution",
+            check_local_target_execution(),
+            Some(format!("install compatible Podman emulation for {TARGET_PLATFORM_NAME}")),
+        );
+        issues += print_check(
+            "local build cache",
+            check_local_cache(),
+            Some(String::from("make the XDG cache directory writable")),
+        );
+    }
 
     let local_branch_issue = cfg.as_ref().and_then(check_local_branch);
     issues += print_check(
@@ -168,13 +196,86 @@ fn check_deployment_scripts() -> Option<String> {
 }
 
 fn check_local_branch(cfg: &config::Bones) -> Option<String> {
+    check_local_branch_at(Path::new("."), cfg)
+}
+
+fn check_local_branch_at(repo: &Path, cfg: &config::Bones) -> Option<String> {
     if cfg.branch.is_empty() {
         return None;
     }
-    match git::branch_exists(&cfg.branch) {
+    if cfg.build.mode == BuildMode::Local {
+        return git::resolve_branch_commit(repo, &cfg.branch)
+            .map(|_| ())
+            .err()
+            .map(|error| format!("Unable to resolve local branch '{}' to an exact commit: {error}", cfg.branch));
+    }
+    match git::branch_exists_at(repo, &cfg.branch) {
         Ok(true) => None,
         Ok(false) => Some(format!("Local branch '{}' does not exist", cfg.branch)),
         Err(error) => Some(format!("Unable to inspect local branch '{}': {error}", cfg.branch)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+    use std::process::Command;
+
+    use bonesdeploy_core::config::BuildMode;
+
+    use super::check_local_branch_at;
+    use crate::config::Bones;
+
+    #[test]
+    fn local_doctor_requires_the_configured_branch_to_resolve_to_a_commit() -> anyhow::Result<()> {
+        let repo = tempfile::tempdir()?;
+        run_git(repo.path(), ["init", "--initial-branch=main"])?;
+        run_git(repo.path(), ["config", "user.email", "test@example.com"])?;
+        run_git(repo.path(), ["config", "user.name", "Test"])?;
+        fs::write(repo.path().join("tracked"), "content")?;
+        run_git(repo.path(), ["add", "."])?;
+        run_git(repo.path(), ["commit", "-m", "initial"])?;
+        let mut config = Bones::default();
+        config.branch = String::from("main");
+        config.build.mode = BuildMode::Local;
+
+        assert_eq!(check_local_branch_at(repo.path(), &config), None);
+        config.branch = String::from("missing");
+        assert!(check_local_branch_at(repo.path(), &config).is_some());
+        Ok(())
+    }
+
+    fn run_git<const N: usize>(repo: &Path, arguments: [&str; N]) -> anyhow::Result<()> {
+        let status = Command::new("git").arg("-C").arg(repo).args(arguments).status()?;
+        anyhow::ensure!(status.success(), "git command failed");
+        Ok(())
+    }
+}
+
+fn check_local_podman() -> Option<String> {
+    local_build::podman_available_rootless().err().map(|error| error.to_string())
+}
+
+fn check_local_builder_image() -> Option<String> {
+    match local_build::podman_image_available() {
+        Ok(true) => None,
+        Ok(false) => Some(String::from("Pinned local builder image is not available")),
+        Err(error) => Some(error.to_string()),
+    }
+}
+
+fn check_local_target_execution() -> Option<String> {
+    local_build::probe_target_execution().err().map(|error| error.to_string())
+}
+
+fn check_local_cache() -> Option<String> {
+    let cache = local_build::local_cache_path("doctor");
+    let ancestor = cache.ancestors().find(|path| path.exists())?;
+    if ancestor.is_dir() && !ancestor.metadata().is_ok_and(|metadata| metadata.permissions().readonly()) {
+        None
+    } else {
+        Some(format!("Local build cache parent is unavailable: {}", ancestor.display()))
     }
 }
 

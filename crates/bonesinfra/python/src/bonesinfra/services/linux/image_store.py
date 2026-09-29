@@ -5,7 +5,9 @@ from pyinfra.operations import server
 from bonesinfra.config.paths import ASSETS_DIR, IMAGE_STORE_GRAPH_ROOT, IMAGE_STORE_RUN_ROOT, IMAGE_STORE_STORAGE_CONF
 from bonesinfra.pyinfra.operations import mkdir, render
 
-BASE_IMAGE = "docker.io/library/buildpack-deps:bookworm"
+BASE_IMAGE = (
+    "docker.io/library/buildpack-deps:bookworm@sha256:5ac8377b7884040464fbf9390409073c6ac62ac8e6563e886fc560f9ea13ec5d"
+)
 
 
 def ensure_shared_store():

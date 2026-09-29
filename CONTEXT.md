@@ -51,8 +51,8 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 - `releases/` contains candidates owned by the runtime user while prepare runs, then sealed as `root:<site>` before activation.
 - `shared/` is owned by the runtime user (`<site>:<site>`) — only the app writes here.
-- Build input is temporary and disposable; build scripts run in Podman with the source mounted at `/workspace/source`.
-- Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed.
+- Build input is temporary and disposable. Remote build scripts run in Podman with the source mounted at `/workspace/source`; local mode runs the same native contract in rootless workstation Podman and uploads a complete post-build artifact.
+- Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed, regardless of build mode. Django prepare still installs `requirements.txt` dependencies into the release virtualenv.
 - Git push transports source only; no Git hook starts a deployment.
 - The `git` SSH session may sudo only exact config-sync and deploy commands; BonesRemote retains ownership of promotion, activation, and service restart.
 - `bonesdeploy site export` is separate local administration: it connects as the configured root SSH user and streams a read-only ZIP of `shared/` directly to a private local file. It does not use `git`, sudo, or BonesRemote.
@@ -109,6 +109,7 @@ BONES_EMAIL=ops@example.com
 BONES_SSL_ENABLED=false
 BONES_TEMPLATE=next
 BONES_RUNTIME_BACKEND=native
+BONES_BUILD_MODE=remote
 BONES_WEB_ROOT=public
 BONES_NODE_VERSION=24.19.0
 BONES_COMPOSE_PORT=
@@ -160,8 +161,25 @@ Newly initialized projects get one encrypted Borg repository per site at `/var/l
 
 The cron entry runs `bonesremote backup run --site <site> --keep-days <retention>` as root, piped to journald through `systemd-cat`; there is no user-facing backup command and no other trigger. Each run archives only the site's `shared/` directory under the site lock as `<site>_<YYYYMMDD_HHMMSS>` (UTC), then prunes archives older than the configured retention (default 30 days). Projects without a passphrase (initialized before this feature) keep their previous behavior. Backups are local to the deployment server: external replication, restoration workflows, and database dumps are the user's responsibility and are not automated.
 
+### Build Modes
+`BONES_BUILD_MODE` is managed in the root `.env` and defaults to `remote` for
+compatibility. `bonesdeploy init --build-mode local` opts a project into local
+native builds. Local mode resolves the configured branch to one exact committed
+revision, exports it, and runs the shared native build contract in rootless
+Podman using the pinned `linux/amd64` builder. It is rejected for the Docker
+runtime and never falls back to a remote build.
+
+The local build packages the complete post-build context as a `tar.gz` and
+streams it over SSH with a manifest. Bonesremote checks the site, exact branch
+commit, pinned builder identity, compressed length, and SHA-256 digest before
+extracting bounded relative paths and safe relative symlinks. Remote mode keeps
+the server-side build user, rootless Podman manager, cache, and resource limits;
+local mode does not provision those server-side build resources. Both modes
+continue through the same promote, prepare, seal, activation, restart, pruning,
+and rollback lifecycle.
+
 ### Deployment Folder
-This folder stores build and prepare scripts. Build scripts live in `deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order inside bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; other files, including `README.md`, are ignored. Bonesremote prepares the image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. Before scripts run, Bonesremote streams the deployment bundle into the container's disposable filesystem at `/workspace/deployment`; it does not bind-mount root-owned control-plane state. The build container receives the exported source tree and private persistent build cache at `/workspace/cache`; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or host BonesRemote control-plane files. The cache is provisioned by BonesInfra at `/var/lib/bonesdeploy/users/<site>-build/cache` and is used only for tool and package downloads. Prepare scripts live in `deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to a runtime-owned candidate release, and are the right place for migrations, cache warmups, and other runtime-state work.
+This folder stores build and prepare scripts. Build scripts live in `deployment/build/`, must use the `NN_name.sh` convention (for example, `01_install_deps.sh`, `02_run_build.sh`), and run in lexical order. Remote mode uses bonesremote's `buildpack-deps:bookworm` container with `cwd=/workspace/source`; local mode runs the same contract in rootless workstation Podman. Other files, including `README.md`, are ignored. Bonesremote prepares the remote image and executes scripts through the build user's systemd user manager with `systemd-run --machine=<site>-build@ --user`, rather than changing UID with `runuser`. The long-lived remote build container is a transient user service that tracks Podman's monitor process, while each script still streams its output through foreground `podman exec`. Before remote scripts run, BonesRemote streams the deployment bundle into the container's disposable filesystem at `/workspace/deployment`; it does not bind-mount root-owned control-plane state. The remote build container receives the exported source tree and private persistent build cache at `/workspace/cache`; it does not receive `.env`, `shared/`, `current`, `releases/`, the bare repo, or host BonesRemote control-plane files. The cache is provisioned by BonesInfra at `/var/lib/bonesdeploy/users/<site>-build/cache` and is used only for tool and package downloads. Prepare scripts live in `deployment/prepare/`, use the same naming convention, run in lexical order as the site runtime user with `cwd` set to a runtime-owned candidate release, and are the right place for migrations, cache warmups, and other runtime-state work.
 
 ## Crate Structure
 This Cargo workspace has four crates under `crates/`:

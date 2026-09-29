@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -23,27 +24,61 @@ struct PreparedDeployment {
 pub struct DeploymentLifecycleCoordinator<'a> {
     mutation: &'a SiteMutation,
     snapshot: lifecycle::DeploymentSnapshot,
+    source: RemoteSource,
+}
+
+/// The two trusted deployment inputs converge once a complete build context exists.
+#[derive(Clone, Copy)]
+pub enum RemoteSource {
+    Repository,
+    LocalArtifact,
+}
+
+struct DeploymentInput<'a> {
+    source: RemoteSource,
+    reader: Option<&'a mut dyn Read>,
 }
 
 impl<'a> DeploymentLifecycleCoordinator<'a> {
     pub fn new(mutation: &'a SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Self {
-        Self { mutation, snapshot }
+        Self { mutation, snapshot, source: RemoteSource::Repository }
     }
 
     pub fn run(self) -> Result<()> {
-        run_staged_deployment(self.mutation, self.snapshot)
+        run_staged_deployment(self.mutation, self.snapshot, DeploymentInput { source: self.source, reader: None })
+    }
+
+    pub fn local_artifact(mut self) -> Self {
+        self.source = RemoteSource::LocalArtifact;
+        self
+    }
+
+    pub fn run_with_artifact(self, reader: &mut dyn Read) -> Result<()> {
+        run_staged_deployment(
+            self.mutation,
+            self.snapshot,
+            DeploymentInput { source: self.source, reader: Some(reader) },
+        )
     }
 }
 
-fn run_staged_deployment(mutation: &SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Result<()> {
-    let prepared = prepare_deployment(mutation, snapshot)?;
+fn run_staged_deployment(
+    mutation: &SiteMutation,
+    snapshot: lifecycle::DeploymentSnapshot,
+    input: DeploymentInput<'_>,
+) -> Result<()> {
+    let prepared = prepare_deployment(mutation, snapshot, input)?;
     activate_deployment(mutation, &prepared)?;
     complete_deployment(mutation, &prepared)
 }
 
-fn prepare_deployment(mutation: &SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Result<PreparedDeployment> {
+fn prepare_deployment(
+    mutation: &SiteMutation,
+    snapshot: lifecycle::DeploymentSnapshot,
+    input: DeploymentInput<'_>,
+) -> Result<PreparedDeployment> {
     let (mut deployment, snapshot, context_dir) = start_release(mutation, snapshot)?;
-    build_and_prepare(mutation, &snapshot, &context_dir, &mut deployment)?;
+    build_and_prepare(mutation, &snapshot, &context_dir, &mut deployment, input)?;
 
     let site = mutation.site();
     stage("Verifying before cut-over");
@@ -97,13 +132,25 @@ fn start_release(
     Ok((deployment, snapshot, context_dir))
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the coordinator's one source-to-promotion boundary keeps both input forms explicit"
+)]
 fn build_and_prepare(
     mutation: &SiteMutation,
     snapshot: &lifecycle::DeploymentSnapshot,
     context_dir: &Path,
     deployment: &mut release_state::DeploymentRecord,
+    input: DeploymentInput<'_>,
 ) -> Result<()> {
-    if let Err(error) = lifecycle::checkout::run(snapshot, context_dir) {
+    let source_result = match input.source {
+        RemoteSource::Repository => lifecycle::checkout::run(snapshot, context_dir),
+        RemoteSource::LocalArtifact => match input.reader {
+            Some(reader) => lifecycle::artifact::receive(reader, &snapshot.site, &snapshot.revision, context_dir),
+            None => Err(anyhow::anyhow!("artifact deployment has no standard input")),
+        },
+    };
+    if let Err(error) = source_result {
         return finish_abort(mutation, Some(context_dir), error);
     }
     if let Err(error) =
@@ -112,9 +159,11 @@ fn build_and_prepare(
         return finish_abort(mutation, Some(context_dir), error);
     }
 
-    stage("Building release");
-    if let Err(error) = lifecycle::build::run(mutation, snapshot, context_dir) {
-        return finish_abort(mutation, Some(context_dir), error);
+    if matches!(input.source, RemoteSource::Repository) {
+        stage("Building release");
+        if let Err(error) = lifecycle::build::run(mutation, snapshot, context_dir) {
+            return finish_abort(mutation, Some(context_dir), error);
+        }
     }
     if let Err(error) =
         advance_phase(mutation, deployment, Some(release_state::DeploymentPhase::Built), Some(context_dir))

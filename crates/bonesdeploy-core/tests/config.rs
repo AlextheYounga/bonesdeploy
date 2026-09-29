@@ -64,7 +64,7 @@ fn build_timeout_defaults_to_five_minutes() {
 
 #[test]
 fn build_timeout_of_zero_disables_the_timeout() {
-    let config = Bones { build: Build { timeout_seconds: 0 }, ..Bones::default() };
+    let config = Bones { build: Build { timeout_seconds: 0, ..Build::default() }, ..Bones::default() };
     assert_eq!(build_timeout_seconds(&config), None);
 }
 

@@ -111,6 +111,10 @@ time. Build-only values such as `NODE_VERSION` come directly from `.env.build`.
 `docker`). `Runtime.permissions` carries framework permission defaults and
 overrides; both are part of the canonical runtime configuration.
 
+`Build.mode` selects the native build location (`remote` by default or
+`local`). It is managed in the root `.env` as `BONES_BUILD_MODE`, transported
+in the site descriptor, and accepted as `local` only with the native runtime.
+
 ---
 
 ### 3.2 Path Constants (`paths` module)
@@ -564,8 +568,21 @@ Cli::Deploy
                  │    ├─ Activate: activate::run()       → Activated
                  │    ├─ Verify:   service::run()        → Verified
                  │    └─ Maintain: prune + cleanup       → Completed
-                 └─ (on failure) abort / rollback / cleanup_pending
+                  └─ (on failure) abort / rollback / cleanup_pending
 ```
+
+With `BONES_BUILD_MODE=local`, the local CLI resolves the configured branch to
+one full Git commit, exports that committed tree, runs numbered native build
+scripts in rootless Podman using the pinned `linux/amd64` builder, and packages
+the complete post-build tree as a streamed `tar.gz`. The artifact manifest names
+the site, exact revision, builder digest, compressed length, and SHA-256.
+Bonesremote independently resolves the configured branch in the bare repository,
+requires the revision to match, verifies the complete payload digest and bounds,
+and safely extracts only relative paths, ordinary files/directories, and safe
+relative symlinks. It then enters at `Promote`; prepare, sealing, activation,
+verification, pruning, and rollback are the same as remote mode. Local mode is
+native-only and failures do not fall back to remote builds. Django prepare still
+installs `requirements.txt` dependencies on the server.
 
 ### 4.5 `bonesdeploy doctor`
 
@@ -683,7 +700,7 @@ runtime state and is not persisted in project configuration.
 
 - Provisioning-time contract: shared ownership is established during `server setup` and site ownership during `site setup`; deploy commands never rewrite either layout.
 - Three identity classes: `git` (application repository access), `<site>` (runtime user, shared files, `/run/<site>`), `root` (sealed releases, system units, config dirs).
-- Build scripts run in Podman as an unprivileged build user. Prepare scripts run as the runtime user. Only `bonesremote` (running as root) promotes, activates, and restarts services.
+- Remote build scripts run in Podman as an unprivileged server build user; local builds run in rootless workstation Podman. Prepare scripts run as the runtime user. Only `bonesremote` (running as root) promotes, activates, and restarts services.
 
 ### State ownership
 

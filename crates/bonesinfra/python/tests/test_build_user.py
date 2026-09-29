@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 from jinja2 import Template
 
@@ -9,6 +11,7 @@ from bonesinfra.cli.commands.site.users import (
     build_home_for,
     build_user_for,
     cpu_quota_for,
+    ensure_users_and_groups,
 )
 
 from . import helpers
@@ -48,3 +51,40 @@ def test_build_slice_renders_with_memory_swap_max():
         memory_swap_max=_BUILD_MEMORY_SWAP_MAX,
     )
     assert f"MemorySwapMax={_BUILD_MEMORY_SWAP_MAX}" in rendered
+
+
+@pytest.mark.parametrize(
+    ("build_mode", "expected_groups"),
+    [("local", []), ("remote", ["demo-build"])],
+)
+def test_build_group_is_remote_only(monkeypatch, build_mode, expected_groups):
+    groups = []
+
+    def host():
+        return SimpleNamespace(get_fact=lambda _fact: 1)
+
+    monkeypatch.setattr(
+        "bonesinfra.cli.commands.site.users._ensure_site_identities",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        "bonesinfra.cli.commands.site.users.ctx_host",
+        SimpleNamespace(get=host),
+    )
+    monkeypatch.setattr(
+        "bonesinfra.cli.commands.site.users.server.group",
+        lambda **kwargs: groups.append(kwargs["group"]),
+    )
+    monkeypatch.setattr("bonesinfra.cli.commands.site.users._ensure_build_user", lambda *_args: None)
+    monkeypatch.setattr("bonesinfra.cli.commands.site.users._configure_build_user", lambda *_args: None)
+    monkeypatch.setattr("bonesinfra.cli.commands.site.users._verify_build_user", lambda *_args: None)
+    ctx = SimpleNamespace(
+        app=SimpleNamespace(
+            project_name="demo",
+            deploy=SimpleNamespace(build_mode=build_mode),
+        )
+    )
+
+    ensure_users_and_groups(ctx)
+
+    assert groups == expected_groups

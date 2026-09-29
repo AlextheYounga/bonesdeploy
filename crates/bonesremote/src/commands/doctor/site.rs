@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
-use bonesdeploy_core::config::RemoteDeploymentConfig;
+use bonesdeploy_core::config::{BuildMode, RemoteDeploymentConfig};
 use bonesdeploy_core::{config, paths};
 
 use crate::control_plane;
@@ -78,7 +78,9 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>, wa
     match fs::read_to_string(paths::ETC_PASSWD) {
         Ok(passwd) => {
             check_runtime_identity(&runtime_user, &runtime_group, &passwd, issues);
-            check_build_user(&build_user, &passwd, issues);
+            if descriptor.build.mode == BuildMode::Remote {
+                check_build_user(&build_user, &passwd, issues);
+            }
         }
         Err(error) => {
             issues.push(format!("could not read {} to validate user accounts ({error})", paths::ETC_PASSWD));

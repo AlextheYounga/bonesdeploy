@@ -5,14 +5,16 @@ use std::path::{Path, PathBuf};
 use std::process::{self, Command, ExitStatus, Stdio};
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::build_contract::{
+    BUILDER_IMAGE, CACHE_MOUNT, SOURCE_MOUNT, WORKSPACE_ROOT, deployment_tar_extract_command,
+};
 use bonesdeploy_core::config::variables;
-use bonesdeploy_core::paths;
 
 use super::build_user::{BuildScriptEnv, build_script_command, build_user_command, build_user_control_command};
 use super::ownership;
 use crate::release::output;
 
-pub const BUILD_IMAGE: &str = paths::IMAGE_STORE_BASE_IMAGE;
+pub const BUILD_IMAGE: &str = BUILDER_IMAGE;
 
 pub fn service_command(build_user: &str, container_name: &str) -> Command {
     let mut command = Command::new("systemd-run");
@@ -167,8 +169,8 @@ pub fn build_container_command(
 }
 
 pub fn configure_create(command: &mut Command, create: &ContainerCreate<'_>) {
-    let source_mount = format!("{}:/workspace/source", create.source_root.display());
-    let cache_mount = format!("{}:/workspace/cache:rw", create.env.build_cache_dir.display());
+    let source_mount = format!("{}:{SOURCE_MOUNT}", create.source_root.display());
+    let cache_mount = format!("{}:{CACHE_MOUNT}:rw", create.env.build_cache_dir.display());
     command
         .current_dir(create.source_root)
         .args(["podman", "run", "-d", "--pull=never"])
@@ -184,7 +186,7 @@ pub fn configure_create(command: &mut Command, create: &ContainerCreate<'_>) {
             "--env",
             &format!("{}={}", variables::PROJECT_NAME, create.env.project_name),
             "--env",
-            &format!("{}=/workspace", variables::PROJECT_ROOT),
+            &format!("{}={WORKSPACE_ROOT}", variables::PROJECT_ROOT),
             "--env",
             &format!("{}=", variables::REPO_PATH),
         ])
@@ -198,7 +200,7 @@ pub fn configure_create(command: &mut Command, create: &ContainerCreate<'_>) {
     command
         .args(["--env-file"])
         .arg(create.build_env_file)
-        .args(["--env", &format!("{}=/workspace/cache", variables::BUILD_CACHE_DIR), "--volume"])
+        .args(["--env", &format!("{}={CACHE_MOUNT}", variables::BUILD_CACHE_DIR), "--volume"])
         .arg(source_mount)
         .args(["--volume"])
         .arg(cache_mount)
@@ -246,7 +248,7 @@ pub fn configure_deployment_extract_command(command: &mut Command, source_root: 
         container_name,
         "sh",
         "-c",
-        "mkdir -p /workspace/deployment && tar --extract --file=- --no-same-owner --no-same-permissions --directory=/workspace/deployment",
+        &deployment_tar_extract_command(),
     ]);
 }
 

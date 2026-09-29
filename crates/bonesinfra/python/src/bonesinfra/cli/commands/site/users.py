@@ -102,29 +102,31 @@ def configure_build_user_cache(project_name: str):
 
 
 def ensure_users_and_groups(ctx):
+    host = ctx_host.get()
+
+    _ensure_site_identities(ctx, host)
+    if ctx.app.deploy.build_mode == "local":
+        return
+
     build_user = build_user_for(ctx.app.project_name)
     build_group = build_group_for(ctx.app.project_name)
     build_home = build_home_for(ctx.app.project_name)
-    host = ctx_host.get()
     cpu_quota = cpu_quota_for(host.get_fact(Cpus))
     staged_dropin = f"{BUILD_SYSTEMD_STAGING_ROOT}/{build_user}.slice.conf"
-
-    _ensure_site_identities(ctx, host, build_group)
+    server.group(
+        name="Ensure build group exists",
+        group=build_group,
+        _sudo=True,
+    )
     _ensure_build_user(build_user, build_group, build_home)
     _configure_build_user(ctx, build_user, cpu_quota, staged_dropin)
     _verify_build_user(build_user, build_home)
 
 
-def _ensure_site_identities(ctx, host, build_group):
+def _ensure_site_identities(ctx, host):
     server.group(
         name="Ensure runtime group exists",
         group=ctx.runtime.runtime_group,
-        _sudo=True,
-    )
-
-    server.group(
-        name="Ensure build group exists",
-        group=build_group,
         _sudo=True,
     )
 

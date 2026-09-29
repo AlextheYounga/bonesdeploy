@@ -3,9 +3,10 @@ use std::fs;
 use std::process;
 
 use anyhow::{Result, anyhow};
+use bonesdeploy_core::build_contract::{
+    derived_environment as derived_config_env, environment as resolve_build_env, numbered_scripts as list_scripts,
+};
 use bonesdeploy_core::config::load;
-
-use bonesremote::release::lifecycle::build::run_scripts::{derived_config_env, list_scripts, resolve_build_env};
 
 #[test]
 fn list_scripts_only_includes_numbered_shell_scripts() -> Result<()> {

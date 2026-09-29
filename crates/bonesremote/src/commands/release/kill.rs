@@ -5,10 +5,11 @@ use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{Bones, build_user_for, validate_site_name};
+use bonesdeploy_core::config::{Bones, BuildMode, build_user_for, validate_site_name};
 use bonesdeploy_core::paths;
 
 use crate::commands::{drop_failed_release, release::list};
+use crate::control_plane;
 use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::lifecycle::build::{ensure_build_user_ready, remove_build_container};
@@ -24,7 +25,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     // site identity and stop the process *before* the lock becomes available.
     // Only then is the guard assembled and used for all file mutations.
     validate_site_name(site)?;
-    let config = Bones::for_site(site);
+    let config = control_plane::load(site)?.into_site_config(site);
     let active = release_state::read_active_deployment(site)?;
     if let Some(active) = &active {
         if active.release() != release {
@@ -51,10 +52,12 @@ pub fn run(site: &str, release: &str) -> Result<()> {
         bail!("Active deployment changed while cancelling {release}; no cleanup was performed.");
     }
 
-    let build_user = build_user_for(site);
-    let working_dir = Path::new(&config.project_root);
-    ensure_build_user_ready(&build_user, working_dir)?;
-    remove_build_container(&build_user, site, working_dir)?;
+    if requires_build_cleanup(&config) {
+        let build_user = build_user_for(site);
+        let working_dir = Path::new(&config.project_root);
+        ensure_build_user_ready(&build_user, working_dir)?;
+        remove_build_container(&build_user, site, working_dir)?;
+    }
 
     if let Some(context) = current.as_ref().and_then(|deployment| deployment.context()) {
         let context = Path::new(context);
@@ -76,6 +79,10 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     mutation.clear_active()?;
     println!("Cancelled release: {release}");
     Ok(())
+}
+
+fn requires_build_cleanup(config: &Bones) -> bool {
+    config.build.mode == BuildMode::Remote
 }
 
 fn cleanup_stale_contexts(site: &str, project_root: &str) -> Result<()> {
@@ -128,4 +135,29 @@ pub fn wait_for_process_exit(active: &DeploymentRecord, timeout: Duration) -> bo
         thread::sleep(Duration::from_millis(100));
     }
     !list::process_matches(active)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use bonesdeploy_core::config::BuildMode;
+    use tempfile::tempdir;
+
+    use super::*;
+
+    #[test]
+    fn local_mode_skips_build_cleanup_and_removes_a_valid_context() -> Result<()> {
+        let root = tempdir()?;
+        let mut config = Bones::for_site("demo");
+        config.build.mode = BuildMode::Local;
+        let context = root.path().join(paths::TMP_BUILDS_DIR).join("build-demo-1");
+        fs::create_dir_all(&context)?;
+        fs::write(context.join("partial"), "data")?;
+
+        assert!(!requires_build_cleanup(&config));
+        cleanup_stale_contexts("demo", &root.path().display().to_string())?;
+        assert!(!context.exists());
+        Ok(())
+    }
 }

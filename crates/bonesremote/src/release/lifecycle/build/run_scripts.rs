@@ -1,12 +1,10 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{
-    self, build_env, build_group_for, build_timeout_seconds, build_user_for, is_numbered_shell_script, variables,
-};
+use bonesdeploy_core::build_contract;
+use bonesdeploy_core::config::{build_group_for, build_timeout_seconds, build_user_for};
 use bonesdeploy_core::paths;
-use serde_json::Value;
 
 use super::build_user::BuildScriptEnv;
 use super::container::BuildContainer;
@@ -31,13 +29,13 @@ pub fn run(snapshot: &super::super::DeploymentSnapshot, context: &Path) -> Resul
         return Ok(());
     }
 
-    let scripts = list_scripts(&scripts_dir)?;
+    let scripts = build_contract::numbered_scripts(&scripts_dir)?;
     if scripts.is_empty() {
         println!("No deployment scripts found at {}; skipping build.", scripts_dir.display());
         return Ok(());
     }
 
-    let build_env_vars = resolve_build_env(cfg, context)?;
+    let build_env_vars = build_contract::environment(cfg, context)?;
     let deployment_dir = scripts_dir.parent().context("Build scripts directory has no deployment parent")?;
     let build_cache_dir = paths::bonesdeploy_user_cache(&build_user);
 
@@ -72,89 +70,4 @@ pub fn run(snapshot: &super::super::DeploymentSnapshot, context: &Path) -> Resul
     container.remove()?;
 
     Ok(())
-}
-
-pub fn resolve_build_env(cfg: &config::Bones, source_context: &Path) -> Result<Vec<(String, String)>> {
-    let mut env_vars = derived_config_env(cfg)?;
-
-    let env_build = build_env::load(source_context)?;
-    for (key, value) in env_build {
-        if CONTAINER_ENV_DENYLIST.contains(&key.as_str()) {
-            bail!(".env.build variable `{key}` is reserved for the build container contract");
-        }
-        env_vars.push((key, value));
-    }
-
-    Ok(env_vars)
-}
-
-const DERIVED_ENV_DENYLIST: &[&str] = &[
-    "app.remote_name",
-    "app.ssh_user",
-    "app.host",
-    "app.port",
-    "app.branch",
-    "app.repo_path",
-    "app.project_root",
-    "runtime.permissions",
-    "runtime.backend",
-    "runtime.node_version",
-    "app.server.host",
-    "app.server.port",
-    "app.dns",
-    "build.timeout_seconds",
-];
-
-const CONTAINER_ENV_DENYLIST: &[&str] = variables::CONTAINER_CONTROLLED;
-
-pub fn derived_config_env(cfg: &config::Bones) -> Result<Vec<(String, String)>> {
-    let value = serde_json::to_value(cfg).context("Failed to serialize configuration for build environment")?;
-    let mut values = Vec::new();
-    flatten_scalars(&value, &mut Vec::new(), &mut values);
-    Ok(values)
-}
-
-fn flatten_scalars<'a>(value: &'a Value, path: &mut Vec<&'a str>, values: &mut Vec<(String, String)>) {
-    match value {
-        Value::Object(entries) => {
-            for (key, value) in entries {
-                path.push(key);
-                flatten_scalars(value, path, values);
-                path.pop();
-            }
-        }
-        Value::String(value) => add_scalar(path, value, values),
-        Value::Bool(value) => add_scalar(path, &value.to_string(), values),
-        Value::Number(value) => add_scalar(path, &value.to_string(), values),
-        Value::Array(_) | Value::Null => {}
-    }
-}
-
-fn add_scalar(path: &[&str], value: &str, values: &mut Vec<(String, String)>) {
-    let path_name = path.join(".");
-    if path.is_empty()
-        || DERIVED_ENV_DENYLIST
-            .iter()
-            .any(|denied| path_name == *denied || path_name.starts_with(&format!("{denied}.")))
-    {
-        return;
-    }
-
-    let name = format!("BONES_{}", path.join("_").to_ascii_uppercase());
-    values.push((name, value.to_string()));
-}
-
-pub fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
-    let mut scripts = Vec::new();
-    for entry in
-        fs::read_dir(scripts_dir).with_context(|| format!("Failed to read scripts dir: {}", scripts_dir.display()))?
-    {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_file() && path.file_name().and_then(|name| name.to_str()).is_some_and(is_numbered_shell_script) {
-            scripts.push(path);
-        }
-    }
-    scripts.sort();
-    Ok(scripts)
 }

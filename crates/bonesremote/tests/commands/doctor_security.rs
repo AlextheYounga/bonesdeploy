@@ -24,13 +24,49 @@ fn duplicate_runtime_identity_fails_isolation() {
             name: "atlas".to_string(),
             project_root: PathBuf::from("/srv/sites/atlas"),
             runtime: account("atlas", 1001, 1001),
-            build: account("atlas-build", 1002, 1002),
+            build: Some(account("atlas-build", 1002, 1002)),
         },
         Site {
             name: "beacon".to_string(),
             project_root: PathBuf::from("/srv/sites/beacon"),
             runtime: account("beacon", 1001, 1001),
-            build: account("beacon-build", 1004, 1004),
+            build: Some(account("beacon-build", 1004, 1004)),
+        },
+    ];
+
+    assert_eq!(evaluate_identities(&sites, &deploy).status, Status::Fail);
+}
+
+#[test]
+fn local_site_without_build_identity_remains_isolated() {
+    let deploy = account("git", 1000, 1000);
+    let sites = vec![Site {
+        name: "atlas".to_string(),
+        project_root: PathBuf::from("/srv/sites/atlas"),
+        runtime: account("atlas", 1001, 1001),
+        build: None,
+    }];
+
+    assert_eq!(evaluate_identities(&sites, &deploy).status, Status::Pass);
+}
+
+#[test]
+fn remote_build_identity_membership_in_another_site_group_fails_isolation() {
+    let deploy = account("git", 1000, 1000);
+    let mut atlas_build = account("atlas-build", 1002, 1002);
+    atlas_build.groups.insert(1003);
+    let sites = vec![
+        Site {
+            name: "atlas".to_string(),
+            project_root: PathBuf::from("/srv/sites/atlas"),
+            runtime: account("atlas", 1001, 1001),
+            build: Some(atlas_build),
+        },
+        Site {
+            name: "beacon".to_string(),
+            project_root: PathBuf::from("/srv/sites/beacon"),
+            runtime: account("beacon", 1003, 1003),
+            build: None,
         },
     ];
 

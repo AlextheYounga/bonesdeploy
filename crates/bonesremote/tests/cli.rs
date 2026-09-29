@@ -53,6 +53,20 @@ fn deploy_rejects_the_removed_config_stdin_option() -> Result<()> {
 }
 
 #[test]
+fn deploy_accepts_the_exact_artifact_stdin_form() -> Result<()> {
+    let output = common::run(&["deploy", "--site", "atlas", "--artifact-stdin"])?;
+    assert_ne!(output.status.code(), Some(2), "artifact stdin must be accepted by clap");
+    Ok(())
+}
+
+#[test]
+fn deploy_rejects_artifact_stdin_with_a_revision() -> Result<()> {
+    let output = common::run(&["deploy", "--site", "atlas", "--revision", "main", "--artifact-stdin"])?;
+    assert_eq!(output.status.code(), Some(2));
+    Ok(())
+}
+
+#[test]
 fn decommission_protocol_commands_accept_a_site_argument() -> Result<()> {
     for command in ["begin", "complete", "verify", "reactivate"] {
         let output = common::run(&["decommission", command, "--site", "atlas"])?;

@@ -1,14 +1,14 @@
 use anyhow::Result;
 use e2e::project::SampleProject;
 
-use super::harness::Harness;
+use super::harness::{BuildMode, Harness};
 
 const SITE: &str = "e2elaravel";
 const MARKER: &str = "e2e-laravel-php";
 const PHP_VERSION: &str = "8.5";
 
-pub fn provision(harness: &Harness) -> Result<SampleProject> {
-    let project = harness.provision(SITE, "laravel", &["php_version=8.5"])?;
+pub fn provision(harness: &Harness, build_mode: BuildMode) -> Result<SampleProject> {
+    let project = harness.provision(SITE, "laravel", &["php_version=8.5"], build_mode)?;
     harness.write_laravel_probe(SITE, MARKER)?;
     Ok(project)
 }

@@ -66,6 +66,8 @@ owner is canonical. Bypassing it creates a competing abstraction.
 | Language runtime installation | `LanguageRuntime` ABC | Add subclass in `services/languages/` | Install runtimes directly from framework `runtime.py` |
 | Compose host provisioning | `services/linux/compose.py` | Install Docker and render the generic site unit/optional nginx ingress | Interpret project Compose files in BonesInfra |
 | Compose deployment runtime | `bonesremote::runtime::docker` | Reuse explicit Compose discovery, commands, and inspection | Create a second release lifecycle or parse Compose internally |
+| Native build execution | `bonesdeploy` local artifact path or `bonesremote` native build stage | Use the shared build contract and existing lifecycle | Add a build-mode fallback or a second promotion/activation flow |
+| Local artifact verification | `bonesremote::release::lifecycle::artifact` | Validate manifest identity, digest, limits, and safe extraction before promotion | Extract an untrusted archive directly into a release |
 | Remote site mutation | `SiteMutation` | Acquire it before any site state change | Create independent locking or config-validation paths |
 | Deployment lifecycle stages | Lifecycle modules (`release/lifecycle/`) | Add behavior to existing stage | Create a separate deployment flow |
 | Per-site persisted state | `SiteState` + `state/` store | Read/write through the store API | Touch state files directly |
@@ -443,6 +445,19 @@ Do not:
 - Skip persisting phase transitions to SiteState
 - Bypass the preflight gate before activation
 ```
+
+Local build mode is an execution-location choice, not a second deployment
+lifecycle. `bonesdeploy init --build-mode local` stores managed
+`BONES_BUILD_MODE=local`; the default remains `remote`. Local mode is valid only
+with the native runtime and has no remote-build fallback. The local CLI resolves
+the configured branch to an exact commit, builds the exported tree in rootless
+Podman with the pinned `linux/amd64` builder, and streams a complete `tar.gz`
+artifact. Bonesremote verifies the site, exact branch commit, builder digest,
+payload length, SHA-256, and safe extraction constraints before promotion.
+After that boundary, prepare, sealing, activation, restart, pruning, and
+rollback are unchanged. Server provisioning is mode-aware: remote mode gets its
+dedicated build user, cache, rootless Podman manager, and resource limits; local
+mode does not. Django prepare still installs application dependencies.
 
 ```text
 ### SiteState

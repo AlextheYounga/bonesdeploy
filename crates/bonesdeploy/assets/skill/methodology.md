@@ -58,7 +58,7 @@ deploy that fails into a security incident.
 
 ## The build container
 
-Build scripts run in `buildpack-deps:bookworm` with `cwd=/workspace/source`.
+Build scripts run in the project-pinned `buildpack-deps:bookworm` image with `cwd=/workspace/source`.
 The container gets the exported source tree and a private persistent build
 cache at `/workspace/cache`. It does *not* get `.env`, `shared/`,
 `current/`, `releases/`, the bare repo, or host `bonesremote` control-plane

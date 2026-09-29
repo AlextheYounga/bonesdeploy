@@ -56,16 +56,20 @@ BonesInfra owns:
 - nginx/AppArmor/systemd provisioning details
 - scheduled Borg backup provisioning
 
-Setup provisioning gives each `<site>-build` user its own persistent home,
-distribution-allocated subordinate UID/GID mappings, and a lingering systemd
-user manager for rootless Podman. Runtime application users remain home-less
-and non-login.
+Remote-build site provisioning gives each `<site>-build` user its own persistent
+home, distribution-allocated subordinate UID/GID mappings, and a lingering
+systemd user manager for rootless Podman. Local-build native sites retain the
+runtime user and site layout but do not create per-site build identities or
+their rootless Podman resources. Runtime application users remain home-less and
+non-login.
 
 Repository and site paths are derived from `project_name`: `repo_path` defaults to `/home/git/<project>.git` and `project_root` defaults to `/srv/sites/<project>`.
 
-Each build user's outer `user-<UID>.slice` is limited by root-owned systemd
-resource control at 80% CPU quota, 80% memory high, and 80% memory max, plus
-`MemorySwapMax=0` so a runaway build cannot thrash host swap.
+Each remote build user's outer `user-<UID>.slice` is limited by root-owned
+systemd resource control at 80% CPU quota, 80% memory high, and 80% memory max,
+plus `MemorySwapMax=0` so a runaway build cannot thrash host swap. Local-build
+native sites do not receive this per-site slice, cache, storage configuration,
+linger, or Podman readiness verification.
 CPUQuota is that percentage of each online CPU; MemoryHigh is the soft
 reclaim/throttling threshold, while MemoryMax is the hard cgroup ceiling, so
 exceeding it fails the build rather than starving the host. These are

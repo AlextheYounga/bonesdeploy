@@ -37,6 +37,9 @@ pub enum Command {
         /// Application runtime backend (native or Docker Compose; default: native)
         #[arg(long, value_parser = ["native", "docker"])]
         runtime_backend: Option<String>,
+        /// Where native build scripts run (local or remote; default: remote)
+        #[arg(long, value_parser = ["local", "remote"])]
+        build_mode: Option<String>,
         /// Framework variable override, repeated (e.g. `--framework-var php_version=8.5`)
         #[arg(long = "framework-var", value_name = "KEY=VALUE")]
         framework_vars: Vec<String>,

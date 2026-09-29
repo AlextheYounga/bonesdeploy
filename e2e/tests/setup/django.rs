@@ -1,12 +1,12 @@
 use anyhow::Result;
 use e2e::project::SampleProject;
 
-use super::harness::Harness;
+use super::harness::{BuildMode, Harness};
 
 const SITE: &str = "e2edjango";
 
-pub fn provision(harness: &Harness) -> Result<SampleProject> {
-    harness.provision(SITE, "django", &["wsgi_module=djangotest.wsgi:application"])
+pub fn provision(harness: &Harness, build_mode: BuildMode) -> Result<SampleProject> {
+    harness.provision(SITE, "django", &["wsgi_module=djangotest.wsgi:application"], build_mode)
 }
 
 pub fn assert_running(harness: &Harness) -> Result<()> {

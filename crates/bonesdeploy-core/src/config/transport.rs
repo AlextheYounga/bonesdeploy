@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 
-use super::model::{Backup, Bones, RuntimeBackend};
+use super::model::{Backup, Bones, BuildMode, RuntimeBackend};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -27,6 +27,8 @@ pub struct SiteFields {
     pub node_version: String,
     pub compose_port: Option<u16>,
     pub compose_wait_timeout: u16,
+    #[serde(default = "default_build_mode")]
+    pub build_mode: String,
     pub backup: Backup,
     pub extras: BTreeMap<String, serde_json::Value>,
 }
@@ -44,6 +46,7 @@ impl ProvisioningRequest {
     /// # Errors
     /// Returns an error when an extra is an array or table.
     pub fn from_bones(config: &Bones) -> Result<Self> {
+        super::model::validate_build_mode(&config.runtime, &config.build)?;
         let mut extras = BTreeMap::new();
         for (key, value) in &config.runtime.extra {
             let json = match value {
@@ -84,6 +87,10 @@ impl ProvisioningRequest {
                 node_version: config.runtime.node_version.clone(),
                 compose_port: config.runtime.compose_port,
                 compose_wait_timeout: config.runtime.compose_wait_timeout,
+                build_mode: match config.build.mode {
+                    BuildMode::Local => "local".into(),
+                    BuildMode::Remote => "remote".into(),
+                },
                 backup: config.backup.clone(),
                 extras,
             }),
@@ -97,6 +104,10 @@ impl ProvisioningRequest {
             site: None,
         }
     }
+}
+
+fn default_build_mode() -> String {
+    "remote".into()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -117,6 +128,13 @@ impl RemoteDeploymentConfig {
             runtime: config.runtime.clone(),
             build: config.build.clone(),
         }
+    }
+
+    /// Validates the transported runtime/build combination at the remote
+    /// descriptor boundary.
+    pub fn validate(&self) -> Result<()> {
+        super::model::validate_runtime(&self.runtime)?;
+        super::model::validate_build_mode(&self.runtime, &self.build)
     }
 
     #[must_use]

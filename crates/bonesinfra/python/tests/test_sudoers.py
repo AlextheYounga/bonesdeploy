@@ -1,4 +1,4 @@
-"""The deploy sudo boundary permits only two exact BonesRemote argument forms."""
+"""The deploy sudo boundary permits only exact BonesRemote argument forms."""
 
 import re
 
@@ -16,7 +16,8 @@ SUDOERS_PATH = "/etc/sudoers.d/bonesdeploy"
 
 ALLOWED_RULE = (
     f"{DEPLOY_USER} ALL=(root) NOPASSWD: {BONESREMOTE_PATH} ^config sync --site [a-z0-9-]+$, "
-    f"{BONESREMOTE_PATH} ^deploy --site [a-z0-9-]+$"
+    f"{BONESREMOTE_PATH} ^deploy --site [a-z0-9-]+$, "
+    f"{BONESREMOTE_PATH} ^deploy --site [a-z0-9-]+ --artifact-stdin$"
 )
 
 
@@ -61,6 +62,7 @@ def test_sudoers_pins_the_direct_bonesremote_allowlist():
         ["config", "sync", "--site", "atlas-2"],
         ["deploy", "--site", "demo"],
         ["deploy", "--site", "atlas-2"],
+        ["deploy", "--site", "demo", "--artifact-stdin"],
     ],
 )
 def test_allowed_argument_forms_are_permitted(argv):
@@ -82,6 +84,8 @@ def test_allowed_argument_forms_are_permitted(argv):
         ["deploy", "--site=demo"],
         ["config", "sync", "--site", "demo", "extra"],
         ["deploy", "--site", "demo", "--config-stdin"],
+        ["deploy", "--artifact-stdin", "--site", "demo"],
+        ["deploy", "--site", "demo", "--artifact-stdin", "extra"],
         ["config", "sync", "--config-stdin", "--site", "demo"],
         ["config", "sync", "--config-stdin"],
         ["--config-stdin"],

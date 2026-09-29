@@ -1,4 +1,5 @@
 use std::collections::BTreeSet;
+use std::iter::once;
 use std::path::PathBuf;
 
 use super::fs::{Authority, account_can_modify, has_login_shell};
@@ -31,7 +32,9 @@ pub fn evaluate_identities(sites: &[Site], deploy: &Account) -> Finding {
     let mut runtime_user_ids = BTreeSet::new();
     let mut runtime_primary_groups = BTreeSet::new();
     for site in sites {
-        if site.runtime.uid == site.build.uid || site.runtime.gid == site.build.gid {
+        if let Some(build) = &site.build
+            && (site.runtime.uid == build.uid || site.runtime.gid == build.gid)
+        {
             return finding(
                 Status::Fail,
                 IDENTITY_RULE,
@@ -60,12 +63,7 @@ pub fn evaluate_identities(sites: &[Site], deploy: &Account) -> Finding {
             );
         }
         for other in sites {
-            if site.name != other.name
-                && (site.runtime.groups.contains(&other.runtime.gid)
-                    || site.runtime.groups.contains(&other.build.gid)
-                    || site.build.groups.contains(&other.runtime.gid)
-                    || site.build.groups.contains(&other.build.gid))
-            {
+            if site.name != other.name && accounts_share_identity_group(site, other) {
                 return finding(
                     Status::Fail,
                     IDENTITY_RULE,
@@ -74,11 +72,13 @@ pub fn evaluate_identities(sites: &[Site], deploy: &Account) -> Finding {
             }
         }
     }
-    finding(
-        Status::Pass,
-        IDENTITY_RULE,
-        format!("{} imported site(s) have distinct runtime/build identities", sites.len()),
-    )
+    finding(Status::Pass, IDENTITY_RULE, format!("{} imported site(s) have distinct required identities", sites.len()))
+}
+
+fn accounts_share_identity_group(site: &Site, other: &Site) -> bool {
+    let mut site_accounts = once(&site.runtime).chain(site.build.iter());
+    let other_groups = once(other.runtime.gid).chain(other.build.iter().map(|account| account.gid));
+    site_accounts.any(|account| other_groups.clone().any(|group| account.groups.contains(&group)))
 }
 
 pub fn evaluate_runtime_sudo(evidence: &SudoEvidence) -> Finding {

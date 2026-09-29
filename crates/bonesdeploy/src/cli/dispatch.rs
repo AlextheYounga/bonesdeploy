@@ -16,6 +16,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
             port,
             template,
             runtime_backend,
+            build_mode,
             framework_vars,
         } => {
             init::run(&init::Args {
@@ -27,6 +28,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
                 port: port.clone(),
                 template: template.clone(),
                 runtime_backend: runtime_backend.clone(),
+                build_mode: build_mode.clone(),
                 framework_vars: framework_vars.clone(),
             })?;
             Ok(())

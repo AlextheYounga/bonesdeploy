@@ -22,6 +22,21 @@ pub struct HarnessRef {
     _guard: MutexGuard<'static, Option<Harness>>,
 }
 
+#[derive(Clone, Copy)]
+pub enum BuildMode {
+    Remote,
+    Local,
+}
+
+impl BuildMode {
+    fn argument(self) -> &'static str {
+        match self {
+            Self::Remote => "remote",
+            Self::Local => "local",
+        }
+    }
+}
+
 impl Deref for HarnessRef {
     type Target = Harness;
 
@@ -58,6 +73,42 @@ pub struct Harness {
     server_setup_complete: Mutex<bool>,
 }
 
+pub struct NginxSabotage<'a> {
+    harness: &'a Harness,
+    unit: String,
+    restored: bool,
+}
+
+impl NginxSabotage<'_> {
+    pub fn restore(&mut self) -> Result<()> {
+        if self.restored {
+            return Ok(());
+        }
+        let mut errors = Vec::new();
+        if let Err(error) = self.harness.exec(&format!("systemctl unmask --runtime -- {}", self.unit)) {
+            errors.push(format!("unmask: {error:#}"));
+        }
+        if let Err(error) = self.harness.exec("systemctl daemon-reload") {
+            errors.push(format!("daemon-reload: {error:#}"));
+        }
+        if let Err(error) = self.harness.exec(&format!("systemctl restart -- {}", self.unit)) {
+            errors.push(format!("restart: {error:#}"));
+        }
+        self.restored = true;
+        if errors.is_empty() { Ok(()) } else { bail!("Failed to restore {}: {}", self.unit, errors.join("; ")) }
+    }
+}
+
+impl Drop for NginxSabotage<'_> {
+    fn drop(&mut self) {
+        if !self.restored
+            && let Err(error) = self.restore()
+        {
+            eprintln!("Failed to restore {} after E2E sabotage: {error:#}", self.unit);
+        }
+    }
+}
+
 impl Harness {
     pub fn create() -> Result<Self> {
         incus::check_server()?;
@@ -77,7 +128,16 @@ impl Harness {
         Ok(Self { artifacts, container, host, session, server_setup_complete: Mutex::new(false) })
     }
 
-    pub fn provision(&self, site: &str, template: &str, framework_vars: &[&str]) -> Result<SampleProject> {
+    // Keep the matrix inputs together so framework scenarios can opt into a
+    // build mode without duplicating the provisioning path.
+    #[allow(clippy::too_many_arguments)]
+    pub fn provision(
+        &self,
+        site: &str,
+        template: &str,
+        framework_vars: &[&str],
+        build_mode: BuildMode,
+    ) -> Result<SampleProject> {
         let fixture = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures").join(format!("{template}.md"));
         let project = SampleProject::from_fixture(&self.session, &fixture)?;
         let mut init_args = vec![
@@ -91,6 +151,8 @@ impl Harness {
             &self.host,
             "--template",
             template,
+            "--build-mode",
+            build_mode.argument(),
         ];
         for framework_var in framework_vars {
             init_args.extend(["--framework-var", *framework_var]);
@@ -193,6 +255,16 @@ impl Harness {
              ! systemctl is-active --quiet {service}"
         ))?;
         Ok(())
+    }
+
+    pub fn current_release(&self, site: &str) -> Result<String> {
+        Ok(self.exec(&format!("readlink -f /srv/sites/{site}/current"))?.trim().to_string())
+    }
+
+    pub fn sabotage_nginx(&self, site: &str) -> Result<NginxSabotage<'_>> {
+        let unit = format!("{site}-nginx.service");
+        self.exec(&format!("systemctl mask --runtime -- {unit}"))?;
+        Ok(NginxSabotage { harness: self, unit, restored: false })
     }
 
     pub fn write_laravel_probe(&self, site: &str, marker: &str) -> Result<()> {

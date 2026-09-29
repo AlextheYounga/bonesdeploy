@@ -211,6 +211,66 @@ pub async fn stream_cmd_with_stdin(session: &Session, cmd: &str, stdin_bytes: &[
     Ok(())
 }
 
+/// Streams a small protocol prefix and an asynchronous payload without buffering
+/// the payload while remote output is drained concurrently.
+pub async fn stream_cmd_with_reader<R>(session: &Session, cmd: &str, prefix: &[u8], mut reader: R) -> Result<()>
+where
+    R: tokio_io::AsyncRead + Unpin,
+{
+    let mut child = session
+        .command("bash")
+        .arg("-c")
+        .arg(cmd)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .await
+        .with_context(|| format!("Failed to execute remote command: {cmd}"))?;
+    let mut stdin = child.stdin().take().ok_or_else(|| anyhow::anyhow!("stdin was not piped"))?;
+    let stdout = child.stdout().take().ok_or_else(|| anyhow::anyhow!("stdout was not piped"))?;
+    let stderr = child.stderr().take().ok_or_else(|| anyhow::anyhow!("stderr was not piped"))?;
+    let stdout_task = tokio::spawn(drain_lines(stdout, false));
+    let stderr_task = tokio::spawn(drain_lines(stderr, true));
+
+    let upload = async {
+        stdin.write_all(prefix).await.context("Failed to write artifact manifest to remote command")?;
+        tokio_io::copy(&mut reader, &mut stdin).await.context("Failed to stream artifact to remote command")?;
+        stdin.shutdown().await.context("Failed to close artifact upload")?;
+        Ok::<(), anyhow::Error>(())
+    }
+    .await;
+    if let Err(error) = upload {
+        let _ = child.disconnect().await;
+        let _ = tokio::join!(stdout_task, stderr_task);
+        return Err(error);
+    }
+
+    let (stdout_result, stderr_result) = tokio::join!(stdout_task, stderr_task);
+    stdout_result.context("Failed to join remote stdout reader")??;
+    stderr_result.context("Failed to join remote stderr reader")??;
+    let status = child.wait().await.context("Failed to wait for remote command")?;
+    if !status.success() {
+        bail!("Remote command failed: {cmd}");
+    }
+    Ok(())
+}
+
+async fn drain_lines<R>(stream: R, stderr: bool) -> io::Result<()>
+where
+    R: tokio_io::AsyncRead + Unpin,
+{
+    let mut lines = BufReader::new(stream).lines();
+    while let Some(line) = lines.next_line().await? {
+        if stderr {
+            eprintln!("{line}");
+        } else {
+            println!("{line}");
+        }
+    }
+    Ok(())
+}
+
 pub fn remote_command_failure(cmd: &str, stdout: &[u8], stderr: &[u8]) -> String {
     let stdout = String::from_utf8_lossy(stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(stderr).trim().to_string();

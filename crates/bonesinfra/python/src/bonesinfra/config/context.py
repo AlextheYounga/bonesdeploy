@@ -3,11 +3,12 @@ from __future__ import annotations
 # The parser import is intentionally lazy to keep domain dataclasses importable.
 # ruff: noqa: PLC0415
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from bonesinfra.config.paths import DeploymentPaths
 
 DEPLOY_USER = "git"
+BuildMode = Literal["local", "remote"]
 
 
 @dataclass
@@ -54,6 +55,7 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
         "web_root": ctx.runtime.web_root,
         "repo_path": paths["repo"],
         "branch": ctx.app.deploy.branch,
+        "build_mode": ctx.app.deploy.build_mode,
         "deploy_user": DEPLOY_USER,
         "runtime_user": ctx.runtime.runtime_user,
         "runtime_group": ctx.runtime.runtime_group,
@@ -105,6 +107,7 @@ class DnsConfig:
 @dataclass
 class DeployConfig:
     branch: str
+    build_mode: BuildMode = "remote"
 
 
 @dataclass

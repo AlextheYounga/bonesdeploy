@@ -9,6 +9,7 @@ from typing import Any
 from bonesinfra.config.context import (
     AppConfig,
     BackupConfig,
+    BuildMode,
     DeployConfig,
     DeployContext,
     DnsConfig,
@@ -89,6 +90,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
             "backend",
             "web_root",
             "branch",
+            "build_mode",
             "node_version",
             "compose_port",
             "compose_wait_timeout",
@@ -102,6 +104,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
     backend = site.get("backend", "native")
     if backend not in {"native", "docker"}:
         raise ValueError("RUNTIME_BACKEND must be 'native' or 'docker'")
+    build_mode = _parse_build_mode(site.get("build_mode", "remote"), backend)
     template = _string(site.get("template", "custom"), "site.template") or "custom"
     if template not in _FRAMEWORKS:
         raise ValueError(f"unknown framework infrastructure: {template}")
@@ -137,7 +140,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
                 email,
                 ssl_enabled,
             ),
-            DeployConfig(_string(site.get("branch", "main"), "site.branch")),
+            DeployConfig(_string(site.get("branch", "main"), "site.branch"), build_mode),
         ),
         runtime=RuntimeConfig(
             backend,
@@ -170,6 +173,14 @@ def _optional_port(value: Any) -> int | None:
         return None
     if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= _MAX_PORT:
         raise ValueError("site.compose_port must be an integer from 1 through 65535")
+    return value
+
+
+def _parse_build_mode(value: Any, backend: str) -> BuildMode:
+    if value not in {"local", "remote"}:
+        raise ValueError("site.build_mode must be 'local' or 'remote'")
+    if value == "local" and backend != "native":
+        raise ValueError("site.build_mode 'local' requires the native runtime backend")
     return value
 
 

@@ -24,8 +24,11 @@ pub enum Command {
         #[arg(long)]
         site: String,
         /// Exact revision to deploy (defaults to the configured branch)
-        #[arg(long)]
+        #[arg(long, conflicts_with = "artifact_stdin")]
         revision: Option<String>,
+        /// Receive a framed local-build artifact from standard input
+        #[arg(long)]
+        artifact_stdin: bool,
     },
     /// Synchronize the sanitized site configuration snapshot
     Config {

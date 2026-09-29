@@ -189,6 +189,17 @@ From your project repo:
 bonesdeploy init
 ```
 
+Remote builds are the default. Opt into workstation builds during
+initialization with:
+
+```sh
+bonesdeploy init --build-mode local
+```
+
+This writes the managed `BONES_BUILD_MODE=local` setting to `.env`; `remote`
+preserves the compatibility default. Local mode is native-runtime-only and
+does not fall back to a remote build if it fails.
+
 For CI or AI agents, pick a runtime template and pass variables non-interactively:
 
 ```sh
@@ -466,6 +477,7 @@ BONES_PORT=22
 BONES_BRANCH=main
 BONES_TEMPLATE=custom
 BONES_RUNTIME_BACKEND=native
+BONES_BUILD_MODE=remote
 # <<< BonesDeploy managed configuration <<<
 ```
 
@@ -488,7 +500,7 @@ the encrypted file contains only values the application needs at runtime.
 ```text
 deployment/
 ├── build/
-│   └── 01_*.sh      # build scripts (run sequentially in the build container)
+│   └── 01_*.sh      # build scripts (run sequentially under the selected build mode)
 └── prepare/
     └── 01_*.sh      # prepare scripts (run as the site user before activation)
 ```
@@ -504,18 +516,29 @@ sudo 1.9.10 or newer. The lifecycle retains the existing root-owned state,
 lock, and release boundaries; repository build scripts still run as the
 dedicated build user and prepare scripts still run as the site runtime user.
 
-Build scripts in `deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order inside bonesremote's `buildpack-deps:bookworm` container. Each build script is capped at 300 seconds by default; a configured timeout of `0` disables that per-script limit. Bonesremote streams an ephemeral copy of the deployment bundle into the container at `/workspace/deployment`, so the build user never needs host access to control-plane files. BonesInfra provisions a private persistent cache for each build user; bonesremote mounts it at `/workspace/cache` and exposes `BUILD_CACHE_DIR`. The shared deployment functions use it for Node, Corepack, npm, pnpm, Yarn, Composer, and Bundler downloads. Installed dependency trees and build output remain disposable. Prepare scripts in `deployment/prepare/` also run in order, but on the host as the site runtime user after shared paths are wired and before activation. Bonesremote streams the shared functions into each prepare shell before the prepare script.
+Build scripts in `deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order. In `remote` mode they run inside bonesremote's `buildpack-deps:bookworm` container. In `local` mode, `bonesdeploy` resolves the configured branch to its exact committed Git revision, exports that tree, and runs the same native contract in rootless local Podman with the pinned `linux/amd64` builder image. Each build script is capped at 300 seconds by default; a configured timeout of `0` disables that per-script limit. Remote builds use an ephemeral deployment bundle and private persistent cache; local builds use the workstation's isolated cache. Installed dependency trees and build output remain disposable. Local mode packages the complete post-build tree as a `tar.gz` artifact and streams it over SSH. Prepare scripts in `deployment/prepare/` still run in order on the host as the site runtime user after shared paths are wired and before activation. Bonesremote streams the shared functions into each prepare shell before the prepare script.
 
 Build scripts can set runtime options such as `NODE_OPTIONS=--max-old-space-size=<MiB>` when a project needs a V8 heap limit. Node does not provide a general CPU-percentage limit; `UV_THREADPOOL_SIZE` only changes libuv's file-system, crypto, DNS, and zlib worker pool. Beyond per-script timeouts, BonesInfra caps each build user's host-level slice at 80% CPU quota, 80% memory high/max, and `MemorySwapMax=0`, so a runaway build fails rather than exhausting host memory or swap.
 
 BonesRemote also exposes safe scalar runtime values as transient `BONES_*` variables in the build container (for example, `BONES_RUNTIME_IS_STATIC` and `BONES_RUNTIME_TEMPLATE`). These values come from the local deployment descriptor; application secrets from remote `shared/.env` are never parsed or injected into build inputs. Runtime permissions, shared paths, service identities, server connection details, and DNS/SSL configuration are excluded. Use `.env.build` for committed public build configuration; use remote `shared/.env` for runtime secrets.
 
-Rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager, Podman, and the Infra-provisioned build cache before staging a release. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
+Remote rootless Podman commands run through the dedicated build user's systemd user manager. Deploy verifies that manager, Podman, and the Infra-provisioned build cache before staging a release. Local mode does not provision the server-side build user, cache, or resource slice; it uses rootless Podman on the workstation. The runtime application user remains a separate home-less, non-login account and never owns or operates the build container.
 
-Each deployment resolves its requested branch or revision to one full Git SHA,
-then uses that immutable revision for source, deployment scripts, infrastructure,
-and build-safe scalar inputs throughout the release lifecycle. Runtime plaintext
-secrets and decryption keys are never included in build inputs.
+Each deployment resolves its configured branch or requested revision to one full
+Git SHA, then uses that immutable revision for source, deployment scripts,
+infrastructure, and build-safe scalar inputs throughout the release lifecycle.
+For local artifacts, the server independently resolves the configured branch in
+its bare repository and requires an exact revision match. It verifies the
+artifact's compressed length and SHA-256, then safely extracts only bounded
+relative files, directories, and relative symlinks. Runtime plaintext secrets
+and decryption keys are never included in build inputs; the local artifact
+excludes the root `.env`.
+
+The local artifact path changes only where the build runs. After verified
+extraction, Bonesremote uses the same promotion, shared-path wiring, prepare,
+sealing, activation, service restart, pruning, and rollback behavior as a
+remote build. Django prepare still installs `requirements.txt` dependencies
+before validation, migrations, and static-file collection.
 
 ## Good Fit
 

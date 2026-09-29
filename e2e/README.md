@@ -62,12 +62,21 @@ the server; the rest reuse it). Run a subset by passing a test-name filter:
 # Single framework
 cargo test -p e2e --test setup -- vue --ignored --test-threads=1 --nocapture
 
-# Multiple frameworks
+# Multiple remote-build frameworks
 cargo test -p e2e --test setup -- vue laravel --ignored --test-threads=1 --nocapture
+
+# Every local-artifact framework scenario
+cargo test -p e2e --test setup -- _local --ignored --test-threads=1 --nocapture
+
+# One local-artifact framework scenario
+cargo test -p e2e --test setup -- laravel_local --ignored --test-threads=1 --nocapture
 ```
 
 Test names: `django`, `laravel`, `next_server`, `next_static`, `nuxt_server`,
-`nuxt_static`, `rails`, `sveltekit`, `vue`.
+`nuxt_static`, `rails`, `sveltekit`, `vue`, plus `_local` variants for every
+native framework scenario. Each local-artifact scenario covers first deploy,
+a second release, and failed activation rollback after the nginx service
+restart phase.
 
 ## How it works
 

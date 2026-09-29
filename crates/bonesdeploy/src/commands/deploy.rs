@@ -2,10 +2,14 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use console::style;
+use tokio::fs::File;
 
 use crate::config;
 use crate::infra::{self, ssh};
 use crate::ui::output;
+use crate::{artifact, local_build};
+use bonesdeploy_core::artifact::encode_manifest;
+use bonesdeploy_core::config::BuildMode;
 use bonesdeploy_core::paths;
 
 pub fn local_bones_load_error() -> String {
@@ -24,12 +28,35 @@ pub async fn run() -> Result<()> {
         style(&cfg.host).dim(),
     );
 
-    let session = ssh::connect(&cfg).await?;
-    infra::sync_control_plane(&session, &cfg).await?;
+    if cfg.build.mode == BuildMode::Local {
+        deploy_local(&cfg).await?;
+    } else {
+        deploy_remote(&cfg).await?;
+    }
+
+    println!("{} Deployment complete.", output::success_marker());
+    Ok(())
+}
+
+async fn deploy_remote(cfg: &config::Bones) -> Result<()> {
+    let session = ssh::connect(cfg).await?;
+    infra::sync_control_plane(&session, cfg).await?;
     let command = infra::deploy_command(&cfg.project_name);
     ssh::stream_cmd(&session, &command).await?;
     session.close().await?;
+    Ok(())
+}
 
-    println!("{} Deployment complete.", output::success_marker());
+async fn deploy_local(cfg: &config::Bones) -> Result<()> {
+    println!("Building the committed {} branch locally...", cfg.branch);
+    let build = local_build::build(cfg)?;
+    let artifact = artifact::package(&cfg.project_name, &build)?;
+    let frame = encode_manifest(&artifact.manifest)?;
+
+    let session = ssh::connect(cfg).await?;
+    infra::sync_control_plane(&session, cfg).await?;
+    let file = File::open(artifact.path()).await.context("Failed to open local artifact for upload")?;
+    ssh::stream_cmd_with_reader(&session, &infra::artifact_deploy_command(&cfg.project_name), &frame, file).await?;
+    session.close().await?;
     Ok(())
 }

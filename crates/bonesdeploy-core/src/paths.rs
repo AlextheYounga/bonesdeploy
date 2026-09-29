@@ -63,7 +63,10 @@ pub const BONESDEPLOY_USERS_ROOT: &str = "/var/lib/bonesdeploy/users";
 pub const IMAGE_STORE_GRAPH_ROOT: &str = "/var/lib/bonesdeploy/image-store";
 pub const IMAGE_STORE_RUN_ROOT: &str = "/run/bonesdeploy/image-store";
 pub const IMAGE_STORE_STORAGE_CONF: &str = "/etc/bonesdeploy/image-store-storage.conf";
-pub const IMAGE_STORE_BASE_IMAGE: &str = "docker.io/library/buildpack-deps:bookworm";
+pub const IMAGE_STORE_BASE_IMAGE: &str =
+    "docker.io/library/buildpack-deps:bookworm@sha256:5ac8377b7884040464fbf9390409073c6ac62ac8e6563e886fc560f9ea13ec5d";
+pub const IMAGE_STORE_BASE_IMAGE_DIGEST: &str =
+    "sha256:5ac8377b7884040464fbf9390409073c6ac62ac8e6563e886fc560f9ea13ec5d";
 pub const BUILD_CACHE_DIR: &str = "cache";
 pub const NGINX_SOCKET: &str = "nginx.sock";
 pub const NGINX_PID: &str = "nginx.pid";
