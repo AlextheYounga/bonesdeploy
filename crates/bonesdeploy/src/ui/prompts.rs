@@ -1,11 +1,9 @@
-use anyhow::{Result, anyhow, bail};
-use console::style;
+use anyhow::{Result, anyhow};
 use inquire::{Confirm, Select, Text};
 use serde_json::Value;
 
 use crate::config::Bones;
 use crate::frameworks::{Framework, Question, QuestionKind};
-use crate::infra::git;
 use bonesdeploy_core::config::RuntimeBackend;
 
 fn config_default<'a>(
@@ -121,80 +119,7 @@ pub fn prompt_branch(existing_config: Option<&Bones>) -> Result<String> {
         .map_err(|err| anyhow!(err))
 }
 
-pub fn prompt_remote_name(existing_config: Option<&Bones>) -> Result<String> {
-    const CREATE_REMOTE_OPTION: &str = "Create new deployment remote";
-
-    let remotes = git::list_remotes_with_urls()?;
-    if remotes.is_empty() {
-        return prompt_remote_name_text(existing_config);
-    }
-
-    let default_remote = existing_config.and_then(|cfg| {
-        let value = cfg.remote_name.as_str();
-        (!value.is_empty()).then(|| cfg.remote_name.clone())
-    });
-
-    let preferred = default_remote.or_else(|| {
-        let has_production = remotes.iter().any(|r| r.name == "production");
-        if has_production { Some(String::from("production")) } else { None }
-    });
-
-    let mut ordered_remotes = Vec::with_capacity(remotes.len());
-    if let Some(ref pref) = preferred
-        && let Some(pos) = remotes.iter().position(|r| r.name == *pref)
-    {
-        ordered_remotes.push(remotes[pos].clone());
-        ordered_remotes.extend(remotes.iter().enumerate().filter(|(i, _)| *i != pos).map(|(_, r)| r.clone()));
-    }
-    if ordered_remotes.is_empty() {
-        ordered_remotes = remotes;
-    }
-
-    let mut display_options: Vec<String> = ordered_remotes.iter().map(remote_display_label).collect();
-    display_options.push(String::from(CREATE_REMOTE_OPTION));
-
-    let choice = Select::new("Deployment remote:", display_options)
-        .with_help_message("Choose the VPS remote, not your code host.")
-        .raw_prompt()
-        .map_err(|err| anyhow!(err))?;
-
-    if choice.index == ordered_remotes.len() {
-        return prompt_remote_name_text(existing_config);
-    }
-
-    let chosen = ordered_remotes[choice.index].name.clone();
-
-    if chosen == "origin" {
-        println!("{} origin usually points to your code host, not your VPS.", style("Warning:").yellow().bold());
-        let proceed = Confirm::new("Use 'origin' anyway?")
-            .with_default(false)
-            .with_help_message("Choose No unless origin points to your VPS.")
-            .prompt()
-            .map_err(|err| anyhow!(err))?;
-        if !proceed {
-            bail!("Choose a deployment remote that points to your VPS.");
-        }
-    }
-
-    Ok(chosen)
-}
-
-fn remote_display_label(remote: &git::RemoteInfo) -> String {
-    if remote.name == "origin" {
-        format!("{} ({}) — not a deployment remote", remote.name, remote.url)
-    } else {
-        format!("{} ({})", remote.name, remote.url)
-    }
-}
-
-pub fn prompt_host(
-    existing_config: Option<&Bones>,
-    inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> Result<String> {
-    if let Some(details) = inferred_remote {
-        return Ok(details.host.clone());
-    }
-
+pub fn prompt_host(existing_config: Option<&Bones>) -> Result<String> {
     let default_host = config_default(existing_config, |cfg| cfg.host.as_str(), "");
     Text::new("Server host or IP:")
         .with_default(default_host)
@@ -204,14 +129,7 @@ pub fn prompt_host(
         .map_err(|err| anyhow!(err))
 }
 
-pub fn prompt_port(
-    existing_config: Option<&Bones>,
-    inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> Result<String> {
-    if let Some(details) = inferred_remote {
-        return Ok(details.port.clone());
-    }
-
+pub fn prompt_port(existing_config: Option<&Bones>) -> Result<String> {
     let default_port = config_default(existing_config, |cfg| cfg.port.as_str(), "22");
     Text::new("SSH port:")
         .with_default(default_port)
@@ -267,17 +185,6 @@ fn confirm_prompt(prompt: &str, message: &str) -> Result<bool> {
     println!("{message}");
     println!();
     Confirm::new(prompt).with_default(false).prompt().map_err(|err| anyhow!(err))
-}
-
-fn prompt_remote_name_text(existing_config: Option<&Bones>) -> Result<String> {
-    let default_remote =
-        existing_config.map(|cfg| cfg.remote_name.as_str()).filter(|value| !value.is_empty()).unwrap_or("production");
-    Text::new("Deployment remote name:")
-        .with_default(default_remote)
-        .with_help_message("Created if missing.")
-        .prompt()
-        .map(|value| value.trim().to_string())
-        .map_err(|err| anyhow!(err))
 }
 
 pub fn prompt_ssl_domain(existing_config: Option<&Bones>) -> Result<String> {

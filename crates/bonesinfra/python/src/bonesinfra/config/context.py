@@ -32,7 +32,6 @@ class DeployContext:
             pass
         self._paths = DeploymentPaths.new(
             self.app.project_name,
-            self.app.repo_path,
             self.app.project_root,
             self.runtime.web_root,
         )
@@ -52,8 +51,6 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
         "project_name": ctx.app.project_name,
         "project_root": paths["project_root"],
         "web_root": ctx.runtime.web_root,
-        "repo_path": paths["repo"],
-        "branch": ctx.app.deploy.branch,
         "deploy_user": DEPLOY_USER,
         "runtime_user": ctx.runtime.runtime_user,
         "runtime_group": ctx.runtime.runtime_group,
@@ -76,10 +73,8 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
 @dataclass
 class AppConfig:
     project_name: str
-    repo_path: str
     project_root: str
     dns: DnsConfig
-    deploy: DeployConfig
 
 
 @dataclass
@@ -100,11 +95,6 @@ class DnsConfig:
     domain: str
     email: str
     ssl_enabled: bool
-
-
-@dataclass
-class DeployConfig:
-    branch: str
 
 
 @dataclass

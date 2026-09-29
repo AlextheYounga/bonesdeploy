@@ -34,7 +34,7 @@ Everything below is what "trusted" actually commits to. Linux can give you hard,
 4.  No shared Unix identity owns data belonging to multiple sites.
 ```
 
-Three identities, not two and not five. The `git` user owns the bare repo and is the deployment SSH entry point. The `<site>` runtime user owns `shared/`, writable paths, and `/run/<site>` and mutates runtime state. `root` owns system units, config dirs, deployment state, and sealed releases, and runs the allowlisted BonesRemote lifecycle. The runtime user is dedicated per project — not `www-data`, not a shared `applications` user. One project, one user. Isolation is enforced by the kernel, not by your discipline.
+Three identities, not two and not five. The `git` user is the deployment SSH entry point and artifact transport principal. The `<site>` runtime user owns `shared/`, writable paths, and `/run/<site>` and mutates runtime state. `root` owns system units, config dirs, deployment state, and sealed releases, and runs the allowlisted BonesRemote lifecycle. The runtime user is dedicated per project — not `www-data`, not a shared `applications` user. One project, one user. Isolation is enforced by the kernel, not by your discipline.
 
 ## Filesystem
 
@@ -77,11 +77,12 @@ optional deployment arguments, reordered arguments, and trailing arguments are
 denied. The policy requires sudo 1.9.10 or newer for argument regular-expression
 support.
 
-Deployment is requested explicitly with `bonesdeploy deploy`. The application
-revision supplies the source and its `infra/deployment` scripts; there is no
-application Git hook, configuration repository, site import/export path, or
-deploy-on-push trigger. BonesInfra validates the sudoers policy at provisioning
-time; anchored argument matching rejects trailing or malformed arguments.
+Deployment is requested explicitly with `bonesdeploy deploy`. The local
+committed revision supplies the source and its `infra/deployment` scripts; the
+server receives only the resulting artifact. There is no application Git hook,
+production application repository, first-push workflow, or deploy-on-push
+trigger. BonesInfra validates the sudoers policy at provisioning time; anchored
+argument matching rejects trailing or malformed arguments.
 
 ## Process confinement
 
@@ -150,7 +151,7 @@ substitute for authentication.
 48. Release rollback does not roll back persistent data or external side effects.
 ```
 
-Containers still share a kernel trust boundary. Local Docker execution does not remove the common kernel from the trusted computing base. BonesDeploy uses an unprivileged local Docker container for native builds: it receives the exported committed source tree, a scoped local cache at `/workspace/cache`, fixed public metadata, and committed public `.env.build` values. It does **not** get the root `.env`, runtime secrets, `shared/`, `current/`, `releases/`, the bare repo, host home, SSH agent, credential stores, or Docker socket. Build input is disposable. Build output is the artifact BonesRemote verifies before promotion.
+Containers still share a kernel trust boundary. Local Docker execution does not remove the common kernel from the trusted computing base. BonesDeploy uses a local Docker build environment for native builds and Compose image builds: it receives the exported committed source tree, a scoped cache, fixed public metadata, and committed public `.env.build` values. It does **not** get the root `.env`, runtime secrets, `shared/`, `current/`, `releases/`, production repositories, host home, SSH agent, credential stores, or Docker socket. Build input is disposable. Build output is the artifact BonesRemote verifies before promotion. This is a compatibility and reproducibility boundary, not a complete hardened tenant sandbox.
 
 For Compose sites, the conventional rootful Docker daemon executes the
 project-owned Compose definition. BonesDeploy constrains its own control plane,
@@ -158,9 +159,12 @@ release paths, locking, and privileged entry points, but does not certify the
 container settings chosen by that file. Directly published ports can bypass
 managed nginx and firewall assumptions.
 
-For native sites, BonesRemote verifies the artifact's site, pushed revision,
-builder identity, length, digest, paths, entry types, symlinks, file count, and
-extracted size before promotion. It never runs application build scripts.
+For native sites, BonesRemote verifies the artifact's site, local revision,
+length, digest, paths, entry types, symlinks, file count, and extracted size
+before promotion. It never runs application build scripts. The receiver caps
+the manifest at 64 KiB, compressed payload at 2 GiB, entries at 100,000, paths
+and symlink targets at 4 KiB, and expanded file content at 4 GiB. Compose image
+inventories are capped at 128 services and are loaded from the artifact.
 
 ## Availability
 

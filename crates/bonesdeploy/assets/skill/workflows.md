@@ -5,7 +5,6 @@
 ```text
 bonesdeploy init
 bonesdeploy setup --yes
-git push production main
 bonesdeploy site ssl --yes --domain app.example.com --email ops@example.com
 bonesdeploy deploy
 ```
@@ -21,7 +20,6 @@ bonesdeploy init
 bonesdeploy server setup --yes
 bonesdeploy server doctor
 bonesdeploy site setup --yes
-git push production main
 bonesdeploy site ssl --yes --domain app.example.com --email ops@example.com
 bonesdeploy deploy
 ```
@@ -35,7 +33,6 @@ once per project.
 ```text
 bonesdeploy init
 bonesdeploy site setup --yes
-git push production main
 bonesdeploy deploy
 ```
 
@@ -46,15 +43,17 @@ every project still requires its own site setup.
 ## The daily deploy
 
 ```text
-git push production main
 bonesdeploy deploy
 ```
 
 For a Compose site, commit exactly one conventional base Compose file and at
-most one conventional override. Compose performs image pull/build and waits for
-declared health checks. `shared/.env` is available for interpolation but is not
-injected unless the Compose file references it. Numbered BonesDeploy build and
-prepare scripts are native-only.
+most one conventional override. BonesDeploy performs Compose validation, image
+pull, and image build locally for `linux/amd64`, then uploads the release tree
+and exact service images. Production loads those images and starts with
+`--no-build --pull never`, while still waiting for declared health checks.
+`shared/.env` is available for interpolation but is not injected unless the
+Compose file references it. Numbered BonesDeploy build and prepare scripts are
+native-only.
 
 For a native site, `bonesdeploy deploy` builds the committed revision locally in
 Docker for `linux/amd64` and uploads one complete artifact. Production receives,
@@ -77,7 +76,8 @@ bonesdeploy deploy
 replaces the complete remote environment; it does not merge any `.env` files.
 The root `.env`, ambient host variables, credentials, and `shared/.env` are not
 build inputs. There is no migration or server-build fallback guarantee for
-earlier installations. That's the contract.
+earlier installations. Registry transfer, private credentials, signing, SBOMs,
+and resumable upload are also deferred. That's the contract.
 ## Recovery
 
 Bad deploy:

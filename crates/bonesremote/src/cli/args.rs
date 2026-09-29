@@ -18,14 +18,11 @@ pub enum Command {
         #[arg(long, requires = "site")]
         exhaustive: bool,
     },
-    /// Deploy a Docker Compose source revision or receive a native artifact
+    /// Receive a framed local-build artifact from standard input
     Deploy {
         /// Site identifier (must match a provisioned site directory)
         #[arg(long)]
         site: String,
-        /// Receive a framed local-build artifact from standard input for native sites
-        #[arg(long)]
-        artifact_stdin: bool,
     },
     /// Synchronize the sanitized site configuration snapshot
     Config {

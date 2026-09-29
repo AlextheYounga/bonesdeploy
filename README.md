@@ -122,9 +122,11 @@ RUNTIME_BACKEND=docker
 Docker mode executes one conventional project-owned Compose file from each
 immutable release. Compose owns Dockerfiles, images, services, health checks,
 networks, and named volumes. BonesDeploy validates, pulls, and builds the
-candidate stack, then reconciles the stable `bonesdeploy-<site>` project with
-`docker compose up --wait` after switching `current`. Numbered BonesDeploy
-build and prepare scripts are native-only.
+candidate stack locally for `linux/amd64`, tags every service image with an
+immutable release-specific identity, and includes those images plus a generated
+override in the artifact. Production loads the artifact and reconciles the
+stable `bonesdeploy-<site>` project with `docker compose up --no-build --pull
+never --wait`. Numbered BonesDeploy build and prepare scripts are native-only.
 
 Set `BONES_COMPOSE_PORT` when host nginx should proxy to a loopback-published
 Compose port. Without it, the stack owns ingress and may publish ports directly.
@@ -190,9 +192,11 @@ bonesdeploy init
 ```
 
 Native deployments always build the configured committed revision locally with
-Docker for `linux/amd64`, then upload the complete artifact. There is no build
-mode and no server-side native build fallback. Docker is a local build
-dependency, not a production dependency.
+Docker for `linux/amd64`, then upload the complete artifact. Compose deployments
+perform their config, pull, and image-build steps locally and upload the release
+tree and exact service images. There is no server-side application build or
+pull fallback. Docker is a local build dependency for native builds and a
+production runtime dependency only for Compose sites.
 
 For CI or AI agents, pick a runtime template and pass variables non-interactively:
 
@@ -357,11 +361,10 @@ Check only the local site side:
 bonesdeploy site doctor --local
 ```
 
-`doctor` reports three states: green checks are healthy, yellow pending items
-are expected next steps (such as the first Git push after setup), and red
-failures need attention. Pending first-push state exits successfully so setup
-can finish without looking broken. For agents and scripts, use the stable
-machine-readable next-step guide:
+`doctor` reports green healthy checks, yellow pending operational work, and red
+failures that need attention. Site setup and deployment do not require a first
+Git push. For agents and scripts, use the stable machine-readable next-step
+guide:
 
 ```sh
 bonesdeploy skill next --format json
@@ -516,21 +519,33 @@ BonesDeploy exposes fixed public contract metadata and safe derived `BONES_*` va
 
 The runtime application user remains a separate home-less, non-login account. Production provisioning creates no native build user, build cache, image store, or local-container state.
 
-Each deployment resolves its configured branch or requested revision to one full
-Git SHA, then uses that immutable revision for source, deployment scripts,
-infrastructure, and build-safe scalar inputs throughout the release lifecycle.
-For local artifacts, the server independently resolves the configured branch in
-its bare repository and requires an exact revision match. It verifies the
-artifact's compressed length and SHA-256, then safely extracts only bounded
-relative files, directories, and relative symlinks. Runtime plaintext secrets
-and decryption keys are never included in build inputs; the local artifact
-excludes the root `.env`.
+Each deployment resolves its configured local branch to one full Git SHA, then
+uses that immutable revision for source, deployment scripts, infrastructure,
+and build-safe scalar inputs throughout the release lifecycle. The server
+receives the resulting artifact without resolving a source branch, maintaining
+an application repository, or requiring a first push. It verifies the artifact's
+compressed length and SHA-256, then safely extracts only bounded relative files,
+directories, and relative symlinks. Runtime plaintext secrets and decryption
+keys are never included in build inputs; the local artifact excludes the root
+`.env`.
 
 After verified extraction, BonesRemote uses the same promotion, shared-path
 wiring, prepare, sealing, activation, service restart, pruning, and rollback
-behavior for every native deployment. Django prepare still installs
-`requirements.txt` dependencies before validation, migrations, and static-file
-collection.
+behavior for every native deployment. Django dependencies are installed and the
+dependency files are packaged under `.python-packages` during the local build,
+and release-owned `.venv/bin` wrappers invoke the provisioned production
+interpreter. Django prepare is limited to production-state work such as
+validation, migrations, and static-file collection.
+
+Artifact receipt enforces a 64 KiB manifest, a 2 GiB compressed payload, at most
+100,000 archive entries, 4 KiB paths and symlink targets, and a 4 GiB expanded
+file-size budget. Compose inventories allow at most 128 services/images.
+
+Previous-installation migration, registry-backed image transfer, private build
+or registry credentials, artifact signing, SBOMs, and resumable upload are
+deliberately deferred. The current contract transfers complete artifacts over
+SSH and does not claim cryptographic build provenance beyond the verified
+manifest and payload digest.
 
 Production hosts are supported only on Debian 12 or newer and Ubuntu 24.04 or
 newer, on `x86_64`. Older releases and other distributions fail clearly. This is

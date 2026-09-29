@@ -13,7 +13,7 @@ fn phases_after_commit_are_serialization_idle() {
 
 #[test]
 fn cancellation_is_refused_after_runtime_mutation() {
-    assert!(!DeploymentPhase::Built.may_have_mutated_runtime());
+    assert!(!DeploymentPhase::Materialized.may_have_mutated_runtime());
     assert!(DeploymentPhase::Promoted.may_have_mutated_runtime());
     assert!(DeploymentPhase::Prepared.may_have_mutated_runtime());
     assert!(DeploymentPhase::Verified.may_have_mutated_runtime());

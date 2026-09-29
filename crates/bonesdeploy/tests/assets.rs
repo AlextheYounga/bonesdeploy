@@ -31,6 +31,62 @@ fn framework_assets_include_expected_build_content() {
 }
 
 #[test]
+fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
+    let django = asset_text("django/deployment/build/02_run_build.sh");
+    assert!(django.contains("--target \"$packages_dir\" -r requirements.txt"));
+    assert!(django.contains("/opt/bonesdeploy/python/${python_version}/bin/python${python_version}"));
+    assert!(django.contains("exec \"$production_python\" \"\\$@\""));
+    assert!(django.contains("exec \"$production_python\" -m gunicorn \"\\$@\""));
+    assert!(!django.contains("-m venv"));
+    assert!(django.contains("rm -rf deployment/build"));
+
+    let django_prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
+    assert!(!django_prepare.contains("pip install"));
+    assert!(!django_prepare.contains("-m venv"));
+    assert!(django_prepare.contains("$VENV_DIR/bin/python"));
+
+    let laravel = asset_text("laravel/deployment/build/03_build_frontend.sh");
+    assert!(laravel.contains("rm -rf node_modules deployment/build"));
+    let rails = asset_text("rails/deployment/build/02_run_build.sh");
+    assert!(rails.contains("bundle install"));
+    assert!(rails.contains("rm -rf node_modules tmp/cache deployment/build"));
+
+    let next = asset_text("next/deployment/build/02_run_build.sh");
+    assert!(next.contains(".next/standalone"));
+    assert!(next.contains("rm -rf .next/cache .next/static node_modules"));
+    assert!(next.contains("rm -rf .next node_modules"));
+
+    let nuxt = asset_text("nuxt/deployment/build/02_run_build.sh");
+    assert!(nuxt.contains("rm -rf .nuxt node_modules deployment/build"));
+    let sveltekit = asset_text("sveltekit/deployment/build/02_run_build.sh");
+    assert!(sveltekit.contains("rm -rf .svelte-kit deployment/build"));
+    let vue = asset_text("vue/deployment/build/02_run_build.sh");
+    assert!(vue.contains("rm -rf .vite node_modules deployment/build"));
+}
+
+#[test]
+fn django_artifact_contract_matches_the_production_runtime() {
+    let build = asset_text("django/deployment/build/02_run_build.sh");
+    assert!(build.contains("local packages_dir=\".python-packages\""));
+    assert!(build.contains("local wrapper_dir=\".venv/bin\""));
+    assert!(
+        build.contains(
+            "local production_python=\"/opt/bonesdeploy/python/${python_version}/bin/python${python_version}\""
+        )
+    );
+    assert!(
+        build.contains("export PYTHONPATH=\\\"\\$release_root/.python-packages\\${PYTHONPATH:+:\\$PYTHONPATH}\\\"")
+    );
+    assert!(build.contains("exec \"$production_python\" -m gunicorn \"\\$@\""));
+    assert!(!build.contains("/opt/bonesdeploy/python/3.14.7/"));
+
+    let prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
+    assert!(prepare.contains("readonly PYTHON_BIN=\"$VENV_DIR/bin/python\""));
+    assert!(prepare.contains("[ -x \"$PYTHON_BIN\" ]"));
+    assert!(!prepare.contains("pip install"));
+}
+
+#[test]
 fn framework_assets_do_not_duplicate_canonical_infrastructure() {
     assert!(framework_asset_paths().iter().all(|path| !path.split('/').any(|part| part == "infra")));
 }

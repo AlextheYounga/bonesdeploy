@@ -16,23 +16,21 @@ use bonesdeploy_core::config;
 pub struct DeploymentSnapshot {
     pub site: String,
     pub config: config::Bones,
-    pub repo_path: PathBuf,
     pub project_root: PathBuf,
     pub revision: String,
     pub deployment_dir: PathBuf,
 }
 
 impl DeploymentSnapshot {
-    pub fn new(mutation: &SiteMutation, revision: String, deployment_dir: PathBuf) -> Self {
+    pub fn new(mutation: &SiteMutation, revision: String) -> Self {
         let site = mutation.site();
         let config = mutation.config();
         Self {
             site: site.to_string(),
             config: config.clone(),
-            repo_path: PathBuf::from(&config.app.repo_path),
             project_root: PathBuf::from(&config.project_root),
             revision,
-            deployment_dir,
+            deployment_dir: PathBuf::new(),
         }
     }
 

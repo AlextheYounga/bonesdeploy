@@ -31,35 +31,34 @@ pub(super) async fn run_with_pending(local_only: bool, verbose: bool) -> Result<
         Some(String::from("rename it with a numeric prefix, like 01_build.sh")),
     );
 
-    if cfg.as_ref().is_some_and(|config| config.runtime.backend == RuntimeBackend::Native) {
+    if cfg.is_some() {
         issues += print_check(
             "local Docker",
             check_local_docker(),
             Some(String::from("install and start Docker with Linux containers enabled")),
         );
-        issues += print_check(
-            "local builder image",
-            check_local_builder_image(),
-            Some(format!("run `docker pull --platform {TARGET_PLATFORM_NAME}` for the configured builder image")),
-        );
-        issues += print_check(
-            "local target execution",
-            check_local_target_execution(),
-            Some(format!("install compatible Docker emulation for {TARGET_PLATFORM_NAME}")),
-        );
-        issues += print_check(
-            "local build cache",
-            check_local_cache(),
-            Some(String::from("make the XDG cache directory writable")),
-        );
+        if cfg.as_ref().is_some_and(|config| config.runtime.backend == RuntimeBackend::Native) {
+            issues += print_check(
+                "local builder image",
+                check_local_builder_image(),
+                Some(format!("run `docker pull --platform {TARGET_PLATFORM_NAME}` for the configured builder image")),
+            );
+            issues += print_check(
+                "local target execution",
+                check_local_target_execution(),
+                Some(format!("install compatible Docker emulation for {TARGET_PLATFORM_NAME}")),
+            );
+            issues += print_check(
+                "local build cache",
+                check_local_cache(),
+                Some(String::from("make the XDG cache directory writable")),
+            );
+        }
     }
 
     let local_branch_issue = cfg.as_ref().and_then(check_local_branch);
-    issues += print_check(
-        "deploy branch",
-        local_branch_issue,
-        cfg.as_ref().map(|c| format!("git checkout -b {} && git push {} {}", c.branch, c.remote_name, c.branch)),
-    );
+    issues +=
+        print_check("deploy branch", local_branch_issue, cfg.as_ref().map(|c| format!("git checkout -b {}", c.branch)));
 
     if !local_only {
         let (remote_issues, remote_pending) = check_remote(cfg.as_ref(), verbose).await;
@@ -70,7 +69,7 @@ pub(super) async fn run_with_pending(local_only: bool, verbose: bool) -> Result<
     if issues == 0 {
         println!();
         if pending {
-            println!("{} Deployment is provisioned and waiting for the first Git push.", output::pending_marker());
+            println!("{} Deployment has pending remote work.", output::pending_marker());
         } else {
             println!("{} All checks passed.", output::success_marker());
         }
@@ -203,17 +202,10 @@ fn check_local_branch_at(repo: &Path, cfg: &config::Bones) -> Option<String> {
     if cfg.branch.is_empty() {
         return None;
     }
-    if cfg.runtime.backend == RuntimeBackend::Native {
-        return git::resolve_branch_commit(repo, &cfg.branch)
-            .map(|_| ())
-            .err()
-            .map(|error| format!("Unable to resolve local branch '{}' to an exact commit: {error}", cfg.branch));
-    }
-    match git::branch_exists_at(repo, &cfg.branch) {
-        Ok(true) => None,
-        Ok(false) => Some(format!("Local branch '{}' does not exist", cfg.branch)),
-        Err(error) => Some(format!("Unable to inspect local branch '{}': {error}", cfg.branch)),
-    }
+    git::resolve_branch_commit(repo, &cfg.branch)
+        .map(|_| ())
+        .err()
+        .map(|error| format!("Unable to resolve local branch '{}' to an exact commit: {error}", cfg.branch))
 }
 
 #[cfg(test)]

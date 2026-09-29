@@ -23,7 +23,6 @@ pub struct SiteFields {
     pub template: String,
     pub backend: String,
     pub web_root: String,
-    pub branch: String,
     pub node_version: String,
     pub compose_port: Option<u16>,
     pub compose_wait_timeout: u16,
@@ -80,7 +79,6 @@ impl ProvisioningRequest {
                 }
                 .into(),
                 web_root: config.runtime.web_root.clone(),
-                branch: config.branch.clone(),
                 node_version: config.runtime.node_version.clone(),
                 compose_port: config.runtime.compose_port,
                 compose_wait_timeout: config.runtime.compose_wait_timeout,
@@ -102,7 +100,6 @@ impl ProvisioningRequest {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RemoteDeploymentConfig {
-    pub branch: String,
     pub releases_keep: usize,
     pub runtime: super::model::Runtime,
 }
@@ -110,7 +107,7 @@ pub struct RemoteDeploymentConfig {
 impl RemoteDeploymentConfig {
     #[must_use]
     pub fn from_bones(config: &Bones) -> Self {
-        Self { branch: config.branch.clone(), releases_keep: config.releases_keep, runtime: config.runtime.clone() }
+        Self { releases_keep: config.releases_keep, runtime: config.runtime.clone() }
     }
 
     /// Validates the transported runtime at the remote descriptor boundary.
@@ -121,7 +118,6 @@ impl RemoteDeploymentConfig {
     #[must_use]
     pub fn into_site_config(self, site: &str) -> Bones {
         let mut config = Bones::for_site(site);
-        config.branch = self.branch;
         config.releases_keep = self.releases_keep;
         config.runtime = self.runtime;
         config

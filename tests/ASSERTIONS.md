@@ -14,6 +14,10 @@
 - validate host accepts hostnames and ips. (validate_host_accepts_hostnames_and_ips)
 - validate host rejects shell metacharacters. (validate_host_rejects_shell_metacharacters)
 
+## `e2e/tests/setup.rs`
+- native artifact scenarios deploy without a production repository or remote build and cover first deploy, second release, failed activation rollback, and release pruning. (django, laravel, next_server, next_static, nuxt_server, nuxt_static, rails, sveltekit, vue)
+- Compose artifact scenario deploys without a production repository or remote build, covers first deploy, second release, failed activation rollback, release pruning, and release image pruning. (docker_compose)
+
 ## `crates/bonesdeploy-core/tests/env_build.rs`
 - allows valid underscore names. (allows_valid_underscore_names)
 - derived bones values cannot be overridden. (derived_bones_values_cannot_be_overridden)
@@ -146,9 +150,6 @@
 - only the first laravel release can defer its configured worker. (only_the_first_laravel_release_can_defer_its_configured_worker)
 - recognizes only the canonical placeholder release. (recognizes_only_the_canonical_placeholder_release)
 - service exists accepts loaded unit. (service_exists_accepts_loaded_unit)
-
-## `crates/bonesremote/tests/commands/doctor_site.rs`
-- empty bare repo is pending before first push. (empty_bare_repo_is_pending_before_first_push)
 
 ## `crates/bonesremote/tests/commands/drop_failed_release.rs`
 - active release cannot be dropped. (active_release_cannot_be_dropped)

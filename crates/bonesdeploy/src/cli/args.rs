@@ -22,9 +22,6 @@ pub enum Command {
         /// Git branch to deploy
         #[arg(long)]
         branch: Option<String>,
-        /// Deployment remote name (default: production)
-        #[arg(short = 'r', long)]
-        remote: Option<String>,
         /// Server hostname or IP
         #[arg(short = 'H', long)]
         host: Option<String>,

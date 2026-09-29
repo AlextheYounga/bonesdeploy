@@ -1,72 +1,59 @@
-use std::io;
-use std::path::PathBuf;
-
 use anyhow::Result;
+use bonesdeploy_core::artifact::{ArtifactKind, ArtifactManifest, read_manifest};
 use bonesdeploy_core::config::RuntimeBackend;
+use std::io;
 
 use crate::commands::ensure_site_idle;
 use crate::control_plane;
-use crate::git;
 use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::lifecycle;
 
 use super::coordinator::DeploymentLifecycleCoordinator;
 
-pub fn run_source(site: &str) -> Result<()> {
-    privileges::ensure_root("bonesremote Compose deploy")?;
-    let bones = control_plane::load(site)?.into_site_config(site);
-    source_deploy_allowed(bones.runtime.backend)?;
-    let mutation = SiteMutation::acquire_with_config(site, bones)?;
-    ensure_site_idle(&mutation)?;
-    let repo_path = PathBuf::from(&mutation.config().repo_path);
-    let revision = git::resolve_revision_commit(&repo_path, &mutation.config().branch)?;
-    let snapshot = lifecycle::DeploymentSnapshot::new(&mutation, revision, PathBuf::new());
-    DeploymentLifecycleCoordinator::new(&mutation, snapshot).run_with_source()
-}
-
 pub fn run_artifact(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote artifact deploy")?;
     let bones = control_plane::load(site)?.into_site_config(site);
-    artifact_deploy_allowed(bones.runtime.backend)?;
     let mutation = SiteMutation::acquire_with_config(site, bones)?;
     ensure_site_idle(&mutation)?;
-    let repo_path = PathBuf::from(&mutation.config().repo_path);
-    let revision = git::resolve_revision_commit(&repo_path, &mutation.config().branch)?;
-    let snapshot = lifecycle::DeploymentSnapshot::new(&mutation, revision, PathBuf::new());
-    DeploymentLifecycleCoordinator::new(&mutation, snapshot).run_with_artifact(&mut io::stdin().lock())
-}
-
-fn source_deploy_allowed(backend: RuntimeBackend) -> Result<()> {
-    if backend != RuntimeBackend::Docker {
-        anyhow::bail!(
-            "ordinary deploy is only supported for the Docker Compose runtime; native sites require --artifact-stdin"
-        );
+    let mut input = io::stdin().lock();
+    let manifest = read_manifest(&mut input)?;
+    if manifest.site != site {
+        anyhow::bail!("artifact site does not match deploy site");
     }
-    Ok(())
+    artifact_matches_backend(&manifest, mutation.config().runtime.backend)?;
+    let snapshot = lifecycle::DeploymentSnapshot::new(&mutation, manifest.revision.clone());
+    DeploymentLifecycleCoordinator::new(&mutation, snapshot).run_with_artifact(&mut input, manifest)
 }
 
-fn artifact_deploy_allowed(backend: RuntimeBackend) -> Result<()> {
-    if backend != RuntimeBackend::Native {
-        anyhow::bail!("artifact deploy requires the native runtime backend");
+fn artifact_matches_backend(manifest: &ArtifactManifest, backend: RuntimeBackend) -> Result<()> {
+    let matches = matches!(
+        (&manifest.kind, backend),
+        (ArtifactKind::NativeTree, RuntimeBackend::Native)
+            | (ArtifactKind::ComposeImages { .. }, RuntimeBackend::Docker)
+    );
+    if !matches {
+        anyhow::bail!("artifact kind does not match the configured runtime backend");
     }
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{artifact_deploy_allowed, source_deploy_allowed};
-    use bonesdeploy_core::config::RuntimeBackend;
+    use bonesdeploy_core::artifact::{ArtifactManifest, ComposeImage};
+
+    use super::*;
+
+    const REVISION: &str = "0123456789abcdef0123456789abcdef01234567";
 
     #[test]
-    fn ordinary_deploy_is_rejected_for_native_sites() {
-        assert!(source_deploy_allowed(RuntimeBackend::Native).is_err());
-        assert!(source_deploy_allowed(RuntimeBackend::Docker).is_ok());
-    }
-
-    #[test]
-    fn artifact_deploy_is_rejected_for_compose_sites() {
-        assert!(artifact_deploy_allowed(RuntimeBackend::Docker).is_err());
-        assert!(artifact_deploy_allowed(RuntimeBackend::Native).is_ok());
+    fn artifact_kind_must_match_the_runtime_backend() -> Result<()> {
+        let native = ArtifactManifest::new_native_tree("atlas".into(), REVISION.into(), 1, &"a".repeat(64));
+        let compose = native.clone().with_compose_images(vec![ComposeImage::new("atlas", "web".into(), REVISION)?]);
+        assert!(artifact_matches_backend(&native, RuntimeBackend::Native).is_ok());
+        assert!(artifact_matches_backend(&compose, RuntimeBackend::Docker).is_ok());
+        assert!(artifact_matches_backend(&native, RuntimeBackend::Docker).is_err());
+        assert!(artifact_matches_backend(&compose, RuntimeBackend::Native).is_err());
+        Ok(())
     }
 }

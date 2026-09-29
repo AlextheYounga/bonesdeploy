@@ -9,7 +9,7 @@ use anyhow::{Context, Result, bail};
 
 use super::model::{
     BACKUP_RETENTION_DAYS_DEFAULT, BACKUP_SCHEDULE_DEFAULT, Bones, COMPOSE_WAIT_TIMEOUT_DEFAULT, RuntimeBackend,
-    default_node_version, default_repo_path_for, validate_host, validate_runtime,
+    default_node_version, validate_host, validate_runtime,
 };
 use crate::paths;
 
@@ -88,6 +88,9 @@ pub fn parse_dotenv(content: &str) -> Result<ParsedDotEnv> {
         if managed && logical == "SERVICES" {
             bail!("BONES_SERVICES is no longer supported; define supporting services outside BonesDeploy")
         }
+        if logical == "REMOTE_NAME" {
+            bail!("REMOTE_NAME is no longer supported; deploys use the local configured branch")
+        }
         let target = if managed { &mut parsed.managed } else { &mut parsed.applications };
         if target.insert(logical, value).is_some() {
             bail!("Duplicate .env key `{key}` on line {}", number + 1);
@@ -113,7 +116,6 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
     let project_name = values.get(keys::PROJECT_NAME).cloned().unwrap_or_default();
     let mut config = Bones::default();
     config.project_name = project_name.clone();
-    config.remote_name = values.get(keys::REMOTE_NAME).cloned().unwrap_or_else(|| "production".into());
     config.ssh_user = values.get(keys::SSH_USER).cloned().unwrap_or_else(|| "root".into());
     config.host = values.get(keys::HOST).cloned().unwrap_or_default();
     config.port = values.get(keys::PORT).cloned().unwrap_or_else(|| "22".into());
@@ -153,7 +155,6 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
             config.runtime.extra.insert(key.to_ascii_lowercase(), parse_runtime_value(value));
         }
     }
-    config.repo_path = default_repo_path_for(&project_name);
     config.project_root = paths::default_project_root_for(&project_name);
     validate_host(&config.host)?;
     validate_runtime(&config.runtime)?;
@@ -226,7 +227,6 @@ pub fn write_local_environment(config: &Bones, path: &Path) -> Result<()> {
     let mut output = format!("{application}\n\n{BEGIN}\n");
     let values = [
         (keys::PROJECT_NAME, config.project_name.clone()),
-        (keys::REMOTE_NAME, config.remote_name.clone()),
         (keys::SSH_USER, config.ssh_user.clone()),
         (keys::HOST, config.host.clone()),
         (keys::PORT, config.port.clone()),

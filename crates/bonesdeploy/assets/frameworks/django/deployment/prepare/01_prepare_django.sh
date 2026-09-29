@@ -3,39 +3,13 @@
 set -Eeuo pipefail
 
 readonly VENV_DIR="${VENV_DIR:-.venv}"
-readonly PYTHON_VERSION="${BONES_RUNTIME_PYTHON_VERSION:?BONES_RUNTIME_PYTHON_VERSION is required}"
-readonly PYTHON_BIN="python${PYTHON_VERSION}"
-
-ensure_virtualenv() {
-	if [ -d "$VENV_DIR" ]; then
-		return
-	fi
-
-	log "Creating Django virtual environment at $VENV_DIR..."
-	"$PYTHON_BIN" -m venv "$VENV_DIR"
-}
-
-activate_virtualenv() {
-	# shellcheck disable=SC1091
-	source "$VENV_DIR/bin/activate"
-}
-
-install_python_dependencies() {
-	log "Installing Django Python dependencies..."
-
-	if [ -f requirements.txt ]; then
-		python -m pip install -r requirements.txt --quiet
-		return
-	fi
-
-	log "No requirements.txt found; skipping Python dependency install."
-}
+readonly PYTHON_BIN="$VENV_DIR/bin/python"
 
 validate_application() {
 	[ -x "$VENV_DIR/bin/gunicorn" ] || die "gunicorn not found in $VENV_DIR; add it to requirements.txt"
 
 	log "Checking Django production configuration..."
-	python manage.py check --deploy
+	"$PYTHON_BIN" manage.py check --deploy
 }
 
 run_migrations() {
@@ -45,12 +19,12 @@ run_migrations() {
 	fi
 
 	log "Running Django migrations..."
-	python manage.py migrate --noinput
+	"$PYTHON_BIN" manage.py migrate --noinput
 }
 
 collect_static() {
 	log "Collecting Django static files..."
-	python manage.py collectstatic --noinput
+	"$PYTHON_BIN" manage.py collectstatic --noinput
 }
 
 main() {
@@ -59,14 +33,7 @@ main() {
 		exit 0
 	fi
 
-	command -v "$PYTHON_BIN" >/dev/null 2>&1 || {
-		echo "$LOG_PREFIX $PYTHON_BIN not found" >&2
-		exit 1
-	}
-
-	ensure_virtualenv
-	activate_virtualenv
-	install_python_dependencies
+	[ -x "$PYTHON_BIN" ] || die "$PYTHON_BIN not found; build the Django artifact first"
 	validate_application
 	run_migrations
 	collect_static

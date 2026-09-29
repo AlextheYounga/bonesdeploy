@@ -4,7 +4,6 @@ use bonesdeploy::commands::init::config::collect_non_interactive;
 use bonesdeploy::commands::init::framework::{collect_framework_config, parse_framework_var};
 use bonesdeploy::config::Bones;
 use bonesdeploy_core::config::RuntimeBackend;
-use bonesdeploy_core::paths;
 use serde_json::Value;
 
 fn args_non_interactive(template: Option<&str>, framework_vars: &[&str]) -> Args {
@@ -12,7 +11,6 @@ fn args_non_interactive(template: Option<&str>, framework_vars: &[&str]) -> Args
         non_interactive: true,
         project_name: Some(String::from("atlas")),
         branch: None,
-        remote: None,
         host: Some(String::from("deploy.example.com")),
         port: None,
         template: template.map(String::from),
@@ -23,7 +21,6 @@ fn args_non_interactive(template: Option<&str>, framework_vars: &[&str]) -> Args
 
 fn incomplete_existing(project_name: &str) -> Bones {
     let mut config = Bones::default();
-    config.remote_name = String::from("production");
     config.project_name = String::from(project_name);
     config.port = String::from("22");
     config.branch = String::from("main");
@@ -72,8 +69,6 @@ fn non_interactive_config_uses_existing_and_cli_values() -> Result<()> {
     assert_eq!(config.project_name, "atlas");
     assert_eq!(config.host, "deploy.example.com");
     assert_eq!(config.branch, "main");
-    assert_eq!(config.remote_name, "production");
-    assert_eq!(config.repo_path, paths::default_repo_path_for("atlas"));
     Ok(())
 }
 
@@ -92,7 +87,6 @@ fn non_interactive_config_requires_host_when_not_inferred() -> Result<()> {
     let existing = incomplete_existing("atlas");
     let mut args = args_non_interactive(None, &[]);
     args.project_name = None;
-    args.remote = Some(String::from("missing-test-remote"));
     args.host = None;
     let Err(error) = collect_non_interactive("workspace", Some(&existing), &args) else {
         bail!("missing host should fail");
@@ -143,14 +137,12 @@ fn non_interactive_config_rejects_invalid_connection_and_identity_values() {
 fn non_interactive_config_trims_cli_values_before_validation() -> Result<()> {
     let mut args = args_non_interactive(None, &[]);
     args.project_name = Some(String::from("  atlas  "));
-    args.remote = Some(String::from("  production  "));
     args.host = Some(String::from("  deploy.example.com  "));
     args.port = Some(String::from("  2222  "));
     args.branch = Some(String::from("  release/production  "));
 
     let config = collect_non_interactive("workspace", None, &args)?;
     assert_eq!(config.project_name, "atlas");
-    assert_eq!(config.remote_name, "production");
     assert_eq!(config.host, "deploy.example.com");
     assert_eq!(config.port, "2222");
     assert_eq!(config.branch, "release/production");

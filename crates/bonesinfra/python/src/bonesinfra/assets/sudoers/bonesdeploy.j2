@@ -18,10 +18,10 @@
 # authorized_keys) per project and scope each sudoers rule to that identity
 # before relying on the per-site split.
 #
-# The anchored patterns allow exactly `config sync --site <site>`,
-# `deploy --site <site>`, and `deploy --site <site> --artifact-stdin` where
-# <site> is lowercase ASCII letters, digits, and hyphens. Every other
+# The anchored patterns allow exactly `config sync --site <site>` and
+# `deploy --site <site>` where <site> is lowercase ASCII letters, digits, and
+# hyphens. Every other
 # BonesRemote subcommand, optional deploy argument,
 # reordered argument, and trailing argument is rejected by sudo. BonesRemote
 # revalidates the site identifier and rejects reserved names after exec.
-{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} ^config sync --site [a-z0-9-]+$, {{ bonesremote_path }} ^deploy --site [a-z0-9-]+$, {{ bonesremote_path }} ^deploy --site [a-z0-9-]+ --artifact-stdin$
+{{ deploy_user }} ALL=(root) NOPASSWD: {{ bonesremote_path }} ^config sync --site [a-z0-9-]+$, {{ bonesremote_path }} ^deploy --site [a-z0-9-]+$

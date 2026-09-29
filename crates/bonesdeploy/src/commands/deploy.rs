@@ -7,7 +7,7 @@ use tokio::fs::File;
 use crate::config;
 use crate::infra::{self, ssh};
 use crate::ui::output;
-use crate::{artifact, local_build};
+use crate::{artifact, compose_build, local_build};
 use bonesdeploy_core::artifact::encode_manifest;
 use bonesdeploy_core::config::RuntimeBackend;
 use bonesdeploy_core::paths;
@@ -28,28 +28,25 @@ pub async fn run() -> Result<()> {
         style(&cfg.host).dim(),
     );
 
-    match cfg.runtime.backend {
-        RuntimeBackend::Native => deploy_artifact(&cfg).await?,
-        RuntimeBackend::Docker => deploy_compose(&cfg).await?,
-    }
+    println!("Building the committed {} branch locally...", cfg.branch);
+    let build = local_build::export(&cfg)?;
+    let artifact = match cfg.runtime.backend {
+        RuntimeBackend::Native => {
+            local_build::build_native(&cfg, &build)?;
+            artifact::package(&cfg.project_name, &build)?
+        }
+        RuntimeBackend::Docker => {
+            let images = compose_build::build(&cfg, &build)?;
+            artifact::package_compose(&cfg.project_name, &build, images)?
+        }
+    };
+    deploy_artifact(&cfg, &artifact).await?;
 
     println!("{} Deployment complete.", output::success_marker());
     Ok(())
 }
 
-async fn deploy_compose(cfg: &config::Bones) -> Result<()> {
-    let session = ssh::connect(cfg).await?;
-    infra::sync_control_plane(&session, cfg).await?;
-    let command = infra::compose_deploy_command(&cfg.project_name);
-    ssh::stream_cmd(&session, &command).await?;
-    session.close().await?;
-    Ok(())
-}
-
-async fn deploy_artifact(cfg: &config::Bones) -> Result<()> {
-    println!("Building the committed {} branch locally...", cfg.branch);
-    let build = local_build::build(cfg)?;
-    let artifact = artifact::package(&cfg.project_name, &build)?;
+async fn deploy_artifact(cfg: &config::Bones, artifact: &artifact::PackagedArtifact) -> Result<()> {
     let frame = encode_manifest(&artifact.manifest)?;
 
     let session = ssh::connect(cfg).await?;

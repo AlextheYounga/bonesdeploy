@@ -9,13 +9,12 @@ from typing import Any
 from bonesinfra.config.context import (
     AppConfig,
     BackupConfig,
-    DeployConfig,
     DeployContext,
     DnsConfig,
     RuntimeConfig,
     ServerContext,
 )
-from bonesinfra.config.paths import DEFAULT_PROJECT_ROOT_PARENT, DEFAULT_REPO_PARENT, DEFAULT_WEB_ROOT
+from bonesinfra.config.paths import DEFAULT_PROJECT_ROOT_PARENT, DEFAULT_WEB_ROOT
 
 _RESERVED_PROJECT_NAMES = {
     "basic",
@@ -88,7 +87,6 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
             "template",
             "backend",
             "web_root",
-            "branch",
             "node_version",
             "compose_port",
             "compose_wait_timeout",
@@ -130,14 +128,12 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
         server=parse_server_connection(server),
         app=AppConfig(
             name,
-            f"{DEFAULT_REPO_PARENT}/{name}.git",
             f"{DEFAULT_PROJECT_ROOT_PARENT}/{name}",
             DnsConfig(
                 domain,
                 email,
                 ssl_enabled,
             ),
-            DeployConfig(_string(site.get("branch", "main"), "site.branch")),
         ),
         runtime=RuntimeConfig(
             backend,

@@ -73,7 +73,7 @@ owner is canonical. Bypassing it creates a competing abstraction.
 | Per-site persisted state | `SiteState` + `state/` store | Read/write through the store API | Touch state files directly |
 | Infrastructure migrations | Python `Patch` registry (`patches/registry.py`) | Add a registered, version-gated patch | Scatter one-off version checks throughout code |
 | SSH connectivity | `infra/ssh.rs` (Rust), `pyinfra/runner.py` (Python) | Use existing session helpers | Open raw SSH channels |
-| Git operations | `infra/git.rs` for local repositories; `bonesremote/src/git.rs` for server bare repositories | Use the existing boundary for the process in use | Shell out to git ad hoc |
+| Git operations | `infra/git.rs` for local source selection and export | Use the local Git boundary for source provenance | Maintain or resolve an application repository on the server |
 | GPG / secrets | `commands/secrets/gpg.rs` | Use the isolated keyring + helpers | Import GPG state from elsewhere |
 | Server CLI orchestration | `commands/server/{setup,doctor,helpers}.rs` | Add a focused server command module | Put server provisioning in root setup or site commands |
 | Site CLI orchestration | `commands/site/` | Add a focused site command module | Put site provisioning in server commands or root composition |
@@ -147,7 +147,7 @@ Reading, writing, or validating project deployment config.
 
 Contract:
 Bones (bonesdeploy-core/src/config.rs)
-├── app: App            # project_name, host, port, branch, domain, ssl, repo_path
+├── app: App            # project_name, host, port, branch, domain, ssl
 ├── runtime: Runtime    # template, web_root, backend, Compose settings, extra
 └── build: Build        # timeout_seconds
 
@@ -214,12 +214,12 @@ Referencing any server-side path in Python templates, framework code, or service
 
 Contract:
 DeploymentPaths (bonesinfra/python/.../config/paths.py)
-- 41 frozen fields covering git repos, project dirs, config dirs, sockets, and logs
+- 41 frozen fields covering project dirs, config dirs, sockets, and logs
 - Helpers include systemd_service(name), systemd_service_requirement(name),
   apparmor_profile(name), runtime_service_socket(name), and runtime_service_dir(name)
 
 Existing implementations:
-- Single frozen dataclass, computed from project_name + repo_path + root + web_root
+- Single frozen dataclass, computed from project_name + root + web_root
 
 To add another:
 Add a field here. The Rust-side constants in bonesdeploy-core/src/paths.rs must agree.
@@ -406,18 +406,17 @@ Modifying what happens during a deploy, or adding a deployment stage.
 
 Contract:
 Phases (release/state/record.rs):
-Created → SourceExported → Built → Promoted → Prepared → Sealed
+Created → Received → Materialized → Promoted → Prepared → Sealed
        → Activated → Verified → Completed
        → (CleanupPending on post-commit failure | Failed on pre-commit abort)
 
 Orchestrator (commands/deploy/lifecycle.rs):
 run_staged_deployment(mutation, revision)
-  ├─ stage::run()         → Created
-  ├─ checkout::run()      → SourceExported
-  ├─ build::run()         → Built
-  ├─ build::promote()     → Promoted
+   ├─ stage::run()         → Created
+   ├─ artifact::receive()  → Received / Materialized
+   ├─ release::promote()   → Promoted
   ├─ wire_shared + prepare → Prepared
-  ├─ build::finalize()    → Sealed
+   ├─ release::finalize()  → Sealed
   ├─ preflight::validate  (nginx -t gate; no live mutation yet)
   ├─ activate::run()      → Activated   *** cut-over ***
   ├─ service::run()       → Verified
@@ -446,16 +445,18 @@ Do not:
 - Bypass the preflight gate before activation
 ```
 
-Native deployment has one artifact path, not a second deployment lifecycle. The
-local CLI resolves the configured branch to an exact commit, builds the exported
-tree in Docker with the pinned `linux/amd64` builder, and streams a complete
-`tar.gz` artifact. The container receives fixed public contract metadata and
-committed public `.env.build` values only, never ambient or runtime secrets.
-BonesRemote verifies the site, exact branch commit, builder digest, payload
-length, SHA-256, and safe extraction constraints before promotion. After that
-boundary, prepare, sealing, activation, restart, pruning, and rollback are
-unchanged. Production provisioning has no native build user, cache, Podman
-manager, or image store. Django prepare still installs application dependencies.
+Native and Compose deployment share one artifact path, not separate deployment
+lifecycles. The local CLI resolves the configured branch to an exact commit.
+Native builds produce a complete filesystem artifact; Compose runs config, pull,
+and build locally, tags every service image with an immutable site/service/
+revision identity, and includes the image archive plus generated override.
+`.env.build` is explicit public build input; runtime secrets and ambient host
+variables are excluded. BonesRemote verifies the site, revision, payload length,
+SHA-256, image inventory, and safe extraction constraints before promotion.
+Production starts Compose with `--no-build --pull never`. Prepare, sealing,
+activation, restart, pruning, and rollback remain shared. Production provisioning
+has no application repository or native build facility, and Django dependencies
+are installed locally rather than during prepare.
 
 ```text
 ### SiteState

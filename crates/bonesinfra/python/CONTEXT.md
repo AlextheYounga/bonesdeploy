@@ -58,10 +58,13 @@ BonesInfra owns:
 
 Native site provisioning creates only the runtime identity and release layout.
 Application builds occur locally and arrive as release artifacts, so production
-hosts do not receive build users, build caches, rootless Podman state, or native
-builder images. Runtime application users remain home-less and non-login.
+hosts do not receive build users, build caches, rootless Podman state, native
+builder images, or application repositories. Runtime application users remain
+home-less and non-login.
 
-Repository and site paths are derived from `project_name`: `repo_path` defaults to `/home/git/<project>.git` and `project_root` defaults to `/srv/sites/<project>`.
+Site paths are derived from `project_name`; `project_root` defaults to
+`/srv/sites/<project>`. BonesInfra does not create or inspect an application
+repository or branch.
 
 Production hosts are supported only when `/etc/os-release` reports literal
 `ID=debian` with `VERSION_ID` 12 or newer, or literal `ID=ubuntu` with
@@ -310,7 +313,7 @@ Example:
 ```python
 def deploy_site_setup(ctx):     # ctx: DeployContext
     ensure_users_and_groups(ctx)
-    setup_repo_and_project(ctx, ctx.paths_dict)
+    setup_project(ctx, ctx.paths_dict)
     seed(ctx, ctx.paths_dict)
 ```
 
@@ -362,8 +365,7 @@ class DeployContext:
 Typed fields read from the root `.env`:
 
 ```text
-`PROJECT_NAME`, derived repository and project roots, `BRANCH`, `SSL_ENABLED`,
-`DOMAIN`, and `EMAIL`.
+`PROJECT_NAME`, derived project roots, `SSL_ENABLED`, `DOMAIN`, and `EMAIL`.
 ```
 
 ## RuntimeConfig
@@ -428,9 +430,10 @@ Responsibilities:
 
 - `server apply` installs packages (including etckeeper) and hardening; disables SSH password login for root; initializes `/etc` as an etckeeper repository; configures firewall, fail2ban, and unattended upgrades; creates the global deploy identity and BonesRemote roots; installs BonesRemote and the validated sudoers drop-in.
 - Every mutating flow (`server`, `site`, `services`, `runtime`, `ssl`, `helpers`) queues `services/linux/etckeeper.py::commit_changes` as its final operation, so a failed flow never commits and a successful flow always records its `/etc` changes with etckeeper defaults. Read-only `manifest` and patch flows do not commit.
-- `site apply` creates the runtime identity, one bare repository, root-owned site control-plane state, project paths, and the placeholder release.
+- `site apply` creates the runtime identity, root-owned site control-plane state,
+  project paths, and the placeholder release.
 - `site apply` creates the shared directory but does not write `shared/.env`; that file is published only by `bonesdeploy secrets push` outside this crate.
-- `site apply` does not install services, configure the framework runtime, configure SSL, push Git or secrets, or deploy.
+- `site apply` does not install services, configure the framework runtime, configure SSL, publish secrets, or deploy.
 
 Server setup should run as root or bootstrap SSH user. Site base provisioning
 does not install services, configure the framework runtime, configure SSL, or
@@ -476,13 +479,10 @@ boundary; supporting multiple operators requires a separate deploy identity
 (Unix account + authorized_keys) per project with the sudoers rule scoped to
 that identity.
 
-Config sync is the sole stdin consumer (the descriptor is read from stdin,
-which passes through sudo); deploy is the snapshot loader. Git push
-transports source only; deployment is explicitly started by `bonesdeploy
-deploy` over the `git` SSH session. The deploy lifecycle then runs as root,
-while server-side prepare scripts run as the runtime identity.
-
-Source code must be pushed to the configured deployment branch before deploy can succeed. The bare repo's default branch (HEAD) is set via `git symbolic-ref HEAD refs/heads/<branch>` during provisioning.
+Config sync and artifact deployment consume their respective stdin streams
+through the deploy SSH session. BonesInfra provisions the transport identity
+and runtime environment; BonesRemote receives and activates release artifacts
+as root while server-side prepare scripts run as the runtime identity.
 
 ______________________________________________________________________
 
@@ -685,9 +685,8 @@ bonesremote owns release deployment
 
 Update migrations are also defined here under `src/bonesinfra/patches/`.
 `bonesdeploy` invokes the private `bonesinfra patches apply` command for local
-Git migrations and remote pyinfra migrations. The command preserves the
-`0001-config-repo` and `0002-root-config-repo` markers and uses an update-only
-root SSH override for remote plans.
+project migrations and remote pyinfra migrations. Application repository
+creation and first-push migration are not part of the artifact lifecycle.
 
 ______________________________________________________________________
 

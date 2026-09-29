@@ -86,14 +86,26 @@ nginx service restart phase.
   built as a static musl binary and pre-seeded into the container, so
   bootstrap's `command -v bonesremote` guard skips the
   cargo-install-from-GitHub path and the container runs your working tree.
-- **Native artifact builds** — native scenarios build the committed revision
-  locally with Docker and upload the complete artifact. The guest receives it
-  only through BonesRemote's receipt path; it does not run application builds.
+- **Artifact builds** — native scenarios build the committed revision locally
+  with Docker and upload the complete artifact. Compose scenarios likewise run
+  config, pulls, and image builds locally, then upload the release tree and
+  image archive. The guest receives artifacts only through BonesRemote's receipt
+  path; it does not run application builds, image pulls, or image builds.
 - **Framework fixtures** — `fixtures/*.md` are mdpack archives of real
-  framework projects. Each scenario expands its archive into a disposable Git
-  repository, pushes `main`, and runs `bonesdeploy deploy`. Project setup creates
-  the encrypted default `infra/secrets/.env.gpg`; the runtime seeds the remote
-  shared environment file itself.
+  framework projects. Each scenario expands its archive into a disposable local
+  Git repository and runs `bonesdeploy deploy`; no production application
+  repository or first push is required. Project setup creates the encrypted default
+  `infra/secrets/.env.gpg`; the runtime seeds the remote shared environment file
+  itself.
+- **Artifact-only production** — native and Compose scenarios assert that the
+  guest has no application bare repository, application build unit, or leftover
+  artifact staging directory. The host performs the build and the guest only
+  receives and activates the artifact.
+- **Lifecycle coverage** — every native scenario covers artifact-only first
+  deploy, second release, failed activation rollback, and pruning the old
+  release. The Compose scenario additionally checks that release image tags are
+  recorded and used by the generated override, then prunes the old release and
+  its unreferenced image.
 - **Cleanup** — sample project directories are dropped at the end of each
   test. The shared container and session home are dropped at process exit via
   a `#[dtor]` hook (the `dtor` crate registers a destructor that fires when

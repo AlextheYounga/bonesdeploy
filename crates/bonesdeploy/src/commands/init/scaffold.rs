@@ -2,14 +2,12 @@ use std::fs;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use bonesdeploy_core::config::default_deploy_user;
 use bonesdeploy_core::paths;
 
 use super::FrameworkSelection;
 use crate::config;
 use crate::frameworks;
 use crate::infra::assets::frameworks as framework_assets;
-use crate::infra::git;
 use bonesdeploy_core::config::build_env;
 
 pub(super) fn materialize_project(cfg: &mut config::Bones, framework: FrameworkSelection) -> Result<()> {
@@ -75,16 +73,6 @@ pub(super) fn update_gitignore() -> Result<()> {
         fs::write(gitignore, format!("{}\n", entries.join("\n")))?;
     }
 
-    Ok(())
-}
-
-pub(super) fn ensure_local_remote(cfg: &config::Bones) -> Result<()> {
-    if git::remote_exists(&cfg.remote_name)? {
-        return Ok(());
-    }
-
-    let remote_url = format!("{}@{}:{}", default_deploy_user(), cfg.host, cfg.repo_path);
-    git::add_remote(&cfg.remote_name, &remote_url)?;
     Ok(())
 }
 

@@ -88,8 +88,6 @@ class DeletionPlan:
 
 
 COMMON_ARTIFACTS = (
-    Artifact("bare repository", "repo", "directory", "setup"),
-    Artifact("bare repository HEAD", "repo_head", "file", "setup"),
     Artifact("project root", "project_root", "directory", "setup"),
     Artifact("releases directory", "releases", "directory", "setup"),
     Artifact("shared directory", "shared", "directory", "setup"),
@@ -366,7 +364,6 @@ def _deletion_roots(ctx: DeployContext) -> tuple[Path, ...]:
     return tuple(
         Path(path)
         for path in (
-            paths.repo,
             paths.project_root,
             paths.conf_root,
             paths.site_root,

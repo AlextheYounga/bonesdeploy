@@ -115,8 +115,9 @@ fn django_prepare_template_uses_the_configured_python_minor() -> Result<()> {
             .join("../bonesdeploy/assets/frameworks/django/deployment/prepare/01_prepare_django.sh"),
     )?;
 
-    assert!(template.contains("BONES_RUNTIME_PYTHON_VERSION"));
-    assert!(template.contains("\"$PYTHON_BIN\" -m venv"));
+    assert!(template.contains("$VENV_DIR/bin/python"));
+    assert!(!template.contains("pip install"));
+    assert!(!template.contains("-m venv"));
     Ok(())
 }
 

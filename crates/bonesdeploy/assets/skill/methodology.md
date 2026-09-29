@@ -6,7 +6,7 @@ Three identities. Not two, not five. Three.
 
 | Identity | Owns | Job |
 |----------|------|-----|
-| `git` (deploy user) | bare repo | source ingress and deployment SSH entry point |
+| `git` (deploy user) | deployment SSH entry point | artifact transport and deployment SSH entry point |
 | `<site>` (runtime user) | `shared/`, writable paths, `/run/<site>` | mutates runtime state |
 | `root` | system units, config dirs, state, releases | provisions and runs the allowlisted BonesRemote lifecycle |
 
@@ -50,8 +50,8 @@ deploy that fails into a security incident.
 - **No ACLs.** Opaque. Unreadable. We use ordinary Unix ownership.
 - **No inotify systems.** Cumbersome, fragile, invisible. We use systemd
   services and explicit restart.
-- **No production-native build fallback.** A local Docker build failure leaves
-  the server untouched; it never causes application build scripts to run there.
+- **No production build fallback.** A local native or Compose build failure leaves
+  the server untouched; production never builds application code or images.
 - **No `chown -R` on shared state during deploy.** Narrow, local changes
   beat recursive ownership rewrites.
 
@@ -62,7 +62,7 @@ image with `cwd=/workspace/source`, targeting `linux/amd64`. The container gets
 the exported committed source tree, a scoped local cache at `/workspace/cache`,
 fixed public build metadata, and committed public `.env.build` values. It does
 *not* get the root `.env`, runtime secrets, `shared/`, `current/`, `releases/`,
-the bare repo, host home, SSH agent, credential stores, or Docker socket. Build
+production source repositories, host home, SSH agent, credential stores, or Docker socket. Build
 input is disposable. Build output becomes the checksummed artifact BonesRemote
 receives before promotion.
 
@@ -70,7 +70,9 @@ receives before promotion.
 
 Prepare scripts run as the runtime user, in a runtime-owned candidate
 release, after shared paths are wired, before `current` is repointed.
-Migrations, cache warmups, runtime-state work — this is the place.
+Migrations, production-secret-based configuration, cache warmups, and
+runtime-state work belong here. Application dependency installation and
+compilation do not.
 `bonesremote` opens the root-owned `functions.sh` and the script and
 streams both as one stdin input to the runtime-user shell. The runtime
 user never gets filesystem access to the deployment bundle.

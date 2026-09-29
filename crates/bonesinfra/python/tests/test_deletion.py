@@ -34,7 +34,7 @@ def test_deletion_plan_serializes_only_validated_manifest_resources():
 
     data = render_deletion_plan(plan)
 
-    assert '"path": "/home/git/example.git"' in data
+    assert '"path": "/srv/sites/example"' in data
     assert '"unit": "example-app.service"' in data
     assert '"unit": "example-cloudflared.service"' in data
     assert "bonesdeploy-cloudflared-example.conf" in data

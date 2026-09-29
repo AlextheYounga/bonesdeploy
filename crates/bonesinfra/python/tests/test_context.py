@@ -12,14 +12,11 @@ def test_reads_typed_site_request():
     ctx = DeployContext.from_request(make_site_request())
 
     assert ctx.app.project_name == "lawsnipe"
-    assert ctx.app.repo_path == "/home/git/lawsnipe.git"
     assert ctx.app.project_root == "/srv/sites/lawsnipe"
     assert ctx.server.host == "example.com"
     assert ctx.server.port == "2222"
-    assert ctx.paths.repo == "/home/git/lawsnipe.git"
     assert ctx.paths.project_root == "/srv/sites/lawsnipe"
     assert ctx.paths.current_web_root == "/srv/sites/lawsnipe/current/dist"
-    assert ctx.app.deploy.branch == "main"
     assert ctx.app.dns.ssl_enabled is True
     assert ctx.runtime.runtime_user == "lawsnipe"
     assert ctx.runtime.runtime_group == "lawsnipe"
@@ -77,8 +74,6 @@ def test_missing_site_fields_use_defaults():
         },
     }
     ctx = DeployContext.from_request(request)
-    assert ctx.app.deploy.branch == "main"
-    assert ctx.app.repo_path == "/home/git/lawsnipe.git"
     assert ctx.runtime.web_root == "public"
     assert ctx.runtime.runtime_user == "lawsnipe"
     assert ctx.backup.configured is False
@@ -112,6 +107,12 @@ def test_unknown_request_fields_are_rejected():
 def test_unknown_site_fields_are_rejected():
     with pytest.raises(ValueError, match="unknown site field 'unexpected'"):
         DeployContext.from_request(make_site_request(unexpected="value"))
+
+
+@pytest.mark.parametrize("field", ["branch", "repo_path"])
+def test_repository_derived_site_context_is_rejected(field):
+    with pytest.raises(ValueError, match=rf"unknown site field '{field}'"):
+        DeployContext.from_request(make_site_request(**{field: "main"}))
 
 
 def test_invalid_extras_are_rejected():

@@ -40,7 +40,6 @@ TEMPLATES_DIR = _TemplatePath()
 ASSETS_DIR = TEMPLATES_DIR / "shared"
 SCRIPTS_DIR = ASSETS_DIR / "scripts"
 
-DEFAULT_REPO_PARENT = "/home/git"
 BONESDEPLOY_LOG_ROOT = "/var/log/bonesdeploy"
 PATCHES_ROOT = "/var/lib/bonesdeploy/patches"
 DEFAULT_PROJECT_ROOT_PARENT = "/srv/sites"
@@ -60,7 +59,6 @@ ETC_SSH_SSHD_CONFIG_D = "/etc/ssh/sshd_config.d"
 RUNTIME_SOCKET_PARENT = "/run"
 NGINX_CONF = "nginx.conf"
 INDEX_HTML = "index.html"
-GIT_HEAD = "HEAD"
 RELEASES_DIR = "releases"
 SHARED_DIR = "shared"
 CURRENT_LINK = "current"
@@ -96,9 +94,6 @@ def _parent_or_default(path: str, fallback: str) -> str:
 @dataclass
 class DeploymentPaths:
     project_name: str
-    repo: str
-    repo_parent: str
-    repo_head: str
     site_nginx_config: str
     site_root: str
     conf_root: str
@@ -147,7 +142,6 @@ class DeploymentPaths:
     def new(
         cls,
         project_name: str,
-        repo_path: str,
         project_root: str,
         web_root: str | None = None,
     ) -> "DeploymentPaths":
@@ -160,12 +154,8 @@ class DeploymentPaths:
         runtime_nginx_dir = runtime_socket_dir / "nginx"
         conf_root = Path(DEFAULT_CONF_ROOT_PARENT) / project_name
 
-        repo = Path(repo_path)
         return cls(
             project_name=project_name,
-            repo=repo_path,
-            repo_parent=_parent_or_default(repo_path, DEFAULT_REPO_PARENT),
-            repo_head=str(repo / GIT_HEAD),
             site_nginx_config=str(conf_root / NGINX_CONF),
             site_root=str(Path(BONESREMOTE_SITE_ROOT) / project_name),
             conf_root=str(conf_root),

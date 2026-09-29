@@ -37,6 +37,7 @@ main() {
 	install_application_packages
 	install_bundle_dependencies
 	precompile_assets
+	rm -rf node_modules tmp/cache deployment/build
 
 	trap - ERR
 

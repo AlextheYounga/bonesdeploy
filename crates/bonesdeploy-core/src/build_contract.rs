@@ -56,16 +56,7 @@ impl TargetPlatform {
 
 pub const SOURCE_MOUNT: &str = "/workspace/source";
 pub const CACHE_MOUNT: &str = "/workspace/cache";
-pub const DEPLOYMENT_MOUNT: &str = "/workspace/deployment";
 pub const WORKSPACE_ROOT: &str = "/workspace";
-
-/// Returns the command used to copy the deployment bundle into a build container.
-#[must_use]
-pub fn deployment_tar_extract_command() -> String {
-    format!(
-        "mkdir -p {DEPLOYMENT_MOUNT} && tar --extract --file=- --no-same-owner --no-same-permissions --directory={DEPLOYMENT_MOUNT}"
-    )
-}
 
 /// Lists executable build scripts in lexical order by their two-digit prefix.
 /// Files must use the established `NN_name.sh` convention.
@@ -87,12 +78,10 @@ pub fn numbered_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
 }
 
 const DERIVED_ENV_DENYLIST: &[&str] = &[
-    "app.remote_name",
     "app.ssh_user",
     "app.host",
     "app.port",
     "app.branch",
-    "app.repo_path",
     "app.project_root",
     "runtime.permissions",
     "runtime.backend",

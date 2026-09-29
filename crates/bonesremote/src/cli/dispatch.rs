@@ -12,13 +12,7 @@ use crate::runtime::docker;
 pub fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
         Command::Doctor { site, exhaustive } => doctor::run(site.as_deref(), *exhaustive),
-        Command::Deploy { site, artifact_stdin } => {
-            if *artifact_stdin {
-                deploy::run_artifact(site)
-            } else {
-                deploy::run_source(site)
-            }
-        }
+        Command::Deploy { site } => deploy::run_artifact(site),
         Command::Config { command: ConfigCommand::Sync { site } } => config::sync(site),
         Command::Decommission { command } => match command {
             DecommissionCommand::Begin { site } => decommission::begin(site),

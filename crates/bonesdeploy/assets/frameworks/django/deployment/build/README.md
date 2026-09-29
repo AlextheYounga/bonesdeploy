@@ -15,6 +15,12 @@ the committed revision.
 - Scripts run in lexical order by filename.
 - Non-zero exit code fails the deploy.
 - Your job: produce the deployable app layout inside `/workspace/source`.
+- Install all application dependencies, including `requirements.txt`, here;
+  production prepare does not install dependencies. Dependencies are stored in
+  `.python-packages`; `.venv/bin/python` and `.venv/bin/gunicorn` are release
+  wrappers that execute the provisioned production interpreter.
+- Remove build-only caches, source-only files, and numbered build scripts when
+  the selected runtime does not need them.
 - BonesRemote verifies and receives the artifact, then promotes this output into
   a sealed release.
 

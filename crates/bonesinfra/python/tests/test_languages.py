@@ -1,3 +1,4 @@
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -49,6 +50,13 @@ def test_python_runtime_builds_the_pinned_release_for_the_selected_minor(monkeyp
     assert calls["packages"]["packages"] == PYTHON_BUILD_PACKAGES
     assert calls["script"]["args"] == (release, checksum, "/opt/bonesdeploy/python")
     assert executable == f"/opt/bonesdeploy/python/{release}/bin/python3.14"
+
+
+def test_python_installer_exposes_a_stable_minor_version_path():
+    installer = (Path(__file__).parents[1] / "src/bonesinfra/assets/scripts/install-python.sh").read_text()
+
+    assert 'ln -sfn "$prefix" "$python_root/$minor"' in installer
+    assert 'ln -sfn "$python_binary" "/usr/local/bin/python$minor"' in installer
 
 
 def test_python_runtime_rejects_unpinned_minor_versions():

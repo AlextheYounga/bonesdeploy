@@ -37,3 +37,5 @@ run_build
 if [ -L dist ]; then
 	rm dist
 fi
+
+rm -rf .nuxt node_modules deployment/build

@@ -9,6 +9,10 @@ prefix="$python_root/$release"
 python_binary="$prefix/bin/python$minor"
 
 if [[ -x "$python_binary" ]] && [[ "$("$python_binary" --version)" == "Python $release" ]]; then
+	install -d -m 0755 "$python_root"
+	ln -sfn "$prefix" "$python_root/$minor"
+	install -d -m 0755 /usr/local/bin
+	ln -sfn "$python_binary" "/usr/local/bin/python$minor"
 	exit 0
 fi
 
@@ -31,3 +35,4 @@ popd >/dev/null
 "$python_binary" -c 'import bz2, compression.zstd, ctypes, hashlib, lzma, sqlite3, ssl, uuid, venv, zlib'
 install -d -m 0755 /usr/local/bin
 ln -sfn "$python_binary" "/usr/local/bin/python$minor"
+ln -sfn "$prefix" "$python_root/$minor"

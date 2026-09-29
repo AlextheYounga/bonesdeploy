@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::state as release_state;
+use crate::runtime::docker;
 
 pub fn run(site: &str, keep: usize) -> Result<()> {
     privileges::ensure_root("bonesremote release prune")?;
@@ -38,6 +39,12 @@ pub fn prune_old_releases(project_root: &str, keep: usize) -> Result<Vec<String>
     for release in candidates {
         let path = release_state::release_dir(project_root, &release);
         if path.exists() {
+            let retained = release_state::list_releases_sorted(project_root)?
+                .into_iter()
+                .filter(|other| other != &release)
+                .map(|other| release_state::release_dir(project_root, &other))
+                .collect::<Vec<_>>();
+            docker::command::remove_unreferenced_release_images(&path, &retained)?;
             fs::remove_dir_all(&path).with_context(|| format!("Failed to prune old release {}", path.display()))?;
             pruned.push(release);
         }

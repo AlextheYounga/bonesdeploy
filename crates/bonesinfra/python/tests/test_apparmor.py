@@ -120,6 +120,8 @@ def test_django_profile_permits_mapping_managed_python_libraries(tmp_path, monke
     assert "/opt/bonesdeploy/python/ r," in rendered
     assert "/opt/bonesdeploy/python/** r," in rendered
     assert "/opt/bonesdeploy/python/**.so* mr," in rendered
+    assert "/srv/sites/lawsnipe/releases/*/** r," in rendered
+    assert "/srv/sites/lawsnipe/current/.venv/bin/gunicorn mrix," in rendered
 
 
 def test_rails_profile_permits_reading_managed_ruby_libraries(tmp_path, monkeypatch):

@@ -12,7 +12,9 @@ Scripts in this directory run after the build is promoted into a release.
 
 - Scripts run in lexical order by filename.
 - Non-zero exit code fails the deploy.
-- This is where migrations, cache/optimize, and runtime-state commands belong.
+- This is where migrations, production-secret-based configuration, cache/optimize,
+  and runtime-state commands belong. Do not install application dependencies or
+  compile assets here; those belong in the local build artifact.
 
 ## Typical Laravel Commands
 

@@ -8,7 +8,6 @@ use serde_json::{Map, Value, json};
 
 fn sample_config(project_name: &str) -> Bones {
     let mut config = Bones::default();
-    config.remote_name = String::from("production");
     config.project_name = String::from(project_name);
     config.host = String::from("deploy.example.com");
     config.port = String::from("22");
@@ -61,7 +60,6 @@ fn write_local_environment_round_trips_dotenv_values() -> Result<()> {
     assert!(content.contains("EMAIL=ops@example.com"));
     let loaded = load(&path)?;
     assert_eq!(loaded.project_name, "phoenix");
-    assert_eq!(loaded.remote_name, "production");
     assert_eq!(loaded.ssh_user, "root");
     assert_eq!(loaded.host, "deploy.example.com");
     assert_eq!(loaded.port, "22");

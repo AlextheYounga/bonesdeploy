@@ -39,9 +39,9 @@ fn config_sync_accepts_a_site_argument() -> Result<()> {
 }
 
 #[test]
-fn deploy_accepts_the_compose_source_form() -> Result<()> {
+fn deploy_accepts_the_artifact_only_form() -> Result<()> {
     let output = common::run(&["deploy", "--site", "atlas"])?;
-    assert_ne!(output.status.code(), Some(2), "Compose source deployment must be accepted by clap");
+    assert_ne!(output.status.code(), Some(2), "artifact deployment must be accepted by clap");
     Ok(())
 }
 
@@ -53,15 +53,15 @@ fn deploy_rejects_the_removed_config_stdin_option() -> Result<()> {
 }
 
 #[test]
-fn deploy_accepts_the_exact_artifact_stdin_form() -> Result<()> {
+fn deploy_rejects_the_removed_artifact_stdin_option() -> Result<()> {
     let output = common::run(&["deploy", "--site", "atlas", "--artifact-stdin"])?;
-    assert_ne!(output.status.code(), Some(2), "artifact stdin must be accepted by clap");
+    assert_eq!(output.status.code(), Some(2), "artifact stdin is implicit for the only deploy route");
     Ok(())
 }
 
 #[test]
 fn deploy_rejects_the_removed_revision_option() -> Result<()> {
-    let output = common::run(&["deploy", "--site", "atlas", "--revision", "main", "--artifact-stdin"])?;
+    let output = common::run(&["deploy", "--site", "atlas", "--revision", "main"])?;
     assert_eq!(output.status.code(), Some(2));
     Ok(())
 }

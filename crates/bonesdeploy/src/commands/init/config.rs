@@ -1,8 +1,5 @@
 use anyhow::{Result, anyhow};
-use bonesdeploy_core::{
-    config::{RuntimeBackend, parse_port, validate_host, validate_project_name},
-    paths,
-};
+use bonesdeploy_core::config::{RuntimeBackend, parse_port, validate_host, validate_project_name};
 
 use crate::config;
 use crate::infra::git;
@@ -29,14 +26,8 @@ fn collect_from_existing(
         || prompts::prompt_project_name(project_name_hint, existing_config),
     )?;
     let branch = cli_or_prompt(args.branch.as_ref(), None, || prompts::prompt_branch(existing_config))?;
-    let remote_name = cli_or_prompt(args.remote.as_ref(), None, || prompts::prompt_remote_name(existing_config))?;
-    let inferred_remote =
-        if git::remote_exists(&remote_name)? { git::infer_remote_connection_details(&remote_name)? } else { None };
-    let host =
-        cli_or_prompt(args.host.as_ref(), None, || prompts::prompt_host(existing_config, inferred_remote.as_ref()))?;
-    let port =
-        cli_or_prompt(args.port.as_ref(), None, || prompts::prompt_port(existing_config, inferred_remote.as_ref()))?;
-    let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
+    let host = cli_or_prompt(args.host.as_ref(), None, || prompts::prompt_host(existing_config))?;
+    let port = cli_or_prompt(args.port.as_ref(), None, || prompts::prompt_port(existing_config))?;
     let project_root = existing_path_override(
         existing_config,
         |cfg| &cfg.project_root,
@@ -45,12 +36,10 @@ fn collect_from_existing(
     );
 
     let mut cfg = config::Bones::default();
-    cfg.remote_name = remote_name;
     cfg.project_name = project_name;
     cfg.host = host;
     cfg.port = port;
     cfg.branch = branch;
-    cfg.repo_path = repo_path;
     cfg.project_root = project_root;
     cfg.runtime.backend = match (args.runtime_backend.as_deref(), existing_config) {
         (Some(value), _) => parse_runtime_backend(value)?,
@@ -79,12 +68,9 @@ pub fn collect_non_interactive(
     args: &super::Args,
 ) -> Result<config::Bones> {
     let project_name = resolve_project_name(args, existing_config, project_name_hint)?;
-    let remote_name = resolve_remote_name(args, existing_config);
-    let inferred_remote = infer_remote_details(&remote_name)?;
-    let host = resolve_host(args, existing_config, inferred_remote.as_ref())?;
+    let host = resolve_host(args, existing_config)?;
     let branch = resolve_branch(args, existing_config);
-    let port = resolve_port(args, existing_config, inferred_remote.as_ref());
-    let repo_path = resolve_repo_path(&project_name, existing_config, inferred_remote.as_ref());
+    let port = resolve_port(args, existing_config);
     let project_root = existing_path_override(
         existing_config,
         |cfg| &cfg.project_root,
@@ -93,12 +79,10 @@ pub fn collect_non_interactive(
     );
 
     let mut cfg = config::Bones::default();
-    cfg.remote_name = remote_name;
     cfg.project_name = project_name;
     cfg.host = host;
     cfg.port = port;
     cfg.branch = branch;
-    cfg.repo_path = repo_path;
     cfg.project_root = project_root;
     cfg.runtime.backend = resolve_runtime_backend(args, existing_config)?;
     apply_existing_fields(&mut cfg, existing_config);
@@ -134,28 +118,11 @@ fn resolve_project_name(
         })
 }
 
-fn resolve_remote_name(args: &super::Args, existing_config: Option<&config::Bones>) -> String {
-    args.remote
-        .as_deref()
-        .and_then(non_empty)
-        .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.remote_name)))
-        .unwrap_or_else(|| String::from("production"))
-}
-
-fn infer_remote_details(remote_name: &str) -> Result<Option<git::RemoteConnectionDetails>> {
-    if git::remote_exists(remote_name)? { git::infer_remote_connection_details(remote_name) } else { Ok(None) }
-}
-
-fn resolve_host(
-    args: &super::Args,
-    existing_config: Option<&config::Bones>,
-    inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> Result<String> {
+fn resolve_host(args: &super::Args, existing_config: Option<&config::Bones>) -> Result<String> {
     args.host
         .as_deref()
         .and_then(non_empty)
         .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.host)))
-        .or_else(|| inferred_remote.map(|details| details.host.clone()))
         .ok_or_else(|| {
             anyhow!(
                 "{} --host is required in non-interactive mode.\n\
@@ -174,16 +141,11 @@ fn resolve_branch(args: &super::Args, existing_config: Option<&config::Bones>) -
         .unwrap_or_else(|| String::from("main"))
 }
 
-fn resolve_port(
-    args: &super::Args,
-    existing_config: Option<&config::Bones>,
-    inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> String {
+fn resolve_port(args: &super::Args, existing_config: Option<&config::Bones>) -> String {
     args.port
         .as_deref()
         .and_then(non_empty)
         .or_else(|| existing_config.and_then(|cfg| non_empty(&cfg.port)))
-        .or_else(|| inferred_remote.map(|details| details.port.clone()))
         .unwrap_or_else(|| String::from("22"))
 }
 
@@ -213,25 +175,6 @@ fn parse_runtime_backend(value: &str) -> Result<RuntimeBackend> {
 pub fn non_empty(value: &str) -> Option<String> {
     let value = value.trim();
     (!value.is_empty()).then(|| value.to_string())
-}
-
-pub fn resolve_repo_path(
-    project_name: &str,
-    existing_config: Option<&config::Bones>,
-    inferred_remote: Option<&git::RemoteConnectionDetails>,
-) -> String {
-    if let Some(details) = inferred_remote {
-        return details.repo_path.clone();
-    }
-
-    let configured_repo_path = existing_config.map(|cfg| cfg.repo_path.as_str());
-
-    let repo_path = match configured_repo_path {
-        Some(path) if !path.is_empty() => path.replace("<project_name>", project_name),
-        _ => paths::default_repo_path_for(project_name),
-    };
-
-    repo_path
 }
 
 pub fn existing_path_override(

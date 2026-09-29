@@ -1,6 +1,7 @@
 pub mod artifact;
 pub mod cli;
 pub mod commands;
+pub mod compose_build;
 pub mod config;
 pub mod frameworks;
 pub mod infra;

@@ -7,16 +7,21 @@ const PORT: u16 = 18080;
 
 pub fn run(h: &Harness) -> Result<()> {
     let project = h.provision_compose(SITE, PORT)?;
+    h.assert_artifact_only(SITE)?;
     h.deploy(&project)?;
     h.assert_service(&format!("{SITE}-compose.service"))?;
     h.assert_route(SITE, "compose-v1")?;
+    h.assert_compose_release_images(SITE)?;
     compose(h, "config --quiet")?;
     compose(h, "exec -T state test -s /data/marker")?;
 
+    let first_release = h.current_release(SITE)?;
+    let first_image = h.compose_image_tag(&first_release)?;
     project.write("index.html", "compose-v2\n")?;
     h.commit(&project, "second Compose release")?;
     h.deploy(&project)?;
     h.assert_route(SITE, "compose-v2")?;
+    h.assert_compose_release_images(SITE)?;
     compose(h, "exec -T state test -s /data/marker")?;
 
     let previous = h.exec(&format!("readlink -f /srv/sites/{SITE}/current"))?;
@@ -29,7 +34,11 @@ pub fn run(h: &Harness) -> Result<()> {
     if active.trim() != previous.trim() {
         bail!("failed Compose activation did not restore the previous release");
     }
-    h.assert_route(SITE, "compose-v2").context("previous Compose release was not restored")
+    h.assert_route(SITE, "compose-v2").context("previous Compose release was not restored")?;
+    h.prune_releases(SITE, 1)?;
+    h.assert_release_removed(&first_release)?;
+    h.assert_image_removed(&first_image)?;
+    h.assert_artifact_only(SITE)
 }
 
 fn compose(h: &Harness, operation: &str) -> Result<String> {

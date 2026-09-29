@@ -33,8 +33,10 @@ fn run_native(
 ) -> Result<()> {
     let h = harness::shared_harness()?;
     let project = provision(&h)?;
+    h.assert_artifact_only(site)?;
     assert_running(&h)?;
     deploy(&h, &project)?;
+    h.assert_artifact_only(site)?;
 
     let first_release = h.current_release(site)?;
     project.write("e2e-release-marker.txt", "second release\n")?;
@@ -60,6 +62,9 @@ fn run_native(
     if active_release != second_release {
         bail!("failed {site} activation restored {active_release:?}, expected second release {second_release:?}");
     }
+    h.prune_releases(site, 1)?;
+    h.assert_release_removed(&first_release)?;
+    h.assert_artifact_only(site)?;
     Ok(())
 }
 

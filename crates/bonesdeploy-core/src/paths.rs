@@ -1,7 +1,6 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-pub const DEFAULT_REPO_PARENT: &str = "/home/git";
 pub const DEFAULT_PROJECT_ROOT_PARENT: &str = "/srv/sites";
 pub const DEFAULT_CONF_ROOT_PARENT: &str = "/srv/conf";
 pub const DEFAULT_WEB_ROOT: &str = "public";
@@ -80,11 +79,6 @@ pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";
 pub const BONES_CONFIG_PROJECTS_DIR: &str = "projects";
 pub const BONESDEPLOY_DIR: &str = "bonesdeploy";
 pub const GITIGNORE_FILE: &str = ".gitignore";
-
-#[must_use]
-pub fn default_repo_path_for(project_name: &str) -> String {
-    Path::new(DEFAULT_REPO_PARENT).join(format!("{project_name}.git")).display().to_string()
-}
 
 #[must_use]
 pub fn default_project_root_for(project_name: &str) -> String {

@@ -1,46 +1,13 @@
-from shlex import quote
-
-from pyinfra.operations import server
-
-from bonesinfra.config.context import DEPLOY_USER
 from bonesinfra.pyinfra.operations import mkdir
 
 
-def _user_env_command(user, command):
-    q_user = quote(user)
-    home = f"$(getent passwd {q_user} | cut -d: -f6)"
-    return f"HOME={home} XDG_CONFIG_HOME={home}/.config {command}"
-
-
-def setup_repo_and_project(ctx, paths):
+def setup_project(ctx, paths):
     mkdir(
         name="Ensure control-plane site state directory exists",
         path=paths["site_root"],
         user="root",
         group="root",
         mode="0700",
-    )
-
-    mkdir(
-        name="Ensure bare repo parent directory exists",
-        path=paths["repo_parent"],
-        user=DEPLOY_USER,
-        group=DEPLOY_USER,
-    )
-
-    server.shell(
-        name="Initialize bare git repo",
-        commands=[_user_env_command(DEPLOY_USER, f"git init --bare {quote(paths['repo'])}")],
-        _sudo=True,
-        _sudo_user=DEPLOY_USER,
-    )
-
-    repo = quote(paths["repo"])
-    server.shell(
-        name="Set bare repo default branch",
-        commands=[f"git --git-dir {repo} symbolic-ref HEAD refs/heads/{ctx.app.deploy.branch}"],
-        _sudo=True,
-        _sudo_user=DEPLOY_USER,
     )
 
     mkdir(

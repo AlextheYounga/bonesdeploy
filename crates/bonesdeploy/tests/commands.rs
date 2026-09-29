@@ -29,31 +29,19 @@ fn gpg_fingerprint_parser_preserves_machine_output_behavior() {
 }
 
 #[test]
-fn verbose_remote_report_preserves_pending_state() {
-    assert!(site::render_remote_doctor_output(
+fn verbose_remote_report_ignores_removed_repository_readiness() {
+    assert!(!site::render_remote_doctor_output(
         "bonesremote doctor\n  • deploy branch 'main' has not been pushed yet\n",
         true
     ));
-    assert!(!site::render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
-    assert!(site::render_remote_doctor_output(
+    assert!(!site::render_remote_doctor_output(
         "bonesremote doctor\n  • repository has no refs yet. Run 'git push <remote> <branch>' before the first deploy.\n",
         true
     ));
-    assert!(!site::render_remote_doctor_output("bonesremote doctor\n✓ All checks passed.\n", true));
     assert!(site::render_remote_doctor_output(
         "bonesremote doctor\n  • shared environment is missing: /srv/sites/demo/shared/.env. Run 'bonesdeploy secrets push' first.\n",
         false
     ));
-}
-
-#[test]
-fn strip_ansi_removes_sgr_color_sequences() {
-    assert_eq!(
-        site::strip_ansi("\x1b[1;33m•\x1b[0m deploy branch 'master' has not been pushed yet"),
-        "• deploy branch 'master' has not been pushed yet"
-    );
-    assert_eq!(site::strip_ansi("\x1b[1;33m•\x1b[0m repository has no refs yet"), "• repository has no refs yet");
-    assert_eq!(site::strip_ansi("plain text"), "plain text");
 }
 
 #[test]
@@ -81,6 +69,11 @@ fn removed_remote_command_is_rejected() {
 #[test]
 fn removed_build_mode_option_is_rejected() {
     assert!(Cli::try_parse_from(["bonesdeploy", "init", "--build-mode", "local"]).is_err());
+}
+
+#[test]
+fn removed_deployment_remote_option_is_rejected() {
+    assert!(Cli::try_parse_from(["bonesdeploy", "init", "--remote", "production"]).is_err());
 }
 
 #[test]

@@ -68,8 +68,8 @@ fn release(name: &str, current: Option<&str>, active: Option<&DeploymentRecord>,
 fn phase_status(phase: &DeploymentPhase) -> String {
     match phase {
         DeploymentPhase::Created => String::from("created"),
-        DeploymentPhase::SourceExported => String::from("source_exported"),
-        DeploymentPhase::Built => String::from("built"),
+        DeploymentPhase::Received => String::from("received"),
+        DeploymentPhase::Materialized => String::from("materialized"),
         DeploymentPhase::Promoted => String::from("promoted"),
         DeploymentPhase::Prepared => String::from("prepared"),
         DeploymentPhase::Sealed => String::from("sealed"),

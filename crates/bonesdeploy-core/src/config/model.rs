@@ -53,12 +53,10 @@ impl Backup {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub struct App {
-    pub remote_name: String,
     pub project_name: String,
     pub ssh_user: String,
     pub host: String,
     pub port: String,
-    pub repo_path: String,
     pub project_root: String,
     pub branch: String,
     pub releases_keep: usize,
@@ -70,12 +68,10 @@ pub struct App {
 impl Default for App {
     fn default() -> Self {
         Self {
-            remote_name: String::new(),
             project_name: String::new(),
             ssh_user: String::from("root"),
             host: String::new(),
             port: String::from("22"),
-            repo_path: String::new(),
             project_root: String::new(),
             branch: String::from("main"),
             releases_keep: 5,
@@ -102,7 +98,6 @@ impl Bones {
     pub fn for_site(site: &str) -> Self {
         let mut config = Self::default();
         config.project_name = site.to_string();
-        config.repo_path = default_repo_path_for(site);
         config.project_root = paths::default_project_root_for(site);
         config
     }
@@ -170,11 +165,6 @@ pub fn build_user_for(project_name: &str) -> String {
 #[must_use]
 pub fn build_group_for(project_name: &str) -> String {
     format!("{project_name}-build")
-}
-
-#[must_use]
-pub fn default_repo_path_for(project_name: &str) -> String {
-    paths::default_repo_path_for(project_name)
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

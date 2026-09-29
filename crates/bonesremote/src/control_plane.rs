@@ -46,9 +46,6 @@ pub fn read_stdin_descriptor() -> Result<RemoteDeploymentConfig> {
 }
 
 fn validate_descriptor(descriptor: &RemoteDeploymentConfig) -> Result<()> {
-    if descriptor.branch.is_empty() {
-        bail!("Deployment config descriptor has an empty branch");
-    }
     config::validate_runtime(&descriptor.runtime)
 }
 
@@ -120,21 +117,17 @@ mod tests {
         root
     }
 
-    fn descriptor(branch: &str, backend: RuntimeBackend) -> RemoteDeploymentConfig {
-        RemoteDeploymentConfig {
-            branch: branch.to_string(),
-            releases_keep: 5,
-            runtime: Runtime { backend, ..Runtime::default() },
-        }
+    fn descriptor(backend: RuntimeBackend) -> RemoteDeploymentConfig {
+        RemoteDeploymentConfig { releases_keep: 5, runtime: Runtime { backend, ..Runtime::default() } }
     }
 
     #[test]
     fn overwrite_replaces_content_and_leaves_no_temp_files() -> Result<()> {
         let root = root("overwrite");
         let _scope = override_control_plane_root(root.clone());
-        store("atlas", &descriptor("main", RuntimeBackend::Native))?;
-        store("atlas", &descriptor("release", RuntimeBackend::Docker))?;
-        assert_eq!(load("atlas")?.branch, "release");
+        store("atlas", &descriptor(RuntimeBackend::Native))?;
+        store("atlas", &descriptor(RuntimeBackend::Docker))?;
+        assert_eq!(load("atlas")?.runtime.backend, RuntimeBackend::Docker);
         assert_eq!(fs::read_dir(root.join("atlas"))?.count(), 1);
         fs::remove_dir_all(root)?;
         Ok(())
@@ -144,7 +137,7 @@ mod tests {
     fn stored_snapshot_directory_is_mode_0750() -> Result<()> {
         let root = root("dir-mode");
         let _scope = override_control_plane_root(root.clone());
-        store("atlas", &descriptor("main", RuntimeBackend::Native))?;
+        store("atlas", &descriptor(RuntimeBackend::Native))?;
         let snapshot = snapshot_path("atlas");
         let Some(site_dir) = snapshot.parent() else {
             bail!("snapshot path has no parent directory: {}", snapshot.display());
@@ -163,8 +156,8 @@ mod tests {
     fn stored_snapshot_is_mode_0644_when_created_and_replaced() -> Result<()> {
         let root = root("mode");
         let _scope = override_control_plane_root(root.clone());
-        store("atlas", &descriptor("main", RuntimeBackend::Native))?;
-        store("atlas", &descriptor("next", RuntimeBackend::Native))?;
+        store("atlas", &descriptor(RuntimeBackend::Native))?;
+        store("atlas", &descriptor(RuntimeBackend::Native))?;
         assert_eq!(fs::metadata(snapshot_path("atlas"))?.permissions().mode() & 0o777, 0o644);
         fs::remove_dir_all(root)?;
         Ok(())
@@ -190,30 +183,20 @@ mod tests {
         let path = snapshot_path("atlas");
         let Some(parent) = path.parent() else { return Ok(()) };
         fs::create_dir_all(parent)?;
-        fs::write(path, r#"{"branch":"main","releases_keep":5,"runtime":{},"build":{},"services":[],"bogus":true}"#)?;
+        fs::write(path, r#"{"releases_keep":5,"runtime":{},"bogus":true}"#)?;
         assert!(load("atlas").is_err());
         fs::remove_dir_all(root)?;
         Ok(())
     }
 
     #[test]
-    fn store_rejects_empty_branch() {
-        let error = match store("atlas", &descriptor("", RuntimeBackend::Native)) {
-            Ok(()) => return,
-            Err(error) => error,
-        };
-        assert!(error.to_string().contains("empty branch"));
-    }
-
-    #[test]
-    fn load_round_trips_branch_backend_and_runtime_extra() -> Result<()> {
+    fn load_round_trips_backend_and_runtime_extra() -> Result<()> {
         let root = root("round-trip");
         let _scope = override_control_plane_root(root.clone());
-        let mut expected = descriptor("feature/login", RuntimeBackend::Docker);
+        let mut expected = descriptor(RuntimeBackend::Docker);
         expected.runtime.extra.insert("workers".to_string(), toml::Value::Integer(3));
         store("atlas", &expected)?;
         let actual = load("atlas")?;
-        assert_eq!(actual.branch, "feature/login");
         assert_eq!(actual.runtime.backend, RuntimeBackend::Docker);
         assert_eq!(actual.runtime.extra.get("workers"), Some(&toml::Value::Integer(3)));
         fs::remove_dir_all(root)?;

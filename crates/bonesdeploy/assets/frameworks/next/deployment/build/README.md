@@ -15,6 +15,9 @@ the committed revision.
 - Scripts run in lexical order by filename.
 - Non-zero exit code fails the deploy.
 - Your job: produce the deployable app layout inside `/workspace/source`.
+- Install dependencies and compile the complete runtime output here. Remove
+  build-only caches and dependency trees when standalone or static output no
+  longer needs them.
 - BonesRemote verifies and receives the artifact, then promotes this output into
   a sealed release.
 

@@ -65,3 +65,23 @@ def test_gunicorn_uses_its_runtime_directory_for_worker_temp(monkeypatch):
 
     command = captured["command"](ctx, paths, None)
     assert "--worker-tmp-dir /run/example/gunicorn" in command
+
+
+def test_gunicorn_runs_the_release_wrapper(monkeypatch):
+    captured = {}
+    ctx = SimpleNamespace(runtime=SimpleNamespace(data={}), paths_dict={})
+    paths = {
+        "current": "/srv/sites/example/current",
+        "runtime_socket_dir": "/run/example",
+        "shared": "/srv/sites/example/shared",
+    }
+
+    monkeypatch.setattr(django.runtime, "orchestrate", lambda current_ctx, provision: provision(current_ctx))
+    monkeypatch.setattr(django.shared, "ensure_directories", lambda *_args: None)
+    monkeypatch.setattr(django.application, "deploy_server", lambda _ctx, **kwargs: captured.update(kwargs))
+
+    django.deploy(ctx)
+
+    assert captured["command"](ctx, paths, None).startswith("/srv/sites/example/current/.venv/bin/gunicorn ")
+    assert captured["exec_paths"](ctx, paths, None) == ["/srv/sites/example/current/.venv/bin/gunicorn"]
+    assert captured["writable_paths"](ctx, paths) == ["/srv/sites/example/shared/media"]

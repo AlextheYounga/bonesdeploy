@@ -6,14 +6,8 @@ from bonesinfra.config import paths as config_paths
 from bonesinfra.config.paths import DeploymentPaths
 
 
-def test_paths_default_repo_parent_is_srv_git():
-    paths = DeploymentPaths.new("lawsnipe", "/srv/git/lawsnipe.git", "/srv/sites/lawsnipe")
-
-    assert paths.repo_parent == "/srv/git"
-
-
 def test_paths_include_global_nginx_default_deny_site():
-    paths = DeploymentPaths.new("lawsnipe", "/srv/git/lawsnipe.git", "/srv/sites/lawsnipe")
+    paths = DeploymentPaths.new("lawsnipe", "/srv/sites/lawsnipe")
 
     assert paths.nginx_default_deny_site_available == "/etc/nginx/sites-available/00-bonesdeploy-default-deny.conf"
     assert paths.nginx_default_deny_site_enabled == "/etc/nginx/sites-enabled/00-bonesdeploy-default-deny.conf"
@@ -22,7 +16,7 @@ def test_paths_include_global_nginx_default_deny_site():
 
 
 def test_paths_include_site_target_and_requires_directory():
-    paths = DeploymentPaths.new("shop", "/srv/git/shop.git", "/srv/sites/shop")
+    paths = DeploymentPaths.new("shop", "/srv/sites/shop")
 
     assert paths.systemd_site_target == "/etc/systemd/system/shop.target"
     assert paths.systemd_site_target_requires == "/etc/systemd/system/shop.target.requires"

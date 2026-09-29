@@ -72,19 +72,14 @@ def test_inspection_reports_present_missing_and_wrong_kind_without_contents(tmp_
 
     class FakeHost:
         def get_fact(self, fact, path):
-            if path == ctx.paths.repo_head and fact is Directory:
-                return {"mode": 755}
-            if path == ctx.paths.repo and fact is Directory:
-                return {"mode": 755}
             if fact is Directory and path == ctx.paths.project_root:
                 return {"mode": 755}
             return None
 
     entries = inspect_artifacts(ctx, FakeHost(), project)
     by_name = {entry.name: entry for entry in entries}
-    assert by_name["bare repository"].state == "present"
-    assert by_name["bare repository HEAD"].state == "wrong-kind"
-    assert by_name["bare repository HEAD"].actual_kind == "directory"
+    assert by_name["project root"].state == "present"
+    assert "bare repository" not in by_name
     assert by_name["project artifact"].state == "missing"
     output = render(report(ctx, entries, [], project), "json")
     assert "contents" not in output
@@ -237,8 +232,6 @@ def test_runner_inspection_uses_the_host_installed_by_pyinfra(tmp_path: Path):
 
     class FakeHost:
         def get_fact(self, fact, path=None, *, services=None):
-            if fact is Directory and path == ctx.paths.repo:
-                return {"mode": 755}
             if fact is SystemdStatus:
                 return {services: True}
             if fact is SystemdEnabled:
@@ -248,5 +241,5 @@ def test_runner_inspection_uses_the_host_installed_by_pyinfra(tmp_path: Path):
     with ctx_host.use(FakeHost()):
         result = inspect_for_runner(ctx, ProjectManifest())
 
-    assert next(entry for entry in result["entries"] if entry["name"] == "bare repository")["state"] == "present"
+    assert all("repository" not in entry["name"] for entry in result["entries"])
     assert all(service["running"] and service["enabled"] for service in result["managed_services"])

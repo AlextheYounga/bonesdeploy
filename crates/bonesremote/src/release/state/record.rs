@@ -15,8 +15,10 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum DeploymentPhase {
     Created,
-    SourceExported,
-    Built,
+    #[serde(alias = "source_exported")]
+    Received,
+    #[serde(alias = "built")]
+    Materialized,
     Promoted,
     Prepared,
     Sealed,

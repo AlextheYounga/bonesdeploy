@@ -15,7 +15,7 @@ pub struct SampleProject {
 }
 
 impl SampleProject {
-    /// Expands a fixture archive into a git repository with one commit on `main`.
+    /// Expands a fixture archive into a local git repository with one commit on `main`.
     pub fn from_fixture(session: &Session, fixture: &Path) -> Result<Self> {
         let dir = scratch_dir().join(format!("project-{}", unique_suffix()));
         fs::create_dir_all(&dir).with_context(|| format!("Failed to create {}", dir.display()))?;
@@ -103,10 +103,6 @@ impl SampleProject {
 
     pub fn write(&self, path: &str, content: &str) -> Result<()> {
         fs::write(self.dir.join(path), content).with_context(|| format!("Failed to write {path}"))
-    }
-
-    pub fn push(&self, session: &Session, remote: &str, branch: &str) -> Result<()> {
-        self.git(session, &["push", remote, branch])
     }
 
     pub fn commit(&self, session: &Session, message: &str) -> Result<()> {

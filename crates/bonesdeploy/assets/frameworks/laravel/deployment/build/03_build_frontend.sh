@@ -178,6 +178,7 @@ main() {
 	generate_wayfinder_files
 
 	run_frontend_build
+	rm -rf node_modules deployment/build
 
 	trap - ERR
 

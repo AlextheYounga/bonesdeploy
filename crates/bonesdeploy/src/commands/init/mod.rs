@@ -13,7 +13,6 @@ pub struct Args {
     pub non_interactive: bool,
     pub project_name: Option<String>,
     pub branch: Option<String>,
-    pub remote: Option<String>,
     pub host: Option<String>,
     pub port: Option<String>,
     pub template: Option<String>,
@@ -80,7 +79,6 @@ fn run_with_prefetch(args: &Args, prefetch_bonesinfra: impl FnOnce() -> Result<(
         println!("{} bonesdeploy config updated.", output::success_marker());
     }
 
-    scaffold::ensure_local_remote(&cfg)?;
     print_follow_up_hint();
     Ok(())
 }

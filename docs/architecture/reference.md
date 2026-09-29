@@ -122,7 +122,7 @@ The single source of truth for all product-owned filesystem paths — local work
 `crates/bonesdeploy-core/src/paths.rs`
 
 **Exports:**
-~60 `pub const` path/filename constants plus ~25 path derivation functions (e.g. `default_repo_path_for(project_name)`, `ssl_certificate_path(domain)`, `bonesremote_site_root(site)`).
+~60 `pub const` path/filename constants plus ~25 path derivation functions (e.g. `default_project_root_for(project_name)`, `ssl_certificate_path(domain)`, `bonesremote_site_root(site)`).
 
 **Usage pattern:**
 All code references these constants by name. No hardcoded path strings exist outside this module. Both Rust binaries and the Python layer (via its own `DeploymentPaths` class) maintain derived representations of these paths.
@@ -169,11 +169,11 @@ Represents the 11 phases of a deployment's lifecycle. Each phase is persisted to
 | Phase | Meaning |
 |-------|---------|
 | `Created` | Release directory created |
-| `SourceExported` | `git archive` completed into build context |
-| `Built` | Build scripts finished inside container |
-| `Promoted` | Artifacts copied out of container into release dir |
+| `Received` | Complete local-build artifact passed manifest and digest checks |
+| `Materialized` | Artifact tree and any Compose image payload are ready in the candidate context |
+| `Promoted` | Verified artifact contents copied into the candidate release |
 | `Prepared` | Shared paths wired, prepare scripts ran |
-| `Sealed` | Container removed, release directory made immutable |
+| `Sealed` | Prepared release directory made immutable |
 | `Activated` | `current` symlink atomically switched |
 | `Verified` | Services restarted successfully |
 | `Completed` | Old releases pruned, context cleaned up |
@@ -307,7 +307,7 @@ to all framework, service, and infrastructure functions.
 ```python
 @dataclass
 class DeployContext:
-    app: AppConfig            # project_name, repo_path, project_root, server (host, ssh_user, port)
+    app: AppConfig            # project_name, project_root, server (host, ssh_user, port)
     runtime: RuntimeConfig    # backend, web_root, runtime_user, runtime_group, data (extra keys)
     services: ServicesConfig  # tuple of service names
 ```
@@ -452,7 +452,7 @@ Validates server environment, per-site configuration, and security posture. Read
 
 **Check categories:**
 - `system.rs` — Debian 12+/Ubuntu 24.04+ `x86_64` platform
-- `site.rs` — config state, bare repo, branch ref, user/group identities,
+- `site.rs` — config state, artifact/revision metadata, user/group identities,
   directory layout, Compose engine/plugin/configuration, container health, and
   optional loopback ingress
 - `services.rs` — systemd target membership and service active state
@@ -526,8 +526,8 @@ Cli::Site::Setup
         ├─ SSH: bonesremote doctor     # stops before site mutation when unavailable
         ├─ bonesinfra::run_with_request(["site", "apply", "--request-stdin"], site_request)
          │    └─ Python: cli/commands/site::deploy_site_setup()
-        │         ├─ users.py          # site runtime and build identities
-        │         ├─ directories.py    # one bare repo and one site layout
+         │         ├─ users.py          # site runtime identity
+         │         ├─ directories.py    # site layout and control-plane state
         │         ├─ placeholder.py    # initial current link only
         │         └─ etckeeper.py commit_changes  # final /etc commit of this flow
         ├─ bonesinfra::run("services", "apply")
@@ -546,15 +546,16 @@ changes. Read-only `manifest` and patch flows do not commit.
 ```
 Cli::Deploy
   └─ commands/deploy.rs::run()
-       ├─ revision                    # deployment unit: committed repository revision
+       ├─ revision                    # deployment unit: committed local revision
        ├─ SSH as git: sudo -n bonesremote config sync --site <site> (descriptor on stdin)
        └─ SSH as git: sudo -n bonesremote deploy --site <site>
             └─ commands/deploy/lifecycle.rs::run_full()
                  ├─ SiteMutation::acquire(site)   # lock + validate config
                  ├─ ensure_site_idle(site)        # verify no in-flight deployment
                  ├─ run_staged_deployment()
-                 │    ├─ Receipt:  artifact::receive()   → SourceExported, Built
-                 │    ├─ Promote:  build::promote()      → Promoted
+                  │    ├─ Receipt:  artifact::receive()   → Received
+                  │    ├─ Materialize: artifact/image load → Materialized
+                  │    ├─ Promote:  release::promote()     → Promoted
                  │    ├─ Prepare:  wire_shared + prepare → Prepared
                  │    ├─ Seal:     build::finalize()     → Sealed
                  │    ├─ Preflight: validate_ready (nginx -t)
@@ -564,19 +565,19 @@ Cli::Deploy
                   └─ (on failure) abort / rollback / cleanup_pending
 ```
 
-For every native deploy, the local CLI resolves the configured branch to one
-full Git commit, exports that committed tree, runs numbered scripts in Docker
-using the pinned `linux/amd64` builder, and packages the complete post-build tree
-as a streamed `tar.gz`. The build receives only fixed public contract metadata
-and committed public `.env.build` values. The artifact manifest names the site,
-exact revision, builder digest, compressed length, and SHA-256. BonesRemote
-independently resolves the configured branch in the bare repository, requires the
-revision to match, verifies the complete payload digest and bounds, and safely
-extracts only relative paths, ordinary files/directories, and safe relative
-symlinks. It then promotes, prepares, seals, activates, verifies, prunes, or
-rolls back through one lifecycle. Native failures never fall back to production
-build execution. Django prepare still installs `requirements.txt` dependencies
-on the server.
+For every deploy, the local CLI resolves one full Git commit and exports that
+committed tree. Native builds package the complete post-build tree. Compose runs
+validation, pull, and build locally for `linux/amd64`, then packages the release
+tree, generated override, image inventory, and exact service image archive.
+`.env.build` supplies explicit public build values; production `.env`, runtime
+secrets, and ambient variables are absent. Compose image tags are immutable and
+derived from site, service, and revision. The artifact manifest names the site,
+exact revision, kind, compressed length, and SHA-256. BonesRemote verifies the
+complete payload and bounds, safely extracts relative paths, loads required
+images, and starts Compose with `--no-build --pull never`. It then promotes,
+prepares, seals, activates, verifies, prunes, or rolls back through one
+lifecycle. Native failures never fall back to production builds. Django
+dependencies are installed locally; prepare performs production-state work only.
 
 ### 4.5 `bonesdeploy doctor`
 
@@ -693,20 +694,20 @@ runtime state and is not persisted in project configuration.
 ### Permission model
 
 - Provisioning-time contract: shared ownership is established during `server setup` and site ownership during `site setup`; deploy commands never rewrite either layout.
-- Three identity classes: `git` (application repository access), `<site>` (runtime user, shared files, `/run/<site>`), `root` (sealed releases, system units, config dirs).
+- Three identity classes: `git` (artifact transport and deployment SSH entry point), `<site>` (runtime user, shared files, `/run/<site>`), `root` (sealed releases, system units, config dirs).
 - Native scripts run locally in Docker against an exported committed revision. The container receives no ambient or runtime secrets. Prepare scripts run as the runtime user. Only `bonesremote` (running as root) receives, promotes, activates, and restarts services.
 
 ### State ownership
 
 - `SiteState` (JSON) owns deployment metadata. It is the single source of truth.
 - `DeploymentLock` serializes all mutations per site. Any command that mutates site state must go through `SiteMutation::acquire()`.
-- The committed repository revision is validated against the site configuration and passed to `bonesremote`; there is no config-repository import/receive state path.
+- The committed local revision is recorded in the artifact and deployment state; BonesRemote does not maintain or resolve an application repository.
 
 ### External API encapsulation
 
 - SSH connectivity is handled by `infra/ssh.rs` (Rust, for bonesdeploy ↔ bonesremote) and `pyinfra/runner.py` (Python, for bonesinfra provisioning).
-- Local Git operations are wrapped in `infra/git.rs`; server-side bare-repository
-  operations are wrapped in `bonesremote/src/git.rs`.
+- Local Git operations are wrapped in `infra/git.rs`; BonesRemote does not
+  maintain an application repository.
 - GPG operations are contained in `commands/secrets/gpg.rs` with an isolated keyring.
 
 ---

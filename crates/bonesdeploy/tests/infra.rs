@@ -1,13 +1,6 @@
-use std::path::Path;
-
 use anyhow::Result;
 use bonesdeploy::infra::{git, server_request, ssh};
 use bonesdeploy_core::config::Bones;
-
-#[test]
-fn branch_exists_reports_missing_branch_without_error() {
-    assert_eq!(git::branch_exists_at(Path::new("/path/that/does/not/exist"), "main").ok(), Some(false));
-}
 
 #[test]
 fn branch_validation_uses_git_reference_rules() {
@@ -30,46 +23,6 @@ fn server_request_contains_only_connection_fields() -> Result<()> {
     assert_eq!(request["server"]["port"], "2222");
     assert!(request.get("site").is_none());
     Ok(())
-}
-
-#[test]
-fn ssh_style_remote_urls_parse_host_port_and_path() {
-    let details = git::parse_remote_url("ssh://git@example.com:2222/home/git/myapp.git");
-    assert!(details.is_some());
-    if let Some(details) = details {
-        assert_eq!(details.host, "example.com");
-        assert_eq!(details.port, "2222");
-        assert_eq!(details.repo_path, "/home/git/myapp.git");
-    }
-
-    let details = git::parse_remote_url("ssh://git@example.com/home/git/myapp.git");
-    assert!(details.is_some());
-    if let Some(details) = details {
-        assert_eq!(details.host, "example.com");
-        assert_eq!(details.port, "22");
-        assert_eq!(details.repo_path, "/home/git/myapp.git");
-    }
-}
-
-#[test]
-fn scp_style_remote_urls_parse_absolute_paths_and_whitespace() {
-    for url in ["git@example.com:/home/git/myapp.git", "git@example.com : /home/git/myapp.git"] {
-        let details = git::parse_remote_url(url);
-        assert!(details.is_some());
-        if let Some(details) = details {
-            assert_eq!(details.host, "example.com");
-            assert_eq!(details.port, "22");
-            assert_eq!(details.repo_path, "/home/git/myapp.git");
-        }
-    }
-}
-
-#[test]
-fn remote_url_parser_rejects_unsupported_urls() {
-    assert!(git::parse_remote_url("ssh://git@example.com:22/home/git/myapp").is_none());
-    assert!(git::parse_remote_url("git@example.com:/home/git/myapp").is_none());
-    assert!(git::parse_remote_url("git@example.com:myapp.git").is_none());
-    assert!(git::parse_remote_url("https://example.com/org/repo.git").is_none());
 }
 
 #[test]

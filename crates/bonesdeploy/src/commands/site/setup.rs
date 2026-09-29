@@ -27,25 +27,16 @@ pub async fn run(yes: bool) -> Result<()> {
     ssh::run_cmd(&session, &reactivate).await?;
     session.close().await?;
 
-    let pending_first_push =
-        super::doctor::run_with_pending(false, false).await.context("Site setup failed while checking site")?;
+    super::doctor::run_with_pending(false, false).await.context("Site setup failed while checking site")?;
     println!();
     println!("{} Site setup complete.", output::success_marker());
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    print_next_step(&cfg, pending_first_push).await;
+    print_next_step(&cfg).await;
     Ok(())
 }
 
-async fn print_next_step(cfg: &config::Bones, pending_first_push: bool) {
-    if pending_first_push {
-        println!(
-            "{}",
-            output::next_step_with_detail(
-                &format!("git push {} {}", cfg.remote_name, cfg.branch),
-                "to publish the first deploy branch",
-            )
-        );
-    } else if cfg.domain.is_empty() {
+async fn print_next_step(cfg: &config::Bones) {
+    if cfg.domain.is_empty() {
         println!("{}", output::next_step("bonesdeploy deploy"));
         println!("Optional public preview: run `bonesdeploy site tunnel start` to create an ephemeral Cloudflare URL.");
     } else if cfg.ssl_enabled {

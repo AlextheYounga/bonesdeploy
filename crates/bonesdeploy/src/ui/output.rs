@@ -29,20 +29,14 @@ pub fn next_step_with_detail(command: &str, detail: &str) -> String {
 }
 
 pub fn render_remote_doctor_output(report: &str, verbose: bool) -> bool {
-    let pending = report.contains("has not been pushed yet")
-        || report.contains("repository has no refs yet")
-        || report.contains("Run 'bonesdeploy secrets push' first.");
+    let pending = report.contains("Run 'bonesdeploy secrets push' first.");
     if verbose {
         print!("{report}");
         if !report.is_empty() && !report.ends_with('\n') {
             println!();
         }
     } else if pending {
-        for line in report.lines().filter(|line| {
-            line.contains("has not been pushed yet")
-                || line.contains("repository has no refs yet")
-                || line.contains("Run 'bonesdeploy secrets push' first.")
-        }) {
+        for line in report.lines().filter(|line| line.contains("Run 'bonesdeploy secrets push' first.")) {
             let clean = strip_ansi(line);
             let clean = clean.trim().strip_prefix('•').map_or(clean.trim(), str::trim_start);
             println!("{} {}", pending_marker(), clean);

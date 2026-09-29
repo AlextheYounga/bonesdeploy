@@ -132,7 +132,7 @@ fn remote_deployment_config_excludes_identity_and_secrets() -> Result<()> {
     assert!(!json.contains("remote_name"));
     assert!(!json.contains("passphrase"));
     assert!(!json.contains("backup"));
-    assert!(json.contains("\"branch\":\"main\""));
+    assert!(!json.contains("\"branch\""));
     assert!(json.contains("\"releases_keep\":3"));
     assert!(json.contains("\"backend\":\"docker\""));
     assert!(json.contains("\"web_root\":\"public\""));
@@ -145,7 +145,6 @@ fn remote_deployment_config_excludes_identity_and_secrets() -> Result<()> {
 #[test]
 fn remote_deployment_config_round_trips_through_json() -> Result<()> {
     let mut bones = Bones::for_site("atlas");
-    bones.branch = "develop".to_string();
     bones.releases_keep = 7;
     bones.runtime.web_root = "dist".to_string();
     bones.runtime.backend = RuntimeBackend::Native;
@@ -153,7 +152,6 @@ fn remote_deployment_config_round_trips_through_json() -> Result<()> {
     let json = serde_json::to_string(&descriptor)?;
     let restored: RemoteDeploymentConfig = serde_json::from_str(&json)?;
 
-    assert_eq!(restored.branch, "develop");
     assert_eq!(restored.releases_keep, 7);
     assert_eq!(restored.runtime.web_root, "dist");
     assert_eq!(restored.runtime.backend, RuntimeBackend::Native);
@@ -163,7 +161,6 @@ fn remote_deployment_config_round_trips_through_json() -> Result<()> {
 #[test]
 fn remote_deployment_config_into_site_config_derives_identity_from_site() {
     let mut bones = Bones::for_site("original");
-    bones.branch = "release".to_string();
     bones.releases_keep = 2;
     bones.runtime.web_root = "build".to_string();
 
@@ -172,8 +169,6 @@ fn remote_deployment_config_into_site_config_derives_identity_from_site() {
 
     assert_eq!(site_config.project_name, "target-site");
     assert_eq!(site_config.project_root, paths::default_project_root_for("target-site"));
-    assert_eq!(site_config.repo_path, paths::default_repo_path_for("target-site"));
-    assert_eq!(site_config.branch, "release");
     assert_eq!(site_config.releases_keep, 2);
     assert_eq!(site_config.runtime.web_root, "build");
     // Host and SSH settings are not carried by the descriptor.
@@ -183,7 +178,7 @@ fn remote_deployment_config_into_site_config_derives_identity_from_site() {
 
 #[test]
 fn remote_deployment_config_rejects_unknown_fields() {
-    let json = r#"{"branch":"main","releases_keep":5,"runtime":{"backend":"native","template":"","web_root":"public","node_version":"24.19.0"},"extra_field":"bad"}"#;
+    let json = r#"{"releases_keep":5,"runtime":{"backend":"native","template":"","web_root":"public","node_version":"24.19.0"},"extra_field":"bad"}"#;
     let result: Result<RemoteDeploymentConfig, _> = serde_json::from_str(json);
     assert!(result.is_err());
 }
@@ -235,6 +230,13 @@ fn flat_configuration_absorbed_into_managed_block_on_load() -> Result<()> {
 fn dotenv_rejects_removed_built_in_service_configuration() {
     let content = "# >>> BonesDeploy managed configuration >>>\nBONES_SERVICES=postgres\n# <<< BonesDeploy managed configuration <<<\n";
     assert!(config::validate_dotenv(content).is_err());
+}
+
+#[test]
+fn dotenv_rejects_removed_deployment_remote_configuration() {
+    let content = "# >>> BonesDeploy managed configuration >>>\nBONES_REMOTE_NAME=production\n# <<< BonesDeploy managed configuration <<<\n";
+    assert!(config::validate_dotenv(content).is_err());
+    assert!(config::validate_dotenv("REMOTE_NAME=production\n").is_err());
 }
 
 #[test]

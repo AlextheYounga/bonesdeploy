@@ -5,7 +5,6 @@ pub(super) const BACKUP_SCHEDULE: &str = "BACKUP_SCHEDULE";
 pub(super) const BACKUP_RETENTION_DAYS: &str = "BACKUP_RETENTION_DAYS";
 pub(super) const BORG_PASSPHRASE: &str = "BORG_PASSPHRASE";
 pub(super) use crate::config::variables::{PROJECT_NAME, WEB_ROOT};
-pub(super) const REMOTE_NAME: &str = "REMOTE_NAME";
 pub(super) const SSH_USER: &str = "SSH_USER";
 pub(super) const HOST: &str = "HOST";
 pub(super) const PORT: &str = "PORT";
@@ -28,7 +27,6 @@ pub(super) const FRAMEWORK_KEYS: &[&str] = &[PHP_VERSION, PYTHON_VERSION, RUBY_V
 
 pub(super) const MANAGED: &[&str] = &[
     PROJECT_NAME,
-    REMOTE_NAME,
     SSH_USER,
     HOST,
     PORT,

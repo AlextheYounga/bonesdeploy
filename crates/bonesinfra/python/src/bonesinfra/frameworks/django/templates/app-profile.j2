@@ -16,6 +16,7 @@ profile {{ apparmor_profile_name }} flags=(attach_disconnected,mediate_deleted) 
   /lib64/** r,
   /opt/bonesdeploy/python/ r,
   /opt/bonesdeploy/python/** r,
+  /opt/bonesdeploy/python/**/bin/python* rix,
   /opt/bonesdeploy/python/**.so* mr,
   /etc/** r,
   /proc/** r,

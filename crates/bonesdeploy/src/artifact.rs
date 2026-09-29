@@ -4,7 +4,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::{Component, Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::artifact::ArtifactManifest;
+use bonesdeploy_core::artifact::{ArtifactManifest, ComposeImage};
 use bonesdeploy_core::paths;
 use flate2::Compression;
 use flate2::write::GzEncoder;
@@ -46,6 +46,13 @@ pub fn package(site: &str, build: &BuildContext) -> Result<PackagedArtifact> {
         file,
         manifest: ArtifactManifest::new(site.to_string(), build.revision.clone(), length, &digest),
     })
+}
+
+pub fn package_compose(site: &str, build: &BuildContext, images: Vec<ComposeImage>) -> Result<PackagedArtifact> {
+    let mut artifact = package(site, build)?;
+    artifact.manifest = artifact.manifest.with_compose_images(images);
+    artifact.manifest.validate()?;
+    Ok(artifact)
 }
 
 fn append_tree<W: Write>(archive: &mut tar::Builder<W>, root: &Path, relative: &Path) -> Result<()> {
@@ -171,9 +178,10 @@ mod tests {
     use std::os::unix::fs::{PermissionsExt, symlink};
     use std::path::Path;
 
-    use super::package;
+    use super::{package, package_compose};
     use crate::local_build::BuildContext;
     use anyhow::{Context, Result};
+    use bonesdeploy_core::artifact::{ArtifactKind, ComposeImage};
     use flate2::read::GzDecoder;
 
     #[test]
@@ -237,6 +245,19 @@ mod tests {
         });
         let link = link.context("long nested symlink missing from artifact")?;
         assert_eq!(link.link_name()?.context("symlink target missing")?, target);
+        Ok(())
+    }
+
+    #[test]
+    fn package_compose_records_validated_image_inventory() -> Result<()> {
+        let context = tempfile::tempdir()?;
+        fs::write(context.path().join("compose.yaml"), "services: {}\n")?;
+        let build = BuildContext::from_tempdir(context, "a".repeat(40));
+
+        let artifact =
+            package_compose("atlas", &build, vec![ComposeImage::new("atlas", "web".into(), &build.revision)?])?;
+
+        assert!(matches!(artifact.manifest.kind, ArtifactKind::ComposeImages { .. }));
         Ok(())
     }
 }

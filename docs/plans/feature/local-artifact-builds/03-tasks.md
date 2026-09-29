@@ -216,77 +216,123 @@ remain deliberately deferred.
 
 ### Implementation
 
-- [ ] Extend the shared artifact contract with explicit native-tree and Compose
+- [x] Extend the shared artifact contract with explicit native-tree and Compose
   image artifact kinds, enforceable kind-specific metadata, validated immutable
   Compose image tags, and realistic bounded payload limits without treating
   client-declared builder identity as attestation.
-- [ ] Refactor deploy so every backend starts from one exact local commit export;
+- [x] Refactor deploy so every backend starts from one exact local commit export;
   remove deployment Git remote creation, first-push guidance, remote repository
   paths, pushed-branch readiness, and server revision comparison while retaining
   the revision in release identity, state, status, and logs.
-- [ ] Simplify the native Docker runner around compatibility and reproducibility,
+- [x] Simplify the native Docker runner around compatibility and reproducibility,
   preserving the pinned `linux/amd64` environment, explicit public inputs,
   secret exclusion, cache, timeout, streamed output, ownership, and reliable
   cleanup without retaining unnecessary detached-container or probe machinery.
-- [ ] Make every native framework build produce a complete runnable artifact:
+- [x] Make every native framework build produce a complete runnable artifact:
   move Django application dependency installation local, verify runtime output,
   and remove framework-specific build-only dependency trees, caches, temporary
   files, and numbered build scripts only where the production runtime does not
   need them.
-- [ ] Add local Compose validation, pull, and build against the exported context
+- [x] Add local Compose validation, pull, and build against the exported context
   using `.env.build`, the stable site project name, and `linux/amd64`; discover
   every service image, assign an immutable site/service/revision tag, generate
   the protected release override and inventory, and save the exact images into
   the artifact.
-- [ ] Replace BonesRemote source and artifact deploy routing with one artifact
+- [x] Replace BonesRemote source and artifact deploy routing with one artifact
   input; safely materialize either kind, validate and load Compose images, and
   preserve the common release transaction without repository export or any
   production application pull/build operation.
-- [ ] Start Compose releases with the generated override passed last and with
+- [x] Start Compose releases with the generated override passed last and with
   `--no-build --pull never`; preserve release-correct restart and rollback, and
   remove release-specific image tags during failed-release cleanup and release
   pruning without removing images still referenced by retained releases.
-- [ ] Rename coordinator operations and persisted phases that currently report
+- [x] Rename coordinator operations and persisted phases that currently report
   remote source export or build so state reflects receipt, materialization,
   production preparation, sealing, activation, verification, and cleanup.
-- [ ] Remove application repository creation, paths, branch context, manifest
+- [x] Remove application repository creation, paths, branch context, manifest
   entries, deletion inventory, package assumptions, and diagnostics from
   BonesInfra while retaining the deploy transport identity and all machine,
   runtime, service, placeholder, security, backup, SSL, tunnel, manifest,
   deletion, and patch responsibilities.
-- [ ] Regenerate the embedded BonesInfra wheel and update user, framework,
+- [x] Regenerate the embedded BonesInfra wheel and update user, framework,
   architecture, security, support, and operational documentation for the single
   local-build/artifact lifecycle and runtime-only BonesInfra boundary.
 
 ### Validation
 
-- [ ] Add focused native artifact tests proving complete runtime dependencies,
+- [x] Add focused native artifact tests proving complete runtime dependencies,
   safe framework pruning, explicit public build inputs, no production or ambient
   secrets, target compatibility, timeout, output, cache, and cleanup.
-- [ ] Add focused Compose tests proving local-only `config`, pull, and build;
+- [x] Add focused Compose tests proving local-only `config`, pull, and build;
   complete image discovery; immutable tagging; override generation; bounded
   image transport; remote load; and `--no-build --pull never` activation.
-- [ ] Add release tests proving native and Compose first deploy, subsequent
+- [x] Add release tests proving native and Compose first deploy, subsequent
   deploy, failed activation, rollback, cancellation, and pruning use the correct
   release tree and image identities without a production repository or build.
-- [ ] Add BonesInfra and CLI tests proving setup, doctor, manifest, and deletion
+- [x] Add BonesInfra and CLI tests proving setup, doctor, manifest, and deletion
   contain no application bare repository or first-push state while preserving
   all runtime and operational resources and friendly public commands.
-- [ ] Compile but do not execute ignored native and Compose E2E scenarios for
+- [x] Compile but do not execute ignored native and Compose E2E scenarios for
   first deploy, second release, failed activation, rollback, and release/image
   pruning.
-- [ ] Run all non-E2E Rust and Python tests, Clippy with warnings denied,
+- [x] Run all non-E2E Rust and Python tests, Clippy with warnings denied,
   Rustfmt, shfmt, Ruff checks and formatting, generated-wheel validation, and
   `git diff --check`; resolve every warning or failure.
 
 ### Completion
 
-- [ ] Review the final diff for any production application checkout, dependency
+- [x] Review the final diff for any production application checkout, dependency
   installation, image pull/build, mutable Compose image tag, build-only artifact
   content, repository provisioning, first-push guidance, unverifiable provenance
   claim, accidental secret input, unsafe artifact receipt, or stale lifecycle
   terminology.
-- [ ] Record exact artifact-size limits, framework pruning outcomes, Compose image
+- [x] Record exact artifact-size limits, framework pruning outcomes, Compose image
   rollback/pruning evidence, implementation deviations, validation results, and
   deliberately deferred migration, registry, credential, signing, SBOM, and
   resumable-upload work.
+
+## Unified Follow-Up Completion Notes
+
+Native and Compose deployments now use artifact protocol version 2 and the same
+artifact-only BonesRemote entry point. The manifest distinguishes native trees
+from Compose image releases, validates at most 128 site/service/revision-derived
+image identities, and caps the compressed transport at 2 GiB. Receipt additionally
+caps one file at 2 GiB, the expanded tree at 4 GiB, paths at 4 KiB, and entries at
+100,000 while retaining strict digest, type, conflict, and symlink checks.
+
+Compose runs `config`, `pull`, and `build` locally from the exact exported commit
+with the stable site project name, `linux/amd64`, and explicit public
+`.env.build` values. The artifact carries the release tree, generated override,
+validated inventory, and exact saved images. BonesRemote loads and verifies those
+images, passes the generated override last, and starts with `--no-build --pull
+never`. Abort, cancellation, failed-release cleanup, and pruning remove only
+unreferenced release tags; rollback selects the retained release override and
+immutable image identities.
+
+Framework artifacts retain only required runtime output. Laravel and Rails retain
+server dependencies while dropping frontend dependencies and caches. Next retains
+standalone output, Nuxt retains `.output`, SvelteKit retains adapter-node runtime
+dependencies, and Vue retains `dist`. Django installs requirements into
+`.python-packages` locally and ships wrappers that invoke the provisioned matching
+production interpreter; prepare performs only validation, migrations, and static
+collection. Numbered build scripts and framework-specific build caches are removed
+after successful builds.
+
+Validation completed successfully:
+
+- `cargo test --workspace --exclude e2e`
+- `cargo clippy --workspace --exclude e2e --all-targets -- -D warnings`
+- `cargo check -p e2e --tests`
+- `cargo clippy -p e2e --tests --no-deps -- -D warnings`
+- `uv run pytest` (`504 passed`)
+- `uv run ruff check .`
+- `uv run ruff format --check .`
+- `cargo fmt --all -- --check`
+- `shfmt -w .`
+- `git diff --check`
+
+Ignored E2E scenarios cover native and Compose first deployment, second release,
+failed activation rollback, and release/image pruning. They compile but were not
+executed. Migration from previous installations, registries, private dependency
+credentials, signing, SBOM generation, and resumable upload remain deliberately
+deferred.

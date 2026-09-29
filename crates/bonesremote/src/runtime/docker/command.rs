@@ -5,9 +5,17 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::artifact;
 use bonesdeploy_core::config::validate_project_name;
 use bonesdeploy_core::paths;
 use serde::{Deserialize, Serialize};
+
+#[cfg(test)]
+pub(crate) use super::artifact_images::{ImageExecutor, remove_unreferenced_release_images_with};
+pub use super::artifact_images::{
+    load_artifact_images, release_image_tags, remove_unreferenced_image_tags, remove_unreferenced_release_images,
+    unreferenced_image_tags, unreferenced_release_image_tags, validate_artifact_images, validate_release_override,
+};
 
 const BASE_FILES: [&str; 4] = ["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
 const OVERRIDE_FILES: [&str; 2] = ["compose.override.yaml", "compose.override.yml"];
@@ -136,6 +144,10 @@ impl ComposeFiles {
 
         let mut files = vec![base_file.clone()];
         files.extend(override_files);
+        let generated = release_root.join(artifact::COMPOSE_OVERRIDE_FILE);
+        if generated.is_file() {
+            files.push(generated);
+        }
         Ok(Self { files })
     }
 
@@ -161,25 +173,6 @@ pub fn project_name(site: &str) -> Result<String> {
     Ok(format!("bonesdeploy-{site}"))
 }
 
-pub fn prepare_candidate(site: &str, project_root: &Path, context: &Path) -> Result<()> {
-    prepare_candidate_with(site, project_root, context, &mut run)
-}
-
-fn prepare_candidate_with(
-    site: &str,
-    project_root: &Path,
-    context: &Path,
-    execute: &mut impl FnMut(&mut Command, &str) -> Result<()>,
-) -> Result<()> {
-    let files = ComposeFiles::discover(context)?;
-    let env_file = project_root.join(paths::SHARED_DIR).join(paths::DOT_ENV);
-    let compose = ComposeCommand { project_directory: context, env_file: &env_file, files: &files };
-
-    execute(&mut compose_command(site, &compose, ["config", "--quiet"])?, "validate Compose configuration")?;
-    execute(&mut compose_command(site, &compose, ["pull"])?, "pull Compose images")?;
-    execute(&mut compose_command(site, &compose, ["build"])?, "build Compose images")
-}
-
 pub fn active_start(site: &str, project_root: &Path, wait_timeout: u64) -> Result<()> {
     active_start_with(site, project_root, wait_timeout, &mut run)
 }
@@ -199,7 +192,17 @@ fn active_start_with(
         &mut compose_command(
             site,
             &compose,
-            ["up", "--detach", "--build", "--remove-orphans", "--wait", "--wait-timeout", &timeout],
+            [
+                "up",
+                "--detach",
+                "--no-build",
+                "--pull",
+                "never",
+                "--remove-orphans",
+                "--wait",
+                "--wait-timeout",
+                &timeout,
+            ],
         )?,
         "start Compose stack",
     )

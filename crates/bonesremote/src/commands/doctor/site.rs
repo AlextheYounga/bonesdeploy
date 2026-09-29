@@ -30,7 +30,7 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>, wa
         return;
     }
 
-    // Without the synchronized descriptor, runtime and branch checks would be fabricated from the site name.
+    // Without the synchronized descriptor, runtime checks would be fabricated from the site name.
     let descriptor = match control_plane::load(site) {
         Ok(descriptor) => descriptor,
         Err(error) => {
@@ -55,7 +55,6 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>, wa
     let releases_root = Path::new(&project_root).join(paths::RELEASES_DIR);
     let runtime_user = config::runtime_user_for(site);
     let runtime_group = config::runtime_group_for(site);
-    let repo_path = paths::default_repo_path_for(site);
 
     let shared_env = shared_root.join(paths::DOT_ENV);
     if !shared_env.is_file() {
@@ -63,14 +62,6 @@ pub fn check(site: &str, issues: &mut Vec<String>, pending: &mut Vec<String>, wa
             "shared environment is missing: {}. Run 'bonesdeploy secrets push' first.",
             shared_env.display()
         ));
-    }
-
-    check_repo_exists(&repo_path, issues);
-
-    // Branch validation requires the repo to exist; skip if it doesn't to
-    // avoid duplicate error messages.
-    if Path::new(&repo_path).is_dir() {
-        check_branch_ref_for_branch(&repo_path, &descriptor.branch, issues, pending);
     }
 
     match fs::read_to_string(paths::ETC_PASSWD) {
@@ -188,59 +179,6 @@ pub fn classify_compose_runtime(status: &ComposeStackStatus, compose_port: Optio
         ));
     }
     findings
-}
-
-fn check_repo_exists(repo_path: &str, issues: &mut Vec<String>) {
-    let repo_path = Path::new(repo_path);
-    if !repo_path.is_dir() {
-        issues.push(format!("bare repo is missing: {}", repo_path.display()));
-    }
-}
-
-pub fn check_branch_ref(repo_path: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
-    check_branch_ref_for_branch(repo_path, "main", issues, pending);
-}
-
-pub fn check_branch_ref_for_branch(repo_path: &str, branch: &str, issues: &mut Vec<String>, pending: &mut Vec<String>) {
-    let repo_path = Path::new(repo_path);
-    let ref_name = paths::branch_ref(branch);
-    let Some(repo) = repo_path.to_str() else {
-        issues.push(format!("could not inspect branch {branch} in {}: path is not valid UTF-8", repo_path.display()));
-        return;
-    };
-    match Command::new("git").args(["--git-dir", repo, "for-each-ref", "--format=%(refname)", &ref_name]).output() {
-        Ok(output) if output.status.success() && !output.stdout.is_empty() => {}
-        Ok(output) if output.status.success() => {
-            match Command::new("git").args(["--git-dir", repo, "for-each-ref", "--format=%(refname)"]).output() {
-                Ok(all_refs) if all_refs.status.success() && all_refs.stdout.is_empty() => {
-                    pending.push(
-                        "repository has no refs yet. Run 'git push <remote> <branch>' before the first deploy."
-                            .to_string(),
-                    );
-                }
-                Ok(all_refs) if all_refs.status.success() => {
-                    issues.push(format!(
-                        "repository is missing expected branch ref {ref_name} in {}",
-                        repo_path.display()
-                    ));
-                }
-                Ok(all_refs) => issues.push(format!(
-                    "could not inspect refs in {}: {}",
-                    repo_path.display(),
-                    String::from_utf8_lossy(&all_refs.stderr).trim()
-                )),
-                Err(error) => issues.push(format!("could not inspect refs in {}: {error}", repo_path.display())),
-            }
-        }
-        Ok(output) => {
-            issues.push(format!(
-                "could not inspect branch {branch} in {}: {}",
-                repo_path.display(),
-                String::from_utf8_lossy(&output.stderr).trim()
-            ));
-        }
-        Err(error) => issues.push(format!("could not inspect branch {branch} in {}: {error}", repo_path.display())),
-    }
 }
 
 fn check_runtime_identity(runtime_user: &str, runtime_group: &str, passwd: &str, issues: &mut Vec<String>) {

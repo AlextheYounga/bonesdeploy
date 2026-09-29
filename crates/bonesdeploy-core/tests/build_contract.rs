@@ -29,14 +29,6 @@ fn target_platform_has_a_canonical_name_and_json_value() -> Result<()> {
 }
 
 #[test]
-fn deployment_tar_extraction_command_uses_the_shared_mount() {
-    assert_eq!(
-        build_contract::deployment_tar_extract_command(),
-        "mkdir -p /workspace/deployment && tar --extract --file=- --no-same-owner --no-same-permissions --directory=/workspace/deployment"
-    );
-}
-
-#[test]
 fn environment_projection_excludes_sensitive_and_controlled_values() -> Result<()> {
     let dir = tempdir()?;
     fs::write(dir.path().join(".env.build"), "PUBLIC_VALUE=ok\nPROJECT_NAME=override\n")?;

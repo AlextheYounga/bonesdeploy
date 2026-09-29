@@ -2,11 +2,10 @@ use std::fs;
 use std::os::unix::fs::symlink;
 
 use super::{
-    BUILDER_IMAGE, ContainerStart, MountOwnership, TARGET_PLATFORM_NAME, build_scripts, create_command,
-    docker_info_command, force_remove_command, normalize_mount_ownership_command, sanitize_exported_context,
-    target_probe_command,
+    BUILDER_IMAGE, ContainerStart, MountUser, TARGET_PLATFORM_NAME, build_scripts, create_command, docker_info_command,
+    sanitize_exported_context, target_probe_command,
 };
-use anyhow::{Context, anyhow};
+use anyhow::Context;
 use bonesdeploy_core::config::Bones;
 use bonesdeploy_core::paths;
 
@@ -17,55 +16,28 @@ fn local_docker_command_uses_the_pinned_platform_and_workspace_contract() -> any
     let config = Bones::default();
     let input = ContainerStart {
         source: temp.path(),
-        deployment: temp.path(),
         cache: temp.path(),
         config: &config,
         environment: &[],
+        user: MountUser { uid: 1001, gid: 1002 },
     };
-    let command = create_command(&input, "build-1", environment_file.path());
+    let command = create_command(&input, environment_file.path());
     assert_eq!(command.get_program().to_string_lossy(), "docker");
     let args: Vec<_> = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
 
     assert!(args.windows(2).any(|pair| pair == ["--platform", TARGET_PLATFORM_NAME]));
-    assert!(args.windows(2).any(|pair| pair == ["--pull=never", "--platform"]));
+    assert!(args.windows(2).any(|pair| pair == ["--rm", "--pull=never"]));
     assert!(args.iter().any(|arg| arg == BUILDER_IMAGE));
     assert!(args.iter().any(|arg| arg.ends_with(":/workspace/source")));
     assert!(args.iter().any(|arg| arg.ends_with(":/workspace/cache:rw")));
-    assert!(!args.iter().any(|arg| arg.contains("/workspace/deployment")));
+    assert!(args.windows(2).any(|pair| pair == ["--user", "1001:1002"]));
+    assert!(args.windows(2).any(|pair| pair == [BUILDER_IMAGE, "bash"]));
+    assert!(args.iter().any(|arg| arg == "-s"));
+    assert!(args.iter().any(|arg| arg == "--env-file"));
     assert!(args.iter().any(|arg| arg == "--security-opt=no-new-privileges"));
-    assert!(!args.iter().any(|arg| arg == "--privileged" || arg.contains("docker.sock")));
-    assert!(!args.iter().any(|arg| arg == "--user"));
+    assert!(!args.iter().any(|arg| arg == "-d" || arg == "--privileged" || arg.contains("docker.sock")));
+    assert!(!args.iter().any(|arg| arg == "exec" || arg == "sleep" || arg == "infinity"));
     Ok(())
-}
-
-#[test]
-fn ownership_cleanup_runs_as_container_root_without_following_symlinks() {
-    let command = normalize_mount_ownership_command("build-1", MountOwnership { uid: 1001, gid: 1002 });
-    let args: Vec<_> = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
-
-    assert_eq!(command.get_program().to_string_lossy(), "docker");
-    assert_eq!(args[0..5], ["exec", "--user", "0:0", "build-1", "sh"]);
-    assert_eq!(args[5], "-c");
-    assert_eq!(args[6], "find -P /workspace/source /workspace/cache -exec chown -h 1001:1002 {} +");
-}
-
-#[test]
-fn cleanup_always_uses_forced_container_removal() {
-    let command = force_remove_command("build-1");
-    let args: Vec<_> = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
-
-    assert_eq!(command.get_program().to_string_lossy(), "docker");
-    assert_eq!(args, ["rm", "--force", "--time", "0", "--ignore", "build-1"]);
-}
-
-#[test]
-fn cleanup_failure_is_attached_without_replacing_the_primary_build_error() {
-    let result = super::finish_with_cleanup(Err(anyhow!("script failed")), Err(anyhow!("ownership failed")));
-    assert!(result.is_err());
-    let message = result.map_or_else(|error| format!("{error:#}"), |_| String::new());
-    assert!(message.contains("script failed"));
-    assert!(message.contains("cleanup also failed"));
-    assert!(message.contains("ownership failed"));
 }
 
 #[test]

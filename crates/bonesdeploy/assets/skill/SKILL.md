@@ -8,7 +8,7 @@ Native sites use a dedicated runtime user, systemd, nginx, and local Docker
 artifact builds. Compose sites use a project-owned stack through rootful Docker
 Compose.
 
-The beauty is in the constraints. There are exactly six moves that matter.
+The beauty is in the constraints. There are exactly five moves that matter.
 Everything else is recovery or inspection. Learn the moves and you can operate
 any bonesdeploy project without reading a single line of YAML.
 
@@ -25,15 +25,13 @@ any bonesdeploy project without reading a single line of YAML.
 3. `bonesdeploy site setup --yes` — once per project, verify server readiness,
    then provision that site in this exact order: site base, runtime, and doctor.
    It never pushes Git or secrets, configures SSL, or deploys a release.
-4. `git push <remote> <branch>` — publish the source so `bonesremote` has
-   something to build. Required once, before the first deploy.
-5. `bonesdeploy site ssl --yes --domain app.example.com --email ops@example.com`
+4. `bonesdeploy site ssl --yes --domain app.example.com --email ops@example.com`
    — TLS. Separate from `setup` because certificate concerns and runtime
    concerns are different concerns.
-6. `bonesdeploy deploy` — ship the release.
+5. `bonesdeploy deploy` — build the configured local revision locally and ship the artifact release.
 
-That's a deployment. In between, you repeat move five. Nothing else matters
-until move five works.
+That's a deployment. In between, you repeat the deploy command. Nothing else
+matters until it works.
 
 `bonesdeploy setup --yes` remains an idempotent convenience command for a first
 project on a fresh host. It runs server setup and site setup in sequence. For
@@ -97,7 +95,7 @@ secrets via `bonesdeploy secrets push`.
 
 - `bonesdeploy skill doc commands` — every command, every flag, every exit.
 - `bonesdeploy skill doc templates` — every framework template and its `--framework-var` keys.
-- `bonesdeploy skill doc workflows` — the end-to-end flows, including git-triggered deploy.
+- `bonesdeploy skill doc workflows` — the end-to-end local-artifact flows.
 - `bonesdeploy skill doc methodology` — permission model, just-in-time mutations, identity classes.
 - `bonesdeploy skill list` — names of every embedded doc.
 

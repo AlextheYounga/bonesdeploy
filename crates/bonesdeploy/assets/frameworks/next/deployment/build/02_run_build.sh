@@ -34,6 +34,7 @@ EOF
 
 	mkdir -p .next/standalone/.next
 	cp -R .next/static .next/standalone/.next/
+	rm -rf .next/cache .next/static node_modules
 
 	if [ -d public ]; then
 		cp -R public .next/standalone/
@@ -67,9 +68,12 @@ main() {
 
 	if [ "$WEB_ROOT" = "out" ]; then
 		require_static_output
+		rm -rf .next node_modules
 	else
 		prepare_standalone_output
 	fi
+
+	rm -rf deployment/build
 
 	log "Next.js build complete."
 }

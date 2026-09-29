@@ -183,7 +183,6 @@ impl Harness {
     }
 
     pub fn deploy(&self, project: &SampleProject) -> Result<()> {
-        project.push(&self.session, "production", "main")?;
         project.bonesdeploy(&self.session, &self.artifacts.bonesdeploy, &["deploy"])
     }
 
@@ -213,6 +212,49 @@ impl Harness {
         self.exec(&format!(
             "test -f /srv/sites/{site}/shared/.env && test -d /srv/sites/{site}/releases/19700101_000000"
         ))?;
+        Ok(())
+    }
+
+    pub fn assert_artifact_only(&self, site: &str) -> Result<()> {
+        self.exec(&format!(
+            "! find /srv/sites/{site} -type d -name .git -print -quit | grep -q . && \
+             test ! -d /root/.config/bonesremote/sites/{site}/tmp && \
+             ! systemctl list-unit-files --type=service --no-legend | grep -Fq -- {site}-build.service"
+        ))?;
+        Ok(())
+    }
+
+    pub fn prune_releases(&self, site: &str, keep: usize) -> Result<()> {
+        self.exec(&format!("bonesremote release prune --site {site} --keep {keep}"))?;
+        Ok(())
+    }
+
+    pub fn assert_release_removed(&self, release: &str) -> Result<()> {
+        self.exec(&format!("test ! -d {release}"))?;
+        Ok(())
+    }
+
+    pub fn assert_compose_release_images(&self, site: &str) -> Result<()> {
+        self.exec(&format!(
+            "release=$(readlink -f /srv/sites/{site}/current) && \
+             test -s \"$release/.bonesdeploy-compose-images.json\" && \
+             test -s \"$release/.bonesdeploy-compose.override.yaml\" && \
+             for tag in $(grep -o '\"tag\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' \"$release/.bonesdeploy-compose-images.json\" | sed -E 's/.*\"([^\"]*)\"$/\\1/'); do \
+                 grep -Fq \"$tag\" \"$release/.bonesdeploy-compose.override.yaml\" && docker image inspect \"$tag\" >/dev/null || exit 1; \
+             done"
+        ))?;
+        Ok(())
+    }
+
+    pub fn compose_image_tag(&self, release: &str) -> Result<String> {
+        self.exec(&format!(
+            "grep -o '\"tag\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' {release}/.bonesdeploy-compose-images.json | sed -E 's/.*\"([^\"]*)\"$/\\1/' | sed -n '1p'"
+        ))
+        .map(|tag| tag.trim().to_string())
+    }
+
+    pub fn assert_image_removed(&self, tag: &str) -> Result<()> {
+        self.exec(&format!("! docker image inspect {tag} >/dev/null 2>&1"))?;
         Ok(())
     }
 
