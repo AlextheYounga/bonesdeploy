@@ -25,10 +25,10 @@
   `crates/bonesinfra/python` and address every warning or failure.
 - [x] Run `cargo clippy`, `cargo fmt`, and `shfmt -w .` and address every warning
   or failure without running the end-to-end suite.
-- [ ] Update the eligible manual projects with the rebuilt wheel, retry Laravel
+- [x] Update the eligible manual projects with the rebuilt wheel, retry Laravel
   first, and confirm Certbot can fetch the HTTP-01 challenge through the active
   router and the resulting HTTPS endpoint responds.
-- [ ] Run SSL provisioning sequentially for the remaining doctor-green manual
+- [x] Run SSL provisioning sequentially for the remaining doctor-green manual
   sites and record each HTTPS result; continue skipping sites whose doctor is
   not green.
 
@@ -49,6 +49,10 @@ single-file `site/ssl` package to `site/ssl.py` without changing its import path
 Focused tests passed (16), the full BonesInfra suite passed (509), and Ruff,
 Clippy, Rust formatting, shell formatting, wheel consistency, and diff checks
 completed successfully. No README or context changes were required because the
-fix restores the documented SSL workflow. Live SSL validation remains
-uncompleted because no eligible manual project, domain, or email target was
-provided. The end-to-end suite was not run.
+fix restores the documented SSL workflow. Live validation on 2026-09-28 passed
+for all seven doctor-green projects: each completed challenge-router activation,
+certificate issuance, SSL-router activation, and returned HTTP `200` over a
+publicly verified TLS connection. Django and Rails also completed SSL setup and
+certificate verification when explicitly requested, but returned HTTP `502`
+because their language runtimes had failed to provision earlier. The
+end-to-end suite was not run.
