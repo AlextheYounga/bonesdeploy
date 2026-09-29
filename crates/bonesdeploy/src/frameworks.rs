@@ -134,7 +134,7 @@ impl Framework {
     }
 
     pub fn build_environment_example(self, runtime: &Runtime) -> Option<String> {
-        Some(match self {
+        let template = match self {
             Self::Django => django::build_environment_example(runtime),
             Self::Laravel => laravel::build_environment_example(runtime),
             Self::Next => next::build_environment_example(),
@@ -143,7 +143,9 @@ impl Framework {
             Self::SvelteKit => sveltekit::build_environment_example(),
             Self::Vue => vue::build_environment_example(),
             Self::Custom => return None,
-        })
+        };
+
+        Some(render_env_template(&template, &[("{node_version}", &runtime.node_version)]))
     }
 }
 

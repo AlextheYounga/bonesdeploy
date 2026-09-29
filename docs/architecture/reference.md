@@ -106,6 +106,8 @@ Serialization crates (`serde`, `toml`), path derivation functions (`paths` modul
 configuration fields are added here rather than extending the `Runtime` struct.
 Derived `BONES_*` environment variables are extracted from the config at build
 time. Build-only values such as `NODE_VERSION` come directly from `.env.build`.
+New framework projects pin it to the configured runtime version, whose exact
+default is `24.19.0`; existing `.env.build` files remain application-owned.
 
 `Runtime.backend` is the typed `RuntimeBackend` selection (`native` or
 `docker`). `Runtime.permissions` carries framework permission defaults and

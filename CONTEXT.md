@@ -86,7 +86,7 @@ Rust is the sole parser of the project-root `.env`. It models two environments:
 - `LocalEnvironment` is the gitignored root `.env`, conceptually `.env.local`. Application-owned content (comments, values, order) survives byte-for-byte; it also carries exactly one BonesDeploy-managed, comment-delimited `BONES_*` configuration block holding project identity, SSH connection, deployment branch, domains, framework, web root, runtime backend, Compose settings, scheduled-backup settings, and framework-specific scalar settings.
 - `ProductionEnvironment` is the decrypted `infra/secrets/.env.gpg`, conceptually `.env.production`, published to the host as `shared/.env` only by `bonesdeploy secrets push`. It contains application runtime keys and never `BONES_*` keys.
 
-Build-only public settings live in the committed `.env.build`. Framework templates declare `NODE_VERSION`; when set, this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository. Provisioning defaults to `24.19.0`.
+Build-only public settings live in the committed `.env.build`. Framework templates pin `NODE_VERSION` to the configured runtime version, defaulting to the exact release `24.19.0`; this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository.
 
 BonesDeploy does not select or provision built-in databases and caches. Native
 sites use independently managed services. Compose sites declare supporting

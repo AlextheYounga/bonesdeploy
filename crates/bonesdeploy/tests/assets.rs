@@ -50,15 +50,27 @@ fn every_framework_scaffolds_deployment_assets() -> Result<()> {
 #[test]
 fn every_framework_has_a_build_environment_example() -> Result<()> {
     for framework in framework_names() {
-        let selected = Framework::parse(&framework)?;
-        let content = selected
-            .build_environment_example(&Runtime::default())
-            .ok_or_else(|| anyhow::anyhow!("{framework} is missing .env.build"))?;
+        let temp = tempfile::tempdir()?;
+        scaffold_framework_env_build(&framework, temp.path(), &Runtime::default())?;
+        let content = fs::read_to_string(temp.path().join(".env.build"))?;
         assert!(content.contains("Committed, non-secret"), "{framework} must include build environment header");
         assert!(
-            content.contains("# BonesDeploy Infra\nNODE_VERSION=\n"),
-            "{framework} must declare Node in .env.build"
+            content.contains("# BonesDeploy Infra\nNODE_VERSION=24.19.0\n"),
+            "{framework} must pin the default Node version in .env.build"
         );
+    }
+    Ok(())
+}
+
+#[test]
+fn every_framework_scaffolds_the_selected_node_version() -> Result<()> {
+    let runtime = Runtime { node_version: "22.15.0".into(), ..Runtime::default() };
+
+    for framework in framework_names() {
+        let temp = tempfile::tempdir()?;
+        scaffold_framework_env_build(&framework, temp.path(), &runtime)?;
+        let content = fs::read_to_string(temp.path().join(".env.build"))?;
+        assert!(content.contains("NODE_VERSION=22.15.0\n"), "{framework} must use the selected Node version");
     }
     Ok(())
 }
