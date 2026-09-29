@@ -34,10 +34,11 @@ deployment path to select or fall back to.
 The Docker runner uses the pinned Linux `x86_64` Debian builder image, fixed
 `/workspace` paths, project- and contract-scoped cache, ordered scripts,
 per-script timeout, streamed output, and unconditional container cleanup. It
-passes only fixed non-secret build-contract metadata. It does not load
-`.env.build`, inherit the host environment, or expose host credentials, home
-directories, production configuration, privileged mode, devices, or the Docker
-socket.
+passes fixed non-secret build-contract metadata and values explicitly declared
+in the committed `.env.build` file. It does not inherit the host environment or
+expose host credentials, home directories, production configuration, privileged
+mode, devices, or the Docker socket. `.env.build` is public build configuration,
+not a secret channel.
 
 BonesRemote accepts the artifact form as the only native deployment input. It
 retains exact pushed-revision verification, bounded safe receipt, persisted
@@ -68,10 +69,11 @@ containers, can pull the exact pinned image, and can execute the required
 retain `no-new-privileges`, narrow mounts, timeout handling, output streaming,
 and unconditional cleanup. Do not introduce a generic multi-engine abstraction.
 
-Reduce the build environment constructor to fixed public contract values owned
-by `bonesdeploy-core`. Remove `.env.build` parsing and projection from both the
-local runner and obsolete remote runner. Build scripts that require private
-dependency credentials are unsupported by this release.
+Retain the shared `.env.build` parser and project its explicitly declared values
+alongside fixed public contract values owned by `bonesdeploy-core`. Continue to
+reject reserved container-controlled names and never merge the ambient host or
+root runtime environment. Build scripts that require private dependency
+credentials are unsupported by this release.
 
 Remove the remote-source coordinator input and native checkout/build stages.
 Keep Git revision resolution on the server solely to prove that the uploaded
@@ -120,7 +122,7 @@ and persistent-state transitions.
 ## Affected Areas
 
 - Build configuration and transport models in `bonesdeploy-core`, including
-  removal of `BuildMode` and user-defined build-environment projection.
+  removal of `BuildMode` while retaining explicit `.env.build` projection.
 - BonesDeploy init, deploy, doctor, local build, Git, artifact, and tests.
 - BonesRemote deploy entry points, coordinator inputs, native checkout/build
   modules, doctor, cancellation, security collection, and tests.
@@ -137,8 +139,9 @@ and persistent-state transitions.
   fallback, and no container-engine abstraction is introduced.
 - Local native artifacts are the only native deployment input. Production hosts
   never build native application source.
-- Build scripts receive fixed public contract metadata only. `.env.build`, host
-  environment variables, production variables, and credentials are excluded.
+- Build scripts receive fixed public contract metadata and committed
+  `.env.build` values only. Ambient host variables, production variables, and
+  credentials are excluded, and `.env.build` is documented as non-secret.
 - Docker's local daemon trust is accepted. The build container still receives no
   privileged mode, Docker socket, host home directory, or credential mounts.
 - Git remains authoritative for revision provenance, and server-side branch
@@ -155,9 +158,10 @@ and persistent-state transitions.
 - Supply-chain code can read source, mutate artifacts, use the network, consume
   resources, and poison persistent caches. Secret exclusion limits credential
   theft but does not make application dependencies trustworthy.
-- Removing `.env.build` can break projects that treated it as build input. The
-  breaking release must report the unsupported contract clearly rather than
-  silently dropping required private values.
+- A project can mistakenly commit a secret to `.env.build`, where build scripts
+  and dependencies can read or exfiltrate it. Generated content, documentation,
+  and diagnostics must state that every value is public build configuration;
+  private dependency credentials remain unsupported.
 - Docker Desktop and non-`x86_64` machines depend on Linux VM and emulation
   behavior. Passing the execution probe establishes target capability but does
   not constitute native Windows support.
@@ -173,7 +177,8 @@ and persistent-state transitions.
 
 - Core and configuration tests prove there is no build-mode field, default, or
   remote compatibility path and that build environment projection contains only
-  the fixed public contract.
+  fixed public contract values and explicitly declared `.env.build` entries,
+  never ambient, runtime, backup, or credential variables.
 - Local build tests prove Docker commands use the pinned digest and
   `linux/amd64`, reject unavailable or non-Linux Docker engines, expose no Docker
   socket or secret-bearing paths, apply timeouts, stream output, scope caches,

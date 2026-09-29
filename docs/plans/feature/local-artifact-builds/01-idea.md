@@ -37,9 +37,11 @@ Docker Linux container, packages the resulting tree, and uploads it. It does not
 build the working tree or execute application build scripts on production.
 
 **Build environment:** The fixed, non-secret metadata required by the build
-contract, such as workspace and cache paths. It excludes the ambient host
-environment, root `.env`, `.env.build`, production variables, credentials,
-tokens, SSH agents, and Docker socket.
+contract plus values explicitly declared in the committed `.env.build` file,
+such as `NODE_VERSION`. Every `.env.build` value is public build configuration,
+not a secret. The build environment excludes the ambient host environment, root
+`.env`, production variables, credentials, tokens, SSH agents, and Docker
+socket.
 
 **Release artifact:** A versioned, checksummed transport containing the complete
 post-build source tree. It includes committed deployment scripts needed by
@@ -81,8 +83,8 @@ per-site build user, build cache, or rootless Podman state.
 - Replace the local rootless-Podman runner and diagnostics with Docker.
 - Keep the pinned Debian builder image, Linux `x86_64` target, clean Git revision
   provenance, complete-context artifact, and strict artifact protocol.
-- Restrict build inputs to fixed non-secret contract metadata; remove
-  `.env.build` injection from application builds.
+- Restrict build inputs to fixed non-secret contract metadata and explicitly
+  declared, committed `.env.build` values.
 - Remove native server checkout/build execution and its build users, caches,
   rootless container resources, image-store requirements, diagnostics, and tests.
 - Retain one BonesRemote artifact receipt and release lifecycle.
@@ -100,8 +102,10 @@ per-site build user, build cache, or rootless Podman state.
 - Docker containers are never privileged and never receive the Docker socket,
   host home directory, SSH configuration, credential stores, production state,
   or ambient host environment.
-- The local root `.env`, `.env.build`, decrypted production environment, backup
-  settings, and other user-defined secret variables are not build inputs.
+- The local root `.env`, decrypted production environment, backup settings,
+  ambient host variables, and other secret variables are not build inputs.
+- `.env.build` remains the explicit project-owned input for non-secret build-tool
+  settings. It must not contain passwords, tokens, private keys, or credentials.
 - Git remains the revision-provenance boundary. The artifact revision must equal
   the configured branch commit in the server bare repository.
 - Artifact input remains untrusted at the privileged boundary. BonesRemote
@@ -120,7 +124,7 @@ per-site build user, build cache, or rootless Podman state.
 - Compatibility guarantees, in-place migrations, or automatic repair for
   installations created by earlier releases.
 - Private dependency credentials or any mechanism that exposes secrets to
-  arbitrary application build scripts.
+  arbitrary application build scripts; `.env.build` is not a secret channel.
 - Docker Compose image builds, registry publishing, Docker image transport, or
   expansion of the existing native artifact format to Compose applications.
 - Production support for Arch Linux, macOS, Windows, or Linux distributions

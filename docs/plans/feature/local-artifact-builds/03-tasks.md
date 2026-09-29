@@ -125,9 +125,10 @@ deliberately deferred.
   that verifies a Linux engine and `linux/amd64` execution, uses the pinned
   builder digest, passes no secret or ambient environment, and retains scoped
   cache, timeout, output streaming, and unconditional cleanup behavior.
-- [ ] Remove `.env.build` parsing and user-defined variable projection from the
-  native build contract; retain only fixed public workspace metadata and tests
-  proving production, backup, credential, and host variables are absent.
+- [ ] Retain committed `.env.build` as the explicit non-secret project build
+  input alongside fixed public workspace metadata; preserve reserved-name
+  validation and prove ambient host, runtime, backup, and credential variables
+  are absent.
 - [ ] Route every native deploy through local build, packaging, and artifact
   upload; remove the ordinary native source-deploy form and any fallback path.
 - [ ] Remove BonesRemote native checkout/build coordinator inputs, build-user and
@@ -158,8 +159,9 @@ deliberately deferred.
 ### Completion
 
 - [ ] Review the final diff for remaining Podman, remote native build,
-  build-mode, `.env.build`, unsupported production-host, secret exposure, broad
-  Docker access, and stale compatibility behavior.
+  build-mode, accidental `.env.build` secret semantics, unsupported
+  production-host, secret exposure, broad Docker access, and stale compatibility
+  behavior.
 - [ ] Record implementation deviations, exact validation evidence, and any
   deliberately deferred Compose, migration, build-host portability, artifact
   pruning, credential, signing, or resumable-upload work.
