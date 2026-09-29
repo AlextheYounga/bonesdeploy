@@ -10,8 +10,9 @@ pub mod promote;
 pub mod run_scripts;
 pub mod tree;
 
-pub(crate) use build_user::{ensure_build_user_ready, validate_build_cache};
-pub(crate) use container::remove_build_container;
+pub(crate) use build_user::{
+    ensure_build_user_ready, is_build_containment_error, terminate_build_user, validate_build_cache,
+};
 
 use crate::privileges;
 use crate::release::SiteMutation;

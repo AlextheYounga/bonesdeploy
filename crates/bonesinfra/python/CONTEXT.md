@@ -69,7 +69,9 @@ resource control at 80% CPU quota, 80% memory high, and 80% memory max, plus
 CPUQuota is that percentage of each online CPU; MemoryHigh is the soft
 reclaim/throttling threshold, while MemoryMax is the hard cgroup ceiling, so
 exceeding it fails the build rather than starving the host. These are
-host-level limits, not rootless Podman delegation.
+host-level limits, not rootless Podman delegation. Site provisioning also
+requires the active `user-<UID>.slice` to expose cgroup v2's `cgroup.kill`;
+BonesRemote uses that root-owned control to contain timed-out native builds.
 
 BonesInfra does not own:
 

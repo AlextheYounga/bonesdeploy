@@ -1,6 +1,7 @@
 import pytest
 from jinja2 import Template
 
+from bonesinfra.cli.commands.site import users
 from bonesinfra.cli.commands.site.users import (
     _BUILD_MEMORY_MAX_PERCENT,
     _BUILD_MEMORY_SWAP_MAX,
@@ -48,3 +49,16 @@ def test_build_slice_renders_with_memory_swap_max():
         memory_swap_max=_BUILD_MEMORY_SWAP_MAX,
     )
     assert f"MemorySwapMax={_BUILD_MEMORY_SWAP_MAX}" in rendered
+
+
+def test_build_user_verification_requires_cgroup_kill_control(monkeypatch):
+    operations = []
+    monkeypatch.setattr(users.server, "shell", lambda **kwargs: operations.append(kwargs))
+    monkeypatch.setattr(users.server, "script_template", lambda **_kwargs: None)
+
+    users._verify_build_user("demo-build", "/var/lib/bonesdeploy/users/demo-build")
+
+    cgroup_check = operations[0]
+    assert cgroup_check["_sudo"] is True
+    assert "user-${uid}.slice/cgroup.kill" in cgroup_check["commands"][0]
+    assert "id -u demo-build" in cgroup_check["commands"][0]

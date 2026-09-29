@@ -136,6 +136,11 @@ the coordinator is not signalled and release filesystem/state cleanup does not
 run. This preserves ownership of the active operation rather than declaring a
 runaway build cancelled without proof.
 
+`commands::deploy::coordinator` distinguishes containment failure from an
+ordinary build error. It preserves the active deployment record, build context,
+and staged release when containment cannot be proven, while successfully
+contained timeouts follow normal failed-build cleanup.
+
 `bonesdeploy::frameworks` owns framework-specific generated defaults. The core
 configuration default remains the fallback for frameworks without a specific
 Node policy.
@@ -147,6 +152,7 @@ Node policy.
 - `crates/bonesremote/src/release/lifecycle/build/run_scripts.rs`
 - `crates/bonesremote/src/release/lifecycle/build/mod.rs`
 - `crates/bonesremote/src/commands/release/kill.rs`
+- `crates/bonesremote/src/commands/deploy/coordinator.rs`
 - `crates/bonesremote/tests/release/lifecycle_build_user.rs`
 - `crates/bonesremote/tests/release/lifecycle_build_container.rs`
 - `crates/bonesremote/tests/commands/release_kill.rs`
@@ -233,6 +239,8 @@ Node policy.
 - Focused BonesRemote tests prove a contained timeout suppresses subsequent
   Podman removal and release cancellation uses build-user cgroup termination
   instead of build-user readiness plus container removal.
+- Focused coordinator tests prove containment failure preserves release state
+  while ordinary build failure retains existing abort cleanup.
 - Focused BonesDeploy tests prove Next and Nuxt runtime defaults and generated
   `.env.build` both contain `25.9.0`, while another framework continues using
   the core `24.19.0` runtime default.
