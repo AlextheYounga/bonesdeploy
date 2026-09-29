@@ -105,6 +105,18 @@ fn custom_is_the_empty_framework_fallback() -> Result<()> {
 }
 
 #[test]
+fn next_and_nuxt_default_to_node_25_without_changing_other_frameworks() -> Result<()> {
+    for framework in [Framework::Next, Framework::Nuxt] {
+        let defaults = framework.runtime_defaults()?.ok_or_else(|| anyhow::anyhow!("missing defaults"))?;
+        assert_eq!(defaults.get("node_version"), Some(&Value::String("25.9.0".into())));
+    }
+
+    let defaults = Framework::SvelteKit.runtime_defaults()?.ok_or_else(|| anyhow::anyhow!("missing defaults"))?;
+    assert_eq!(defaults.get("node_version"), Some(&Value::String("24.19.0".into())));
+    Ok(())
+}
+
+#[test]
 fn environment_examples_use_project_name_in_shared_paths() -> Result<()> {
     let laravel = Framework::Laravel
         .environment_example("atlas", "example.com")

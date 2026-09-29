@@ -111,10 +111,19 @@ fn every_framework_has_a_build_environment_example() -> Result<()> {
             .build_environment_example(&Runtime::default())
             .ok_or_else(|| anyhow::anyhow!("{framework} is missing .env.build"))?;
         assert!(content.contains("Committed, non-secret"), "{framework} must include build environment header");
-        assert!(
-            content.contains("# BonesDeploy Infra\nNODE_VERSION=\n"),
-            "{framework} must declare Node in .env.build"
-        );
+        assert!(content.contains("# BonesDeploy Infra\nNODE_VERSION="), "{framework} must declare Node in .env.build");
+    }
+    Ok(())
+}
+
+#[test]
+fn next_and_nuxt_build_environments_use_the_selected_node_version() -> Result<()> {
+    let runtime = Runtime { node_version: "25.8.0".into(), ..Runtime::default() };
+    for framework in [Framework::Next, Framework::Nuxt] {
+        let content = framework
+            .build_environment_example(&runtime)
+            .ok_or_else(|| anyhow::anyhow!("{framework} is missing .env.build"))?;
+        assert!(content.contains("NODE_VERSION=25.8.0"));
     }
     Ok(())
 }

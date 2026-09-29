@@ -1,4 +1,6 @@
-use super::{Bones, FrameworkDefaults, IS_STATIC_KEY, PermissionDefault, Question, QuestionKind, directory, file};
+use super::{
+    Bones, FrameworkDefaults, IS_STATIC_KEY, PermissionDefault, Question, QuestionKind, Runtime, directory, file,
+};
 
 const PERMISSIONS: [PermissionDefault; 3] = [directory("*", 750, false), file("*", 640), directory(".next", 770, true)];
 
@@ -24,6 +26,9 @@ pub(super) fn environment_example(project_name: &str, site_url: &str) -> String 
     )
 }
 
-pub(super) fn build_environment_example() -> String {
-    include_str!("../../assets/frameworks/next/next.env.build.example").to_string()
+pub(super) fn build_environment_example(runtime: &Runtime) -> String {
+    super::render_env_template(
+        include_str!("../../assets/frameworks/next/next.env.build.example"),
+        &[("{node_version}", &runtime.node_version)],
+    )
 }

@@ -1,4 +1,6 @@
-use super::{Bones, FrameworkDefaults, IS_STATIC_KEY, PermissionDefault, Question, QuestionKind, directory, file};
+use super::{
+    Bones, FrameworkDefaults, IS_STATIC_KEY, PermissionDefault, Question, QuestionKind, Runtime, directory, file,
+};
 
 const NUXT_STATIC_WEB_ROOT: &str = ".output/public";
 const PERMISSIONS: [PermissionDefault; 4] =
@@ -26,6 +28,9 @@ pub(super) fn environment_example(_project_name: &str, site_url: &str) -> String
     )
 }
 
-pub(super) fn build_environment_example() -> String {
-    include_str!("../../assets/frameworks/nuxt/nuxt.env.build.example").to_string()
+pub(super) fn build_environment_example(runtime: &Runtime) -> String {
+    super::render_env_template(
+        include_str!("../../assets/frameworks/nuxt/nuxt.env.build.example"),
+        &[("{node_version}", &runtime.node_version)],
+    )
 }
