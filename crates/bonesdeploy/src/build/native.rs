@@ -28,9 +28,15 @@ pub fn build(config: &Bones, context: &BuildContext) -> Result<()> {
     let cache = local_cache_path(&config.project_name);
     fs::create_dir_all(&cache).with_context(|| format!("Failed to create local build cache {}", cache.display()))?;
     let environment = build_contract::environment(config, source)?;
-    let user = mount_user(source)?;
-    let input =
-        ContainerStart { source, deployment: &deployment_dir, cache: &cache, config, environment: &environment, user };
+    let ownership = mount_ownership(source)?;
+    let input = ContainerStart {
+        source,
+        deployment: &deployment_dir,
+        cache: &cache,
+        config,
+        environment: &environment,
+        ownership,
+    };
     for script in scripts {
         let name = script.file_name().and_then(|value| value.to_str()).unwrap_or("<unknown>");
         println!("Running local build script {name}...");
@@ -122,7 +128,7 @@ struct ContainerStart<'a> {
     cache: &'a Path,
     config: &'a Bones,
     environment: &'a [(String, String)],
-    user: MountUser,
+    ownership: MountOwnership,
 }
 
 fn create_command(input: &ContainerStart<'_>, environment_file: &Path) -> Command {
@@ -137,7 +143,6 @@ fn create_command(input: &ContainerStart<'_>, environment_file: &Path) -> Comman
             TARGET_PLATFORM_NAME,
             "--security-opt=no-new-privileges",
         ])
-        .args(["--user", &format!("{}:{}", input.user.uid, input.user.gid)])
         .args(["--workdir", SOURCE_MOUNT])
         .args(["--env", &format!("{}={}", variables::PROJECT_NAME, input.config.project_name)])
         .args(["--env", &format!("{}={WORKSPACE_ROOT}", variables::PROJECT_ROOT)])
@@ -159,7 +164,7 @@ fn create_command(input: &ContainerStart<'_>, environment_file: &Path) -> Comman
 }
 
 #[derive(Clone, Copy)]
-struct MountUser {
+struct MountOwnership {
     uid: u32,
     gid: u32,
 }
@@ -180,22 +185,25 @@ fn run_script(input: &ContainerStart<'_>, script: &Path, timeout: Option<u64>) -
     let stdout_thread = thread::spawn(move || stream_output(stdout, false));
     let stderr_thread = thread::spawn(move || stream_output(stderr, true));
     let started = Instant::now();
-    loop {
-        if let Some(status) = child.try_wait().context("Failed to wait for local build script")? {
-            finish_output(stdout_thread, stderr_thread)?;
-            if status.success() {
-                return Ok(());
+    let result = (|| -> Result<()> {
+        loop {
+            if let Some(status) = child.try_wait().context("Failed to wait for local build script")? {
+                finish_output(stdout_thread, stderr_thread)?;
+                if status.success() {
+                    return Ok(());
+                }
+                bail!("Build script {} exited with status {status}", script.display());
             }
-            bail!("Build script {} exited with status {status}", script.display());
+            if let Some(seconds) = timeout.filter(|seconds| started.elapsed() >= Duration::from_secs(*seconds)) {
+                child.kill().context("Failed to stop timed out local build script")?;
+                let _ = child.wait();
+                finish_output(stdout_thread, stderr_thread)?;
+                bail!("Build script {} exceeded its {seconds}-second timeout", script.display());
+            }
+            thread::sleep(Duration::from_millis(50));
         }
-        if let Some(seconds) = timeout.filter(|seconds| started.elapsed() >= Duration::from_secs(*seconds)) {
-            child.kill().context("Failed to stop timed out local build script")?;
-            let _ = child.wait();
-            finish_output(stdout_thread, stderr_thread)?;
-            bail!("Build script {} exceeded its {seconds}-second timeout", script.display());
-        }
-        thread::sleep(Duration::from_millis(50));
-    }
+    })();
+    finish_with_cleanup(result, normalize_mount_ownership(input))
 }
 
 fn write_environment_file(environment: &[(String, String)]) -> Result<NamedTempFile> {
@@ -210,10 +218,38 @@ fn write_environment_file(environment: &[(String, String)]) -> Result<NamedTempF
     Ok(file)
 }
 
-fn mount_user(path: &Path) -> Result<MountUser> {
+fn mount_ownership(path: &Path) -> Result<MountOwnership> {
     let metadata = fs::symlink_metadata(path)
         .with_context(|| format!("Failed to inspect local build mount {}", path.display()))?;
-    Ok(MountUser { uid: metadata.uid(), gid: metadata.gid() })
+    Ok(MountOwnership { uid: metadata.uid(), gid: metadata.gid() })
+}
+
+fn normalize_mount_ownership(input: &ContainerStart<'_>) -> Result<()> {
+    let ownership = format!("{}:{}", input.ownership.uid, input.ownership.gid);
+    let status = Command::new("docker")
+        .args(["run", "--rm", "--pull=never", "--platform", TARGET_PLATFORM_NAME])
+        .args(["--volume"])
+        .arg(format!("{}:{SOURCE_MOUNT}", input.source.display()))
+        .args(["--volume"])
+        .arg(format!("{}:{CACHE_MOUNT}:rw", input.cache.display()))
+        .arg(BUILDER_IMAGE)
+        .args(["find", "-P", SOURCE_MOUNT, CACHE_MOUNT, "-exec", "chown", "-h", &ownership, "{}", "+"])
+        .status()
+        .context("Failed to restore local build mount ownership")?;
+    if !status.success() {
+        bail!("Failed to restore local build mount ownership: {status}");
+    }
+    Ok(())
+}
+
+fn finish_with_cleanup(primary: Result<()>, cleanup: Result<()>) -> Result<()> {
+    match (primary, cleanup) {
+        (Ok(()), Ok(())) => Ok(()),
+        (Ok(()), Err(error)) | (Err(error), Ok(())) => Err(error),
+        (Err(error), Err(cleanup_error)) => {
+            Err(error.context(format!("Local build mount ownership cleanup also failed: {cleanup_error:#}")))
+        }
+    }
 }
 
 fn stream_output<R: io::Read>(reader: R, stderr: bool) -> Result<()> {
