@@ -148,5 +148,6 @@ fn add_scalar(path: &[&str], value: &str, values: &mut Vec<(String, String)>) {
 /// The cache location that keeps sites, platforms, and builder identities isolated.
 #[must_use]
 pub fn cache_path(cache_root: &Path, site: &str) -> PathBuf {
-    cache_root.join(site).join(TargetPlatform::LinuxAmd64.name()).join(BUILDER_IMAGE_DIGEST)
+    let builder_key = BUILDER_IMAGE_DIGEST.replace(':', "-");
+    cache_root.join(site).join(TargetPlatform::LinuxAmd64.name()).join(builder_key)
 }

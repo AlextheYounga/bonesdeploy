@@ -1,4 +1,5 @@
 use std::fs;
+use std::path::Path;
 
 use anyhow::Result;
 use bonesdeploy_core::build_contract;
@@ -26,6 +27,17 @@ fn target_platform_has_a_canonical_name_and_json_value() -> Result<()> {
     assert!(serde_json::from_str::<TargetPlatform>("\"linux/arm64\"").is_err());
     assert!(serde_json::from_str::<TargetPlatform>("null").is_err());
     Ok(())
+}
+
+#[test]
+fn cache_path_uses_a_docker_volume_safe_builder_key() {
+    let path = build_contract::cache_path(Path::new("/cache"), "atlas");
+
+    assert_eq!(
+        path,
+        Path::new("/cache/atlas/linux/amd64/sha256-5ac8377b7884040464fbf9390409073c6ac62ac8e6563e886fc560f9ea13ec5d")
+    );
+    assert!(!path.to_string_lossy().contains(':'));
 }
 
 #[test]
