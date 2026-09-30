@@ -72,9 +72,24 @@ impl SampleProject {
     pub fn pin_node_version(&self, version: &str) -> Result<()> {
         let path = self.dir.join(".env.build");
         let source = fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
-        let updated = source.replace("NODE_VERSION=\n", &format!("NODE_VERSION={version}\n"));
-        if updated == source {
-            bail!(".env.build does not contain an empty NODE_VERSION in {}", self.dir.display());
+        let mut found = false;
+        let mut updated = String::with_capacity(source.len() + version.len());
+        for line in source.split_inclusive('\n') {
+            let content = line.strip_suffix('\n').unwrap_or(line);
+            let (content, line_ending) = content
+                .strip_suffix('\r')
+                .map_or_else(|| (content, if line.ends_with('\n') { "\n" } else { "" }), |content| (content, "\r\n"));
+
+            if !found && content.starts_with("NODE_VERSION=") {
+                updated.push_str(&format!("NODE_VERSION={version}{line_ending}"));
+                found = true;
+            } else {
+                updated.push_str(line);
+            }
+        }
+
+        if !found {
+            bail!(".env.build does not contain a NODE_VERSION assignment in {}", self.dir.display());
         }
         fs::write(&path, updated).with_context(|| format!("Failed to write {}", path.display()))?;
         Ok(())
@@ -187,5 +202,50 @@ impl Drop for SampleProject {
         if let Err(err) = fs::remove_dir_all(&self.dir) {
             eprintln!("Failed to clean up sample project {}: {err}", self.dir.display());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn project_with_build_env(content: &str) -> Result<SampleProject> {
+        let dir = crate::scratch_dir().join(format!("project-test-{}", crate::unique_suffix()));
+        fs::create_dir_all(&dir)?;
+        fs::write(dir.join(".env.build"), content)?;
+        Ok(SampleProject { dir, keep: false })
+    }
+
+    #[test]
+    fn pin_node_version_replaces_empty_assignment_and_preserves_other_content() -> Result<()> {
+        let project = project_with_build_env("BUILD_FLAG=true\nNODE_VERSION=\nOTHER=value\n")?;
+
+        project.pin_node_version("24.19.0")?;
+
+        assert_eq!(
+            fs::read_to_string(project.dir().join(".env.build"))?,
+            "BUILD_FLAG=true\nNODE_VERSION=24.19.0\nOTHER=value\n"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pin_node_version_replaces_defaulted_assignment() -> Result<()> {
+        let project = project_with_build_env("# generated\nNODE_VERSION=25.9.0\n")?;
+
+        project.pin_node_version("24.19.0")?;
+
+        assert_eq!(fs::read_to_string(project.dir().join(".env.build"))?, "# generated\nNODE_VERSION=24.19.0\n");
+        Ok(())
+    }
+
+    #[test]
+    fn pin_node_version_rejects_missing_assignment_without_writing() -> Result<()> {
+        let source = "# generated\nOTHER=value\n";
+        let project = project_with_build_env(source)?;
+
+        assert!(project.pin_node_version("24.19.0").is_err());
+        assert_eq!(fs::read_to_string(project.dir().join(".env.build"))?, source);
+        Ok(())
     }
 }
