@@ -7,6 +7,7 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::artifact;
 use bonesdeploy_core::config::validate_project_name;
+use bonesdeploy_core::docker_env::{DOCKER_CERT_PATH, DOCKER_CONTEXT, DOCKER_HOST, DOCKER_TLS, DOCKER_TLS_VERIFY};
 use bonesdeploy_core::paths;
 use serde::{Deserialize, Serialize};
 
@@ -38,7 +39,7 @@ const COMPOSE_CONTROL_ENVIRONMENT: [&str; 16] = [
     "COMPOSE_STATUS_STDOUT",
 ];
 const DOCKER_CONTROL_ENVIRONMENT: [&str; 5] =
-    ["DOCKER_CERT_PATH", "DOCKER_CONTEXT", "DOCKER_HOST", "DOCKER_TLS", "DOCKER_TLS_VERIFY"];
+    [DOCKER_CERT_PATH, DOCKER_CONTEXT, DOCKER_HOST, DOCKER_TLS, DOCKER_TLS_VERIFY];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ComposeStackStatus {
