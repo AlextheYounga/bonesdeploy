@@ -1,4 +1,6 @@
-use anyhow::Result;
+use std::path::{Path, PathBuf};
+
+use anyhow::{Result, bail};
 use bonesdeploy_core::config::{Bones, RuntimeBackend};
 
 pub mod artifact;
@@ -18,7 +20,7 @@ pub fn package(config: &Bones) -> Result<PackagedArtifact> {
     let context = source::export(config)?;
     match config.runtime.backend {
         RuntimeBackend::Native => {
-            if native::build_scripts(context.path())?.is_none() {
+            if native_build_scripts(config, context.path())?.is_none() {
                 return artifact::package(&config.project_name, &context);
             }
             let docker = docker::DockerClient::new()?;
@@ -30,5 +32,47 @@ pub fn package(config: &Bones) -> Result<PackagedArtifact> {
             let images = compose::build(config, &context, &docker)?;
             artifact::package_compose(&config.project_name, &context, images)
         }
+    }
+}
+
+fn native_build_scripts(config: &Bones, source: &Path) -> Result<Option<(PathBuf, Vec<PathBuf>)>> {
+    let scripts = native::build_scripts(source)?;
+    if scripts.is_none() && !config.runtime.template.is_empty() && config.runtime.template != "custom" {
+        bail!(
+            "Committed deploy branch '{}' has no native build scripts for the '{}' framework. Run `bonesdeploy update`, commit infra/deployment, and merge it into the deploy branch.",
+            config.branch,
+            config.runtime.template
+        );
+    }
+    Ok(scripts)
+}
+
+#[cfg(test)]
+mod tests {
+    use bonesdeploy_core::config::Bones;
+
+    use super::native_build_scripts;
+
+    #[test]
+    fn built_in_native_framework_requires_committed_build_scripts() -> anyhow::Result<()> {
+        let source = tempfile::tempdir()?;
+        let mut config = Bones::default();
+        config.branch = String::from("master");
+        config.runtime.template = String::from("laravel");
+
+        let error = native_build_scripts(&config, source.path()).expect_err("missing Laravel build scripts must fail");
+
+        assert!(error.to_string().contains("Committed deploy branch 'master' has no native build scripts"));
+        Ok(())
+    }
+
+    #[test]
+    fn custom_native_framework_may_package_without_build_scripts() -> anyhow::Result<()> {
+        let source = tempfile::tempdir()?;
+        let mut config = Bones::default();
+        config.runtime.template = String::from("custom");
+
+        assert!(native_build_scripts(&config, source.path())?.is_none());
+        Ok(())
     }
 }

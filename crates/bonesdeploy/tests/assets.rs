@@ -155,6 +155,17 @@ fn framework_pnpm_installs_use_the_persistent_store() {
 }
 
 #[test]
+fn corepack_supports_modern_pnpm_package_layouts() {
+    let functions = kit_asset("deployment/functions.sh").expect("missing deployment functions");
+    let functions = String::from_utf8_lossy(&functions);
+
+    assert!(functions.contains("COREPACK_LEGACY_VERSION=\"0.31.0\""));
+    assert!(functions.contains("COREPACK_MODERN_VERSION=\"0.34.5\""));
+    assert!(functions.contains("[ \"$major\" -eq 18 ]"));
+    assert!(functions.contains("COREPACK_HOME=\"$BUILD_CACHE_DIR/corepack/$target_version\""));
+}
+
+#[test]
 fn prepare_scripts_preserve_validation_and_mutation_order() -> Result<()> {
     let laravel = asset_text("laravel/deployment/prepare/01_prepare_laravel.sh");
     assert!(laravel.contains("php artisan optimize"));

@@ -2,7 +2,8 @@
 
 BUILD_NODE_TMP_DIR=""
 BUILD_RUBY_TMP_DIR=""
-COREPACK_VERSION="0.31.0"
+COREPACK_LEGACY_VERSION="0.31.0"
+COREPACK_MODERN_VERSION="0.34.5"
 
 log() {
 	echo "[bonesdeploy] $*"
@@ -231,8 +232,10 @@ node_corepack_version() {
 		{ [ "$major" -eq 18 ] && [ "$minor" -lt 17 ]; } ||
 		{ [ "$major" -eq 20 ] && [ "$minor" -lt 10 ]; }; then
 		echo "0.24.1"
+	elif [ "$major" -eq 18 ]; then
+		echo "$COREPACK_LEGACY_VERSION"
 	else
-		echo "$COREPACK_VERSION"
+		echo "$COREPACK_MODERN_VERSION"
 	fi
 }
 
@@ -241,6 +244,10 @@ node_ensure_corepack() {
 
 	local target_version installed_version
 	target_version="$(node_corepack_version)"
+	# Corepack stores its resolved executable path in the package-manager cache.
+	# Keep caches versioned so an upgrade cannot reuse incompatible metadata.
+	export COREPACK_HOME="$BUILD_CACHE_DIR/corepack/$target_version"
+	mkdir -p "$COREPACK_HOME"
 	installed_version="$(corepack --version 2>/dev/null || true)"
 	if [ "$installed_version" != "$target_version" ]; then
 		log "Installing Corepack ${target_version}..."
