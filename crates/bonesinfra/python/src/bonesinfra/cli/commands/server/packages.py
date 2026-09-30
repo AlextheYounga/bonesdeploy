@@ -2,6 +2,7 @@ from pyinfra.operations import apt
 
 BASE_SYSTEM_PACKAGES: list[str] = [
     "build-essential",
+    "borgbackup",
     "ca-certificates",
     "fail2ban",
     "curl",

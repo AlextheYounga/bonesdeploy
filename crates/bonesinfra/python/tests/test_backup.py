@@ -62,7 +62,6 @@ def test_provisioning_is_a_no_operation_for_unconfigured_backups(monkeypatch):
     def fail(**_kwargs):
         raise AssertionError("no operation should run for unconfigured backups")
 
-    monkeypatch.setattr(backup.apt, "packages", fail)
     monkeypatch.setattr(backup.files, "put", fail)
     monkeypatch.setattr(backup.server, "shell", fail)
     monkeypatch.setattr(backup, "mkdir", fail)
@@ -71,9 +70,8 @@ def test_provisioning_is_a_no_operation_for_unconfigured_backups(monkeypatch):
     backup.provision(_ctx(BackupConfig("0 0 * * *", 30, "")), _paths())
 
 
-def test_provisioning_installs_borg_passphrase_repository_and_cron(monkeypatch):
+def test_provisioning_creates_passphrase_repository_and_cron(monkeypatch):
     calls = []
-    monkeypatch.setattr(backup.apt, "packages", lambda **kwargs: calls.append(("packages", kwargs)))
     monkeypatch.setattr(backup, "mkdir", lambda **kwargs: calls.append(("mkdir", kwargs)))
     monkeypatch.setattr(backup.files, "put", lambda **kwargs: calls.append(("put", kwargs)))
     monkeypatch.setattr(backup.server, "shell", lambda **kwargs: calls.append(("shell", kwargs)))
@@ -81,24 +79,21 @@ def test_provisioning_installs_borg_passphrase_repository_and_cron(monkeypatch):
 
     backup.provision(_ctx(BackupConfig("15 2 * * *", 21, PASSPHRASE)), _paths())
 
-    assert [operation for operation, _kwargs in calls] == ["packages", "mkdir", "mkdir", "put", "shell", "render"]
+    assert [operation for operation, _kwargs in calls] == ["mkdir", "mkdir", "put", "shell", "render"]
 
-    package_kwargs = calls[0][1]
-    assert package_kwargs["packages"] == ["borgbackup"]
-
-    passphrase_kwargs = calls[3][1]
+    passphrase_kwargs = calls[2][1]
     assert passphrase_kwargs["dest"] == "/root/.config/bonesremote/sites/atlas/.borg_passphrase"
     assert passphrase_kwargs["mode"] == "0600"
     assert isinstance(passphrase_kwargs["src"], io.StringIO)
     assert passphrase_kwargs["src"].getvalue() == PASSPHRASE
 
-    shell_command = calls[4][1]["commands"][0]
+    shell_command = calls[3][1]["commands"][0]
     assert "/var/lib/bonesdeploy/backups/atlas.borg" in shell_command
     assert "repokey-blake2" in shell_command
     assert "cat /root/.config/bonesremote/sites/atlas/.borg_passphrase" in shell_command
     assert PASSPHRASE not in shell_command, "the passphrase must never reach a command line"
 
-    render_kwargs = calls[5][1]
+    render_kwargs = calls[4][1]
     assert render_kwargs["dest"] == "/etc/cron.d/bonesdeploy-atlas-backup"
     assert render_kwargs["mode"] == "0644"
     assert render_kwargs["backup_schedule"] == "15 2 * * *"

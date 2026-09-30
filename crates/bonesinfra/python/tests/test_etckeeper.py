@@ -31,8 +31,9 @@ exit 0
 """
 
 
-def test_server_baseline_installs_etckeeper():
+def test_server_baseline_installs_etckeeper_and_borg():
     assert "etckeeper" in BASE_SYSTEM_PACKAGES
+    assert "borgbackup" in BASE_SYSTEM_PACKAGES
 
 
 def test_commit_changes_after_runs_the_commit_after_the_deploy_plan(monkeypatch):

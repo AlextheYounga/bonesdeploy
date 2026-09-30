@@ -4,28 +4,20 @@ from io import StringIO
 from pathlib import Path
 from shlex import quote
 
-from pyinfra.operations import apt, files, server
+from pyinfra.operations import files, server
 
 from bonesinfra.config.paths import ASSETS_DIR, BACKUPS_ROOT
 from bonesinfra.pyinfra.operations import mkdir, render
 
 
 def provision(ctx, paths):
-    """Install Borg, create the encrypted repository, and install the cron schedule.
+    """Create the encrypted repository and install the cron schedule.
 
     Sites without a configured passphrase keep their pre-backup behavior.
     """
     backup = ctx.backup
     if not backup.configured:
         return
-    apt.packages(
-        name="Install Borg",
-        packages=["borgbackup"],
-        present=True,
-        update=True,
-        cache_time=3600,
-        _sudo=True,
-    )
     mkdir(name="Ensure backup repository root exists", path=BACKUPS_ROOT, mode="0700")
     mkdir(
         name="Ensure BonesRemote site state directory exists",

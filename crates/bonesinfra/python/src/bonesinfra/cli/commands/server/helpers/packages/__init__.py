@@ -12,7 +12,6 @@ HELPER_APT_PACKAGES: list[str] = [
     "bash-completion",
     "bat",
     "btop",
-    "borgbackup",
     "fastfetch",
     "fd-find",
     "fzf",

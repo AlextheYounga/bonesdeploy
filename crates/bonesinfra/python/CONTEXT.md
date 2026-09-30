@@ -552,11 +552,11 @@ ______________________________________________________________________
 
 # Backup Provisioning
 
-Backup provisioning schedules encrypted shared-data backups for the site.
+Server setup installs Borg. Backup provisioning schedules encrypted shared-data
+backups for the site.
 
 Responsibilities (`services/linux/backup.py`):
 
-- install the `borgbackup` package
 - create the root-only backup root `/var/lib/bonesdeploy/backups`
 - write the root-only passphrase file `.borg_passphrase` (mode `0600`) into the
   site's BonesRemote state directory
