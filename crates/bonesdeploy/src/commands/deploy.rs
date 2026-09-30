@@ -5,6 +5,7 @@ use console::style;
 use tokio::fs::File;
 
 use crate::build;
+use crate::commands::secrets;
 use crate::config;
 use crate::infra::{self, ssh};
 use crate::ui::output;
@@ -26,6 +27,11 @@ pub async fn run() -> Result<()> {
         style("to").dim(),
         style(&cfg.host).dim(),
     );
+
+    if !secrets::production_secrets_exist(&cfg).await? {
+        println!("Production secrets are missing; pushing them now...");
+        secrets::push().await?;
+    }
 
     println!("Building the committed {} branch locally...", cfg.branch);
     let artifact = build::package(&cfg)?;

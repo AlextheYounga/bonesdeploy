@@ -184,6 +184,20 @@ pub async fn push() -> Result<()> {
     Ok(())
 }
 
+pub async fn production_secrets_exist(cfg: &config::Bones) -> Result<bool> {
+    let ssh_user = config::bootstrap_ssh_user(cfg);
+    let port = parse_port(&cfg.port)?;
+    let session = ssh::connect_as(&ssh_user, &cfg.host, port).await?;
+    let target = Path::new(&cfg.project_root).join(paths::SHARED_DIR).join(paths::DOT_ENV);
+    let command = format!(
+        "if test -f {}; then printf present; else printf missing; fi",
+        ssh::shell_quote(&target.display().to_string())
+    );
+    let result = ssh::run_cmd(&session, &command).await;
+    session.close().await?;
+    Ok(result?.trim() == "present")
+}
+
 #[cfg(test)]
 mod tests {
     use anyhow::Result;

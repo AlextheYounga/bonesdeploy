@@ -8,5 +8,8 @@ pub fn run(format: &str) -> Result<()> {
 
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
     let request = infra::provisioning_request(&cfg)?;
-    bonesinfra::run_with_request(&["manifest", "show", "--request-stdin", "--format", format], &request)
+    let manifest =
+        bonesinfra::run_with_request_output(&["manifest", "show", "--request-stdin", "--format", format], &request)?;
+    print!("{manifest}");
+    Ok(())
 }
