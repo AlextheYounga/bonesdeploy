@@ -9,7 +9,7 @@ use bonesdeploy::build;
 use bonesdeploy_core::config::Bones;
 
 #[test]
-fn native_builder_runs_as_container_root_and_restores_mount_ownership() -> Result<()> {
+fn native_builder_reuses_one_root_container_and_restores_mount_ownership() -> Result<()> {
     let project = tempfile::tempdir()?;
     initialize_project(project.path())?;
     let tools = tempfile::tempdir()?;
@@ -34,6 +34,8 @@ fn native_builder_runs_as_container_root_and_restores_mount_ownership() -> Resul
     );
     let commands = fs::read_to_string(docker_log)?;
     assert!(!commands.contains("--user"), "build command must retain container root: {commands}");
+    assert_eq!(commands.lines().filter(|line| line.starts_with("run --detach ")).count(), 1, "{commands}");
+    assert_eq!(commands.lines().filter(|line| line.starts_with("exec -i ")).count(), 2, "{commands}");
     assert!(commands.contains("find -P /workspace/source /workspace/cache -exec chown -h"));
     Ok(())
 }
@@ -57,6 +59,7 @@ fn initialize_project(project: &Path) -> Result<()> {
     let build = project.join("infra/deployment/build");
     fs::create_dir_all(&build)?;
     fs::write(build.join("01_requires_root.sh"), "test \"$(id -u)\" = 0\n")?;
+    fs::write(build.join("02_reuses_container.sh"), "true\n")?;
     run_git(project, ["add", "."])?;
     run_git(project, ["commit", "-m", "initial"])
 }
@@ -76,7 +79,7 @@ if [ "$1" = image ] && [ "$2" = inspect ]; then
 fi
 for argument in "$@"; do
 	[ "$argument" = --user ] && exit 97
-	[ "$argument" = --interactive ] && interactive=1
+	[ "$argument" = -i ] && interactive=1
 done
 [ "${interactive:-0}" = 1 ] && cat >/dev/null
 exit 0

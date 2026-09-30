@@ -2,9 +2,9 @@ use std::fs;
 use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{self, Command, Stdio};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::build_contract::{
@@ -37,12 +37,17 @@ pub fn build(config: &Bones, context: &BuildContext) -> Result<()> {
         environment: &environment,
         ownership,
     };
-    for script in scripts {
-        let name = script.file_name().and_then(|value| value.to_str()).unwrap_or("<unknown>");
-        println!("Running local build script {name}...");
-        run_script(&input, &script, build_timeout_seconds(config))?;
-    }
-    Ok(())
+    let mut container = BuildContainer::start(&input)?;
+    let build_result = (|| {
+        for script in scripts {
+            let name = script.file_name().and_then(|value| value.to_str()).unwrap_or("<unknown>");
+            println!("Running local build script {name}...");
+            container.run_script(&script, build_timeout_seconds(config))?;
+        }
+        Ok(())
+    })();
+    let cleanup_result = container.remove();
+    finish_with_cleanup(build_result, cleanup_result)
 }
 
 /// Finds the committed deployment bundle and its numbered build scripts.
@@ -131,19 +136,18 @@ struct ContainerStart<'a> {
     ownership: MountOwnership,
 }
 
-fn create_command(input: &ContainerStart<'_>, environment_file: &Path) -> Command {
+fn create_command(input: &ContainerStart<'_>, name: &str, environment_file: &Path) -> Command {
     let mut command = Command::new("docker");
     command
         .args([
             "run",
-            "--rm",
-            "--interactive",
+            "--detach",
             "--pull=never",
             "--platform",
             TARGET_PLATFORM_NAME,
             "--security-opt=no-new-privileges",
         ])
-        .args(["--workdir", SOURCE_MOUNT])
+        .args(["--workdir", SOURCE_MOUNT, "--name", name])
         .args(["--env", &format!("{}={}", variables::PROJECT_NAME, input.config.project_name)])
         .args(["--env", &format!("{}={WORKSPACE_ROOT}", variables::PROJECT_ROOT)])
         .args(["--env", &format!("{}=", variables::REPO_PATH)])
@@ -159,7 +163,7 @@ fn create_command(input: &ContainerStart<'_>, environment_file: &Path) -> Comman
         .args(["--volume"])
         .arg(format!("{}:{CACHE_MOUNT}:rw", input.cache.display()))
         .arg(BUILDER_IMAGE)
-        .args(["bash", "-s"]);
+        .args(["sleep", "infinity"]);
     command
 }
 
@@ -169,23 +173,52 @@ struct MountOwnership {
     gid: u32,
 }
 
-fn run_script(input: &ContainerStart<'_>, script: &Path, timeout: Option<u64>) -> Result<()> {
-    let script_input =
-        fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
-    let environment_file = write_environment_file(input.environment)?;
-    let mut child = create_command(input, environment_file.path())
-        .current_dir(input.source)
-        .stdin(Stdio::from(script_input))
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .with_context(|| format!("Failed to execute build script {}", script.display()))?;
-    let stdout = child.stdout.take().context("Docker stdout was not piped")?;
-    let stderr = child.stderr.take().context("Docker stderr was not piped")?;
-    let stdout_thread = thread::spawn(move || stream_output(stdout, false));
-    let stderr_thread = thread::spawn(move || stream_output(stderr, true));
-    let started = Instant::now();
-    let result = (|| -> Result<()> {
+struct BuildContainer {
+    source: PathBuf,
+    name: String,
+    ownership: MountOwnership,
+    _environment_file: NamedTempFile,
+    removed: bool,
+}
+
+impl BuildContainer {
+    fn start(input: &ContainerStart<'_>) -> Result<Self> {
+        let environment_file = write_environment_file(input.environment)?;
+        let name = unique_container_name(&input.config.project_name);
+        let status = create_command(input, &name, environment_file.path())
+            .current_dir(input.source)
+            .stdout(Stdio::null())
+            .status()
+            .with_context(|| format!("Failed to start local build container {name}"))?;
+        if !status.success() {
+            let _ = force_remove_container(input.source, &name);
+            bail!("Failed to start local build container {name}: {status}");
+        }
+        Ok(Self {
+            source: input.source.to_path_buf(),
+            name,
+            ownership: input.ownership,
+            _environment_file: environment_file,
+            removed: false,
+        })
+    }
+
+    fn run_script(&self, script: &Path, timeout: Option<u64>) -> Result<()> {
+        let script_input =
+            fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
+        let mut child = Command::new("docker")
+            .current_dir(&self.source)
+            .args(["exec", "-i", &self.name, "bash", "-c", "umask 0002; exec bash -s"])
+            .stdin(Stdio::from(script_input))
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .with_context(|| format!("Failed to execute build script {}", script.display()))?;
+        let stdout = child.stdout.take().context("Docker stdout was not piped")?;
+        let stderr = child.stderr.take().context("Docker stderr was not piped")?;
+        let stdout_thread = thread::spawn(move || stream_output(stdout, false));
+        let stderr_thread = thread::spawn(move || stream_output(stderr, true));
+        let started = Instant::now();
         loop {
             if let Some(status) = child.try_wait().context("Failed to wait for local build script")? {
                 finish_output(stdout_thread, stderr_thread)?;
@@ -202,8 +235,27 @@ fn run_script(input: &ContainerStart<'_>, script: &Path, timeout: Option<u64>) -
             }
             thread::sleep(Duration::from_millis(50));
         }
-    })();
-    finish_with_cleanup(result, normalize_mount_ownership(input))
+    }
+
+    fn remove(&mut self) -> Result<()> {
+        if self.removed {
+            return Ok(());
+        }
+        let ownership_result = normalize_mount_ownership(&self.name, self.ownership);
+        let removal_result = force_remove_container(&self.source, &self.name);
+        self.removed = true;
+        finish_with_cleanup(ownership_result, removal_result)
+    }
+}
+
+impl Drop for BuildContainer {
+    fn drop(&mut self) {
+        if !self.removed {
+            let _ = normalize_mount_ownership(&self.name, self.ownership);
+            let _ = force_remove_container(&self.source, &self.name);
+            self.removed = true;
+        }
+    }
 }
 
 fn write_environment_file(environment: &[(String, String)]) -> Result<NamedTempFile> {
@@ -224,15 +276,10 @@ fn mount_ownership(path: &Path) -> Result<MountOwnership> {
     Ok(MountOwnership { uid: metadata.uid(), gid: metadata.gid() })
 }
 
-fn normalize_mount_ownership(input: &ContainerStart<'_>) -> Result<()> {
-    let ownership = format!("{}:{}", input.ownership.uid, input.ownership.gid);
+fn normalize_mount_ownership(name: &str, ownership: MountOwnership) -> Result<()> {
+    let ownership = format!("{}:{}", ownership.uid, ownership.gid);
     let status = Command::new("docker")
-        .args(["run", "--rm", "--pull=never", "--platform", TARGET_PLATFORM_NAME])
-        .args(["--volume"])
-        .arg(format!("{}:{SOURCE_MOUNT}", input.source.display()))
-        .args(["--volume"])
-        .arg(format!("{}:{CACHE_MOUNT}:rw", input.cache.display()))
-        .arg(BUILDER_IMAGE)
+        .args(["exec", name])
         .args(["find", "-P", SOURCE_MOUNT, CACHE_MOUNT, "-exec", "chown", "-h", &ownership, "{}", "+"])
         .status()
         .context("Failed to restore local build mount ownership")?;
@@ -240,6 +287,23 @@ fn normalize_mount_ownership(input: &ContainerStart<'_>) -> Result<()> {
         bail!("Failed to restore local build mount ownership: {status}");
     }
     Ok(())
+}
+
+fn force_remove_container(source: &Path, name: &str) -> Result<()> {
+    let status = Command::new("docker")
+        .current_dir(source)
+        .args(["rm", "--force", "--time", "0", name])
+        .status()
+        .with_context(|| format!("Failed to remove local build container {name}"))?;
+    if !status.success() {
+        bail!("Failed to remove local build container {name}: {status}");
+    }
+    Ok(())
+}
+
+fn unique_container_name(project: &str) -> String {
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+    format!("bonesdeploy-build-{project}-{}-{nonce}", process::id())
 }
 
 fn finish_with_cleanup(primary: Result<()>, cleanup: Result<()>) -> Result<()> {
