@@ -18,7 +18,7 @@ fn nologin_shells_are_not_interactive() {
 
 #[test]
 fn duplicate_runtime_identity_fails_isolation() {
-    let deploy = account("git", 1000, 1000);
+    let deploy = account("bonesdeploy", 1000, 1000);
     let sites = vec![
         Site {
             name: "atlas".to_string(),
@@ -37,7 +37,7 @@ fn duplicate_runtime_identity_fails_isolation() {
 
 #[test]
 fn site_without_a_build_identity_remains_isolated() {
-    let deploy = account("git", 1000, 1000);
+    let deploy = account("bonesdeploy", 1000, 1000);
     let sites = vec![Site {
         name: "atlas".to_string(),
         project_root: PathBuf::from("/srv/sites/atlas"),

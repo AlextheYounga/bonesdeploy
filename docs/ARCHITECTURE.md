@@ -50,7 +50,7 @@ owns *what gets installed* at provisioning time.
 **`bonesremote`** — the server-side binary that owns the existing root-required
 release lifecycle: staging, sealing, activation, rollback, and pruning. Routine
 deployment reaches it through an exact sudoers command in an SSH session owned
-by `git`; it never calls `bonesinfra`.
+by `bonesdeploy`; it never calls `bonesinfra`.
 
 ## 2. Responsibility / Ownership Map
 

@@ -33,7 +33,7 @@ fn run_script(script: &Path, build_root: &Path, log_path: &Path) -> Result<ExitS
         .current_dir(build_root)
         .env("PROJECT_NAME", "demo")
         .env("PROJECT_ROOT", "/srv/deployments/demo")
-        .env("REPO_PATH", "/home/git/demo.git")
+        .env("REPO_PATH", "")
         .env("WEB_ROOT", "public")
         .env("SERVICE_USER", "demo")
         .stdout(Stdio::piped())

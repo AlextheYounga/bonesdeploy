@@ -6,7 +6,7 @@ Three identities. Not two, not five. Three.
 
 | Identity | Owns | Job |
 |----------|------|-----|
-| `git` (deploy user) | deployment SSH entry point | artifact transport and deployment SSH entry point |
+| `bonesdeploy` (deploy user) | deployment SSH entry point | artifact transport and deployment SSH entry point |
 | `<site>` (runtime user) | `shared/`, writable paths, `/run/<site>` | mutates runtime state |
 | `root` | system units, config dirs, state, releases | provisions and runs the allowlisted BonesRemote lifecycle |
 

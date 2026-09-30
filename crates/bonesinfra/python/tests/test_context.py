@@ -23,6 +23,7 @@ def test_reads_typed_site_request():
 
 def test_template_data_contains_runtime_values():
     td = template_data(DeployContext.from_request(make_site_request()))
+    assert td["deploy_user"] == "bonesdeploy"
     assert td["runtime_user"] == "lawsnipe"
     assert td["runtime_group"] == "lawsnipe"
     assert td["runtime_backend"] == "native"

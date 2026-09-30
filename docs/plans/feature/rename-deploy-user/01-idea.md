@@ -2,7 +2,7 @@
 
 ## Request
 
-Rename the historical `git` deployment user to `bonesdeploy` now that local
+Rename the historical `git` deployment user to `deploy` now that local
 artifact builds and SSH artifact transport have replaced Git-push deployment.
 Treat the rename as a breaking host contract and do not migrate accounts from
 past releases.
@@ -17,7 +17,7 @@ documentation.
 
 ## Definitions
 
-**Deploy identity:** The global production Unix account named `bonesdeploy`
+**Deploy identity:** The global production Unix account named `deploy`
 that accepts authorized-key SSH connections for routine artifact deployment.
 It may invoke only the exact root-owned BonesRemote config-sync and deploy
 commands granted by the BonesDeploy sudoers policy. It is not an application
@@ -33,34 +33,37 @@ isolated from the global deploy identity.
 
 ## Desired outcome
 
-Fresh BonesDeploy server provisioning creates `bonesdeploy` as the deploy
+Fresh BonesDeploy server provisioning creates `deploy` as the deploy
 identity, installs its authorized keys, grants its existing narrow sudo policy,
-and does not create a `git` account. Routine deployment, remote version checks,
-and SSH connectivity checks connect as `bonesdeploy`. BonesRemote diagnostics
-and security checks recognize `bonesdeploy` as the deploy identity and continue
+and does not create a `git` or `bonesdeploy` account. Routine deployment, remote
+version checks, and SSH connectivity checks connect as `deploy`. BonesRemote
+diagnostics and security checks recognize `deploy` as the deploy identity and continue
 to reject membership in site runtime groups.
 
 Code, tests, generated assets, architecture descriptions, security guidance,
-and user documentation consistently call this account `bonesdeploy` or the
+and user documentation consistently call this account `deploy` or the
 deploy identity. References to Git remain only where they describe local source
 selection or actual Git operations.
 
 ## Scope
 
 - Change the canonical Rust and Python deploy-account values from `git` to
-  `bonesdeploy`.
-- Provision `/home/bonesdeploy`, copy the configured administrative authorized
-  keys into it, and render the existing sudoers allowlist for `bonesdeploy`.
-- Make routine BonesDeploy SSH transport use `bonesdeploy`.
+  `deploy`.
+- Provision `/home/deploy`, copy the configured administrative authorized keys
+  into it, and render the existing sudoers allowlist for `deploy`.
+- Make routine BonesDeploy SSH transport use `deploy`.
 - Update BonesRemote identity collection, site isolation checks, doctor output,
   tests, and fixtures to use the renamed account.
+- Reserve the project/site name `deploy` so runtime identity provisioning cannot
+  collide with the global deploy account.
 - Update embedded guidance and repository documentation that describe the
   production deploy identity or its home directory.
 - Remove stale deploy-account terminology and test data exposed by the rename.
 
 ## Constraints
 
-- This is a breaking production-host contract. Existing `git` accounts,
+- This is a breaking production-host contract. Existing `git` and
+  `bonesdeploy` accounts,
   authorized keys, home contents, UIDs, GIDs, and sudoers entries are not
   migrated or retained for compatibility.
 - Existing hosts must be reprovisioned to satisfy the new contract.
@@ -79,7 +82,7 @@ selection or actual Git operations.
 - In-place account rename, UID/GID preservation, home-directory movement,
   authorized-key migration, legacy sudoers cleanup, or update patches for hosts
   provisioned by past releases.
-- Automatic fallback from `bonesdeploy` to `git` during SSH connection.
+- Automatic fallback from `deploy` to `git` or `bonesdeploy` during SSH connection.
 - Changes to the two-command sudoers authority or the root-owned BonesRemote
   deployment lifecycle.
 - Per-site deploy identities, multi-operator tenant isolation, forced-command

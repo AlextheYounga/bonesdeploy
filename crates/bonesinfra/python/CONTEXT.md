@@ -448,7 +448,7 @@ The current model uses a single per-project identity:
 - **Runtime group**: `<site>`
 - Releases are owned/sealed using the runtime group
 - Directories: `releases/` is `root:runtime_group 2750`, `shared/` is `runtime_user:runtime_group 0750`
-- The deploy user (`git`) is NOT added to the runtime group
+- The deploy user (`bonesdeploy`) is NOT added to the runtime group
 
 ## Sudoers Contract
 
@@ -458,6 +458,9 @@ through the root-owned BonesRemote binary installed at
 drop-in (`/etc/sudoers.d/bonesdeploy`, mode `0440`) grants passwordless sudo
 for exactly two anchored argument forms and is validated with `visudo -c` at
 install time (removed if validation fails):
+
+This is a fresh-host contract. Hosts with the former `git` deploy account must
+be reprovisioned; BonesInfra does not migrate or retain that identity.
 
 ```
 sudo -n /usr/local/bin/bonesremote config sync --site <site>

@@ -26,25 +26,25 @@ administrative SSH identity rather than the deploy identity.
 
 ## Intended behavior
 
-The canonical deploy identity is `bonesdeploy` in both Rust and Python. Fresh
-server setup creates `/home/bonesdeploy`, installs its authorized keys, and
+The canonical deploy identity is `deploy` in both Rust and Python. Fresh
+server setup creates `/home/deploy`, installs its authorized keys, and
 grants that principal the same two anchored BonesRemote sudo command forms.
 Routine deployment and unprivileged connectivity/version probes connect as
-`bonesdeploy`.
+`deploy`.
 
-BonesRemote server and site diagnostics require the `bonesdeploy` account and
+BonesRemote server and site diagnostics require the `deploy` account and
 verify that it remains isolated from every runtime identity. User-facing and
-architectural descriptions identify it as the deploy identity or `bonesdeploy`,
+architectural descriptions identify it as the deploy identity or `deploy`,
 without implying that it hosts application Git repositories.
 
 No code detects, renames, copies from, deletes, or falls back to a legacy `git`
-account. A host provisioned under the old contract is unsupported until it is
-reprovisioned under the new contract.
+or `bonesdeploy` account. A host provisioned under an old contract is
+unsupported until it is reprovisioned under the new contract.
 
 ## Approach
 
-Replace the two existing cross-language deploy-account constants with
-`bonesdeploy` and let their current consumers carry the new identity through
+Replace the two existing cross-language deploy-account constants with `deploy`
+and let their current consumers carry the new identity through
 SSH, provisioning templates, sudoers rendering, and diagnostics. Keep the
 current separation between Rust and embedded Python constants because each
 runtime must package its own value and the project already tests the rendered
@@ -55,8 +55,10 @@ sudoers principal, and identity-isolation behavior. Search human-authored source
 and documentation for deploy-account uses of `git`, changing only references to
 the removed production identity while preserving genuine local Git terminology.
 
-Do not extend the patch registry or add compatibility branches. Fresh server
-setup is the only account-provisioning path covered by this feature.
+Reserve `deploy` in the existing project/site validation lists in both Rust and
+Python because those names become runtime users and groups. Do not extend the
+patch registry or add compatibility branches. Fresh server setup is the only
+account-provisioning path covered by this feature.
 
 ## Responsibilities and boundaries
 
@@ -89,18 +91,20 @@ setup is the only account-provisioning path covered by this feature.
 
 ## Decisions
 
-- Name the account `bonesdeploy`, matching the product and avoiding the generic
-  collision and ambiguity of `deploy`.
+- Name the account `deploy`, matching the user's requested concise Unix identity.
 - Preserve the dedicated deploy identity rather than using root SSH, because it
   remains the narrow transport principal for the sudo-controlled deployment
   boundary.
-- Make a clean breaking change with no `git` fallback or migration. This keeps
+- Make a clean breaking change with no `git` or `bonesdeploy` fallback or
+  migration. This keeps
   account state single-sourced and avoids unrequested handling of arbitrary old
   home contents and identity collisions.
 - Preserve the current sudoers command allowlist exactly; local building did not
   remove the need for privileged release activation and service management.
 - Preserve real Git terminology for local committed-source selection. Only the
   production Unix identity is renamed.
+- Reserve the `deploy` project/site name because runtime identities are derived
+  directly from those names.
 
 ## Risks
 
@@ -119,10 +123,11 @@ setup is the only account-provisioning path covered by this feature.
 ## Validation
 
 - Focused Rust tests prove `default_deploy_user()` and routine SSH command
-  construction select `bonesdeploy`, and BonesRemote doctor/security evaluation
+  construction select `deploy`, project validation rejects `deploy`, and
+  BonesRemote doctor/security evaluation
   imports that account and rejects its runtime-group membership.
-- Focused Python tests prove server setup provisions `bonesdeploy`, copies keys
-  into `/home/bonesdeploy/.ssh`, and renders the unchanged anchored sudoers
+- Focused Python tests prove server setup provisions `deploy`, copies keys into
+  `/home/deploy/.ssh`, project validation rejects `deploy`, and renders the unchanged anchored sudoers
   command forms for the new principal.
 - Repository searches show no current production deploy-account references to
   `git` or `/home/git`; remaining matches describe actual Git behavior or

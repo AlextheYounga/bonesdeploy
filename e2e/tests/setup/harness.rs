@@ -200,7 +200,8 @@ impl Harness {
     }
 
     pub fn assert_site(&self, site: &str) -> Result<()> {
-        self.exec("id git")?;
+        self.exec("id bonesdeploy")?;
+        self.exec("! id git")?;
         self.exec("bonesremote version")?;
         self.exec("systemctl is-active --quiet nginx")?;
         self.exec(&format!(

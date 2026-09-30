@@ -10,7 +10,7 @@ from bonesinfra.cli.commands.server import sudoers
 from . import helpers
 
 SUDOERS_TEMPLATE = helpers.SRC_DIR / "bonesinfra/assets/sudoers/bonesdeploy.j2"
-DEPLOY_USER = "git"
+DEPLOY_USER = "bonesdeploy"
 BONESREMOTE_PATH = "/usr/local/bin/bonesremote"
 SUDOERS_PATH = "/etc/sudoers.d/bonesdeploy"
 

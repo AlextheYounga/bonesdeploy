@@ -1,8 +1,14 @@
 from types import SimpleNamespace
 
+from jinja2 import Environment, StrictUndefined
+
 from bonesinfra.cli.commands import server, site
-from bonesinfra.cli.commands.server import helpers as server_helpers
+from bonesinfra.cli.commands.server import helpers as server_helpers, users as server_users
 from bonesinfra.cli.commands.site import ssl as site_ssl, tunnel as site_tunnel
+
+from . import helpers
+
+AUTHORIZED_KEYS_TEMPLATE = helpers.SRC_DIR / "bonesinfra/assets/scripts/copy-ssh-authorized-keys.sh.j2"
 
 
 def test_server_setup_runs_only_server_operations(monkeypatch):
@@ -38,6 +44,45 @@ def test_server_setup_runs_only_server_operations(monkeypatch):
         "sudoers",
         "etckeeper-commit",
     ]
+
+
+def test_server_setup_creates_bonesdeploy_and_installs_its_authorized_key(monkeypatch):
+    calls = []
+    ctx = SimpleNamespace(ssh_user="admin")
+    monkeypatch.setattr(server_users.server, "user", lambda **kwargs: calls.append(("user", kwargs)))
+    monkeypatch.setattr(
+        server_users.server,
+        "script_template",
+        lambda **kwargs: calls.append(("script_template", kwargs)),
+    )
+
+    server_users.ensure_deploy_user(ctx)
+
+    assert calls[0] == (
+        "user",
+        {
+            "name": "Ensure deploy user exists",
+            "user": "bonesdeploy",
+            "shell": "/bin/bash",
+            "ensure_home": True,
+            "_sudo": True,
+        },
+    )
+    assert calls[1][0] == "script_template"
+    assert calls[1][1]["deploy_user"] == "bonesdeploy"
+    assert calls[1][1]["ssh_user"] == "admin"
+
+
+def test_authorized_key_script_targets_the_bonesdeploy_home():
+    env = Environment(autoescape=False, undefined=StrictUndefined)  # noqa: S701
+    rendered = env.from_string(helpers.read(AUTHORIZED_KEYS_TEMPLATE)).render(
+        deploy_user="bonesdeploy",
+        ssh_user="admin",
+    )
+
+    assert 'DEPLOY_USER="bonesdeploy"' in rendered
+    assert '"/home/$DEPLOY_USER/.ssh/authorized_keys"' in rendered
+    assert 'chmod 0600 "/home/$DEPLOY_USER/.ssh/authorized_keys"' in rendered
 
 
 def test_site_setup_runs_only_site_base_operations(monkeypatch):

@@ -5,15 +5,15 @@
 # sudo matches the anchored expression against the command line arguments.
 #
 # Trust model: this rule assumes a SINGLE OPERATOR owns every project on this
-# host. The shared `deploy_user` account (default: git) is granted passwordless
+# host. The shared `deploy_user` account (default: bonesdeploy) is granted passwordless
 # sudo for exactly two anchored argument forms of the root-owned BonesRemote
 # binary. Any compromise of that account, or of any SSH key authorized for it,
 # can deploy every project on the host.
 #
 # This rule is NOT a tenant-isolation boundary. Scoping the site identifier is
 # insufficient while all projects still share the same Unix account and the
-# same authorized_keys file, because a key authenticated as `git` can still
-# target any project's repository path. To support multiple operators or
+# same authorized_keys file, because a key authenticated as `bonesdeploy` can
+# still target any project. To support multiple operators or
 # tenants on one host, provision a separate deploy identity (Unix account +
 # authorized_keys) per project and scope each sudoers rule to that identity
 # before relying on the per-site split.

@@ -7,7 +7,7 @@ from typing import Any
 
 from bonesinfra.config.paths import DeploymentPaths
 
-DEPLOY_USER = "git"
+DEPLOY_USER = "bonesdeploy"
 
 
 @dataclass

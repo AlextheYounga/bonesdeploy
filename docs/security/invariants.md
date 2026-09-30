@@ -34,7 +34,7 @@ Everything below is what "trusted" actually commits to. Linux can give you hard,
 4.  No shared Unix identity owns data belonging to multiple sites.
 ```
 
-Three identities, not two and not five. The `git` user is the deployment SSH entry point and artifact transport principal. The `<site>` runtime user owns `shared/`, writable paths, and `/run/<site>` and mutates runtime state. `root` owns system units, config dirs, deployment state, and sealed releases, and runs the allowlisted BonesRemote lifecycle. The runtime user is dedicated per project — not `www-data`, not a shared `applications` user. One project, one user. Isolation is enforced by the kernel, not by your discipline.
+Three identities, not two and not five. The `bonesdeploy` user is the deployment SSH entry point and artifact transport principal. The `<site>` runtime user owns `shared/`, writable paths, and `/run/<site>` and mutates runtime state. `root` owns system units, config dirs, deployment state, and sealed releases, and runs the allowlisted BonesRemote lifecycle. The runtime user is dedicated per project — not `www-data`, not a shared `applications` user. One project, one user. Isolation is enforced by the kernel, not by your discipline.
 
 ## Filesystem
 
@@ -54,7 +54,7 @@ Three identities, not two and not five. The `git` user is the deployment SSH ent
     logs, deployment descriptors, or the control-plane snapshot.
 ```
 
-Permissions are a provisioning-time contract, not a deployment-time repair. The ownership layout is established by `bonesdeploy server setup` and site setup, and never rewritten by deploy commands. If you find yourself wanting to `chmod` during a deploy, you are fixing the wrong thing — fix the provisioning. `shared/` is owned by the runtime user; only the app writes there. The existing root-owned lifecycle creates, prepares, seals, and activates release candidates without granting `git` write authority over the release namespace.
+Permissions are a provisioning-time contract, not a deployment-time repair. The ownership layout is established by `bonesdeploy server setup` and site setup, and never rewritten by deploy commands. If you find yourself wanting to `chmod` during a deploy, you are fixing the wrong thing — fix the provisioning. `shared/` is owned by the runtime user; only the app writes there. The existing root-owned lifecycle creates, prepares, seals, and activates release candidates without granting `bonesdeploy` write authority over the release namespace.
 
 No shared groups with `660`/`770` everywhere — that pattern is a tangle of logic traps. No ACLs — they're opaque and unreadable. Ordinary Unix ownership, every time.
 
