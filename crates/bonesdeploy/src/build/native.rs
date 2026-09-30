@@ -95,8 +95,8 @@ pub fn docker_image_available() -> Result<bool> {
 }
 
 fn docker_image_available_with_client(docker: &DockerClient, timeout: Option<u64>) -> Result<bool> {
-    match command::run(image_inspect_command(docker)?, "inspect local builder image", timeout) {
-        Ok(()) => Ok(true),
+    match command::output(image_inspect_command(docker)?, "inspect local builder image", timeout) {
+        Ok(_) => Ok(true),
         Err(error) if command::failed(&error) => Ok(false),
         Err(error) => Err(error),
     }

@@ -19,6 +19,7 @@ pub async fn run(yes: bool) -> Result<()> {
     server::doctor(false).await.context("Server baseline is not ready.\n\nNext: bonesdeploy server setup --yes")?;
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
     if cfg.runtime.backend == RuntimeBackend::Native {
+        println!("Checking local builder...");
         native::ensure_builder_image().context("Failed to prepare local builder")?;
     }
     println!("Provisioning site base...");

@@ -24,11 +24,15 @@ fn local_non_default_context_binds_native_and_compose_commands_to_one_endpoint()
     let docker_log = tools.path().join("docker.log");
     write_fake_docker(tools.path())?;
 
-    run_helper(
+    let output = run_helper(
         DockerFixture { project: project.path(), tools: tools.path(), docker_log: &docker_log },
         "local_context_helper",
         [("DOCKER_CONTEXT", "desktop-local"), ("FAKE_DOCKER_ENDPOINT", LOCAL_ENDPOINT)],
     )?;
+    assert!(
+        !String::from_utf8_lossy(&output.stdout).contains("builder-image-inspect-output"),
+        "builder image inspection output leaked to the terminal"
+    );
 
     let commands = fs::read_to_string(docker_log)?;
     assert!(!commands.is_empty(), "fake Docker received no commands");
@@ -198,7 +202,7 @@ struct DockerFixture<'a> {
     docker_log: &'a Path,
 }
 
-fn run_helper<'a, I>(fixture: DockerFixture<'_>, helper: &str, variables: I) -> Result<()>
+fn run_helper<'a, I>(fixture: DockerFixture<'_>, helper: &str, variables: I) -> Result<std::process::Output>
 where
     I: IntoIterator<Item = (&'a str, &'a str)>,
 {
@@ -220,7 +224,7 @@ where
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
-    Ok(())
+    Ok(output)
 }
 
 fn initialize_project(project: &Path) -> Result<()> {
@@ -276,6 +280,7 @@ if [ "$1" = info ]; then
 	exit 0
 fi
 if [ "$1" = image ] && [ "$2" = inspect ]; then
+	printf '%s\n' 'builder-image-inspect-output'
 	exit 0
 fi
 if [ "$1" = compose ]; then
