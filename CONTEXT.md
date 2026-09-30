@@ -171,6 +171,10 @@ Every native deploy resolves the configured branch to one exact committed
 revision, exports it, and runs the numbered build scripts locally in Docker with
 the pinned `linux/amd64` builder. Docker is the only local build engine. The
 CLI pulls the pinned builder automatically when it is not installed locally. The
+configured build timeout applies independently to each local Docker build
+operation; a value of `0` leaves those operations unbounded. Failed or timed-out
+native builds restore mounted ownership before their temporary container state is
+removed. Compose builds similarly clean up their generated release image tags.
 build receives fixed public contract metadata and values explicitly declared in
 the committed `.env.build`; it does not inherit ambient variables or receive the
 root `.env`, runtime environment, credentials, host home, SSH agent, or Docker
