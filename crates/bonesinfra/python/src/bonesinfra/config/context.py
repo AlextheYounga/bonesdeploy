@@ -7,7 +7,7 @@ from typing import Any
 
 from bonesinfra.config.paths import DeploymentPaths
 
-DEPLOY_USER = "bonesdeploy"
+DEPLOY_USER = "deploy"
 
 
 @dataclass

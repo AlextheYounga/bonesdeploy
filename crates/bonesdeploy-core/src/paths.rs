@@ -5,7 +5,7 @@ pub const DEFAULT_PROJECT_ROOT_PARENT: &str = "/srv/sites";
 pub const DEFAULT_CONF_ROOT_PARENT: &str = "/srv/conf";
 pub const DEFAULT_WEB_ROOT: &str = "public";
 
-pub const DEPLOY_USER: &str = "bonesdeploy";
+pub const DEPLOY_USER: &str = "deploy";
 pub const DEFAULT_GROUP: &str = "www-data";
 
 pub const ETC_NGINX_SITES_AVAILABLE: &str = "/etc/nginx/sites-available";

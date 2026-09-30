@@ -23,7 +23,7 @@ def test_reads_typed_site_request():
 
 def test_template_data_contains_runtime_values():
     td = template_data(DeployContext.from_request(make_site_request()))
-    assert td["deploy_user"] == "bonesdeploy"
+    assert td["deploy_user"] == "deploy"
     assert td["runtime_user"] == "lawsnipe"
     assert td["runtime_group"] == "lawsnipe"
     assert td["runtime_backend"] == "native"
@@ -115,7 +115,7 @@ def test_invalid_extras_are_rejected():
         DeployContext.from_request(make_site_request(extras={"nested": {"value": 1}}))
 
 
-@pytest.mark.parametrize("project_name", ["", "Demo", "demo_name", "network", "demo;rm"])
+@pytest.mark.parametrize("project_name", ["", "Demo", "demo_name", "network", "deploy", "demo;rm"])
 def test_project_identity_matches_remote_validation(project_name):
     with pytest.raises(ValueError, match="Invalid project name"):
         DeployContext.from_request(make_site_request(project_name=project_name))

@@ -508,14 +508,14 @@ deployment/
 Deployments are explicit: `bonesdeploy deploy` does not push application
 changes, synchronize a second repository, or trigger from Git hooks.
 
-Routine deployment SSH connects as the `bonesdeploy` deploy identity, not root. That
+Routine deployment SSH connects as the `deploy` deploy identity, not root. That
 session may invoke only direct configuration-sync and deployment BonesRemote
 commands through non-interactive sudo. Anchored sudoers argument rules deny
 other BonesRemote subcommands and extra or trailing arguments; they require
 sudo 1.9.10 or newer. The lifecycle retains the existing root-owned state,
 lock, and release boundaries; prepare scripts run as the site runtime user.
-Hosts provisioned with the former `git` deploy identity must be reprovisioned;
-BonesDeploy does not migrate that account or fall back to it.
+Hosts provisioned with the former `git` or `bonesdeploy` deploy identity must be
+reprovisioned; BonesDeploy does not migrate those accounts or fall back to them.
 
 Build scripts in `deployment/build/` must be numbered (for example `01_install_deps.sh`, `02_build.sh`) and run in order. `bonesdeploy` resolves the configured branch to its exact committed Git revision, exports that tree, and runs the native build contract in a local Docker container using the pinned `linux/amd64` builder image. Each local Docker build operation is capped at 300 seconds by default; a configured timeout of `0` disables that per-operation limit. The local cache, installed dependency trees, and build output are disposable. BonesDeploy packages the complete post-build tree as a `tar.gz` artifact and streams it over SSH. Prepare scripts in `deployment/prepare/` still run in order on the host as the site runtime user after shared paths are wired and before activation. BonesRemote streams the shared functions into each prepare shell before the prepare script.
 

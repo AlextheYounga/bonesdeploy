@@ -5,7 +5,7 @@
 BonesDeploy is a remote release deployment tool for simple Debian/Ubuntu Linux servers. It produces two Rust binaries:
 
 - **`bonesdeploy`** — local CLI for setup, provisioning, deployment, and management. Runs on the developer's workstation.
-- **`bonesremote`** — server-side release lifecycle executor. The deployment SSH session belongs to `bonesdeploy`, which may run only exact config-sync and deploy command forms through sudo; the existing lifecycle executes as root.
+- **`bonesremote`** — server-side release lifecycle executor. The deployment SSH session belongs to `deploy`, which may run only exact config-sync and deploy command forms through sudo; the existing lifecycle executes as root.
 
 A third component, **`bonesinfra`**, is an embedded Python provisioning runtime (pyinfra-based) that handles server bootstrap, framework-specific provisioning, database services, SSL, and infrastructure migrations. It is compiled into the `bonesdeploy` binary via `rust-embed` and materialized on demand into a Python venv under `~/.cache/bonesdeploy/bonesinfra`.
 
@@ -22,7 +22,7 @@ Developer workstation                           Deployment server
 │   (setup, runtime,      │                   │                            │
 │    services, ssl)       │                   │                            │
 │                         │                   │                            │
-│ bonesdeploy deploy      │── SSH as bonesdeploy ▶│ sudo bonesremote config sync│
+│ bonesdeploy deploy      │── SSH as deploy ────▶│ sudo bonesremote config sync│
 │   (committed revision)  │                   │ sudo bonesremote deploy     │
 │                         │                   │   └─ release lifecycle      │
 │                         │                   │                            │
@@ -547,8 +547,8 @@ changes. Read-only `manifest` and patch flows do not commit.
 Cli::Deploy
   └─ commands/deploy.rs::run()
        ├─ revision                    # deployment unit: committed local revision
-       ├─ SSH as bonesdeploy: sudo -n bonesremote config sync --site <site> (descriptor on stdin)
-       └─ SSH as bonesdeploy: sudo -n bonesremote deploy --site <site>
+       ├─ SSH as deploy: sudo -n bonesremote config sync --site <site> (descriptor on stdin)
+       └─ SSH as deploy: sudo -n bonesremote deploy --site <site>
             └─ commands/deploy/lifecycle.rs::run_full()
                  ├─ SiteMutation::acquire(site)   # lock + validate config
                  ├─ ensure_site_idle(site)        # verify no in-flight deployment
@@ -698,7 +698,7 @@ runtime state and is not persisted in project configuration.
 ### Permission model
 
 - Provisioning-time contract: shared ownership is established during `server setup` and site ownership during `site setup`; deploy commands never rewrite either layout.
-- Three identity classes: `bonesdeploy` (artifact transport and deployment SSH entry point), `<site>` (runtime user, shared files, `/run/<site>`), `root` (sealed releases, system units, config dirs).
+- Three identity classes: `deploy` (artifact transport and deployment SSH entry point), `<site>` (runtime user, shared files, `/run/<site>`), `root` (sealed releases, system units, config dirs). The project/site name `deploy` is reserved to prevent a runtime identity collision.
 - Native scripts run locally in Docker against an exported committed revision. The container receives no ambient or runtime secrets. Prepare scripts run as the runtime user. Only `bonesremote` (running as root) receives, promotes, activates, and restarts services.
 
 ### State ownership

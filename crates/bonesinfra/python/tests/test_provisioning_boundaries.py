@@ -46,7 +46,7 @@ def test_server_setup_runs_only_server_operations(monkeypatch):
     ]
 
 
-def test_server_setup_creates_bonesdeploy_and_installs_its_authorized_key(monkeypatch):
+def test_server_setup_creates_deploy_and_installs_its_authorized_key(monkeypatch):
     calls = []
     ctx = SimpleNamespace(ssh_user="admin")
     monkeypatch.setattr(server_users.server, "user", lambda **kwargs: calls.append(("user", kwargs)))
@@ -62,25 +62,25 @@ def test_server_setup_creates_bonesdeploy_and_installs_its_authorized_key(monkey
         "user",
         {
             "name": "Ensure deploy user exists",
-            "user": "bonesdeploy",
+            "user": "deploy",
             "shell": "/bin/bash",
             "ensure_home": True,
             "_sudo": True,
         },
     )
     assert calls[1][0] == "script_template"
-    assert calls[1][1]["deploy_user"] == "bonesdeploy"
+    assert calls[1][1]["deploy_user"] == "deploy"
     assert calls[1][1]["ssh_user"] == "admin"
 
 
-def test_authorized_key_script_targets_the_bonesdeploy_home():
+def test_authorized_key_script_targets_the_deploy_home():
     env = Environment(autoescape=False, undefined=StrictUndefined)  # noqa: S701
     rendered = env.from_string(helpers.read(AUTHORIZED_KEYS_TEMPLATE)).render(
-        deploy_user="bonesdeploy",
+        deploy_user="deploy",
         ssh_user="admin",
     )
 
-    assert 'DEPLOY_USER="bonesdeploy"' in rendered
+    assert 'DEPLOY_USER="deploy"' in rendered
     assert '"/home/$DEPLOY_USER/.ssh/authorized_keys"' in rendered
     assert 'chmod 0600 "/home/$DEPLOY_USER/.ssh/authorized_keys"' in rendered
 

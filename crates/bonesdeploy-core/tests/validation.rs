@@ -13,6 +13,7 @@ fn rejects_unit_name_syntax_and_reserved_targets() {
     assert!(validate_project_name("shop_admin").is_err());
     assert!(validate_project_name("reboot").is_err());
     assert!(validate_project_name("multi-user").is_err());
+    assert!(validate_project_name("deploy").is_err());
 }
 
 #[test]

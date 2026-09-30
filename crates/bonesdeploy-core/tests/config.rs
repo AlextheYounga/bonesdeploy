@@ -45,8 +45,8 @@ fn parse_port_rejects_zero_and_values_outside_tcp_range() {
 }
 
 #[test]
-fn deploy_user_defaults_to_bonesdeploy() {
-    assert_eq!(default_deploy_user(), "bonesdeploy");
+fn deploy_user_defaults_to_deploy() {
+    assert_eq!(default_deploy_user(), "deploy");
 }
 
 #[test]

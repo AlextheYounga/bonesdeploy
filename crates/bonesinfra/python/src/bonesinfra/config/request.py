@@ -19,6 +19,7 @@ from bonesinfra.config.paths import DEFAULT_PROJECT_ROOT_PARENT, DEFAULT_WEB_ROO
 _RESERVED_PROJECT_NAMES = {
     "basic",
     "default",
+    "deploy",
     "emergency",
     "final",
     "graphical",

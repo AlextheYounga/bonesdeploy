@@ -112,7 +112,7 @@ account-provisioning path covered by this feature.
   disagree about which account is authoritative.
 - Broad text replacement can incorrectly rename genuine local Git behavior or
   historical planning records.
-- Hosts provisioned by older releases will reject routine SSH as `bonesdeploy`;
+- Hosts provisioned by older releases will reject routine SSH as `deploy`;
   this is intentional but must be stated clearly wherever the host contract is
   documented.
 - Python source or template changes can leave the embedded BonesInfra wheel or

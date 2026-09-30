@@ -5,9 +5,9 @@ A remote release deployment tool for simple Linux servers. It produces two execu
 The command behavior is documented in this file and in the command examples in `README.md`.
 
 ## Deployment Methodology
-We have an SSH deployment user named `bonesdeploy` that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user named after the project. This is not a shared `applications` user; it must be a dedicated user per project so isolation works on a shared server. This user has no home folder, no login, and no sudo ability. This is ultimately who we want to own our project files to limit attack scope.
+We have an SSH deployment user named `deploy` that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user named after the project. This is not a shared `applications` user; it must be a dedicated user per project so isolation works on a shared server. This user has no home folder, no login, and no sudo ability. The project name `deploy` is reserved so the global deploy account cannot collide with a runtime identity.
 
-The `bonesdeploy` account is a fresh-host contract. Existing hosts provisioned with the former `git` deploy account must be reprovisioned; no account migration or SSH fallback is provided.
+The `deploy` account is a fresh-host contract. Existing hosts provisioned with the former `git` or `bonesdeploy` deploy account must be reprovisioned; no account migration or SSH fallback is provided.
 
 ### Just-in-Time Concerns
 This project should prefer just-in-time mutations.
@@ -44,7 +44,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 | Identity | Owner of | Scope |
 |----------|----------|-------|
-| `bonesdeploy` (deploy user) | Deployment SSH entry point | Artifact transport and deployment SSH entry point |
+| `deploy` (deploy user) | Deployment SSH entry point | Artifact transport and deployment SSH entry point |
 | `root` | Config and release state | Artifact receipt and control-plane import |
 | `<site>` (runtime user) | Shared files, `/run/<site>`, writable paths | Mutates runtime state |
 | `root` | System units, config dirs, deployment state, sealed releases | Provisions and runs the allowlisted BonesRemote lifecycle |
@@ -56,7 +56,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 - Build input is temporary and disposable. Native scripts run only in local Docker against the exported committed source and upload one complete post-build artifact. Production never executes native application build scripts.
 - Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed. Application dependencies and native extensions are built locally; prepare performs only production-state work such as validation, migrations, and runtime configuration.
 - Local Git selects the committed source tree; production receives only the built artifact and never needs an application repository or first push.
-- The `bonesdeploy` SSH session may sudo only exact config-sync and deploy commands; BonesRemote retains ownership of promotion, activation, and service restart.
+- The `deploy` SSH session may sudo only exact config-sync and deploy commands; BonesRemote retains ownership of promotion, activation, and service restart.
 - `bonesdeploy site export` is separate local administration: it connects as the configured root SSH user and streams a read-only ZIP of `shared/` directly to a private local file. It does not use the deploy identity, sudo, or BonesRemote.
 
 ### Release Visibility and Cancellation
@@ -299,7 +299,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Is a live best-effort view, does not acquire the deployment lock or stop services, and is not a Borg backup operation.
 
 - **deploy**
-  - SSHes into the configured host as `bonesdeploy`, synchronizes the narrow backend-specific control-plane snapshot through `sudo -n bonesremote config sync --site <project>`, then runs the existing root-required lifecycle through `sudo -n bonesremote deploy --site <project>`.
+  - SSHes into the configured host as `deploy`, synchronizes the narrow backend-specific control-plane snapshot through `sudo -n bonesremote config sync --site <project>`, then runs the existing root-required lifecycle through `sudo -n bonesremote deploy --site <project>`.
   - Does not modify the remote environment. Run `bonesdeploy secrets push` explicitly to replace `shared/.env` from the encrypted local source.
   - Sends the artifact built from the configured local branch; production does not resolve a source branch.
 
@@ -370,7 +370,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 - **config sync**:
   - `--site <name>` receives the sanitized control-plane descriptor as JSON on stdin, validates it, and atomically installs root-owned `/srv/conf/<site>/bones.json`. BonesDeploy invokes it through sudo before deploy.
 - **deploy**:
-  - Runs the full deployment lifecycle as root after the `bonesdeploy` SSH identity invokes the exact allowed command through sudo. It receives the locally built artifact; Git push is not part of deployment.
+  - Runs the full deployment lifecycle as root after the `deploy` SSH identity invokes the exact allowed command through sudo. It receives the locally built artifact; Git push is not part of deployment.
    - Orchestrates one shared lifecycle: artifact receipt → candidate release → shared wiring → backend preparation → seal release → activate → restart `<site>.target` → post-deploy pruning. Native sites receive a verified local Docker artifact and run host prepare scripts. Compose sites receive a verified image artifact, load its images, and skip numbered prepare scripts.
    - Native preflight validates nginx. Compose activation reconciles the stack from `current` with `up --detach --no-build --pull never --remove-orphans --wait`. On failure before activation, automatically drops the staged release. If the service restart fails after activation,
     restores and restarts the previous release before dropping the failed release.
@@ -416,7 +416,7 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 
 ### Primary Deploy Flow
 
-1. `bonesdeploy deploy` resolves and exports the configured committed revision, then builds a complete local artifact. Only after packaging succeeds does it check or push production secrets, SSH into the configured host as `bonesdeploy`, synchronize the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <site>`, and run `sudo -n bonesremote deploy --site <site>` with that retained artifact.
+1. `bonesdeploy deploy` resolves and exports the configured committed revision, then builds a complete local artifact. Only after packaging succeeds does it check or push production secrets, SSH into the configured host as `deploy`, synchronize the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <site>`, and run `sudo -n bonesremote deploy --site <site>` with that retained artifact.
 2. `bonesremote deploy`, running as root through the exact sudoers grant, loads the synchronized snapshot and orchestrates the existing pipeline:
    - **stage_release** — Create timestamped release state
     - **artifact_receipt** — Verify the manifest, digest, and bounded archive before extracting it into a temporary context
