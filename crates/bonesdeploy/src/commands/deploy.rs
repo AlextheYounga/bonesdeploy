@@ -44,10 +44,10 @@ pub async fn run() -> Result<()> {
 async fn deploy_artifact(cfg: &config::Bones, artifact: &build::PackagedArtifact) -> Result<()> {
     let frame = encode_manifest(&artifact.manifest)?;
 
-    let session = ssh::connect(cfg).await?;
-    infra::sync_control_plane(&session, cfg).await?;
+    let transport = ssh::SshTransport::connect(cfg).await?;
+    infra::sync_control_plane(&transport, cfg).await?;
     let file = File::open(artifact.path()).await.context("Failed to open local artifact for upload")?;
-    ssh::stream_cmd_with_reader(&session, &infra::artifact_deploy_command(&cfg.project_name), &frame, file).await?;
-    session.close().await?;
+    transport.stream_cmd_with_reader(&infra::artifact_deploy_command(&cfg.project_name), &frame, file).await?;
+    transport.close().await?;
     Ok(())
 }

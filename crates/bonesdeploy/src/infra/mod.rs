@@ -14,10 +14,10 @@ pub fn server_request(config: &Bones) -> Result<String> {
         .context("Failed to serialize server provisioning request")
 }
 
-pub async fn sync_control_plane(session: &openssh::Session, config: &Bones) -> Result<()> {
+pub async fn sync_control_plane(transport: &ssh::SshTransport, config: &Bones) -> Result<()> {
     let body = format!("{}\n", serde_json::to_string_pretty(&RemoteDeploymentConfig::from_bones(config))?);
     let command = sync_control_plane_command(&config.project_name);
-    ssh::stream_cmd_with_stdin(session, &command, body.as_bytes()).await
+    transport.stream_cmd_with_stdin(&command, body.as_bytes()).await
 }
 
 pub fn artifact_deploy_command(site: &str) -> String {

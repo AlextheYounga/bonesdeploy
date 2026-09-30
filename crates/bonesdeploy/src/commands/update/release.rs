@@ -23,11 +23,11 @@ pub(super) async fn current_remote_version() -> String {
         return String::from("unknown");
     };
 
-    let Ok(session) = ssh::connect(&cfg).await else {
+    let Ok(transport) = ssh::SshTransport::connect(&cfg).await else {
         return String::from("unknown");
     };
-    let version = ssh::run_cmd(&session, "bonesremote version").await.ok();
-    let _ = session.close().await;
+    let version = transport.run_cmd("bonesremote version").await.ok();
+    let _ = transport.close().await;
 
     version
         .as_deref()
@@ -58,23 +58,21 @@ pub(super) async fn update_remote_from_release(current_version: &str, target_ver
 
     let cfg = config::load(env_file)?;
     let port = parse_port(&cfg.port)?;
-    let session = ssh::connect_as("root", &cfg.host, port).await?;
+    let transport = ssh::SshTransport::connect_as("root", &cfg.host, port).await?;
 
     let install_root = paths::USR_LOCAL_BIN;
     if current_version != target_version {
-        ssh::stream_cmd(&session, &bonesremote_download_command(target_version, install_root)).await?;
+        transport.stream_cmd(&bonesremote_download_command(target_version, install_root)).await?;
     }
 
-    ssh::stream_cmd(
-        &session,
-        &format!(
+    transport
+        .stream_cmd(&format!(
             "mkdir -p {root} && chown root:root {root} && chmod 711 {root}",
             root = paths::DEFAULT_PROJECT_ROOT_PARENT
-        ),
-    )
-    .await?;
+        ))
+        .await?;
 
-    session.close().await?;
+    transport.close().await?;
 
     let request = infra::provisioning_request(&cfg)?;
     bonesinfra::run_with_request(

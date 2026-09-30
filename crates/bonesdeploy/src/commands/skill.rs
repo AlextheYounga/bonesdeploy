@@ -196,36 +196,31 @@ fn print_text(report: &Report) {
 }
 
 async fn server_ready(cfg: &config::Bones) -> Result<bool> {
-    let Ok(session) = ssh::connect_privileged(cfg).await else {
+    let Ok(session) = ssh::SshTransport::connect_privileged(cfg).await else {
         return Ok(false);
     };
 
-    let bonesremote_installed = ssh::run_cmd(&session, "command -v bonesremote >/dev/null 2>&1").await.is_ok();
+    let bonesremote_installed = session.run_cmd("command -v bonesremote >/dev/null 2>&1").await.is_ok();
 
-    let host_doctor_ok = if bonesremote_installed {
-        ssh::run_cmd(&session, "bonesremote doctor >/dev/null 2>&1").await.is_ok()
-    } else {
-        false
-    };
+    let host_doctor_ok =
+        if bonesremote_installed { session.run_cmd("bonesremote doctor >/dev/null 2>&1").await.is_ok() } else { false };
 
     session.close().await?;
     Ok(host_doctor_ok)
 }
 
 async fn site_ready(cfg: &config::Bones) -> Result<bool> {
-    let Ok(session) = ssh::connect_privileged(cfg).await else {
+    let Ok(session) = ssh::SshTransport::connect_privileged(cfg).await else {
         return Ok(false);
     };
 
     let registry_path = Path::new(&cfg.project_root).join(paths::SHARED_DIR).join(paths::DOT_ENV);
     let sync_ok =
-        ssh::run_cmd(&session, &format!("test -r {}", ssh::shell_quote(&registry_path.display().to_string())))
-            .await
-            .is_ok();
+        session.run_cmd(&format!("test -r {}", ssh::shell_quote(&registry_path.display().to_string()))).await.is_ok();
 
     let current = Path::new(&cfg.project_root).join(paths::CURRENT_LINK);
     let current_ok =
-        ssh::run_cmd(&session, &format!("test -e {}", ssh::shell_quote(&current.display().to_string()))).await.is_ok();
+        session.run_cmd(&format!("test -e {}", ssh::shell_quote(&current.display().to_string()))).await.is_ok();
 
     session.close().await?;
 
@@ -237,13 +232,13 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones) -> Result<bool> {
         return Ok(false);
     }
 
-    let session = ssh::connect_privileged(cfg).await?;
+    let session = ssh::SshTransport::connect_privileged(cfg).await?;
     let certificate_directory = format!("/etc/letsencrypt/live/{}", cfg.domain);
     let command = format!(
         "test -r {certificate}/fullchain.pem && test -r {certificate}/privkey.pem",
         certificate = ssh::shell_quote(&certificate_directory),
     );
-    let enabled = ssh::run_cmd(&session, &command).await.is_ok();
+    let enabled = session.run_cmd(&command).await.is_ok();
     session.close().await?;
 
     Ok(enabled)

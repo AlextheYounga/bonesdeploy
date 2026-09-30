@@ -112,9 +112,9 @@ pub async fn run() -> Result<()> {
 }
 
 pub(crate) async fn remote_status(cfg: &config::Bones) -> Result<RemoteReport> {
-    let session = ssh::connect_privileged(cfg).await?;
+    let session = ssh::SshTransport::connect_privileged(cfg).await?;
     let command = format!("bonesremote status --site {}", ssh::shell_quote(&cfg.project_name));
-    let output = ssh::run_cmd(&session, &command).await;
+    let output = session.run_cmd(&command).await;
     session.close().await?;
 
     Ok(serde_json::from_str(&output?)?)

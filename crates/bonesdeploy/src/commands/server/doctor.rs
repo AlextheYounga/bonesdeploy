@@ -11,8 +11,8 @@ use crate::ui::output;
 pub async fn run(verbose: bool) -> Result<()> {
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
     println!("{} Checking server baseline...", style("bonesdeploy server doctor").bold());
-    let session = ssh::connect_privileged(&cfg).await?;
-    let result = ssh::run_cmd(&session, "bonesremote doctor").await;
+    let session = ssh::SshTransport::connect_privileged(&cfg).await?;
+    let result = session.run_cmd("bonesremote doctor").await;
     let _ = session.close().await;
     let report = result?;
     if verbose {

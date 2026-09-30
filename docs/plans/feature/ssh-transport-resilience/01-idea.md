@@ -26,7 +26,8 @@ also leave policy ownership and test control outside the SSH boundary.
 ## Definitions
 
 **SSH transport policy:** A public value object containing the connect deadline,
-command deadline, transfer deadline, and remote-output tail limit used by
+command deadline, transfer deadline, remote-output tail limit, and command
+output limit used by
 `SshTransport`. Production constructors use its fixed default values. An
 explicit policy is available to meaningful transport callers, including
 crate-root integration tests that need short deadlines. The policy is not
@@ -85,11 +86,14 @@ The fixed production connect deadline is 30 seconds. The fixed production
 command deadline is 30 minutes for run, stream, and stdin command helpers. The
 fixed production transfer deadline is 2 hours for downloads and artifact
 uploads through `stream_cmd_with_reader`. Each retained stdout and stderr tail
-is capped at 64 KiB. These values are product-owned defaults and are not read
+and each returned successful command stdout value is capped at 64 KiB. A
+command exceeding the returned-output limit fails explicitly rather than
+returning a partial successful result. These values are product-owned defaults and are not read
 from `Bones` or another project configuration source.
 
-Use `tokio::time::timeout` at each public transport boundary. Disconnect the
-remote child channel on timeout and on local stream failure. Drain stdout and
+Use one absolute `tokio::time::Instant` deadline at each public transport
+boundary. Disconnect the remote child channel on timeout and on local stream
+failure with independently bounded cleanup. Drain stdout and
 stderr concurrently with directly joined fallible futures so one full stream
 cannot block the other and reader-task join failures do not exist. Preserve
 the existing public helper responsibilities and `anyhow::Result` boundary.

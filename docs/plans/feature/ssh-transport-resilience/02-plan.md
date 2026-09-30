@@ -28,27 +28,29 @@ modules and arbitrary test-only public seams.
 `infra::ssh` will expose `SshTransport`, which owns an `openssh::Session` and a
 `TransportPolicy`. Production constructors (`connect`, `connect_privileged`,
 and `connect_as`) use the fixed default policy: a 30-second connection
-deadline, a 30-minute command deadline, a 2-hour transfer deadline, and a
-64 KiB per-stream diagnostic tail cap. An explicit policy-taking constructor is
+deadline, a 30-minute command deadline, a 2-hour transfer deadline, a 64 KiB
+per-stream diagnostic tail cap, and a 64 KiB returned-command-output cap. An explicit policy-taking constructor is
 part of this focused transport API so crate-root integration tests can use
 millisecond deadlines without waiting for production values.
 
 Every current command caller uses `SshTransport`; no command caller passes an
-`openssh::Session` to an SSH helper. Each public SSH operation, including child
-creation, concurrent stream draining, output copying, and child wait, has the
-policy deadline for its class. Run, stream, and stdin command helpers use the
+`openssh::Session` to an SSH helper. Each public SSH operation establishes one
+absolute deadline before child creation; it covers concurrent stream draining,
+output copying, and child wait. Run, stream, and stdin command helpers use the
 30-minute command deadline. `download_cmd` and `stream_cmd_with_reader` use
 the 2-hour transfer deadline for complete download or artifact-transfer
 boundaries.
 
-When an operation times out, the child channel is disconnected and the result
+When an operation times out, the child channel is disconnected with separately
+bounded cleanup and the result
 identifies a timeout. When local stream I/O, reader execution, child waiting,
 or SSH communication fails, the child channel is disconnected and the result
 identifies a transport failure. A remote nonzero exit is reported as a
 remote-exit failure and includes bounded stdout and stderr tails. The command
 string, stdin bytes, artifact bytes, and secrets are excluded from diagnostics.
 
-Streaming helpers continue to print live stdout and stderr, while their shared
+Streaming helpers continue to print live stdout and stderr, while non-streaming
+helpers retain output without printing it. Their shared
 draining path also records at most 64 KiB per stream for a later remote-exit
 diagnostic. Both streams are drained concurrently by directly joined fallible
 futures. Reader failures are returned; spawned reader tasks and task-join
@@ -64,9 +66,9 @@ accepts a `TransportPolicy` for deliberate transport callers and integration
 tests. The policy constructor is not a fake-only seam and does not introduce a
 generic transport trait.
 
-Refactor every public operation method so the complete child lifecycle is
-executed inside the policy's operation timeout and all failure paths
-disconnect the child before returning. Keep the existing operation
+Refactor every public operation method so one absolute policy deadline covers
+the complete child lifecycle. All failure paths attempt child disconnect through
+a separate bounded cleanup deadline before returning. Keep the existing operation
 responsibilities and `anyhow::Result` error boundary while moving their
 receiver from `&Session` to `&SshTransport`.
 
@@ -74,8 +76,9 @@ Implement one shared concurrent stream-draining path for streaming commands
 with directly joined fallible futures. It will print each received line,
 retain bounded stdout/stderr tails, and return both reader results. This
 eliminates spawned task-join failure handling rather than adding panic
-injection to tests. Non-streaming helpers will use the same policy and bounded
-diagnostic formatting for remote nonzero exits.
+injection to tests. Non-streaming helpers retain bounded command stdout and
+diagnostic tails without printing remote output. Command output exceeding 64 KiB
+fails explicitly rather than returning partial output.
 
 ## Responsibilities and boundaries
 

@@ -501,7 +501,7 @@ these systems should use the wrapper, not open a new channel.
 
 ```text
 ### SSH (Rust)
-infra/ssh.rs — connect, connect_privileged, connect_as, run_cmd, stream_cmd
+infra/ssh.rs — SshTransport connection, command, stream, and transfer boundary
   Used by: bonesdeploy commands that invoke bonesremote on the server
   Do not: open raw SSH sessions outside this module
 
