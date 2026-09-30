@@ -10,6 +10,8 @@ mod ssl;
 mod status;
 mod tunnel;
 
+const SSL_LABEL: &str = "SSL";
+
 pub use crate::ui::output::{render_remote_doctor_output, strip_ansi};
 pub use delete::run as delete;
 pub use doctor::run as doctor;

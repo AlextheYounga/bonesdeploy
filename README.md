@@ -380,7 +380,8 @@ bonesdeploy site manifest
 bonesdeploy site manifest --format json
 ```
 
-The manifest reports present, missing, and wrong-kind paths, plus active and
+The text manifest presents paths as a tree with colored status markers. JSON
+retains complete present, missing, and wrong-kind details plus active and
 enabled state for project-managed services. JSON is intended for automation;
 neither format prints file contents or secrets.
 

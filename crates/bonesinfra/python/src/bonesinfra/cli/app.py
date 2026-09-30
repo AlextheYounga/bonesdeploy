@@ -209,17 +209,14 @@ def manifest_show_cmd(
         "--request-stdin",
         help="Read the typed JSON provisioning request from stdin",
     ),
-    output_format: str = typer.Option("text", "--format", help="Output format: text or json"),
 ):
-    if output_format not in {"text", "json"}:
-        raise typer.BadParameter("must be text or json", param_hint="--format")
     ctx = _read_request(request_stdin)
     _validate_host(ctx)
     project_manifest = load_manifest(ctx)
     data = run(ctx=ctx, deploy=lambda current_ctx: inspect_for_runner(current_ctx, project_manifest), quiet=True)
     if not isinstance(data, dict):
         raise TypeError("manifest inspection returned no report")
-    print(render(data, output_format))
+    print(render(data))
 
 
 @patches_app.command("apply")

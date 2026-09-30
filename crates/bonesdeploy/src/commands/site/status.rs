@@ -66,7 +66,7 @@ pub async fn run() -> Result<()> {
         match remote_status(cfg).await {
             Ok(remote) => {
                 println!("{} {}", style("Release").dim(), style(&remote.current_release).bold());
-                println!("{} {}", style("SSL").dim(), ssl_state(&remote.ssl));
+                println!("{} {}", style(super::SSL_LABEL).dim(), ssl_state(&remote.ssl));
                 if let Some(preview) = render_preview_status(remote.preview.as_ref()) {
                     println!("{preview}");
                 }

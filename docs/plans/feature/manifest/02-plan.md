@@ -12,7 +12,7 @@ Rust Core already embeds typed specifications under `crates/bonesdeploy-core/spe
 
 BonesInfra will collect typed manifest entries from the enabled framework, service, and SSL components, combine them with common entries selected by `DeployContext`, and resolve each site-specific filesystem entry's `DeploymentPaths` key or project-derived name to an absolute remote path. The inventory will include every site-specific configuration file, directory, link, AppArmor profile, systemd unit, target membership link, and runtime path installed or managed by BonesInfra.
 
-The inspection command will connect through the existing PyInfra runner and use read-only facts to classify each declared path as present, missing, or a filesystem-kind mismatch. It will inspect every declared site-specific systemd service without changing it. It will emit a stable tree for human output and a JSON representation containing the same entries and states.
+The inspection command will connect through the existing PyInfra runner and use read-only facts to classify each declared path as present, missing, or a filesystem-kind mismatch. It will inspect every declared site-specific systemd service without changing it and return a JSON report to Rust. Rust will emit the stable, colored tree for human output or pass through JSON for automation.
 
 `bonesdeploy manifest` will add the public CLI variant and invoke BonesInfra with the project config and requested output format. Rust will not deserialize or reconstruct manifest entries.
 
@@ -22,19 +22,19 @@ Extend the focused `bonesinfra.manifest` module with typed Python entries for fi
 
 The typed declarations will use path-key references such as `nginx_site_available`, or project-derived names where `DeploymentPaths` does not yet expose the value, rather than unrelated absolute-path formulas. A resolver will validate that every referenced key and derived name is valid before any remote operation begins.
 
-Add a `manifest show` BonesInfra CLI command that reuses the existing context loading and PyInfra connection lifecycle. Keep output generation separate from path resolution so JSON tests do not depend on terminal styling.
+Add a `manifest show` BonesInfra CLI command that reuses the existing context loading and PyInfra connection lifecycle and serializes the inspection report as JSON. Keep public output generation in Rust so Python inspection does not depend on terminal styling.
 
 Add `bonesdeploy manifest` with a `--format text|json` option and delegate to the embedded BonesInfra runtime using the existing Rust command wrapper.
 
 ## Responsibilities and boundaries
 
-`crates/bonesinfra/python/src/bonesinfra/manifest.py` owns the typed declarations, strategy selection, filesystem and service resolution, inspection, and output model.
+`crates/bonesinfra/python/src/bonesinfra/manifest.py` owns the typed declarations, strategy selection, filesystem and service resolution, inspection, and serialized report model.
 
 `DeployContext` remains the owner of project configuration and `DeploymentPaths` remains the owner of reusable path derivation. The manifest may read those objects and derive only names that are inherently runtime-specific, such as a framework's project-qualified systemd service and AppArmor profile.
 
 `bonesinfra/pyinfra/runner.py` owns remote connection and operation execution. The manifest command supplies read-only inspection operations to that runner.
 
-`bonesdeploy/src/cli` owns public argument parsing and dispatch. The Rust command module only validates the local config path and delegates; it does not own manifest policy.
+`bonesdeploy/src/cli` owns public argument parsing and dispatch. The Rust command module validates the local config path, delegates inspection, deserializes the narrow report DTO, and renders public text or JSON without owning manifest policy.
 
 ## Affected areas
 
@@ -51,7 +51,7 @@ Add `bonesdeploy manifest` with a `--format text|json` option and delegate to th
 - The manifest source lives inside BonesInfra because framework and service strategy selection already belongs there and the embedded Python package is the runtime that can inspect the remote host.
 - The v1 manifest source is typed Python code rather than RON or JSON because Rust only dispatches the subprocess and does not need to interpret manifest entries.
 - Manifest paths reference `DeploymentPaths` field names instead of repeating path literals, preventing the inventory from drifting from provisioning.
-- Rust delegates the manifest operation instead of interpreting manifest entries. This keeps one manifest source and uses the existing Rust-to-Python process boundary.
+- Rust interprets the secret-free inspection report only for public presentation. Python remains the sole source of manifest declarations and inspection policy.
 - The command reports only declared paths. Arbitrary filesystem discovery would misclassify shared host files and cannot establish ownership.
 - Every site-specific artifact and managed service installed or managed by BonesInfra belongs in the manifest, including framework application units, per-site nginx, target membership links, AppArmor profiles, and project runtime paths. Shared host packages, daemons, and other non-project artifacts do not belong in this inventory.
 - JSON is an output format for automation, not the internal manifest source. Manifest output is read-only and contains path metadata only; it never emits file contents or secrets.

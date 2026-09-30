@@ -291,7 +291,8 @@ as a package (supporting relative imports such as `from . import custom`),
 and validates entrypoints before SSH.
 
 `manifest.py` combines core declarations and the loaded project manifest to
-inspect artifacts and services, and renders reports for `manifest show`.
+inspect artifacts and services, then serializes the report for the Rust CLI.
+Human-readable tree and color rendering belong to the public Rust command.
 Framework-owned runtime artifacts are declared by the project manifest, not
 embedded core constants.
 
