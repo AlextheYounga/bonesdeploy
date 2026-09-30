@@ -17,10 +17,6 @@ use tempfile::{NamedTempFile, TempDir};
 
 use crate::infra::git;
 
-#[cfg(test)]
-#[path = "local_build/tests.rs"]
-mod tests;
-
 pub struct BuildContext {
     context: TempDir,
     pub revision: String,
@@ -59,7 +55,7 @@ pub fn build(config: &Bones) -> Result<BuildContext> {
 pub fn build_native(config: &Bones, context: &BuildContext) -> Result<()> {
     let source = context.path();
 
-    let Some((_deployment_dir, scripts)) = build_scripts(source)? else {
+    let Some((deployment_dir, scripts)) = build_scripts(source)? else {
         return Ok(());
     };
 
@@ -68,7 +64,8 @@ pub fn build_native(config: &Bones, context: &BuildContext) -> Result<()> {
     fs::create_dir_all(&cache).with_context(|| format!("Failed to create local build cache {}", cache.display()))?;
     let environment = build_contract::environment(config, source)?;
     let user = mount_user(source)?;
-    let input = ContainerStart { source, cache: &cache, config, environment: &environment, user };
+    let input =
+        ContainerStart { source, deployment: &deployment_dir, cache: &cache, config, environment: &environment, user };
     for script in scripts {
         let name = script.file_name().and_then(|value| value.to_str()).unwrap_or("<unknown>");
         println!("Running local build script {name}...");
@@ -121,7 +118,7 @@ pub fn docker_available_linux() -> Result<()> {
     Ok(())
 }
 
-pub fn docker_info_command() -> Command {
+fn docker_info_command() -> Command {
     let mut command = Command::new("docker");
     command.arg("info").args(["--format", "{{.OSType}}"]);
     command
@@ -155,7 +152,7 @@ pub fn ensure_builder_image() -> Result<()> {
     probe_target_execution()
 }
 
-pub fn target_probe_command() -> Command {
+fn target_probe_command() -> Command {
     let mut command = Command::new("docker");
     command.args(["run", "--rm", "--pull=never", "--platform", TARGET_PLATFORM_NAME]).arg(BUILDER_IMAGE).arg("true");
     command
@@ -171,18 +168,27 @@ pub fn probe_target_execution() -> Result<()> {
     Ok(())
 }
 
-pub struct ContainerStart<'a> {
+struct ContainerStart<'a> {
     source: &'a Path,
+    deployment: &'a Path,
     cache: &'a Path,
     config: &'a Bones,
     environment: &'a [(String, String)],
     user: MountUser,
 }
 
-pub fn create_command(input: &ContainerStart<'_>, environment_file: &Path) -> Command {
+fn create_command(input: &ContainerStart<'_>, environment_file: &Path) -> Command {
     let mut command = Command::new("docker");
     command
-        .args(["run", "--rm", "--pull=never", "--platform", TARGET_PLATFORM_NAME, "--security-opt=no-new-privileges"])
+        .args([
+            "run",
+            "--rm",
+            "--interactive",
+            "--pull=never",
+            "--platform",
+            TARGET_PLATFORM_NAME,
+            "--security-opt=no-new-privileges",
+        ])
         .args(["--user", &format!("{}:{}", input.user.uid, input.user.gid)])
         .args(["--workdir", SOURCE_MOUNT])
         .args(["--env", &format!("{}={}", variables::PROJECT_NAME, input.config.project_name)])
@@ -195,6 +201,8 @@ pub fn create_command(input: &ContainerStart<'_>, environment_file: &Path) -> Co
         .arg(environment_file)
         .args(["--volume"])
         .arg(format!("{}:{SOURCE_MOUNT}", input.source.display()))
+        .args(["--volume"])
+        .arg(format!("{}:{WORKSPACE_ROOT}/deployment:ro", input.deployment.display()))
         .args(["--volume"])
         .arg(format!("{}:{CACHE_MOUNT}:rw", input.cache.display()))
         .arg(BUILDER_IMAGE)

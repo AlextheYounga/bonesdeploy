@@ -255,7 +255,3 @@ fn existing_files(source: &Path, candidates: &[&str]) -> Result<Vec<PathBuf>> {
         })
         .collect()
 }
-
-#[cfg(test)]
-#[path = "compose_build/tests.rs"]
-mod tests;

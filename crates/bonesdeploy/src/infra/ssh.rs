@@ -237,6 +237,7 @@ where
         stdin.write_all(prefix).await.context("Failed to write artifact manifest to remote command")?;
         tokio_io::copy(&mut reader, &mut stdin).await.context("Failed to stream artifact to remote command")?;
         stdin.shutdown().await.context("Failed to close artifact upload")?;
+        drop(stdin);
         Ok::<(), anyhow::Error>(())
     }
     .await;
