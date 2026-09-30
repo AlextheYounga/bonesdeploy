@@ -55,7 +55,7 @@ fn scaffold_custom_provisioning(infra_dir: &Path) -> Result<()> {
 
 pub(super) fn update_gitignore() -> Result<()> {
     let gitignore = Path::new(paths::GITIGNORE_FILE);
-    let entries = [paths::DOT_ENV, "!.env.build"];
+    let entries = [paths::DOT_ENV, "!.env.build", "infra/secrets/.env.gpg"];
 
     if gitignore.exists() {
         let content = fs::read_to_string(gitignore)?;

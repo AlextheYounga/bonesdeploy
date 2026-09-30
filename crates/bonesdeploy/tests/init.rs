@@ -78,6 +78,7 @@ fn materializes_base_bones_assets() -> Result<()> {
 
     let gitignore = fs::read_to_string(repo.join(".gitignore"))?;
     assert!(gitignore.lines().any(|line| line.trim() == ".env"));
+    assert!(gitignore.lines().any(|line| line.trim() == "infra/secrets/.env.gpg"));
     assert!(!atlas_config_root(&env).exists());
 
     Ok(())
