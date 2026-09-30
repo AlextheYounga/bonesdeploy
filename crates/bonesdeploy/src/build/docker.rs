@@ -4,9 +4,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, bail};
-
-const DOCKER_HOST: &str = "DOCKER_HOST";
-const DOCKER_CONTEXT: &str = "DOCKER_CONTEXT";
+use bonesdeploy_core::docker_env::{DOCKER_CONTEXT, DOCKER_HOST, PATH};
 
 /// The accepted local Docker endpoint for one package operation.
 pub struct DockerClient {
@@ -106,7 +104,7 @@ fn current_context(executable: &Path) -> Result<String> {
 }
 
 fn docker_executable() -> Result<PathBuf> {
-    let path = env::var_os("PATH").context("PATH is not set; cannot locate Docker")?;
+    let path = env::var_os(PATH).context("PATH is not set; cannot locate Docker")?;
     env::split_paths(&path)
         .map(|directory| directory.join("docker"))
         .find(|candidate| candidate.is_file())
