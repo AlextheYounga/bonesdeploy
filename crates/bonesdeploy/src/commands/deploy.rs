@@ -47,7 +47,7 @@ impl<O: DeployOperations> DeployWorkflow<O> {
 }
 
 struct ProductionDeployOperations {
-    session: Option<openssh::Session>,
+    session: Option<ssh::SshTransport>,
 }
 
 impl ProductionDeployOperations {
@@ -74,7 +74,7 @@ impl DeployOperations for ProductionDeployOperations {
 
     fn sync_control_plane(&mut self, config: &Bones) -> impl Future<Output = Result<()>> + Send {
         async move {
-            let session = ssh::connect(config).await?;
+            let session = ssh::SshTransport::connect(config).await?;
             infra::sync_control_plane(&session, config).await?;
             self.session = Some(session);
             Ok(())
@@ -90,8 +90,7 @@ impl DeployOperations for ProductionDeployOperations {
             let frame = encode_manifest(&artifact.manifest)?;
             let session = self.session.take().context("Deployment SSH session is not available for artifact upload")?;
             let file = File::open(artifact.path()).await.context("Failed to open local artifact for upload")?;
-            ssh::stream_cmd_with_reader(&session, &infra::artifact_deploy_command(&config.project_name), &frame, file)
-                .await?;
+            session.stream_cmd_with_reader(&infra::artifact_deploy_command(&config.project_name), &frame, file).await?;
             session.close().await?;
             Ok(())
         }

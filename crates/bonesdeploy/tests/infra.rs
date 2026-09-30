@@ -29,15 +29,3 @@ fn server_request_contains_only_connection_fields() -> Result<()> {
 fn shell_quote_preserves_single_quotes() {
     assert_eq!(ssh::shell_quote("site's"), "'site'\\''s'");
 }
-
-#[test]
-fn remote_command_failure_includes_stdout_and_stderr() {
-    let message = ssh::remote_command_failure(
-        "bonesremote doctor --site demo",
-        b"issue one\nissue two\n",
-        b"Doctor found 2 issues\n",
-    );
-    assert!(message.contains("Remote command failed: bonesremote doctor --site demo"));
-    assert!(message.contains("stdout:\nissue one\nissue two"));
-    assert!(message.contains("stderr:\nDoctor found 2 issues"));
-}

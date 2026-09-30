@@ -158,7 +158,7 @@ pub async fn push() -> Result<()> {
 
     let ssh_user = config::bootstrap_ssh_user(&cfg);
     let port = parse_port(&cfg.port)?;
-    let session = ssh::connect_as(&ssh_user, &cfg.host, port).await?;
+    let session = ssh::SshTransport::connect_as(&ssh_user, &cfg.host, port).await?;
 
     let encrypted_path = Path::new(LOCAL_ENV_SECRET);
     if !encrypted_path.is_file() {
@@ -178,7 +178,7 @@ pub async fn push() -> Result<()> {
         "tmp=; trap 'rm -f \"$tmp\"' EXIT; mkdir -p {parent_s} && tmp=$(mktemp {target_s}.XXXXXX) && cat > \"$tmp\" && chown root:{group_s} \"$tmp\" && chmod {DEFAULT_SECRET_MODE} \"$tmp\" && mv \"$tmp\" {target_s} && tmp=",
     );
 
-    ssh::run_cmd_with_stdin(&session, &cmd, environment.as_bytes()).await?;
+    session.run_cmd_with_stdin(&cmd, environment.as_bytes()).await?;
     session.close().await?;
     println!("{} Secrets pushed.", output::success_marker());
     Ok(())
@@ -187,13 +187,13 @@ pub async fn push() -> Result<()> {
 pub async fn production_secrets_exist(cfg: &config::Bones) -> Result<bool> {
     let ssh_user = config::bootstrap_ssh_user(cfg);
     let port = parse_port(&cfg.port)?;
-    let session = ssh::connect_as(&ssh_user, &cfg.host, port).await?;
+    let session = ssh::SshTransport::connect_as(&ssh_user, &cfg.host, port).await?;
     let target = Path::new(&cfg.project_root).join(paths::SHARED_DIR).join(paths::DOT_ENV);
     let command = format!(
         "if test -f {}; then printf present; else printf missing; fi",
         ssh::shell_quote(&target.display().to_string())
     );
-    let result = ssh::run_cmd(&session, &command).await;
+    let result = session.run_cmd(&command).await;
     session.close().await?;
     Ok(result?.trim() == "present")
 }

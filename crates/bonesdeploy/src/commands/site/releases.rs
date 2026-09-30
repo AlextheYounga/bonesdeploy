@@ -71,21 +71,21 @@ fn format_status(release: &Release) -> String {
 
 pub async fn kill(release: &str) -> Result<()> {
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    let session = ssh::connect_privileged(&cfg).await?;
+    let session = ssh::SshTransport::connect_privileged(&cfg).await?;
     let command = format!(
         "bonesremote release kill --site {} --release {}",
         ssh::shell_quote(&cfg.project_name),
         ssh::shell_quote(release)
     );
-    let result = ssh::stream_cmd(&session, &command).await;
+    let result = session.stream_cmd(&command).await;
     session.close().await?;
     result
 }
 
 async fn remote_report(cfg: &config::Bones) -> Result<Report> {
-    let session = ssh::connect_privileged(cfg).await?;
+    let session = ssh::SshTransport::connect_privileged(cfg).await?;
     let command = format!("bonesremote release list --site {}", ssh::shell_quote(&cfg.project_name));
-    let output = ssh::run_cmd(&session, &command).await;
+    let output = session.run_cmd(&command).await;
     session.close().await?;
     serde_json::from_str(&output?).context("Failed to parse remote release report")
 }

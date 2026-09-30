@@ -20,11 +20,11 @@ pub async fn run(output_path: Option<&Path>) -> Result<()> {
     let config = config::load(Path::new(paths::DOT_ENV)).context("Failed to load the project configuration")?;
     let destination = resolve_output_path(output_path, &config.project_name, OffsetDateTime::now_utc())?;
     let export = ExportFile::create(destination)?;
-    let session = ssh::connect_privileged(&config).await?;
+    let transport = ssh::SshTransport::connect_privileged(&config).await?;
     let mut writer = export.writer()?;
     let command = archive_command(&config.project_name);
-    let transfer_result = ssh::download_cmd(&session, &command, &mut writer).await;
-    let close_result = session.close().await;
+    let transfer_result = transport.download_cmd(&command, &mut writer).await;
+    let close_result = transport.close().await;
     transfer_result?;
     close_result.context("Failed to close the SSH session")?;
     writer.flush().await.context("Failed to flush the shared export")?;

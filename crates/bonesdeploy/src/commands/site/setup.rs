@@ -26,9 +26,9 @@ pub async fn run(yes: bool) -> Result<()> {
     bonesinfra::run_with_request(&["site", "apply", "--request-stdin"], &request)?;
     super::runtime::apply()?;
 
-    let session = ssh::connect_privileged(&cfg).await?;
+    let session = ssh::SshTransport::connect_privileged(&cfg).await?;
     let reactivate = infra::decommission_command("reactivate", &cfg.project_name);
-    ssh::run_cmd(&session, &reactivate).await?;
+    session.run_cmd(&reactivate).await?;
     session.close().await?;
 
     super::doctor::run_with_pending(false, false).await.context("Site setup failed while checking site")?;

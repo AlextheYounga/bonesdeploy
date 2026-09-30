@@ -268,7 +268,7 @@ fn check_local_cache() -> Option<String> {
 }
 
 async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
-    match ssh::connect(cfg).await {
+    match ssh::SshTransport::connect(cfg).await {
         Ok(session) => {
             let _ = session.close().await;
             None
@@ -278,14 +278,14 @@ async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
 }
 
 async fn check_remote_doctor(cfg: &config::Bones, verbose: bool) -> (Option<String>, bool) {
-    let session = match ssh::connect_privileged(cfg).await {
+    let session = match ssh::SshTransport::connect_privileged(cfg).await {
         Ok(session) => session,
         Err(error) => return (Some(format!("Cannot connect as privileged remote user\n  {error}")), false),
     };
     let result = match infra::sync_control_plane(&session, cfg).await {
         Ok(()) => {
             let command = format!("bonesremote doctor --site {}", ssh::shell_quote(&cfg.project_name));
-            ssh::run_cmd(&session, &command).await
+            session.run_cmd(&command).await
         }
         Err(error) => Err(error),
     };
