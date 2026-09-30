@@ -172,6 +172,7 @@ The cron entry runs `bonesremote backup run --site <site> --keep-days <retention
 Every native deploy resolves the configured branch to one exact committed
 revision, exports it, and runs the numbered build scripts locally in Docker with
 the pinned `linux/amd64` builder. Docker is the only local build engine. The
+CLI pulls the pinned builder automatically when it is not installed locally. The
 build receives fixed public contract metadata and values explicitly declared in
 the committed `.env.build`; it does not inherit ambient variables or receive the
 root `.env`, runtime environment, credentials, host home, SSH agent, or Docker

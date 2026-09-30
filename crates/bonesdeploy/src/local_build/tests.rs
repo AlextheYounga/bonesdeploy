@@ -2,8 +2,8 @@ use std::fs;
 use std::os::unix::fs::symlink;
 
 use super::{
-    BUILDER_IMAGE, ContainerStart, MountUser, TARGET_PLATFORM_NAME, build_scripts, create_command, docker_info_command,
-    sanitize_exported_context, target_probe_command,
+    BUILDER_IMAGE, ContainerStart, MountUser, TARGET_PLATFORM_NAME, build_scripts, builder_image_pull_command,
+    create_command, docker_info_command, sanitize_exported_context, target_probe_command,
 };
 use anyhow::Context;
 use bonesdeploy_core::config::Bones;
@@ -47,6 +47,15 @@ fn docker_info_probe_requires_a_linux_engine() {
     assert_eq!(command.get_program().to_string_lossy(), "docker");
     let args: Vec<_> = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
     assert_eq!(args.as_slice(), ["info", "--format", "{{.OSType}}"]);
+}
+
+#[test]
+fn missing_builder_image_is_pulled_for_the_pinned_platform() {
+    let command = builder_image_pull_command();
+
+    assert_eq!(command.get_program().to_string_lossy(), "docker");
+    let args: Vec<_> = command.get_args().map(|arg| arg.to_string_lossy().into_owned()).collect();
+    assert_eq!(args, vec!["pull", "--platform", TARGET_PLATFORM_NAME, BUILDER_IMAGE]);
 }
 
 #[test]
