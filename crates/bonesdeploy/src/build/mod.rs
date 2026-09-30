@@ -3,13 +3,16 @@ use bonesdeploy_core::config::{Bones, RuntimeBackend};
 
 pub mod artifact;
 pub mod compose;
+mod local_lock;
 pub mod native;
 pub mod source;
 
 pub use artifact::PackagedArtifact;
+pub use local_lock::LocalBuildLock;
 
 /// Produces the configured committed revision's uploadable build artifact.
 pub fn package(config: &Bones) -> Result<PackagedArtifact> {
+    let _lock = LocalBuildLock::acquire(&config.project_name)?;
     let context = source::export(config)?;
     match config.runtime.backend {
         RuntimeBackend::Native => {
