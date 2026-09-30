@@ -112,8 +112,7 @@ fn check_docker_runtime(
         Err(error) => findings.issues.push(format!("Docker Compose plugin is unavailable: {error}")),
     }
 
-    let current = project_root.join(paths::CURRENT_LINK);
-    if !current.exists() {
+    if compose_deployment_is_pending(project_root) {
         findings.pending.push(format!("first Compose deployment is pending for {site}"));
         return;
     }
@@ -142,6 +141,12 @@ fn check_docker_runtime(
     let runtime_findings = classify_compose_runtime(&status, compose_port);
     findings.issues.extend(runtime_findings.issues);
     findings.warnings.extend(runtime_findings.warnings);
+}
+
+#[must_use]
+pub fn compose_deployment_is_pending(project_root: &Path) -> bool {
+    let current = project_root.join(paths::CURRENT_LINK);
+    !current.exists() || services::current_is_placeholder(&project_root.to_string_lossy())
 }
 
 #[must_use]

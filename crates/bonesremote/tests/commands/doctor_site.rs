@@ -1,5 +1,28 @@
-use bonesremote::commands::doctor::site::classify_compose_runtime;
+use std::fs;
+use std::os::unix::fs::symlink;
+
+use anyhow::Result;
+use bonesdeploy_core::paths;
+use bonesremote::commands::doctor::site::{classify_compose_runtime, compose_deployment_is_pending};
 use bonesremote::runtime::docker::command::{ComposePublisher, ComposeServiceStatus, ComposeStackStatus};
+use tempfile::tempdir;
+
+#[test]
+fn compose_doctor_treats_the_placeholder_current_release_as_pending() -> Result<()> {
+    let root = tempdir()?;
+    let placeholder = root.path().join(paths::RELEASES_DIR).join(paths::PLACEHOLDER_RELEASE_NAME);
+    let deployed = root.path().join(paths::RELEASES_DIR).join("20260930_120000");
+    fs::create_dir_all(&placeholder)?;
+    fs::create_dir_all(&deployed)?;
+    symlink(&placeholder, root.path().join(paths::CURRENT_LINK))?;
+
+    assert!(compose_deployment_is_pending(root.path()));
+
+    fs::remove_file(root.path().join(paths::CURRENT_LINK))?;
+    symlink(&deployed, root.path().join(paths::CURRENT_LINK))?;
+    assert!(!compose_deployment_is_pending(root.path()));
+    Ok(())
+}
 
 #[test]
 fn compose_runtime_findings_classify_health_failures_and_ingress() {
