@@ -196,7 +196,8 @@ Docker for `linux/amd64`, then upload the complete artifact. Compose deployments
 perform their config, pull, and image-build steps locally and upload the release
 tree and exact service images. There is no server-side application build or
 pull fallback. Docker is a local build dependency for native builds and a
-production runtime dependency only for Compose sites.
+production runtime dependency only for Compose sites. BonesDeploy automatically
+pulls its pinned native builder image when it is not already installed.
 
 For CI or AI agents, pick a runtime template and pass variables non-interactively:
 

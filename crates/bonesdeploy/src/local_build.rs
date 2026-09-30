@@ -63,6 +63,7 @@ pub fn build_native(config: &Bones, context: &BuildContext) -> Result<()> {
         return Ok(());
     };
 
+    ensure_builder_image()?;
     let cache = local_cache_path(&config.project_name);
     fs::create_dir_all(&cache).with_context(|| format!("Failed to create local build cache {}", cache.display()))?;
     let environment = build_contract::environment(config, source)?;
@@ -134,6 +135,24 @@ pub fn docker_image_available() -> Result<bool> {
         .status()
         .context("Failed to inspect local builder image")?;
     Ok(status.success())
+}
+
+fn builder_image_pull_command() -> Command {
+    let mut command = Command::new("docker");
+    command.args(["pull", "--platform", TARGET_PLATFORM_NAME, BUILDER_IMAGE]);
+    command
+}
+
+pub fn ensure_builder_image() -> Result<()> {
+    docker_available_linux()?;
+    if !docker_image_available()? {
+        println!("Pulling local builder image...");
+        let status = builder_image_pull_command().status().context("Failed to pull local builder image")?;
+        if !status.success() {
+            bail!("Failed to pull local builder image {BUILDER_IMAGE}");
+        }
+    }
+    probe_target_execution()
 }
 
 pub fn target_probe_command() -> Command {
