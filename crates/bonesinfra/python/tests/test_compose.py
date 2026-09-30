@@ -67,7 +67,7 @@ def test_compose_provisioning_installs_plugin_registers_unit_and_renders_loopbac
 
 
 def test_compose_without_ingress_does_not_configure_nginx(monkeypatch):
-    ctx = DeployContext.from_request(make_site_request(backend="docker", domain="", ssl_enabled=False))
+    ctx = DeployContext.from_request(make_site_request(backend="docker", domain=""))
     monkeypatch.setattr(compose, "_remove_stale_managed_runtime", lambda _ctx: None)
     monkeypatch.setattr(compose, "_install_docker", lambda: None)
     monkeypatch.setattr(compose.site_systemd, "render_target", lambda *_args, **_kwargs: None)
@@ -86,7 +86,7 @@ def test_compose_service_waits_for_the_first_release():
 
 
 def test_compose_manifest_omits_nginx_without_a_loopback_port():
-    ctx = DeployContext.from_request(make_site_request(backend="docker", domain="", ssl_enabled=False))
+    ctx = DeployContext.from_request(make_site_request(backend="docker", domain=""))
 
     assert all("nginx" not in artifact[0].lower() for artifact in compose.artifacts(ctx))
 
@@ -110,9 +110,7 @@ def test_docker_repository_accepts_supported_distributions_and_rejects_unknown_h
 
 
 def test_compose_migration_removes_all_native_runtime_and_legacy_docker_artifacts(monkeypatch):
-    ctx = DeployContext.from_request(
-        make_site_request(backend="docker", project_name="example", domain="", ssl_enabled=False)
-    )
+    ctx = DeployContext.from_request(make_site_request(backend="docker", project_name="example", domain=""))
     shell_calls = []
     monkeypatch.setattr(compose.server, "shell", lambda **kwargs: shell_calls.append(kwargs))
     monkeypatch.setattr(compose.systemd, "daemon_reload", lambda **_kwargs: None)

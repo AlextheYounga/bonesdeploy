@@ -60,7 +60,6 @@ pub struct App {
     pub project_root: String,
     pub branch: String,
     pub releases_keep: usize,
-    pub ssl_enabled: bool,
     pub domain: String,
     pub email: String,
 }
@@ -75,7 +74,6 @@ impl Default for App {
             project_root: String::new(),
             branch: String::from("main"),
             releases_keep: 5,
-            ssl_enabled: false,
             domain: String::new(),
             email: String::new(),
         }

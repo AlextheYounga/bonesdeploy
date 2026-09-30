@@ -34,12 +34,12 @@ class ProjectManifest:
         return "server"
 
 
-def _context(*, ssl: bool = False, domain: str = "example.test"):
-    return DeployContext.from_request(make_site_request(project_name="example", ssl_enabled=ssl, domain=domain))
+def _context(*, domain: str = "example.test"):
+    return DeployContext.from_request(make_site_request(project_name="example", domain=domain))
 
 
 def test_project_manifest_declarations_are_included(tmp_path: Path):
-    ctx = _context(ssl=True)
+    ctx = _context()
     project = ProjectManifest()
     artifacts = resolve_artifacts(ctx, project)
     names = {artifact.name for artifact in artifacts}
@@ -118,7 +118,7 @@ def test_socket_fact_is_reported_as_present(tmp_path: Path):
 
 
 def test_acme_certificate_links_are_declared_as_links(tmp_path: Path):
-    artifacts = resolve_artifacts(_context(ssl=True), ProjectManifest())
+    artifacts = resolve_artifacts(_context(), ProjectManifest())
     certificates = {artifact.name: artifact for artifact in artifacts if artifact.owner == "ssl"}
 
     assert certificates["ACME certificate"].kind == "link"
@@ -133,7 +133,7 @@ def test_quick_tunnel_is_not_a_required_manifest_service():
 
 def test_compose_manifest_reports_runtime_contract_without_claiming_native_security():
     ctx = DeployContext.from_request(
-        make_site_request(backend="docker", project_name="example", domain="", ssl_enabled=False, compose_port=None)
+        make_site_request(backend="docker", project_name="example", domain="", compose_port=None)
     )
 
     data = report(ctx, [], [], ProjectManifest())
@@ -205,7 +205,7 @@ Managed services:"""
 
 def test_compose_manifest_includes_secret_free_remote_runtime_status():
     ctx = DeployContext.from_request(
-        make_site_request(backend="docker", project_name="example", domain="", ssl_enabled=False, compose_port=None)
+        make_site_request(backend="docker", project_name="example", domain="", compose_port=None)
     )
 
     class FakeHost:
@@ -246,7 +246,7 @@ def test_compose_manifest_includes_secret_free_remote_runtime_status():
 )
 def test_compose_manifest_reports_runtime_inspection_failures(engine, plugin, status, expected_error):
     ctx = DeployContext.from_request(
-        make_site_request(backend="docker", project_name="example", domain="", ssl_enabled=False, compose_port=None)
+        make_site_request(backend="docker", project_name="example", domain="", compose_port=None)
     )
 
     class FakeHost:

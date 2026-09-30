@@ -194,7 +194,6 @@ pub fn existing_path_override(
 
 fn apply_existing_fields(config: &mut config::Bones, existing_config: Option<&config::Bones>) {
     config.releases_keep = existing_config.map_or(5, |cfg| cfg.releases_keep.max(1));
-    config.ssl_enabled = existing_config.is_some_and(|cfg| cfg.ssl_enabled);
     config.domain = existing_config.map_or_else(String::new, |cfg| cfg.domain.clone());
     config.email = existing_config.map_or_else(String::new, |cfg| cfg.email.clone());
 }

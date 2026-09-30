@@ -94,7 +94,6 @@ class ServerContext:
 class DnsConfig:
     domain: str
     email: str
-    ssl_enabled: bool
 
 
 @dataclass

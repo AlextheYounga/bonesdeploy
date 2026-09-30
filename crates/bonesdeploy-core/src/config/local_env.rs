@@ -74,7 +74,7 @@ pub fn parse_dotenv(content: &str) -> Result<ParsedDotEnv> {
         }
         let value = strip_quotes(value.trim()).to_string();
         let (logical, managed) = if let Some(logical) = key.strip_prefix(keys::MANAGED_PREFIX) {
-            if !in_block && !keys::MANAGED.contains(&logical) {
+            if !in_block && logical != "SSL_ENABLED" && !keys::MANAGED.contains(&logical) {
                 bail!("Reserved .env key `{key}`; place it in the BonesDeploy managed block");
             }
             (logical.to_string(), true)
@@ -90,6 +90,9 @@ pub fn parse_dotenv(content: &str) -> Result<ParsedDotEnv> {
         }
         if logical == "REMOTE_NAME" {
             bail!("REMOTE_NAME is no longer supported; deploys use the local configured branch")
+        }
+        if logical == "SSL_ENABLED" {
+            continue;
         }
         let target = if managed { &mut parsed.managed } else { &mut parsed.applications };
         if target.insert(logical, value).is_some() {
@@ -122,7 +125,6 @@ pub fn load_local(path: &Path) -> Result<LoadedLocal> {
     config.branch = values.get(keys::BRANCH).cloned().unwrap_or_else(|| "main".into());
     config.domain = values.get(keys::DOMAIN).cloned().unwrap_or_default();
     config.email = values.get(keys::EMAIL).cloned().unwrap_or_default();
-    config.ssl_enabled = values.get(keys::SSL_ENABLED).is_some_and(|v| v == "true");
     config.runtime.template = values.get(keys::TEMPLATE).cloned().unwrap_or_default();
     config.runtime.web_root = values.get(keys::WEB_ROOT).cloned().unwrap_or_else(paths::default_web_root);
     config.runtime.node_version = values.get(keys::NODE_VERSION).cloned().unwrap_or_else(default_node_version);
@@ -214,7 +216,8 @@ pub fn write_local_environment(config: &Bones, path: &Path) -> Result<()> {
             continue;
         }
         if let Some((key, _)) = raw.trim_end_matches('\n').trim_end_matches('\r').trim().split_once('=') {
-            if keys::MANAGED.contains(&key.trim().strip_prefix(keys::MANAGED_PREFIX).unwrap_or(key.trim())) {
+            let logical = key.trim().strip_prefix(keys::MANAGED_PREFIX).unwrap_or(key.trim());
+            if logical == "SSL_ENABLED" || keys::MANAGED.contains(&logical) {
                 continue;
             }
         }
@@ -233,7 +236,6 @@ pub fn write_local_environment(config: &Bones, path: &Path) -> Result<()> {
         (keys::BRANCH, config.branch.clone()),
         (keys::DOMAIN, config.domain.clone()),
         (keys::EMAIL, config.email.clone()),
-        (keys::SSL_ENABLED, config.ssl_enabled.to_string()),
         (keys::TEMPLATE, config.runtime.template.clone()),
         (
             keys::RUNTIME_BACKEND,

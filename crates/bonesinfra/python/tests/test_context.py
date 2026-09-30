@@ -17,7 +17,6 @@ def test_reads_typed_site_request():
     assert ctx.server.port == "2222"
     assert ctx.paths.project_root == "/srv/sites/lawsnipe"
     assert ctx.paths.current_web_root == "/srv/sites/lawsnipe/current/dist"
-    assert ctx.app.dns.ssl_enabled is True
     assert ctx.runtime.runtime_user == "lawsnipe"
     assert ctx.runtime.runtime_group == "lawsnipe"
 
@@ -35,11 +34,6 @@ def test_extras_are_forwarded_with_json_types():
 
     assert ctx.runtime.data == {"php_version": True, "is_static": False, "custom": "value"}
     assert template_data(ctx)["is_static"] is False
-
-
-def test_ssl_enabled_accepts_boolean_string_for_request_compatibility():
-    ctx = DeployContext.from_request(make_site_request(ssl_enabled="false"))
-    assert ctx.app.dns.ssl_enabled is False
 
 
 def test_docker_runtime_backend_is_preserved():

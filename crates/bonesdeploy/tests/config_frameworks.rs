@@ -44,7 +44,6 @@ fn write_local_environment_round_trips_dotenv_values() -> Result<()> {
     let temp = tempfile::tempdir()?;
     let path = temp.path().join("save.env");
     let mut config = sample_config("phoenix");
-    config.ssl_enabled = true;
     config.domain = String::from("app.example.com");
     config.email = String::from("ops@example.com");
     config.runtime.template = String::from("next");
@@ -55,7 +54,7 @@ fn write_local_environment_round_trips_dotenv_values() -> Result<()> {
 
     write_local_environment(&config, &path)?;
     let content = fs::read_to_string(&path)?;
-    assert!(content.contains("SSL_ENABLED=true"));
+    assert!(!content.contains("SSL_ENABLED"));
     assert!(content.contains("DOMAIN=app.example.com"));
     assert!(content.contains("EMAIL=ops@example.com"));
     let loaded = load(&path)?;
@@ -64,7 +63,6 @@ fn write_local_environment_round_trips_dotenv_values() -> Result<()> {
     assert_eq!(loaded.host, "deploy.example.com");
     assert_eq!(loaded.port, "22");
     assert_eq!(loaded.branch, "master");
-    assert!(loaded.ssl_enabled);
     assert_eq!(loaded.runtime.template, "next");
     assert_eq!(loaded.runtime.backend, RuntimeBackend::Docker);
     assert_eq!(loaded.runtime.web_root, "dist");

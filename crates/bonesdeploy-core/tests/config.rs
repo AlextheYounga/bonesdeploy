@@ -130,7 +130,6 @@ fn flat_configuration_absorbed_into_managed_block_on_load() -> Result<()> {
     )?;
     let loaded = config::load_local(&path)?;
     assert_eq!(loaded.environment.project_name, "atlas");
-    assert!(loaded.environment.ssl_enabled);
     assert_eq!(loaded.environment.runtime.compose_port, Some(8080));
     assert_eq!(loaded.environment.runtime.compose_wait_timeout, 240);
     assert!(loaded.environment.runtime.extra.contains_key("is_static"));

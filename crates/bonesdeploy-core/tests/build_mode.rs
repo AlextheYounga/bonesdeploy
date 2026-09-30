@@ -46,12 +46,12 @@ fn provisioning_and_remote_config_omit_build_settings() -> Result<()> {
 
 #[test]
 fn provisioning_rejects_removed_build_mode() {
-    let json = r#"{"server":{"host":"h","ssh_user":"u","port":"22"},"site":{"project_name":"atlas","domain":"","email":"","ssl_enabled":false,"template":"","backend":"native","web_root":"public","node_version":"24.19.0","compose_port":null,"compose_wait_timeout":120,"build_mode":"remote","backup":{"schedule":"0 0 * * *","retention_days":30,"passphrase":""},"extras":{}}}"#;
+    let json = r#"{"server":{"host":"h","ssh_user":"u","port":"22"},"site":{"project_name":"atlas","domain":"","email":"","template":"","backend":"native","web_root":"public","node_version":"24.19.0","compose_port":null,"compose_wait_timeout":120,"build_mode":"remote","backup":{"schedule":"0 0 * * *","retention_days":30,"passphrase":""},"extras":{}}}"#;
     assert!(serde_json::from_str::<ProvisioningRequest>(json).is_err());
 }
 
 #[test]
 fn provisioning_rejects_repository_branch_context() {
-    let json = r#"{"server":{"host":"h","ssh_user":"u","port":"22"},"site":{"project_name":"atlas","domain":"","email":"","ssl_enabled":false,"template":"","backend":"native","web_root":"public","branch":"main","node_version":"24.19.0","compose_port":null,"compose_wait_timeout":120,"backup":{"schedule":"0 0 * * *","retention_days":30,"passphrase":""},"extras":{}}}"#;
+    let json = r#"{"server":{"host":"h","ssh_user":"u","port":"22"},"site":{"project_name":"atlas","domain":"","email":"","template":"","backend":"native","web_root":"public","branch":"main","node_version":"24.19.0","compose_port":null,"compose_wait_timeout":120,"backup":{"schedule":"0 0 * * *","retention_days":30,"passphrase":""},"extras":{}}}"#;
     assert!(serde_json::from_str::<ProvisioningRequest>(json).is_err());
 }

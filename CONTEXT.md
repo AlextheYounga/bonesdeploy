@@ -99,14 +99,12 @@ APP_URL=http://app.example.test
 
 # >>> BonesDeploy managed configuration >>>
 BONES_PROJECT_NAME=lawsnipe
-BONES_REMOTE_NAME=production
 BONES_SSH_USER=root
 BONES_HOST=deploy.example.com
 BONES_PORT=22
 BONES_BRANCH=main
 BONES_DOMAIN=app.example.com
 BONES_EMAIL=ops@example.com
-BONES_SSL_ENABLED=false
 BONES_TEMPLATE=next
 BONES_RUNTIME_BACKEND=native
 BONES_WEB_ROOT=public

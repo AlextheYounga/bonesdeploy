@@ -24,7 +24,6 @@ fn docker_remote_deployment_config_contains_only_consumed_values() -> Result<()>
     bones.ssh_user = "root".to_string();
     bones.port = "2222".to_string();
     bones.domain = "myapp.com".to_string();
-    bones.ssl_enabled = true;
     bones.backup.passphrase = "hex-passphrase".to_string();
 
     let descriptor = RemoteDeploymentConfig::from_bones(&bones);

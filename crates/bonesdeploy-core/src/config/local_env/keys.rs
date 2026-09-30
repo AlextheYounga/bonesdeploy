@@ -11,7 +11,6 @@ pub(super) const PORT: &str = "PORT";
 pub(super) const BRANCH: &str = "BRANCH";
 pub(super) const DOMAIN: &str = "DOMAIN";
 pub(super) const EMAIL: &str = "EMAIL";
-pub(super) const SSL_ENABLED: &str = "SSL_ENABLED";
 pub(super) const TEMPLATE: &str = "TEMPLATE";
 pub(super) const RUNTIME_BACKEND: &str = "RUNTIME_BACKEND";
 pub(super) const NODE_VERSION: &str = "NODE_VERSION";
@@ -33,7 +32,6 @@ pub(super) const MANAGED: &[&str] = &[
     BRANCH,
     DOMAIN,
     EMAIL,
-    SSL_ENABLED,
     TEMPLATE,
     RUNTIME_BACKEND,
     WEB_ROOT,

@@ -90,8 +90,7 @@ pub async fn build_report() -> Result<Report> {
         return Ok(ready_report(cfg));
     }
 
-    let ssl_enabled =
-        cfg.ssl_enabled || remote_ssl_enabled(&cfg).await.context("Unable to determine remote SSL status")?;
+    let ssl_enabled = remote_ssl_enabled(&cfg).await.context("Unable to determine remote SSL status")?;
 
     if ssl_enabled { Ok(ready_report(cfg)) } else { Ok(ssl_missing_report(cfg)) }
 }
@@ -239,12 +238,10 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones) -> Result<bool> {
     }
 
     let session = ssh::connect_privileged(cfg).await?;
-    let nginx_site_available =
-        Path::new(paths::ETC_NGINX_SITES_AVAILABLE).join(format!("{}.conf", cfg.project_name)).display().to_string();
+    let certificate_directory = format!("/etc/letsencrypt/live/{}", cfg.domain);
     let command = format!(
-        "test -r {path} && grep -Fq {domain} {path} && grep -Fq 'listen 443 ssl;' {path}",
-        path = ssh::shell_quote(&nginx_site_available),
-        domain = ssh::shell_quote(&format!("server_name {};", cfg.domain)),
+        "test -r {certificate}/fullchain.pem && test -r {certificate}/privkey.pem",
+        certificate = ssh::shell_quote(&certificate_directory),
     );
     let enabled = ssh::run_cmd(&session, &command).await.is_ok();
     session.close().await?;

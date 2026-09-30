@@ -69,7 +69,7 @@ def parse_server_connection(server: Mapping[str, Any]) -> ServerContext:
     return ServerContext(host=host, ssh_user=ssh_user, port=port)
 
 
-def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
+def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
     reject_unknown(body, {"server", "site"}, "request")
     server = body.get("server")
     site = body.get("site")
@@ -83,7 +83,6 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
             "project_name",
             "domain",
             "email",
-            "ssl_enabled",
             "template",
             "backend",
             "web_root",
@@ -103,11 +102,6 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
     template = _string(site.get("template", "custom"), "site.template") or "custom"
     if template not in _FRAMEWORKS:
         raise ValueError(f"unknown framework infrastructure: {template}")
-    ssl_enabled = site.get("ssl_enabled", False)
-    if isinstance(ssl_enabled, str) and ssl_enabled.lower() in {"true", "false"}:
-        ssl_enabled = ssl_enabled.lower() == "true"
-    if not isinstance(ssl_enabled, bool):
-        raise ValueError("site.ssl_enabled must be a boolean")
     extras = site.get("extras", {})
     if not isinstance(extras, Mapping):
         raise ValueError("site.extras must be an object")
@@ -122,18 +116,14 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901, PLR0912
         validate_domain(domain)
     if email:
         validate_email(email)
-    if backend == "docker" and (domain or ssl_enabled) and compose_port is None:
+    if backend == "docker" and domain and compose_port is None:
         raise ValueError("site.compose_port is required for Docker sites with managed ingress")
     return DeployContext(
         server=parse_server_connection(server),
         app=AppConfig(
             name,
             f"{DEFAULT_PROJECT_ROOT_PARENT}/{name}",
-            DnsConfig(
-                domain,
-                email,
-                ssl_enabled,
-            ),
+            DnsConfig(domain, email),
         ),
         runtime=RuntimeConfig(
             backend,

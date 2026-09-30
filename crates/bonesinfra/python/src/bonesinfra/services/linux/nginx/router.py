@@ -1,6 +1,8 @@
 from pathlib import Path
 from shlex import quote
 
+from pyinfra.context import ctx_host
+from pyinfra.facts.files import File
 from pyinfra.operations import files, server, systemd
 
 from bonesinfra.config.context import template_data
@@ -122,9 +124,16 @@ def setup(ctx, paths, *, nginx_address_families="AF_UNIX", nginx_ip_loopback_onl
 
     install_default_deny_server(paths)
     if ctx.app.dns.domain:
-        # SSL state comes from the project config; certificate lifecycle is owned
-        # by `ssl apply`, not runtime provisioning.
-        deploy_router_config(ctx, paths, ssl_enabled=ctx.app.dns.ssl_enabled, validate=True)
+        certificate_path, key_path = letsencrypt_cert_paths(ctx.app.dns.domain)
+        certificate_ready = all(
+            ctx_host.get().get_fact(File, path) not in (None, False) for path in (certificate_path, key_path)
+        )
+        deploy_router_config(
+            ctx,
+            paths,
+            ssl_enabled=certificate_ready,
+            validate=True,
+        )
 
 
 def remove_project_router(paths):

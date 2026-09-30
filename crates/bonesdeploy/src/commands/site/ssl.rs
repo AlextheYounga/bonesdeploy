@@ -38,7 +38,6 @@ pub fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Result<(
     println!("{} {}", style("Configuring HTTPS for").cyan().bold(), style(&cfg.domain).bold());
     let request = infra::provisioning_request(&cfg)?;
     bonesinfra::run_with_request(&["ssl", "apply", "--request-stdin"], &request)?;
-    cfg.ssl_enabled = true;
     config::write_local_environment(&cfg, env_file)?;
     println!("{} HTTPS configured.", output::success_marker());
     println!();

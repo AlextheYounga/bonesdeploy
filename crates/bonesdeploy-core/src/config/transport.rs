@@ -20,7 +20,6 @@ pub struct SiteFields {
     pub project_name: String,
     pub domain: String,
     pub email: String,
-    pub ssl_enabled: bool,
     pub template: String,
     pub backend: String,
     pub web_root: String,
@@ -72,7 +71,6 @@ impl ProvisioningRequest {
                 project_name: config.project_name.clone(),
                 domain: config.domain.clone(),
                 email: config.email.clone(),
-                ssl_enabled: config.ssl_enabled,
                 template: config.runtime.template.clone(),
                 backend: match config.runtime.backend {
                     RuntimeBackend::Native => "native",

@@ -14,6 +14,17 @@ def _noop(*args, **kwargs):
     del args, kwargs
 
 
+class _Host:
+    def __init__(self, certificate):
+        self.certificate = certificate
+
+    def get_fact(self, *args):
+        del args
+        if isinstance(self.certificate, list):
+            return self.certificate.pop(0)
+        return self.certificate
+
+
 def test_runtime_nginx_provisions_site_service_without_a_public_domain(monkeypatch):
     ctx = _make_ctx(domain="")
     paths = ctx.paths_dict
@@ -62,7 +73,7 @@ def test_deploy_router_config_activates_before_validation_and_reload(monkeypatch
     assert calls == ["render", "link", "validate", "reload"]
 
 
-def test_runtime_nginx_deploys_public_router_for_a_real_domain(monkeypatch):
+def test_runtime_nginx_uses_http_router_until_configured_certificate_exists(monkeypatch):
     ctx = _make_ctx(domain="example.com")
     paths = ctx.paths_dict
     deploy_calls = []
@@ -76,6 +87,7 @@ def test_runtime_nginx_deploys_public_router_for_a_real_domain(monkeypatch):
     monkeypatch.setattr(nginx_router, "install_default_deny_server", _noop)
     monkeypatch.setattr(nginx_router, "validate_config", _noop)
     monkeypatch.setattr(nginx_router, "render", _noop)
+    monkeypatch.setattr(nginx_router.ctx_host, "get", lambda: _Host(None))
     monkeypatch.setattr(
         nginx_router,
         "deploy_router_config",
@@ -84,8 +96,63 @@ def test_runtime_nginx_deploys_public_router_for_a_real_domain(monkeypatch):
 
     nginx_router.setup(ctx, paths)
 
-    assert deploy_calls == [{"ssl_enabled": ctx.app.dns.ssl_enabled, "validate": True}]
+    assert deploy_calls == [{"ssl_enabled": False, "validate": True}]
     assert link_calls == []
+
+
+def test_runtime_nginx_uses_https_router_when_configured_certificate_exists(monkeypatch):
+    ctx = _make_ctx(domain="example.com")
+    paths = ctx.paths_dict
+    deploy_calls = []
+
+    monkeypatch.setattr(nginx_router, "mkdir", _noop)
+    monkeypatch.setattr(nginx_router.service, "render_target", _noop)
+    monkeypatch.setattr(nginx_router.service, "register_service", _noop)
+    monkeypatch.setattr(nginx_router.systemd, "daemon_reload", _noop)
+    monkeypatch.setattr(nginx_router.files, "link", _noop)
+    monkeypatch.setattr(nginx_router, "install_default_deny_server", _noop)
+    monkeypatch.setattr(nginx_router, "validate_config", _noop)
+    monkeypatch.setattr(nginx_router, "render", _noop)
+    monkeypatch.setattr(
+        nginx_router.ctx_host,
+        "get",
+        lambda: _Host({"mode": 644}),
+    )
+    monkeypatch.setattr(
+        nginx_router,
+        "deploy_router_config",
+        lambda *_args, **kwargs: deploy_calls.append(kwargs),
+    )
+
+    nginx_router.setup(ctx, paths)
+
+    assert deploy_calls == [{"ssl_enabled": True, "validate": True}]
+
+
+def test_runtime_nginx_uses_http_router_when_certificate_key_is_missing(monkeypatch):
+    ctx = _make_ctx(domain="example.com")
+    paths = ctx.paths_dict
+    deploy_calls = []
+
+    monkeypatch.setattr(nginx_router, "mkdir", _noop)
+    monkeypatch.setattr(nginx_router.service, "render_target", _noop)
+    monkeypatch.setattr(nginx_router.service, "register_service", _noop)
+    monkeypatch.setattr(nginx_router.systemd, "daemon_reload", _noop)
+    monkeypatch.setattr(nginx_router.files, "link", _noop)
+    monkeypatch.setattr(nginx_router, "install_default_deny_server", _noop)
+    monkeypatch.setattr(nginx_router, "validate_config", _noop)
+    monkeypatch.setattr(nginx_router, "render", _noop)
+    host = _Host([{"mode": 644}, False])
+    monkeypatch.setattr(nginx_router.ctx_host, "get", lambda: host)
+    monkeypatch.setattr(
+        nginx_router,
+        "deploy_router_config",
+        lambda *_args, **kwargs: deploy_calls.append(kwargs),
+    )
+
+    nginx_router.setup(ctx, paths)
+
+    assert deploy_calls == [{"ssl_enabled": False, "validate": True}]
 
 
 def test_runtime_nginx_migrates_site_service_to_target(monkeypatch):

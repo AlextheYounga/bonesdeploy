@@ -110,7 +110,7 @@ def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifa
     artifacts = list(COMMON_ARTIFACTS)
     artifacts.extend(Artifact.at_path(*spec) for spec in project_manifest.artifacts(ctx))
 
-    if ctx.app.dns.ssl_enabled and ctx.app.dns.domain:
+    if ctx.app.dns.domain:
         artifacts.append(Artifact("ACME webroot", "acme_webroot", "directory", "ssl"))
         certificate, key = letsencrypt_cert_paths(ctx.app.dns.domain)
         artifacts.append(Artifact.at_path("ACME certificate", certificate, "link", "ssl"))
@@ -208,12 +208,13 @@ def report(
 ) -> dict[str, Any]:
     template = ctx.runtime.data.get("template")
 
+    ssl_entries = [entry for entry in entries if entry.owner == "ssl"]
     data = {
         "strategy": {
             "backend": ctx.runtime.backend,
             "framework": template or "none",
             "mode": project_manifest.mode(ctx),
-            "ssl": ctx.app.dns.ssl_enabled,
+            "ssl": bool(ssl_entries) and all(entry.state == "present" for entry in ssl_entries),
         },
         "entries": [asdict(entry) for entry in entries],
         "managed_services": [asdict(service) for service in services],

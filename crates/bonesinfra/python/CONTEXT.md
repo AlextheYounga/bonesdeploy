@@ -365,7 +365,7 @@ class DeployContext:
 Typed fields read from the root `.env`:
 
 ```text
-`PROJECT_NAME`, derived project roots, `SSL_ENABLED`, `DOMAIN`, and `EMAIL`.
+`PROJECT_NAME`, derived project roots, `DOMAIN`, and `EMAIL`. SSL readiness is derived from the domain's remote Let's Encrypt certificate files.
 ```
 
 ## RuntimeConfig

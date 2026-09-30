@@ -43,8 +43,6 @@ async fn print_next_step(cfg: &config::Bones) {
     if cfg.domain.is_empty() {
         println!("{}", output::next_step("bonesdeploy deploy"));
         println!("Optional public preview: run `bonesdeploy site tunnel start` to create an ephemeral Cloudflare URL.");
-    } else if cfg.ssl_enabled {
-        println!("{}", output::next_step("bonesdeploy deploy"));
     } else {
         println!("{}", output::next_step_with_detail("bonesdeploy site ssl", "to configure HTTPS"));
     }

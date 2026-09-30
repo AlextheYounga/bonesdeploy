@@ -68,7 +68,6 @@ def make_site_request(**overrides):
             "project_name": "lawsnipe",
             "domain": "example.com",
             "email": "ops@example.com",
-            "ssl_enabled": True,
             "template": "custom",
             "backend": "native",
             "web_root": "dist",
