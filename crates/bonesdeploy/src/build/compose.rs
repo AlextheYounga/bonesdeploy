@@ -13,16 +13,20 @@ use bonesdeploy_core::config::{Bones, validate_site_name};
 use serde::Deserialize;
 use tempfile::NamedTempFile;
 
-use super::source::BuildContext;
+use super::{docker::DockerClient, source::BuildContext};
 
 const BASE_FILES: [&str; 4] = ["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
 const OVERRIDE_FILES: [&str; 2] = ["compose.override.yaml", "compose.override.yml"];
-pub fn build(config: &Bones, context: &BuildContext) -> Result<Vec<ComposeImage>> {
+pub fn build(config: &Bones, context: &BuildContext, docker: &DockerClient) -> Result<Vec<ComposeImage>> {
     reserve_artifact_paths(context.path())?;
     let files = ComposeFiles::discover(context.path())?;
     let environment = write_environment_file(&build_contract::environment(config, context.path())?)?;
-    let compose =
-        ComposeCommand { project_directory: context.path(), environment_file: environment.path(), files: &files };
+    let compose = ComposeCommand {
+        docker,
+        project_directory: context.path(),
+        environment_file: environment.path(),
+        files: &files,
+    };
 
     run(compose.command(config, ["config", "--quiet"])?, "validate Compose configuration")?;
     run(compose.command(config, ["pull"])?, "pull Compose images")?;
@@ -36,9 +40,9 @@ pub fn build(config: &Bones, context: &BuildContext) -> Result<Vec<ComposeImage>
         bail!("Failed to discover Compose service images: {}", output.status);
     }
     let images = inventory(config, &context.revision, &output.stdout)?;
-    tag_images(config, &images, &output.stdout)?;
+    tag_images(docker, config, &images, &output.stdout)?;
     write_release_files(context.path(), &images)?;
-    save_images(context.path(), &images)?;
+    save_images(docker, context.path(), &images)?;
     Ok(images)
 }
 
@@ -66,6 +70,7 @@ impl ComposeFiles {
 }
 
 struct ComposeCommand<'a> {
+    docker: &'a DockerClient,
     project_directory: &'a Path,
     environment_file: &'a Path,
     files: &'a ComposeFiles,
@@ -78,13 +83,14 @@ impl ComposeCommand<'_> {
         S: AsRef<OsStr>,
     {
         validate_site_name(&config.project_name)?;
-        let mut command = Command::new("docker");
+        let mut command = self.docker.command()?;
         command
             .env_clear()
             .env("DOCKER_DEFAULT_PLATFORM", TARGET_PLATFORM_NAME)
             .args(["compose", "--project-name", &format!("bonesdeploy-{}", config.project_name)])
             .args(["--project-directory", self.project_directory.to_string_lossy().as_ref()])
             .args(["--env-file", self.environment_file.to_string_lossy().as_ref()]);
+        self.docker.apply_after_env_clear(&mut command)?;
         for file in &self.files.paths {
             command.args(["--file", file.to_string_lossy().as_ref()]);
         }
@@ -140,13 +146,13 @@ fn source_images(config: &Bones, output: &[u8]) -> Result<BTreeMap<String, Strin
         .collect())
 }
 
-fn tag_images(config: &Bones, images: &[ComposeImage], output: &[u8]) -> Result<()> {
+fn tag_images(docker: &DockerClient, config: &Bones, images: &[ComposeImage], output: &[u8]) -> Result<()> {
     let source_images = source_images(config, output)?;
     for image in images {
         let source = source_images
             .get(&image.service)
             .with_context(|| format!("Compose configuration omitted image for service `{}`", image.service))?;
-        run(image_tag_command(source, &image.tag), &format!("tag image for service `{}`", image.service))?;
+        run(image_tag_command(docker, source, &image.tag)?, &format!("tag image for service `{}`", image.service))?;
     }
     Ok(())
 }
@@ -160,13 +166,13 @@ fn write_release_files(source: &Path, images: &[ComposeImage]) -> Result<()> {
     Ok(())
 }
 
-fn save_images(source: &Path, images: &[ComposeImage]) -> Result<()> {
+fn save_images(docker: &DockerClient, source: &Path, images: &[ComposeImage]) -> Result<()> {
     let output = source.join(artifact::COMPOSE_IMAGE_ARCHIVE_FILE);
     let temporary = tempfile::Builder::new()
         .prefix(".bonesdeploy-compose-images-")
         .tempfile_in(source)
         .context("Failed to create private Compose image archive file")?;
-    run(image_save_command(temporary.path(), images), "save Compose images into artifact")?;
+    run(image_save_command(docker, temporary.path(), images)?, "save Compose images into artifact")?;
     persist_no_clobber(temporary.path(), &output)
 }
 
@@ -218,17 +224,17 @@ fn write_environment_file(environment: &[(String, String)]) -> Result<NamedTempF
     Ok(file)
 }
 
-fn image_tag_command(source: &str, tag: &str) -> Command {
-    let mut command = Command::new("docker");
+fn image_tag_command(docker: &DockerClient, source: &str, tag: &str) -> Result<Command> {
+    let mut command = docker.command()?;
     command.args(["image", "tag", source, tag]);
-    command
+    Ok(command)
 }
 
-fn image_save_command(output: &Path, images: &[ComposeImage]) -> Command {
-    let mut command = Command::new("docker");
+fn image_save_command(docker: &DockerClient, output: &Path, images: &[ComposeImage]) -> Result<Command> {
+    let mut command = docker.command()?;
     command.args(["image", "save", "--output"]).arg(output);
     command.args(images.iter().map(|image| image.tag.as_str()));
-    command
+    Ok(command)
 }
 
 fn run(mut command: Command, action: &str) -> Result<()> {

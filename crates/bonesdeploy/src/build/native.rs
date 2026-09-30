@@ -14,17 +14,17 @@ use bonesdeploy_core::config::{Bones, build_timeout_seconds, variables};
 use bonesdeploy_core::paths;
 use tempfile::NamedTempFile;
 
-use super::source::BuildContext;
+use super::{docker::DockerClient, source::BuildContext};
 
 /// Runs numbered native build scripts against an already-exported commit.
-pub fn build(config: &Bones, context: &BuildContext) -> Result<()> {
+pub fn build(config: &Bones, context: &BuildContext, docker: &DockerClient) -> Result<()> {
     let source = context.path();
 
     let Some((deployment_dir, scripts)) = build_scripts(source)? else {
         return Ok(());
     };
 
-    ensure_builder_image()?;
+    ensure_builder_image_with_client(docker)?;
     let cache = local_cache_path(&config.project_name);
     fs::create_dir_all(&cache).with_context(|| format!("Failed to create local build cache {}", cache.display()))?;
     let environment = build_contract::environment(config, source)?;
@@ -37,7 +37,7 @@ pub fn build(config: &Bones, context: &BuildContext) -> Result<()> {
         environment: &environment,
         ownership,
     };
-    let mut container = BuildContainer::start(&input)?;
+    let mut container = BuildContainer::start(&input, docker)?;
     let build_result = (|| {
         for script in scripts {
             let name = script.file_name().and_then(|value| value.to_str()).unwrap_or("<unknown>");
@@ -70,21 +70,32 @@ pub fn local_cache_path(site: &str) -> PathBuf {
 }
 
 pub fn docker_available_linux() -> Result<()> {
-    let output = docker_info_command().output().context("Failed to run docker info")?;
+    let docker = DockerClient::new()?;
+    docker_available_linux_with_client(&docker)
+}
+
+fn docker_available_linux_with_client(docker: &DockerClient) -> Result<()> {
+    let output = docker_info_command(docker)?.output().context("Failed to run docker info")?;
     if !output.status.success() || String::from_utf8_lossy(&output.stdout).trim() != "linux" {
         bail!("Docker must be reachable and configured for Linux containers for local builds");
     }
     Ok(())
 }
 
-fn docker_info_command() -> Command {
-    let mut command = Command::new("docker");
+fn docker_info_command(docker: &DockerClient) -> Result<Command> {
+    let mut command = docker.command()?;
     command.arg("info").args(["--format", "{{.OSType}}"]);
-    command
+    Ok(command)
 }
 
 pub fn docker_image_available() -> Result<bool> {
-    let status = Command::new("docker")
+    let docker = DockerClient::new()?;
+    docker_image_available_with_client(&docker)
+}
+
+fn docker_image_available_with_client(docker: &DockerClient) -> Result<bool> {
+    let status = docker
+        .command()?
         .args(["image", "inspect", BUILDER_IMAGE])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -93,32 +104,42 @@ pub fn docker_image_available() -> Result<bool> {
     Ok(status.success())
 }
 
-fn builder_image_pull_command() -> Command {
-    let mut command = Command::new("docker");
+fn builder_image_pull_command(docker: &DockerClient) -> Result<Command> {
+    let mut command = docker.command()?;
     command.args(["pull", "--platform", TARGET_PLATFORM_NAME, BUILDER_IMAGE]);
-    command
+    Ok(command)
 }
 
 pub fn ensure_builder_image() -> Result<()> {
-    docker_available_linux()?;
-    if !docker_image_available()? {
+    let docker = DockerClient::new()?;
+    ensure_builder_image_with_client(&docker)
+}
+
+fn ensure_builder_image_with_client(docker: &DockerClient) -> Result<()> {
+    docker_available_linux_with_client(docker)?;
+    if !docker_image_available_with_client(docker)? {
         println!("Pulling local builder image...");
-        let status = builder_image_pull_command().status().context("Failed to pull local builder image")?;
+        let status = builder_image_pull_command(docker)?.status().context("Failed to pull local builder image")?;
         if !status.success() {
             bail!("Failed to pull local builder image {BUILDER_IMAGE}");
         }
     }
-    probe_target_execution()
+    probe_target_execution_with_client(docker)
 }
 
-fn target_probe_command() -> Command {
-    let mut command = Command::new("docker");
+fn target_probe_command(docker: &DockerClient) -> Result<Command> {
+    let mut command = docker.command()?;
     command.args(["run", "--rm", "--pull=never", "--platform", TARGET_PLATFORM_NAME]).arg(BUILDER_IMAGE).arg("true");
-    command
+    Ok(command)
 }
 
 pub fn probe_target_execution() -> Result<()> {
-    let status = target_probe_command().status().context("Failed to probe local builder target execution")?;
+    let docker = DockerClient::new()?;
+    probe_target_execution_with_client(&docker)
+}
+
+fn probe_target_execution_with_client(docker: &DockerClient) -> Result<()> {
+    let status = target_probe_command(docker)?.status().context("Failed to probe local builder target execution")?;
     if !status.success() {
         bail!(
             "Pinned builder image cannot execute for target {TARGET_PLATFORM_NAME}; install compatible Docker emulation (for example binfmt/QEMU) or use a compatible host"
@@ -136,8 +157,13 @@ struct ContainerStart<'a> {
     ownership: MountOwnership,
 }
 
-fn create_command(input: &ContainerStart<'_>, name: &str, environment_file: &Path) -> Command {
-    let mut command = Command::new("docker");
+fn create_command(
+    input: &ContainerStart<'_>,
+    docker: &DockerClient,
+    name: &str,
+    environment_file: &Path,
+) -> Result<Command> {
+    let mut command = docker.command()?;
     command
         .args([
             "run",
@@ -164,7 +190,7 @@ fn create_command(input: &ContainerStart<'_>, name: &str, environment_file: &Pat
         .arg(format!("{}:{CACHE_MOUNT}:rw", input.cache.display()))
         .arg(BUILDER_IMAGE)
         .args(["sleep", "infinity"]);
-    command
+    Ok(command)
 }
 
 #[derive(Clone, Copy)]
@@ -173,7 +199,8 @@ struct MountOwnership {
     gid: u32,
 }
 
-struct BuildContainer {
+struct BuildContainer<'a> {
+    docker: &'a DockerClient,
     source: PathBuf,
     name: String,
     ownership: MountOwnership,
@@ -181,20 +208,21 @@ struct BuildContainer {
     removed: bool,
 }
 
-impl BuildContainer {
-    fn start(input: &ContainerStart<'_>) -> Result<Self> {
+impl<'a> BuildContainer<'a> {
+    fn start(input: &ContainerStart<'_>, docker: &'a DockerClient) -> Result<Self> {
         let environment_file = write_environment_file(input.environment)?;
         let name = unique_container_name(&input.config.project_name);
-        let status = create_command(input, &name, environment_file.path())
+        let status = create_command(input, docker, &name, environment_file.path())?
             .current_dir(input.source)
             .stdout(Stdio::null())
             .status()
             .with_context(|| format!("Failed to start local build container {name}"))?;
         if !status.success() {
-            let _ = force_remove_container(input.source, &name);
+            let _ = force_remove_container(docker, input.source, &name);
             bail!("Failed to start local build container {name}: {status}");
         }
         Ok(Self {
+            docker,
             source: input.source.to_path_buf(),
             name,
             ownership: input.ownership,
@@ -206,7 +234,9 @@ impl BuildContainer {
     fn run_script(&self, script: &Path, timeout: Option<u64>) -> Result<()> {
         let script_input =
             fs::File::open(script).with_context(|| format!("Failed to open build script {}", script.display()))?;
-        let mut child = Command::new("docker")
+        let mut child = self
+            .docker
+            .command()?
             .current_dir(&self.source)
             .args(["exec", "-i", &self.name, "bash", "-c", "umask 0002; exec bash -s"])
             .stdin(Stdio::from(script_input))
@@ -241,18 +271,18 @@ impl BuildContainer {
         if self.removed {
             return Ok(());
         }
-        let ownership_result = normalize_mount_ownership(&self.name, self.ownership);
-        let removal_result = force_remove_container(&self.source, &self.name);
+        let ownership_result = normalize_mount_ownership(self.docker, &self.name, self.ownership);
+        let removal_result = force_remove_container(self.docker, &self.source, &self.name);
         self.removed = true;
         finish_with_cleanup(ownership_result, removal_result)
     }
 }
 
-impl Drop for BuildContainer {
+impl Drop for BuildContainer<'_> {
     fn drop(&mut self) {
         if !self.removed {
-            let _ = normalize_mount_ownership(&self.name, self.ownership);
-            let _ = force_remove_container(&self.source, &self.name);
+            let _ = normalize_mount_ownership(self.docker, &self.name, self.ownership);
+            let _ = force_remove_container(self.docker, &self.source, &self.name);
             self.removed = true;
         }
     }
@@ -276,9 +306,10 @@ fn mount_ownership(path: &Path) -> Result<MountOwnership> {
     Ok(MountOwnership { uid: metadata.uid(), gid: metadata.gid() })
 }
 
-fn normalize_mount_ownership(name: &str, ownership: MountOwnership) -> Result<()> {
+fn normalize_mount_ownership(docker: &DockerClient, name: &str, ownership: MountOwnership) -> Result<()> {
     let ownership = format!("{}:{}", ownership.uid, ownership.gid);
-    let status = Command::new("docker")
+    let status = docker
+        .command()?
         .args(["exec", name])
         .args(["find", "-P", SOURCE_MOUNT, CACHE_MOUNT, "-exec", "chown", "-h", &ownership, "{}", "+"])
         .status()
@@ -289,8 +320,9 @@ fn normalize_mount_ownership(name: &str, ownership: MountOwnership) -> Result<()
     Ok(())
 }
 
-fn force_remove_container(source: &Path, name: &str) -> Result<()> {
-    let status = Command::new("docker")
+fn force_remove_container(docker: &DockerClient, source: &Path, name: &str) -> Result<()> {
+    let status = docker
+        .command()?
         .current_dir(source)
         .args(["rm", "--force", name])
         .stdout(Stdio::null())

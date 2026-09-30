@@ -22,6 +22,7 @@ fn native_builder_reuses_one_root_container_and_restores_mount_ownership() -> Re
         .current_dir(project.path())
         .env("BONESDEPLOY_NATIVE_BUILD_HELPER", "1")
         .env("DOCKER_LOG", &docker_log)
+        .env("DOCKER_HOST", "unix:///tmp/bonesdeploy-native-build.sock")
         .env("PATH", path)
         .env("XDG_CACHE_HOME", tools.path().join("cache"))
         .output()?;
@@ -72,6 +73,10 @@ fn write_fake_docker(tools: &Path) -> Result<()> {
         &docker,
         r#"#!/bin/sh
 printf '%s\n' "$*" >>"$DOCKER_LOG"
+if [ "$1" = context ]; then
+	printf 'unix:///tmp/bonesdeploy-native-build.sock\n'
+	exit 0
+fi
 if [ "$1" = info ]; then
 	printf 'linux\n'
 	exit 0
