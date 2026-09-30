@@ -1,6 +1,5 @@
-use std::env;
 use std::fs;
-use std::io::{self, BufRead, BufReader, ErrorKind, Write};
+use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -13,46 +12,12 @@ use bonesdeploy_core::build_contract::{
 };
 use bonesdeploy_core::config::{Bones, build_timeout_seconds, variables};
 use bonesdeploy_core::paths;
-use tempfile::{NamedTempFile, TempDir};
+use tempfile::NamedTempFile;
 
-use crate::infra::git;
-
-pub struct BuildContext {
-    context: TempDir,
-    pub revision: String,
-}
-
-impl BuildContext {
-    pub fn path(&self) -> &Path {
-        self.context.path()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn from_tempdir(context: TempDir, revision: String) -> Self {
-        Self { context, revision }
-    }
-}
-
-/// Exports the one committed source tree used by every deployment backend.
-pub fn export(config: &Bones) -> Result<BuildContext> {
-    let context =
-        tempfile::Builder::new().prefix("bonesdeploy-build-").tempdir().context("Failed to create build context")?;
-    let repo = env::current_dir().context("Failed to determine project directory")?;
-    let revision = git::resolve_branch_commit(&repo, &config.branch)?;
-    git::export_commit(&repo, &revision, context.path())?;
-    sanitize_exported_context(context.path())?;
-
-    Ok(BuildContext { context, revision })
-}
-
-pub fn build(config: &Bones) -> Result<BuildContext> {
-    let context = export(config)?;
-    build_native(config, &context)?;
-    Ok(context)
-}
+use super::source::BuildContext;
 
 /// Runs numbered native build scripts against an already-exported commit.
-pub fn build_native(config: &Bones, context: &BuildContext) -> Result<()> {
+pub fn build(config: &Bones, context: &BuildContext) -> Result<()> {
     let source = context.path();
 
     let Some((deployment_dir, scripts)) = build_scripts(source)? else {
@@ -70,23 +35,6 @@ pub fn build_native(config: &Bones, context: &BuildContext) -> Result<()> {
         let name = script.file_name().and_then(|value| value.to_str()).unwrap_or("<unknown>");
         println!("Running local build script {name}...");
         run_script(&input, &script, build_timeout_seconds(config))?;
-    }
-    Ok(())
-}
-
-/// Removes the committed runtime environment before anything can read the
-/// exported context. Build configuration remains available through `.env.build`.
-pub fn sanitize_exported_context(source_context: &Path) -> Result<()> {
-    let root_env = source_context.join(paths::DOT_ENV);
-    match fs::symlink_metadata(&root_env) {
-        Ok(metadata) if metadata.file_type().is_file() || metadata.file_type().is_symlink() => {
-            fs::remove_file(&root_env).with_context(|| format!("Failed to remove exported {}", paths::DOT_ENV))?;
-        }
-        Ok(metadata) => {
-            bail!("Exported {} has unsupported file type: {:?}", paths::DOT_ENV, metadata.file_type());
-        }
-        Err(error) if error.kind() == ErrorKind::NotFound => {}
-        Err(error) => return Err(error).with_context(|| format!("Failed to inspect exported {}", paths::DOT_ENV)),
     }
     Ok(())
 }

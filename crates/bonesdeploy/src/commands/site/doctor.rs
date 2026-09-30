@@ -8,9 +8,9 @@ use bonesdeploy_core::{
     paths,
 };
 
+use crate::build::native;
 use crate::config;
 use crate::infra::{self, git, ssh};
-use crate::local_build;
 use crate::ui::output;
 
 pub async fn run(local_only: bool, verbose: bool) -> Result<()> {
@@ -242,11 +242,11 @@ mod tests {
 }
 
 fn check_local_docker() -> Option<String> {
-    local_build::docker_available_linux().err().map(|error| error.to_string())
+    native::docker_available_linux().err().map(|error| error.to_string())
 }
 
 fn check_local_builder_image() -> Option<String> {
-    match local_build::docker_image_available() {
+    match native::docker_image_available() {
         Ok(true) => None,
         Ok(false) => Some(String::from("Pinned local builder image is not available")),
         Err(error) => Some(error.to_string()),
@@ -254,11 +254,11 @@ fn check_local_builder_image() -> Option<String> {
 }
 
 fn check_local_target_execution() -> Option<String> {
-    local_build::probe_target_execution().err().map(|error| error.to_string())
+    native::probe_target_execution().err().map(|error| error.to_string())
 }
 
 fn check_local_cache() -> Option<String> {
-    let cache = local_build::local_cache_path("doctor");
+    let cache = native::local_cache_path("doctor");
     let ancestor = cache.ancestors().find(|path| path.exists())?;
     if ancestor.is_dir() && !ancestor.metadata().is_ok_and(|metadata| metadata.permissions().readonly()) {
         None

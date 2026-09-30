@@ -13,7 +13,7 @@ use bonesdeploy_core::config::{Bones, validate_site_name};
 use serde::Deserialize;
 use tempfile::NamedTempFile;
 
-use crate::local_build::BuildContext;
+use super::source::BuildContext;
 
 const BASE_FILES: [&str; 4] = ["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
 const OVERRIDE_FILES: [&str; 2] = ["compose.override.yaml", "compose.override.yml"];

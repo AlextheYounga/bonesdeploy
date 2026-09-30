@@ -1,7 +1,7 @@
 use std::fs;
 use std::os::unix::fs::symlink;
 
-use bonesdeploy::local_build::sanitize_exported_context;
+use bonesdeploy::build::source::sanitize_exported_context;
 use bonesdeploy_core::paths;
 
 #[test]

@@ -3,9 +3,9 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use bonesdeploy_core::{config::RuntimeBackend, paths};
 
+use crate::build::native;
 use crate::commands::server;
 use crate::infra::ssh;
-use crate::local_build;
 use crate::ui::output;
 use crate::ui::prompts;
 use crate::{config, infra};
@@ -19,7 +19,7 @@ pub async fn run(yes: bool) -> Result<()> {
     server::doctor(false).await.context("Server baseline is not ready.\n\nNext: bonesdeploy server setup --yes")?;
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
     if cfg.runtime.backend == RuntimeBackend::Native {
-        local_build::ensure_builder_image().context("Failed to prepare local builder")?;
+        native::ensure_builder_image().context("Failed to prepare local builder")?;
     }
     println!("Provisioning site base...");
     let request = infra::provisioning_request(&cfg)?;

@@ -11,7 +11,7 @@ use flate2::write::GzEncoder;
 use sha2::{Digest, Sha256};
 use tempfile::NamedTempFile;
 
-use crate::local_build::BuildContext;
+use super::source::BuildContext;
 
 pub struct PackagedArtifact {
     file: NamedTempFile,
@@ -178,8 +178,8 @@ mod tests {
     use std::os::unix::fs::{PermissionsExt, symlink};
     use std::path::Path;
 
+    use super::super::source::BuildContext;
     use super::{package, package_compose};
-    use crate::local_build::BuildContext;
     use anyhow::{Context, Result};
     use bonesdeploy_core::artifact::{ArtifactKind, ComposeImage};
     use flate2::read::GzDecoder;

@@ -4,12 +4,11 @@ use anyhow::{Context, Result};
 use console::style;
 use tokio::fs::File;
 
+use crate::build;
 use crate::config;
 use crate::infra::{self, ssh};
 use crate::ui::output;
-use crate::{artifact, compose_build, local_build};
 use bonesdeploy_core::artifact::encode_manifest;
-use bonesdeploy_core::config::RuntimeBackend;
 use bonesdeploy_core::paths;
 
 pub fn local_bones_load_error() -> String {
@@ -29,24 +28,14 @@ pub async fn run() -> Result<()> {
     );
 
     println!("Building the committed {} branch locally...", cfg.branch);
-    let build = local_build::export(&cfg)?;
-    let artifact = match cfg.runtime.backend {
-        RuntimeBackend::Native => {
-            local_build::build_native(&cfg, &build)?;
-            artifact::package(&cfg.project_name, &build)?
-        }
-        RuntimeBackend::Docker => {
-            let images = compose_build::build(&cfg, &build)?;
-            artifact::package_compose(&cfg.project_name, &build, images)?
-        }
-    };
+    let artifact = build::package(&cfg)?;
     deploy_artifact(&cfg, &artifact).await?;
 
     println!("{} Deployment complete.", output::success_marker());
     Ok(())
 }
 
-async fn deploy_artifact(cfg: &config::Bones, artifact: &artifact::PackagedArtifact) -> Result<()> {
+async fn deploy_artifact(cfg: &config::Bones, artifact: &build::PackagedArtifact) -> Result<()> {
     let frame = encode_manifest(&artifact.manifest)?;
 
     let session = ssh::connect(cfg).await?;

@@ -3,8 +3,8 @@ use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result};
+use bonesdeploy::build::native::build_scripts;
 use bonesdeploy::infra::git;
-use bonesdeploy::local_build::build_scripts;
 
 #[test]
 fn exporting_a_configured_branch_uses_only_its_committed_tree() -> Result<()> {
