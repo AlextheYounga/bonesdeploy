@@ -293,6 +293,7 @@ fn force_remove_container(source: &Path, name: &str) -> Result<()> {
     let status = Command::new("docker")
         .current_dir(source)
         .args(["rm", "--force", name])
+        .stdout(Stdio::null())
         .status()
         .with_context(|| format!("Failed to remove local build container {name}"))?;
     if !status.success() {
