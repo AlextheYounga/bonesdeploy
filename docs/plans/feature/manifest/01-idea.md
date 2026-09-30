@@ -26,7 +26,7 @@ Deployment files are currently created by several BonesInfra modules, but no sin
 
 `bonesdeploy manifest` loads the configured project, determines its deployment strategy, and displays every site-specific artifact and managed service that BonesInfra installs or manages. The output identifies expected paths and service state, reports missing or wrong filesystem types instead of silently omitting them, and has a machine-readable JSON form for automated checks.
 
-BonesInfra collects typed manifest declarations and performs the remote inspection. Rust exposes the public command and passes its format selection to BonesInfra; Rust and Python do not maintain separate manifest schemas.
+BonesInfra collects typed manifest declarations, performs the remote inspection, and returns a secret-free JSON report. Rust owns the public text-tree and JSON presentation through a narrow report DTO; Python does not render public CLI output.
 
 ## Scope
 
@@ -36,7 +36,7 @@ This change includes:
 - Strategy-specific manifest declarations for every framework, service, and SSL artifact installed for the site, including project-derived systemd units, target membership links, AppArmor profiles, and runtime paths.
 - Managed-service declarations and read-only status inspection for every site-specific systemd service.
 - Resolution of manifest path references through `DeploymentPaths`.
-- A read-only BonesInfra inspection command with tree and JSON output.
+- A read-only BonesInfra inspection command that returns the inspected JSON report.
 - A Rust `bonesdeploy manifest` command that delegates to BonesInfra.
 - Tests proving typed declarations and representative strategy manifests resolve to the expected paths.
 

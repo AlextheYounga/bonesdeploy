@@ -278,9 +278,9 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 
 - **site manifest**
   - Inspects every project-specific filesystem artifact and managed systemd service expected by the effective framework, service, and SSL strategy. Shared host-wide packages, daemons, and configuration are excluded.
-   - Delegates to the embedded BonesInfra runtime as `python -m bonesinfra manifest show --request-stdin --format <format>`, feeding the typed site request on stdin.
+   - Delegates read-only inspection to the embedded BonesInfra runtime as `python -m bonesinfra manifest show --request-stdin`, then renders the returned JSON report in Rust as either the public text tree or unchanged JSON.
   - Uses typed Python declarations inside BonesInfra, resolves path keys through `DeploymentPaths`, and performs read-only PyInfra fact checks.
-   - Reports present, missing, and wrong-kind paths, plus active and enabled state for managed services. `--format json` is intended for automation and never includes file contents or secrets.
+   - The text tree uses colored status markers for present, missing, and wrong-kind paths and for managed-service health. `--format json` retains complete artifact and service metadata for automation and never includes file contents or secrets.
 
 - **site delete**
   - Runs a local, read-only manifest preflight before any remote mutation and requires the exact configured project name unless `--yes` is supplied.

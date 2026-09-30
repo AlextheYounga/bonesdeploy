@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict, dataclass, field
-from pathlib import Path, PurePosixPath
+from dataclasses import asdict, dataclass
+from pathlib import Path
 from shlex import quote
 from typing import Any, Literal
 
@@ -58,12 +58,6 @@ class ResolvedService:
     owner: str
     running: bool
     enabled: bool
-
-
-@dataclass
-class ArtifactTreeNode:
-    children: dict[str, ArtifactTreeNode] = field(default_factory=dict)
-    entry: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -241,69 +235,9 @@ def report(
     return data
 
 
-def render_text(data: dict[str, Any]) -> str:
-    strategy = data["strategy"]
-    lines = [
-        f"Framework: {strategy['framework']} ({strategy['mode']})",
-        f"Runtime backend: {strategy['backend']}",
-        f"SSL: {'enabled' if strategy['ssl'] else 'disabled'}",
-        "",
-        "Manifest:",
-    ]
-    lines.extend(_render_artifact_tree(data["entries"]))
-    lines.extend(["", "Managed services:"])
-    for service in data["managed_services"]:
-        state = "running" if service["running"] else "stopped"
-        enabled = "enabled" if service["enabled"] else "disabled"
-        lines.append(f"- [{state}, {enabled}] {service['unit']} {service['owner']}")
-    if compose := data.get("compose"):
-        lines.extend(
-            [
-                "",
-                f"Compose project: {compose['project_name']}",
-                f"Compose files: {', '.join(compose['files']) or 'not available'}",
-                f"Compose security: {compose['security_mode']}",
-                f"Warning: {compose['security_warning']}",
-                f"Persistent data: {compose['persistent_data']}",
-            ]
-        )
-        lines.extend(f"- [{service['condition']}] {service['service']}" for service in compose["services"])
-        if compose.get("error"):
-            lines.append(f"- [error] {compose['error']}")
-    return "\n".join(lines)
-
-
-def _render_artifact_tree(entries: list[dict[str, Any]]) -> list[str]:
-    root = ArtifactTreeNode()
-    for entry in entries:
-        node = root
-        for part in PurePosixPath(entry["path"]).parts[1:]:
-            node = node.children.setdefault(part, ArtifactTreeNode())
-        node.entry = entry
-
-    lines = ["/"]
-
-    def append_children(nodes: dict[str, ArtifactTreeNode], prefix: str) -> None:
-        for index, (name, node) in enumerate(sorted(nodes.items())):
-            is_last = index == len(nodes) - 1
-            connector = "└── " if is_last else "├── "
-            entry = node.entry
-            label = f"{name}/" if entry is None or entry["kind"] == "directory" else name
-            suffix = f" (actual: {entry['actual_kind']})" if entry and entry["actual_kind"] else ""
-            metadata = f" [{entry['state']}] [{entry['kind']}] {entry['owner']}{suffix}" if entry else ""
-            lines.append(f"{prefix}{connector}{label}{metadata}")
-            append_children(node.children, f"{prefix}{'    ' if is_last else '│   '}")
-
-    append_children(root.children, "")
-    return lines
-
-
-def render(data: dict[str, Any], output_format: str) -> str:
-    if output_format == "json":
-        return json.dumps(data, sort_keys=True)
-    if output_format == "text":
-        return render_text(data)
-    raise ValueError(f"unsupported manifest format: {output_format}")
+def render(data: dict[str, Any]) -> str:
+    """Serialize the inspected manifest for the public Rust CLI."""
+    return json.dumps(data, sort_keys=True)
 
 
 def inspect_for_runner(ctx: DeployContext, project_manifest: Any) -> dict[str, Any]:
