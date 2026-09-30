@@ -37,6 +37,8 @@ fn native_builder_reuses_one_root_container_and_restores_mount_ownership() -> Re
     assert_eq!(commands.lines().filter(|line| line.starts_with("run --detach ")).count(), 1, "{commands}");
     assert_eq!(commands.lines().filter(|line| line.starts_with("exec -i ")).count(), 2, "{commands}");
     assert!(commands.contains("find -P /workspace/source /workspace/cache -exec chown -h"));
+    assert!(commands.lines().any(|line| line.starts_with("rm --force bonesdeploy-build-")), "{commands}");
+    assert!(!commands.contains("--time"), "Docker cleanup must not use Podman's --time option: {commands}");
     Ok(())
 }
 
@@ -79,6 +81,7 @@ if [ "$1" = image ] && [ "$2" = inspect ]; then
 fi
 for argument in "$@"; do
 	[ "$argument" = --user ] && exit 97
+	[ "$argument" = --time ] && exit 98
 	[ "$argument" = -i ] && interactive=1
 done
 [ "${interactive:-0}" = 1 ] && cat >/dev/null

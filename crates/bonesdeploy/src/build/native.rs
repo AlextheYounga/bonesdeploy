@@ -292,7 +292,7 @@ fn normalize_mount_ownership(name: &str, ownership: MountOwnership) -> Result<()
 fn force_remove_container(source: &Path, name: &str) -> Result<()> {
     let status = Command::new("docker")
         .current_dir(source)
-        .args(["rm", "--force", "--time", "0", name])
+        .args(["rm", "--force", name])
         .status()
         .with_context(|| format!("Failed to remove local build container {name}"))?;
     if !status.success() {
