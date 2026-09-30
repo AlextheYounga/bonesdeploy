@@ -2,6 +2,7 @@ use anyhow::Result;
 use bonesdeploy_core::config::{Bones, RuntimeBackend};
 
 pub mod artifact;
+pub(crate) mod command;
 pub mod compose;
 pub mod native;
 pub mod source;
