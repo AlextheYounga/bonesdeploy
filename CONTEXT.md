@@ -410,7 +410,7 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 
 ### Primary Deploy Flow
 
-1. `bonesdeploy deploy` SSHes into the configured host as `git`, synchronizes the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <site>`, then runs `sudo -n bonesremote deploy --site <site>`.
+1. `bonesdeploy deploy` resolves and exports the configured committed revision, then builds a complete local artifact. Only after packaging succeeds does it check or push production secrets, SSH into the configured host as `git`, synchronize the sanitized control-plane snapshot through `sudo -n bonesremote config sync --site <site>`, and run `sudo -n bonesremote deploy --site <site>` with that retained artifact.
 2. `bonesremote deploy`, running as root through the exact sudoers grant, loads the synchronized snapshot and orchestrates the existing pipeline:
    - **stage_release** — Create timestamped release state
     - **artifact_receipt** — Verify the manifest, digest, and bounded archive before extracting it into a temporary context
