@@ -145,6 +145,64 @@ def test_compose_manifest_reports_runtime_contract_without_claiming_native_secur
     assert not any(service.unit == "example-cloudflared.service" for service in services)
 
 
+def test_text_manifest_renders_artifacts_as_a_path_tree():
+    data = {
+        "strategy": {"framework": "none", "mode": "static", "backend": "native", "ssl": False},
+        "entries": [
+            {
+                "path": "/srv/sites/example/current",
+                "state": "missing",
+                "kind": "link",
+                "owner": "deploy",
+                "actual_kind": None,
+            },
+            {
+                "path": "/etc/nginx/sites-enabled/example.conf",
+                "state": "present",
+                "kind": "link",
+                "owner": "runtime",
+                "actual_kind": None,
+            },
+            {
+                "path": "/srv/sites/example/releases",
+                "state": "wrong-kind",
+                "kind": "directory",
+                "owner": "setup",
+                "actual_kind": "file",
+            },
+            {
+                "path": "/srv/sites/example",
+                "state": "present",
+                "kind": "directory",
+                "owner": "setup",
+                "actual_kind": None,
+            },
+        ],
+        "managed_services": [],
+    }
+
+    assert (
+        render(data, "text")
+        == """Framework: none (static)
+Runtime backend: native
+SSL: disabled
+
+Manifest:
+/
+├── etc/
+│   └── nginx/
+│       └── sites-enabled/
+│           └── example.conf [present] [link] runtime
+└── srv/
+    └── sites/
+        └── example/ [present] [directory] setup
+            ├── current [missing] [link] deploy
+            └── releases/ [wrong-kind] [directory] setup (actual: file)
+
+Managed services:"""
+    )
+
+
 def test_compose_manifest_includes_secret_free_remote_runtime_status():
     ctx = DeployContext.from_request(
         make_site_request(backend="docker", project_name="example", domain="", ssl_enabled=False, compose_port=None)

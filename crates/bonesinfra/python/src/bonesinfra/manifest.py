@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict, dataclass
-from pathlib import Path
+from dataclasses import asdict, dataclass, field
+from pathlib import Path, PurePosixPath
 from shlex import quote
 from typing import Any, Literal
 
@@ -58,6 +58,12 @@ class ResolvedService:
     owner: str
     running: bool
     enabled: bool
+
+
+@dataclass
+class ArtifactTreeNode:
+    children: dict[str, ArtifactTreeNode] = field(default_factory=dict)
+    entry: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)
@@ -243,9 +249,7 @@ def render_text(data: dict[str, Any]) -> str:
         "",
         "Manifest:",
     ]
-    for entry in data["entries"]:
-        suffix = f" (actual: {entry['actual_kind']})" if entry["actual_kind"] else ""
-        lines.append(f"- [{entry['state']}] {entry['path']} [{entry['kind']}] {entry['owner']}{suffix}")
+    lines.extend(_render_artifact_tree(data["entries"]))
     lines.extend(["", "Managed services:"])
     for service in data["managed_services"]:
         state = "running" if service["running"] else "stopped"
@@ -266,6 +270,31 @@ def render_text(data: dict[str, Any]) -> str:
         if compose.get("error"):
             lines.append(f"- [error] {compose['error']}")
     return "\n".join(lines)
+
+
+def _render_artifact_tree(entries: list[dict[str, Any]]) -> list[str]:
+    root = ArtifactTreeNode()
+    for entry in entries:
+        node = root
+        for part in PurePosixPath(entry["path"]).parts[1:]:
+            node = node.children.setdefault(part, ArtifactTreeNode())
+        node.entry = entry
+
+    lines = ["/"]
+
+    def append_children(nodes: dict[str, ArtifactTreeNode], prefix: str) -> None:
+        for index, (name, node) in enumerate(sorted(nodes.items())):
+            is_last = index == len(nodes) - 1
+            connector = "└── " if is_last else "├── "
+            entry = node.entry
+            label = f"{name}/" if entry is None or entry["kind"] == "directory" else name
+            suffix = f" (actual: {entry['actual_kind']})" if entry and entry["actual_kind"] else ""
+            metadata = f" [{entry['state']}] [{entry['kind']}] {entry['owner']}{suffix}" if entry else ""
+            lines.append(f"{prefix}{connector}{label}{metadata}")
+            append_children(node.children, f"{prefix}{'    ' if is_last else '│   '}")
+
+    append_children(root.children, "")
+    return lines
 
 
 def render(data: dict[str, Any], output_format: str) -> str:
