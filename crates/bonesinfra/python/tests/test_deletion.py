@@ -90,6 +90,19 @@ def test_deletion_stops_services_before_removing_artifacts(monkeypatch: pytest.M
     ]
 
 
+def test_deletion_removes_unix_sockets_without_treating_them_as_regular_files(monkeypatch: pytest.MonkeyPatch):
+    calls = []
+    monkeypatch.setattr(delete.server, "shell", lambda **kwargs: calls.append(kwargs))
+    plan = DeletionPlan(
+        artifacts=(DeletionArtifact("application socket", "/run/example/app.sock", "socket", "framework"),),
+        services=(),
+    )
+
+    delete.deploy_site_delete(_context(), plan)
+
+    assert calls[0]["commands"] == ["rm -f -- /run/example/app.sock"]
+
+
 def test_deletion_reloads_systemd_and_nginx_after_optional_tunnel_cleanup(monkeypatch: pytest.MonkeyPatch):
     calls = []
     monkeypatch.setattr(delete.systemd, "service", lambda **kwargs: calls.append(("service", kwargs)))

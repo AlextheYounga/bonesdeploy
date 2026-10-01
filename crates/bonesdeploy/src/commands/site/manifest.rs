@@ -31,6 +31,18 @@ struct Artifact {
     state: String,
 }
 
+pub(super) struct PathArtifact {
+    pub(super) path: String,
+    pub(super) kind: String,
+    pub(super) state: Option<String>,
+}
+
+impl From<Artifact> for PathArtifact {
+    fn from(artifact: Artifact) -> Self {
+        Self { path: artifact.path, kind: artifact.kind, state: Some(artifact.state) }
+    }
+}
+
 #[derive(Deserialize)]
 struct ManagedService {
     unit: String,
@@ -58,7 +70,7 @@ struct ComposeService {
 #[derive(Default)]
 struct TreeNode {
     children: BTreeMap<String, TreeNode>,
-    artifact: Option<Artifact>,
+    artifact: Option<PathArtifact>,
 }
 
 pub fn run(format: &str) -> Result<()> {
@@ -91,14 +103,8 @@ fn render_text(report: ManifestReport) -> Result<String> {
         ),
         String::new(),
         style("Manifest").cyan().bold().to_string(),
-        style(char::from(b'/')).bold().to_string(),
     ];
-
-    let mut root = TreeNode::default();
-    for artifact in report.entries {
-        insert_artifact(&mut root, artifact)?;
-    }
-    append_children(&root.children, "", &mut lines);
+    lines.extend(render_path_tree(report.entries.into_iter().map(PathArtifact::from).collect())?);
 
     lines.push(String::new());
     lines.push(style("Managed services").cyan().bold().to_string());
@@ -118,7 +124,17 @@ fn summary(label: &str, value: &str) -> String {
     format!("{} {value}", style(format!("{label:<9}")).dim())
 }
 
-fn insert_artifact(root: &mut TreeNode, artifact: Artifact) -> Result<()> {
+pub(super) fn render_path_tree(artifacts: Vec<PathArtifact>) -> Result<Vec<String>> {
+    let mut lines = vec![style(char::from(b'/')).bold().to_string()];
+    let mut root = TreeNode::default();
+    for artifact in artifacts {
+        insert_artifact(&mut root, artifact)?;
+    }
+    append_children(&root.children, "", &mut lines);
+    Ok(lines)
+}
+
+fn insert_artifact(root: &mut TreeNode, artifact: PathArtifact) -> Result<()> {
     if !artifact.path.starts_with('/') {
         bail!("Manifest artifact path is not absolute: {}", artifact.path);
     }
@@ -139,10 +155,11 @@ fn append_children(children: &BTreeMap<String, TreeNode>, prefix: &str, lines: &
         } else {
             name.clone()
         };
-        let marker = node.artifact.as_ref().map(|artifact| match artifact.state.as_str() {
-            "present" => style("✓").green().bold().to_string(),
-            "missing" => style("!").yellow().bold().to_string(),
-            _ => style("✗").red().bold().to_string(),
+        let marker = node.artifact.as_ref().and_then(|artifact| match artifact.state.as_deref() {
+            Some("present") => Some(style("✓").green().bold().to_string()),
+            Some("missing") => Some(style("!").yellow().bold().to_string()),
+            Some(_) => Some(style("✗").red().bold().to_string()),
+            None => None,
         });
         let item = marker.map_or(label.clone(), |marker| format!("{marker} {label}"));
         lines.push(format!("{}{}{item}", style(prefix).dim(), style(connector).dim()));

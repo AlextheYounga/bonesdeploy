@@ -2,7 +2,7 @@ from shlex import quote
 
 from pyinfra.operations import files, server, systemd
 
-from bonesinfra.manifest import DeletionPlan
+from bonesinfra.manifest import ArtifactKind, DeletionPlan
 
 
 def deploy_site_delete(_ctx, plan: DeletionPlan) -> None:
@@ -30,11 +30,12 @@ def deploy_site_delete(_ctx, plan: DeletionPlan) -> None:
         systemd.service(name="Reload nginx after Quick Tunnel removal", service="nginx", reloaded=True, _sudo=True)
 
 
-def _remove_artifact(name: str, path: str, kind: str) -> None:
+def _remove_artifact(name: str, path: str, kind: ArtifactKind) -> None:
     if kind == "directory":
         files.directory(name=f"Remove {name}", path=path, present=False, recursive=True, _sudo=True)
     elif kind == "link":
         files.link(name=f"Remove {name}", path=path, present=False, _sudo=True)
+    elif kind == "socket":
+        server.shell(name=f"Remove {name}", commands=[f"rm -f -- {quote(path)}"], _sudo=True)
     else:
-        # files.file removes regular files and Unix sockets without following links.
         files.file(name=f"Remove {name}", path=path, present=False, _sudo=True)

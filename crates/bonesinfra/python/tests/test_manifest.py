@@ -8,6 +8,11 @@ from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra import manifest
 from bonesinfra.config.context import DeployContext
+from bonesinfra.frameworks.django import manifest as django_manifest
+from bonesinfra.frameworks.next import manifest as next_manifest
+from bonesinfra.frameworks.nuxt import manifest as nuxt_manifest
+from bonesinfra.frameworks.rails import manifest as rails_manifest
+from bonesinfra.frameworks.sveltekit import manifest as sveltekit_manifest
 from bonesinfra.frameworks.vue import manifest as vue_manifest
 from bonesinfra.manifest import (
     Artifact,
@@ -52,6 +57,19 @@ def test_project_manifest_declarations_are_included(tmp_path: Path):
 def test_vue_declares_nginx_socket_as_socket(tmp_path: Path):
     ctx = _context()
     socket = next(entry for entry in vue_manifest.artifacts(ctx) if entry[0] == "runtime nginx socket")
+    assert socket[2] == "socket"
+
+
+@pytest.mark.parametrize(
+    "project_manifest",
+    [django_manifest, next_manifest, nuxt_manifest, rails_manifest, sveltekit_manifest],
+)
+def test_server_frameworks_declare_application_runtime_socket_as_socket(project_manifest):
+    ctx = _context()
+    ctx.runtime.data["is_static"] = False
+
+    socket = next(entry for entry in project_manifest.artifacts(ctx) if entry[0] == "application runtime socket")
+
     assert socket[2] == "socket"
 
 

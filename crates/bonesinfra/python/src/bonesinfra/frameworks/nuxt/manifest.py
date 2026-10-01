@@ -11,7 +11,7 @@ def artifacts(ctx):
         ("application systemd service", paths.systemd_service("nuxt"), "file", "framework"),
         ("application systemd requirement", paths.systemd_service_requirement("nuxt"), "link", "framework"),
         ("application runtime directory", paths.runtime_service_dir("nuxt"), "directory", "framework"),
-        ("application runtime socket", paths.runtime_service_socket("nuxt"), "file", "framework"),
+        ("application runtime socket", paths.runtime_service_socket("nuxt"), "socket", "framework"),
         ("application log directory", paths.site_log_dir, "directory", "framework"),
         ("Nuxt placeholder server directory", f"{paths.placeholder_release}/.output/server", "directory", "framework"),
         ("Nuxt placeholder server", f"{paths.placeholder_release}/.output/server/index.mjs", "file", "framework"),

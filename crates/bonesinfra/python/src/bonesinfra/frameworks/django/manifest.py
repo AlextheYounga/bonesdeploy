@@ -6,7 +6,7 @@ def artifacts(ctx):
         ("application systemd service", paths.systemd_service("gunicorn"), "file", "framework"),
         ("application systemd requirement", paths.systemd_service_requirement("gunicorn"), "link", "framework"),
         ("application runtime directory", paths.runtime_service_dir("gunicorn"), "directory", "framework"),
-        ("application runtime socket", paths.runtime_service_socket("gunicorn"), "file", "framework"),
+        ("application runtime socket", paths.runtime_service_socket("gunicorn"), "socket", "framework"),
         ("application log directory", paths.site_log_dir, "directory", "framework"),
         ("Django placeholder virtual environment", f"{placeholder}/.venv", "directory", "framework"),
         ("Django placeholder configuration", f"{placeholder}/config", "directory", "framework"),

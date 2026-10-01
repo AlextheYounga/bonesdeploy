@@ -6,7 +6,7 @@ def artifacts(ctx):
         ("application systemd service", paths.systemd_service("sveltekit"), "file", "framework"),
         ("application systemd requirement", paths.systemd_service_requirement("sveltekit"), "link", "framework"),
         ("application runtime directory", paths.runtime_service_dir("sveltekit"), "directory", "framework"),
-        ("application runtime socket", paths.runtime_service_socket("sveltekit"), "file", "framework"),
+        ("application runtime socket", paths.runtime_service_socket("sveltekit"), "socket", "framework"),
         ("application log directory", paths.site_log_dir, "directory", "framework"),
         ("SvelteKit placeholder build directory", f"{placeholder}/build", "directory", "framework"),
         ("SvelteKit placeholder entrypoint", f"{placeholder}/build/index.js", "file", "framework"),
