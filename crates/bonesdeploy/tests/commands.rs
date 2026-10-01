@@ -4,6 +4,7 @@ use anyhow::Result;
 use bonesdeploy::cli::args::{Cli, Command, ServerCommand, SiteCommand, TunnelCommand};
 use bonesdeploy::commands::{secrets, site, skill, update};
 use bonesdeploy::frameworks::Framework;
+use bonesdeploy::infra::{shared_import_command, shared_install_environment_command};
 use clap::Parser;
 
 #[test]
@@ -89,6 +90,26 @@ fn site_export_accepts_an_optional_output_path() -> Result<()> {
     let parsed = Cli::try_parse_from(["bonesdeploy", "site", "export"])?;
     assert!(matches!(parsed.command, Command::Site { command: SiteCommand::Export { output: None } }));
     Ok(())
+}
+
+#[test]
+fn site_import_accepts_archive_and_confirmation_flag() -> Result<()> {
+    let parsed = Cli::try_parse_from(["bonesdeploy", "site", "import", "shared.zip", "--yes"])?;
+    assert!(matches!(
+        parsed.command,
+        Command::Site { command: SiteCommand::Import { archive, yes: true } }
+            if archive == Path::new("shared.zip")
+    ));
+    Ok(())
+}
+
+#[test]
+fn shared_operation_commands_are_fixed_and_site_quoted() {
+    assert_eq!(shared_import_command("a site's"), "sudo -n bonesremote shared import --site 'a site'\\''s'");
+    assert_eq!(
+        shared_install_environment_command("demo"),
+        "sudo -n bonesremote shared install-environment --site 'demo'"
+    );
 }
 
 #[test]

@@ -190,6 +190,14 @@ pub enum SiteCommand {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// Replace the remote shared directory from a local ZIP archive
+    Import {
+        /// Local shared directory archive
+        archive: PathBuf,
+        /// Skip the exact project-name confirmation prompt
+        #[arg(long)]
+        yes: bool,
+    },
     /// Inspect project-owned remote deployment artifacts
     Manifest {
         /// Output format

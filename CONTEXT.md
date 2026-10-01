@@ -298,6 +298,12 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Includes hidden files such as `shared/.env`, stores symbolic links without following them, and writes a `0600` local ZIP atomically without overwriting an existing path.
   - Is a live best-effort view, does not acquire the deployment lock or stop services, and is not a Borg backup operation.
 
+- **site import**
+  - Accepts an export-compatible ZIP rooted beneath `shared/`, requires exact project-name confirmation unless `--yes` is supplied, and replaces rather than merges remote shared data.
+  - Streams the archive to a private same-filesystem transaction, rejects unsafe paths, links, types, conflicts, permissions, and resource usage, then stops `<site>.target` only for atomic directory exchange.
+  - Ignores archive `shared/.env`, preserves the existing protected remote file, normalizes imported ownership and modes, restarts and verifies registered services, and restores the previous tree after restart failure.
+  - Persists root-owned transaction state and uses directory inode identities to recover a process interruption without guessing whether exchange occurred. Application-managed sessions, caches, logs, uploads, and similar files remain opaque.
+
 - **deploy**
   - SSHes into the configured host as `deploy`, synchronizes the narrow backend-specific control-plane snapshot through `sudo -n bonesremote config sync --site <project>`, then runs the existing root-required lifecycle through `sudo -n bonesremote deploy --site <project>`.
   - Does not modify the remote environment. Run `bonesdeploy secrets push` explicitly to replace `shared/.env` from the encrypted local source.
@@ -352,7 +358,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
   - Manages the GPG-encrypted production environment at `infra/secrets/.env.gpg`.
   - First initialization merges missing framework keys into the production environment, generates framework-native settings, validates, and encrypts the result. If the encrypted file already exists it is returned untouched; later additions go through `secrets edit`.
   - `secrets edit` decrypts `infra/secrets/.env.gpg` for editing and re-encrypts on save.
-  - `secrets push` atomically replaces remote `shared/.env` with the decrypted content. It does not read, merge, or upload the local root `.env`.
+  - `secrets push` validates the decrypted content and sends it to the typed `bonesremote shared install-environment` operation, which atomically replaces remote `shared/.env` under the same `SiteMutation` lock used by deploy and shared import. It does not read, merge, or upload the local root `.env`.
 
 - **skill**
   - Embedded documentation for AI agents, plus the state-aware next-step compass.
@@ -367,6 +373,7 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 ### BonesRemote CLI Commands
 - **Release commands** live under `bonesremote release ...`
 - **Service commands** live under `bonesremote service ...`
+- **Shared commands** live under `bonesremote shared ...`; `import` receives a ZIP on stdin and `install-environment` receives validated dotenv plaintext. Both derive paths from `--site`, require root, and acquire the site mutation lock.
 - **config sync**:
   - `--site <name>` receives the sanitized control-plane descriptor as JSON on stdin, validates it, and atomically installs root-owned `/srv/conf/<site>/bones.json`. BonesDeploy invokes it through sudo before deploy.
 - **deploy**:

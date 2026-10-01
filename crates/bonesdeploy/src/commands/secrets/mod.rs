@@ -11,7 +11,7 @@ use anyhow::{Context, Result, bail};
 
 use crate::config;
 use crate::frameworks;
-use crate::infra::ssh;
+use crate::infra::{self, ssh};
 use crate::ui::output;
 use bonesdeploy_core::config as shared_config;
 use bonesdeploy_core::config::parse_port;
@@ -19,8 +19,6 @@ use bonesdeploy_core::paths;
 
 mod environment;
 pub mod gpg;
-
-const DEFAULT_SECRET_MODE: &str = "640";
 
 fn environment_to_push(plaintext: &str) -> Result<&str> {
     shared_config::validate_dotenv(plaintext)?;
@@ -153,12 +151,6 @@ pub async fn push() -> Result<()> {
     gpg::ensure_installed()?;
 
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    let runtime_group = shared_config::runtime_group_for(&cfg.project_name);
-
-    let ssh_user = config::bootstrap_ssh_user(&cfg);
-    let port = parse_port(&cfg.port)?;
-    let session = ssh::SshTransport::connect_as(&ssh_user, &cfg.host, port).await?;
-
     let encrypted_path = Path::new(paths::LOCAL_INFRA_ENV_SECRET);
     if !encrypted_path.is_file() {
         bail!("Missing encrypted secrets\n\n{}", output::next_step("bonesdeploy secrets edit"));
@@ -166,19 +158,16 @@ pub async fn push() -> Result<()> {
 
     let plaintext =
         String::from_utf8(gpg::decrypt(encrypted_path)?).context("Decrypted secrets are not valid UTF-8")?;
-    let shared = Path::new(&cfg.project_root).join(paths::SHARED_DIR);
-    let target = shared.join(paths::DOT_ENV);
-    let parent = target.parent().ok_or_else(|| anyhow::anyhow!("Remote target has no parent: {}", target.display()))?;
-    let parent_s = ssh::shell_quote(&parent.display().to_string());
-    let target_s = ssh::shell_quote(&target.display().to_string());
-    let group_s = ssh::shell_quote(&runtime_group);
     let environment = environment_to_push(&plaintext)?;
-    let cmd = format!(
-        "tmp=; trap 'rm -f \"$tmp\"' EXIT; mkdir -p {parent_s} && tmp=$(mktemp {target_s}.XXXXXX) && cat > \"$tmp\" && chown root:{group_s} \"$tmp\" && chmod {DEFAULT_SECRET_MODE} \"$tmp\" && mv \"$tmp\" {target_s} && tmp=",
-    );
 
-    session.run_cmd_with_stdin(&cmd, environment.as_bytes()).await?;
-    session.close().await?;
+    let ssh_user = config::bootstrap_ssh_user(&cfg);
+    let port = parse_port(&cfg.port)?;
+    let session = ssh::SshTransport::connect_as(&ssh_user, &cfg.host, port).await?;
+    let command = infra::shared_install_environment_command(&cfg.project_name);
+    let push_result = session.run_cmd_with_stdin(&command, environment.as_bytes()).await;
+    let close_result = session.close().await;
+    push_result?;
+    close_result.context("Failed to close the SSH session")?;
     println!("{} Secrets pushed.", output::success_marker());
     Ok(())
 }

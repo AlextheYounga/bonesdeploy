@@ -28,6 +28,14 @@ pub fn sync_control_plane_command(site: &str) -> String {
     format!("sudo -n bonesremote config sync --site {}", ssh::shell_quote(site))
 }
 
+pub fn shared_import_command(site: &str) -> String {
+    format!("sudo -n bonesremote shared import --site {}", ssh::shell_quote(site))
+}
+
+pub fn shared_install_environment_command(site: &str) -> String {
+    format!("sudo -n bonesremote shared install-environment --site {}", ssh::shell_quote(site))
+}
+
 pub fn decommission_command(action: &str, site: &str) -> String {
     format!("sudo -n bonesremote decommission {action} --site {}", ssh::shell_quote(site))
 }

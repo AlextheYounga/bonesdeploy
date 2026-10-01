@@ -59,6 +59,11 @@ pub enum Command {
         #[command(subcommand)]
         command: BackupCommand,
     },
+    /// Shared-data import and environment installation operations
+    Shared {
+        #[command(subcommand)]
+        command: SharedCommand,
+    },
     /// Print the version
     Version,
 }
@@ -166,5 +171,19 @@ pub enum BackupCommand {
         /// Age-based retention window in days
         #[arg(long, default_value_t = 30, value_parser = clap::value_parser!(u16).range(1..))]
         keep_days: u16,
+    },
+}
+
+#[derive(Subcommand)]
+pub enum SharedCommand {
+    /// Import shared data for a site
+    Import {
+        #[arg(long)]
+        site: String,
+    },
+    /// Install the shared environment for a site
+    InstallEnvironment {
+        #[arg(long)]
+        site: String,
     },
 }

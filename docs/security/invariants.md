@@ -84,6 +84,15 @@ production application repository, first-push workflow, or deploy-on-push
 trigger. BonesInfra validates the sudoers policy at provisioning time; anchored
 argument matching rejects trailing or malformed arguments.
 
+Shared import is a narrow root-only BonesRemote state machine. It accepts ZIP
+bytes only on stdin, derives every remote path and identity from validated
+`--site`, stages on the live filesystem, strips world and special permission
+bits, changes symlink ownership without following targets, and retains both
+directory trees until service verification succeeds. The archive `.env` is
+never installed. `secrets push` publishes that file through a typed operation
+using the same per-site mutation lock, so cutover cannot discard a concurrent
+successful environment update.
+
 ## Process confinement
 
 ```text

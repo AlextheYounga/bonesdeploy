@@ -163,7 +163,10 @@ Existing implementations:
 
 `bonesremote` does not load `shared/.env` as Bones configuration. That file is
 application runtime input only and is linked into each release. `secrets push`
-replaces it atomically from encrypted `infra/secrets/.env.gpg`.
+replaces it atomically from encrypted `infra/secrets/.env.gpg` through a typed
+BonesRemote shared operation. Shared import uses the same site mutation lock,
+preserves this file, and replaces the rest of `shared/` through staged atomic
+directory exchange.
 
 To add another:
 Add a field to the struct (global) or use Runtime.extra (framework-specific).

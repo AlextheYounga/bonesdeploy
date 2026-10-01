@@ -154,6 +154,13 @@ pub fn confirm_site_delete(project_name: &str) -> Result<bool> {
     Ok(entered.trim() == project_name)
 }
 
+pub fn confirm_site_import(project_name: &str) -> Result<bool> {
+    println!();
+    println!("This replaces non-environment shared data for {project_name} and briefly stops its services.");
+    let entered = Text::new(&format!("Type {project_name} to confirm import:")).prompt().map_err(|err| anyhow!(err))?;
+    Ok(entered.trim() == project_name)
+}
+
 pub fn confirm_site_runtime() -> Result<bool> {
     confirm_prompt("Apply runtime setup?", "Runtime setup installs app services for this project.")
 }

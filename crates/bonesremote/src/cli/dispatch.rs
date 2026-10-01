@@ -2,9 +2,10 @@ use anyhow::Result;
 
 use crate::cli::args::{
     BackupCommand, Cli, Command, ConfigCommand, DecommissionCommand, ReleaseCommand, RuntimeCommand, ServiceCommand,
+    SharedCommand,
 };
 use crate::commands::{
-    backup, config, decommission, deploy, doctor, drop_failed_release, release, service, status, version,
+    backup, config, decommission, deploy, doctor, drop_failed_release, release, service, shared, status, version,
 };
 use crate::release::SiteMutation;
 use crate::runtime::docker;
@@ -41,6 +42,10 @@ pub fn run(cli: &Cli) -> Result<()> {
         },
         Command::Backup { command } => match command {
             BackupCommand::Run { site: site_name, keep_days } => backup::run(site_name, *keep_days),
+        },
+        Command::Shared { command } => match command {
+            SharedCommand::Import { site } => shared::import(site),
+            SharedCommand::InstallEnvironment { site } => shared::install_environment(site),
         },
         Command::Version => {
             version::run();

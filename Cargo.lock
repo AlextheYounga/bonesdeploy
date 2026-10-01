@@ -124,6 +124,7 @@ dependencies = [
  "flate2",
  "getrandom",
  "inquire",
+ "libc",
  "openssh",
  "rust-embed",
  "serde",
@@ -176,6 +177,7 @@ dependencies = [
  "tar",
  "tempfile",
  "time",
+ "zip",
 ]
 
 [[package]]

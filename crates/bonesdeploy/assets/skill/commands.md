@@ -47,6 +47,7 @@ multiple projects.
 `bonesdeploy site tunnel stop [--yes]`
 `bonesdeploy site tunnel status`
 `bonesdeploy site export [--output <path>]`
+`bonesdeploy site import <archive> [--yes]`
 `bonesdeploy site manifest [--format text|json]`
 `bonesdeploy site releases [kill <release>]`
 `bonesdeploy site runtime [--yes]`
@@ -59,6 +60,9 @@ the remote manifest inventory after exact project-name confirmation; it retains
 local project files and blocks deployment until deletion finishes.
 `site export` downloads the complete remote `shared/` directory as a private ZIP;
 it includes `shared/.env` and is a live view rather than a consistent snapshot.
+`site import` replaces non-environment shared data from an export-compatible ZIP,
+preserves the current remote `.env`, briefly stops services for atomic cutover,
+and rolls back the previous tree if service verification fails.
 `site tunnel` explicitly manages an optional ephemeral Cloudflare preview. Site
 setup and runtime do not install or start it.
 

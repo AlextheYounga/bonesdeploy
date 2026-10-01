@@ -6,6 +6,7 @@ pub mod inspection;
 pub mod privileges;
 pub mod release;
 pub mod runtime;
+pub mod shared;
 pub mod ui;
 
 use std::process::ExitCode;

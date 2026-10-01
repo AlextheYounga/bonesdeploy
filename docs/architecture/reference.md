@@ -687,7 +687,7 @@ runtime state and is not persisted in project configuration.
   timeout. It sends that descriptor over SSH stdin to the allowlisted `config
   sync` command before deploy.
 - `bonesremote` derives identity and paths from `--site`; it never parses the application `shared/.env` as control-plane config.
-- Runtime secrets are saved encrypted by `bonesdeploy` and atomically published to `shared/.env` by `secrets push`.
+- Runtime secrets are saved encrypted by `bonesdeploy` and atomically published to `shared/.env` by the typed BonesRemote operation used by `secrets push`. Environment publication and shared import acquire the same site mutation lock.
 
 ### Path ownership
 
@@ -705,6 +705,7 @@ runtime state and is not persisted in project configuration.
 
 - `SiteState` (JSON) owns deployment metadata. It is the single source of truth.
 - `DeploymentLock` serializes all mutations per site. Any command that mutates site state must go through `SiteMutation::acquire()`.
+- Shared import keeps separate durable transaction state until its directory exchange and service restart are verified. Recovery compares recorded directory device/inode identities so interruption cannot make exchange state ambiguous.
 - The committed local revision is recorded in the artifact and deployment state; BonesRemote does not maintain or resolve an application repository.
 
 ### External API encapsulation
@@ -732,6 +733,7 @@ runtime state and is not persisted in project configuration.
 - Activation concerns happen at activation time.
 - Permission hardening happens after successful activation, not before.
 - If a deploy fails pre-activation, it leaves no live-state mutations.
+- Shared import validates and expands untrusted ZIP input in a private same-filesystem transaction. Services stop only for environment carryover and atomic exchange; restart failure restores the previous shared tree before cleanup.
 
 ### Framework convention
 - Rust owns framework questions, centralized validation, defaults, permission defaults, and build-environment generation.

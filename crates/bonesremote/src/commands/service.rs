@@ -1,3 +1,4 @@
+use std::iter::once;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
@@ -15,6 +16,34 @@ pub fn run(mutation: &SiteMutation) -> Result<()> {
 
 pub fn run_for_release(mutation: &SiteMutation) -> Result<()> {
     run_with_options(mutation, false)
+}
+
+pub fn stop(mutation: &SiteMutation) -> Result<()> {
+    privileges::ensure_root("bonesremote shared import")?;
+
+    let target_name = paths::site_target_name(mutation.site());
+    let services = systemd::required_services(&target_name)?;
+    if services.is_empty() {
+        bail!("Site target {target_name} has no registered services");
+    }
+
+    let status = Command::new("systemctl")
+        .args(["stop", "--", &target_name])
+        .status()
+        .with_context(|| format!("Failed to stop {target_name}"))?;
+    if !status.success() {
+        bail!("Failed to stop {target_name}");
+    }
+    let active: Vec<&str> = services
+        .iter()
+        .map(String::as_str)
+        .chain(once(target_name.as_str()))
+        .filter(|unit| systemd::is_active(unit))
+        .collect();
+    if !active.is_empty() {
+        bail!("Site services are still active after stopping {target_name}: {}", active.join(", "));
+    }
+    Ok(())
 }
 
 fn run_with_options(mutation: &SiteMutation, start_target: bool) -> Result<()> {

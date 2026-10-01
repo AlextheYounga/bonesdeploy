@@ -439,6 +439,45 @@ does not stop the application, so files changed during transfer are not a
 point-in-time snapshot. It uses the configured root SSH connection directly and
 is separate from scheduled Borg backups.
 
+## Import Shared Data
+
+Replace the configured site's remote `shared/` directory from an
+export-compatible ZIP archive:
+
+```sh
+bonesdeploy site import ./atlas-shared.zip
+bonesdeploy site import ./atlas-shared.zip --yes
+```
+
+Without `--yes`, you must type the configured project name exactly. Import is a
+replacement, not a merge: every remote shared entry absent from the archive is
+removed. The archive must contain only entries rooted beneath one top-level
+`shared/` directory. An archive made from a manually synchronized site directory
+is accepted when it has that layout, for example by running
+`zip -r -y atlas-shared.zip shared` from the directory containing `shared/`.
+
+The archive's `shared/.env` is ignored. The existing protected remote `.env` is
+carried into the replacement, and `bonesdeploy secrets push` remains its only
+writer. Import stages and validates the complete ZIP while the site remains
+available, then briefly stops the site target for an atomic directory exchange.
+Services are restarted and verified before the previous directory is deleted. If
+restart fails, BonesDeploy restores and restarts the previous directory. A later
+import or secrets push recovers an interrupted cutover before changing shared
+state.
+
+The server must simultaneously hold the current shared tree, the uploaded ZIP,
+the expanded replacement, and a 512 MiB safety reserve. Imported files are
+re-owned by the site's runtime identity with restrictive permissions. Absolute
+or traversing paths, unsafe symlinks, duplicate/conflicting paths, special files,
+and excessive archives are rejected before cutover. Treat every import archive
+as sensitive even though its `.env` is not installed.
+
+Application state is restored opaquely. For Laravel this includes file sessions,
+caches, compiled views, logs, and uploads under `shared/`; database or Redis state
+is not coordinated. Check application consistency after import. Run commands
+such as `php artisan optimize:clear` manually only when appropriate for that
+application and archive.
+
 ## Scheduled Backups
 
 Projects initialized by BonesDeploy get one encrypted Borg repository per site
@@ -493,7 +532,8 @@ environments. `.env.build` is the committed, non-secret build configuration.
 Runtime secrets are edited through `bonesdeploy secrets edit`, stored encrypted
 at `infra/secrets/.env.gpg`, and explicitly sent as the complete protected
 remote `shared/.env` with `bonesdeploy secrets push`. The push atomically
-replaces the remote file; it does not read, merge, or upload the local root
+replaces the remote file through the same site mutation lock used by shared
+imports; it does not read, merge, or upload the local root
 `.env`. `bonesdeploy deploy` does not push environment values. The local managed
 block supplies the values used to derive BonesRemote's narrow deployment
 descriptor at deploy time. Only release retention and the selected backend's

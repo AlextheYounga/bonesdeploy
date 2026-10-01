@@ -74,3 +74,32 @@ fn decommission_protocol_commands_accept_a_site_argument() -> Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn shared_commands_accept_a_site_argument() -> Result<()> {
+    for command in ["import", "install-environment"] {
+        let output = common::run(&["shared", command, "--site", "atlas"])?;
+        assert_ne!(output.status.code(), Some(2), "shared {command} must accept --site");
+    }
+    Ok(())
+}
+
+#[test]
+fn shared_commands_require_a_site_argument() -> Result<()> {
+    for command in ["import", "install-environment"] {
+        let output = common::run(&["shared", command])?;
+        assert_eq!(output.status.code(), Some(2), "shared {command} must require --site");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains("--site"), "missing-site error should mention --site: {stderr}");
+    }
+    Ok(())
+}
+
+#[test]
+fn shared_commands_reject_extra_path_arguments() -> Result<()> {
+    for command in ["import", "install-environment"] {
+        let output = common::run(&["shared", command, "--site", "atlas", "/tmp/shared"])?;
+        assert_eq!(output.status.code(), Some(2), "shared {command} must reject extra paths");
+    }
+    Ok(())
+}

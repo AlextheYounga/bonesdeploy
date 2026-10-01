@@ -6,6 +6,7 @@ pub mod doctor;
 pub mod drop_failed_release;
 pub mod release;
 pub mod service;
+pub mod shared;
 pub mod status;
 pub mod version;
 

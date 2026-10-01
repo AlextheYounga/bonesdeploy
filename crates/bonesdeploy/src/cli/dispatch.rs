@@ -81,6 +81,7 @@ async fn dispatch_site(command: &SiteCommand) -> Result<()> {
             TunnelCommand::Status => site::tunnel_status().await,
         },
         SiteCommand::Export { output } => site::export(output.as_deref()).await,
+        SiteCommand::Import { archive, yes } => site::import(archive, *yes).await,
         SiteCommand::Manifest { format } => site::manifest(match format {
             ManifestFormat::Text => "text",
             ManifestFormat::Json => "json",
