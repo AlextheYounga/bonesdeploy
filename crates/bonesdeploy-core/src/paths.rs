@@ -26,6 +26,7 @@ pub const LOCAL_INFRA_DIR: &str = "infra";
 pub const LOCAL_INFRA_DEPLOYMENT_DIR: &str = "infra/deployment";
 pub const LOCAL_INFRA_TEMPLATES_DIR: &str = "infra/templates";
 pub const LOCAL_INFRA_SECRETS_DIR: &str = "infra/secrets";
+pub const LOCAL_INFRA_ENV_SECRET: &str = "infra/secrets/.env.gpg";
 pub const DOT_ENV: &str = ".env";
 pub const ENV_BUILD_FILE: &str = ".env.build";
 

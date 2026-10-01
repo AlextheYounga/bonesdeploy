@@ -74,6 +74,8 @@ pub enum Command {
         #[command(subcommand)]
         command: SecretsCommand,
     },
+    /// Build and package the configured deployment locally without deploying it
+    Build,
     /// Deploy the configured project release to the remote server
     Deploy,
     /// Update BonesDeploy, BonesRemote, and project infrastructure to the latest version

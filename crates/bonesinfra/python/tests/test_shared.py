@@ -27,7 +27,13 @@ def test_framework_shared_directories_are_directories_only():
 
 
 def test_laravel_declares_all_shared_runtime_directories():
-    assert LARAVEL_SHARED_DIRECTORIES == ("storage", "storage/framework/views", "cache", "uploads")
+    assert LARAVEL_SHARED_DIRECTORIES == (
+        "storage",
+        "storage/framework/sessions",
+        "storage/framework/views",
+        "cache",
+        "uploads",
+    )
 
 
 def test_ensure_directories_creates_only_declared_directories(monkeypatch):

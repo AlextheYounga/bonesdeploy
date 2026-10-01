@@ -20,7 +20,6 @@ use bonesdeploy_core::paths;
 mod environment;
 pub mod gpg;
 
-const LOCAL_ENV_SECRET: &str = "infra/secrets/.env.gpg";
 const DEFAULT_SECRET_MODE: &str = "640";
 
 fn environment_to_push(plaintext: &str) -> Result<&str> {
@@ -43,7 +42,7 @@ pub fn init() -> Result<()> {
 }
 
 pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
-    let encrypted_path = Path::new(LOCAL_ENV_SECRET);
+    let encrypted_path = Path::new(paths::LOCAL_INFRA_ENV_SECRET);
     if encrypted_path.is_file() {
         return Ok(());
     }
@@ -99,7 +98,7 @@ pub fn edit() -> Result<()> {
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
     let key_fingerprint = gpg::ensure_project_key(&cfg.project_name)?;
 
-    let encrypted_path = Path::new(LOCAL_ENV_SECRET);
+    let encrypted_path = Path::new(paths::LOCAL_INFRA_ENV_SECRET);
 
     if let Some(parent) = encrypted_path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("Failed to create {}", parent.display()))?;
@@ -160,7 +159,7 @@ pub async fn push() -> Result<()> {
     let port = parse_port(&cfg.port)?;
     let session = ssh::SshTransport::connect_as(&ssh_user, &cfg.host, port).await?;
 
-    let encrypted_path = Path::new(LOCAL_ENV_SECRET);
+    let encrypted_path = Path::new(paths::LOCAL_INFRA_ENV_SECRET);
     if !encrypted_path.is_file() {
         bail!("Missing encrypted secrets\n\n{}", output::next_step("bonesdeploy secrets edit"));
     }

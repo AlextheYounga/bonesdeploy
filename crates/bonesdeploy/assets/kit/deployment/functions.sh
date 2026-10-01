@@ -2,7 +2,7 @@
 
 BUILD_NODE_TMP_DIR=""
 BUILD_RUBY_TMP_DIR=""
-COREPACK_LEGACY_VERSION="0.31.0"
+COREPACK_COMPAT_VERSION="0.31.0"
 COREPACK_MODERN_VERSION="0.34.5"
 
 log() {
@@ -233,7 +233,7 @@ node_corepack_version() {
 		{ [ "$major" -eq 20 ] && [ "$minor" -lt 10 ]; }; then
 		echo "0.24.1"
 	elif [ "$major" -eq 18 ]; then
-		echo "$COREPACK_LEGACY_VERSION"
+		echo "$COREPACK_COMPAT_VERSION"
 	else
 		echo "$COREPACK_MODERN_VERSION"
 	fi

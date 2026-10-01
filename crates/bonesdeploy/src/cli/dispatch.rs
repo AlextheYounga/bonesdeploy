@@ -3,7 +3,7 @@ use anyhow::Result;
 use crate::cli::args::{
     Cli, Command, ManifestFormat, ReleasesCommand, SecretsCommand, ServerCommand, SiteCommand, TunnelCommand,
 };
-use crate::commands::{deploy, init, rollback, secrets, server, setup, site, skill, update, version};
+use crate::commands::{build, deploy, init, rollback, secrets, server, setup, site, skill, update, version};
 
 pub async fn run(cli: &Cli) -> Result<()> {
     match &cli.command {
@@ -35,6 +35,7 @@ pub async fn run(cli: &Cli) -> Result<()> {
         Command::Site { command } => dispatch_site(command).await,
         Command::Skill { command } => skill::dispatch(command.as_ref()).await,
         Command::Secrets { command } => dispatch_secrets(command).await,
+        Command::Build => build::run(),
         Command::Deploy => deploy::run().await,
         Command::Update { skip_local, skip_remote, continue_update } => {
             update::run(update::Options {

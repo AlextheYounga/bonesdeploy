@@ -6,7 +6,7 @@ from bonesinfra.services.linux import runtime, shared, systemd
 from bonesinfra.services.linux.nginx import site
 
 TEMPLATES = TEMPLATES_DIR / "frameworks/laravel"
-SHARED_DIRECTORIES = ("storage", "storage/framework/views", "cache", "uploads")
+SHARED_DIRECTORIES = ("storage", "storage/framework/sessions", "storage/framework/views", "cache", "uploads")
 
 
 def deploy(ctx):

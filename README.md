@@ -326,6 +326,12 @@ stop` after the real domain is ready.
 
 ## Deploy
 
+Verify the configured deployment branch builds locally without contacting the server:
+
+```sh
+bonesdeploy build
+```
+
 Deploy:
 
 ```sh

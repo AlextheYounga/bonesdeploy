@@ -60,7 +60,9 @@ mod tests {
         config.branch = String::from("master");
         config.runtime.template = String::from("laravel");
 
-        let error = native_build_scripts(&config, source.path()).expect_err("missing Laravel build scripts must fail");
+        let Err(error) = native_build_scripts(&config, source.path()) else {
+            anyhow::bail!("missing Laravel build scripts must fail");
+        };
 
         assert!(error.to_string().contains("Committed deploy branch 'master' has no native build scripts"));
         Ok(())
