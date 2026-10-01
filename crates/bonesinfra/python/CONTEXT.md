@@ -123,7 +123,7 @@ bonesinfra manifest show --request-stdin
 `site preflight` emits the JSON deletion plan supported by the current manifest.
 `site delete` stops the declared site services before removing those validated
 artifacts. This Python-only boundary currently covers manifest filesystem paths
-and systemd services; BonesRemote persistence, coordination, and resources not
+and systemd services; BonesRemote registration removal and resources not
 represented by the manifest remain outside it.
 
 This command surface is an internal contract with `bonesdeploy`. Runtime

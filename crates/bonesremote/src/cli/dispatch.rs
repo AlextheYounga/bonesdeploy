@@ -1,11 +1,10 @@
 use anyhow::Result;
 
 use crate::cli::args::{
-    BackupCommand, Cli, Command, ConfigCommand, DecommissionCommand, ReleaseCommand, RuntimeCommand, ServiceCommand,
-    SharedCommand,
+    BackupCommand, Cli, Command, ConfigCommand, ReleaseCommand, RuntimeCommand, ServiceCommand, SharedCommand,
 };
 use crate::commands::{
-    backup, config, decommission, deploy, doctor, drop_failed_release, release, service, shared, status, version,
+    backup, config, deploy, doctor, drop_failed_release, release, service, shared, site_registration, status, version,
 };
 use crate::release::SiteMutation;
 use crate::runtime::docker;
@@ -15,12 +14,7 @@ pub fn run(cli: &Cli) -> Result<()> {
         Command::Doctor { site, exhaustive } => doctor::run(site.as_deref(), *exhaustive),
         Command::Deploy { site } => deploy::run_artifact(site),
         Command::Config { command: ConfigCommand::Sync { site } } => config::sync(site),
-        Command::Decommission { command } => match command {
-            DecommissionCommand::Begin { site } => decommission::begin(site),
-            DecommissionCommand::Complete { site } => decommission::complete(site),
-            DecommissionCommand::Verify { site } => decommission::verify(site),
-            DecommissionCommand::Reactivate { site } => decommission::reactivate(site),
-        },
+        Command::RemoveSite { site } => site_registration::remove(site),
         Command::Status { site } => status::run(site),
         Command::Release { command } => match command {
             ReleaseCommand::List { site: site_name } => release::list::run(site_name),

@@ -5,7 +5,6 @@ use bonesdeploy_core::{config::RuntimeBackend, paths};
 
 use crate::build::native;
 use crate::commands::server;
-use crate::infra::ssh;
 use crate::ui::output;
 use crate::ui::prompts;
 use crate::{config, infra};
@@ -26,11 +25,6 @@ pub async fn run(yes: bool) -> Result<()> {
     let request = infra::provisioning_request(&cfg)?;
     bonesinfra::run_with_request(&["site", "apply", "--request-stdin"], &request)?;
     super::runtime::apply()?;
-
-    let session = ssh::SshTransport::connect_privileged(&cfg).await?;
-    let reactivate = infra::decommission_command("reactivate", &cfg.project_name);
-    session.run_cmd(&reactivate).await?;
-    session.close().await?;
 
     super::doctor::run_with_pending(false, false).await.context("Site setup failed while checking site")?;
     println!();

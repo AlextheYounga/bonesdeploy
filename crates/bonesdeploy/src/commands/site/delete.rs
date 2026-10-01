@@ -42,23 +42,20 @@ pub async fn run(yes: bool) -> Result<()> {
         return Ok(());
     }
 
-    let session = ssh::SshTransport::connect_privileged(&cfg).await?;
-    let begin = infra::decommission_command("begin", &cfg.project_name);
-    let plan = session.run_cmd_with_stdin_output(&begin, preflight.as_bytes()).await?;
-    let plan = plan.trim();
-    if plan.is_empty() {
-        anyhow::bail!("BonesRemote returned an empty deletion plan");
-    }
-
-    let delete_args = ["site", "delete", "--request-stdin", "--plan-json", plan];
+    let delete_args = ["site", "delete", "--request-stdin", "--plan-json", preflight.trim()];
     bonesinfra::run_with_request(&delete_args, &request)
         .context("Site deletion stopped before completion; rerun the command to resume")?;
 
-    let complete = infra::decommission_command("complete", &cfg.project_name);
-    session.run_cmd(&complete).await?;
-    let verify = infra::decommission_command("verify", &cfg.project_name);
-    session.run_cmd(&verify).await?;
-    session.close().await?;
+    let session = ssh::SshTransport::connect_privileged(&cfg).await.context(
+        "Site resources were removed, but BonesRemote registration cleanup could not connect; rerun the command",
+    )?;
+    session
+        .run_cmd(&infra::remove_site_command(&cfg.project_name))
+        .await
+        .context("Site resources were removed, but BonesRemote registration cleanup failed; rerun the command")?;
+    session.close().await.context(
+        "Site resources and registration were removed, but the SSH session did not close cleanly; rerunning is safe",
+    )?;
 
     println!("{} Site deletion complete.", output::success_marker());
     Ok(())

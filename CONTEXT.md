@@ -290,7 +290,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 
 - **site delete**
   - Runs a local, read-only manifest preflight before any remote mutation and requires the exact configured project name unless `--yes` is supplied.
-  - Persists the validated, secret-free inventory in BonesRemote before stopping declared services and removing declared artifacts. A retry uses that persisted plan, while normal deployment mutations remain blocked by decommissioning or tombstone state.
+  - Passes that validated, secret-free inventory directly to BonesInfra, which idempotently stops declared services and removes declared artifacts. After teardown succeeds, BonesRemote removes the site's registration under the deployment lock; missing resources and registration are successful no-ops.
   - Retains local project source, Git configuration, secrets, and caches. It does not remove shared host packages or daemons.
 
 - **site export**
@@ -322,7 +322,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Site base creates site identities, paths, root-owned control-plane state, and a placeholder release.
   - For projects with a configured Borg passphrase, site base also provisions the scheduled backup: root-only passphrase file, encrypted repository, and the `/etc/cron.d` schedule entry. Borg itself is installed during server setup.
    - Does not push Git or secrets, configure SSL, or deploy a release.
-   - Clears a verified deletion tombstone only after provisioning succeeds; an unverified tombstone remains blocked until deletion is rerun.
+   - Can provision a site afresh after deletion because completed deletion removes the prior BonesRemote registration.
 
 `bonesdeploy update` resolves the latest published GitHub release, validates that
 its `v<version>` tag matches both package manifests, clones that exact tag for

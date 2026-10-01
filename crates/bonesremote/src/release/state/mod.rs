@@ -1,12 +1,13 @@
 use std::cell::RefCell;
 use std::fs;
 use std::fs::{File, OpenOptions, TryLockError};
+use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::thread_local;
 
 use anyhow::{Context, Result, bail};
 
-use bonesdeploy_core::paths;
+use bonesdeploy_core::{config, paths};
 
 pub mod atomic;
 pub mod record;
@@ -18,7 +19,7 @@ pub use record::{DeploymentPhase, DeploymentRecord, ProcessIdentity};
 pub use releases::{
     current_release_dir, current_release_name, list_releases_sorted, point_symlink_atomically, release_dir, shared_dir,
 };
-pub use store::{DeletionPlan, quarantine_candidates};
+pub use store::quarantine_candidates;
 
 thread_local! {
     static SITES_ROOT_OVERRIDE: RefCell<Option<PathBuf>> = const { RefCell::new(None) };
@@ -140,68 +141,21 @@ pub fn clear_staged_release(site: &str) -> Result<()> {
     store::write_state(site, &state).with_context(|| format!("Failed to clear staged release state for {site}"))
 }
 
-/// Begins deletion protection, retaining the first accepted plan for retries.
-pub fn begin_decommission(site: &str, plan: DeletionPlan) -> Result<DeletionPlan> {
-    let state = store::read_state(site)?;
-    if let Some(plan) = state.decommissioning() {
-        return Ok(plan.clone());
+pub fn remove_site_registration(site: &str) -> Result<()> {
+    config::validate_site_name(site)?;
+    let sites_root = resolved_sites_root();
+    let site_root = resolved_site_root(site);
+    if site_root.parent() != Some(sites_root.as_path()) {
+        bail!("Refusing to remove site registration outside {}", sites_root.display());
     }
-    if let Some(tombstone) = state.tombstone() {
-        return Ok(tombstone.plan().clone());
-    }
-    if state.active().is_some_and(|active| !active.phase().is_committed()) {
-        bail!("A deployment is active or interrupted; resolve it before decommissioning {site}");
-    }
-    if state.staged_release().is_some() && state.active().is_none() {
-        bail!("A staged release is interrupted; resolve it before decommissioning {site}");
-    }
-
-    store::write_state(site, &state.with_decommissioning(Some(plan.clone())))?;
-    Ok(plan)
-}
-
-/// Replaces mutable deployment state with an unverified tombstone.
-pub fn complete_decommission(site: &str) -> Result<()> {
-    let state = store::read_state(site)?;
-    if state.tombstone().is_some() {
-        return Ok(());
-    }
-    let plan = state.decommissioning().cloned().context("Site is not decommissioning")?;
-    let tombstone = store::DeletionTombstone::new(plan);
-    let state =
-        state.with_active(None).with_staged_release(None).with_decommissioning(None).with_tombstone(Some(tombstone));
-    store::write_state(site, &state)
-}
-
-/// Marks a completed tombstone verified without ever reopening site mutations.
-pub fn verify_decommission(site: &str) -> Result<()> {
-    let state = store::read_state(site)?;
-    let tombstone = state.tombstone().cloned().context("Site deletion state has not been completed")?;
-    if tombstone.verified() {
-        return Ok(());
-    }
-    store::write_state(site, &state.with_tombstone(Some(tombstone.verify())))
-}
-
-/// Clears deletion protection only after final deletion verification succeeded.
-pub fn reactivate_decommission(site: &str) -> Result<()> {
-    let state = store::read_state(site)?;
-    let Some(tombstone) = state.tombstone() else {
-        return Ok(());
+    let metadata = match fs::symlink_metadata(&site_root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error).with_context(|| format!("Failed to inspect {}", site_root.display())),
     };
-    if !tombstone.verified() {
-        bail!("Site deletion has not been verified; refusing to reactivate {site}");
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        bail!("Refusing to recursively remove non-directory site registration {}", site_root.display());
     }
-    store::write_state(site, &state.with_tombstone(None))
-}
-
-pub fn ensure_site_mutable(site: &str) -> Result<()> {
-    let state = store::read_state(site)?;
-    if state.decommissioning().is_some() {
-        bail!("Site {site} is decommissioning; normal site mutations are blocked");
-    }
-    if state.tombstone().is_some() {
-        bail!("Site {site} has been deleted; normal site mutations are blocked");
-    }
-    Ok(())
+    fs::remove_dir_all(&site_root)
+        .with_context(|| format!("Failed to remove site registration {}", site_root.display()))
 }

@@ -401,9 +401,10 @@ bonesdeploy site delete --yes
 ```
 
 Deletion is irreversible. Without `--yes`, you must type the configured project
-name exactly. It preserves local source, Git configuration, secrets, and
-BonesInfra caches, while persisting remote decommissioning state so an
-interrupted deletion remains blocked from deployment and can be rerun safely.
+name exactly. It preserves local source, Git configuration, secrets, BonesInfra
+caches, and shared host resources. The command removes the site's BonesRemote
+registration after teardown succeeds and can be rerun when resources or the
+registration are already absent.
 
 Embedded documentation for AI agents lives under the `skill` command:
 

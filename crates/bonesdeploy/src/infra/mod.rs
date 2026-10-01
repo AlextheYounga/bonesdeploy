@@ -36,13 +36,13 @@ pub fn shared_install_environment_command(site: &str) -> String {
     format!("sudo -n bonesremote shared install-environment --site {}", ssh::shell_quote(site))
 }
 
-pub fn decommission_command(action: &str, site: &str) -> String {
-    format!("sudo -n bonesremote decommission {action} --site {}", ssh::shell_quote(site))
+pub fn remove_site_command(site: &str) -> String {
+    format!("sudo -n bonesremote remove-site --site {}", ssh::shell_quote(site))
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{artifact_deploy_command, decommission_command, sync_control_plane_command};
+    use super::{artifact_deploy_command, remove_site_command, sync_control_plane_command};
 
     #[test]
     fn artifact_deploy_command_uses_the_current_remote_cli_form() {
@@ -55,7 +55,7 @@ mod tests {
     }
 
     #[test]
-    fn decommission_command_runs_a_sudoed_remote_transition() {
-        assert_eq!(decommission_command("begin", "demo"), "sudo -n bonesremote decommission begin --site 'demo'");
+    fn remove_site_command_runs_a_sudoed_remote_cleanup() {
+        assert_eq!(remove_site_command("demo"), "sudo -n bonesremote remove-site --site 'demo'");
     }
 }

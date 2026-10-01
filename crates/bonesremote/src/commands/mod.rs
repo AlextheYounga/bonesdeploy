@@ -1,12 +1,12 @@
 pub mod backup;
 pub mod config;
-pub mod decommission;
 pub mod deploy;
 pub mod doctor;
 pub mod drop_failed_release;
 pub mod release;
 pub mod service;
 pub mod shared;
+pub mod site_registration;
 pub mod status;
 pub mod version;
 

@@ -22,6 +22,8 @@ pub fn collect_path_tree(path: &Path, follow_symlink_targets: bool) -> Result<Pa
 pub fn collect_release(site: &Site, exhaustive: bool) -> Result<ReleaseEvidence, String> {
     let current_path = site.project_root.join(paths::CURRENT_LINK);
     let releases_path = site.project_root.join(paths::RELEASES_DIR);
+    let releases_root = fs::canonicalize(&releases_path)
+        .map_err(|error| format!("cannot resolve releases root {}: {error}", releases_path.display()))?;
     let current = match fs::symlink_metadata(&current_path) {
         Ok(metadata) if !metadata.file_type().is_symlink() => CurrentState::NotSymlink,
         Ok(_) => match fs::canonicalize(&current_path) {
@@ -31,20 +33,6 @@ pub fn collect_release(site: &Site, exhaustive: bool) -> Result<ReleaseEvidence,
         },
         Err(error) if error.kind() == ErrorKind::NotFound => CurrentState::Missing,
         Err(error) => return Err(format!("cannot inspect {}: {error}", current_path.display())),
-    };
-    let releases_root = match fs::canonicalize(&releases_path) {
-        Ok(path) => path,
-        Err(error) if error.kind() == ErrorKind::NotFound && current == CurrentState::Missing => {
-            return Ok(ReleaseEvidence {
-                site: site.name.clone(),
-                releases_root: releases_path,
-                current,
-                filesystem: PathTree { requested: current_path, nodes: BTreeMap::new() },
-            });
-        }
-        Err(error) => {
-            return Err(format!("cannot resolve releases root {}: {error}", releases_path.display()));
-        }
     };
 
     let mut nodes = BTreeMap::new();

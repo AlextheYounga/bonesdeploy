@@ -8,47 +8,6 @@ use serde::{Deserialize, Serialize};
 use super::record::{DeploymentRecord, PreviousDeployment};
 use super::{atomic_write, resolved_site_root};
 
-/// A deletion plan is intentionally opaque to BonesRemote. Its producer and
-/// executor own its schema; BonesRemote only persists it durably.
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(transparent)]
-pub struct DeletionPlan(serde_json::Value);
-
-impl DeletionPlan {
-    pub fn new(value: serde_json::Value) -> Self {
-        Self(value)
-    }
-
-    pub fn value(&self) -> &serde_json::Value {
-        &self.0
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct DeletionTombstone {
-    plan: DeletionPlan,
-    verified: bool,
-}
-
-impl DeletionTombstone {
-    pub fn new(plan: DeletionPlan) -> Self {
-        Self { plan, verified: false }
-    }
-
-    pub fn plan(&self) -> &DeletionPlan {
-        &self.plan
-    }
-
-    pub fn verified(&self) -> bool {
-        self.verified
-    }
-
-    pub fn verify(mut self) -> Self {
-        self.verified = true;
-        self
-    }
-}
-
 /// The centrally-stored, authoritative per-site deployment state.
 ///
 /// One JSON document per site is the only runtime-mutated state file: the
@@ -64,10 +23,6 @@ pub struct SiteState {
     active: Option<DeploymentRecord>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     staged_release: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    decommissioning: Option<DeletionPlan>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    tombstone: Option<DeletionTombstone>,
 }
 
 impl SiteState {
@@ -83,20 +38,6 @@ impl SiteState {
     }
     pub fn with_staged_release(mut self, staged_release: Option<String>) -> Self {
         self.staged_release = staged_release;
-        self
-    }
-    pub fn decommissioning(&self) -> Option<&DeletionPlan> {
-        self.decommissioning.as_ref()
-    }
-    pub fn tombstone(&self) -> Option<&DeletionTombstone> {
-        self.tombstone.as_ref()
-    }
-    pub fn with_decommissioning(mut self, plan: Option<DeletionPlan>) -> Self {
-        self.decommissioning = plan;
-        self
-    }
-    pub fn with_tombstone(mut self, tombstone: Option<DeletionTombstone>) -> Self {
-        self.tombstone = tombstone;
         self
     }
 }
@@ -164,7 +105,7 @@ fn migrate_previous(site: &str) -> Result<SiteState> {
         return Ok(SiteState::default());
     }
 
-    let state = SiteState { schema_version: SCHEMA_VERSION, active, staged_release, ..SiteState::default() };
+    let state = SiteState { schema_version: SCHEMA_VERSION, active, staged_release };
     write_state(site, &state)?;
 
     if previous_active_path.exists() {

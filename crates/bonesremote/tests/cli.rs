@@ -67,11 +67,9 @@ fn deploy_rejects_the_removed_revision_option() -> Result<()> {
 }
 
 #[test]
-fn decommission_protocol_commands_accept_a_site_argument() -> Result<()> {
-    for command in ["begin", "complete", "verify", "reactivate"] {
-        let output = common::run(&["decommission", command, "--site", "atlas"])?;
-        assert_ne!(output.status.code(), Some(2), "{command} must accept --site");
-    }
+fn remove_site_accepts_a_site_argument() -> Result<()> {
+    let output = common::run(&["remove-site", "--site", "atlas"])?;
+    assert_ne!(output.status.code(), Some(2), "remove-site must accept --site");
     Ok(())
 }
 

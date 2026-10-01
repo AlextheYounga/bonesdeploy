@@ -1,5 +1,3 @@
-#[path = "commands/decommission.rs"]
-mod decommission;
 #[path = "commands/deploy_coordinator.rs"]
 mod deploy_coordinator;
 #[path = "commands/deploy_rollback.rs"]
@@ -36,5 +34,7 @@ mod release_prune;
 mod release_recover;
 #[path = "commands/root.rs"]
 mod root;
+#[path = "commands/site_registration.rs"]
+mod site_registration;
 #[path = "commands/status.rs"]
 mod status;

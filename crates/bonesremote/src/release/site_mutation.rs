@@ -32,7 +32,6 @@ impl SiteMutation {
     pub(crate) fn acquire(site: &str) -> Result<Self> {
         config::validate_site_name(site)?;
         let _lock = DeploymentLock::acquire(site)?;
-        state::ensure_site_mutable(site)?;
         let config = Bones::for_site(site);
         Ok(Self::new(site, config, _lock))
     }
@@ -42,14 +41,12 @@ impl SiteMutation {
     pub(crate) fn acquire_with_config(site: &str, config: Bones) -> Result<Self> {
         config::validate_site_name(site)?;
         let _lock = DeploymentLock::acquire(site)?;
-        state::ensure_site_mutable(site)?;
         Ok(Self::new(site, config, _lock))
     }
 
     /// Adopts an already-held lock for cancellation, which must stop a live
     /// deployment process before the lock becomes available.
     pub fn adopt(site: &str, config: Bones, lock: DeploymentLock) -> Result<Self> {
-        state::ensure_site_mutable(site)?;
         Ok(Self::new(site, config, lock))
     }
 

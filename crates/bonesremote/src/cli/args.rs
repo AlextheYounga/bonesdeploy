@@ -29,10 +29,10 @@ pub enum Command {
         #[command(subcommand)]
         command: ConfigCommand,
     },
-    /// Persist and finalize remote site decommissioning state
-    Decommission {
-        #[command(subcommand)]
-        command: DecommissionCommand,
+    /// Remove one site's BonesRemote registration after resource teardown
+    RemoveSite {
+        #[arg(long)]
+        site: String,
     },
     /// Print remote deployment status as JSON
     Status {
@@ -72,30 +72,6 @@ pub enum Command {
 pub enum ConfigCommand {
     /// Install a site configuration snapshot read from stdin
     Sync {
-        #[arg(long)]
-        site: String,
-    },
-}
-
-#[derive(Subcommand)]
-pub enum DecommissionCommand {
-    /// Persist a deletion plan read as JSON from stdin and print the stored plan
-    Begin {
-        #[arg(long)]
-        site: String,
-    },
-    /// Replace mutable deployment state with an unverified deletion tombstone
-    Complete {
-        #[arg(long)]
-        site: String,
-    },
-    /// Mark a completed deletion tombstone verified
-    Verify {
-        #[arg(long)]
-        site: String,
-    },
-    /// Clear a verified deletion tombstone after successful site setup
-    Reactivate {
         #[arg(long)]
         site: String,
     },
