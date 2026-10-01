@@ -8,6 +8,7 @@ use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result, bail};
+use rustix::fs::{CWD, RenameFlags, renameat_with};
 
 pub fn exchange_directories(left: &Path, right: &Path) -> Result<()> {
     let left_metadata = real_directory_metadata(left)?;
@@ -15,19 +16,8 @@ pub fn exchange_directories(left: &Path, right: &Path) -> Result<()> {
     if left_metadata.dev() != right_metadata.dev() {
         bail!("Cannot atomically exchange directories on different filesystems");
     }
-    let left = CString::new(left.as_os_str().as_bytes()).context("Left exchange path contains a NUL byte")?;
-    let right = CString::new(right.as_os_str().as_bytes()).context("Right exchange path contains a NUL byte")?;
-    // SAFETY: both pointers are valid NUL-terminated path strings. The call
-    // does not retain either pointer, and both paths were verified as real
-    // directories on one filesystem immediately before the syscall.
-    let result = unsafe {
-        libc::renameat2(libc::AT_FDCWD, left.as_ptr(), libc::AT_FDCWD, right.as_ptr(), libc::RENAME_EXCHANGE)
-    };
-    if result != 0 {
-        let error = Error::last_os_error();
-        bail!("Atomic shared directory exchange is not supported or failed: {error}");
-    }
-    Ok(())
+    renameat_with(CWD, left, CWD, right, RenameFlags::EXCHANGE)
+        .context("Atomic shared directory exchange is not supported or failed")
 }
 
 pub(super) fn create_transaction_directory(project_root: &Path) -> Result<PathBuf> {
