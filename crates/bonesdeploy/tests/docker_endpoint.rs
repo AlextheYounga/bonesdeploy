@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::Read;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 use std::thread;
 use std::time::Duration;
 
@@ -202,7 +202,7 @@ struct DockerFixture<'a> {
     docker_log: &'a Path,
 }
 
-fn run_helper<'a, I>(fixture: DockerFixture<'_>, helper: &str, variables: I) -> Result<std::process::Output>
+fn run_helper<'a, I>(fixture: DockerFixture<'_>, helper: &str, variables: I) -> Result<Output>
 where
     I: IntoIterator<Item = (&'a str, &'a str)>,
 {

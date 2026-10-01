@@ -277,7 +277,9 @@ host resources such as package indexes and security configuration.
 This runs the provisioning from your project's versioned `infra/bonesinfra-*.whl`:
 framework services, per-site nginx, AppArmor, and your `infra/custom/` project
 extensions. Templates rendered by the managed framework come from
-`infra/templates/`.
+`infra/templates/`. The wheel is the complete universal BonesInfra package;
+after materializing `infra/`, BonesDeploy removes template paths belonging to
+unselected frameworks.
 
 Site setup and runtime provisioning do not install or start Cloudflare. To
 explicitly expose a site through an accountless Quick Tunnel, run:

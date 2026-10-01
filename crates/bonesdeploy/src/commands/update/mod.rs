@@ -51,9 +51,9 @@ pub async fn run(options: Options) -> Result<()> {
             return continue_with_installed_binary(options);
         }
 
-        if Path::new(paths::DOT_ENV).exists() {
-            bonesinfra::materialize_project_artifacts(Path::new("."))?;
+        let template = if Path::new(paths::DOT_ENV).exists() {
             let cfg = config::load(Path::new(paths::DOT_ENV))?;
+            bonesinfra::materialize_project_artifacts(Path::new("."), &cfg.runtime)?;
             let request = infra::provisioning_request(&cfg)?;
             bonesinfra::run_with_request(
                 &[
@@ -67,9 +67,7 @@ pub async fn run(options: Options) -> Result<()> {
                 ],
                 &request,
             )?;
-        }
-        let template = if Path::new(paths::DOT_ENV).exists() {
-            let template = config::load(Path::new(paths::DOT_ENV))?.runtime.template;
+            let template = cfg.runtime.template;
             (!template.is_empty()).then_some(template)
         } else {
             None
