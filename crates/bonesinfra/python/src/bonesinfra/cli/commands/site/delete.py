@@ -33,9 +33,5 @@ def deploy_site_delete(_ctx, plan: DeletionPlan) -> None:
 def _remove_artifact(name: str, path: str, kind: ArtifactKind) -> None:
     if kind == "directory":
         files.directory(name=f"Remove {name}", path=path, present=False, recursive=True, _sudo=True)
-    elif kind == "link":
-        files.link(name=f"Remove {name}", path=path, present=False, _sudo=True)
-    elif kind == "socket":
-        server.shell(name=f"Remove {name}", commands=[f"rm -f -- {quote(path)}"], _sudo=True)
     else:
-        files.file(name=f"Remove {name}", path=path, present=False, _sudo=True)
+        server.shell(name=f"Remove {name}", commands=[f"rm -f -- {quote(path)}"], _sudo=True)

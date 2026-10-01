@@ -71,8 +71,7 @@ def test_deletion_stops_services_before_removing_artifacts(monkeypatch: pytest.M
     calls = []
     monkeypatch.setattr(delete.systemd, "service", lambda **kwargs: calls.append(("service", kwargs["service"])))
     monkeypatch.setattr(delete.files, "directory", lambda **kwargs: calls.append(("directory", kwargs["path"])))
-    monkeypatch.setattr(delete.files, "file", lambda **kwargs: calls.append(("file", kwargs["path"])))
-    monkeypatch.setattr(delete.files, "link", lambda **kwargs: calls.append(("link", kwargs["path"])))
+    monkeypatch.setattr(delete.server, "shell", lambda **kwargs: calls.append(("shell", kwargs["commands"][0])))
     plan = DeletionPlan(
         artifacts=(
             DeletionArtifact("site root", "/srv/sites/example", "directory", "setup"),
@@ -85,16 +84,19 @@ def test_deletion_stops_services_before_removing_artifacts(monkeypatch: pytest.M
 
     assert calls == [
         ("service", "example-app.service"),
-        ("file", "/srv/sites/example/config"),
+        ("shell", "rm -f -- /srv/sites/example/config"),
         ("directory", "/srv/sites/example"),
     ]
 
 
-def test_deletion_removes_unix_sockets_without_treating_them_as_regular_files(monkeypatch: pytest.MonkeyPatch):
+@pytest.mark.parametrize("persisted_kind", ["file", "socket"])
+def test_deletion_removes_unix_sockets_from_current_and_legacy_plans(
+    monkeypatch: pytest.MonkeyPatch, persisted_kind: str
+):
     calls = []
     monkeypatch.setattr(delete.server, "shell", lambda **kwargs: calls.append(kwargs))
     plan = DeletionPlan(
-        artifacts=(DeletionArtifact("application socket", "/run/example/app.sock", "socket", "framework"),),
+        artifacts=(DeletionArtifact("application socket", "/run/example/app.sock", persisted_kind, "framework"),),
         services=(),
     )
 
@@ -108,8 +110,6 @@ def test_deletion_reloads_systemd_and_nginx_after_optional_tunnel_cleanup(monkey
     monkeypatch.setattr(delete.systemd, "service", lambda **kwargs: calls.append(("service", kwargs)))
     monkeypatch.setattr(delete.systemd, "daemon_reload", lambda **kwargs: calls.append(("daemon-reload", kwargs)))
     monkeypatch.setattr(delete.server, "shell", lambda **kwargs: calls.append(("shell", kwargs)))
-    monkeypatch.setattr(delete.files, "file", lambda **kwargs: calls.append(("file", kwargs)))
-    monkeypatch.setattr(delete.files, "link", lambda **kwargs: calls.append(("link", kwargs)))
     plan = DeletionPlan(
         artifacts=(
             DeletionArtifact(
