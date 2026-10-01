@@ -124,7 +124,7 @@ def test_django_profile_permits_mapping_managed_python_libraries(tmp_path, monke
     assert "/srv/sites/lawsnipe/current/.venv/bin/gunicorn mrix," in rendered
 
 
-def test_rails_profile_permits_reading_managed_ruby_libraries(tmp_path, monkeypatch):
+def test_rails_profile_permits_distribution_ruby_and_bundler(monkeypatch):
     ctx = _ctx()
     seen = {}
 
@@ -141,10 +141,7 @@ def test_rails_profile_permits_reading_managed_ruby_libraries(tmp_path, monkeypa
         paths=paths,
         runtime="rails",
         template_src=RAILS_TEMPLATES / "app-profile.j2",
-        apparmor_exec_paths=[
-            "/opt/bonesdeploy/ruby/3.4.8/bin/ruby",
-            "/opt/bonesdeploy/ruby/3.4.8/bin/bundle",
-        ],
+        apparmor_exec_paths=["/usr/bin/ruby", "/usr/bin/bundle"],
         apparmor_writable_paths=[],
     )
 
@@ -156,7 +153,6 @@ def test_rails_profile_permits_reading_managed_ruby_libraries(tmp_path, monkeypa
         .get_template("app-profile.j2")
         .render(seen["data"])
     )
-    assert "/opt/bonesdeploy/ruby/3.4.8/bin/ruby mrix," in rendered
-    assert "/opt/bonesdeploy/ruby/3.4.8/bin/bundle mrix," in rendered
-    assert "/opt/bonesdeploy/ruby/ r," in rendered
-    assert "/opt/bonesdeploy/ruby/** r," in rendered
+    assert "/usr/bin/ruby mrix," in rendered
+    assert "/usr/bin/bundle mrix," in rendered
+    assert "/opt/bonesdeploy/ruby/" not in rendered

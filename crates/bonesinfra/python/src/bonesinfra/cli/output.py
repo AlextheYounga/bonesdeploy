@@ -133,12 +133,12 @@ def stop_live_output() -> None:
     BonesDeployCallback._stop_status()
 
 
-def print_done(success: bool) -> None:
+def print_done(success: bool, operation: str) -> None:
     console.print()
     if success:
-        console.print("💀  [bold green]deploy complete[/]")
+        console.print(f"💀  [bold green]{operation} complete[/]")
     else:
-        console.print("💀  [bold red]deploy failed[/]")
+        console.print(f"💀  [bold red]{operation} failed[/]")
     console.print()
 
 

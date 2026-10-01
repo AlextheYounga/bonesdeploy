@@ -4,7 +4,7 @@ use std::path::{Component, Path};
 use anyhow::{Result, bail};
 use serde::{Deserialize, Serialize};
 
-use super::model::{Backup, Bones, RUNTIME_RUBY_VERSION, Runtime, RuntimeBackend};
+use super::model::{Backup, Bones, Runtime, RuntimeBackend};
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -101,7 +101,8 @@ impl ProvisioningRequest {
 pub enum RemoteRuntime {
     Native {
         web_root: String,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
+        // Read descriptors written before production switched to distribution Ruby.
+        #[serde(default, skip_serializing)]
         ruby_version: Option<String>,
     },
     Docker {
@@ -138,10 +139,7 @@ impl RemoteRuntime {
 
     fn from_runtime(runtime: &Runtime) -> Self {
         match runtime.backend {
-            RuntimeBackend::Native => Self::Native {
-                web_root: runtime.web_root.clone(),
-                ruby_version: runtime.extra.get(RUNTIME_RUBY_VERSION).and_then(toml::Value::as_str).map(str::to_owned),
-            },
+            RuntimeBackend::Native => Self::Native { web_root: runtime.web_root.clone(), ruby_version: None },
             RuntimeBackend::Docker => {
                 Self::Docker { compose_port: runtime.compose_port, compose_wait_timeout: runtime.compose_wait_timeout }
             }
@@ -150,13 +148,7 @@ impl RemoteRuntime {
 
     fn into_runtime(self) -> Runtime {
         match self {
-            Self::Native { web_root, ruby_version } => {
-                let mut runtime = Runtime { web_root, ..Runtime::default() };
-                if let Some(ruby_version) = ruby_version {
-                    runtime.extra.insert(RUNTIME_RUBY_VERSION.to_string(), toml::Value::String(ruby_version));
-                }
-                runtime
-            }
+            Self::Native { web_root, .. } => Runtime { web_root, ..Runtime::default() },
             Self::Docker { compose_port, compose_wait_timeout } => {
                 Runtime { backend: RuntimeBackend::Docker, compose_port, compose_wait_timeout, ..Runtime::default() }
             }

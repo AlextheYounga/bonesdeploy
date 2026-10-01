@@ -2,78 +2,98 @@
 
 ## Current behavior
 
-`RubyRuntime` in `crates/bonesinfra/python/src/bonesinfra/services/languages/ruby.py`
-accepts an `X.Y` value and installs `ruby<X.Y>` and `ruby<X.Y>-dev` with APT,
-then returns `/usr/bin/ruby<X.Y>`. Rails exposes `3.2`, `3.3`, and `3.4` as
-choices. The Rails build script independently installs the same invalid APT
-package names. The E2E fixture requests `3.4` and uses a Rails application
-created with Ruby 3.4.8. Node is installed independently from a verified
-archive and cached separately for host and build contexts.
+Before this change, `RubyRuntime` invoked `install-ruby.sh`, which downloaded a checksum-pinned Ruby
+source archive, installs compiler dependencies, and builds the selected release
+under `/opt/bonesdeploy/ruby/<version>`. Rails runtime commands and remote
+migrations use that versioned installation.
+
+The local Rails build independently compiled the same selected Ruby into the
+build cache, installs production gems into `vendor/bundle`, and precompiles
+assets. The complete build tree, including that bundle, is packaged and copied
+to the production host. Production supports Debian 12+ and Ubuntu 24.04+, whose
+distribution Ruby versions can differ from the build Ruby and from each other.
 
 ## Intended behavior
 
-Rails selects one of the supported exact Ruby releases. BonesInfra installs that
-release from a checksum-verified official Ruby archive under
-`/opt/bonesdeploy/ruby/<version>` and returns its `bin/ruby` path. The Rails
-build script installs the same selected release into the build cache and runs
-Bundler through that versioned path. Puma, prepare scripts, and host validation
-use the executable returned by the Ruby runtime.
-Existing `X.Y` values resolve to their corresponding supported exact release.
+BonesInfra installs the host distribution's `ruby`, `ruby-dev`, and
+`ruby-bundler` packages plus the native build dependencies used by supported
+Rails database adapters. Puma, placeholder setup, validation, and migrations
+use `/usr/bin/ruby` and `/usr/bin/bundle`.
+
+The local build retains its selected exact Ruby solely to install build-time
+gems and precompile assets, then removes `vendor/bundle` before artifact
+packaging. During remote prepare, Bundler installs production gems into the
+staged release's `vendor/bundle` before migrations. A Ruby incompatibility or
+bundle failure prevents release activation. Existing persisted `ruby_version`
+values remain valid as local-build configuration but no longer select the
+production interpreter.
 
 ## Approach
 
-Add a focused Ruby installer script beside the existing Node installer. It
-validates the selected version against a finite supported-release checksum map,
-installs native compilation packages with APT, downloads the official archive,
-verifies its SHA-256 hash, compiles it under a versioned prefix, and confirms
-the installed interpreter version. RubyRuntime invokes this installer and
-returns its versioned executable. Rails build functions gain the equivalent
-cache-local installation logic and the Rails build script uses it instead of
-APT Ruby packages. Rails configuration choices and the E2E fixture use exact
-versions.
+Replace the host source installer with a PyInfra APT package operation in
+`RubyRuntime` and return the stable distribution executable. Keep the local
+Ruby build toolchain unchanged because it operates on the developer's build
+machine and is still needed for asset compilation. Change the Rails build
+cleanup to remove its local `vendor/bundle`.
+
+Extend the Rails prepare script to run `/usr/bin/bundle install` with production
+groups excluded and `BUNDLE_PATH=vendor/bundle`, then run migrations through
+the same Bundler command. Remove the obsolete Ruby-version environment
+projection from BonesRemote prepare. Update runtime path expectations, tests,
+and documentation, with a dedicated README explanation of the production Ruby
+and deployment-time bundle contract.
 
 ## Responsibilities and boundaries
 
-The BonesInfra language service owns host runtime installation and executable
-paths. Its installer asset owns download, checksum, compilation, and
-idempotency mechanics. The shared deployment functions own build-cache Ruby
-installation and activation. The Rails framework owns allowed configuration
-values and Rails-specific invocation. Tests remain in the existing Rust,
-Python, and shell-adjacent test suites.
+The BonesInfra language service owns host APT package installation and the
+production Ruby executable path. The shared deployment functions continue to
+own the local build-cache Ruby toolchain. The Rails local build owns removal of
+build-only gems, while the Rails prepare script owns target bundle installation
+and migrations. BonesRemote owns the generic prepare execution boundary and no
+longer projects a managed Ruby path. Tests remain in the existing Rust, Python,
+and shell-adjacent test suites.
 
 ## Affected areas
 
 - `crates/bonesinfra/python/src/bonesinfra/services/languages/ruby.py`
-- `crates/bonesinfra/python/src/bonesinfra/assets/scripts/install-ruby.sh`
 - `crates/bonesinfra/python/tests/test_languages.py`
-- `crates/bonesdeploy/src/frameworks/rails.rs`
-- `crates/bonesdeploy/tests/config_frameworks.rs`
-- `crates/bonesdeploy/assets/kit/deployment/functions.sh`
 - `crates/bonesdeploy/assets/frameworks/rails/deployment/build/02_run_build.sh`
-- `e2e/tests/setup/rails.rs`
-- Rails and project documentation that state Ruby support.
+- `crates/bonesdeploy/assets/frameworks/rails/deployment/prepare/01_prepare_rails.sh`
+- `crates/bonesdeploy/tests/assets.rs`
+- `crates/bonesremote/src/release/lifecycle/prepare.rs`
+- `crates/bonesremote/tests/release/lifecycle_prepare.rs`
+- Rails AppArmor and runtime path tests
+- `README.md`, `CONTEXT.md`, and architecture documentation that state Ruby support
 
 ## Decisions
 
-Ruby uses official source releases instead of an external APT repository or
-unversioned distro packages. This honors the configured version on all
-supported distributions and avoids adding a repository trust boundary. The
-supported releases form a finite checksum map so provisioning never accepts an
-unverified user-selected archive. Installations are versioned and do not create
-or replace `/usr/bin/ruby` symlinks, which permits different sites to coexist.
-Legacy `X.Y` configuration values are accepted because existing project
-configuration is persisted; new project configuration writes exact values.
+Production uses only the host distribution's Ruby packages. This avoids both
+the resource cost of compiling on production and an additional package
+repository trust boundary, at the cost of making the available Ruby version a
+property of the host OS.
+
+Application gems are installed on the target because locally compiled native
+extensions cannot be safely reused across the supported distribution Ruby ABIs.
+The selected exact Ruby remains a local-build setting so existing projects and
+asset builds retain their current behavior. It is not represented as the
+production Ruby version in user-facing documentation.
 
 ## Risks
 
-Source compilation increases first-run setup time and requires build tools.
-The installer must clean temporary data and fail before installation on checksum
-or version validation errors. Build execution must activate the cached Ruby
-before invoking `bundle`; otherwise it could silently use the container Ruby.
+Deployments now require access to configured gem sources and can take longer
+while Bundler downloads or compiles gems. The production host's Ruby may not
+satisfy an application's Ruby or Rails requirement; Bundler must fail before
+activation and leave the current release running. Native gem installation
+requires compiler and database client development packages on the production
+host. Removing `vendor/bundle` after local asset compilation must not remove
+precompiled public assets.
 
 ## Validation
 
-Focused Python tests prove Ruby validation, installer invocation, and executable
-paths. Rust tests prove Rails uses exact Ruby build settings. Shell formatting
-validates the installers. Python tests, Ruff, Cargo formatting, Clippy, and
-the relevant Rust test targets must pass. The full E2E suite is excluded.
+Focused Python tests prove the distribution package set and executable paths.
+Rust asset tests prove the local bundle is removed and remote prepare installs
+the target bundle before migrations. BonesRemote tests prove the obsolete Ruby
+version environment projection is absent. Existing exact-version local-build
+tests remain green. Python tests, Ruff, Cargo formatting, Clippy, shell
+formatting, and the relevant Rust test targets must pass. The full E2E suite is
+excluded.

@@ -5,9 +5,7 @@ use std::process::{Command, ExitStatus, Stdio};
 use std::thread;
 
 use anyhow::{Context, Result, bail};
-use bonesdeploy_core::config::{
-    RUNTIME_RUBY_VERSION, RuntimeBackend, is_numbered_shell_script, runtime_user_for, variables,
-};
+use bonesdeploy_core::config::{RuntimeBackend, is_numbered_shell_script, runtime_user_for, variables};
 use bonesdeploy_core::paths;
 
 use crate::privileges;
@@ -19,7 +17,6 @@ struct PrepareScriptEnv<'a> {
     project_root: &'a str,
     runtime_user: &'a str,
     web_root: &'a str,
-    ruby_version: Option<&'a str>,
     shared_functions: &'a Path,
 }
 
@@ -66,7 +63,6 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
         project_root: &cfg.project_root,
         runtime_user: &runtime_user,
         web_root: &web_root,
-        ruby_version: cfg.runtime.extra.get(RUNTIME_RUBY_VERSION).and_then(|version| version.as_str()),
         shared_functions: &shared_functions,
     };
 
@@ -150,10 +146,6 @@ fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &P
         .env(variables::REPO_PATH, "")
         .env(variables::WEB_ROOT, env.web_root)
         .env(variables::SERVICE_USER, env.runtime_user);
-
-    if let Some(ruby_version) = env.ruby_version {
-        command.env("BONES_RUNTIME_RUBY_VERSION", ruby_version);
-    }
 }
 
 pub fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
@@ -179,14 +171,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn prepare_command_projects_only_the_remote_ruby_version() {
+    fn prepare_command_projects_only_generic_runtime_context() {
         let mut command = Command::new("runuser");
         let env = PrepareScriptEnv {
             project_name: "atlas",
             project_root: "/srv/www/atlas",
             runtime_user: "atlas",
             web_root: "public",
-            ruby_version: Some("3.4.8"),
             shared_functions: Path::new("functions.sh"),
         };
 
@@ -196,10 +187,7 @@ mod tests {
             .get_envs()
             .filter_map(|(key, value)| value.map(|value| (key.to_owned(), value.to_owned())))
             .collect();
-        assert_eq!(
-            variables.get(OsStr::new("BONES_RUNTIME_RUBY_VERSION")).map(AsRef::as_ref),
-            Some(OsStr::new("3.4.8"))
-        );
+        assert!(!variables.contains_key(OsStr::new("BONES_RUNTIME_RUBY_VERSION")));
         assert!(!variables.contains_key(OsStr::new("BONES_RUNTIME_PYTHON_VERSION")));
     }
 }

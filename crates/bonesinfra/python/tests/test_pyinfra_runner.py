@@ -37,11 +37,15 @@ def test_run_passes_ssh_auth_through_inventory(monkeypatch):
 
     seen = {}
 
+    def fake_print_done(success, operation):
+        del operation
+        seen.setdefault("done", success)
+
     monkeypatch.setattr(runner, "setup_output", lambda: None)
     monkeypatch.setattr(runner, "print_banner", lambda: None)
     monkeypatch.setattr(runner, "print_target", _noop_print_target)
     monkeypatch.setattr(runner, "print_connected", lambda: None)
-    monkeypatch.setattr(runner, "print_done", lambda success: seen.setdefault("done", success))
+    monkeypatch.setattr(runner, "print_done", fake_print_done)
     monkeypatch.setattr(runner, "stop_live_output", lambda: None)
     monkeypatch.setattr(runner, "activity", _noop_activity)
     monkeypatch.setattr(runner, "run_ops", _noop_run_ops)

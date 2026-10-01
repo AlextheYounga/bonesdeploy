@@ -122,13 +122,18 @@ fn django_prepare_template_uses_the_configured_python_minor() -> Result<()> {
 }
 
 #[test]
-fn rails_prepare_template_uses_the_managed_bundler_binary() -> Result<()> {
+fn rails_prepare_template_installs_the_target_bundle_before_migrations() -> Result<()> {
     let template = fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../bonesdeploy/assets/frameworks/rails/deployment/prepare/01_prepare_rails.sh"),
     )?;
 
-    assert!(template.contains("local bundle_binary=\"${ruby_binary%/*}/bundle\""));
-    assert!(!template.contains("-S bundle"));
+    let install = template.find("/usr/bin/bundle install").context("missing target bundle installation")?;
+    let migration_skip = template.find("BONES_RAILS_SKIP_MIGRATIONS").context("missing migration skip setting")?;
+    let migrate = template.find("/usr/bin/bundle exec rails db:migrate").context("missing Rails migration")?;
+    assert!(install < migration_skip);
+    assert!(install < migrate);
+    assert!(template.contains("BUNDLE_PATH=\"vendor/bundle\""));
+    assert!(!template.contains("BONES_RUNTIME_RUBY_VERSION"));
     Ok(())
 }

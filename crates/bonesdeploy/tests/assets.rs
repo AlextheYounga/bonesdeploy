@@ -49,7 +49,18 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     assert!(laravel.contains("rm -rf node_modules deployment/build"));
     let rails = asset_text("rails/deployment/build/02_run_build.sh");
     assert!(rails.contains("bundle install"));
-    assert!(rails.contains("rm -rf node_modules tmp/cache deployment/build"));
+    assert!(rails.contains("rm -rf node_modules tmp/cache vendor/bundle deployment/build"));
+
+    let rails_prepare = asset_text("rails/deployment/prepare/01_prepare_rails.sh");
+    let install = rails_prepare.find("/usr/bin/bundle install").expect("Rails prepare must install the target bundle");
+    let migration_skip =
+        rails_prepare.find("BONES_RAILS_SKIP_MIGRATIONS").expect("Rails prepare must support skipping migrations");
+    let migrate = rails_prepare
+        .find("/usr/bin/bundle exec rails db:migrate")
+        .expect("Rails prepare must run migrations through the target bundle");
+    assert!(install < migration_skip);
+    assert!(install < migrate);
+    assert!(rails_prepare.contains("BUNDLE_PATH=\"vendor/bundle\""));
 
     let next = asset_text("next/deployment/build/02_run_build.sh");
     assert!(next.contains(".next/standalone"));

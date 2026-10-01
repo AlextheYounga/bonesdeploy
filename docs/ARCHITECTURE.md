@@ -158,9 +158,10 @@ Runtime.extra is a serde-flattened BTreeMap for framework-specific keys.
 Existing implementations:
 - Loaded from the project root `.env` via config::load()
 - Projected into a backend-specific `RemoteDeploymentConfig` for deploy-time SSH
-  transport. Native carries `web_root` and optional Rails `ruby_version`; Docker
-  carries `compose_port` and `compose_wait_timeout`. Local build and arbitrary
-  framework fields do not cross this boundary.
+  transport. Native carries `web_root`; Docker carries `compose_port` and
+  `compose_wait_timeout`. Native descriptors still accept and discard the legacy
+  Rails `ruby_version` field when reading existing state. Local build and
+  arbitrary framework fields do not cross this boundary.
 - Reconstructed remotely with identity and paths derived from `--site`
 
 `bonesremote` does not load `shared/.env` as Bones configuration. That file is

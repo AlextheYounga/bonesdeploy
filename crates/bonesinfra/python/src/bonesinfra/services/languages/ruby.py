@@ -1,12 +1,21 @@
 import re
 
-from pyinfra.operations import server
+from pyinfra.operations import apt
 
-from bonesinfra.config.paths import SCRIPTS_DIR
 from bonesinfra.services.languages.base import LanguageRuntime
 
-RUBY_ROOT = "/opt/bonesdeploy/ruby"
 RUBY_RELEASES = {"3.2": "3.2.8", "3.3": "3.3.8", "3.4": "3.4.8"}
+RUBY_PACKAGES = [
+    "build-essential",
+    "default-libmysqlclient-dev",
+    "git",
+    "libpq-dev",
+    "libsqlite3-dev",
+    "pkg-config",
+    "ruby",
+    "ruby-bundler",
+    "ruby-dev",
+]
 
 
 class RubyRuntime(LanguageRuntime):
@@ -23,13 +32,14 @@ class RubyRuntime(LanguageRuntime):
         return self.executable
 
     def install_version(self, _ctx) -> str:
-        server.script(
-            name=f"Install Ruby {self.version}",
-            src=str(SCRIPTS_DIR / "install-ruby.sh"),
-            args=(self.version,),
+        apt.packages(
+            name="Install distribution Ruby and native gem build dependencies",
+            packages=RUBY_PACKAGES,
+            present=True,
+            update=True,
             _sudo=True,
         )
-        return f"{RUBY_ROOT}/{self.version}/bin/ruby"
+        return "/usr/bin/ruby"
 
 
 RUBY = RubyRuntime()

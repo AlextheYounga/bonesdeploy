@@ -78,7 +78,11 @@ def runtime_apply_cmd(
     ctx = _read_request(request_stdin)
     _validate_host(ctx)
     project_runtime = load_runtime(ctx)
-    run(ctx=ctx, deploy=etckeeper.commit_changes_after(project_runtime.deploy, RUNTIME_CHANGE_MESSAGE))
+    run(
+        ctx=ctx,
+        deploy=etckeeper.commit_changes_after(project_runtime.deploy, RUNTIME_CHANGE_MESSAGE),
+        operation="runtime provisioning",
+    )
 
 
 @server_app.command("apply")
@@ -97,6 +101,7 @@ def server_apply_cmd(
     run(
         ctx=ctx,
         deploy=lambda server_ctx: deploy_server_setup(server_ctx, bonesremote_version),
+        operation="server setup",
     )
 
 
@@ -110,7 +115,7 @@ def site_apply_cmd(
 ):
     ctx = _read_request(request_stdin)
     _validate_host(ctx)
-    run(ctx=ctx, deploy=deploy_site_setup)
+    run(ctx=ctx, deploy=deploy_site_setup, operation="site provisioning")
 
 
 @site_app.command("preflight")
@@ -139,7 +144,7 @@ def site_delete_cmd(
     ctx = _read_request(request_stdin)
     _validate_host(ctx)
     plan = parse_deletion_plan(plan_json, ctx) if plan_json else resolve_deletion_plan(ctx, load_manifest(ctx))
-    run(ctx=ctx, deploy=lambda current_ctx: deploy_site_delete(current_ctx, plan))
+    run(ctx=ctx, deploy=lambda current_ctx: deploy_site_delete(current_ctx, plan), operation="site deletion")
 
 
 @tunnel_app.command("start")
@@ -157,7 +162,7 @@ def tunnel_start_cmd(
     except ValueError as error:
         print(f"Error: {error}", file=sys.stderr)
         sys.exit(3)
-    run(ctx=ctx, deploy=deploy_tunnel_start)
+    run(ctx=ctx, deploy=deploy_tunnel_start, operation="tunnel start")
 
 
 @tunnel_app.command("stop")
@@ -170,7 +175,7 @@ def tunnel_stop_cmd(
 ):
     ctx = _read_request(request_stdin)
     _validate_host(ctx)
-    run(ctx=ctx, deploy=deploy_tunnel_stop)
+    run(ctx=ctx, deploy=deploy_tunnel_stop, operation="tunnel stop")
 
 
 @ssl_app.command("apply")
@@ -186,7 +191,7 @@ def ssl_apply_cmd(
         print("Error: DOMAIN and EMAIL are required", file=sys.stderr)
         sys.exit(3)
     _validate_host(ctx)
-    run(ctx=ctx, deploy=deploy_ssl)
+    run(ctx=ctx, deploy=deploy_ssl, operation="SSL provisioning")
 
 
 @helpers_app.command("apply")
@@ -199,7 +204,7 @@ def helpers_apply_cmd(
 ):
     ctx = _read_request(request_stdin)
     _validate_host(ctx)
-    run(ctx=ctx, deploy=deploy_helpers)
+    run(ctx=ctx, deploy=deploy_helpers, operation="helper provisioning")
 
 
 @manifest_app.command("show")
