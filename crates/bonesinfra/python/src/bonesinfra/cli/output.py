@@ -44,7 +44,7 @@ class BonesDeployCallback(BaseStateCallback):
         op_meta = state.get_op_meta(op_hash)
         op_name = ", ".join(op_meta.names) or "Operation"
         BonesDeployCallback._status = console.status(
-            f"[bold cyan]☠[/]  Running operation: [bold]{escape(op_name)}[/]",
+            f"[bold cyan]🦴[/]  Running operation: [bold]{escape(op_name)}[/]",
             spinner="dots",
         )
         BonesDeployCallback._status.start()
@@ -71,7 +71,7 @@ class BonesDeployCallback(BaseStateCallback):
                 status = "Success"
 
         status_style = _STATUS_STYLES.get(status, "dim")
-        console.print(f"☠  {op_name}", end=" ")
+        console.print(f"🦴  {op_name}", end=" ")
         console.print(f"[{status_style}]{status}[/{status_style}]")
 
 
@@ -111,7 +111,7 @@ def setup_output() -> None:
 
 def print_banner() -> None:
     console.print()
-    title = Text("☠  bonesdeploy", style="bold cyan")
+    title = Text("💀  bonesdeploy", style="bold cyan")
     console.print(Panel(title, border_style="cyan"))
 
 
@@ -125,7 +125,7 @@ def print_target(hostname: str, user: str) -> None:
 
 
 def print_connected() -> None:
-    console.print("☠  [bold cyan]connected[/]")
+    console.print("💀  [bold cyan]connected[/]")
     console.print()
 
 
@@ -136,13 +136,13 @@ def stop_live_output() -> None:
 def print_done(success: bool) -> None:
     console.print()
     if success:
-        console.print("☠  [bold green]deploy complete[/]")
+        console.print("💀  [bold green]deploy complete[/]")
     else:
-        console.print("☠  [bold red]deploy failed[/]")
+        console.print("💀  [bold red]deploy failed[/]")
     console.print()
 
 
 @contextmanager
 def activity(message: str) -> Iterator[None]:
-    with console.status(f"[bold cyan]☠ bonesdeploy[/] {message}", spinner="dots"):
+    with console.status(f"[bold cyan]💀 bonesdeploy[/] {message}", spinner="dots"):
         yield
