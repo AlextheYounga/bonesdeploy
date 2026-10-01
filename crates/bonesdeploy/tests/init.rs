@@ -39,6 +39,7 @@ fn assert_project_infra(repo: &Path) -> Result<()> {
     }));
     assert!(infra.join("templates/shared/nginx/index.html.j2").is_file());
     assert!(infra.join("templates/frameworks/custom/app.service.j2").is_file());
+    assert_only_framework_templates(&infra, Some("custom"));
     assert!(!infra.join(".framework").exists());
     assert!(infra.join("custom/__init__.py").is_file());
     assert!(infra.join("custom/runtime.py").is_file());
@@ -52,6 +53,16 @@ fn assert_project_infra(repo: &Path) -> Result<()> {
     assert!(deploy_dir.is_dir());
     assert!(deploy_dir.read_dir()?.next().is_some(), "deployment directory should have scripts");
     Ok(())
+}
+
+fn assert_only_framework_templates(infra: &Path, selected: Option<&str>) {
+    for framework in ["custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"] {
+        assert_eq!(
+            infra.join("templates/frameworks").join(framework).is_dir(),
+            selected == Some(framework),
+            "unexpected framework templates for {framework}"
+        );
+    }
 }
 
 fn atlas_config_root(env: &TestEnv) -> PathBuf {
@@ -102,6 +113,7 @@ fn init_preserves_selected_runtime_backend_when_applying_framework_defaults() ->
 
     assert!(output.status.success(), "init failed: {}", String::from_utf8_lossy(&output.stderr));
     assert!(fs::read_to_string(env.repo().join(".env"))?.contains("BONES_RUNTIME_BACKEND=docker\n"));
+    assert_only_framework_templates(&env.repo().join("infra"), None);
 
     Ok(())
 }
@@ -129,6 +141,7 @@ fn named_framework_materializes_project_template_snapshot() -> Result<()> {
     assert!(infra.join("custom/runtime.py").is_file(), "{framework} is missing custom runtime");
     assert!(infra.join("deployment/functions.sh").is_file(), "{framework} is missing kit deployment functions");
     assert!(infra.join("templates/frameworks/laravel").is_dir(), "{framework} is missing infra templates");
+    assert_only_framework_templates(&infra, Some("laravel"));
     let dotenv = fs::read_to_string(env.repo().join(".env"))?;
     assert!(dotenv.contains("APP_URL=\n"));
     assert!(dotenv.contains("DB_CONNECTION=sqlite\n"));

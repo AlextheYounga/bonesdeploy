@@ -41,9 +41,11 @@ provisions via `bonesinfra`, triggers `bonesremote` over SSH, or performs local
 administrative exports through the configured root SSH connection.
 
 **`bonesinfra`** — an embedded Python provisioning runtime. Its committed pure-
-Python wheel is materialized as `infra/bonesinfra-<version>-py3-none-any.whl`, while managed templates
-are materialized under `infra/templates/`; a project-scoped venv installs the
-wheel and its dependencies. It uses `pyinfra` to provision
+Python wheel is materialized unchanged as
+`infra/bonesinfra-<version>-py3-none-any.whl`. Managed templates are fully
+materialized under `infra/templates/` and then paths owned by unselected
+frameworks are pruned; a project-scoped venv installs the universal wheel and
+its dependencies. It uses `pyinfra` to provision
 the remote server (users, packages, frameworks, Docker Compose, SSL, firewalls) and
 owns *what gets installed* at provisioning time.
 
@@ -262,14 +264,15 @@ Rust side (crates/bonesdeploy/src/frameworks/<fw>.rs), selected through
 └── defaults() -> FrameworkDefaults        # web root, language, permissions
 
 Python side (materialized under `infra/`):
-├── bonesinfra-*.whl → committed managed runtime package
-├── templates/     → committed managed templates
+├── bonesinfra-*.whl → complete universal managed runtime package
+├── templates/     → shared plus selected-framework managed templates
 └── custom/        → project-owned package composed after the framework
     (`manifest.py`, `runtime.py`)
 
 BonesDeploy owns framework selection, centralized validation, defaults,
 permission defaults, environment generation, and deployment assets. BonesInfra
-owns the managed wheel and template snapshot. Project-owned extensions live in
+owns the universal wheel, complete template snapshot, and framework path rules
+used to prune the materialized snapshot. Project-owned extensions live in
 `infra/custom/` and are composed after the framework package.
 
 The materialized framework/custom packages are used together. Managed framework content is

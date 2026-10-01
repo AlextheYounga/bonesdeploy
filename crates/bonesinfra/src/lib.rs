@@ -7,10 +7,13 @@ use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
+use bonesdeploy_core::config::Runtime;
 use bonesdeploy_core::paths;
 use rust_embed::Embed;
 use sha2::{Digest, Sha256};
 use zip::ZipArchive;
+
+mod framework_paths;
 
 #[derive(Embed)]
 #[folder = "assets/"]
@@ -26,11 +29,12 @@ struct TemplateAsset;
 const STAMP_FILE: &str = ".stamp";
 const PREVIOUS_FRAMEWORK_PATH: &str = "infra/.framework";
 
-/// Writes the embedded wheel and all managed templates into a project.
+/// Writes the embedded wheel and managed templates into a project.
 ///
 /// # Errors
-/// Fails when either managed artifact cannot be atomically replaced.
-pub fn materialize_project_artifacts(project_root: &Path) -> Result<PathBuf> {
+/// Fails when an artifact cannot be replaced, the native framework is unknown,
+/// or an unselected framework path cannot be removed.
+pub fn materialize_project_artifacts(project_root: &Path, runtime: &Runtime) -> Result<PathBuf> {
     let infra = project_root.join(paths::LOCAL_INFRA_DIR);
     fs::create_dir_all(&infra).with_context(|| format!("Failed to create {}", infra.display()))?;
 
@@ -39,6 +43,7 @@ pub fn materialize_project_artifacts(project_root: &Path) -> Result<PathBuf> {
     remove_project_wheels(&infra)?;
     replace_file(&infra.join(&wheel_name), &wheel)?;
     replace_templates(&project_root.join(paths::LOCAL_INFRA_TEMPLATES_DIR))?;
+    framework_paths::prune(&infra, runtime)?;
     remove_path(&project_root.join(PREVIOUS_FRAMEWORK_PATH))?;
     Ok(infra.join(wheel_name))
 }

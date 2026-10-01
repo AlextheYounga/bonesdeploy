@@ -7,9 +7,11 @@ It is not the public product interface. It is called by `bonesdeploy` to run pyi
 
 The user should normally never call `bonesinfra` directly, except for dev
 testing. The Rust `bonesinfra` crate embeds this Python tree into the
-`bonesdeploy` binary, materializes the complete distribution into
-`infra/bonesinfra-<version>-py3-none-any.whl`, creates a project-scoped dependency virtualenv, and
-invokes that project-local package with `python -m bonesinfra`.
+`bonesdeploy` binary, materializes the complete universal distribution unchanged
+as `infra/bonesinfra-<version>-py3-none-any.whl`, creates a project-scoped
+dependency virtualenv, and invokes that project-local package with
+`python -m bonesinfra`. Repository template paths are materialized separately
+and pruned by the Rust wrapper for the selected framework.
 
 ______________________________________________________________________
 
@@ -326,11 +328,10 @@ Raw pyinfra operations should live in focused modules.
 
 ## `frameworks/`
 
-Framework packages are part of the complete distribution materialized at
-`infra/provision/core/src/bonesinfra/frameworks/`. The project-local package
-selects its framework from the root `.env` and composes it with optional
-project-owned `infra/custom/` code. It never falls back to a cached
-or globally installed framework implementation.
+Framework packages are part of the complete universal wheel installed in the
+project-scoped environment. The project-local package selects its framework
+from the root `.env` and composes it with optional project-owned `infra/custom/`
+code. Repository template pruning does not alter these installed packages.
 
 Each generated runtime must expose a consistent interface:
 

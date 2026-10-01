@@ -80,7 +80,7 @@ deployment/
     └── 01_prepare.sh
 ```
 
-Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`). A generated pure-Python wheel is committed as `crates/bonesinfra/assets/bonesinfra-<version>-py3-none-any.whl`, checked against the Python source by `crates/bonesinfra/build.rs`, embedded into the `bonesdeploy` binary, and installed into each project's project-scoped cached venv. Regenerate it with `cargo build-wheel` after Python changes. Managed templates are materialized under `infra/templates/`. See `crates/bonesinfra/src/lib.rs`.
+Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`). A generated pure-Python wheel is committed as `crates/bonesinfra/assets/bonesinfra-<version>-py3-none-any.whl`, checked against the Python source by `crates/bonesinfra/build.rs`, embedded into the `bonesdeploy` binary, and installed unchanged into each project's project-scoped cached venv. Regenerate it with `cargo build-wheel` after Python changes. Managed templates are fully materialized under `infra/templates/`, then framework paths declared in `crates/bonesinfra/src/framework_paths.rs` are pruned for the selected runtime. See `crates/bonesinfra/src/lib.rs`.
 
 ### Project Environment
 Rust is the sole parser of the project-root `.env`. It models two environments:
@@ -259,7 +259,7 @@ Django resolves its configured `python_version` minor to a BonesInfra-pinned CPy
 
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
 
-Projects materialize the BonesInfra wheel and managed templates under `infra/` and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the installed wheel and composes its selected framework runtime with custom provisioning. Updates refresh managed templates wholesale.
+Projects materialize the universal BonesInfra wheel and managed templates under `infra/`, prune unselected framework template paths, and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the complete installed wheel and composes its selected framework runtime with custom provisioning. Updates rematerialize the complete managed template tree before applying the same pruning rules.
 
 Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves (e.g. Next's `out/`). A static site only works if the app is configured to emit that directory: for `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
 
