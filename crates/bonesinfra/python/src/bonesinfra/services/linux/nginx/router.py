@@ -2,7 +2,7 @@ from pathlib import Path
 from shlex import quote
 
 from pyinfra.context import ctx_host
-from pyinfra.facts.files import File
+from pyinfra.facts.files import Link
 from pyinfra.operations import files, server, systemd
 
 from bonesinfra.config.context import template_data
@@ -126,7 +126,7 @@ def setup(ctx, paths, *, nginx_address_families="AF_UNIX", nginx_ip_loopback_onl
     if ctx.app.dns.domain:
         certificate_path, key_path = letsencrypt_cert_paths(ctx.app.dns.domain)
         certificate_ready = all(
-            ctx_host.get().get_fact(File, path) not in (None, False) for path in (certificate_path, key_path)
+            ctx_host.get().get_fact(Link, path) not in (None, False) for path in (certificate_path, key_path)
         )
         deploy_router_config(
             ctx,

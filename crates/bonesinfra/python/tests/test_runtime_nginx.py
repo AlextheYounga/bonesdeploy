@@ -17,9 +17,10 @@ def _noop(*args, **kwargs):
 class _Host:
     def __init__(self, certificate):
         self.certificate = certificate
+        self.fact_types = []
 
-    def get_fact(self, *args):
-        del args
+    def get_fact(self, fact_type, _path):
+        self.fact_types.append(fact_type)
         if isinstance(self.certificate, list):
             return self.certificate.pop(0)
         return self.certificate
@@ -104,6 +105,7 @@ def test_runtime_nginx_uses_https_router_when_configured_certificate_exists(monk
     ctx = _make_ctx(domain="example.com")
     paths = ctx.paths_dict
     deploy_calls = []
+    host = _Host({"link_target": "../../archive/example.com/cert.pem"})
 
     monkeypatch.setattr(nginx_router, "mkdir", _noop)
     monkeypatch.setattr(nginx_router.service, "render_target", _noop)
@@ -116,7 +118,7 @@ def test_runtime_nginx_uses_https_router_when_configured_certificate_exists(monk
     monkeypatch.setattr(
         nginx_router.ctx_host,
         "get",
-        lambda: _Host({"mode": 644}),
+        lambda: host,
     )
     monkeypatch.setattr(
         nginx_router,
@@ -127,6 +129,7 @@ def test_runtime_nginx_uses_https_router_when_configured_certificate_exists(monk
     nginx_router.setup(ctx, paths)
 
     assert deploy_calls == [{"ssl_enabled": True, "validate": True}]
+    assert host.fact_types == [nginx_router.Link, nginx_router.Link]
 
 
 def test_runtime_nginx_uses_http_router_when_certificate_key_is_missing(monkeypatch):
