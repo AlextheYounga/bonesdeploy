@@ -3,7 +3,7 @@ revision = 3
 requires-python = ">=3.12"
 
 [options]
-exclude-newer = "2026-09-24T19:14:26.849770926Z"
+exclude-newer = "2026-09-24T19:43:20.445410383Z"
 exclude-newer-span = "P7D"
 
 [[package]]
@@ -92,7 +92,7 @@ wheels = [
 
 [[package]]
 name = "bonesinfra"
-version = "0.5.5"
+version = "0.5.6"
 source = { editable = "." }
 dependencies = [
     { name = "pyinfra" },
