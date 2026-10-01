@@ -8,10 +8,12 @@ use tokio::fs::File;
 
 use crate::config;
 use crate::infra::{self, ssh};
-use crate::ui::{output, prompts};
+use crate::ui::{output, progress::ProgressReader, prompts};
 
 pub async fn run(archive: &Path, yes: bool) -> Result<()> {
     let file = open_archive(archive)?;
+    let archive_size = file.metadata()?.len();
+    println!("Archive size: {archive_size} bytes.");
 
     let config = config::load(Path::new(paths::DOT_ENV)).context("Failed to load the project configuration")?;
     println!("Shared data for {} will be replaced.", config.project_name);
@@ -23,9 +25,15 @@ pub async fn run(archive: &Path, yes: bool) -> Result<()> {
     }
 
     let file = File::from_std(file);
+    let reader = ProgressReader::new(file, archive_size, |percentage| {
+        output::upload_progress("shared data archive", percentage);
+    });
     let transport = ssh::SshTransport::connect_privileged(&config).await?;
     let transfer_result =
-        transport.stream_cmd_with_reader(&infra::shared_import_command(&config.project_name), &[], file).await;
+        transport.stream_cmd_with_reader(&infra::shared_import_command(&config.project_name), &[], reader).await;
+    if transfer_result.is_err() {
+        println!();
+    }
     let close_result = transport.close().await;
 
     transfer_result?;

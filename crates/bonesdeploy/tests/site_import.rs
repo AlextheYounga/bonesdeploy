@@ -19,6 +19,19 @@ fn missing_archive_fails_before_project_configuration_or_ssh() -> Result<()> {
 }
 
 #[test]
+fn valid_archive_reports_its_size_before_project_configuration_or_ssh() -> Result<()> {
+    let env = common::TestEnv::new()?;
+    fs::write(env.repo().join("archive.zip"), b"archive data")?;
+
+    let output = env.run(&["site", "import", "archive.zip", "--yes"])?;
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Archive size: 12 bytes."));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("Failed to load the project configuration"));
+    Ok(())
+}
+
+#[test]
 fn directory_and_symlink_archives_are_rejected_before_ssh() -> Result<()> {
     let env = common::TestEnv::new()?;
     fs::create_dir(env.repo().join("archive.zip"))?;

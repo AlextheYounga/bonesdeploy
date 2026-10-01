@@ -1,3 +1,5 @@
+use std::io::{self, Write};
+
 use console::style;
 
 pub fn green_command(command: &str) -> String {
@@ -14,6 +16,15 @@ pub fn pending_marker() -> String {
 
 pub fn failure_marker() -> String {
     style("✗").red().bold().to_string()
+}
+
+pub fn upload_progress(label: &str, percentage: u8) {
+    print!("\rUploading {label}: {percentage:>3}%");
+    if percentage == 100 {
+        println!();
+    } else {
+        let _ = io::stdout().flush();
+    }
 }
 
 pub fn run_command(command: &str) -> String {

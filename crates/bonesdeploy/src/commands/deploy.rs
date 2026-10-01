@@ -11,7 +11,7 @@ use crate::build::{self, PackagedArtifact};
 use crate::commands::secrets;
 use crate::config::{self, Bones};
 use crate::infra::{self, ssh};
-use crate::ui::output;
+use crate::ui::{output, progress::ProgressReader};
 
 pub trait DeployOperations {
     fn package(&mut self, config: &Bones) -> Result<PackagedArtifact>;
@@ -59,7 +59,9 @@ impl ProductionDeployOperations {
 impl DeployOperations for ProductionDeployOperations {
     fn package(&mut self, config: &Bones) -> Result<PackagedArtifact> {
         println!("Building the committed {} branch locally...", config.branch);
-        build::package(config)
+        let artifact = build::package(config)?;
+        println!("Artifact size: {} bytes.", artifact.manifest.artifact_length);
+        Ok(artifact)
     }
 
     fn handle_production_secrets(&mut self, config: &Bones) -> impl Future<Output = Result<()>> + Send {
@@ -90,7 +92,16 @@ impl DeployOperations for ProductionDeployOperations {
             let frame = encode_manifest(&artifact.manifest)?;
             let session = self.session.take().context("Deployment SSH session is not available for artifact upload")?;
             let file = File::open(artifact.path()).await.context("Failed to open local artifact for upload")?;
-            session.stream_cmd_with_reader(&infra::artifact_deploy_command(&config.project_name), &frame, file).await?;
+            let reader = ProgressReader::new(file, artifact.manifest.artifact_length, |percentage| {
+                output::upload_progress("artifact", percentage);
+            });
+            let upload = session
+                .stream_cmd_with_reader(&infra::artifact_deploy_command(&config.project_name), &frame, reader)
+                .await;
+            if upload.is_err() {
+                println!();
+            }
+            upload?;
             session.close().await?;
             Ok(())
         }
