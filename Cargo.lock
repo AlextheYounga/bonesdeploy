@@ -114,7 +114,7 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
@@ -139,7 +139,7 @@ dependencies = [
 
 [[package]]
 name = "bonesdeploy-core"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "anyhow",
  "serde",
@@ -162,7 +162,7 @@ dependencies = [
 
 [[package]]
 name = "bonesremote"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "anyhow",
  "bonesdeploy-core",
