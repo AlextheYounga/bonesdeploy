@@ -9,7 +9,7 @@ use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use bonesremote::commands::doctor::security::collection::filesystem::{collect_path_tree, collect_release};
-use bonesremote::commands::doctor::security::types::{Account, Site};
+use bonesremote::commands::doctor::security::types::{Account, CurrentState, Site};
 
 fn temporary_root(name: &str) -> PathBuf {
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
@@ -62,5 +62,16 @@ fn release_boundary_scan_skips_nested_entries_unless_exhaustive() -> Result<(), 
     assert!(boundary.filesystem.nodes.contains_key(&release));
     assert!(!boundary.filesystem.nodes.contains_key(&nested_file));
     assert!(exhaustive.filesystem.nodes.contains_key(&nested_file));
+    Ok(())
+}
+
+#[test]
+fn release_scan_accepts_a_site_that_has_not_been_set_up() -> Result<(), Box<dyn Error>> {
+    let root = temporary_root("site-not-set-up");
+
+    let evidence = collect_release(&site(&root), false).map_err(io::Error::other)?;
+
+    assert_eq!(evidence.current, CurrentState::Missing);
+    assert!(evidence.filesystem.nodes.is_empty());
     Ok(())
 }

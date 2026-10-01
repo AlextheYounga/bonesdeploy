@@ -102,6 +102,10 @@ COMMON_ARTIFACTS = (
 def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifact, ...]:
     """Return the artifacts expected for the context's deployment strategy."""
     artifacts = list(COMMON_ARTIFACTS)
+    artifacts.extend(
+        Artifact.at_path(artifact.name, artifact.path, artifact.kind, artifact.owner)
+        for artifact in runtime_deletion_artifacts(ctx)
+    )
     artifacts.extend(Artifact.at_path(*spec) for spec in project_manifest.artifacts(ctx))
 
     if ctx.app.dns.domain:
@@ -111,6 +115,27 @@ def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifa
         artifacts.append(Artifact.at_path("ACME certificate key", key, "link", "ssl"))
 
     return _deduplicate(artifacts)
+
+
+def runtime_deletion_artifacts(ctx: DeployContext) -> tuple[DeletionArtifact, ...]:
+    """Return resources installed by the shared per-site nginx runtime."""
+    if ctx.runtime.backend == "docker" and ctx.runtime.compose_port is None:
+        return ()
+    paths = ctx.paths
+    return (
+        DeletionArtifact("nginx site configuration", paths.site_nginx_config, "file", "runtime"),
+        DeletionArtifact("nginx site", paths.nginx_site_available, "file", "runtime"),
+        DeletionArtifact("enabled nginx site", paths.nginx_site_enabled, "link", "runtime"),
+        DeletionArtifact("site systemd target", paths.systemd_site_target, "file", "runtime"),
+        DeletionArtifact("site systemd requirements", paths.systemd_site_target_requires, "directory", "runtime"),
+        DeletionArtifact("site nginx systemd service", paths.systemd_site_nginx_service, "file", "runtime"),
+        DeletionArtifact("site nginx systemd requirement", paths.systemd_site_nginx_requirement, "link", "runtime"),
+        DeletionArtifact("nginx AppArmor profile", paths.nginx_apparmor_profile, "file", "runtime"),
+        DeletionArtifact("runtime socket directory", paths.runtime_socket_dir, "directory", "runtime"),
+        DeletionArtifact("runtime nginx directory", paths.runtime_nginx_dir, "directory", "runtime"),
+        DeletionArtifact("runtime nginx socket", paths.runtime_nginx_socket, "socket", "runtime"),
+        DeletionArtifact("runtime nginx PID", paths.runtime_nginx_pid, "file", "runtime"),
+    )
 
 
 def collect_services(ctx: DeployContext, project_manifest: Any) -> tuple[ManagedService, ...]:

@@ -2,7 +2,7 @@ from shlex import quote
 
 from pyinfra.operations import files, server, systemd
 
-from bonesinfra.manifest import ArtifactKind, DeletionPlan
+from bonesinfra.manifest import ArtifactKind, DeletionPlan, runtime_deletion_artifacts
 
 
 def deploy_site_delete(_ctx, plan: DeletionPlan) -> None:
@@ -23,7 +23,11 @@ def deploy_site_delete(_ctx, plan: DeletionPlan) -> None:
             enabled=False,
             _sudo=True,
         )
-    for artifact in sorted(plan.artifacts, key=lambda item: len(item.path), reverse=True):
+    artifacts = {artifact.path: artifact for artifact in plan.artifacts}
+    if any(service.unit == f"{_ctx.app.project_name}-nginx.service" for service in plan.services):
+        for artifact in runtime_deletion_artifacts(_ctx):
+            artifacts.setdefault(artifact.path, artifact)
+    for artifact in sorted(artifacts.values(), key=lambda item: len(item.path), reverse=True):
         _remove_artifact(artifact.name, artifact.path, artifact.kind)
     if any(artifact.owner == "tunnel" for artifact in plan.artifacts):
         systemd.daemon_reload(name="Reload systemd after Quick Tunnel removal", _sudo=True)

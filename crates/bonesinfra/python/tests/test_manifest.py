@@ -30,7 +30,7 @@ from .helpers import make_site_request
 
 class ProjectManifest:
     def artifacts(self, ctx):
-        return [("project artifact", ctx.paths.site_nginx_config, "file", "framework")]
+        return [("project artifact", ctx.paths.systemd_service("project"), "file", "framework")]
 
     def services(self, _ctx):
         return [("project service", "{project}-app.service", "framework")]
@@ -52,6 +52,14 @@ def test_project_manifest_declarations_are_included(tmp_path: Path):
     assert "ACME certificate" in names
     assert collect_services(ctx, project)[-1].unit == "example-app.service"
     assert report(ctx, [], [], project)["strategy"]["mode"] == "server"
+
+
+def test_shared_nginx_runtime_resources_are_included_once():
+    artifacts = resolve_artifacts(_context(), ProjectManifest())
+    by_path = [artifact for artifact in artifacts if artifact.path == "/etc/nginx/sites-enabled/example.conf"]
+
+    assert len(by_path) == 1
+    assert by_path[0].kind == "link"
 
 
 def test_vue_declares_nginx_socket_as_socket(tmp_path: Path):

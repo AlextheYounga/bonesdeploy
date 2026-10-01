@@ -105,11 +105,12 @@ def test_deletion_removes_unix_sockets_from_current_and_legacy_plans(
     assert calls[0]["commands"] == ["rm -f -- /run/example/app.sock"]
 
 
-def test_deletion_reloads_systemd_and_nginx_after_optional_tunnel_cleanup(monkeypatch: pytest.MonkeyPatch):
+def test_deletion_adds_shared_nginx_resources_when_resuming_a_legacy_plan(monkeypatch: pytest.MonkeyPatch):
     calls = []
     monkeypatch.setattr(delete.systemd, "service", lambda **kwargs: calls.append(("service", kwargs)))
     monkeypatch.setattr(delete.systemd, "daemon_reload", lambda **kwargs: calls.append(("daemon-reload", kwargs)))
     monkeypatch.setattr(delete.server, "shell", lambda **kwargs: calls.append(("shell", kwargs)))
+    monkeypatch.setattr(delete.files, "directory", lambda **kwargs: calls.append(("directory", kwargs)))
     plan = DeletionPlan(
         artifacts=(
             DeletionArtifact(
@@ -122,7 +123,10 @@ def test_deletion_reloads_systemd_and_nginx_after_optional_tunnel_cleanup(monkey
                 "tunnel",
             ),
         ),
-        services=(DeletionService("quick tunnel", "example-cloudflared.service", "tunnel"),),
+        services=(
+            DeletionService("site nginx", "example-nginx.service", "runtime"),
+            DeletionService("quick tunnel", "example-cloudflared.service", "tunnel"),
+        ),
     )
 
     delete.deploy_site_delete(_context(), plan)
@@ -131,6 +135,10 @@ def test_deletion_reloads_systemd_and_nginx_after_optional_tunnel_cleanup(monkey
     tunnel_stop = next(kwargs for operation, kwargs in calls if operation == "shell")
     assert "systemctl cat" in tunnel_stop["commands"][0]
     assert "systemctl disable --now" in tunnel_stop["commands"][0]
+    assert any(
+        operation == "shell" and kwargs.get("commands") == ["rm -f -- /etc/nginx/sites-enabled/example.conf"]
+        for operation, kwargs in calls
+    )
     assert any(
         operation == "service" and kwargs.get("service") == "nginx" and kwargs.get("reloaded") is True
         for operation, kwargs in calls
