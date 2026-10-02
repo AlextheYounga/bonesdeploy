@@ -577,8 +577,9 @@ complete payload and bounds, safely extracts relative paths, loads required
 images, and starts Compose with `--no-build --pull never`. It then promotes,
 prepares, seals, activates, verifies, prunes, or rolls back through one
 lifecycle. Native failures never fall back to a production asset build. Django
-prepare creates a release virtualenv and installs requirements with the host's
-distribution Python before production-state commands.
+artifacts include locally installed requirements and release launchers; prepare
+validates them before running production-state commands. Rails artifacts likewise
+include their production bundle, which prepare checks before migrations.
 
 ### 4.5 `bonesdeploy doctor`
 

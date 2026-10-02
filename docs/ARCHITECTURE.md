@@ -466,8 +466,9 @@ SHA-256, image inventory, and safe extraction constraints before promotion.
 Production starts Compose with `--no-build --pull never`. Prepare, sealing,
 activation, restart, pruning, and rollback remain shared. Production provisioning
 has no application repository or general build facility. Rails and Django
-prepare install application dependencies into the staged release with the host
-distribution's language runtime before activation.
+artifacts include their locally installed application dependencies. Prepare
+validates that output and performs production-state work without invoking a
+package manager or compiling application dependencies.
 
 ```text
 ### SiteState

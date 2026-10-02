@@ -109,38 +109,38 @@ fn framework_prepare_templates_do_not_source_control_plane_files() -> Result<()>
 }
 
 #[test]
-fn django_prepare_template_installs_target_dependencies_before_django_commands() -> Result<()> {
+fn django_prepare_template_uses_packaged_dependencies_before_django_commands() -> Result<()> {
     let template = fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../bonesdeploy/assets/frameworks/django/deployment/prepare/01_prepare_django.sh"),
     )?;
 
-    let create_venv = template.find("/usr/bin/python3 -m venv").context("missing target virtualenv creation")?;
-    let install = template.find("-m pip --isolated install").context("missing target dependency installation")?;
+    let require_artifact = template.find("build the Django artifact first").context("missing artifact validation")?;
     let validate = template.find("manage.py check --deploy").context("missing Django validation")?;
     let migration_skip = template.find("BONES_DJANGO_SKIP_MIGRATIONS").context("missing migration skip setting")?;
     let migrate = template.find("manage.py migrate --noinput").context("missing Django migration")?;
-    assert!(create_venv < install);
-    assert!(install < validate);
-    assert!(install < migration_skip);
-    assert!(install < migrate);
-    assert!(template.contains("--no-cache-dir"));
+    assert!(require_artifact < validate);
+    assert!(require_artifact < migration_skip);
+    assert!(require_artifact < migrate);
+    assert!(!template.contains("pip install"));
+    assert!(!template.contains("-m venv"));
     assert!(!template.contains("BONES_RUNTIME_PYTHON_VERSION"));
     Ok(())
 }
 
 #[test]
-fn rails_prepare_template_installs_the_target_bundle_before_migrations() -> Result<()> {
+fn rails_prepare_template_uses_the_packaged_bundle_before_migrations() -> Result<()> {
     let template = fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../bonesdeploy/assets/frameworks/rails/deployment/prepare/01_prepare_rails.sh"),
     )?;
 
-    let install = template.find("/usr/bin/bundle install").context("missing target bundle installation")?;
+    let check = template.find("/usr/bin/bundle check").context("missing packaged bundle check")?;
     let migration_skip = template.find("BONES_RAILS_SKIP_MIGRATIONS").context("missing migration skip setting")?;
     let migrate = template.find("/usr/bin/bundle exec rails db:migrate").context("missing Rails migration")?;
-    assert!(install < migration_skip);
-    assert!(install < migrate);
+    assert!(check < migration_skip);
+    assert!(check < migrate);
+    assert!(!template.contains("bundle install"));
     assert!(template.contains("BUNDLE_PATH=\"vendor/bundle\""));
     assert!(!template.contains("BONES_RUNTIME_RUBY_VERSION"));
     Ok(())

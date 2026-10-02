@@ -35,14 +35,15 @@ fn framework_assets_include_expected_build_content() {
 fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     let django = asset_text("django/deployment/build/02_run_build.sh");
     assert!(!django.contains("-m venv"));
-    assert!(!django.contains("pip install"));
+    assert!(django.contains("python3 -m pip install"));
+    assert!(django.contains("--target \"$packages_dir\""));
+    assert!(django.contains("exec /usr/bin/python3 -m gunicorn \"$@\""));
     assert!(!django.contains("BONES_RUNTIME_PYTHON_VERSION"));
-    assert!(django.contains("rm -rf .python-packages .venv deployment/build"));
+    assert!(django.contains("rm -rf deployment/build"));
 
     let django_prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
-    assert!(django_prepare.contains("/usr/bin/python3 -m venv"));
-    assert!(django_prepare.contains("-m pip --isolated install"));
-    assert!(django_prepare.contains("--no-cache-dir"));
+    assert!(!django_prepare.contains("-m venv"));
+    assert!(!django_prepare.contains("pip install"));
     assert!(django_prepare.contains("$VENV_DIR/bin/python"));
 
     let laravel = asset_text("laravel/deployment/build/03_build_frontend.sh");
@@ -53,17 +54,19 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     assert!(rails.contains("BUNDLE_WITHOUT=\"development:test\""));
     assert!(!rails.contains("--deployment"));
     assert!(!rails.contains("--without"));
-    assert!(rails.contains("rm -rf node_modules tmp/cache vendor/bundle deployment/build"));
+    assert!(rails.contains("rm -rf node_modules tmp/cache deployment/build"));
+    assert!(!rails.contains("rm -rf node_modules tmp/cache vendor/bundle"));
 
     let rails_prepare = asset_text("rails/deployment/prepare/01_prepare_rails.sh");
-    let install = rails_prepare.find("/usr/bin/bundle install").expect("Rails prepare must install the target bundle");
+    let check = rails_prepare.find("/usr/bin/bundle check").expect("Rails prepare must check the packaged bundle");
     let migration_skip =
         rails_prepare.find("BONES_RAILS_SKIP_MIGRATIONS").expect("Rails prepare must support skipping migrations");
     let migrate = rails_prepare
         .find("/usr/bin/bundle exec rails db:migrate")
         .expect("Rails prepare must run migrations through the target bundle");
-    assert!(install < migration_skip);
-    assert!(install < migrate);
+    assert!(check < migration_skip);
+    assert!(check < migrate);
+    assert!(!rails_prepare.contains("bundle install"));
     assert!(rails_prepare.contains("BUNDLE_DEPLOYMENT=\"true\""));
     assert!(rails_prepare.contains("BUNDLE_PATH=\"vendor/bundle\""));
     assert!(rails_prepare.contains("BUNDLE_WITHOUT=\"development:test\""));
@@ -93,22 +96,24 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
 #[test]
 fn django_artifact_contract_matches_the_production_runtime() {
     let build = asset_text("django/deployment/build/02_run_build.sh");
-    assert!(build.contains("rm -rf .python-packages .venv deployment/build"));
-    assert!(!build.contains("pip install"));
+    assert!(build.contains("local packages_dir=\".python-packages\""));
+    assert!(build.contains("local wrapper_dir=\".venv/bin\""));
+    assert!(build.contains("python3 -m pip install"));
+    assert!(build.contains("export PYTHONPATH=\"$release_root/.python-packages${PYTHONPATH:+:$PYTHONPATH}\""));
+    assert!(build.contains("exec /usr/bin/python3 \"$@\""));
     assert!(!build.contains("BONES_RUNTIME_PYTHON_VERSION"));
     assert!(!build.contains("production_python"));
-    assert!(!build.contains("PYTHONPATH"));
 
     let prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
-    let create_venv = prepare.find("/usr/bin/python3 -m venv").expect("Django prepare must create the target venv");
-    let install = prepare.find("-m pip --isolated install").expect("Django prepare must install target dependencies");
+    let require_artifact = prepare.find("build the Django artifact first").expect("missing artifact validation");
     let validate = prepare.find("manage.py check --deploy").expect("Django prepare must validate the application");
     let migration_skip =
         prepare.find("BONES_DJANGO_SKIP_MIGRATIONS").expect("Django prepare must support skipping migrations");
     assert!(prepare.contains("readonly PYTHON_BIN=\"$VENV_DIR/bin/python\""));
-    assert!(create_venv < install);
-    assert!(install < validate);
-    assert!(install < migration_skip);
+    assert!(require_artifact < validate);
+    assert!(require_artifact < migration_skip);
+    assert!(!prepare.contains("pip install"));
+    assert!(!prepare.contains("-m venv"));
 }
 
 #[test]

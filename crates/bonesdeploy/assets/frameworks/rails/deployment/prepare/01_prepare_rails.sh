@@ -8,14 +8,15 @@ main() {
 		exit 0
 	fi
 
-	export HOME="$PROJECT_ROOT/shared"
 	export BUNDLE_DEPLOYMENT="true"
+	export BUNDLE_DISABLE_VERSION_CHECK="true"
 	export BUNDLE_PATH="vendor/bundle"
-	export BUNDLE_USER_CACHE="$PROJECT_ROOT/shared/.bundle-cache"
+	export BUNDLE_VERSION="system"
 	export BUNDLE_WITHOUT="development:test"
 
-	log "Installing production bundle with the host Ruby..."
-	/usr/bin/bundle install
+	[ -d vendor/bundle ] || die "vendor/bundle not found; build the Rails artifact first"
+	log "Checking packaged production bundle..."
+	/usr/bin/bundle check
 
 	if [ "${BONES_RAILS_SKIP_MIGRATIONS:-0}" = "1" ]; then
 		log "Skipping migrations because BONES_RAILS_SKIP_MIGRATIONS=1."

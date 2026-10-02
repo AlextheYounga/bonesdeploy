@@ -113,7 +113,7 @@ fn remote_deployment_config_accepts_but_drops_previous_ruby_version() -> Result<
     let descriptor: RemoteDeploymentConfig = serde_json::from_str(json)?;
     let site_config = descriptor.into_site_config("atlas");
 
-    assert!(site_config.runtime.extra.get(RUNTIME_RUBY_VERSION).is_none());
+    assert!(!site_config.runtime.extra.contains_key(RUNTIME_RUBY_VERSION));
     Ok(())
 }
 
@@ -123,7 +123,7 @@ fn remote_deployment_config_accepts_but_drops_previous_python_version() -> Resul
     let descriptor: RemoteDeploymentConfig = serde_json::from_str(json)?;
     let site_config = descriptor.into_site_config("atlas");
 
-    assert!(site_config.runtime.extra.get(RUNTIME_PYTHON_VERSION).is_none());
+    assert!(!site_config.runtime.extra.contains_key(RUNTIME_PYTHON_VERSION));
     Ok(())
 }
 

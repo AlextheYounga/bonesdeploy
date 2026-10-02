@@ -19,7 +19,10 @@ def bundler_binary(ruby_binary):
 
 
 def bundler_command(bundle_binary, command):
-    return f"BUNDLE_PATH={BUNDLER_PATH} {quote(bundle_binary)} {command}"
+    return (
+        f"BUNDLE_DISABLE_VERSION_CHECK=true BUNDLE_PATH={BUNDLER_PATH} "
+        f"BUNDLE_VERSION=system {quote(bundle_binary)} {command}"
+    )
 
 
 def apparmor_exec_paths(paths, ruby_binary):

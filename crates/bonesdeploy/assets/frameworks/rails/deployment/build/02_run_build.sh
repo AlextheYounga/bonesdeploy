@@ -22,6 +22,7 @@ install_application_packages() {
 
 install_bundle_dependencies() {
 	export BUNDLE_DEPLOYMENT="true"
+	export BUNDLE_PATH="vendor/bundle"
 	export BUNDLE_WITHOUT="development:test"
 	log "Installing bundle dependencies..."
 	bundle install
@@ -38,7 +39,7 @@ main() {
 	install_application_packages
 	install_bundle_dependencies
 	precompile_assets
-	rm -rf node_modules tmp/cache vendor/bundle deployment/build
+	rm -rf node_modules tmp/cache deployment/build
 
 	trap - ERR
 

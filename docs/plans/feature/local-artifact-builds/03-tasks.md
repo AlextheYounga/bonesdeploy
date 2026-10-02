@@ -9,6 +9,34 @@ framework pruning. Its pending follow-up is the authoritative remaining
 execution state.
 Clarification `07-narrow-remote-config-clarity.md` narrows the completed
 artifact lifecycle's control-plane sync to values BonesRemote still consumes.
+Clarification `08-prepare-build-boundary-clarity.md` restores the complete
+Rails and Django artifact contract after distribution-runtime changes moved
+dependency installation into remote prepare.
+
+## Prepare Build Boundary Regression Correction
+
+### Implementation
+
+- [ ] Retain the locally installed production Rails bundle and remove all
+  Bundler installation from remote Rails prepare.
+- [ ] Install and retain Django production dependencies and release launchers
+  during the local build, and remove virtualenv creation and pip installation
+  from remote Django prepare.
+- [ ] Update focused regression tests and current documentation to enforce that
+  prepare performs validation and production-state work without building.
+
+### Validation
+
+- [ ] Run focused BonesDeploy and BonesRemote tests proving complete dependency
+  output is packaged and neither prepare script invokes a package installer.
+- [ ] Run all required non-E2E Rust, Python, lint, formatting, shell formatting,
+  generated-artifact, and diff checks without warnings or failures.
+
+### Completion
+
+- [ ] Review the final diff for package-manager execution in prepare, removed
+  runtime dependencies, stale distribution-runtime documentation, and unrelated
+  changes; record validation evidence below.
 
 ## Narrow Remote Configuration Follow-Up
 

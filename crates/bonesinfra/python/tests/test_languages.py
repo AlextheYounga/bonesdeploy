@@ -81,7 +81,8 @@ def test_rails_bundler_binary_is_next_to_distribution_ruby():
 def test_rails_bundler_commands_use_the_project_local_bundle():
     assert (
         bundler_command("/usr/bin/bundle", "exec puma --help")
-        == "BUNDLE_PATH=vendor/bundle /usr/bin/bundle exec puma --help"
+        == "BUNDLE_DISABLE_VERSION_CHECK=true BUNDLE_PATH=vendor/bundle "
+        "BUNDLE_VERSION=system /usr/bin/bundle exec puma --help"
     )
 
 

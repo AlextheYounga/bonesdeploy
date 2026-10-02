@@ -166,13 +166,11 @@ Ruby version therefore depends on the host release, and the Rails application
 must support that version. The configured exact `RUBY_VERSION` remains a local
 asset-build setting and does not select the server interpreter.
 
-The bundle created while precompiling Rails assets locally is discarded before
-artifact packaging. During every deployment, the staged release runs
-`bundle install` with the host Ruby before migrations and activation. The host
-must be able to reach the gem sources configured by the application, and gems
-with native extensions are compiled on that host. A Ruby incompatibility or
-bundle installation failure stops the deployment before activation, leaving the
-current release running.
+The local build installs the production bundle, compiles native gems, and
+includes `vendor/bundle` in the release artifact. Remote prepare verifies that
+packaged bundle and runs migrations; it does not download or compile gems. An
+incompatible artifact fails before activation, leaving the current release
+running.
 
 Django production sites likewise use the `python3` interpreter supplied by the
 host's Debian or Ubuntu APT repositories. Site setup installs Python, virtualenv
@@ -181,11 +179,11 @@ compile CPython. `PYTHON_VERSION` is retained for compatibility with existing
 project configuration but does not select an interpreter. Django applications
 and their requirements must support the host distribution's Python version.
 
-During every deployment, the staged release creates `.venv` with
-`/usr/bin/python3` and installs `requirements.txt` before validation, migrations,
-static collection, and activation. The host must be able to reach the configured
-Python package indexes. Python incompatibility or installation failure leaves
-the current release running.
+The local build installs `requirements.txt` into the release dependency tree and
+includes launchers that use `/usr/bin/python3`. Remote prepare validates the
+packaged application, runs migrations, and collects static files; it does not
+download or compile Python packages. An incompatible artifact fails before
+activation, leaving the current release running.
 
 Native Laravel sites also receive a per-site systemd queue worker by default.
 It runs `php artisan queue:work` with bounded lifetime and explicit writable
@@ -616,12 +614,12 @@ keys are never included in build inputs; the local artifact excludes the root
 
 After verified extraction, BonesRemote uses the same promotion, shared-path
 wiring, prepare, sealing, activation, service restart, pruning, and rollback
-behavior for every native deployment. Django's locally resolved dependency tree
-is removed before packaging; remote prepare creates a release-owned virtualenv
-with the target host's distribution Python and installs `requirements.txt`
-before validation, migrations, and static-file collection. Rails likewise
-installs production gems into the staged release with the target host's
-distribution Ruby before migrations.
+behavior for every native deployment. Django artifacts retain their locally
+installed dependency tree and release launchers; remote prepare performs
+validation, migrations, and static-file collection. Rails artifacts retain
+their locally installed production bundle; remote prepare checks that bundle
+and runs migrations. Neither prepare path downloads or compiles application
+dependencies.
 
 Artifact receipt enforces a 64 KiB manifest, a 2 GiB compressed payload, at most
 100,000 archive entries, 4 KiB paths and symlink targets, and a 4 GiB expanded

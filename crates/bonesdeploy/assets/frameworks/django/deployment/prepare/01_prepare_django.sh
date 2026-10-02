@@ -5,18 +5,8 @@ set -Eeuo pipefail
 readonly VENV_DIR="${VENV_DIR:-.venv}"
 readonly PYTHON_BIN="$VENV_DIR/bin/python"
 
-install_dependencies() {
-	rm -rf "$VENV_DIR"
-
-	log "Creating production virtualenv with the host Python..."
-	/usr/bin/python3 -m venv "$VENV_DIR"
-
-	if [ -f requirements.txt ]; then
-		log "Installing production Python dependencies..."
-		"$PYTHON_BIN" -m pip --isolated install --disable-pip-version-check --no-cache-dir -r requirements.txt
-	else
-		log "No requirements.txt found; skipping Python dependency install."
-	fi
+validate_artifact() {
+	[ -x "$PYTHON_BIN" ] || die "$PYTHON_BIN not found; build the Django artifact first"
 }
 
 validate_application() {
@@ -47,7 +37,7 @@ main() {
 		exit 0
 	fi
 
-	install_dependencies
+	validate_artifact
 	validate_application
 	run_migrations
 	collect_static

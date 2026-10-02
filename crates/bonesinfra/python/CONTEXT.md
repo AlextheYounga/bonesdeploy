@@ -62,9 +62,10 @@ Native site provisioning creates only the runtime identity and release layout.
 Application asset builds occur locally and arrive as release artifacts, so
 production hosts do not receive build users, build caches, rootless Podman
 state, native builder images, or application repositories. Rails and Django
-install application dependencies into each staged release during remote prepare
-using the host's distribution language runtime. Runtime application users remain
-home-less and non-login.
+receive complete dependency trees in their local release artifacts. Remote
+prepare validates those dependencies and performs production-state work without
+invoking application package managers. Runtime application users remain home-less
+and non-login.
 
 Site paths are derived from `project_name`; `project_root` defaults to
 `/srv/sites/<project>`. BonesInfra does not create or inspect an application
