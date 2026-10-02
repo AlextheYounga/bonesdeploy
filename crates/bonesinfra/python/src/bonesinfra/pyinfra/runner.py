@@ -28,6 +28,7 @@ def run(
     *,
     ctx: DeployContext | ServerContext,
     deploy: Callable[[DeployContext | ServerContext], object | None],
+    operation: str = "operation",
     ssh_key: str | None = None,
     ssh_user_override: str | None = None,
     quiet: bool = False,
@@ -54,16 +55,16 @@ def run(
     target_host = next(iter(inventory))
 
     _show_target(hostname, ssh_user, quiet)
-    _connect(state, quiet)
+    _connect(state, quiet, operation)
     result = _plan(ctx, deploy, state, config, inventory, target_host, quiet)
 
     state.add_callback_handler(BonesDeployCallback())
 
-    _run_operations(state, quiet)
+    _run_operations(state, quiet, operation)
 
     if not quiet:
         stop_live_output()
-        print_done(success=True)
+        print_done(success=True, operation=operation)
     return result
 
 
@@ -73,12 +74,12 @@ def _show_target(hostname: str, ssh_user: str, quiet: bool) -> None:
         print_target(hostname, ssh_user)
 
 
-def _connect(state: State, quiet: bool) -> None:
+def _connect(state: State, quiet: bool, operation: str) -> None:
     try:
         with activity("connecting") if not quiet else nullcontext():
             connect_all(state)
     except PyinfraError:
-        _fail(quiet)
+        _fail(quiet, operation)
     if not quiet:
         print_connected()
 
@@ -95,17 +96,17 @@ def _plan(ctx, deploy, state, config, inventory, target_host, quiet):
         return deploy(ctx)
 
 
-def _run_operations(state: State, quiet: bool) -> None:
+def _run_operations(state: State, quiet: bool, operation: str) -> None:
     try:
         run_ops(state)
     except PyinfraError:
-        _fail(quiet)
+        _fail(quiet, operation)
     if state.failed_hosts:
-        _fail(quiet)
+        _fail(quiet, operation)
 
 
-def _fail(quiet: bool) -> None:
+def _fail(quiet: bool, operation: str) -> None:
     if not quiet:
         stop_live_output()
-        print_done(success=False)
+        print_done(success=False, operation=operation)
     sys.exit(1)

@@ -1,4 +1,3 @@
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -6,8 +5,8 @@ import pytest
 from bonesinfra.frameworks.rails.runtime import bundler_binary, bundler_command
 from bonesinfra.services.languages import NODE, PYTHON, RUBY
 from bonesinfra.services.languages.php import PHPRuntime
-from bonesinfra.services.languages.python import PYTHON_BUILD_PACKAGES, PYTHON_RELEASES, PythonRuntime
-from bonesinfra.services.languages.ruby import RUBY_ROOT, RubyRuntime
+from bonesinfra.services.languages.python import PYTHON_PACKAGES, PythonRuntime
+from bonesinfra.services.languages.ruby import RUBY_PACKAGES, RubyRuntime
 
 
 def _context(**runtime_data):
@@ -33,55 +32,40 @@ def test_language_runtime_rejects_invalid_versions(runtime, key, value):
         runtime.install(_context(**{key: value}))
 
 
-def test_python_runtime_builds_the_pinned_release_for_the_selected_minor(monkeypatch):
-    calls = {}
+def test_python_runtime_installs_distribution_packages(monkeypatch):
+    calls = []
     runtime = PythonRuntime()
 
-    monkeypatch.setattr(
-        "bonesinfra.services.languages.python.apt.packages", lambda **kwargs: calls.setdefault("packages", kwargs)
-    )
-    monkeypatch.setattr(
-        "bonesinfra.services.languages.python.server.script", lambda **kwargs: calls.setdefault("script", kwargs)
-    )
+    monkeypatch.setattr("bonesinfra.services.languages.python.apt.packages", lambda **kwargs: calls.append(kwargs))
 
     executable = runtime.install(_context(python_version="3.14"))
 
-    release, checksum = PYTHON_RELEASES["3.14"]
-    assert calls["packages"]["packages"] == PYTHON_BUILD_PACKAGES
-    assert calls["script"]["args"] == (release, checksum, "/opt/bonesdeploy/python")
-    assert executable == f"/opt/bonesdeploy/python/{release}/bin/python3.14"
-
-
-def test_python_installer_exposes_a_stable_minor_version_path():
-    installer = (Path(__file__).parents[1] / "src/bonesinfra/assets/scripts/install-python.sh").read_text()
-
-    assert 'ln -sfn "$prefix" "$python_root/$minor"' in installer
-    assert 'ln -sfn "$python_binary" "/usr/local/bin/python$minor"' in installer
-
-
-def test_python_runtime_rejects_unpinned_minor_versions():
-    runtime = PythonRuntime()
-    runtime.version = "3.13"
-
-    with pytest.raises(ValueError, match="Unsupported python_version"):
-        runtime._release()
+    assert runtime.version == "3.14"
+    assert executable == "/usr/bin/python3"
+    assert len(calls) == 1
+    assert calls[0]["packages"] == PYTHON_PACKAGES
+    assert calls[0]["present"] is True
+    assert calls[0]["update"] is True
+    assert calls[0]["_sudo"] is True
 
 
 @pytest.mark.parametrize(
     ("selected", "expected"),
     [("3.4.8", "3.4.8"), ("3.4", "3.4.8")],
 )
-def test_ruby_runtime_installs_supported_release_and_returns_versioned_binary(monkeypatch, selected, expected):
+def test_ruby_runtime_installs_distribution_packages(monkeypatch, selected, expected):
     calls = []
-    monkeypatch.setattr("bonesinfra.services.languages.ruby.server.script", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr("bonesinfra.services.languages.ruby.apt.packages", lambda **kwargs: calls.append(kwargs))
 
-    executable = RubyRuntime().install(_context(ruby_version=selected))
+    runtime = RubyRuntime()
+    executable = runtime.install(_context(ruby_version=selected))
 
-    assert executable == f"{RUBY_ROOT}/{expected}/bin/ruby"
+    assert runtime.version == expected
+    assert executable == "/usr/bin/ruby"
     assert len(calls) == 1
-    assert calls[0]["name"] == f"Install Ruby {expected}"
-    assert calls[0]["src"].endswith("src/bonesinfra/assets/scripts/install-ruby.sh")
-    assert calls[0]["args"] == (expected,)
+    assert calls[0]["packages"] == RUBY_PACKAGES
+    assert calls[0]["present"] is True
+    assert calls[0]["update"] is True
     assert calls[0]["_sudo"] is True
 
 
@@ -90,14 +74,14 @@ def test_ruby_runtime_rejects_unsupported_patch_release():
         RubyRuntime().install(_context(ruby_version="3.4.9"))
 
 
-def test_rails_bundler_binary_is_next_to_managed_ruby():
-    assert bundler_binary("/opt/bonesdeploy/ruby/3.4.8/bin/ruby") == "/opt/bonesdeploy/ruby/3.4.8/bin/bundle"
+def test_rails_bundler_binary_is_next_to_distribution_ruby():
+    assert bundler_binary("/usr/bin/ruby") == "/usr/bin/bundle"
 
 
 def test_rails_bundler_commands_use_the_project_local_bundle():
     assert (
-        bundler_command("/opt/bonesdeploy/ruby/3.4.8/bin/bundle", "exec puma --help")
-        == "BUNDLE_PATH=vendor/bundle /opt/bonesdeploy/ruby/3.4.8/bin/bundle exec puma --help"
+        bundler_command("/usr/bin/bundle", "exec puma --help")
+        == "BUNDLE_PATH=vendor/bundle /usr/bin/bundle exec puma --help"
     )
 
 

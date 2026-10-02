@@ -63,8 +63,7 @@ fn native_remote_deployment_config_contains_only_consumed_values() -> Result<()>
             "releases_keep": 7,
             "runtime": {
                 "backend": "native",
-                "web_root": "dist",
-                "ruby_version": "3.4.8"
+                "web_root": "dist"
             }
         })
     );
@@ -81,7 +80,10 @@ fn remote_deployment_config_round_trips_through_json() -> Result<()> {
     let restored: RemoteDeploymentConfig = serde_json::from_str(&json)?;
 
     assert_eq!(restored.releases_keep, 7);
-    assert_eq!(restored.runtime, RemoteRuntime::Native { web_root: "dist".to_string(), ruby_version: None });
+    assert_eq!(
+        restored.runtime,
+        RemoteRuntime::Native { web_root: "dist".to_string(), ruby_version: None, python_version: None }
+    );
     Ok(())
 }
 
@@ -100,10 +102,29 @@ fn remote_deployment_config_into_site_config_derives_identity_from_site() {
     assert_eq!(site_config.project_root, paths::default_project_root_for("target-site"));
     assert_eq!(site_config.releases_keep, 2);
     assert_eq!(site_config.runtime.web_root, "build");
-    assert_eq!(site_config.runtime.extra.len(), 1);
-    assert_eq!(site_config.runtime.extra.get(RUNTIME_RUBY_VERSION).and_then(toml::Value::as_str), Some("3.4.8"));
+    assert!(site_config.runtime.extra.is_empty());
     assert!(site_config.host.is_empty());
     assert_eq!(site_config.ssh_user, "root");
+}
+
+#[test]
+fn remote_deployment_config_accepts_but_drops_previous_ruby_version() -> Result<()> {
+    let json = r#"{"releases_keep":5,"runtime":{"backend":"native","web_root":"public","ruby_version":"3.4.8"}}"#;
+    let descriptor: RemoteDeploymentConfig = serde_json::from_str(json)?;
+    let site_config = descriptor.into_site_config("atlas");
+
+    assert!(site_config.runtime.extra.get(RUNTIME_RUBY_VERSION).is_none());
+    Ok(())
+}
+
+#[test]
+fn remote_deployment_config_accepts_but_drops_previous_python_version() -> Result<()> {
+    let json = r#"{"releases_keep":5,"runtime":{"backend":"native","web_root":"public","python_version":"3.14"}}"#;
+    let descriptor: RemoteDeploymentConfig = serde_json::from_str(json)?;
+    let site_config = descriptor.into_site_config("atlas");
+
+    assert!(site_config.runtime.extra.get(RUNTIME_PYTHON_VERSION).is_none());
+    Ok(())
 }
 
 #[test]
@@ -140,7 +161,7 @@ fn remote_deployment_config_rejects_web_roots_outside_the_release() {
     for web_root in ["/var/www/public", "../public", "public/../../shared"] {
         let descriptor = RemoteDeploymentConfig {
             releases_keep: 5,
-            runtime: RemoteRuntime::Native { web_root: web_root.to_string(), ruby_version: None },
+            runtime: RemoteRuntime::Native { web_root: web_root.to_string(), ruby_version: None, python_version: None },
         };
 
         assert!(descriptor.validate().is_err(), "accepted unsafe web root {web_root}");

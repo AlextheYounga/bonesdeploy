@@ -253,10 +253,17 @@ Framework templates ship starter overlays that `bonesdeploy init` uses when scaf
 - `frameworks/next/`       → Next.js (Node)
 - `frameworks/nuxt/`       → Nuxt (Node)
 - `frameworks/sveltekit/`  → SvelteKit (Node)
+<<<<<<< HEAD
 - `frameworks/vue/`        → Vue (static frontend)
 - `frameworks/rails/`      → Rails (Ruby; supported releases are provisioned from verified source archives)
+=======
+- `frameworks/vue/`        → Vue (Node)
+- `frameworks/rails/`      → Rails (the production host's distribution Ruby + Puma)
+>>>>>>> develop
 
-Django resolves its configured `python_version` minor to a BonesInfra-pinned CPython patch release, verifies the official source archive checksum, and installs it under `/opt/bonesdeploy/python/<patch>` with a stable minor-version symlink. It never changes Debian's `/usr/bin/python3`; local Django artifacts store dependencies in `.python-packages` and ship `.venv/bin` wrappers that execute the provisioned interpreter.
+Django site setup installs distribution Python, virtualenv support, development headers, and native package build dependencies from the host's configured Debian or Ubuntu APT repositories. The exact `python_version` setting controls only the local build toolchain. Local dependency output is removed from the artifact; remote prepare creates `.venv` with `/usr/bin/python3` and installs `requirements.txt` before Django validation, migrations, static collection, and activation. Django deployments require package-index access and application compatibility with the host distribution's Python.
+
+Rails site setup installs Ruby, Bundler, development headers, and native gem build dependencies from the host's configured Debian or Ubuntu APT repositories. The exact `ruby_version` setting controls only the local asset-build toolchain. The local bundle is removed from the artifact; remote prepare installs production gems into the staged release with `/usr/bin/bundle` before migrations, so native extensions match the target host's Ruby ABI. Rails deployments therefore require access to the application's configured gem sources and fail before activation when the application does not support the host distribution's Ruby.
 
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
 

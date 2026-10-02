@@ -53,15 +53,17 @@ BonesInfra owns:
 - canonical framework infrastructure and scaffold resources
 - Jinja2 templates used by provisioning
 - runtime package installation
-- Ruby runtime installation from pinned, checksum-verified official source archives
+- Ruby, Python, their package tooling and development headers, and native extension build dependencies from the host's APT repositories
 - runtime services
 - nginx/AppArmor/systemd provisioning details
 - scheduled Borg backup provisioning
 
 Native site provisioning creates only the runtime identity and release layout.
-Application builds occur locally and arrive as release artifacts, so production
-hosts do not receive build users, build caches, rootless Podman state, native
-builder images, or application repositories. Runtime application users remain
+Application asset builds occur locally and arrive as release artifacts, so
+production hosts do not receive build users, build caches, rootless Podman
+state, native builder images, or application repositories. Rails and Django
+install application dependencies into each staged release during remote prepare
+using the host's distribution language runtime. Runtime application users remain
 home-less and non-login.
 
 Site paths are derived from `project_name`; `project_root` defaults to

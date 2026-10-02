@@ -2,51 +2,54 @@
 
 ## Request
 
-Add the Rails Ruby runtime corrections identified while diagnosing the failed
-Rails E2E setup.
+Install the production Rails Ruby runtime from the supported Debian or Ubuntu
+distribution instead of compiling Ruby during site setup. Document this runtime
+and deployment model clearly in the README.
 
 ## Problem
 
-Rails converts its configured Ruby version into versioned Debian packages such
-as `ruby3.4` and `ruby3.4-dev`. Debian 13 does not provide those package names,
-so provisioning a Rails site configured for Ruby 3.4 fails before Puma is
-installed. The Rails build container has the same package-name assumption and
-cannot guarantee the configured host and build Ruby versions match.
+Rails site setup currently compiles a selected exact Ruby release from source.
+That build can exhaust the memory of a 512 MiB production server and make the
+server unresponsive. Shipping the application bundle produced by the local
+Debian build container is not a safe substitute because supported production
+hosts can provide a different Ruby ABI through their distribution packages.
 
 ## Definitions
 
-**Ruby toolchain:** A pinned Ruby interpreter, its standard Bundler command,
-and the native libraries required to compile it. It is installed independently
-of the Linux distribution's Ruby packages.
+**Distribution Ruby:** The default `ruby`, `ruby-dev`, and `ruby-bundler`
+packages supplied by the production host's configured Debian or Ubuntu APT
+repositories.
 
-**Exact Ruby version:** A stable `X.Y.Z` Ruby release selected by a Rails
-project. It is distinct from an `X.Y` release series and determines the source
-archive and executable installation path.
+**Target bundle:** The production gems installed into `vendor/bundle` inside a
+staged release by the production host's Ruby and Bundler before that release is
+activated.
 
 ## Desired outcome
 
-Rails setup and deployment work on supported Debian and Ubuntu hosts for the
-selected exact Ruby version. Runtime provisioning and release builds use the
-same verified Ruby source release, while multiple sites can use different Ruby
-versions without changing a global Ruby executable.
+Rails site setup installs Ruby and Bundler through APT without compiling Ruby.
+Each deployment creates its target bundle on the production host before running
+migrations or activating the release, so native gems match the host's Ruby ABI.
+The README makes the host-controlled Ruby version, deployment-time RubyGems
+access, and application compatibility requirement explicit.
 
 ## Scope
 
-This change includes exact Rails Ruby version selection, verified source-based
-installation on the host and in the build cache, versioned Ruby execution for
-Puma and Rails build scripts, regression tests, and related documentation.
-Existing Rails projects using the former `X.Y` values continue to resolve to
-their supported exact release.
+This change includes distribution Ruby installation on production hosts,
+distribution executable paths for Puma and Bundler, removal of locally compiled
+gems from release artifacts, target bundle installation before migrations,
+regression tests, and related documentation. The existing exact Ruby selection
+continues to control the local asset build only.
 
 ## Constraints
 
-Ruby archives must be downloaded only over HTTPS and verified against committed
-SHA-256 checksums. Host provisioning must use the existing BonesInfra runtime;
-release builds must keep using the private build cache. Full E2E tests must not
-be run during this work.
+Production Ruby packages must come from the host's configured APT repositories.
+Target bundle installation must run as the site's runtime user while the staged
+release is writable, and deployment must stop before activation when Bundler or
+the application's Ruby requirements fail. Full E2E tests must not be run during
+this work.
 
 ## Exclusions
 
-This change does not add arbitrary Ruby-version installation, Ruby version
-managers, support for non-Debian/Ubuntu hosts, or changes to Rails application
-source code.
+This change does not add a third-party Ruby repository, arbitrary production
+Ruby-version installation, Ruby version managers, support for non-Debian/Ubuntu
+hosts, vendored Ruby gems, or changes to Rails application source code.

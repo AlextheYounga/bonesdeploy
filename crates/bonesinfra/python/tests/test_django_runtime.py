@@ -27,7 +27,7 @@ def test_placeholder_uses_the_configured_wsgi_module_path(monkeypatch):
     monkeypatch.setattr(django, "template_data", lambda *_args, **_kwargs: {})
 
     django.deploy(ctx)
-    captured["seed_placeholder"](ctx, paths, "/opt/bonesdeploy/python/3.14/bin/python")
+    captured["seed_placeholder"](ctx, paths, "/usr/bin/python3")
 
     assert operations[1]["path"] == "/srv/sites/example/releases/19700101_000000/djangotest"
     assert operations[2][0][2] == "/srv/sites/example/releases/19700101_000000/djangotest/wsgi.py"
@@ -67,7 +67,7 @@ def test_gunicorn_uses_its_runtime_directory_for_worker_temp(monkeypatch):
     assert "--worker-tmp-dir /run/example/gunicorn" in command
 
 
-def test_gunicorn_runs_the_release_wrapper(monkeypatch):
+def test_gunicorn_runs_from_the_release_virtualenv(monkeypatch):
     captured = {}
     ctx = SimpleNamespace(runtime=SimpleNamespace(data={}), paths_dict={})
     paths = {

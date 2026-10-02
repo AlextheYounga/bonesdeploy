@@ -5,6 +5,21 @@ set -Eeuo pipefail
 readonly VENV_DIR="${VENV_DIR:-.venv}"
 readonly PYTHON_BIN="$VENV_DIR/bin/python"
 
+install_dependencies() {
+	export HOME="$PROJECT_ROOT/shared"
+	rm -rf "$VENV_DIR"
+
+	log "Creating production virtualenv with the host Python..."
+	/usr/bin/python3 -m venv "$VENV_DIR"
+
+	if [ -f requirements.txt ]; then
+		log "Installing production Python dependencies..."
+		"$PYTHON_BIN" -m pip install --disable-pip-version-check -r requirements.txt
+	else
+		log "No requirements.txt found; skipping Python dependency install."
+	fi
+}
+
 validate_application() {
 	[ -x "$VENV_DIR/bin/gunicorn" ] || die "gunicorn not found in $VENV_DIR; add it to requirements.txt"
 
@@ -33,7 +48,7 @@ main() {
 		exit 0
 	fi
 
-	[ -x "$PYTHON_BIN" ] || die "$PYTHON_BIN not found; build the Django artifact first"
+	install_dependencies
 	validate_application
 	run_migrations
 	collect_static

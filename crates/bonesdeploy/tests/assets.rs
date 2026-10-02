@@ -35,22 +35,30 @@ fn framework_assets_include_expected_build_content() {
 fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     let django = asset_text("django/deployment/build/02_run_build.sh");
     assert!(django.contains("--target \"$packages_dir\" -r requirements.txt"));
-    assert!(django.contains("/opt/bonesdeploy/python/${python_version}/bin/python${python_version}"));
-    assert!(django.contains("exec \"$production_python\" \"\\$@\""));
-    assert!(django.contains("exec \"$production_python\" -m gunicorn \"\\$@\""));
     assert!(!django.contains("-m venv"));
-    assert!(django.contains("rm -rf deployment/build"));
+    assert!(django.contains("rm -rf \"$packages_dir\" .venv deployment/build"));
 
     let django_prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
-    assert!(!django_prepare.contains("pip install"));
-    assert!(!django_prepare.contains("-m venv"));
+    assert!(django_prepare.contains("/usr/bin/python3 -m venv"));
+    assert!(django_prepare.contains("-m pip install"));
     assert!(django_prepare.contains("$VENV_DIR/bin/python"));
 
     let laravel = asset_text("laravel/deployment/build/03_build_frontend.sh");
     assert!(laravel.contains("rm -rf node_modules deployment/build"));
     let rails = asset_text("rails/deployment/build/02_run_build.sh");
     assert!(rails.contains("bundle install"));
-    assert!(rails.contains("rm -rf node_modules tmp/cache deployment/build"));
+    assert!(rails.contains("rm -rf node_modules tmp/cache vendor/bundle deployment/build"));
+
+    let rails_prepare = asset_text("rails/deployment/prepare/01_prepare_rails.sh");
+    let install = rails_prepare.find("/usr/bin/bundle install").expect("Rails prepare must install the target bundle");
+    let migration_skip =
+        rails_prepare.find("BONES_RAILS_SKIP_MIGRATIONS").expect("Rails prepare must support skipping migrations");
+    let migrate = rails_prepare
+        .find("/usr/bin/bundle exec rails db:migrate")
+        .expect("Rails prepare must run migrations through the target bundle");
+    assert!(install < migration_skip);
+    assert!(install < migrate);
+    assert!(rails_prepare.contains("BUNDLE_PATH=\"vendor/bundle\""));
 
     let next = asset_text("next/deployment/build/02_run_build.sh");
     assert!(next.contains(".next/standalone"));
@@ -76,22 +84,20 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
 fn django_artifact_contract_matches_the_production_runtime() {
     let build = asset_text("django/deployment/build/02_run_build.sh");
     assert!(build.contains("local packages_dir=\".python-packages\""));
-    assert!(build.contains("local wrapper_dir=\".venv/bin\""));
-    assert!(
-        build.contains(
-            "local production_python=\"/opt/bonesdeploy/python/${python_version}/bin/python${python_version}\""
-        )
-    );
-    assert!(
-        build.contains("export PYTHONPATH=\\\"\\$release_root/.python-packages\\${PYTHONPATH:+:\\$PYTHONPATH}\\\"")
-    );
-    assert!(build.contains("exec \"$production_python\" -m gunicorn \"\\$@\""));
-    assert!(!build.contains("/opt/bonesdeploy/python/3.14.7/"));
+    assert!(build.contains("rm -rf \"$packages_dir\" .venv deployment/build"));
+    assert!(!build.contains("production_python"));
+    assert!(!build.contains("PYTHONPATH"));
 
     let prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
+    let create_venv = prepare.find("/usr/bin/python3 -m venv").expect("Django prepare must create the target venv");
+    let install = prepare.find("-m pip install").expect("Django prepare must install target dependencies");
+    let validate = prepare.find("manage.py check --deploy").expect("Django prepare must validate the application");
+    let migration_skip =
+        prepare.find("BONES_DJANGO_SKIP_MIGRATIONS").expect("Django prepare must support skipping migrations");
     assert!(prepare.contains("readonly PYTHON_BIN=\"$VENV_DIR/bin/python\""));
-    assert!(prepare.contains("[ -x \"$PYTHON_BIN\" ]"));
-    assert!(!prepare.contains("pip install"));
+    assert!(create_venv < install);
+    assert!(install < validate);
+    assert!(install < migration_skip);
 }
 
 #[test]
