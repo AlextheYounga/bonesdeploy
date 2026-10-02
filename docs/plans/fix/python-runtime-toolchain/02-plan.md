@@ -22,9 +22,10 @@ commands, and then performs validation, migrations, and static collection.
 
 Replace the Python source installer with one APT package operation and return
 `/usr/bin/python3` as the production executable. Simplify the local build so it
-may resolve dependencies with its exact configured Python but removes both
-`.python-packages` and `.venv` before packaging. Move virtualenv creation and pip
-installation into Django prepare before validation and migration skip handling.
+does not require Python or resolve dependencies; it removes stale
+`.python-packages` and `.venv` outputs before packaging. Move virtualenv creation
+and pip installation into Django prepare before validation and migration skip
+handling.
 
 Remove managed-Python AppArmor paths and permit distribution Python execution.
 Stop serializing `python_version` into remote descriptors while accepting and
@@ -34,8 +35,7 @@ discarding the old native field for compatibility, matching `ruby_version`.
 
 - BonesInfra `PythonRuntime` owns host APT packages and the production Python
   executable path.
-- The local Django build owns disposable dependency resolution and artifact
-  cleanup.
+- The local Django build owns cleanup of stale dependency outputs.
 - Django remote prepare owns the release virtualenv and production dependency
   installation.
 - The Django AppArmor profile owns distribution-interpreter execution access.

@@ -177,16 +177,15 @@ current release running.
 Django production sites likewise use the `python3` interpreter supplied by the
 host's Debian or Ubuntu APT repositories. Site setup installs Python, virtualenv
 support, development headers, and native package build dependencies; it does not
-compile CPython. The configured exact `PYTHON_VERSION` remains a local build
-setting, so the Django application and its requirements must also support the
-host distribution's Python version.
+compile CPython. `PYTHON_VERSION` is retained for compatibility with existing
+project configuration but does not select an interpreter. Django applications
+and their requirements must support the host distribution's Python version.
 
-The local dependency tree is discarded before packaging. During every
-deployment, the staged release creates `.venv` with `/usr/bin/python3` and
-installs `requirements.txt` before validation, migrations, static collection,
-and activation. The host must be able to reach the configured Python package
-indexes. Python incompatibility or installation failure leaves the current
-release running.
+During every deployment, the staged release creates `.venv` with
+`/usr/bin/python3` and installs `requirements.txt` before validation, migrations,
+static collection, and activation. The host must be able to reach the configured
+Python package indexes. Python incompatibility or installation failure leaves
+the current release running.
 
 Native Laravel sites also receive a per-site systemd queue worker by default.
 It runs `php artisan queue:work` with bounded lifetime and explicit writable

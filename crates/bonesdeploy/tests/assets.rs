@@ -34,9 +34,10 @@ fn framework_assets_include_expected_build_content() {
 #[test]
 fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     let django = asset_text("django/deployment/build/02_run_build.sh");
-    assert!(django.contains("--target \"$packages_dir\" -r requirements.txt"));
     assert!(!django.contains("-m venv"));
-    assert!(django.contains("rm -rf \"$packages_dir\" .venv deployment/build"));
+    assert!(!django.contains("pip install"));
+    assert!(!django.contains("BONES_RUNTIME_PYTHON_VERSION"));
+    assert!(django.contains("rm -rf .python-packages .venv deployment/build"));
 
     let django_prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
     assert!(django_prepare.contains("/usr/bin/python3 -m venv"));
@@ -92,8 +93,9 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
 #[test]
 fn django_artifact_contract_matches_the_production_runtime() {
     let build = asset_text("django/deployment/build/02_run_build.sh");
-    assert!(build.contains("local packages_dir=\".python-packages\""));
-    assert!(build.contains("rm -rf \"$packages_dir\" .venv deployment/build"));
+    assert!(build.contains("rm -rf .python-packages .venv deployment/build"));
+    assert!(!build.contains("pip install"));
+    assert!(!build.contains("BONES_RUNTIME_PYTHON_VERSION"));
     assert!(!build.contains("production_python"));
     assert!(!build.contains("PYTHONPATH"));
 

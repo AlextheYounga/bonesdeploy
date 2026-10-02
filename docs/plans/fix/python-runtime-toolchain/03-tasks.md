@@ -24,10 +24,11 @@
 
 ## Completion Notes
 
-Production Django now uses distribution Python from APT. Local dependency output
-is removed from artifacts, and prepare creates a release-owned virtualenv before
-installing requirements with isolated, cacheless pip. Migration skip handling
-still occurs only after dependencies and validation are ready.
+Production Django now uses distribution Python from APT. Local builds do not
+install Python or dependencies and remove stale dependency output from artifacts.
+Prepare creates a release-owned virtualenv before installing requirements with
+isolated, cacheless pip. Migration skip handling still occurs only after
+dependencies and validation are ready.
 
 The embedded wheel was rebuilt. Ruff checks, 516 Python tests, focused runtime
 tests, the workspace Rust suite excluding E2E, Clippy, Rustfmt, Shfmt, and

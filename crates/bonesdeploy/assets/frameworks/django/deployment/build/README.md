@@ -15,9 +15,9 @@ the committed revision.
 - Scripts run in lexical order by filename.
 - Non-zero exit code fails the deploy.
 - Your job: produce the deployable app layout inside `/workspace/source`.
-- Resolve `requirements.txt` here as a local compatibility check, then remove the
-  disposable dependency tree. Production prepare creates the release virtualenv
-  and installs requirements with the host's distribution Python.
+- Do not install Python dependencies here. Production prepare creates the
+  release virtualenv and installs `requirements.txt` with the host's
+  distribution Python.
 - Remove build-only caches, source-only files, and numbered build scripts when
   the selected runtime does not need them.
 - BonesRemote verifies and receives the artifact, then promotes this output into
