@@ -26,7 +26,7 @@ def apparmor_exec_paths(paths, ruby_binary):
     bundle_root = f"{paths['releases']}/*/{BUNDLER_PATH}/ruby/*"
     return [
         "/usr/bin/env",
-        ruby_binary,
+        "/usr/bin/ruby*",
         bundler_binary(ruby_binary),
         f"{bundle_root}/bin/puma",
     ]

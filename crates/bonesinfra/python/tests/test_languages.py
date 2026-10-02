@@ -90,7 +90,7 @@ def test_rails_apparmor_allows_every_puma_command_executable():
 
     assert apparmor_exec_paths(paths, "/usr/bin/ruby") == [
         "/usr/bin/env",
-        "/usr/bin/ruby",
+        "/usr/bin/ruby*",
         "/usr/bin/bundle",
         "/srv/sites/atlas/releases/*/vendor/bundle/ruby/*/bin/puma",
     ]

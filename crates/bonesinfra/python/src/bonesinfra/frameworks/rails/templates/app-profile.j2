@@ -19,6 +19,7 @@ profile {{ apparmor_profile_name }} flags=(attach_disconnected,mediate_deleted) 
   /sys/devices/system/cpu/online r,
 
   # current is a symlink, so AppArmor mediates the resolved release path.
+  {{ paths.releases }}/*/ r,
   {{ paths.releases }}/*/** r,
 {% for write_path in apparmor_writable_paths %}
   {{ write_path }}/ rw,

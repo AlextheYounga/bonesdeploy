@@ -122,6 +122,7 @@ def test_django_profile_permits_distribution_python(monkeypatch):
     )
     assert "/usr/bin/python3* rix," in rendered
     assert "/opt/bonesdeploy/python/" not in rendered
+    assert "/srv/sites/lawsnipe/releases/*/ r," in rendered
     assert "/srv/sites/lawsnipe/releases/*/** r," in rendered
     assert "/srv/sites/lawsnipe/releases/*/**.so* mr," in rendered
     assert "/srv/sites/lawsnipe/current/.venv/bin/gunicorn mrix," in rendered
@@ -157,7 +158,7 @@ def test_rails_profile_permits_distribution_ruby_and_bundler(monkeypatch):
         .render(seen["data"])
     )
     assert "/usr/bin/env mrix," in rendered
-    assert "/usr/bin/ruby mrix," in rendered
+    assert "/usr/bin/ruby* mrix," in rendered
     assert "/usr/bin/bundle mrix," in rendered
     assert "/srv/sites/lawsnipe/releases/*/vendor/bundle/ruby/*/bin/puma mrix," in rendered
     assert "/opt/bonesdeploy/ruby/" not in rendered
