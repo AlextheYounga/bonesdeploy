@@ -253,13 +253,8 @@ Framework templates ship starter overlays that `bonesdeploy init` uses when scaf
 - `frameworks/next/`       → Next.js (Node)
 - `frameworks/nuxt/`       → Nuxt (Node)
 - `frameworks/sveltekit/`  → SvelteKit (Node)
-<<<<<<< HEAD
-- `frameworks/vue/`        → Vue (static frontend)
-- `frameworks/rails/`      → Rails (Ruby; supported releases are provisioned from verified source archives)
-=======
 - `frameworks/vue/`        → Vue (Node)
 - `frameworks/rails/`      → Rails (the production host's distribution Ruby + Puma)
->>>>>>> develop
 
 Django site setup installs distribution Python, virtualenv support, development headers, and native package build dependencies from the host's configured Debian or Ubuntu APT repositories. The exact `python_version` setting controls only the local build toolchain. Local dependency output is removed from the artifact; remote prepare creates `.venv` with `/usr/bin/python3` and installs `requirements.txt` before Django validation, migrations, static collection, and activation. Django deployments require package-index access and application compatibility with the host distribution's Python.
 
