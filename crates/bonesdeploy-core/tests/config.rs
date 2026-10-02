@@ -106,6 +106,20 @@ fn dotenv_round_trips_framework_values() -> Result<()> {
 }
 
 #[test]
+fn dotenv_accepts_and_preserves_previous_python_version() -> Result<()> {
+    let dir = tempdir()?;
+    let path = dir.path().join(".env");
+    fs::write(&path, "BONES_PYTHON_VERSION=3.14\n")?;
+
+    let loaded = config::load(&path)?;
+    assert_eq!(loaded.runtime.extra.get("python_version"), Some(&toml::Value::String("3.14".into())));
+
+    config::write_local_environment(&loaded, &path)?;
+    assert!(fs::read_to_string(&path)?.contains("BONES_PYTHON_VERSION=3.14\n"));
+    Ok(())
+}
+
+#[test]
 fn managed_block_delimiters_replaced_atomically_preserving_application_content() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join(".env");

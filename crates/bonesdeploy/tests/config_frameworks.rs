@@ -156,7 +156,6 @@ fn environment_examples_use_project_name_in_shared_paths() -> Result<()> {
 fn build_environments_use_selected_language_versions() -> Result<()> {
     for (framework, key, version, expected, old) in [
         (Framework::Laravel, "php_version", "8.3", "PHP_VERSION=8.3", "PHP_VERSION=8.5"),
-        (Framework::Django, "python_version", "3.14", "PYTHON_VERSION=3.14", "PYTHON_VERSION=3.13"),
         (Framework::Rails, "ruby_version", "3.4.8", "RUBY_VERSION=3.4.8", "RUBY_VERSION=3.3.8"),
     ] {
         let runtime: Runtime = serde_json::from_value(Value::Object(
@@ -168,6 +167,19 @@ fn build_environments_use_selected_language_versions() -> Result<()> {
         assert!(environment.contains(expected));
         assert!(!environment.contains(old));
     }
+    Ok(())
+}
+
+#[test]
+fn django_does_not_expose_an_unused_python_version() -> Result<()> {
+    let defaults = Framework::Django.runtime_defaults()?.ok_or_else(|| anyhow::anyhow!("missing Django defaults"))?;
+    let environment = Framework::Django
+        .build_environment_example(&Runtime::default())
+        .ok_or_else(|| anyhow::anyhow!("missing Django build environment"))?;
+
+    assert!(!defaults.contains_key("python_version"));
+    assert!(Framework::Django.questions().iter().all(|question| question.key != "python_version"));
+    assert!(!environment.contains("PYTHON_VERSION"));
     Ok(())
 }
 

@@ -158,7 +158,7 @@ impl Framework {
     pub fn build_environment_example(self, runtime: &Runtime) -> Option<String> {
         Some(match self {
             Self::Angular => angular::build_environment_example(),
-            Self::Django => django::build_environment_example(runtime),
+            Self::Django => django::build_environment_example(),
             Self::Laravel => laravel::build_environment_example(runtime),
             Self::Next => next::build_environment_example(runtime),
             Self::Nuxt => nuxt::build_environment_example(runtime),

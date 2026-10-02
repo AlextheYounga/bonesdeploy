@@ -17,8 +17,8 @@ packages and wrappers tied to the managed interpreter.
 **Distribution Python:** The `python3` interpreter and supporting packages from
 the supported Debian or Ubuntu APT repositories.
 
-**Local Python:** The exact `python_version` selected for the disposable local
-artifact build environment.
+**Legacy Python version:** The accepted but unused `python_version` value from
+existing project configuration and remote descriptors.
 
 **Target virtualenv:** The release-owned `.venv` created with distribution
 Python while preparing a staged release.
@@ -26,9 +26,9 @@ Python while preparing a staged release.
 ## Desired Outcome
 
 Django host provisioning installs Python through APT without compiling CPython.
-Local build dependencies are not shipped. Before activation, the target host
-creates `.venv`, installs `requirements.txt`, validates Django, runs migrations
-unless skipped, and collects static files.
+The local build does not install Python dependencies. Before activation, the
+target host creates `.venv`, installs `requirements.txt`, validates Django, runs
+migrations unless skipped, and collects static files.
 
 ## Scope
 
@@ -40,8 +40,8 @@ unless skipped, and collects static files.
 ## Constraints
 
 - Supported hosts remain Debian 12+ and Ubuntu 24.04+ on `x86_64`.
-- `python_version` remains the exact local build input and does not select the
-  production interpreter.
+- Existing `python_version` values remain readable but do not select an
+  interpreter and are not generated for new projects.
 - Prepare scripts continue to run as the home-less site runtime user.
 - Full E2E tests are not run unless explicitly requested.
 
