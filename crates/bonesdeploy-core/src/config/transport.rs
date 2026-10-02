@@ -101,9 +101,11 @@ impl ProvisioningRequest {
 pub enum RemoteRuntime {
     Native {
         web_root: String,
-        // Read descriptors written before production switched to distribution Ruby.
+        // Read descriptors written before production switched to distribution runtimes.
         #[serde(default, skip_serializing)]
         ruby_version: Option<String>,
+        #[serde(default, skip_serializing)]
+        python_version: Option<String>,
     },
     Docker {
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -139,7 +141,9 @@ impl RemoteRuntime {
 
     fn from_runtime(runtime: &Runtime) -> Self {
         match runtime.backend {
-            RuntimeBackend::Native => Self::Native { web_root: runtime.web_root.clone(), ruby_version: None },
+            RuntimeBackend::Native => {
+                Self::Native { web_root: runtime.web_root.clone(), ruby_version: None, python_version: None }
+            }
             RuntimeBackend::Docker => {
                 Self::Docker { compose_port: runtime.compose_port, compose_wait_timeout: runtime.compose_wait_timeout }
             }

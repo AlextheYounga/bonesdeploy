@@ -109,15 +109,22 @@ fn framework_prepare_templates_do_not_source_control_plane_files() -> Result<()>
 }
 
 #[test]
-fn django_prepare_template_uses_the_configured_python_minor() -> Result<()> {
+fn django_prepare_template_installs_target_dependencies_before_django_commands() -> Result<()> {
     let template = fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../bonesdeploy/assets/frameworks/django/deployment/prepare/01_prepare_django.sh"),
     )?;
 
-    assert!(template.contains("$VENV_DIR/bin/python"));
-    assert!(!template.contains("pip install"));
-    assert!(!template.contains("-m venv"));
+    let create_venv = template.find("/usr/bin/python3 -m venv").context("missing target virtualenv creation")?;
+    let install = template.find("-m pip install").context("missing target dependency installation")?;
+    let validate = template.find("manage.py check --deploy").context("missing Django validation")?;
+    let migration_skip = template.find("BONES_DJANGO_SKIP_MIGRATIONS").context("missing migration skip setting")?;
+    let migrate = template.find("manage.py migrate --noinput").context("missing Django migration")?;
+    assert!(create_venv < install);
+    assert!(install < validate);
+    assert!(install < migration_skip);
+    assert!(install < migrate);
+    assert!(!template.contains("BONES_RUNTIME_PYTHON_VERSION"));
     Ok(())
 }
 

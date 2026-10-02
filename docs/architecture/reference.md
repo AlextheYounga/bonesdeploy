@@ -576,8 +576,9 @@ exact revision, kind, compressed length, and SHA-256. BonesRemote verifies the
 complete payload and bounds, safely extracts relative paths, loads required
 images, and starts Compose with `--no-build --pull never`. It then promotes,
 prepares, seals, activates, verifies, prunes, or rolls back through one
-lifecycle. Native failures never fall back to production builds. Django
-dependencies are installed locally; prepare performs production-state work only.
+lifecycle. Native failures never fall back to a production asset build. Django
+prepare creates a release virtualenv and installs requirements with the host's
+distribution Python before production-state commands.
 
 ### 4.5 `bonesdeploy doctor`
 
@@ -683,9 +684,9 @@ runtime state and is not persisted in project configuration.
 - `bonesdeploy-core` defines the canonical `Bones` struct, all path constants, and validation functions.
 - `bonesdeploy` loads the local root `.env` and projects only release retention
   plus backend-specific remote values into `RemoteDeploymentConfig`: native web
-  root and optional Rails Ruby version, or Docker ingress port and startup
-  timeout. It sends that descriptor over SSH stdin to the allowlisted `config
-  sync` command before deploy.
+  root, or Docker ingress port and startup timeout. Legacy native Ruby and Python
+  version fields are accepted and discarded. It sends that descriptor over SSH
+  stdin to the allowlisted `config sync` command before deploy.
 - `bonesremote` derives identity and paths from `--site`; it never parses the application `shared/.env` as control-plane config.
 - Runtime secrets are saved encrypted by `bonesdeploy` and atomically published to `shared/.env` by the typed BonesRemote operation used by `secrets push`. Environment publication and shared import acquire the same site mutation lock.
 

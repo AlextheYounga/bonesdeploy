@@ -173,6 +173,20 @@ with native extensions are compiled on that host. A Ruby incompatibility or
 bundle installation failure stops the deployment before activation, leaving the
 current release running.
 
+Django production sites likewise use the `python3` interpreter supplied by the
+host's Debian or Ubuntu APT repositories. Site setup installs Python, virtualenv
+support, development headers, and native package build dependencies; it does not
+compile CPython. The configured exact `PYTHON_VERSION` remains a local build
+setting, so the Django application and its requirements must also support the
+host distribution's Python version.
+
+The local dependency tree is discarded before packaging. During every
+deployment, the staged release creates `.venv` with `/usr/bin/python3` and
+installs `requirements.txt` before validation, migrations, static collection,
+and activation. The host must be able to reach the configured Python package
+indexes. Python incompatibility or installation failure leaves the current
+release running.
+
 Native Laravel sites also receive a per-site systemd queue worker by default.
 It runs `php artisan queue:work` with bounded lifetime and explicit writable
 Laravel storage paths, and is restarted with the application after activation.
@@ -602,13 +616,12 @@ keys are never included in build inputs; the local artifact excludes the root
 
 After verified extraction, BonesRemote uses the same promotion, shared-path
 wiring, prepare, sealing, activation, service restart, pruning, and rollback
-behavior for every native deployment. Django dependencies are installed and the
-dependency files are packaged under `.python-packages` during the local build,
-and release-owned `.venv/bin` wrappers invoke the provisioned production
-interpreter. Django prepare is limited to production-state work such as
-validation, migrations, and static-file collection. Rails is the exception to
-the packaged-dependency model: its production gems are installed into the
-staged release by the target host's distribution Ruby before migrations.
+behavior for every native deployment. Django's locally resolved dependency tree
+is removed before packaging; remote prepare creates a release-owned virtualenv
+with the target host's distribution Python and installs `requirements.txt`
+before validation, migrations, and static-file collection. Rails likewise
+installs production gems into the staged release with the target host's
+distribution Ruby before migrations.
 
 Artifact receipt enforces a 64 KiB manifest, a 2 GiB compressed payload, at most
 100,000 archive entries, 4 KiB paths and symlink targets, and a 4 GiB expanded

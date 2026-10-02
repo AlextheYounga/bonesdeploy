@@ -119,7 +119,9 @@ mod tests {
 
     fn descriptor(backend: RuntimeBackend) -> RemoteDeploymentConfig {
         let runtime = match backend {
-            RuntimeBackend::Native => RemoteRuntime::Native { web_root: String::from("public"), ruby_version: None },
+            RuntimeBackend::Native => {
+                RemoteRuntime::Native { web_root: String::from("public"), ruby_version: None, python_version: None }
+            }
             RuntimeBackend::Docker => RemoteRuntime::Docker { compose_port: None, compose_wait_timeout: 120 },
         };
         RemoteDeploymentConfig { releases_keep: 5, runtime }

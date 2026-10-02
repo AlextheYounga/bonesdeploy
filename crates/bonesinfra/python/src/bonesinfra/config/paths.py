@@ -45,7 +45,6 @@ PATCHES_ROOT = "/var/lib/bonesdeploy/patches"
 DEFAULT_PROJECT_ROOT_PARENT = "/srv/sites"
 DEFAULT_CONF_ROOT_PARENT = "/srv/conf"
 DEFAULT_WEB_ROOT = "public"
-PYTHON_ROOT = "/opt/bonesdeploy/python"
 
 ETC_NGINX_SITES_AVAILABLE = "/etc/nginx/sites-available"
 ETC_NGINX_SITES_ENABLED = "/etc/nginx/sites-enabled"

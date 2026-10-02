@@ -88,7 +88,7 @@ def test_sveltekit_profile_permits_reading_the_shared_environment(tmp_path, monk
     assert "/srv/sites/lawsnipe/shared/.env r," in rendered
 
 
-def test_django_profile_permits_mapping_managed_python_libraries(tmp_path, monkeypatch):
+def test_django_profile_permits_distribution_python(monkeypatch):
     ctx = _ctx()
     seen = {}
 
@@ -117,10 +117,10 @@ def test_django_profile_permits_mapping_managed_python_libraries(tmp_path, monke
         .get_template("app-profile.j2")
         .render(seen["data"])
     )
-    assert "/opt/bonesdeploy/python/ r," in rendered
-    assert "/opt/bonesdeploy/python/** r," in rendered
-    assert "/opt/bonesdeploy/python/**.so* mr," in rendered
+    assert "/usr/bin/python3* rix," in rendered
+    assert "/opt/bonesdeploy/python/" not in rendered
     assert "/srv/sites/lawsnipe/releases/*/** r," in rendered
+    assert "/srv/sites/lawsnipe/releases/*/**.so* mr," in rendered
     assert "/srv/sites/lawsnipe/current/.venv/bin/gunicorn mrix," in rendered
 
 

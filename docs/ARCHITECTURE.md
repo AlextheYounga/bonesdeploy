@@ -159,9 +159,9 @@ Existing implementations:
 - Loaded from the project root `.env` via config::load()
 - Projected into a backend-specific `RemoteDeploymentConfig` for deploy-time SSH
   transport. Native carries `web_root`; Docker carries `compose_port` and
-  `compose_wait_timeout`. Native descriptors still accept and discard the legacy
-  Rails `ruby_version` field when reading existing state. Local build and
-  arbitrary framework fields do not cross this boundary.
+  `compose_wait_timeout`. Native descriptors still accept and discard legacy
+  `ruby_version` and `python_version` fields when reading existing state. Local
+  build and arbitrary framework fields do not cross this boundary.
 - Reconstructed remotely with identity and paths derived from `--site`
 
 `bonesremote` does not load `shared/.env` as Bones configuration. That file is
@@ -465,8 +465,9 @@ variables are excluded. BonesRemote verifies the site, revision, payload length,
 SHA-256, image inventory, and safe extraction constraints before promotion.
 Production starts Compose with `--no-build --pull never`. Prepare, sealing,
 activation, restart, pruning, and rollback remain shared. Production provisioning
-has no application repository or native build facility, and Django dependencies
-are installed locally rather than during prepare.
+has no application repository or general build facility. Rails and Django
+prepare install application dependencies into the staged release with the host
+distribution's language runtime before activation.
 
 ```text
 ### SiteState
