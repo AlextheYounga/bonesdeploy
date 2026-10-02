@@ -22,8 +22,14 @@ def bundler_command(bundle_binary, command):
     return f"BUNDLE_PATH={BUNDLER_PATH} {quote(bundle_binary)} {command}"
 
 
-def apparmor_exec_paths(ruby_binary):
-    return ["/usr/bin/env", ruby_binary, bundler_binary(ruby_binary)]
+def apparmor_exec_paths(paths, ruby_binary):
+    bundle_root = f"{paths['releases']}/*/{BUNDLER_PATH}/ruby/*"
+    return [
+        "/usr/bin/env",
+        ruby_binary,
+        bundler_binary(ruby_binary),
+        f"{bundle_root}/bin/puma",
+    ]
 
 
 def deploy(ctx):
@@ -87,7 +93,7 @@ def deploy(ctx):
             seed_placeholder=seed_placeholder,
             validate=validate,
             command=command,
-            exec_paths=lambda _ctx, _paths, ruby: apparmor_exec_paths(ruby),
+            exec_paths=lambda _ctx, paths, ruby: apparmor_exec_paths(paths, ruby),
             writable_paths=lambda _ctx, paths: [
                 f"{paths['shared']}/tmp",  # noqa: S108 - Rails owns this shared application path.
                 f"{paths['shared']}/log",

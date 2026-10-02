@@ -86,7 +86,14 @@ def test_rails_bundler_commands_use_the_project_local_bundle():
 
 
 def test_rails_apparmor_allows_every_puma_command_executable():
-    assert apparmor_exec_paths("/usr/bin/ruby") == ["/usr/bin/env", "/usr/bin/ruby", "/usr/bin/bundle"]
+    paths = {"releases": "/srv/sites/atlas/releases"}
+
+    assert apparmor_exec_paths(paths, "/usr/bin/ruby") == [
+        "/usr/bin/env",
+        "/usr/bin/ruby",
+        "/usr/bin/bundle",
+        "/srv/sites/atlas/releases/*/vendor/bundle/ruby/*/bin/puma",
+    ]
 
 
 def test_php_runtime_configures_the_project_fpm_pool(monkeypatch):

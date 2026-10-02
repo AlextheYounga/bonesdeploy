@@ -9,7 +9,10 @@ import jinja2
 from bonesinfra.config.context import DeployContext
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.frameworks.django.runtime import TEMPLATES as DJANGO_TEMPLATES
-from bonesinfra.frameworks.rails.runtime import TEMPLATES as RAILS_TEMPLATES
+from bonesinfra.frameworks.rails.runtime import (
+    TEMPLATES as RAILS_TEMPLATES,
+    apparmor_exec_paths as rails_apparmor_exec_paths,
+)
 from bonesinfra.frameworks.sveltekit.runtime import TEMPLATES as SVELTEKIT_TEMPLATES
 from bonesinfra.services.linux.apparmor import app as apparmor_app
 
@@ -141,7 +144,7 @@ def test_rails_profile_permits_distribution_ruby_and_bundler(monkeypatch):
         paths=paths,
         runtime="rails",
         template_src=RAILS_TEMPLATES / "app-profile.j2",
-        apparmor_exec_paths=["/usr/bin/ruby", "/usr/bin/bundle"],
+        apparmor_exec_paths=rails_apparmor_exec_paths(paths, "/usr/bin/ruby"),
         apparmor_writable_paths=[],
     )
 
@@ -153,6 +156,8 @@ def test_rails_profile_permits_distribution_ruby_and_bundler(monkeypatch):
         .get_template("app-profile.j2")
         .render(seen["data"])
     )
+    assert "/usr/bin/env mrix," in rendered
     assert "/usr/bin/ruby mrix," in rendered
     assert "/usr/bin/bundle mrix," in rendered
+    assert "/srv/sites/lawsnipe/releases/*/vendor/bundle/ruby/*/bin/puma mrix," in rendered
     assert "/opt/bonesdeploy/ruby/" not in rendered
