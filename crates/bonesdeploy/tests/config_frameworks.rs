@@ -82,12 +82,13 @@ fn write_local_environment_writes_flat_local_input_file() -> Result<()> {
 
 #[test]
 fn framework_wire_values_parse_and_display() -> Result<()> {
-    for wire in ["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue", "custom"] {
+    for wire in ["angular", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue", "custom"] {
         assert_eq!(Framework::parse(wire)?.to_string(), wire);
     }
     assert!(Framework::parse("unknown").is_err());
     assert_eq!(Framework::Next.display_name(), "Next.js");
     assert_eq!(Framework::SvelteKit.display_name(), "SvelteKit");
+    assert_eq!(Framework::Angular.display_name(), "Angular");
     assert_eq!(Framework::Django.display_name(), "Django");
     Ok(())
 }
@@ -111,6 +112,24 @@ fn next_and_nuxt_default_to_node_25_without_changing_other_frameworks() -> Resul
 
     let defaults = Framework::SvelteKit.runtime_defaults()?.ok_or_else(|| anyhow::anyhow!("missing defaults"))?;
     assert_eq!(defaults.get("node_version"), Some(&Value::String("24.19.0".into())));
+    Ok(())
+}
+
+#[test]
+fn angular_defaults_to_the_static_browser_artifact() -> Result<()> {
+    assert!(Framework::Angular.questions().is_empty());
+    let defaults = Framework::Angular.runtime_defaults()?.ok_or_else(|| anyhow::anyhow!("missing defaults"))?;
+
+    assert_eq!(defaults.get("template"), Some(&Value::String("angular".into())));
+    assert_eq!(defaults.get("web_root"), Some(&Value::String("dist/browser".into())));
+    assert_eq!(
+        defaults.get("permissions"),
+        Some(&json!([
+            {"path": "*", "type": "dir", "mode": 750, "recursive": false},
+            {"path": "*", "type": "file", "mode": 640},
+            {"path": "dist", "type": "dir", "mode": 755, "recursive": true}
+        ]))
+    );
     Ok(())
 }
 

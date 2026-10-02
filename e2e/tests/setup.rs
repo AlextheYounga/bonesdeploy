@@ -4,6 +4,8 @@
 use anyhow::{Context, Result, bail};
 use e2e::project::SampleProject;
 
+#[path = "setup/angular.rs"]
+mod angular;
 #[path = "setup/compose.rs"]
 mod compose;
 #[path = "setup/django.rs"]
@@ -66,6 +68,12 @@ fn run_native(
     h.assert_release_removed(&first_release)?;
     h.assert_artifact_only(site)?;
     Ok(())
+}
+
+#[test]
+#[ignore = "requires a running Incus daemon; see e2e/README.md"]
+fn angular() -> Result<()> {
+    run_native("e2eangular", angular::provision, angular::assert_running, angular::deploy)
 }
 
 #[test]

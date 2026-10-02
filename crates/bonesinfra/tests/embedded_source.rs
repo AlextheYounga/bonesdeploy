@@ -12,6 +12,7 @@ fn distribution_contains_a_portable_wheel() -> Result<()> {
 fn template_inventory_contains_shared_and_framework_assets() {
     let paths = embedded_template_paths().collect::<Vec<_>>();
     assert!(paths.iter().any(|path| path == "assets/nginx/index.html.j2"));
+    assert!(paths.iter().any(|path| path == "frameworks/angular/templates/nginx/static-site-nginx.conf.j2"));
     assert!(paths.iter().any(|path| path == "frameworks/laravel/templates/queue-worker.service.j2"));
     assert!(!paths.iter().any(|path| path.starts_with("tests/") || path.contains("__pycache__")));
 }

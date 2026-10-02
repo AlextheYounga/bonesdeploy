@@ -8,6 +8,7 @@ from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra import manifest
 from bonesinfra.config.context import DeployContext
+from bonesinfra.frameworks.angular import manifest as angular_manifest
 from bonesinfra.frameworks.django import manifest as django_manifest
 from bonesinfra.frameworks.next import manifest as next_manifest
 from bonesinfra.frameworks.nuxt import manifest as nuxt_manifest
@@ -66,6 +67,17 @@ def test_vue_declares_nginx_socket_as_socket(tmp_path: Path):
     ctx = _context()
     socket = next(entry for entry in vue_manifest.artifacts(ctx) if entry[0] == "runtime nginx socket")
     assert socket[2] == "socket"
+
+
+def test_angular_declares_the_static_browser_artifact():
+    ctx = _context()
+    artifacts = {entry[0]: entry for entry in angular_manifest.artifacts(ctx)}
+
+    assert artifacts["static placeholder web root"][1].endswith("/dist/browser")
+    assert artifacts["static placeholder index"][1].endswith("/dist/browser/index.html")
+    assert artifacts["current static web root"][1].endswith("/dist/browser")
+    assert artifacts["runtime nginx socket"][2] == "socket"
+    assert angular_manifest.mode(ctx) == "static"
 
 
 @pytest.mark.parametrize(

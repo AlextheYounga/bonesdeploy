@@ -254,7 +254,7 @@ Each framework module exports these functions:
 - `environment_example(...) -> String` — generates a sample `.env.build` content
 
 **Existing frameworks:**
-`django`, `laravel`, `next`, `nuxt`, `rails`, `sveltekit`, `vue`
+`angular`, `django`, `laravel`, `next`, `nuxt`, `rails`, `sveltekit`, `vue`
 
 **Extension model:**
 Add a new module under `src/frameworks/<name>.rs`, implement the four-function contract, and register it in `src/frameworks.rs`. Also add corresponding Python framework files (see §3.9).

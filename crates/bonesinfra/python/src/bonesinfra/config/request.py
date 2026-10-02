@@ -41,7 +41,7 @@ _RESERVED_PROJECT_NAMES = {
     "timers",
     "umount",
 }
-_FRAMEWORKS = {"custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"}
+_FRAMEWORKS = {"angular", "custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"}
 _DOMAIN_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _CRON_FIELD = re.compile(r"^[0-9A-Za-z*/,\-]+$")

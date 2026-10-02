@@ -10,7 +10,7 @@ from typing import Any
 
 from bonesinfra.config.context import DeployContext
 
-FRAMEWORKS = frozenset({"custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"})
+FRAMEWORKS = frozenset({"angular", "custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"})
 
 
 def load_runtime(ctx: DeployContext) -> ModuleType:

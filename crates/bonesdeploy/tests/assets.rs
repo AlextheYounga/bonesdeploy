@@ -19,6 +19,7 @@ fn asset_text(path: &str) -> String {
 
 #[test]
 fn framework_assets_include_expected_build_content() {
+    assert!(framework_asset("angular/deployment/build/02_run_build.sh").is_some());
     assert!(framework_asset("next/deployment/build/02_run_build.sh").is_some());
     let nuxt = asset_text("nuxt/deployment/build/02_run_build.sh");
     assert!(nuxt.contains("BONES_RUNTIME_IS_STATIC"));
@@ -62,6 +63,13 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     assert!(sveltekit.contains("rm -rf .svelte-kit deployment/build"));
     let vue = asset_text("vue/deployment/build/02_run_build.sh");
     assert!(vue.contains("rm -rf .vite node_modules deployment/build"));
+
+    let angular = asset_text("angular/deployment/build/02_run_build.sh");
+    assert!(angular.contains("./node_modules/.bin/ng build --configuration production --output-path dist"));
+    assert!(angular.contains("npm ci --include=optional"));
+    assert!(angular.contains("[ ! -f \"dist/browser/index.html\" ]"));
+    assert!(angular.contains("rm -rf .angular/cache node_modules deployment/build"));
+    assert!(!angular.contains("rm -rf dist"));
 }
 
 #[test]

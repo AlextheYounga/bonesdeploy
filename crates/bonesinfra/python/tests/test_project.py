@@ -41,6 +41,16 @@ def test_runtime_loader_uses_project_template_root(tmp_path: Path, monkeypatch):
     assert str(runtime.TEMPLATES) == str(tmp_path / "infra/templates/frameworks/next")
 
 
+def test_runtime_loader_accepts_angular_and_uses_its_template_root(tmp_path: Path, monkeypatch):
+    config = DeployContext.from_request(make_site_request(template="angular", web_root="dist/browser"))
+    (tmp_path / "infra/templates").mkdir(parents=True)
+    monkeypatch.chdir(tmp_path)
+
+    runtime = load_runtime(config)
+
+    assert str(runtime.TEMPLATES) == str(tmp_path / "infra/templates/frameworks/angular")
+
+
 def test_runtime_loader_reports_custom_syntax_error_with_path(tmp_path: Path, monkeypatch):
     config = _project(tmp_path)
     monkeypatch.chdir(tmp_path)

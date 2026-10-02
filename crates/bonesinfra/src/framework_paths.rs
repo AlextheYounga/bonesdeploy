@@ -7,6 +7,7 @@ use bonesdeploy_core::config::{Runtime, RuntimeBackend};
 
 static FRAMEWORK_PATHS: LazyLock<HashMap<&'static str, &'static [&'static str]>> = LazyLock::new(|| {
     HashMap::from([
+        ("angular", &["templates/frameworks/angular"][..]),
         ("custom", &["templates/frameworks/custom"][..]),
         ("django", &["templates/frameworks/django"][..]),
         ("laravel", &["templates/frameworks/laravel"][..]),

@@ -1,8 +1,8 @@
 # BonesDeploy framework templates
 
-Seven templates ship in the binary. Each one provisions the runtime on the
-server: nginx router, systemd service, AppArmor profile, and
-whichever language runtime the framework needs. You pick one at `init` time.
+Eight templates ship in the binary. Each one provisions the matching native
+runtime, such as a static nginx site or an isolated application service and
+language runtime. You pick one at `init` time.
 
 ## Picking a template
 
@@ -25,6 +25,17 @@ bonesdeploy init --non-interactive --project-name atlas --host deploy.example.co
 runtime is provisioned; you wire your own. Most projects pick a template.
 
 ## The templates
+
+### angular
+
+Angular browser application. Static export from `dist/browser`. No framework
+vars. This template supports a single application using the current
+`@angular/build:application` builder; it does not run Angular SSR.
+
+```
+bonesdeploy init --non-interactive --project-name atlas --host deploy.example.com \
+  --template angular
+```
 
 ### laravel
 

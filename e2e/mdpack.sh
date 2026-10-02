@@ -1,3 +1,4 @@
+mdpack pack e2e/fixtures/angular -o e2e/fixtures/angular.md --include-hidden --ignored
 mdpack pack e2e/fixtures/rails -o e2e/fixtures/rails.md --include-hidden --ignored
 mdpack pack e2e/fixtures/next -o e2e/fixtures/next.md --include-hidden --ignored
 mdpack pack e2e/fixtures/nuxt -o e2e/fixtures/nuxt.md --include-hidden --ignored

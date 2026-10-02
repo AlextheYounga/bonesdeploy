@@ -249,10 +249,11 @@ Framework templates ship starter overlays that `bonesdeploy init` uses when scaf
 
 - `frameworks/laravel/`    → Laravel (PHP + PHP-FPM)
 - `frameworks/django/`     → Django (Python + Gunicorn)
+- `frameworks/angular/`    → Angular (static browser application)
 - `frameworks/next/`       → Next.js (Node)
 - `frameworks/nuxt/`       → Nuxt (Node)
 - `frameworks/sveltekit/`  → SvelteKit (Node)
-- `frameworks/vue/`        → Vue (Node)
+- `frameworks/vue/`        → Vue (static frontend)
 - `frameworks/rails/`      → Rails (Ruby; supported releases are provisioned from verified source archives)
 
 Django resolves its configured `python_version` minor to a BonesInfra-pinned CPython patch release, verifies the official source archive checksum, and installs it under `/opt/bonesdeploy/python/<patch>` with a stable minor-version symlink. It never changes Debian's `/usr/bin/python3`; local Django artifacts store dependencies in `.python-packages` and ship `.venv/bin` wrappers that execute the provisioned interpreter.
@@ -261,7 +262,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 Projects materialize the universal BonesInfra wheel and managed templates under `infra/`, prune unselected framework template paths, and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the complete installed wheel and composes its selected framework runtime with custom provisioning. Updates rematerialize the complete managed template tree before applying the same pruning rules.
 
-Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves (e.g. Next's `out/`). A static site only works if the app is configured to emit that directory: for `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
+Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves. Angular uses the current `@angular/build:application` builder with `dist` as its output base and serves `dist/browser/`. For `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
 
 ### BonesDeploy CLI Commands
 - **init**:

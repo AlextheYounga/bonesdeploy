@@ -3,7 +3,7 @@ use std::fs;
 use anyhow::Result;
 use bonesdeploy_core::config::{Runtime, RuntimeBackend};
 
-const FRAMEWORKS: &[&str] = &["custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"];
+const FRAMEWORKS: &[&str] = &["angular", "custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"];
 
 #[test]
 fn native_materialization_keeps_only_the_selected_framework_paths() -> Result<()> {

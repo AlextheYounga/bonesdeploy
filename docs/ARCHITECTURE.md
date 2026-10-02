@@ -280,7 +280,7 @@ updated by infrastructure synchronization; custom content is preserved and runs
 as the project-owned extension.
 
 Existing implementations:
-- custom, django, laravel, next, nuxt, rails, sveltekit, vue
+- angular, custom, django, laravel, next, nuxt, rails, sveltekit, vue
 
 To add another:
 1. Add Rust module under src/frameworks/<name>.rs; register in frameworks.rs.

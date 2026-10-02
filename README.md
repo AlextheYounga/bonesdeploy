@@ -147,6 +147,7 @@ Runtime templates set up the Linux pieces for a framework.
 
 | Template | Status     | Notes                              |
 | -------- | ---------- | ---------------------------------- |
+| Angular  | Working    | Static frontend (`dist/browser`)   |
 | Laravel  | Working    | PHP / PHP-FPM setup                |
 | Next.js  | Working    | Node runtime setup                 |
 | Nuxt     | Working    | Nuxt runtime setup                 |

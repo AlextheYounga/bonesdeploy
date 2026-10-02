@@ -606,8 +606,8 @@ services through neutral core helpers in `services/`:
   provisioning helpers
 - `services/languages/` — Python, Node, Ruby, PHP runtime installs
 
-Each runtime stays small and reads like a story against those primitives. Django,
-Rails, Node, Vue, etc. all follow the same `deploy(ctx)` interface, and each
+Each runtime stays small and reads like a story against those primitives. Angular,
+Django, Rails, Node, Vue, etc. all follow the same `deploy(ctx)` interface, and each
 framework's templates live in the project's `infra/templates/`.
 
 ______________________________________________________________________

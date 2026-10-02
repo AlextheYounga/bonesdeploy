@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 const E2E_NODE_VERSION: &str = "24.19.0";
-const NODE_TEMPLATES: &[&str] = &["django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"];
+const NODE_TEMPLATES: &[&str] = &["angular", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"];
 const SERVER_SETUP_ARGS: &[&str] = &["server", "setup", "--yes"];
 const SITE_SETUP_ARGS: &[&str] = &["site", "setup", "--yes"];
 
@@ -291,11 +291,15 @@ impl Harness {
     }
 
     pub fn assert_route(&self, site: &str, expected_content: &str) -> Result<()> {
-        let response = self.route_response(site)?;
+        self.assert_route_path(site, "/", expected_content)
+    }
+
+    pub fn assert_route_path(&self, site: &str, path: &str, expected_content: &str) -> Result<()> {
+        let response = self.route_response(site, path)?;
         if response.contains(expected_content) {
             Ok(())
         } else {
-            bail!("Route for {site} did not contain {expected_content:?}: {response}")
+            bail!("Route {path} for {site} did not contain {expected_content:?}: {response}")
         }
     }
 
@@ -303,7 +307,7 @@ impl Harness {
         self.exec(&format!(
             "test \"$(readlink -f /srv/sites/{site}/current)\" != /srv/sites/{site}/releases/19700101_000000"
         ))?;
-        let response = self.route_response(site)?;
+        let response = self.route_response(site, "/")?;
         if response.contains("It's Working!") {
             bail!("Route for {site} still served the placeholder: {response}")
         }
@@ -320,9 +324,11 @@ impl Harness {
         self.container.exec(script)
     }
 
-    fn route_response(&self, site: &str) -> Result<String> {
+    fn route_response(&self, site: &str, path: &str) -> Result<String> {
         let socket = format!("/run/{site}/nginx/nginx.sock");
-        self.exec(&format!("curl --silent --show-error --fail --max-time 10 --unix-socket {socket} http://localhost/"))
+        self.exec(&format!(
+            "curl --silent --show-error --fail --max-time 10 --unix-socket {socket} http://localhost{path}"
+        ))
     }
 }
 
