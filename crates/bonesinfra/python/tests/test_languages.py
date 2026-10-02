@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from bonesinfra.frameworks.rails.runtime import bundler_binary, bundler_command
+from bonesinfra.frameworks.rails.runtime import apparmor_exec_paths, bundler_binary, bundler_command
 from bonesinfra.services.languages import NODE, PYTHON, RUBY
 from bonesinfra.services.languages.php import PHPRuntime
 from bonesinfra.services.languages.python import PYTHON_PACKAGES, PythonRuntime
@@ -83,6 +83,10 @@ def test_rails_bundler_commands_use_the_project_local_bundle():
         bundler_command("/usr/bin/bundle", "exec puma --help")
         == "BUNDLE_PATH=vendor/bundle /usr/bin/bundle exec puma --help"
     )
+
+
+def test_rails_apparmor_allows_every_puma_command_executable():
+    assert apparmor_exec_paths("/usr/bin/ruby") == ["/usr/bin/env", "/usr/bin/ruby", "/usr/bin/bundle"]
 
 
 def test_php_runtime_configures_the_project_fpm_pool(monkeypatch):

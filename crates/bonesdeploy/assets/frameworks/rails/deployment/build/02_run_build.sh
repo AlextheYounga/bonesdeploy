@@ -21,9 +21,10 @@ install_application_packages() {
 }
 
 install_bundle_dependencies() {
+	export BUNDLE_DEPLOYMENT="true"
 	export BUNDLE_WITHOUT="development:test"
 	log "Installing bundle dependencies..."
-	bundle install --deployment --without development test
+	bundle install
 }
 
 precompile_assets() {

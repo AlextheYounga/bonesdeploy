@@ -48,6 +48,10 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     assert!(laravel.contains("rm -rf node_modules deployment/build"));
     let rails = asset_text("rails/deployment/build/02_run_build.sh");
     assert!(rails.contains("bundle install"));
+    assert!(rails.contains("BUNDLE_DEPLOYMENT=\"true\""));
+    assert!(rails.contains("BUNDLE_WITHOUT=\"development:test\""));
+    assert!(!rails.contains("--deployment"));
+    assert!(!rails.contains("--without"));
     assert!(rails.contains("rm -rf node_modules tmp/cache vendor/bundle deployment/build"));
 
     let rails_prepare = asset_text("rails/deployment/prepare/01_prepare_rails.sh");
@@ -59,7 +63,11 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
         .expect("Rails prepare must run migrations through the target bundle");
     assert!(install < migration_skip);
     assert!(install < migrate);
+    assert!(rails_prepare.contains("BUNDLE_DEPLOYMENT=\"true\""));
     assert!(rails_prepare.contains("BUNDLE_PATH=\"vendor/bundle\""));
+    assert!(rails_prepare.contains("BUNDLE_WITHOUT=\"development:test\""));
+    assert!(!rails_prepare.contains("--deployment"));
+    assert!(!rails_prepare.contains("--without"));
 
     let next = asset_text("next/deployment/build/02_run_build.sh");
     assert!(next.contains(".next/standalone"));
