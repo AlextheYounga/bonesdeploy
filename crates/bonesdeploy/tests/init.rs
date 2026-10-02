@@ -56,7 +56,7 @@ fn assert_project_infra(repo: &Path) -> Result<()> {
 }
 
 fn assert_only_framework_templates(infra: &Path, selected: Option<&str>) {
-    for framework in ["custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"] {
+    for framework in ["angular", "custom", "django", "laravel", "next", "nuxt", "rails", "sveltekit", "vue"] {
         assert_eq!(
             infra.join("templates/frameworks").join(framework).is_dir(),
             selected == Some(framework),
@@ -146,6 +146,32 @@ fn named_framework_materializes_project_template_snapshot() -> Result<()> {
     assert!(dotenv.contains("APP_URL=\n"));
     assert!(dotenv.contains("DB_CONNECTION=sqlite\n"));
     assert!(!env.repo().join(".bones").exists());
+    Ok(())
+}
+
+#[test]
+fn angular_init_scaffolds_the_static_browser_artifact_contract() -> Result<()> {
+    let env = TestEnv::new()?;
+    let output = env.run(&[
+        "init",
+        "--non-interactive",
+        "--project-name",
+        "atlas",
+        "--host",
+        "deploy.example.com",
+        "--template",
+        "angular",
+    ])?;
+
+    assert!(output.status.success(), "Angular init failed: {}", String::from_utf8_lossy(&output.stderr));
+    let repo = env.repo();
+    assert!(repo.join("infra/deployment/build/02_run_build.sh").is_file());
+    assert!(repo.join("infra/templates/frameworks/angular/nginx/static-site-nginx.conf.j2").is_file());
+    assert_only_framework_templates(&repo.join("infra"), Some("angular"));
+    let environment = fs::read_to_string(repo.join(".env"))?;
+    assert!(environment.contains("BONES_TEMPLATE=angular\n"));
+    assert!(environment.contains("BONES_WEB_ROOT=dist/browser\n"));
+    assert!(environment.contains("NODE_ENV=production\n"));
     Ok(())
 }
 

@@ -1,3 +1,4 @@
+from bonesinfra.frameworks.angular.runtime import SHARED_DIRECTORIES as ANGULAR_SHARED_DIRECTORIES
 from bonesinfra.frameworks.django.runtime import SHARED_DIRECTORIES as DJANGO_SHARED_DIRECTORIES
 from bonesinfra.frameworks.laravel.runtime import SHARED_DIRECTORIES as LARAVEL_SHARED_DIRECTORIES
 from bonesinfra.frameworks.next.runtime import SHARED_DIRECTORIES as NEXT_SHARED_DIRECTORIES
@@ -10,6 +11,7 @@ from bonesinfra.services.linux import shared
 
 def test_framework_shared_directories_are_directories_only():
     declarations = (
+        ANGULAR_SHARED_DIRECTORIES,
         DJANGO_SHARED_DIRECTORIES,
         LARAVEL_SHARED_DIRECTORIES,
         NEXT_SHARED_DIRECTORIES,

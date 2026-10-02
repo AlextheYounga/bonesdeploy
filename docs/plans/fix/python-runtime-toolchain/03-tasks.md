@@ -2,26 +2,33 @@
 
 ## Implementation
 
-- [ ] Replace production CPython source compilation with distribution Python and
+- [x] Replace production CPython source compilation with distribution Python and
   native dependency build packages installed through APT.
-- [ ] Remove managed Python runtime paths and the obsolete source installer.
-- [ ] Remove local Django dependency outputs from artifacts and create the target
+- [x] Remove managed Python runtime paths and the obsolete source installer.
+- [x] Remove local Django dependency outputs from artifacts and create the target
   virtualenv before installing production requirements during prepare.
-- [ ] Drop `python_version` from new remote descriptors while reading and
+- [x] Drop `python_version` from new remote descriptors while reading and
   discarding descriptors that previously included it.
 
 ## Validation
 
-- [ ] Update focused Python and Rust coverage for provisioning, AppArmor,
+- [x] Update focused Python and Rust coverage for provisioning, AppArmor,
   artifacts, prepare ordering, and descriptor compatibility.
-- [ ] Rebuild the embedded BonesInfra wheel and run all required non-E2E checks.
+- [x] Rebuild the embedded BonesInfra wheel and run all required non-E2E checks.
 
 ## Completion
 
-- [ ] Update runtime and deployment documentation for distribution Python,
+- [x] Update runtime and deployment documentation for distribution Python,
   target-side pip installation, and host-version compatibility.
-- [ ] Review the final diff for stale managed-Python paths and unrelated changes.
+- [x] Review the final diff for stale managed-Python paths and unrelated changes.
 
 ## Completion Notes
 
-Implementation is pending.
+Production Django now uses distribution Python from APT. Local dependency output
+is removed from artifacts, and prepare creates a release-owned virtualenv before
+installing requirements with isolated, cacheless pip. Migration skip handling
+still occurs only after dependencies and validation are ready.
+
+The embedded wheel was rebuilt. Ruff checks, 516 Python tests, focused runtime
+tests, the workspace Rust suite excluding E2E, Clippy, Rustfmt, Shfmt, and
+`git diff --check` passed. Full E2E was not run.

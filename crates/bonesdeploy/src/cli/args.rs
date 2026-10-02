@@ -28,7 +28,7 @@ pub enum Command {
         /// SSH port (default: 22)
         #[arg(long)]
         port: Option<String>,
-        /// Framework template (laravel, django, next, nuxt, rails, sveltekit, vue, or none)
+        /// Framework template (angular, laravel, django, next, nuxt, rails, sveltekit, vue, or none)
         #[arg(long)]
         template: Option<String>,
         /// Application runtime backend (native or Docker Compose; default: native)

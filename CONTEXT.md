@@ -54,7 +54,7 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 - `releases/` contains candidates owned by the runtime user while prepare runs, then sealed as `root:<site>` before activation.
 - `shared/` is owned by the runtime user (`<site>:<site>`) — only the app writes here.
 - Build input is temporary and disposable. Native scripts run only in local Docker against the exported committed source and upload one complete post-build artifact. Production never executes native application build scripts.
-- Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed. Application dependencies and native extensions are built locally; prepare performs only production-state work such as validation, migrations, and runtime configuration.
+- Prepare scripts run as the runtime user after shared paths are wired and before `current` is repointed. Most application dependencies and native extensions are built locally. Rails and Django instead rebuild dependencies against the host distribution runtime in the staged release before validation, migrations, and activation.
 - Local Git selects the committed source tree; production receives only the built artifact and never needs an application repository or first push.
 - The `deploy` SSH session may sudo only exact config-sync and deploy commands; BonesRemote retains ownership of promotion, activation, and service restart.
 - `bonesdeploy site export` is separate local administration: it connects as the configured root SSH user and streams a read-only ZIP of `shared/` directly to a private local file. It does not use the deploy identity, sudo, or BonesRemote.
@@ -249,6 +249,7 @@ Framework templates ship starter overlays that `bonesdeploy init` uses when scaf
 
 - `frameworks/laravel/`    → Laravel (PHP + PHP-FPM)
 - `frameworks/django/`     → Django (Python + Gunicorn)
+- `frameworks/angular/`    → Angular (static browser application)
 - `frameworks/next/`       → Next.js (Node)
 - `frameworks/nuxt/`       → Nuxt (Node)
 - `frameworks/sveltekit/`  → SvelteKit (Node)
@@ -263,7 +264,7 @@ Templates inherit the same `bones.toml` schema and customize permissions paths, 
 
 Projects materialize the universal BonesInfra wheel and managed templates under `infra/`, prune unselected framework template paths, and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the complete installed wheel and composes its selected framework runtime with custom provisioning. Updates rematerialize the complete managed template tree before applying the same pruning rules.
 
-Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves (e.g. Next's `out/`). A static site only works if the app is configured to emit that directory: for `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
+Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves. Angular uses the current `@angular/build:application` builder with `dist` as its output base and serves `dist/browser/`. For `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
 
 ### BonesDeploy CLI Commands
 - **init**:

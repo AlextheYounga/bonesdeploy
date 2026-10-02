@@ -6,7 +6,6 @@ readonly VENV_DIR="${VENV_DIR:-.venv}"
 readonly PYTHON_BIN="$VENV_DIR/bin/python"
 
 install_dependencies() {
-	export HOME="$PROJECT_ROOT/shared"
 	rm -rf "$VENV_DIR"
 
 	log "Creating production virtualenv with the host Python..."
@@ -14,7 +13,7 @@ install_dependencies() {
 
 	if [ -f requirements.txt ]; then
 		log "Installing production Python dependencies..."
-		"$PYTHON_BIN" -m pip install --disable-pip-version-check -r requirements.txt
+		"$PYTHON_BIN" -m pip --isolated install --disable-pip-version-check --no-cache-dir -r requirements.txt
 	else
 		log "No requirements.txt found; skipping Python dependency install."
 	fi

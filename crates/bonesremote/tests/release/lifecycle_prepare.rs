@@ -116,7 +116,7 @@ fn django_prepare_template_installs_target_dependencies_before_django_commands()
     )?;
 
     let create_venv = template.find("/usr/bin/python3 -m venv").context("missing target virtualenv creation")?;
-    let install = template.find("-m pip install").context("missing target dependency installation")?;
+    let install = template.find("-m pip --isolated install").context("missing target dependency installation")?;
     let validate = template.find("manage.py check --deploy").context("missing Django validation")?;
     let migration_skip = template.find("BONES_DJANGO_SKIP_MIGRATIONS").context("missing migration skip setting")?;
     let migrate = template.find("manage.py migrate --noinput").context("missing Django migration")?;
@@ -124,6 +124,7 @@ fn django_prepare_template_installs_target_dependencies_before_django_commands()
     assert!(install < validate);
     assert!(install < migration_skip);
     assert!(install < migrate);
+    assert!(template.contains("--no-cache-dir"));
     assert!(!template.contains("BONES_RUNTIME_PYTHON_VERSION"));
     Ok(())
 }

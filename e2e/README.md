@@ -53,16 +53,16 @@ the server; the rest reuse it). Run a subset by passing a test-name filter:
 
 ```sh
 # Single framework
-cargo test -p e2e --test setup -- vue --ignored --test-threads=1 --nocapture
+cargo test -p e2e --test setup -- angular --ignored --test-threads=1 --nocapture
 
 # Multiple native artifact frameworks
-cargo test -p e2e --test setup -- vue laravel --ignored --test-threads=1 --nocapture
+cargo test -p e2e --test setup -- angular vue --ignored --test-threads=1 --nocapture
 
 # One native artifact framework scenario
 cargo test -p e2e --test setup -- laravel --ignored --test-threads=1 --nocapture
 ```
 
-Test names: `django`, `laravel`, `next_server`, `next_static`, `nuxt_server`,
+Test names: `angular`, `django`, `laravel`, `next_server`, `next_static`, `nuxt_server`,
 `nuxt_static`, `rails`, `sveltekit`, and `vue`. Every native artifact scenario
 covers first deploy, a second release, and failed activation rollback after the
 nginx service restart phase.

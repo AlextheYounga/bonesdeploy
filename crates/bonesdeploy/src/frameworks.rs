@@ -9,6 +9,7 @@ use serde_json::Value;
 /// Shared question keys used by more than one template.
 pub(crate) const IS_STATIC_KEY: &str = "is_static";
 const NEXT_NUXT_NODE_VERSION: &str = "25.9.0";
+mod angular;
 mod django;
 mod laravel;
 mod next;
@@ -19,6 +20,7 @@ mod vue;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Framework {
+    Angular,
     Django,
     Laravel,
     Next,
@@ -30,8 +32,17 @@ pub enum Framework {
 }
 
 impl Framework {
-    pub const ALL: &'static [Self] =
-        &[Self::Django, Self::Laravel, Self::Next, Self::Nuxt, Self::Rails, Self::SvelteKit, Self::Vue, Self::Custom];
+    pub const ALL: &'static [Self] = &[
+        Self::Angular,
+        Self::Django,
+        Self::Laravel,
+        Self::Next,
+        Self::Nuxt,
+        Self::Rails,
+        Self::SvelteKit,
+        Self::Vue,
+        Self::Custom,
+    ];
 
     pub fn parse(template: &str) -> Result<Self> {
         template.parse()
@@ -54,6 +65,7 @@ impl Framework {
 
     pub fn questions(self) -> &'static [Question] {
         match self {
+            Self::Angular => angular::questions(),
             Self::Django => django::questions(),
             Self::Laravel => laravel::questions(),
             Self::Next => next::questions(),
@@ -86,6 +98,7 @@ impl Framework {
 
     fn defaults(self) -> Option<FrameworkDefaults> {
         match self {
+            Self::Angular => Some(angular::defaults()),
             Self::Django => Some(django::defaults()),
             Self::Laravel => Some(laravel::defaults()),
             Self::Next => Some(next::defaults()),
@@ -130,6 +143,7 @@ impl Framework {
     pub fn environment_example(self, project_name: &str, domain: &str) -> Option<String> {
         let site_url = environment_url(domain);
         Some(match self {
+            Self::Angular => angular::environment_example(project_name, &site_url),
             Self::Django => django::environment_example(project_name, &site_url),
             Self::Laravel => laravel::environment_example(project_name, &site_url),
             Self::Next => next::environment_example(project_name, &site_url),
@@ -143,6 +157,7 @@ impl Framework {
 
     pub fn build_environment_example(self, runtime: &Runtime) -> Option<String> {
         Some(match self {
+            Self::Angular => angular::build_environment_example(),
             Self::Django => django::build_environment_example(runtime),
             Self::Laravel => laravel::build_environment_example(runtime),
             Self::Next => next::build_environment_example(runtime),
@@ -158,6 +173,7 @@ impl Framework {
 impl fmt::Display for Framework {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
+            Self::Angular => "angular",
             Self::Django => "django",
             Self::Laravel => "laravel",
             Self::Next => "next",
@@ -175,6 +191,7 @@ impl FromStr for Framework {
 
     fn from_str(template: &str) -> Result<Self, Self::Err> {
         match template {
+            "angular" => Ok(Self::Angular),
             "django" => Ok(Self::Django),
             "laravel" => Ok(Self::Laravel),
             "next" => Ok(Self::Next),
@@ -245,7 +262,7 @@ impl Question {
 }
 
 /// Every promptable question for a framework template. Empty for templates
-/// that take no configuration (sveltekit, vue).
+/// that take no configuration (angular, sveltekit, vue).
 pub(crate) fn environment_url(domain: &str) -> String {
     if domain.is_empty() { String::new() } else { format!("https://{domain}") }
 }

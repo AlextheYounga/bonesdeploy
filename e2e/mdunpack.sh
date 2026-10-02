@@ -1,3 +1,4 @@
+mdpack unpack e2e/fixtures/angular.md -d e2e/fixtures/angular
 mdpack unpack e2e/fixtures/rails.md -d e2e/fixtures/rails
 mdpack unpack e2e/fixtures/next.md -d e2e/fixtures/next
 mdpack unpack e2e/fixtures/nuxt.md -d e2e/fixtures/nuxt

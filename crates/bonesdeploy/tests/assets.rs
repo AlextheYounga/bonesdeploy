@@ -19,6 +19,7 @@ fn asset_text(path: &str) -> String {
 
 #[test]
 fn framework_assets_include_expected_build_content() {
+    assert!(framework_asset("angular/deployment/build/02_run_build.sh").is_some());
     assert!(framework_asset("next/deployment/build/02_run_build.sh").is_some());
     let nuxt = asset_text("nuxt/deployment/build/02_run_build.sh");
     assert!(nuxt.contains("BONES_RUNTIME_IS_STATIC"));
@@ -39,7 +40,8 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
 
     let django_prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
     assert!(django_prepare.contains("/usr/bin/python3 -m venv"));
-    assert!(django_prepare.contains("-m pip install"));
+    assert!(django_prepare.contains("-m pip --isolated install"));
+    assert!(django_prepare.contains("--no-cache-dir"));
     assert!(django_prepare.contains("$VENV_DIR/bin/python"));
 
     let laravel = asset_text("laravel/deployment/build/03_build_frontend.sh");
@@ -70,6 +72,13 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     assert!(sveltekit.contains("rm -rf .svelte-kit deployment/build"));
     let vue = asset_text("vue/deployment/build/02_run_build.sh");
     assert!(vue.contains("rm -rf .vite node_modules deployment/build"));
+
+    let angular = asset_text("angular/deployment/build/02_run_build.sh");
+    assert!(angular.contains("./node_modules/.bin/ng build --configuration production --output-path dist"));
+    assert!(angular.contains("npm ci --include=optional"));
+    assert!(angular.contains("[ ! -f \"dist/browser/index.html\" ]"));
+    assert!(angular.contains("rm -rf .angular/cache node_modules deployment/build"));
+    assert!(!angular.contains("rm -rf dist"));
 }
 
 #[test]
@@ -82,7 +91,7 @@ fn django_artifact_contract_matches_the_production_runtime() {
 
     let prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
     let create_venv = prepare.find("/usr/bin/python3 -m venv").expect("Django prepare must create the target venv");
-    let install = prepare.find("-m pip install").expect("Django prepare must install target dependencies");
+    let install = prepare.find("-m pip --isolated install").expect("Django prepare must install target dependencies");
     let validate = prepare.find("manage.py check --deploy").expect("Django prepare must validate the application");
     let migration_skip =
         prepare.find("BONES_DJANGO_SKIP_MIGRATIONS").expect("Django prepare must support skipping migrations");
