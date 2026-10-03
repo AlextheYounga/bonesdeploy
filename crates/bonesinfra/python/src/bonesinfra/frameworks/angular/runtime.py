@@ -1,4 +1,4 @@
-from bonesinfra.config.paths import TEMPLATES_DIR
+from bonesinfra.config.paths import ASSETS_DIR, TEMPLATES_DIR
 from bonesinfra.services.linux import runtime, shared
 from bonesinfra.services.linux.application import deploy_static
 
@@ -13,7 +13,7 @@ def deploy(ctx):
             current_ctx,
             static_root="dist/browser",
             nginx_template=TEMPLATES / "nginx/static-site-nginx.conf.j2",
-            placeholder_template=TEMPLATES / "nginx/index.html.j2",
+            placeholder_template=ASSETS_DIR / "nginx/index.html.j2",
         )
 
     runtime.orchestrate(ctx, provision)
