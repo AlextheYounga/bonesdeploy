@@ -2,9 +2,9 @@
 
 ## Request
 
-Install the production Rails Ruby runtime from the supported Debian or Ubuntu
-distribution instead of compiling Ruby during site setup. Document this runtime
-and deployment model clearly in the README.
+This completed distribution-Ruby change is superseded by
+`feature/mise-runtimes`: production Rails now uses the exact configured managed
+Ruby runtime. Its historical goal was to avoid production source compilation.
 
 ## Problem
 
@@ -26,27 +26,20 @@ activated.
 
 ## Desired outcome
 
-Rails site setup installs Ruby and Bundler through APT without compiling Ruby.
-Each deployment creates its target bundle on the production host before running
-migrations or activating the release, so native gems match the host's Ruby ABI.
-The README makes the host-controlled Ruby version, deployment-time RubyGems
-access, and application compatibility requirement explicit.
+Rails local builds and production use the same exact configured Ruby installed
+precompiled-only by pinned mise. The artifact packages `vendor/bundle` and the
+lockfile-selected Bundler; prepare validates runtime identity and runs migrations
+without downloading or compiling gems.
 
 ## Scope
 
-This change includes distribution Ruby installation on production hosts,
-distribution executable paths for Puma and Bundler, removal of locally compiled
-gems from release artifacts, target bundle installation before migrations,
-regression tests, and related documentation. The existing exact Ruby selection
-continues to control the local asset build only.
+This historical record remains for its completed source-build removal. The
+current Rails runtime contract is owned by `feature/mise-runtimes`.
 
 ## Constraints
 
-Production Ruby packages must come from the host's configured APT repositories.
-Target bundle installation must run as the site's runtime user while the staged
-release is writable, and deployment must stop before activation when Bundler or
-the application's Ruby requirements fail. Full E2E tests must not be run during
-this work.
+Production source-build fallback remains prohibited. The current exact runtime,
+packaged Bundler, and E2E requirements are defined by `feature/mise-runtimes`.
 
 ## Exclusions
 

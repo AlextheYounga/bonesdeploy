@@ -13,6 +13,7 @@ def artifacts(ctx):
         ("application runtime directory", paths.runtime_service_dir("nuxt"), "directory", "framework"),
         ("application runtime socket", paths.runtime_service_socket("nuxt"), "socket", "framework"),
         ("application log directory", paths.site_log_dir, "directory", "framework"),
+        ("managed Node runtime", paths.node_runtime, "link", "runtime"),
         ("Nuxt placeholder server directory", f"{paths.placeholder_release}/.output/server", "directory", "framework"),
         ("Nuxt placeholder server", f"{paths.placeholder_release}/.output/server/index.mjs", "file", "framework"),
     ]

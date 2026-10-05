@@ -88,7 +88,11 @@ Rust is the sole parser of the project-root `.env`. It models two environments:
 - `LocalEnvironment` is the gitignored root `.env`, conceptually `.env.local`. Application-owned content (comments, values, order) survives byte-for-byte; it also carries exactly one BonesDeploy-managed, comment-delimited `BONES_*` configuration block holding project identity, SSH connection, deployment branch, domains, framework, web root, runtime backend, Compose settings, scheduled-backup settings, and framework-specific scalar settings.
 - `ProductionEnvironment` is the decrypted `infra/secrets/.env.gpg`, conceptually `.env.production`, published to the host as `shared/.env` only by `bonesdeploy secrets push`. It contains application runtime keys and never `BONES_*` keys.
 
-Build-only public settings live in the committed `.env.build`. Framework templates declare `NODE_VERSION`; when set, this value is passed to build scripts as `NODE_VERSION` and takes precedence over version files in the repository. Provisioning defaults to `24.19.0`.
+Build-only public settings live in the committed `.env.build`. Exact Ruby,
+Python, and Node versions are derived from the managed root `.env` configuration
+and injected into build scripts; generated `.env.build` files do not declare a
+second language-version source. Node repository version files retain their
+existing precedence when no explicit BonesDeploy Node version is configured.
 
 BonesDeploy does not select or provision built-in databases and caches. Native
 sites use independently managed services. Compose sites declare supporting
@@ -254,11 +258,18 @@ Framework templates ship starter overlays that `bonesdeploy init` uses when scaf
 - `frameworks/nuxt/`       → Nuxt (Node)
 - `frameworks/sveltekit/`  → SvelteKit (Node)
 - `frameworks/vue/`        → Vue (Node)
-- `frameworks/rails/`      → Rails (the production host's distribution Ruby + Puma)
+- `frameworks/rails/`      → Rails (managed Ruby + packaged Bundler/Puma)
 
-Django site setup installs distribution Python, virtualenv support, development headers, and native package build dependencies from the host's configured Debian or Ubuntu APT repositories. The legacy `python_version` setting is accepted but no longer selects an interpreter. The local build installs `requirements.txt` into `.python-packages` and packages release launchers under `.venv/bin`; remote prepare only validates the packaged application, runs migrations, and collects static files. Deployment does not require production package-index access, and incompatible artifacts fail before activation.
-
-Rails site setup installs Ruby, Bundler, development headers, and native gem build dependencies from the host's configured Debian or Ubuntu APT repositories. The exact `ruby_version` setting controls only the local build toolchain. The local build packages the production `vendor/bundle`; remote prepare checks that bundle and runs migrations without installing or compiling gems. Incompatible artifacts fail before activation, and deployment does not require production gem-source access.
+Django and Rails use the exact Python or Ruby version selected in managed Bones
+configuration. Pinned mise `2026.10.0` installs precompiled-only runtimes into a
+root-owned shared production store, then creates stable site links under
+`.bonesdeploy/runtimes`. The local Docker build uses the same policy in its
+project cache. Django packages requirements and site-link launchers; Rails
+packages `vendor/bundle` and the lockfile-selected Bundler. Prepare validates
+artifact/runtime identity before checks or migrations and never installs or
+compiles application dependencies. Dynamic Next, Nuxt, and SvelteKit services
+use the matching site Node link. PHP remains on its existing APT and PHP-FPM
+path.
 
 Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
 

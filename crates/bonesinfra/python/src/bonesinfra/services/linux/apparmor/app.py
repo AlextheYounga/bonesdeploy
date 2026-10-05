@@ -11,6 +11,7 @@ def render_profile(
     runtime,
     apparmor_exec_paths,
     apparmor_writable_paths,
+    apparmor_runtime_access=None,
     template_src,
     apparmor_network="network unix stream,",
 ):
@@ -25,6 +26,7 @@ def render_profile(
         apparmor_runtime=runtime,
         apparmor_exec_paths=apparmor_exec_paths,
         apparmor_writable_paths=apparmor_writable_paths,
+        apparmor_runtime_access=apparmor_runtime_access,
         apparmor_network=apparmor_network,
         **template_data(ctx, paths=paths),
     )

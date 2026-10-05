@@ -264,6 +264,21 @@ impl Harness {
         Ok(())
     }
 
+    pub fn assert_managed_runtime(
+        &self,
+        site: &str,
+        runtime: &str,
+        executable: &str,
+        version_pattern: &str,
+    ) -> Result<()> {
+        let path = format!("/srv/sites/{site}/.bonesdeploy/runtimes/{runtime}/bin/{executable}");
+        self.exec(&format!(
+            "test -L /srv/sites/{site}/.bonesdeploy/runtimes/{runtime} && \\
+			 runuser -u {site} -- {path} --version | grep -Eq {version_pattern:?}"
+        ))?;
+        Ok(())
+    }
+
     pub fn assert_service_condition_skipped(&self, service: &str) -> Result<()> {
         self.exec(&format!(
             "test \"$(systemctl show --property=LoadState --value -- {service})\" = loaded && \

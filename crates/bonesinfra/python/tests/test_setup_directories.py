@@ -13,6 +13,7 @@ def test_setup_does_not_provision_the_shared_environment(monkeypatch):
         "project_root": "/srv/sites/atlas",
         "releases": "/srv/sites/atlas/releases",
         "shared": "/srv/sites/atlas/shared",
+        "site_runtime_dir": "/srv/sites/atlas/.bonesdeploy/runtimes",
         "placeholder_web_root": "/srv/sites/atlas/releases/19700101_000000/public",
     }
 
@@ -24,4 +25,11 @@ def test_setup_does_not_provision_the_shared_environment(monkeypatch):
         "user": "root",
         "group": "root",
         "mode": "0700",
+    }
+    assert created[5] == {
+        "name": "Ensure root-controlled site runtime link directory exists",
+        "path": "/srv/sites/atlas/.bonesdeploy/runtimes",
+        "user": "root",
+        "group": "root",
+        "mode": "0755",
     }

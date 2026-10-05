@@ -15,9 +15,9 @@ the committed revision.
 - Scripts run in lexical order by filename.
 - Non-zero exit code fails the deploy.
 - Your job: produce the deployable app layout inside `/workspace/source`.
-- Install dependencies and compile the complete runtime output here. Retain the
-  production `vendor/bundle`; remove only build-time dependencies and caches the
-  production runtime does not need.
+- Build uses the exact Ruby selected in Bones configuration through pinned mise.
+  Retain `vendor/bundle` and the lockfile-selected Bundler in the artifact;
+  production validates and uses them without installing gems.
 - BonesRemote verifies and receives the artifact, then promotes this output into
   a sealed release.
 
@@ -30,4 +30,5 @@ Name them with a numbered prefix so the order is clear:
 02_build_assets.sh
 ```
 
-No secrets or runtime state. `.env.build` is public build configuration only.
+No secrets or runtime state. `.env.build` is public build configuration only;
+Ruby version selection stays in managed Bones configuration.

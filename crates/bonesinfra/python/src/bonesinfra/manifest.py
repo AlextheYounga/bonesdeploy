@@ -91,6 +91,7 @@ COMMON_ARTIFACTS = (
     Artifact("project root", "project_root", "directory", "setup"),
     Artifact("releases directory", "releases", "directory", "setup"),
     Artifact("shared directory", "shared", "directory", "setup"),
+    Artifact("site runtime links", "site_runtime_dir", "directory", "runtime"),
     Artifact("current release link", "current", "link", "deploy"),
     Artifact("placeholder release", "placeholder_release", "directory", "setup"),
     Artifact("placeholder web root", "placeholder_web_root", "directory", "setup"),

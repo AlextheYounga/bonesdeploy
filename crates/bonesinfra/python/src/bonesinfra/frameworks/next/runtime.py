@@ -41,11 +41,11 @@ def deploy(ctx):
                     **template_data(current_ctx, paths=paths),
                 )
 
-            def validate(current_ctx, paths, _node_binary):
+            def validate(current_ctx, paths, node_binary):
                 validation.run_as_runtime_user(
                     current_ctx,
-                    "Validate Next.js standalone server exists as runtime user",
-                    f"test -f {paths['current']}/.next/standalone/server.js",
+                    "Validate Next.js standalone server with the managed Node runtime",
+                    f"{node_binary} --check {paths['current']}/.next/standalone/server.js",
                 )
 
             def command(current_ctx, _paths, node_binary):
@@ -66,6 +66,7 @@ def deploy(ctx):
                 validate=validate,
                 command=command,
                 exec_paths=lambda _ctx, _paths, node: [node],
+                apparmor_runtime_access=NODE.apparmor_access,
                 writable_paths=application.empty_writable,
                 tcp=True,
                 port=3100,

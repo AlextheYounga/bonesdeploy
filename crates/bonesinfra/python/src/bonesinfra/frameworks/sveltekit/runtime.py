@@ -40,11 +40,11 @@ def deploy(ctx):
                 _sudo=True,
             )
 
-        def validate(current_ctx, paths, _node_binary):
+        def validate(current_ctx, paths, node_binary):
             validation.run_as_runtime_user(
                 current_ctx,
-                "Validate SvelteKit build entrypoint exists as runtime user",
-                f"test -e {paths['current']}/build",
+                "Validate SvelteKit build entrypoint with the managed Node runtime",
+                f"{node_binary} --check {paths['current']}/build/index.js",
             )
 
         def command(current_ctx, paths, node_binary):
@@ -66,6 +66,7 @@ def deploy(ctx):
             validate=validate,
             command=command,
             exec_paths=lambda _ctx, _paths, node: [node],
+            apparmor_runtime_access=NODE.apparmor_access,
             writable_paths=application.empty_writable,
         )
 

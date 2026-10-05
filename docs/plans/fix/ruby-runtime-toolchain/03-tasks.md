@@ -29,11 +29,10 @@
 
 ## Completion notes
 
-The earlier exact source-built production Ruby implementation was superseded by
-the distribution Ruby decision recorded in `04-distribution-ruby-clarity.md`.
-Rails setup now installs distribution Ruby and native gem build packages through
-APT. Local Rails builds discard `vendor/bundle`, and remote prepare installs the
-target bundle even when migrations are explicitly skipped.
+The distribution-Ruby decision recorded in `04-distribution-ruby-clarity.md` is
+superseded by `05-mise-runtime-supersession-clarity.md`. The current Rails
+contract is exact config-selected Ruby, pinned precompiled-only mise, stable site
+links, and packaged Bundler/application dependencies.
 
 `uv run ruff check .`, `uv run ruff format --check .`, and `uv run pytest` (518
 tests) passed. `cargo test --workspace --exclude e2e`, `cargo clippy`, `cargo

@@ -22,6 +22,7 @@ pub fn assert_static_running(harness: &Harness) -> Result<()> {
 pub fn assert_server_running(harness: &Harness) -> Result<()> {
     harness.assert_site(SERVER_SITE)?;
     harness.assert_service("e2enextserver-next.service")?;
+    harness.assert_managed_runtime(SERVER_SITE, "node", "node", "^v24\\.19\\.0$")?;
     harness.assert_route(SERVER_SITE, SERVER_SITE)
 }
 

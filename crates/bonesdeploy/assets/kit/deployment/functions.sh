@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-BUILD_NODE_TMP_DIR=""
-BUILD_RUBY_TMP_DIR=""
+MISE_VERSION="2026.10.0"
+MISE_BINARY_URL="https://github.com/jdx/mise/releases/download/v2026.10.0/mise-v2026.10.0-linux-x64"
+MISE_BINARY_SHA256="57ced973f968b8fbab07aa8e32bd7077d4a357e200a22356d98963c723c6de0a"
 COREPACK_COMPAT_VERSION="0.31.0"
 COREPACK_MODERN_VERSION="0.34.5"
 
@@ -22,25 +23,6 @@ on_error() {
 
 trap on_error ERR
 
-cleanup_node_install() {
-	if [ -n "${BUILD_NODE_TMP_DIR:-}" ]; then
-		rm -rf "$BUILD_NODE_TMP_DIR"
-	fi
-}
-
-cleanup_ruby_install() {
-	if [ -n "${BUILD_RUBY_TMP_DIR:-}" ]; then
-		rm -rf "$BUILD_RUBY_TMP_DIR"
-	fi
-}
-
-cleanup_build_toolchain_install() {
-	cleanup_node_install
-	cleanup_ruby_install
-}
-
-trap cleanup_build_toolchain_install EXIT
-
 configure_build_cache() {
 	[ -n "${BUILD_CACHE_DIR:-}" ] || return 0
 
@@ -53,10 +35,13 @@ configure_build_cache() {
 		"$BUILD_CACHE_DIR/yarn/global" \
 		"$BUILD_CACHE_DIR/composer" \
 		"$BUILD_CACHE_DIR/bundler" \
-		"$BUILD_CACHE_DIR/node" \
-		"$BUILD_CACHE_DIR/ruby"; do
+		"$BUILD_CACHE_DIR/mise/bin" \
+		"$BUILD_CACHE_DIR/mise/data" \
+		"$BUILD_CACHE_DIR/mise/cache" \
+		"$BUILD_CACHE_DIR/mise/config"; do
 		mkdir -p "$directory"
 	done
+	: >"$BUILD_CACHE_DIR/mise/config/config.toml"
 
 	export COREPACK_HOME="$BUILD_CACHE_DIR/corepack"
 	export NPM_CONFIG_CACHE="$BUILD_CACHE_DIR/npm"
@@ -65,6 +50,54 @@ configure_build_cache() {
 	export YARN_GLOBAL_FOLDER="$BUILD_CACHE_DIR/yarn/global"
 	export COMPOSER_CACHE_DIR="$BUILD_CACHE_DIR/composer"
 	export BUNDLE_USER_CACHE="$BUILD_CACHE_DIR/bundler"
+	export MISE_BIN="$BUILD_CACHE_DIR/mise/bin/mise"
+	export MISE_DATA_DIR="$BUILD_CACHE_DIR/mise/data"
+	export MISE_INSTALLS_DIR="$MISE_DATA_DIR/installs"
+	export MISE_CACHE_DIR="$BUILD_CACHE_DIR/mise/cache"
+	export MISE_CONFIG_DIR="$BUILD_CACHE_DIR/mise/config"
+	export MISE_CONFIG_FILE="$MISE_CONFIG_DIR/config.toml"
+	export MISE_GLOBAL_CONFIG_ROOT="$MISE_CONFIG_DIR"
+	export MISE_GLOBAL_CONFIG_FILE="$MISE_CONFIG_FILE"
+	export MISE_SYSTEM_CONFIG_FILE="$MISE_CONFIG_FILE"
+	export MISE_ALL_COMPILE="false"
+	export MISE_NODE_COMPILE="false"
+	export MISE_PYTHON_COMPILE="false"
+	export MISE_RUBY_COMPILE="false"
+	export MISE_REGISTRY_FLOATING="false"
+	export MISE_AUTO_UPDATE="false"
+	export MISE_NO_HOOKS="true"
+	export MISE_SAFE="true"
+	export MISE_OVERRIDE_CONFIG_FILENAMES=".bonesdeploy-mise-disabled"
+	export MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES="none"
+}
+
+mise_is_installed() {
+	[ -x "$MISE_BIN" ] && [ "$("$MISE_BIN" --version | awk '{ print $1 }')" = "$MISE_VERSION" ]
+}
+
+mise_bootstrap() {
+	: "${BUILD_CACHE_DIR:?BUILD_CACHE_DIR must be set by bonesremote}"
+
+	if mise_is_installed; then
+		return
+	fi
+
+	local temporary_binary
+	temporary_binary="$(mktemp "$BUILD_CACHE_DIR/mise/bin/.mise.XXXXXX")"
+	log "Installing mise ${MISE_VERSION}..."
+	curl -fsSL --retry 3 --retry-delay 2 -o "$temporary_binary" "$MISE_BINARY_URL"
+	printf '%s  %s\n' "$MISE_BINARY_SHA256" "$temporary_binary" | sha256sum --check --status - || die "mise binary checksum verification failed"
+	chmod 0755 "$temporary_binary"
+	"$temporary_binary" --version | awk '{ print $1 }' | grep -qx "$MISE_VERSION" || die "mise binary contained an unexpected version"
+	mv -f "$temporary_binary" "$MISE_BIN"
+}
+
+mise_install_runtime() {
+	local tool="$1"
+	local version="$2"
+
+	mise_bootstrap
+	"$MISE_BIN" install "$tool@$version"
 }
 
 node_read_version_from_package_json() {
@@ -154,27 +187,12 @@ node_assert_exact_version() {
 	die "Node requires an exact pinned version. Set NODE_VERSION or use .node-version, .nvmrc, .tool-versions, or package.json volta."
 }
 
-node_architecture() {
-	case "$(uname -m)" in
-	x86_64)
-		echo "x64"
-		;;
-	aarch64)
-		echo "arm64"
-		;;
-	*)
-		die "Unsupported architecture for Node binary install: $(uname -m)"
-		;;
-	esac
-}
-
 node_configure_paths() {
 	local version="$1"
-	local node_arch="$2"
 
 	: "${BUILD_CACHE_DIR:?BUILD_CACHE_DIR must be set by bonesremote}"
 
-	NODE_DIR="$BUILD_CACHE_DIR/node/v${version}-linux-${node_arch}"
+	NODE_DIR="$MISE_INSTALLS_DIR/node/$version"
 	NODE_BIN="$NODE_DIR/bin/node"
 
 	export NODE_DIR NODE_BIN
@@ -184,39 +202,6 @@ node_is_installed() {
 	local version="$1"
 
 	[ -x "$NODE_BIN" ] && "$NODE_BIN" --version | grep -qx "v$version"
-}
-
-node_install() {
-	local version="$1"
-	local node_arch="$2"
-	local archive="node-v${version}-linux-${node_arch}.tar.xz"
-	local base_url="https://nodejs.org/dist/v${version}"
-	local checksum_line
-
-	node_configure_paths "$version" "$node_arch"
-	BUILD_NODE_TMP_DIR="$(mktemp -d "$BUILD_CACHE_DIR/node/.tmp.XXXXXX")"
-
-	log "Installing Node v${version}..."
-	log "Downloading ${base_url}/${archive}"
-	curl -fsSL --retry 3 --retry-delay 2 -o "$BUILD_NODE_TMP_DIR/$archive" "$base_url/$archive"
-	curl -fsSL --retry 3 --retry-delay 2 -o "$BUILD_NODE_TMP_DIR/SHASUMS256.txt" "$base_url/SHASUMS256.txt"
-
-	if ! checksum_line="$(awk -v archive="$archive" '$2 == archive { print; count++ } END { exit count != 1 }' "$BUILD_NODE_TMP_DIR/SHASUMS256.txt")"; then
-		die "Node checksum entry not found or not unique for $archive"
-	fi
-	if ! (cd "$BUILD_NODE_TMP_DIR" && printf '%s\n' "$checksum_line" | sha256sum --check --status -); then
-		die "Node archive checksum verification failed for $archive"
-	fi
-
-	mkdir "$BUILD_NODE_TMP_DIR/extracted"
-	tar --no-same-owner -xJ -f "$BUILD_NODE_TMP_DIR/$archive" -C "$BUILD_NODE_TMP_DIR/extracted"
-	local extracted="$BUILD_NODE_TMP_DIR/extracted/node-v${version}-linux-${node_arch}"
-	[ -x "$extracted/bin/node" ] || die "Node archive did not contain the expected executable"
-	"$extracted/bin/node" --version | grep -qx "v$version" || die "Node archive contained an unexpected version"
-
-	rm -rf "$NODE_DIR"
-	mv "$extracted" "$NODE_DIR"
-	BUILD_NODE_TMP_DIR=""
 }
 
 node_corepack_version() {
@@ -259,17 +244,16 @@ node_ensure_corepack() {
 
 install_node_dependencies() {
 	local version
-	local node_arch
 
 	version="$(node_resolve_version)"
 	node_assert_exact_version "$version"
-	node_arch="$(node_architecture)"
-	node_configure_paths "$version" "$node_arch"
+	node_configure_paths "$version"
 
 	if node_is_installed "$version"; then
 		log "Using cached Node v${version}..."
 	else
-		node_install "$version" "$node_arch"
+		mise_install_runtime node "$version"
+		node_is_installed "$version" || die "mise did not install Node v${version}"
 	fi
 
 	node_ensure_corepack
@@ -279,12 +263,10 @@ install_node_dependencies() {
 
 node_enable_toolchain() {
 	local version
-	local node_arch
 
 	version="$(node_resolve_version)"
 	node_assert_exact_version "$version"
-	node_arch="$(node_architecture)"
-	node_configure_paths "$version" "$node_arch"
+	node_configure_paths "$version"
 
 	export PATH="$NODE_DIR/bin:$PATH"
 	command -v node >/dev/null 2>&1 || die "node not found"
@@ -307,7 +289,7 @@ ruby_configure_paths() {
 
 	: "${BUILD_CACHE_DIR:?BUILD_CACHE_DIR must be set by bonesremote}"
 
-	RUBY_DIR="$BUILD_CACHE_DIR/ruby/$version"
+	RUBY_DIR="$MISE_INSTALLS_DIR/ruby/$version"
 	RUBY_BIN="$RUBY_DIR/bin/ruby"
 
 	export RUBY_DIR RUBY_BIN
@@ -319,52 +301,14 @@ ruby_is_installed() {
 	[ -x "$RUBY_BIN" ] && "$RUBY_BIN" --version | grep -q "^ruby $version "
 }
 
-ruby_checksum() {
-	case "$1" in
-	3.2.8) echo "77acdd8cfbbe1f8e573b5e6536e03c5103df989dc05fa68c70f011833c356075" ;;
-	3.3.8) echo "5ae28a87a59a3e4ad66bc2931d232dbab953d0aa8f6baf3bc4f8f80977c89cab" ;;
-	3.4.8) echo "53c4ddad41fbb6189f1f5ee0db57a51d54bd1f87f8755b3d68604156a35b045b" ;;
-	esac
-}
-
-ruby_install() {
-	local version="$1"
-	local archive="ruby-$version.tar.gz"
-	local checksum
-	local source_url="https://cache.ruby-lang.org/pub/ruby/${version%.*}/$archive"
-
-	ruby_configure_paths "$version"
-	checksum="$(ruby_checksum "$version")"
-	BUILD_RUBY_TMP_DIR="$(mktemp -d "$BUILD_CACHE_DIR/ruby/.tmp.XXXXXX")"
-
-	log "Installing Ruby $version..."
-	apt-get update
-	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-		bison build-essential ca-certificates curl libffi-dev libgdbm-dev libpq-dev \
-		libreadline-dev libssl-dev libyaml-dev shared-mime-info zlib1g-dev
-	curl -fsSL --retry 3 --retry-delay 2 -o "$BUILD_RUBY_TMP_DIR/$archive" "$source_url"
-	printf '%s  %s\n' "$checksum" "$archive" >"$BUILD_RUBY_TMP_DIR/$archive.sha256"
-	(cd "$BUILD_RUBY_TMP_DIR" && sha256sum --check --status "$archive.sha256") || die "Ruby archive checksum verification failed"
-	tar -xzf "$BUILD_RUBY_TMP_DIR/$archive" -C "$BUILD_RUBY_TMP_DIR"
-
-	rm -rf "$RUBY_DIR"
-	(
-		cd "$BUILD_RUBY_TMP_DIR/ruby-$version"
-		./configure --prefix="$RUBY_DIR" --disable-install-doc
-		make -j "$(nproc)"
-		make install
-	)
-	ruby_is_installed "$version" || die "Ruby installation did not contain version $version"
-	BUILD_RUBY_TMP_DIR=""
-}
-
 ruby_enable_toolchain() {
 	local version
 
 	version="$(ruby_resolve_version)"
 	ruby_configure_paths "$version"
 	if ! ruby_is_installed "$version"; then
-		ruby_install "$version"
+		mise_install_runtime ruby "$version"
+		ruby_is_installed "$version" || die "mise did not install Ruby $version"
 	fi
 
 	export PATH="$RUBY_DIR/bin:$PATH"
@@ -372,6 +316,46 @@ ruby_enable_toolchain() {
 	command -v bundle >/dev/null 2>&1 || die "Bundler not found"
 	ruby_is_installed "$version" || die "Cached Ruby installation is missing or has the wrong version"
 	log "Ruby: $(ruby --version)"
+}
+
+python_assert_exact_version() {
+	local version="$1"
+
+	[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "Python requires an exact pinned version. Set PYTHON_VERSION in project configuration."
+}
+
+python_configure_paths() {
+	local version="$1"
+
+	: "${BUILD_CACHE_DIR:?BUILD_CACHE_DIR must be set by bonesremote}"
+
+	PYTHON_DIR="$MISE_INSTALLS_DIR/python/$version"
+	PYTHON_BIN="$PYTHON_DIR/bin/python"
+
+	export PYTHON_DIR PYTHON_BIN
+}
+
+python_is_installed() {
+	local version="$1"
+
+	[ -x "$PYTHON_BIN" ] && "$PYTHON_BIN" --version | grep -qx "Python $version"
+}
+
+python_enable_toolchain() {
+	local version="${PYTHON_VERSION:-}"
+
+	python_assert_exact_version "$version"
+	python_configure_paths "$version"
+	if ! python_is_installed "$version"; then
+		mise_install_runtime python "$version"
+		python_is_installed "$version" || die "mise did not install Python $version"
+	fi
+
+	export PATH="$PYTHON_DIR/bin:$PATH"
+	command -v python >/dev/null 2>&1 || die "Python not found"
+	command -v pip >/dev/null 2>&1 || die "pip not found"
+	python_is_installed "$version" || die "Cached Python installation is missing or has the wrong version"
+	log "Python: $(python --version)"
 }
 
 configure_build_cache

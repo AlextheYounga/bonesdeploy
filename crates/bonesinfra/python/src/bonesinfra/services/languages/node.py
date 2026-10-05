@@ -1,26 +1,16 @@
 import re
 
-from pyinfra.operations import server
-
-from bonesinfra.config.paths import SCRIPTS_DIR
-from bonesinfra.services.languages.base import LanguageRuntime
-
-NODE_ROOT = "/opt/bonesdeploy/node"
+from bonesinfra.services.languages.mise import MiseRuntime
 
 
-class NodeRuntime(LanguageRuntime):
+class NodeRuntime(MiseRuntime):
     config_key = "node_version"
     default_version = "24.19.0"
     version_pattern = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
-
-    def install_version(self, _ctx) -> str:
-        server.script(
-            name=f"Install Node.js v{self.version}",
-            src=str(SCRIPTS_DIR / "install-node.sh"),
-            args=(self.version,),
-            _sudo=True,
-        )
-        return f"{NODE_ROOT}/v{self.version}/bin/node"
+    tool = "node"
+    executable_name = "node"
+    version_output_prefix = "v"
+    runtime_path_key = "node_runtime"
 
 
 NODE = NodeRuntime()

@@ -14,6 +14,7 @@ def artifacts(ctx):
         ("application runtime directory", paths.runtime_service_dir("next"), "directory", "framework"),
         ("application runtime socket", paths.runtime_service_socket("next"), "socket", "framework"),
         ("application log directory", paths.site_log_dir, "directory", "framework"),
+        ("managed Node runtime", paths.node_runtime, "link", "runtime"),
         ("Next.js placeholder standalone directory", f"{placeholder}/.next/standalone", "directory", "framework"),
         ("Next.js placeholder standalone server", f"{placeholder}/.next/standalone/server.js", "file", "framework"),
     ]

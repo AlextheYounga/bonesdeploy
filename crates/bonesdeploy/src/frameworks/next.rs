@@ -26,9 +26,6 @@ pub(super) fn environment_example(project_name: &str, site_url: &str) -> String 
     )
 }
 
-pub(super) fn build_environment_example(runtime: &Runtime) -> String {
-    super::render_env_template(
-        include_str!("../../assets/frameworks/next/next.env.build.example"),
-        &[("{node_version}", &runtime.node_version)],
-    )
+pub(super) fn build_environment_example(_runtime: &Runtime) -> String {
+    include_str!("../../assets/frameworks/next/next.env.build.example").to_string()
 }

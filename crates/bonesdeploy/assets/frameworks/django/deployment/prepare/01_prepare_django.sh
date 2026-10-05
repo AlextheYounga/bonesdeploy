@@ -2,15 +2,22 @@
 
 set -Eeuo pipefail
 
-readonly VENV_DIR="${VENV_DIR:-.venv}"
-readonly PYTHON_BIN="$VENV_DIR/bin/python"
+readonly PYTHON_RUNTIME_MARKER=".bonesdeploy-python-runtime"
+readonly SITE_ROOT="$(cd -- "$PWD/../.." && pwd)"
+readonly PYTHON_BIN="$SITE_ROOT/.bonesdeploy/runtimes/python/bin/python"
 
 validate_artifact() {
-	[ -x "$PYTHON_BIN" ] || die "$PYTHON_BIN not found; build the Django artifact first"
+	[ -f "$PYTHON_RUNTIME_MARKER" ] || die "$PYTHON_RUNTIME_MARKER not found; build the Django artifact first"
+	[ -x "$PYTHON_BIN" ] || die "$PYTHON_BIN not found; provision the configured Python runtime first"
+
+	local artifact_identity provisioned_identity
+	artifact_identity="$(<"$PYTHON_RUNTIME_MARKER")"
+	provisioned_identity="$("$PYTHON_BIN" --version)"
+	[ "$artifact_identity" = "$provisioned_identity" ] || die "Django artifact Python runtime $artifact_identity does not match provisioned runtime $provisioned_identity"
 }
 
 validate_application() {
-	[ -x "$VENV_DIR/bin/gunicorn" ] || die "gunicorn not found in $VENV_DIR; add it to requirements.txt"
+	[ -x .venv/bin/gunicorn ] || die "gunicorn launcher not found; add gunicorn to requirements.txt"
 
 	log "Checking Django production configuration..."
 	"$PYTHON_BIN" manage.py check --deploy
@@ -38,6 +45,7 @@ main() {
 	fi
 
 	validate_artifact
+	export PYTHONPATH="$PWD/.python-packages${PYTHONPATH:+:$PYTHONPATH}"
 	validate_application
 	run_migrations
 	collect_static

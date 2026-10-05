@@ -32,9 +32,13 @@ def deploy(ctx):
             placeholder = paths["placeholder_release"]
             _, module_path = _wsgi_module(current_ctx)
             server.shell(
-                name="Create placeholder venv with gunicorn",
+                name="Create placeholder Python launchers",
                 commands=[
-                    f"cd {quote(placeholder)} && {python_binary} -m venv .venv && .venv/bin/pip install gunicorn"
+                    f"cd {quote(placeholder)} && mkdir -p .venv/bin && "
+                    f"printf '%s\\n' '#!/usr/bin/env bash' 'exec {python_binary} \"$@\"' > .venv/bin/python && "
+                    "printf '%s\\n' '#!/usr/bin/env bash' "
+                    f"'exec {python_binary} -m gunicorn \"$@\"' > .venv/bin/gunicorn && "
+                    "chmod 0755 .venv/bin/python .venv/bin/gunicorn"
                 ],
                 _sudo=True,
             )
@@ -55,19 +59,20 @@ def deploy(ctx):
                 **template_data(current_ctx, paths=paths),
             )
 
-        def validate(current_ctx, paths, _python_binary):
-            gunicorn = f"{paths['current']}/.venv/bin/gunicorn"
+        def validate(current_ctx, paths, python_binary):
             module, _ = _wsgi_module(current_ctx)
             validation.run_as_runtime_user(
                 current_ctx,
                 "Validate Gunicorn configuration as runtime user",
-                f"{gunicorn} --check-config {quote(module)}",
+                f"PYTHONPATH={quote(paths['current'] + '/.python-packages')} "
+                f"{quote(python_binary)} -m gunicorn --check-config {quote(module)}",
             )
 
-        def command(current_ctx, paths, _python_binary):
+        def command(current_ctx, paths, python_binary):
             module, _ = _wsgi_module(current_ctx)
             return (
-                f"{paths['current']}/.venv/bin/gunicorn {quote(module)} "
+                f"PYTHONPATH={quote(paths['current'] + '/.python-packages')} "
+                f"{quote(python_binary)} -m gunicorn {quote(module)} "
                 f"--bind unix:{paths['runtime_socket_dir']}/gunicorn/gunicorn.sock "
                 f"--worker-tmp-dir {paths['runtime_socket_dir']}/gunicorn"
             )
@@ -82,7 +87,8 @@ def deploy(ctx):
             seed_placeholder=seed_placeholder,
             validate=validate,
             command=command,
-            exec_paths=lambda _ctx, paths, _binary: [f"{paths['current']}/.venv/bin/gunicorn"],
+            exec_paths=lambda _ctx, _paths, python_binary: [python_binary],
+            apparmor_runtime_access=PYTHON.apparmor_access,
             writable_paths=lambda _ctx, paths: [f"{paths['shared']}/media"],
         )
 

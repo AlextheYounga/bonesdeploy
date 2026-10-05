@@ -58,6 +58,24 @@ fn environment_projection_excludes_sensitive_and_controlled_values() -> Result<(
 }
 
 #[test]
+fn managed_runtime_build_variables_override_env_build_values() -> Result<()> {
+    let dir = tempdir()?;
+    fs::write(dir.path().join(".env.build"), "NODE_VERSION=stale\nPYTHON_VERSION=3.13.0\nRUBY_VERSION=3.3.8\n")?;
+    let mut config = Bones::for_site("atlas");
+    config.runtime.node_version = "24.19.0".into();
+    config.runtime.extra.insert("python_version".into(), toml::Value::String("3.14.0".into()));
+    config.runtime.extra.insert("ruby_version".into(), toml::Value::String("3.4.8".into()));
+
+    let values = build_contract::environment(&config, dir.path())?;
+
+    assert_eq!(values.iter().filter(|(key, _)| key == "NODE_VERSION").count(), 1);
+    assert!(values.contains(&("NODE_VERSION".into(), "24.19.0".into())));
+    assert!(values.contains(&("PYTHON_VERSION".into(), "3.14.0".into())));
+    assert!(values.contains(&("RUBY_VERSION".into(), "3.4.8".into())));
+    Ok(())
+}
+
+#[test]
 fn environment_projection_excludes_the_entire_backup_section() -> Result<()> {
     let dir = tempdir()?;
     let mut config = Bones::for_site("atlas");

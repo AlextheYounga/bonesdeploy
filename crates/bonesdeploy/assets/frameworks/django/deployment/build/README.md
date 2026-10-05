@@ -15,8 +15,9 @@ the committed revision.
 - Scripts run in lexical order by filename.
 - Non-zero exit code fails the deploy.
 - Your job: produce the deployable app layout inside `/workspace/source`.
-- Install Python dependencies and create the release-local launchers here.
-  Production prepare validates this output and never invokes pip.
+- Build uses the exact Python selected in Bones configuration through pinned
+  mise. Install Python dependencies and create the site-link launchers here;
+  production prepare validates this output and never invokes pip.
 - Remove build-only caches, source-only files, and numbered build scripts when
   the selected runtime does not need them.
 - BonesRemote verifies and receives the artifact, then promotes this output into
@@ -31,4 +32,5 @@ Name them with a numbered prefix so the order is clear:
 02_build_assets.sh
 ```
 
-No secrets or runtime state. `.env.build` is public build configuration only.
+No secrets or runtime state. `.env.build` is public build configuration only;
+Python version selection stays in managed Bones configuration.

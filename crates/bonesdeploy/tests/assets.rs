@@ -1,9 +1,6 @@
-use std::env;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
-use std::process::Command;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bonesdeploy::frameworks::Framework;
 use bonesdeploy::infra::assets::frameworks::{
     base_framework_defaults, framework_asset, framework_asset_paths, framework_defaults, framework_names,
@@ -32,24 +29,29 @@ fn framework_assets_include_expected_build_content() {
 }
 
 #[test]
-fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
+fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() -> Result<()> {
     let django = asset_text("django/deployment/build/02_run_build.sh");
     assert!(!django.contains("-m venv"));
-    assert!(django.contains("python3 -m pip install"));
+    assert!(django.contains("python_enable_toolchain"));
+    assert!(django.contains("python -m pip install"));
     assert!(django.contains("--target \"$packages_dir\""));
-    assert!(django.contains("exec /usr/bin/python3 -m gunicorn \"$@\""));
+    assert!(django.contains("python --version >.bonesdeploy-python-runtime"));
+    assert!(django.contains(".bonesdeploy/runtimes/python\" -m gunicorn \"$@\""));
     assert!(!django.contains("BONES_RUNTIME_PYTHON_VERSION"));
     assert!(django.contains("rm -rf deployment/build"));
 
     let django_prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
     assert!(!django_prepare.contains("-m venv"));
     assert!(!django_prepare.contains("pip install"));
-    assert!(django_prepare.contains("$VENV_DIR/bin/python"));
+    assert!(django_prepare.contains(".bonesdeploy-python-runtime"));
+    assert!(django_prepare.contains(".bonesdeploy/runtimes/python/bin/python"));
 
     let laravel = asset_text("laravel/deployment/build/03_build_frontend.sh");
     assert!(laravel.contains("rm -rf node_modules deployment/build"));
     let rails = asset_text("rails/deployment/build/02_run_build.sh");
-    assert!(rails.contains("bundle install"));
+    assert!(rails.contains("gem install bundler --version \"$bundler_version\""));
+    assert!(rails.contains(".bonesdeploy-ruby-version"));
+    assert!(rails.contains("\"$RUBY_BIN\" \"$packaged_bundler\" install"));
     assert!(rails.contains("BUNDLE_DEPLOYMENT=\"true\""));
     assert!(rails.contains("BUNDLE_WITHOUT=\"development:test\""));
     assert!(!rails.contains("--deployment"));
@@ -58,15 +60,23 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     assert!(!rails.contains("rm -rf node_modules tmp/cache vendor/bundle"));
 
     let rails_prepare = asset_text("rails/deployment/prepare/01_prepare_rails.sh");
-    let check = rails_prepare.find("/usr/bin/bundle check").expect("Rails prepare must check the packaged bundle");
+    let runtime = rails_prepare
+        .rfind("\tvalidate_runtime")
+        .context("Rails prepare must validate the provisioned Ruby before checking the bundle")?;
+    let check = rails_prepare
+        .find("\"$SITE_RUBY\" \"$PACKAGED_BUNDLER\" check")
+        .context("Rails prepare must check the packaged bundle")?;
     let migration_skip =
-        rails_prepare.find("BONES_RAILS_SKIP_MIGRATIONS").expect("Rails prepare must support skipping migrations");
+        rails_prepare.find("BONES_RAILS_SKIP_MIGRATIONS").context("Rails prepare must support skipping migrations")?;
     let migrate = rails_prepare
-        .find("/usr/bin/bundle exec rails db:migrate")
-        .expect("Rails prepare must run migrations through the target bundle");
+        .find("\"$SITE_RUBY\" \"$PACKAGED_BUNDLER\" exec rails db:migrate")
+        .context("Rails prepare must run migrations through the target bundle")?;
+    assert!(runtime < check);
     assert!(check < migration_skip);
     assert!(check < migrate);
     assert!(!rails_prepare.contains("bundle install"));
+    assert!(rails_prepare.contains(".bonesdeploy/runtimes/ruby/bin/ruby"));
+    assert!(rails_prepare.contains("vendor/bundle/bundler/bin/bundle"));
     assert!(rails_prepare.contains("BUNDLE_DEPLOYMENT=\"true\""));
     assert!(rails_prepare.contains("BUNDLE_PATH=\"vendor/bundle\""));
     assert!(rails_prepare.contains("BUNDLE_WITHOUT=\"development:test\""));
@@ -91,29 +101,35 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     assert!(angular.contains("[ ! -f \"dist/browser/index.html\" ]"));
     assert!(angular.contains("rm -rf .angular/cache node_modules deployment/build"));
     assert!(!angular.contains("rm -rf dist"));
+    Ok(())
 }
 
 #[test]
-fn django_artifact_contract_matches_the_production_runtime() {
+fn django_artifact_contract_matches_the_production_runtime() -> Result<()> {
     let build = asset_text("django/deployment/build/02_run_build.sh");
     assert!(build.contains("local packages_dir=\".python-packages\""));
     assert!(build.contains("local wrapper_dir=\".venv/bin\""));
-    assert!(build.contains("python3 -m pip install"));
+    assert!(build.contains("python_enable_toolchain"));
+    assert!(build.contains("python -m pip install"));
     assert!(build.contains("export PYTHONPATH=\"$release_root/.python-packages${PYTHONPATH:+:$PYTHONPATH}\""));
-    assert!(build.contains("exec /usr/bin/python3 \"$@\""));
+    assert!(build.contains(".bonesdeploy/runtimes/python\" \"$@\""));
+    assert!(build.contains("python --version >.bonesdeploy-python-runtime"));
     assert!(!build.contains("BONES_RUNTIME_PYTHON_VERSION"));
     assert!(!build.contains("production_python"));
 
     let prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
-    let require_artifact = prepare.find("build the Django artifact first").expect("missing artifact validation");
-    let validate = prepare.find("manage.py check --deploy").expect("Django prepare must validate the application");
+    let require_artifact = prepare.find("PYTHON_RUNTIME_MARKER not found").context("missing artifact validation")?;
+    let validate = prepare.find("manage.py check --deploy").context("Django prepare must validate the application")?;
     let migration_skip =
-        prepare.find("BONES_DJANGO_SKIP_MIGRATIONS").expect("Django prepare must support skipping migrations");
-    assert!(prepare.contains("readonly PYTHON_BIN=\"$VENV_DIR/bin/python\""));
+        prepare.find("BONES_DJANGO_SKIP_MIGRATIONS").context("Django prepare must support skipping migrations")?;
+    assert!(prepare.contains("readonly PYTHON_BIN=\"$SITE_ROOT/.bonesdeploy/runtimes/python/bin/python\""));
+    assert!(prepare.contains("export PYTHONPATH=\"$PWD/.python-packages${PYTHONPATH:+:$PYTHONPATH}\""));
+    assert!(prepare.contains("does not match provisioned runtime"));
     assert!(require_artifact < validate);
     assert!(require_artifact < migration_skip);
     assert!(!prepare.contains("pip install"));
     assert!(!prepare.contains("-m venv"));
+    Ok(())
 }
 
 #[test]
@@ -141,19 +157,22 @@ fn every_framework_has_a_build_environment_example() -> Result<()> {
             .build_environment_example(&Runtime::default())
             .ok_or_else(|| anyhow::anyhow!("{framework} is missing .env.build"))?;
         assert!(content.contains("Committed, non-secret"), "{framework} must include build environment header");
-        assert!(content.contains("# BonesDeploy Infra\nNODE_VERSION="), "{framework} must declare Node in .env.build");
+        assert!(content.contains("# BonesDeploy Infra"), "{framework} must include the BonesDeploy build section");
+        for variable in ["NODE_VERSION=", "PYTHON_VERSION=", "RUBY_VERSION="] {
+            assert!(!content.contains(variable), "{framework} must derive {variable} from Bones config");
+        }
     }
     Ok(())
 }
 
 #[test]
-fn next_and_nuxt_build_environments_use_the_selected_node_version() -> Result<()> {
+fn framework_build_environments_do_not_declare_managed_runtime_versions() -> Result<()> {
     let runtime = Runtime { node_version: "25.8.0".into(), ..Runtime::default() };
     for framework in [Framework::Next, Framework::Nuxt] {
         let content = framework
             .build_environment_example(&runtime)
             .ok_or_else(|| anyhow::anyhow!("{framework} is missing .env.build"))?;
-        assert!(content.contains("NODE_VERSION=25.8.0"));
+        assert!(!content.contains("NODE_VERSION="));
     }
     Ok(())
 }
@@ -255,57 +274,32 @@ fn skill_doc_names_cover_the_expected_topics() {
 }
 
 #[test]
-fn node_install_extracts_a_cold_cache_archive() -> Result<()> {
-    let temp = tempfile::tempdir()?;
-    let archive_root = temp.path().join("archive-root");
-    let node_root = archive_root.join("node-v1.2.3-linux-x64/bin");
-    fs::create_dir_all(&node_root)?;
-    let node = node_root.join("node");
-    fs::write(&node, "#!/bin/sh\nprintf 'v1.2.3\\n'\n")?;
-    fs::set_permissions(&node, fs::Permissions::from_mode(0o755))?;
-
-    let archive = temp.path().join("node-v1.2.3-linux-x64.tar.xz");
-    let archive_status = Command::new("tar")
-        .current_dir(temp.path())
-        .args(["-cJf"])
-        .arg(&archive)
-        .args(["-C"])
-        .arg(&archive_root)
-        .arg("node-v1.2.3-linux-x64")
-        .status()?;
-    assert!(archive_status.success(), "failed to create Node archive fixture");
-    let checksum = Command::new("sha256sum").current_dir(temp.path()).arg(&archive).output()?;
-    assert!(checksum.status.success(), "failed to checksum Node archive fixture");
-    let checksum_hash = String::from_utf8(checksum.stdout)?
-        .split_whitespace()
-        .next()
-        .ok_or_else(|| anyhow::anyhow!("Node archive checksum fixture was empty"))?
-        .to_string();
-    let checksums = temp.path().join("SHASUMS256.txt");
-    fs::write(&checksums, format!("{checksum_hash}  node-v1.2.3-linux-x64.tar.xz\n"))?;
-
-    let fake_bin = temp.path().join("bin");
-    fs::create_dir(&fake_bin)?;
-    let fake_curl = fake_bin.join("curl");
-    fs::write(
-        &fake_curl,
-        "#!/bin/sh\noutput=\nwhile [ \"$#\" -gt 0 ]; do\n  if [ \"$1\" = \"-o\" ]; then output=$2; shift 2; else shift; fi\ndone\ncase $output in\n  *SHASUMS256.txt) cp \"$FIXTURE_CHECKSUMS\" \"$output\" ;;\n  *) cp \"$FIXTURE_ARCHIVE\" \"$output\" ;;\nesac\n",
-    )?;
-    fs::set_permissions(&fake_curl, fs::Permissions::from_mode(0o755))?;
+fn build_toolchains_use_verified_precompiled_mise_runtimes() -> Result<()> {
     let functions = kit_asset("deployment/functions.sh").ok_or_else(|| anyhow::anyhow!("missing functions.sh"))?;
-    let functions_file = temp.path().join("functions.sh");
-    fs::write(&functions_file, functions)?;
-    let status = Command::new("bash")
-        .current_dir(temp.path())
-        .arg("-c")
-        .arg("source \"$FUNCTIONS_FILE\"\nnode_install 1.2.3 x64\n")
-        .env("FUNCTIONS_FILE", &functions_file)
-        .env("BUILD_CACHE_DIR", temp.path().join("cache"))
-        .env("FIXTURE_ARCHIVE", &archive)
-        .env("FIXTURE_CHECKSUMS", &checksums)
-        .env("PATH", format!("{}:{}", fake_bin.display(), env::var("PATH").unwrap_or_default()))
-        .status()?;
-    assert!(status.success(), "Node fixture installation failed");
-    assert!(temp.path().join("cache/node/v1.2.3-linux-x64/bin/node").is_file());
+    let functions = String::from_utf8_lossy(&functions);
+
+    assert!(functions.contains("MISE_VERSION=\"2026.10.0\""));
+    assert!(functions.contains("MISE_BINARY_SHA256="));
+    assert!(functions.contains("MISE_DATA_DIR=\"$BUILD_CACHE_DIR/mise/data\""));
+    assert!(functions.contains("MISE_ALL_COMPILE=\"false\""));
+    assert!(functions.contains("MISE_NODE_COMPILE=\"false\""));
+    assert!(functions.contains("MISE_PYTHON_COMPILE=\"false\""));
+    assert!(functions.contains("MISE_RUBY_COMPILE=\"false\""));
+    assert!(functions.contains("MISE_REGISTRY_FLOATING=\"false\""));
+    assert!(functions.contains("MISE_AUTO_UPDATE=\"false\""));
+    assert!(functions.contains("MISE_NO_HOOKS=\"true\""));
+    assert!(functions.contains("MISE_OVERRIDE_CONFIG_FILENAMES=\".bonesdeploy-mise-disabled\""));
+    assert!(functions.contains("MISE_OVERRIDE_TOOL_VERSIONS_FILENAMES=\"none\""));
+    assert!(functions.contains("mise_install_runtime node \"$version\""));
+    assert!(functions.contains("mise_install_runtime ruby \"$version\""));
+    assert!(functions.contains("mise_install_runtime python \"$version\""));
+    let node_version = functions.find("if [ -n \"${NODE_VERSION:-}\" ]").context("missing NODE_VERSION resolver")?;
+    let dot_node_version = functions.find("if [ -f .node-version ]").context("missing .node-version resolver")?;
+    let nvmrc = functions.find("if [ -f .nvmrc ]").context("missing .nvmrc resolver")?;
+    let tool_versions = functions.find("if [ -f .tool-versions ]").context("missing .tool-versions resolver")?;
+    assert!(node_version < dot_node_version && dot_node_version < nvmrc && nvmrc < tool_versions);
+    assert!(!functions.contains("node-v${version}-linux-${node_arch}"));
+    assert!(!functions.contains("cache.ruby-lang.org"));
+    assert!(!functions.contains("make -j"));
     Ok(())
 }

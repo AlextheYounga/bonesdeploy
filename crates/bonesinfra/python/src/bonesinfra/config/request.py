@@ -52,6 +52,7 @@ _MIN_DOMAIN_LABELS = 2
 _MAX_EMAIL_LENGTH = 254
 _MAX_PORT = 65535
 _MAX_COMPOSE_WAIT_TIMEOUT = 3600
+_DEFAULT_NODE_VERSION = "24.19.0"
 
 
 def reject_unknown(mapping: Mapping[str, Any], allowed: set[str], where: str) -> None:
@@ -119,6 +120,8 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
         validate_email(email)
     if backend == "docker" and domain and compose_port is None:
         raise ValueError("site.compose_port is required for Docker sites with managed ingress")
+    runtime_data = dict(extras)
+    runtime_data["node_version"] = _string(site.get("node_version", _DEFAULT_NODE_VERSION), "site.node_version")
     return DeployContext(
         server=parse_server_connection(server),
         app=AppConfig(
@@ -133,7 +136,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
             name,
             compose_port,
             _compose_wait_timeout(site.get("compose_wait_timeout", 120)),
-            dict(extras),
+            runtime_data,
         ),
         backup=backup,
         template=template,

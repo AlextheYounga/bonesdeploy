@@ -62,6 +62,7 @@ RELEASES_DIR = "releases"
 SHARED_DIR = "shared"
 CURRENT_LINK = "current"
 PLACEHOLDER_RELEASE_NAME = "19700101_000000"
+SITE_RUNTIME_DIR = ".bonesdeploy/runtimes"
 
 NGINX_SOCKET = "nginx.sock"
 NGINX_PID = "nginx.pid"
@@ -136,6 +137,10 @@ class DeploymentPaths:
     bonesremote_global_link: str
     apparmor_enabled_param: str
     apparmor_profiles: str
+    site_runtime_dir: str
+    ruby_runtime: str
+    python_runtime: str
+    node_runtime: str
 
     @classmethod
     def new(
@@ -152,6 +157,7 @@ class DeploymentPaths:
         runtime_socket_dir = Path(RUNTIME_SOCKET_PARENT) / project_name
         runtime_nginx_dir = runtime_socket_dir / "nginx"
         conf_root = Path(DEFAULT_CONF_ROOT_PARENT) / project_name
+        site_runtime_dir = Path(project_root) / SITE_RUNTIME_DIR
 
         return cls(
             project_name=project_name,
@@ -206,6 +212,10 @@ class DeploymentPaths:
             bonesremote_global_link=str(Path(USR_LOCAL_BIN) / BONESREMOTE_BINARY),
             apparmor_enabled_param=APPARMOR_ENABLED_PARAM,
             apparmor_profiles=APPARMOR_PROFILES,
+            site_runtime_dir=str(site_runtime_dir),
+            ruby_runtime=str(site_runtime_dir / "ruby"),
+            python_runtime=str(site_runtime_dir / "python"),
+            node_runtime=str(site_runtime_dir / "node"),
         )
 
     def systemd_service(self, name: str) -> str:

@@ -2,25 +2,33 @@ from types import SimpleNamespace
 
 import pytest
 
-from bonesinfra.frameworks.rails.runtime import apparmor_exec_paths, bundler_binary, bundler_command
+from bonesinfra.frameworks.rails.runtime import apparmor_exec_paths, bundled_bundler, bundled_bundler_command
 from bonesinfra.services.languages import NODE, PYTHON, RUBY
 from bonesinfra.services.languages.php import PHPRuntime
-from bonesinfra.services.languages.python import PYTHON_PACKAGES, PythonRuntime
-from bonesinfra.services.languages.ruby import RUBY_PACKAGES, RubyRuntime
+from bonesinfra.services.languages.python import PythonRuntime
+from bonesinfra.services.languages.ruby import RubyRuntime
 
 
 def _context(**runtime_data):
-    return SimpleNamespace(runtime=SimpleNamespace(data=runtime_data))
+    return SimpleNamespace(
+        paths=SimpleNamespace(
+            node_runtime="/srv/sites/example/.bonesdeploy/runtimes/node",
+            python_runtime="/srv/sites/example/.bonesdeploy/runtimes/python",
+            ruby_runtime="/srv/sites/example/.bonesdeploy/runtimes/ruby",
+        ),
+        runtime=SimpleNamespace(data=runtime_data, runtime_user="example"),
+    )
 
 
 def test_language_runtime_stores_selected_version_and_executable(monkeypatch):
-    monkeypatch.setattr("bonesinfra.services.languages.node.server.script", lambda **_kwargs: None)
+    monkeypatch.setattr("bonesinfra.services.languages.mise.server.script", lambda **_kwargs: None)
+    monkeypatch.setattr("bonesinfra.services.languages.mise.server.shell", lambda **_kwargs: None)
 
     executable = NODE.install(_context(node_version="24.19.0"))
 
     assert NODE.version == "24.19.0"
     assert NODE.executable == executable
-    assert executable.endswith("/v24.19.0/bin/node")
+    assert executable == "/srv/sites/example/.bonesdeploy/runtimes/node/bin/node"
 
 
 @pytest.mark.parametrize(
@@ -32,67 +40,67 @@ def test_language_runtime_rejects_invalid_versions(runtime, key, value):
         runtime.install(_context(**{key: value}))
 
 
-def test_python_runtime_installs_distribution_packages(monkeypatch):
-    calls = []
-    runtime = PythonRuntime()
-
-    monkeypatch.setattr("bonesinfra.services.languages.python.apt.packages", lambda **kwargs: calls.append(kwargs))
-
-    executable = runtime.install(_context(python_version="3.14"))
-
-    assert runtime.version == "3.14"
-    assert executable == "/usr/bin/python3"
-    assert len(calls) == 1
-    assert calls[0]["packages"] == PYTHON_PACKAGES
-    assert calls[0]["present"] is True
-    assert calls[0]["update"] is True
-    assert calls[0]["_sudo"] is True
-
-
 @pytest.mark.parametrize(
-    ("selected", "expected"),
-    [("3.4.8", "3.4.8"), ("3.4", "3.4.8")],
+    ("runtime", "key", "selected", "expected"),
+    [
+        (NODE, "node_version", "24.19.0", "node"),
+        (PythonRuntime(), "python_version", "3.14.0", "python"),
+        (RubyRuntime(), "ruby_version", "3.4.9", "ruby"),
+    ],
 )
-def test_ruby_runtime_installs_distribution_packages(monkeypatch, selected, expected):
+def test_managed_runtime_installs_an_exact_version_and_returns_its_site_link(
+    monkeypatch, runtime, key, selected, expected
+):
     calls = []
-    monkeypatch.setattr("bonesinfra.services.languages.ruby.apt.packages", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr(
+        "bonesinfra.services.languages.mise.server.script", lambda **kwargs: calls.append(("script", kwargs))
+    )
+    monkeypatch.setattr(
+        "bonesinfra.services.languages.mise.server.shell", lambda **kwargs: calls.append(("shell", kwargs))
+    )
 
-    runtime = RubyRuntime()
-    executable = runtime.install(_context(ruby_version=selected))
+    executable = runtime.install(_context(**{key: selected}))
 
-    assert runtime.version == expected
-    assert executable == "/usr/bin/ruby"
-    assert len(calls) == 1
-    assert calls[0]["packages"] == RUBY_PACKAGES
-    assert calls[0]["present"] is True
-    assert calls[0]["update"] is True
-    assert calls[0]["_sudo"] is True
+    assert runtime.version == selected
+    assert executable == f"/srv/sites/example/.bonesdeploy/runtimes/{expected}/bin/{expected}"
+    assert calls[0][1]["args"] == (expected, selected, f"/srv/sites/example/.bonesdeploy/runtimes/{expected}")
+    assert calls[0][1]["_sudo"] is True
+    assert calls[0][1]["_env"]["MISE_ALL_COMPILE"] == "false"
+    assert calls[1][1]["_sudo_user"] == "example"
+    assert selected in calls[1][1]["commands"][0]
 
-
-def test_ruby_runtime_rejects_unsupported_patch_release():
-    with pytest.raises(ValueError, match="ruby_version"):
-        RubyRuntime().install(_context(ruby_version="3.4.9"))
+    access = runtime.apparmor_access()
+    assert access.executable == f"/var/lib/bonesdeploy/mise/installs/{expected}/{selected}/bin/{expected}"
+    assert access.root == f"/var/lib/bonesdeploy/mise/installs/{expected}/{selected}"
 
 
-def test_rails_bundler_binary_is_next_to_distribution_ruby():
-    assert bundler_binary("/usr/bin/ruby") == "/usr/bin/bundle"
-
-
-def test_rails_bundler_commands_use_the_project_local_bundle():
+def test_rails_bundler_is_packaged_with_the_release():
     assert (
-        bundler_command("/usr/bin/bundle", "exec puma --help")
+        bundled_bundler({"current": "/srv/sites/atlas/current"})
+        == "/srv/sites/atlas/current/vendor/bundle/bundler/bin/bundle"
+    )
+
+
+def test_rails_bundler_commands_use_managed_ruby_and_the_packaged_bundler():
+    assert (
+        bundled_bundler_command(
+            "/srv/sites/atlas/.bonesdeploy/runtimes/ruby/bin/ruby",
+            "/srv/sites/atlas/current/vendor/bundle/bundler/bin/bundle",
+            "exec puma --help",
+        )
         == "BUNDLE_DISABLE_VERSION_CHECK=true BUNDLE_PATH=vendor/bundle "
-        "BUNDLE_VERSION=system /usr/bin/bundle exec puma --help"
+        "/srv/sites/atlas/.bonesdeploy/runtimes/ruby/bin/ruby "
+        "/srv/sites/atlas/current/vendor/bundle/bundler/bin/bundle exec puma --help"
     )
 
 
 def test_rails_apparmor_allows_every_puma_command_executable():
     paths = {"releases": "/srv/sites/atlas/releases"}
 
-    assert apparmor_exec_paths(paths, "/usr/bin/ruby") == [
+    assert apparmor_exec_paths(paths, "/srv/sites/atlas/.bonesdeploy/runtimes/ruby/bin/ruby") == [
         "/usr/bin/env",
-        "/usr/bin/ruby*",
-        "/usr/bin/bundle",
+        "/srv/sites/atlas/.bonesdeploy/runtimes/ruby/bin/ruby",
+        "/srv/sites/atlas/releases/*/vendor/bundle/bundler/bin/bundle",
         "/srv/sites/atlas/releases/*/vendor/bundle/ruby/*/bin/puma",
     ]
 

@@ -2,8 +2,9 @@
 
 ## Request
 
-Apply the distribution-runtime approach used for Ruby to Django so provisioning
-does not compile CPython on production servers.
+This completed distribution-Python change is superseded by
+`feature/mise-runtimes`: Django now uses the exact configured managed Python
+runtime. Its historical goal was to avoid production source compilation.
 
 ## Problem
 
@@ -25,23 +26,21 @@ Python while preparing a staged release.
 
 ## Desired Outcome
 
-Django host provisioning installs Python through APT without compiling CPython.
-The local build does not install Python dependencies. Before activation, the
-target host creates `.venv`, installs `requirements.txt`, validates Django, runs
-migrations unless skipped, and collects static files.
+Django local builds and production use the same exact configured Python installed
+precompiled-only by pinned mise. The artifact packages dependencies and
+site-linked launchers; prepare validates runtime identity, checks Django, runs
+migrations unless skipped, and collects static files without installing packages.
 
 ## Scope
 
-- Django production Python provisioning and runtime paths.
-- Django artifact cleanup and target-side dependency installation.
-- AppArmor, remote descriptor compatibility, tests, generated wheel, and
-  documentation affected by the runtime boundary.
+- This historical record remains for its completed source-build removal. The
+  current Django runtime contract is owned by `feature/mise-runtimes`.
 
 ## Constraints
 
 - Supported hosts remain Debian 12+ and Ubuntu 24.04+ on `x86_64`.
-- Existing `python_version` values remain readable but do not select an
-  interpreter and are not generated for new projects.
+- Production source-build fallback remains prohibited. The current exact runtime,
+  packaged dependency, and E2E requirements are defined by `feature/mise-runtimes`.
 - Prepare scripts continue to run as the home-less site runtime user.
 - Full E2E tests are not run unless explicitly requested.
 

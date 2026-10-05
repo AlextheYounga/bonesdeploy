@@ -41,6 +41,14 @@ def setup_project(ctx, paths):
     )
 
     mkdir(
+        name="Ensure root-controlled site runtime link directory exists",
+        path=paths["site_runtime_dir"],
+        user="root",
+        group="root",
+        mode="0755",
+    )
+
+    mkdir(
         name="Ensure placeholder release directory exists",
         path=paths["placeholder_web_root"],
         user="root",

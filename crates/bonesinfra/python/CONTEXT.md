@@ -53,7 +53,7 @@ BonesInfra owns:
 - canonical framework infrastructure and scaffold resources
 - Jinja2 templates used by provisioning
 - runtime package installation
-- Ruby, Python, their package tooling and development headers, and native extension build dependencies from the host's APT repositories
+- pinned mise installation and root-owned precompiled Ruby, Python, and Node runtime store
 - runtime services
 - nginx/AppArmor/systemd provisioning details
 - scheduled Borg backup provisioning
@@ -61,11 +61,13 @@ BonesInfra owns:
 Native site provisioning creates only the runtime identity and release layout.
 Application asset builds occur locally and arrive as release artifacts, so
 production hosts do not receive build users, build caches, rootless Podman
-state, native builder images, or application repositories. Rails and Django
-receive complete dependency trees in their local release artifacts. Remote
-prepare validates those dependencies and performs production-state work without
-invoking application package managers. Runtime application users remain home-less
-and non-login.
+state, native builder images, or application repositories. Pinned mise
+`2026.10.0` installs Ruby, Python, and Node precompiled-only into a root-owned
+shared store; each site receives stable runtime links. Rails and Django receive
+complete dependency trees in their local release artifacts. Remote prepare
+validates those dependencies and runtime identity before production-state work
+without invoking application package managers. Runtime application users remain
+home-less and non-login. PHP remains on its separate APT/PHP-FPM integration.
 
 Site paths are derived from `project_name`; `project_root` defaults to
 `/srv/sites/<project>`. BonesInfra does not create or inspect an application
@@ -307,7 +309,7 @@ Owns pyinfra deploy operations, grouped by concern:
 
 ```text
 services/
-├── languages/    # Python, Node, Ruby, PHP runtime installs
+├── languages/    # mise-managed Python, Node, Ruby; APT/PHP runtime installs
 ├── linux/        # systemd, nginx, apparmor, firewall, validation, application
 └── runtime/      # database/data services (mysql, redis, valkey, ...)
 ```
@@ -499,7 +501,10 @@ ______________________________________________________________________
 # Runtime Provisioning
 
 Runtime provisioning prepares the selected native framework runtime or the
-generic Compose backend.
+generic Compose backend. For Ruby, Python, and Node, it installs the verified
+pinned mise binary and exact precompiled runtimes in the root-owned shared store,
+then renders stable site links and direct executable paths. Services never use
+mise activation, shims, or project-owned mise configuration.
 
 Responsibilities:
 

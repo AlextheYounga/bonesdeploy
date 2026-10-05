@@ -153,37 +153,26 @@ Runtime templates set up the Linux pieces for a framework.
 | Nuxt     | Working    | Nuxt runtime setup                 |
 | Vue      | Working    | Static frontend setup              |
 | SvelteKit| Working    | Node runtime setup                 |
-| Django   | Not tested | Python / Gunicorn not tested yet   |
-| Rails    | E2E coverage | Distribution Ruby / Puma setup   |
+| Django   | Not tested | Managed Python / Gunicorn setup   |
+| Rails    | E2E coverage | Managed Ruby / Puma setup        |
 
 Templates are not magic. They are shared server setup so every project does not become a custom snowflake.
 
-Rails production sites use the default Ruby supplied by the host's Debian or
-Ubuntu APT repositories. Site setup installs `ruby`, `ruby-dev`,
-`ruby-bundler`, and the native-extension build dependencies; it does not compile
-Ruby or install a separate production Ruby version. The available production
-Ruby version therefore depends on the host release, and the Rails application
-must support that version. The configured exact `RUBY_VERSION` remains a local
-asset-build setting and does not select the server interpreter.
+Native Rails, Django, and dynamic Node sites use exact Ruby, Python, and Node
+versions from BonesDeploy project configuration. The local `linux/amd64` build
+and production host use pinned mise `2026.10.0` to install only precompiled
+runtimes. Local installations live in the project build cache; production
+installations live in a root-owned shared store and each site receives stable
+read-only runtime links below `/srv/sites/<site>/.bonesdeploy/runtimes/`.
+Services invoke those linked executables directly, never mise activation, shims,
+or a project-owned mise configuration.
 
-The local build installs the production bundle, compiles native gems, and
-includes `vendor/bundle` in the release artifact. Remote prepare verifies that
-packaged bundle and runs migrations; it does not download or compile gems. An
-incompatible artifact fails before activation, leaving the current release
-running.
-
-Django production sites likewise use the `python3` interpreter supplied by the
-host's Debian or Ubuntu APT repositories. Site setup installs Python, virtualenv
-support, development headers, and native package build dependencies; it does not
-compile CPython. `PYTHON_VERSION` is retained for compatibility with existing
-project configuration but does not select an interpreter. Django applications
-and their requirements must support the host distribution's Python version.
-
-The local build installs `requirements.txt` into the release dependency tree and
-includes launchers that use `/usr/bin/python3`. Remote prepare validates the
-packaged application, runs migrations, and collects static files; it does not
-download or compile Python packages. An incompatible artifact fails before
-activation, leaving the current release running.
+Rails packages its production `vendor/bundle` and lockfile-selected Bundler with
+the artifact. Django packages its dependency tree and launchers. Remote prepare
+validates runtime identity before checks or migrations and never downloads or
+compiles application dependencies. A mismatch fails before activation, leaving
+the current release running. PHP is explicitly excluded: Laravel continues to
+use its existing APT, PHP-FPM, extension, and Composer integration.
 
 Native Laravel sites also receive a per-site systemd queue worker by default.
 It runs `php artisan queue:work` with bounded lifetime and explicit writable

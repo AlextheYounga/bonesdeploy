@@ -22,6 +22,15 @@ def test_paths_include_site_target_and_requires_directory():
     assert paths.systemd_site_target_requires == "/etc/systemd/system/shop.target.requires"
 
 
+def test_paths_expose_stable_managed_runtime_links_below_the_project_root():
+    paths = DeploymentPaths.new("shop", "/srv/sites/shop")
+
+    assert paths.site_runtime_dir == "/srv/sites/shop/.bonesdeploy/runtimes"
+    assert paths.ruby_runtime == "/srv/sites/shop/.bonesdeploy/runtimes/ruby"
+    assert paths.python_runtime == "/srv/sites/shop/.bonesdeploy/runtimes/python"
+    assert paths.node_runtime == "/srv/sites/shop/.bonesdeploy/runtimes/node"
+
+
 def test_template_path_falls_back_to_package_when_project_templates_are_inaccessible(monkeypatch):
     def inaccessible_project(_path):
         raise PermissionError("project templates are inaccessible")

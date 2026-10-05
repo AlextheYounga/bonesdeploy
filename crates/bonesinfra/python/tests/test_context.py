@@ -33,8 +33,19 @@ def test_extras_are_forwarded_with_json_types():
     request = make_site_request(extras={"php_version": True, "is_static": False, "custom": "value"})
     ctx = DeployContext.from_request(request)
 
-    assert ctx.runtime.data == {"php_version": True, "is_static": False, "custom": "value"}
+    assert ctx.runtime.data == {
+        "php_version": True,
+        "is_static": False,
+        "custom": "value",
+        "node_version": "22",
+    }
     assert template_data(ctx)["is_static"] is False
+
+
+def test_node_version_is_forwarded_alongside_runtime_extras():
+    ctx = DeployContext.from_request(make_site_request(node_version="24.19.0", extras={"ruby_version": "3.4.8"}))
+
+    assert ctx.runtime.data == {"node_version": "24.19.0", "ruby_version": "3.4.8"}
 
 
 def test_docker_runtime_backend_is_preserved():

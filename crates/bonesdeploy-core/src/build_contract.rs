@@ -7,7 +7,9 @@ use anyhow::{Context, Result, bail};
 use serde::de::Error as DeError;
 use serde_json::Value;
 
-use crate::config::{Bones, build_env, is_numbered_shell_script, variables};
+use crate::config::{
+    Bones, RUNTIME_PYTHON_VERSION, RUNTIME_RUBY_VERSION, build_env, is_numbered_shell_script, variables,
+};
 use crate::paths;
 
 /// The immutable builder image used by local builds.
@@ -92,6 +94,7 @@ const DERIVED_ENV_DENYLIST: &[&str] = &[
     "backup",
     "build.timeout_seconds",
 ];
+const MANAGED_BUILD_VARIABLES: &[&str] = &[variables::NODE_VERSION, variables::PYTHON_VERSION, variables::RUBY_VERSION];
 
 /// Projects safe derived configuration and committed `.env.build` values.
 /// Container-controlled variables cannot be overridden by project files.
@@ -105,9 +108,24 @@ pub fn environment(cfg: &Bones, source_context: &Path) -> Result<Vec<(String, St
         if variables::CONTAINER_CONTROLLED.contains(&key.as_str()) {
             bail!(".env.build variable `{key}` is reserved for the build container contract");
         }
-        values.push((key, value));
+        if !MANAGED_BUILD_VARIABLES.contains(&key.as_str()) {
+            values.push((key, value));
+        }
     }
+    values.extend(managed_build_environment(cfg));
     Ok(values)
+}
+
+fn managed_build_environment(cfg: &Bones) -> Vec<(String, String)> {
+    let mut values = vec![(variables::NODE_VERSION.to_string(), cfg.runtime.node_version.clone())];
+    for (key, variable) in
+        [(RUNTIME_PYTHON_VERSION, variables::PYTHON_VERSION), (RUNTIME_RUBY_VERSION, variables::RUBY_VERSION)]
+    {
+        if let Some(version) = cfg.runtime.extra.get(key).and_then(toml::Value::as_str) {
+            values.push((variable.to_string(), version.to_string()));
+        }
+    }
+    values
 }
 
 pub fn derived_environment(cfg: &Bones) -> Result<Vec<(String, String)>> {

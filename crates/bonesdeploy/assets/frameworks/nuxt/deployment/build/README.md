@@ -18,6 +18,8 @@ the committed revision.
 - Install dependencies and compile the complete runtime output here. Remove
   build-only caches and dependency trees when the selected runtime does not need
   them.
+- Node is resolved from Bones configuration and installed by pinned mise. Dynamic
+  services use the production site's stable Node link directly.
 - BonesRemote verifies and receives the artifact, then promotes this output into
   a sealed release.
 
@@ -30,4 +32,5 @@ Name them with a numbered prefix so the order is clear:
 02_build_assets.sh
 ```
 
-No secrets or runtime state. `.env.build` is public build configuration only.
+No secrets or runtime state. `.env.build` is public build configuration only;
+Node version selection stays in managed Bones configuration.

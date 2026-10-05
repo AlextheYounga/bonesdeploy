@@ -153,33 +153,28 @@ fn environment_examples_use_project_name_in_shared_paths() -> Result<()> {
 }
 
 #[test]
-fn build_environments_use_selected_language_versions() -> Result<()> {
-    for (framework, key, version, expected, old) in [
-        (Framework::Laravel, "php_version", "8.3", "PHP_VERSION=8.3", "PHP_VERSION=8.5"),
-        (Framework::Rails, "ruby_version", "3.4.8", "RUBY_VERSION=3.4.8", "RUBY_VERSION=3.3.8"),
-    ] {
-        let runtime: Runtime = serde_json::from_value(Value::Object(
-            [(key.to_string(), Value::String(version.to_string()))].into_iter().collect(),
-        ))?;
-        let environment = framework
-            .build_environment_example(&runtime)
-            .ok_or_else(|| anyhow::anyhow!("missing build environment"))?;
-        assert!(environment.contains(expected));
-        assert!(!environment.contains(old));
-    }
+fn build_environments_only_declare_php_version() -> Result<()> {
+    let runtime: Runtime = serde_json::from_value(json!({ "php_version": "8.3" }))?;
+    let environment = Framework::Laravel
+        .build_environment_example(&runtime)
+        .ok_or_else(|| anyhow::anyhow!("missing Laravel build environment"))?;
+    assert!(environment.contains("PHP_VERSION=8.3"));
+    assert!(!environment.contains("PHP_VERSION=8.5"));
+
+    let rails = Framework::Rails
+        .build_environment_example(&Runtime::default())
+        .ok_or_else(|| anyhow::anyhow!("missing Rails build environment"))?;
+    assert!(!rails.contains("RUBY_VERSION="));
     Ok(())
 }
 
 #[test]
-fn django_does_not_expose_an_unused_python_version() -> Result<()> {
+fn django_defaults_to_exact_python_version() -> Result<()> {
     let defaults = Framework::Django.runtime_defaults()?.ok_or_else(|| anyhow::anyhow!("missing Django defaults"))?;
-    let environment = Framework::Django
-        .build_environment_example(&Runtime::default())
-        .ok_or_else(|| anyhow::anyhow!("missing Django build environment"))?;
 
-    assert!(!defaults.contains_key("python_version"));
-    assert!(Framework::Django.questions().iter().all(|question| question.key != "python_version"));
-    assert!(!environment.contains("PYTHON_VERSION"));
+    assert_eq!(defaults.get("python_version"), Some(&Value::String("3.14.0".into())));
+    let question = Framework::Django.questions().iter().find(|question| question.key == "python_version");
+    assert_eq!(question.map(|question| question.default_value()), Some(Value::String("3.14.0".into())));
     Ok(())
 }
 

@@ -115,7 +115,7 @@ fn django_prepare_template_uses_packaged_dependencies_before_django_commands() -
             .join("../bonesdeploy/assets/frameworks/django/deployment/prepare/01_prepare_django.sh"),
     )?;
 
-    let require_artifact = template.find("build the Django artifact first").context("missing artifact validation")?;
+    let require_artifact = template.find("PYTHON_RUNTIME_MARKER not found").context("missing artifact validation")?;
     let validate = template.find("manage.py check --deploy").context("missing Django validation")?;
     let migration_skip = template.find("BONES_DJANGO_SKIP_MIGRATIONS").context("missing migration skip setting")?;
     let migrate = template.find("manage.py migrate --noinput").context("missing Django migration")?;
@@ -124,24 +124,30 @@ fn django_prepare_template_uses_packaged_dependencies_before_django_commands() -
     assert!(require_artifact < migrate);
     assert!(!template.contains("pip install"));
     assert!(!template.contains("-m venv"));
-    assert!(!template.contains("BONES_RUNTIME_PYTHON_VERSION"));
+    assert!(template.contains(".bonesdeploy/runtimes/python/bin/python"));
+    assert!(template.contains("does not match provisioned runtime"));
     Ok(())
 }
 
 #[test]
-fn rails_prepare_template_uses_the_packaged_bundle_before_migrations() -> Result<()> {
+fn rails_prepare_template_validates_the_managed_ruby_before_the_packaged_bundle() -> Result<()> {
     let template = fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../bonesdeploy/assets/frameworks/rails/deployment/prepare/01_prepare_rails.sh"),
     )?;
 
-    let check = template.find("/usr/bin/bundle check").context("missing packaged bundle check")?;
+    let runtime = template.rfind("\tvalidate_runtime").context("missing managed Ruby validation")?;
+    let check = template.find("\"$SITE_RUBY\" \"$PACKAGED_BUNDLER\" check").context("missing packaged bundle check")?;
     let migration_skip = template.find("BONES_RAILS_SKIP_MIGRATIONS").context("missing migration skip setting")?;
-    let migrate = template.find("/usr/bin/bundle exec rails db:migrate").context("missing Rails migration")?;
+    let migrate = template
+        .find("\"$SITE_RUBY\" \"$PACKAGED_BUNDLER\" exec rails db:migrate")
+        .context("missing Rails migration")?;
+    assert!(runtime < check);
     assert!(check < migration_skip);
     assert!(check < migrate);
     assert!(!template.contains("bundle install"));
     assert!(template.contains("BUNDLE_PATH=\"vendor/bundle\""));
-    assert!(!template.contains("BONES_RUNTIME_RUBY_VERSION"));
+    assert!(template.contains(".bonesdeploy/runtimes/ruby/bin/ruby"));
+    assert!(template.contains("vendor/bundle/bundler/bin/bundle"));
     Ok(())
 }

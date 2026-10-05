@@ -6,6 +6,9 @@ pub const REPO_PATH: &str = "REPO_PATH";
 pub const WEB_ROOT: &str = "WEB_ROOT";
 pub const SERVICE_USER: &str = "SERVICE_USER";
 pub const BUILD_CACHE_DIR: &str = "BUILD_CACHE_DIR";
+pub const NODE_VERSION: &str = "NODE_VERSION";
+pub const PYTHON_VERSION: &str = "PYTHON_VERSION";
+pub const RUBY_VERSION: &str = "RUBY_VERSION";
 
 pub const CONTAINER_CONTROLLED: &[&str] =
     &[PROJECT_NAME, PROJECT_ROOT, REPO_PATH, WEB_ROOT, SERVICE_USER, BUILD_CACHE_DIR];

@@ -41,6 +41,15 @@ def test_deletion_plan_serializes_only_validated_manifest_resources():
     assert "password" not in data
 
 
+def test_deletion_plan_removes_site_runtime_links_but_not_the_global_mise_store():
+    plan = resolve_deletion_plan(_context(), ProjectManifest())
+
+    paths = {artifact.path for artifact in plan.artifacts}
+
+    assert "/srv/sites/example/.bonesdeploy/runtimes" in paths
+    assert "/var/lib/bonesdeploy/mise" not in paths
+
+
 def test_deletion_plan_rejects_custom_artifact_outside_site_owned_paths():
     class UnsafeManifest(ProjectManifest):
         def artifacts(self, _ctx):

@@ -33,8 +33,9 @@ fn skips_comments_and_blank_lines() -> Result<()> {
 }
 
 #[test]
-fn default_content_declares_node_version() {
-    assert!(build_env::default_content().contains("# BonesDeploy Infra\nNODE_VERSION=\n"));
+fn default_content_does_not_declare_managed_runtime_versions() {
+    assert!(build_env::default_content().contains("# BonesDeploy Infra\n"));
+    assert!(!build_env::default_content().contains("VERSION="));
 }
 
 #[test]

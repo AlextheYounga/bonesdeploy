@@ -65,7 +65,27 @@ cargo test -p e2e --test setup -- laravel --ignored --test-threads=1 --nocapture
 Test names: `angular`, `django`, `laravel`, `next_server`, `next_static`, `nuxt_server`,
 `nuxt_static`, `rails`, `sveltekit`, and `vue`. Every native artifact scenario
 covers first deploy, a second release, and failed activation rollback after the
-nginx service restart phase.
+nginx service restart phase. Rails and Django scenarios also verify their exact
+configured site-linked Ruby/Python versions; dynamic Next, Nuxt, and SvelteKit
+scenarios verify the site-linked Node version. Run these ignored scenarios
+manually; they are not routine validation.
+
+### Managed runtime verification
+
+Run these manually after the wheel is regenerated:
+
+```sh
+cargo test -p e2e --test setup -- rails --ignored --test-threads=1 --nocapture
+cargo test -p e2e --test setup -- django --ignored --test-threads=1 --nocapture
+cargo test -p e2e --test setup -- next_server --ignored --test-threads=1 --nocapture
+cargo test -p e2e --test setup -- nuxt_server --ignored --test-threads=1 --nocapture
+cargo test -p e2e --test setup -- sveltekit --ignored --test-threads=1 --nocapture
+```
+
+Each scenario requires a stable per-site link under
+`/srv/sites/<site>/.bonesdeploy/runtimes/`, executed as the site user. Expected
+version output begins with `ruby 3.4.8` for Rails, `Python 3.14.0` for Django,
+and is exactly `v24.19.0` for dynamic Node services.
 
 ## How it works
 

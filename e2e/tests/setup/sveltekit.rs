@@ -12,6 +12,7 @@ pub fn provision(harness: &Harness) -> Result<SampleProject> {
 pub fn assert_running(harness: &Harness) -> Result<()> {
     harness.assert_site(SITE)?;
     harness.assert_service("e2esveltekit-sveltekit.service")?;
+    harness.assert_managed_runtime(SITE, "node", "node", "^v24\\.19\\.0$")?;
     harness.assert_route(SITE, SITE)
 }
 

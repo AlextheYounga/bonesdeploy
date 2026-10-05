@@ -27,10 +27,12 @@ def test_placeholder_uses_the_configured_wsgi_module_path(monkeypatch):
     monkeypatch.setattr(django, "template_data", lambda *_args, **_kwargs: {})
 
     django.deploy(ctx)
-    captured["seed_placeholder"](ctx, paths, "/usr/bin/python3")
+    captured["seed_placeholder"](ctx, paths, "/srv/sites/example/.bonesdeploy/runtimes/python/bin/python")
 
     assert operations[1]["path"] == "/srv/sites/example/releases/19700101_000000/djangotest"
     assert operations[2][0][2] == "/srv/sites/example/releases/19700101_000000/djangotest/wsgi.py"
+    assert "/srv/sites/example/.bonesdeploy/runtimes/python/bin/python" in operations[0]["commands"][0]
+    assert "pip install" not in operations[0]["commands"][0]
     assert "djangotest.wsgi:application" in captured["command"](ctx, paths, None)
 
 
@@ -63,11 +65,11 @@ def test_gunicorn_uses_its_runtime_directory_for_worker_temp(monkeypatch):
 
     django.deploy(ctx)
 
-    command = captured["command"](ctx, paths, None)
+    command = captured["command"](ctx, paths, "/srv/sites/example/.bonesdeploy/runtimes/python/bin/python")
     assert "--worker-tmp-dir /run/example/gunicorn" in command
 
 
-def test_gunicorn_runs_from_the_release_virtualenv(monkeypatch):
+def test_gunicorn_uses_the_site_python_runtime_and_release_packages(monkeypatch):
     captured = {}
     ctx = SimpleNamespace(runtime=SimpleNamespace(data={}), paths_dict={})
     paths = {
@@ -82,6 +84,11 @@ def test_gunicorn_runs_from_the_release_virtualenv(monkeypatch):
 
     django.deploy(ctx)
 
-    assert captured["command"](ctx, paths, None).startswith("/srv/sites/example/current/.venv/bin/gunicorn ")
-    assert captured["exec_paths"](ctx, paths, None) == ["/srv/sites/example/current/.venv/bin/gunicorn"]
+    assert captured["command"](ctx, paths, "/srv/sites/example/.bonesdeploy/runtimes/python/bin/python").startswith(
+        "PYTHONPATH=/srv/sites/example/current/.python-packages "
+        "/srv/sites/example/.bonesdeploy/runtimes/python/bin/python -m gunicorn "
+    )
+    assert captured["exec_paths"](ctx, paths, "/srv/sites/example/.bonesdeploy/runtimes/python/bin/python") == [
+        "/srv/sites/example/.bonesdeploy/runtimes/python/bin/python"
+    ]
     assert captured["writable_paths"](ctx, paths) == ["/srv/sites/example/shared/media"]

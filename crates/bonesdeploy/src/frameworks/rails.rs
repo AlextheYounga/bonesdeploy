@@ -39,11 +39,6 @@ pub(super) fn environment_example(project_name: &str, _site_url: &str) -> String
     )
 }
 
-pub(super) fn build_environment_example(runtime: &Runtime) -> String {
-    let ruby_version =
-        runtime.extra.get(RUNTIME_RUBY_VERSION).and_then(|value| value.as_str()).unwrap_or(DEFAULT_RUBY_VERSION);
-    super::render_env_template(
-        include_str!("../../assets/frameworks/rails/rails.env.build.example"),
-        &[("{ruby_version}", ruby_version)],
-    )
+pub(super) fn build_environment_example(_runtime: &Runtime) -> String {
+    include_str!("../../assets/frameworks/rails/rails.env.build.example").to_string()
 }

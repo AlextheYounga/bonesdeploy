@@ -8,6 +8,7 @@ def artifacts(ctx):
         ("application runtime directory", paths.runtime_service_dir("sveltekit"), "directory", "framework"),
         ("application runtime socket", paths.runtime_service_socket("sveltekit"), "socket", "framework"),
         ("application log directory", paths.site_log_dir, "directory", "framework"),
+        ("managed Node runtime", paths.node_runtime, "link", "runtime"),
         ("SvelteKit placeholder build directory", f"{placeholder}/build", "directory", "framework"),
         ("SvelteKit placeholder entrypoint", f"{placeholder}/build/index.js", "file", "framework"),
         ("SvelteKit placeholder environment", f"{placeholder}/.env", "file", "framework"),

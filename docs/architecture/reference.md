@@ -105,7 +105,9 @@ Serialization crates (`serde`, `toml`), path derivation functions (`paths` modul
 `Runtime.extra` captures framework-specific values into a map. New framework
 configuration fields are added here rather than extending the `Runtime` struct.
 Derived `BONES_*` environment variables are extracted from the config at build
-time. Build-only values such as `NODE_VERSION` come directly from `.env.build`.
+time. Exact `NODE_VERSION`, `PYTHON_VERSION`, and `RUBY_VERSION` are managed
+build values derived from `Bones`, not independently authored `.env.build`
+values.
 
 `Runtime.backend` is the typed `RuntimeBackend` selection (`native` or
 `docker`). `Runtime.permissions` carries framework permission defaults and
@@ -391,13 +393,20 @@ Add a `Patch` to `registry.py` with an `introduced_in` version. Implement the lo
 ### 3.15 Language Runtimes
 
 **Responsibility:**
-Abstracts the installation and configuration of programming language runtimes (Ruby, Python, PHP, Node.js) on the deployment server.
+Abstracts installation and configuration of programming language runtimes (Ruby,
+Python, PHP, Node.js) on the deployment server. Ruby, Python, and Node use the
+shared pinned mise policy; PHP retains its APT/PHP-FPM implementation.
 
 **Lives in:**
 `crates/bonesinfra/python/src/bonesinfra/services/languages/`
 
 **Pattern:**
-`LanguageRuntime` ABC with `install(ctx)`, `install_version(ctx, version)`. Each concrete implementation (e.g. `PHPRuntime`, `PythonRuntime`) defines a `config_key`, `default_version`, and `version_pattern`. Framework `runtime.py` modules select and invoke the appropriate language runtime.
+`LanguageRuntime` ABC with `install(ctx)`, `install_version(ctx, version)`.
+`MiseRuntime` installs exact Ruby, Python, and Node versions through verified
+mise `2026.10.0`, precompiled-only, into a root-owned shared store and returns a
+stable site-linked executable. Framework `runtime.py` modules select and invoke
+the appropriate language runtime; services use direct links, never mise shims or
+project configuration.
 
 ---
 
@@ -685,8 +694,9 @@ runtime state and is not persisted in project configuration.
 - `bonesdeploy-core` defines the canonical `Bones` struct, all path constants, and validation functions.
 - `bonesdeploy` loads the local root `.env` and projects only release retention
   plus backend-specific remote values into `RemoteDeploymentConfig`: native web
-  root, or Docker ingress port and startup timeout. Legacy native Ruby and Python
-  version fields are accepted and discarded. It sends that descriptor over SSH
+  root, or Docker ingress port and startup timeout. Exact Ruby, Python, and Node
+  versions are instead projected into build and PyInfra provisioning requests;
+  they are not BonesRemote descriptor fields. It sends that descriptor over SSH
   stdin to the allowlisted `config sync` command before deploy.
 - `bonesremote` derives identity and paths from `--site`; it never parses the application `shared/.env` as control-plane config.
 - Runtime secrets are saved encrypted by `bonesdeploy` and atomically published to `shared/.env` by the typed BonesRemote operation used by `secrets push`. Environment publication and shared import acquire the same site mutation lock.

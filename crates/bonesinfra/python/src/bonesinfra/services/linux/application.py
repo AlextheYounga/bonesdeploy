@@ -41,6 +41,7 @@ def deploy_server(  # noqa: PLR0913
     command,
     exec_paths,
     writable_paths,
+    apparmor_runtime_access=None,
     tcp=False,
     port=3000,
     apparmor_network="network unix stream,",
@@ -56,6 +57,7 @@ def deploy_server(  # noqa: PLR0913
         template_src=apparmor_template,
         apparmor_exec_paths=exec_paths(ctx, paths, runtime_binary),
         apparmor_writable_paths=writable_paths(ctx, paths),
+        apparmor_runtime_access=apparmor_runtime_access() if apparmor_runtime_access else None,
         apparmor_network=apparmor_network,
     )
     seed_placeholder(ctx, paths, runtime_binary)

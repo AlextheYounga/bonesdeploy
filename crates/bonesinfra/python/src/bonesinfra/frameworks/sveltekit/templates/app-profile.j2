@@ -8,6 +8,9 @@ profile {{ apparmor_profile_name }} flags=(attach_disconnected,mediate_deleted) 
 {% for exec_path in apparmor_exec_paths %}
   {{ exec_path }} mrix,
 {% endfor %}
+{% if apparmor_runtime_access %}
+  {{ apparmor_runtime_access.executable }} mrix,
+{% endif %}
 
   /usr/** r,
   /bin/** r,
@@ -21,6 +24,11 @@ profile {{ apparmor_profile_name }} flags=(attach_disconnected,mediate_deleted) 
   # current is a symlink, so AppArmor mediates the resolved release path.
   {{ paths.releases }}/*/ r,
   {{ paths.releases }}/*/** r,
+{% if apparmor_runtime_access %}
+  # mise's site link resolves here; keep access limited to this exact version.
+  {{ apparmor_runtime_access.root }}/ r,
+  {{ apparmor_runtime_access.root }}/** rm,
+{% endif %}
   # The release .env symlink resolves to the protected shared environment.
   {{ paths.shared_env }} r,
 {% for write_path in apparmor_writable_paths %}

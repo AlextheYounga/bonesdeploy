@@ -12,24 +12,16 @@ Remote prepare assumes those packaged dependencies and wrappers already exist.
 
 ## Intended Behavior
 
-BonesInfra installs distribution Python, venv support, development headers, and
-native package build prerequisites through APT. Django artifacts contain source
-and requirements but no local dependency tree or virtualenv. Remote prepare
-creates `.venv` with `/usr/bin/python3`, installs requirements before all Django
-commands, and then performs validation, migrations, and static collection.
+Superseded by `feature/mise-runtimes`. Pinned mise installs the exact configured
+Python precompiled-only for local builds and into the root-owned production
+store. Django artifacts retain their dependency tree and site-linked launchers.
+Prepare rejects runtime mismatch before validation, migrations, or static
+collection and does not install packages.
 
 ## Approach
 
-Replace the Python source installer with one APT package operation and return
-`/usr/bin/python3` as the production executable. Simplify the local build so it
-does not require Python or resolve dependencies; it removes stale
-`.python-packages` and `.venv` outputs before packaging. Move virtualenv creation
-and pip installation into Django prepare before validation and migration skip
-handling.
-
-Remove managed-Python AppArmor paths and permit distribution Python execution.
-Stop serializing `python_version` into remote descriptors while accepting and
-discarding the old native field for compatibility, matching `ruby_version`.
+No further work is planned under this record. `feature/mise-runtimes` owns the
+replacement implementation and validation.
 
 ## Responsibilities And Boundaries
 
@@ -50,32 +42,19 @@ discarding the old native field for compatibility, matching `ruby_version`.
 
 ## Decisions
 
-- Use unversioned distribution package names and `/usr/bin/python3` so the
-  supported host release selects Python.
-- Use a release-owned virtualenv so pip does not modify externally managed
-  distribution Python and rollback retains each release's dependencies.
-- Retain local dependency resolution as a build-time compatibility check, then
-  delete its output rather than shipping host-incompatible native extensions.
-- Install dependencies before migration skip handling because skipping database
-  migrations must not produce an unstartable release.
+The distribution-runtime decision is superseded. `feature/mise-runtimes` makes
+the exact configured Python version authoritative for both build and production,
+uses pinned mise `2026.10.0` with precompiled-only installation, and exposes a
+stable site link. Django packages dependencies locally; production never invokes
+pip or compiles application dependencies.
 
 ## Risks
 
-- Applications requiring a newer Python than the host distribution will fail;
-  documentation must make host compatibility explicit.
-- Native Python dependencies compile on the target and require adequate APT
-  headers; preserve the useful general and PostgreSQL build prerequisites.
-- A missing `requirements.txt` still produces a clear Gunicorn validation error,
-  preserving the existing application contract.
+- The selected Python release must have a mise precompiled artifact.
+- A runtime or artifact identity mismatch must fail before activation and leave
+  the current release running.
 
 ## Validation
 
-- Python tests prove one APT operation installs distribution Python packages and
-  no source installer or managed path remains.
-- Asset and prepare tests prove local dependencies are removed and target venv,
-  pip installation, validation, migration skip, migrations, and static collection
-  occur in safe order.
-- Remote config tests prove new descriptors omit Python while old native
-  `python_version` fields deserialize and are discarded.
-- Rebuild the embedded wheel; run focused tests, all non-E2E Python and Rust
-  suites, Ruff, Clippy, Rustfmt, Shfmt, and `git diff --check`.
+Validation is now defined by `feature/mise-runtimes`, including managed-runtime,
+packaged-dependency, direct-site-link, and human-run E2E checks.

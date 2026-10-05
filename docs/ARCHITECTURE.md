@@ -65,7 +65,7 @@ owner is canonical. Bypassing it creates a competing abstraction.
 | Product filesystem layout | `paths` / `DeploymentPaths` | Add path constants here | Scatter path literals in commands, templates, or scripts |
 | Framework-specific config questions | Framework Rust module (`frameworks/<fw>.rs`) | Add sibling module + register in `frameworks.rs` | Inline prompt logic in init command |
 | Framework provisioning | Installed BonesInfra wheel + `infra/templates` + `infra/custom`, loaded by `bonesinfra.project` | Extend managed framework or project-owned custom content | Special-case framework behavior in setup/runtime commands |
-| Language runtime installation | `LanguageRuntime` ABC | Add subclass in `services/languages/` | Install runtimes directly from framework `runtime.py` |
+| Ruby, Python, and Node runtime installation | `MiseRuntime` / `LanguageRuntime` | Extend the shared pinned mise policy | Install runtimes directly from framework `runtime.py` or project mise files |
 | Compose host provisioning | `services/linux/compose.py` | Install Docker and render the generic site unit/optional nginx ingress | Interpret project Compose files in BonesInfra |
 | Compose deployment runtime | `bonesremote::runtime::docker` | Reuse explicit Compose discovery, commands, and inspection | Create a second release lifecycle or parse Compose internally |
 | Native build execution | `bonesdeploy` local Docker artifact path | Use the shared build contract and existing lifecycle | Add a server build fallback or a second promotion/activation flow |
@@ -160,8 +160,9 @@ Existing implementations:
 - Projected into a backend-specific `RemoteDeploymentConfig` for deploy-time SSH
   transport. Native carries `web_root`; Docker carries `compose_port` and
   `compose_wait_timeout`. Native descriptors still accept and discard legacy
-  `ruby_version` and `python_version` fields when reading existing state. Local
-  build and arbitrary framework fields do not cross this boundary.
+  `ruby_version` and `python_version` fields when reading existing state. Exact
+  Ruby, Python, and Node versions remain local Bones configuration projected to
+  build and provisioning; they do not cross this boundary.
 - Reconstructed remotely with identity and paths derived from `--site`
 
 `bonesremote` does not load `shared/.env` as Bones configuration. That file is
@@ -304,23 +305,22 @@ Do not:
 ```text
 ### LanguageRuntime
 
-Represents: A programming language runtime that can be installed on the deployment server.
+Represents: A programming language runtime installed on the deployment server.
 
 Use when:
 Adding support for a new language (e.g. Go, Elixir).
 
 Contract:
 LanguageRuntime ABC (services/languages/base.py)
-├── config_key          # .env key for version selection
-├── default_version
-├── version_pattern
-├── install(ctx)
-└── install_version(ctx) -> str
+└── MiseRuntime (services/languages/mise.py) for Ruby, Python, and Node
+    ├── pinned mise 2026.10.0
+    ├── root-owned shared precompiled runtime store
+    └── stable per-site direct executable links
 
 Framework runtime.py modules select and invoke the appropriate language runtime.
 
 Existing implementations:
-- PHPRuntime, PythonRuntime, NodeRuntime, RubyRuntime
+- PHPRuntime (APT/PHP-FPM), PythonRuntime, NodeRuntime, RubyRuntime (mise)
 
 To add another:
 Subclass LanguageRuntime in services/languages/<name>.py; export a singleton.
@@ -329,7 +329,7 @@ Canonical example:
 services/languages/php.py
 
 Do not:
-- Install language runtimes directly from framework runtime.py code
+- Bypass the shared mise policy for Ruby, Python, or Node
 - Create a second language-installation mechanism
 - Reimplement version selection logic per framework
 ```

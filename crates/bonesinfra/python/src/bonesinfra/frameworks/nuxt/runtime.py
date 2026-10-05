@@ -2,7 +2,7 @@ from bonesinfra.config.context import template_data
 from bonesinfra.config.paths import TEMPLATES_DIR
 from bonesinfra.pyinfra.operations import mkdir, render
 from bonesinfra.services.languages import NODE
-from bonesinfra.services.linux import application, runtime, shared
+from bonesinfra.services.linux import application, runtime, shared, validation
 
 TEMPLATES = TEMPLATES_DIR / "frameworks/nuxt"
 SHARED_DIRECTORIES = ()
@@ -39,6 +39,13 @@ def deploy(ctx):
                     **template_data(current_ctx, paths=paths),
                 )
 
+            def validate(current_ctx, paths, node_binary):
+                validation.run_as_runtime_user(
+                    current_ctx,
+                    "Validate Nuxt server with the managed Node runtime",
+                    f"{node_binary} --check {paths['current']}/.output/server/index.mjs",
+                )
+
             def command(_current_ctx, paths, node_binary):
                 socket = f"{paths['runtime_socket_dir']}/nuxt/nuxt.sock"
                 return (
@@ -54,9 +61,10 @@ def deploy(ctx):
                 apparmor_template=TEMPLATES / "app-profile.j2",
                 install=NODE.install,
                 seed_placeholder=seed_placeholder,
-                validate=application.empty_validation,
+                validate=validate,
                 command=command,
                 exec_paths=lambda _ctx, _paths, node: [node],
+                apparmor_runtime_access=NODE.apparmor_access,
                 writable_paths=application.empty_writable,
             )
 
