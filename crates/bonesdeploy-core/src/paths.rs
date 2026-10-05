@@ -172,11 +172,13 @@ pub fn bonesremote_global_link() -> PathBuf {
     Path::new(USR_LOCAL_BIN).join(BONESREMOTE_BINARY)
 }
 
+#[cfg(not(windows))]
 fn home_dir() -> PathBuf {
     env::var("HOME").map_or_else(|_| PathBuf::from("/root"), PathBuf::from)
 }
 
 #[must_use]
+#[cfg(not(windows))]
 pub fn bones_config_root() -> PathBuf {
     if let Some(dir) = env::var("XDG_CONFIG_HOME").ok().filter(|v| !v.is_empty()) {
         Path::new(&dir).join("bonesdeploy")
@@ -191,6 +193,7 @@ pub fn bones_projects_root() -> PathBuf {
 }
 
 #[must_use]
+#[cfg(not(windows))]
 pub fn bones_data_root() -> PathBuf {
     if let Some(dir) = env::var("XDG_DATA_HOME").ok().filter(|v| !v.is_empty()) {
         return Path::new(&dir).join(BONESDEPLOY_DIR);
@@ -199,6 +202,7 @@ pub fn bones_data_root() -> PathBuf {
 }
 
 #[must_use]
+#[cfg(not(windows))]
 pub fn bones_cache_root() -> PathBuf {
     if let Some(dir) = env::var("XDG_CACHE_HOME").ok().filter(|v| !v.is_empty()) {
         return Path::new(&dir).join(BONESDEPLOY_DIR);
@@ -207,6 +211,7 @@ pub fn bones_cache_root() -> PathBuf {
 }
 
 #[must_use]
+#[cfg(not(windows))]
 pub fn bones_state_root() -> PathBuf {
     if let Some(dir) = env::var("XDG_STATE_HOME").ok().filter(|v| !v.is_empty()) {
         Path::new(&dir).join("bonesdeploy")
@@ -214,6 +219,44 @@ pub fn bones_state_root() -> PathBuf {
         home_dir().join(".local/state/bonesdeploy")
     }
 }
+
+#[cfg(windows)]
+fn windows_app_data_root(variable: &str, fallback: &str) -> PathBuf {
+    env::var_os(variable).filter(|value| !value.is_empty()).map_or_else(
+        || {
+            env::var_os("USERPROFILE")
+                .filter(|value| !value.is_empty())
+                .map_or_else(|| PathBuf::from("."), PathBuf::from)
+                .join(fallback)
+        },
+        PathBuf::from,
+    )
+}
+
+#[must_use]
+#[cfg(windows)]
+pub fn bones_config_root() -> PathBuf {
+    windows_app_data_root("APPDATA", "AppData/Roaming").join(BONESDEPLOY_DIR)
+}
+
+#[must_use]
+#[cfg(windows)]
+pub fn bones_data_root() -> PathBuf {
+    windows_app_data_root("LOCALAPPDATA", "AppData/Local").join(BONESDEPLOY_DIR)
+}
+
+#[must_use]
+#[cfg(windows)]
+pub fn bones_cache_root() -> PathBuf {
+    bones_data_root()
+}
+
+#[must_use]
+#[cfg(windows)]
+pub fn bones_state_root() -> PathBuf {
+    bones_data_root()
+}
+
 #[must_use]
 pub fn bonesremote_config_root() -> PathBuf {
     PathBuf::from(BONESREMOTE_CONFIG_DIR)

@@ -8,11 +8,13 @@ use bonesdeploy_core::config::Bones;
 use bonesdeploy_core::paths;
 use tempfile::TempDir;
 
+use super::inventory::{BuildInventory, EntryType};
 use crate::infra::git;
 
 pub struct BuildContext {
     context: TempDir,
     pub revision: String,
+    inventory: BuildInventory,
 }
 
 impl BuildContext {
@@ -20,9 +22,21 @@ impl BuildContext {
         self.context.path()
     }
 
+    pub(crate) fn entry(&self, path: &Path) -> Option<super::inventory::Entry> {
+        self.inventory.get(path)
+    }
+
+    pub(crate) fn replace_inventory(&mut self, inventory: BuildInventory) {
+        self.inventory = inventory;
+    }
+
+    pub(crate) fn record_generated(&mut self, path: &Path, entry_type: EntryType, mode: u32) -> Result<()> {
+        self.inventory.record(path, entry_type, mode)
+    }
+
     #[cfg(test)]
     pub(crate) fn from_tempdir(context: TempDir, revision: String) -> Self {
-        Self { context, revision }
+        Self { context, revision, inventory: BuildInventory::default() }
     }
 }
 
@@ -32,10 +46,10 @@ pub fn export(config: &Bones) -> Result<BuildContext> {
         tempfile::Builder::new().prefix("bonesdeploy-build-").tempdir().context("Failed to create build context")?;
     let repo = env::current_dir().context("Failed to determine project directory")?;
     let revision = git::resolve_branch_commit(&repo, &config.branch)?;
-    git::export_commit(&repo, &revision, context.path())?;
+    let inventory = git::export_commit(&repo, &revision, context.path())?;
     sanitize_exported_context(context.path())?;
 
-    Ok(BuildContext { context, revision })
+    Ok(BuildContext { context, revision, inventory })
 }
 
 /// Removes the committed runtime environment before anything can read the

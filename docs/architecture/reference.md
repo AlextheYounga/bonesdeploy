@@ -2,12 +2,23 @@
 
 ## 1. System Overview
 
-BonesDeploy is a remote release deployment tool for simple Debian/Ubuntu Linux servers. It produces two Rust binaries:
+BonesDeploy is a remote release deployment tool for simple Debian/Ubuntu Linux servers. Its local `bonesdeploy` CLI also supports native `x86_64-pc-windows-msvc` workstations. It produces two Rust binaries:
 
 - **`bonesdeploy`** — local CLI for setup, provisioning, deployment, and management. Runs on the developer's workstation.
 - **`bonesremote`** — server-side release lifecycle executor. The deployment SSH session belongs to `deploy`, which may run only exact config-sync and deploy command forms through sudo; the existing lifecycle executes as root.
 
-A third component, **`bonesinfra`**, is an embedded Python provisioning runtime (pyinfra-based) that handles server bootstrap, framework-specific provisioning, database services, SSL, and infrastructure migrations. It is compiled into the `bonesdeploy` binary via `rust-embed` and materialized on demand into a Python venv under `~/.cache/bonesdeploy/bonesinfra`.
+The Windows boundary applies only to the local CLI. Windows users need Git,
+OpenSSH, Python 3.12 or newer, Cargo, curl, GnuPG, and an editor, plus Windows
+Developer Mode for symlink operations. Docker Desktop must use Linux containers
+with Compose enabled for local `linux/amd64` package builds. Build the CLI with
+`cargo build --locked --release --package bonesdeploy`; the output is
+`target\release\bonesdeploy.exe`. Windows configuration is under
+`%APPDATA%\bonesdeploy`, while data, cache, and state are under
+`%LOCALAPPDATA%\bonesdeploy`. Tagged releases publish
+`bonesdeploy-x86_64-pc-windows-msvc.exe` and its `.sha256` checksum. `bonesremote`
+and the production release contract remain Linux-only and unchanged.
+
+A third component, **`bonesinfra`**, is an embedded Python provisioning runtime (pyinfra-based) that handles server bootstrap, framework-specific provisioning, database services, SSL, and infrastructure migrations. It is compiled into the `bonesdeploy` binary via `rust-embed` and materialized on demand into a Python venv under the platform-specific BonesDeploy cache root (`%LOCALAPPDATA%\bonesdeploy` on Windows; `~/.cache/bonesdeploy` on Linux).
 
 The system is organized as a Cargo workspace of four crates, with a deliberate split between the *declarative model* (`bonesdeploy-core` — config schema, paths, validation) and the *imperative agents* (`bonesdeploy` and `bonesremote` — the binaries that produce behavior).
 
@@ -129,6 +140,12 @@ All code references these constants by name. No hardcoded path strings exist out
 
 **Extension model:**
 New paths that represent product-owned layout (directories, filenames, install locations) are added here. One-off runtime paths derived from user input may remain local to their consumer.
+
+The local workstation roots are platform-specific: Windows uses
+`%APPDATA%\bonesdeploy` for configuration and `%LOCALAPPDATA%\bonesdeploy`
+for data, cache, and state; Linux uses the existing XDG or home-relative roots.
+Remote production paths remain Linux paths and are not selected from workstation
+environment variables.
 
 ---
 
@@ -465,8 +482,9 @@ Validates server environment, per-site configuration, and security posture. Read
 
 **Responsibility:**
 Manages GPG-encrypted environment secrets under `infra/secrets/`. The GPG home
-is isolated at `~/.local/share/bonesdeploy/gnupg`. Per-project keys are
-auto-generated.
+is isolated under the platform-specific BonesDeploy data root
+(`%LOCALAPPDATA%\bonesdeploy\gnupg` on Windows;
+`~/.local/share/bonesdeploy/gnupg` on Linux). Per-project keys are auto-generated.
 
 **Lives in:**
 `crates/bonesdeploy/src/commands/secrets/`

@@ -101,7 +101,12 @@ fn collect_source_files(root: &Path, directory: &Path, files: &mut BTreeMap<Stri
             let relative = path
                 .strip_prefix(root)
                 .map_err(|error| io::Error::other(format!("failed to resolve source path: {error}")))?;
-            files.insert(format!("bonesinfra/{}", relative.to_string_lossy().replace('\\', "/")), fs::read(path)?);
+            let relative = relative
+                .to_string_lossy()
+                .chars()
+                .map(|character| if character == '\\' { '/' } else { character })
+                .collect::<String>();
+            files.insert(format!("bonesinfra/{relative}"), fs::read(path)?);
         }
     }
     Ok(())

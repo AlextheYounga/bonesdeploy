@@ -102,7 +102,6 @@ impl DeployOperations for ProductionDeployOperations {
                 println!();
             }
             upload?;
-            session.close().await?;
             Ok(())
         }
     }

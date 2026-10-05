@@ -1,25 +1,32 @@
+use std::ffi::OsString;
 use std::io;
-use std::process::ExitStatus;
+use std::path::PathBuf;
+use std::process::Stdio;
 use std::time::Duration;
 
 use anyhow::{Context, Result, anyhow, bail};
 use bonesdeploy_core::config::{default_deploy_user, parse_port};
-use openssh::{Session, SessionBuilder, Stdio};
-use tokio::io::{self as tokio_io, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
-use tokio::time::{Instant, timeout, timeout_at};
+use tokio::io::{self as tokio_io, AsyncRead, AsyncWrite, AsyncWriteExt};
+use tokio::time::{Instant, timeout_at};
 
 use crate::config::Bones;
+
+mod output;
+mod process;
+
+use output::{copy_with_tail, drain_stream, ensure_success, read_command_output, tail_from_bytes};
+use process::{disconnect_child, ssh_executable, take_stderr, take_stdin, take_stdout, wait_for_child, write_bytes};
 
 macro_rules! complete_operation {
     ($child:ident, $result:expr) => {
         match $result {
             Ok(Ok(value)) => value,
             Ok(Err(error)) => {
-                disconnect_child($child).await;
+                disconnect_child(&mut $child).await;
                 return Err(error).context("SSH transport failed during remote operation");
             }
             Err(_) => {
-                disconnect_child($child).await;
+                disconnect_child(&mut $child).await;
                 bail!("SSH operation timed out");
             }
         }
@@ -31,8 +38,6 @@ const DEFAULT_COMMAND_DEADLINE: Duration = Duration::from_secs(30 * 60);
 const DEFAULT_TRANSFER_DEADLINE: Duration = Duration::from_secs(2 * 60 * 60);
 const DEFAULT_REMOTE_OUTPUT_TAIL_LIMIT: usize = 64 * 1024;
 const DEFAULT_COMMAND_OUTPUT_LIMIT: usize = 64 * 1024;
-const CHILD_CLEANUP_DEADLINE: Duration = Duration::from_secs(5);
-
 /// Deadlines and diagnostic limits applied to every SSH transport operation.
 #[derive(Clone, Copy, Debug)]
 pub struct TransportPolicy {
@@ -55,9 +60,30 @@ impl Default for TransportPolicy {
     }
 }
 
-/// The SSH session and the policy governing work performed through it.
+pub fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+#[doc(hidden)]
+pub struct SshCommand {
+    pub executable: PathBuf,
+    pub connection_args: Vec<OsString>,
+}
+
+#[doc(hidden)]
+pub struct SshTarget<'a> {
+    pub user: &'a str,
+    pub host: &'a str,
+    pub port: u16,
+}
+
+/// Connection arguments and policy for system OpenSSH operations.
 pub struct SshTransport {
-    session: Session,
+    executable: PathBuf,
+    connection_args: Vec<OsString>,
+    user: String,
+    host: String,
+    port: u16,
     policy: TransportPolicy,
 }
 
@@ -75,27 +101,35 @@ impl SshTransport {
     }
 
     pub async fn connect_as_with_policy(user: &str, host: &str, port: u16, policy: TransportPolicy) -> Result<Self> {
-        let mut builder = SessionBuilder::default();
-        let connect = builder.user(user.into()).port(port).connect(host);
-        let session = timeout(policy.connect_deadline, connect)
-            .await
-            .map_err(|_| anyhow!("SSH connection timed out"))?
-            .with_context(|| format!("SSH transport failed while connecting to {user}@{host}:{port}"))?;
-        Ok(Self { session, policy })
+        Self::connect_as_with_command(
+            SshTarget { user, host, port },
+            policy,
+            SshCommand { executable: ssh_executable().into(), connection_args: Vec::new() },
+        )
+        .await
     }
 
-    /// Wraps an already-established session in the transport policy boundary.
-    pub fn from_session(session: Session, policy: TransportPolicy) -> Self {
-        Self { session, policy }
-    }
-
-    pub async fn close(self) -> Result<()> {
-        self.session.close().await.context("SSH transport failed while closing the session")
+    #[doc(hidden)]
+    pub async fn connect_as_with_command(
+        target: SshTarget<'_>,
+        policy: TransportPolicy,
+        command: SshCommand,
+    ) -> Result<Self> {
+        let transport = Self {
+            executable: command.executable,
+            connection_args: command.connection_args,
+            user: target.user.into(),
+            host: target.host.into(),
+            port: target.port,
+            policy,
+        };
+        transport.verify_connection().await?;
+        Ok(transport)
     }
 
     pub async fn run_cmd(&self, cmd: &str) -> Result<String> {
         let deadline = Instant::now() + self.policy.command_deadline;
-        let mut child = self.spawn(cmd, Stdio::null(), deadline).await?;
+        let mut child = self.spawn(cmd, Stdio::null())?;
         let stdout = take_stdout(&mut child)?;
         let stderr = take_stderr(&mut child)?;
         let result = timeout_at(deadline, async {
@@ -122,7 +156,7 @@ impl SshTransport {
         W: AsyncWrite + Unpin,
     {
         let deadline = Instant::now() + self.policy.transfer_deadline;
-        let mut child = self.spawn(cmd, Stdio::null(), deadline).await?;
+        let mut child = self.spawn(cmd, Stdio::null())?;
         let stdout = take_stdout(&mut child)?;
         let stderr = take_stderr(&mut child)?;
         let result = timeout_at(deadline, async {
@@ -144,7 +178,7 @@ impl SshTransport {
 
     pub async fn run_cmd_with_stdin_output(&self, cmd: &str, stdin_bytes: &[u8]) -> Result<String> {
         let deadline = Instant::now() + self.policy.command_deadline;
-        let mut child = self.spawn(cmd, Stdio::piped(), deadline).await?;
+        let mut child = self.spawn(cmd, Stdio::piped())?;
         let stdin = take_stdin(&mut child)?;
         let stdout = take_stdout(&mut child)?;
         let stderr = take_stderr(&mut child)?;
@@ -182,7 +216,7 @@ impl SshTransport {
     {
         let duration = if reader.is_some() { self.policy.transfer_deadline } else { self.policy.command_deadline };
         let deadline = Instant::now() + duration;
-        let mut child = self.spawn(cmd, if bytes.is_some() { Stdio::piped() } else { Stdio::null() }, deadline).await?;
+        let mut child = self.spawn(cmd, if bytes.is_some() { Stdio::piped() } else { Stdio::null() })?;
         let stdin = bytes.map(|_| take_stdin(&mut child)).transpose()?;
         let stdout = take_stdout(&mut child)?;
         let stderr = take_stderr(&mut child)?;
@@ -213,169 +247,58 @@ impl SshTransport {
         ensure_success(status.success(), &stdout, &stderr)
     }
 
-    async fn spawn(&self, cmd: &str, stdin: Stdio, deadline: Instant) -> Result<openssh::RemoteChild<'_>> {
-        timeout_at(
-            deadline,
-            self.session
-                .command("bash")
-                .arg("-c")
-                .arg(cmd)
-                .stdin(stdin)
-                .stdout(Stdio::piped())
-                .stderr(Stdio::piped())
-                .spawn(),
-        )
-        .await
-        .map_err(|_| anyhow!("SSH operation timed out"))?
-        .context("SSH transport failed while starting remote command")
-    }
-}
-
-pub fn shell_quote(value: &str) -> String {
-    format!("'{}'", value.replace('\'', "'\\''"))
-}
-
-fn take_stdin(child: &mut openssh::RemoteChild<'_>) -> Result<openssh::ChildStdin> {
-    child.stdin().take().ok_or_else(|| anyhow!("SSH transport failed: stdin was not piped"))
-}
-
-async fn wait_for_child(child: openssh::RemoteChild<'_>, deadline: Instant) -> Result<ExitStatus> {
-    // `wait` consumes the child; timing it out drops that handle, which openssh
-    // documents as terminating the local SSH process for the remote channel.
-    timeout_at(deadline, child.wait())
-        .await
-        .map_err(|_| anyhow!("SSH operation timed out"))?
-        .context("SSH transport failed while waiting for remote command")
-}
-
-fn take_stdout(child: &mut openssh::RemoteChild<'_>) -> Result<openssh::ChildStdout> {
-    child.stdout().take().ok_or_else(|| anyhow!("SSH transport failed: stdout was not piped"))
-}
-
-fn take_stderr(child: &mut openssh::RemoteChild<'_>) -> Result<openssh::ChildStderr> {
-    child.stderr().take().ok_or_else(|| anyhow!("SSH transport failed: stderr was not piped"))
-}
-
-async fn write_bytes(mut stdin: openssh::ChildStdin, bytes: &[u8]) -> io::Result<()> {
-    stdin.write_all(bytes).await?;
-    stdin.shutdown().await
-}
-
-async fn read_command_output(mut stream: openssh::ChildStdout, limit: usize) -> io::Result<Vec<u8>> {
-    let mut bytes = Vec::new();
-    let mut buffer = [0; 8192];
-    loop {
-        let count = stream.read(&mut buffer).await?;
-        if count == 0 {
-            return Ok(bytes);
-        }
-        if bytes.len().saturating_add(count) > limit {
-            return Err(io::Error::new(io::ErrorKind::Other, "remote command output exceeded the configured limit"));
-        }
-        bytes.extend_from_slice(&buffer[..count]);
-    }
-}
-
-async fn copy_with_tail<W>(
-    mut stream: openssh::ChildStdout,
-    destination: &mut W,
-    limit: usize,
-) -> io::Result<OutputTail>
-where
-    W: AsyncWrite + Unpin,
-{
-    let mut tail = OutputTail::new(limit);
-    let mut buffer = [0; 8192];
-    loop {
-        let count = stream.read(&mut buffer).await?;
-        if count == 0 {
-            return Ok(tail);
-        }
-        destination.write_all(&buffer[..count]).await?;
-        tail.push(&buffer[..count]);
-    }
-}
-
-async fn drain_stream<R>(stream: R, stderr: bool, live: bool, limit: usize) -> io::Result<OutputTail>
-where
-    R: AsyncRead + Unpin,
-{
-    let mut reader = BufReader::new(stream);
-    let mut tail = OutputTail::new(limit);
-    let mut line = Vec::new();
-    loop {
-        line.clear();
-        let count = reader.read_until(b'\n', &mut line).await?;
-        if count == 0 {
-            return Ok(tail);
-        }
-        tail.push(&line);
-        let text = String::from_utf8_lossy(&line);
-        if live {
-            if stderr {
-                eprint!("{text}");
-            } else {
-                print!("{text}");
+    async fn verify_connection(&self) -> Result<()> {
+        let deadline = Instant::now() + self.policy.connect_deadline;
+        let mut child = self.spawn("true", Stdio::null())?;
+        let stdout = take_stdout(&mut child)?;
+        let stderr = take_stderr(&mut child)?;
+        let result = timeout_at(deadline, async {
+            tokio::try_join!(
+                drain_stream(stdout, false, false, self.policy.remote_output_tail_limit),
+                drain_stream(stderr, true, false, self.policy.remote_output_tail_limit)
+            )
+            .map_err(anyhow::Error::from)
+        })
+        .await;
+        let (stdout, stderr) = match result {
+            Ok(Ok(output)) => output,
+            Ok(Err(error)) => {
+                disconnect_child(&mut child).await;
+                return Err(error).context("SSH transport failed while connecting");
             }
-        }
+            Err(_) => {
+                disconnect_child(&mut child).await;
+                bail!("SSH connection timed out");
+            }
+        };
+        let status = wait_for_child(child, deadline).await.with_context(|| {
+            format!("SSH transport failed while connecting to {}@{}:{}", self.user, self.host, self.port)
+        })?;
+        ensure_success(status.success(), &stdout, &stderr).with_context(|| {
+            format!("SSH transport failed while connecting to {}@{}:{}", self.user, self.host, self.port)
+        })
     }
 }
 
-async fn disconnect_child(child: openssh::RemoteChild<'_>) {
-    let _ = timeout(CHILD_CLEANUP_DEADLINE, child.disconnect()).await;
-}
+#[cfg(test)]
+mod tests {
+    use anyhow::{Context, Result};
+    use std::path::PathBuf;
 
-#[derive(Debug)]
-struct OutputTail {
-    bytes: Vec<u8>,
-    limit: usize,
-    truncated: bool,
-}
+    use super::{SshCommand, SshTarget, SshTransport, TransportPolicy};
 
-impl OutputTail {
-    fn new(limit: usize) -> Self {
-        Self { bytes: Vec::new(), limit, truncated: false }
+    #[tokio::test]
+    async fn missing_openssh_names_the_windows_prerequisite_and_executable() -> Result<()> {
+        let result = SshTransport::connect_as_with_command(
+            SshTarget { user: "user", host: "host", port: 22 },
+            TransportPolicy::default(),
+            SshCommand { executable: PathBuf::from("missing/ssh.exe"), connection_args: Vec::new() },
+        )
+        .await;
+        let error = result.err().context("missing OpenSSH should fail")?;
+        let message = format!("{error:#}");
+        assert!(message.contains("OpenSSH client"), "{message}");
+        assert!(message.contains("ssh.exe"), "{message}");
+        Ok(())
     }
-
-    fn push(&mut self, bytes: &[u8]) {
-        self.bytes.extend_from_slice(bytes);
-        if self.bytes.len() > self.limit {
-            self.bytes.drain(..self.bytes.len() - self.limit);
-            self.truncated = true;
-        }
-    }
-}
-
-fn tail_from_bytes(bytes: &[u8], limit: usize) -> OutputTail {
-    let mut tail = OutputTail::new(limit);
-    tail.push(bytes);
-    tail
-}
-
-fn ensure_success(success: bool, stdout: &OutputTail, stderr: &OutputTail) -> Result<()> {
-    if !success {
-        bail!("{}", remote_command_failure(stdout, stderr));
-    }
-    Ok(())
-}
-
-fn remote_command_failure(stdout: &OutputTail, stderr: &OutputTail) -> String {
-    let mut message = String::from("SSH remote command exited unsuccessfully");
-    append_tail(&mut message, "stdout", stdout);
-    append_tail(&mut message, "stderr", stderr);
-    message
-}
-
-fn append_tail(message: &mut String, name: &str, tail: &OutputTail) {
-    if tail.bytes.is_empty() {
-        return;
-    }
-    message.push_str("\n");
-    message.push_str(name);
-    message.push_str(" tail");
-    if tail.truncated {
-        message.push_str(" (truncated)");
-    }
-    message.push_str(":\n");
-    message.push_str(String::from_utf8_lossy(&tail.bytes).trim());
 }

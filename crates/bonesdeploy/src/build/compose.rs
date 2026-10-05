@@ -20,7 +20,7 @@ use super::{command, docker::DockerClient, source::BuildContext};
 const BASE_FILES: [&str; 4] = ["compose.yaml", "compose.yml", "docker-compose.yaml", "docker-compose.yml"];
 const OVERRIDE_FILES: [&str; 2] = ["compose.override.yaml", "compose.override.yml"];
 
-pub fn build(config: &Bones, context: &BuildContext, docker: &DockerClient) -> Result<Vec<ComposeImage>> {
+pub fn build(config: &Bones, context: &mut BuildContext, docker: &DockerClient) -> Result<Vec<ComposeImage>> {
     reserve_artifact_paths(context.path())?;
     let files = ComposeFiles::discover(context.path())?;
     let environment = write_environment_file(&build_contract::environment(config, context.path())?)?;
@@ -46,7 +46,22 @@ pub fn build(config: &Bones, context: &BuildContext, docker: &DockerClient) -> R
     let result = (|| {
         tag_images(config, &images, &output.stdout, &mut tags)?;
         write_release_files(context.path(), &images)?;
+        context.record_generated(
+            Path::new(artifact::COMPOSE_OVERRIDE_FILE),
+            super::inventory::EntryType::File,
+            0o644,
+        )?;
+        context.record_generated(
+            Path::new(artifact::COMPOSE_IMAGE_INVENTORY_FILE),
+            super::inventory::EntryType::File,
+            0o644,
+        )?;
         save_images(docker, context.path(), &images, timeout)?;
+        context.record_generated(
+            Path::new(artifact::COMPOSE_IMAGE_ARCHIVE_FILE),
+            super::inventory::EntryType::File,
+            0o600,
+        )?;
         Ok(images)
     })();
     finish_with_tag_cleanup(result, tags.remove())

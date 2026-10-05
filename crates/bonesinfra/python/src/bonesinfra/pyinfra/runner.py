@@ -84,7 +84,7 @@ def _connect(state: State, quiet: bool, operation: str) -> None:
         print_connected()
 
 
-def _plan(ctx, deploy, state, config, inventory, target_host, quiet):
+def _plan(ctx, deploy, state, config, inventory, target_host, quiet):  # noqa: PLR0917
     with (
         ctx_state.use(state),
         ctx_config.use(config),

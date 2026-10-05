@@ -54,6 +54,22 @@ release lifecycle: staging, sealing, activation, rollback, and pruning. Routine
 deployment reaches it through an exact sudoers command in an SSH session owned
 by `deploy`; it never calls `bonesinfra`.
 
+### Platform Boundary
+
+`bonesdeploy` is the local CLI and supports native `x86_64-pc-windows-msvc`
+workstations as well as Unix workstations. Windows local builds use
+`cargo build --locked --release --package bonesdeploy` and produce
+`target\release\bonesdeploy.exe`. Git, OpenSSH, Python 3.12 or newer, Cargo,
+curl, GnuPG, and an editor are local prerequisites; Windows Developer Mode is
+required for symlink operations. Docker Desktop must be configured for Linux
+containers with Compose enabled because local native and Compose builds target
+`linux/amd64`.
+
+On Windows, configuration uses `%APPDATA%\bonesdeploy`; data, cache, and state
+use `%LOCALAPPDATA%\bonesdeploy`. Linux retains its existing XDG behavior.
+`bonesremote` is not a Windows target: production remains the existing
+Debian/Ubuntu Linux contract, and the Linux release artifact is unchanged.
+
 ## 2. Responsibility / Ownership Map
 
 This is the heart of the document. If a responsibility is listed here, the named

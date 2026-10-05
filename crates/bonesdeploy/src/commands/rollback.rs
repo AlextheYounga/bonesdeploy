@@ -23,7 +23,6 @@ pub async fn run() -> Result<()> {
     let session = ssh::SshTransport::connect_privileged(&cfg).await?;
     let command = format!("bonesremote release rollback --site {}", ssh::shell_quote(&cfg.project_name));
     session.stream_cmd(&command).await?;
-    session.close().await?;
 
     println!("{} Rollback complete.", output::success_marker());
     println!();

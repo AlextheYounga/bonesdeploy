@@ -1,13 +1,13 @@
-use std::fs::{File as StdFile, OpenOptions};
-use std::os::unix::fs::OpenOptionsExt;
+use std::fs::File as StdFile;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
 use tokio::fs::File;
 
 use crate::config;
 use crate::infra::{self, ssh};
+use crate::platform;
 use crate::ui::{output, progress::ProgressReader, prompts};
 
 pub async fn run(archive: &Path, yes: bool) -> Result<()> {
@@ -29,28 +29,17 @@ pub async fn run(archive: &Path, yes: bool) -> Result<()> {
         output::upload_progress("shared data archive", percentage);
     });
     let transport = ssh::SshTransport::connect_privileged(&config).await?;
-    let transfer_result =
+    let transfer =
         transport.stream_cmd_with_reader(&infra::shared_import_command(&config.project_name), &[], reader).await;
-    if transfer_result.is_err() {
+    if transfer.is_err() {
         println!();
     }
-    let close_result = transport.close().await;
-
-    transfer_result?;
-    close_result.context("Failed to close the SSH session")?;
+    transfer?;
     println!("{} Shared data imported.", output::success_marker());
     println!("The existing .env was preserved and services were restarted.");
     Ok(())
 }
 
 fn open_archive(archive: &Path) -> Result<StdFile> {
-    let file = OpenOptions::new()
-        .read(true)
-        .custom_flags(libc::O_NOFOLLOW)
-        .open(archive)
-        .with_context(|| format!("Failed to open archive {}", archive.display()))?;
-    if !file.metadata()?.is_file() {
-        bail!("Archive is not a regular file: {}", archive.display());
-    }
-    Ok(file)
+    platform::open_regular_file(archive)
 }

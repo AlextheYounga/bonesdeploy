@@ -1,8 +1,11 @@
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
 
 use anyhow::{Context, Result};
+use bonesdeploy::build::inventory::EntryType;
 use bonesdeploy::build::native::build_scripts;
 use bonesdeploy::infra::git;
 
@@ -17,6 +20,8 @@ fn exporting_a_configured_branch_uses_only_its_committed_tree() -> Result<()> {
     let build_dir = repo.path().join("infra/deployment/build");
     fs::create_dir_all(&build_dir)?;
     fs::write(build_dir.join("01_build.sh"), "echo committed")?;
+    #[cfg(unix)]
+    fs::set_permissions(build_dir.join("01_build.sh"), fs::Permissions::from_mode(0o755))?;
     fs::write(repo.path().join("infra/deployment/bundle.txt"), "committed bundle")?;
     run(repo.path(), ["add", "."])?;
     run(repo.path(), ["commit", "-m", "initial"])?;
@@ -28,12 +33,21 @@ fn exporting_a_configured_branch_uses_only_its_committed_tree() -> Result<()> {
 
     let revision = git::resolve_branch_commit(repo.path(), "main")?;
     let export = tempfile::tempdir()?;
-    git::export_commit(repo.path(), &revision, export.path())?;
+    let inventory = git::export_commit(repo.path(), &revision, export.path())?;
 
     assert_eq!(fs::read_to_string(export.path().join("tracked.txt"))?, "committed");
     assert!(!export.path().join("untracked.txt").exists());
     assert!(!export.path().join("ignored.txt").exists());
     assert!(!export.path().join(".git").exists());
+    assert_eq!(inventory.get(Path::new("tracked.txt")).map(|entry| entry.entry_type), Some(EntryType::File));
+    assert_eq!(
+        inventory.get(Path::new("infra/deployment/build")).map(|entry| entry.entry_type),
+        Some(EntryType::Directory)
+    );
+    #[cfg(unix)]
+    assert!(
+        inventory.get(Path::new("infra/deployment/build/01_build.sh")).is_some_and(|entry| entry.mode & 0o111 != 0)
+    );
     let (deployment, scripts) = build_scripts(export.path())?.context("committed build script expected")?;
     assert_eq!(scripts, vec![export.path().join("infra/deployment/build/01_build.sh")]);
     assert_eq!(fs::read_to_string(&scripts[0])?, "echo committed");

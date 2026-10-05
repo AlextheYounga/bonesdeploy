@@ -14,7 +14,7 @@ pub struct DockerClient {
 }
 
 impl DockerClient {
-    /// Resolves the current Docker selector to a local Unix socket.
+    /// Resolves the current Docker selector to the platform's local Docker endpoint.
     pub fn new() -> Result<Self> {
         let executable = docker_executable()?;
         let selector = DockerSelector::capture();
@@ -27,7 +27,7 @@ impl DockerClient {
                 None => inspect_context_endpoint(&executable, &current_context(&executable)?)?,
             },
         };
-        let endpoint = validate_unix_endpoint(&endpoint)?;
+        let endpoint = validate_local_endpoint(&endpoint)?;
         Ok(Self { executable, selector, endpoint })
     }
 
@@ -106,11 +106,61 @@ fn current_context(executable: &Path) -> Result<String> {
 fn docker_executable() -> Result<PathBuf> {
     let path = env::var_os(PATH).context("PATH is not set; cannot locate Docker")?;
     env::split_paths(&path)
-        .map(|directory| directory.join("docker"))
+        .flat_map(|directory| docker_program_names().iter().map(move |program| directory.join(program)))
         .find(|candidate| candidate.is_file())
-        .context("Docker executable was not found in PATH")
+        .context("Docker is required; install Docker Desktop and ensure docker.exe is on PATH")
 }
 
+#[cfg(test)]
+mod tests {
+    use anyhow::{Context, Result};
+
+    use super::DockerClient;
+    use crate::test_support::with_env;
+
+    #[test]
+    fn missing_docker_names_the_windows_prerequisite_and_executable() -> Result<()> {
+        let result = with_env("PATH", Some("missing-docker-path"), DockerClient::new);
+        let error = result.err().context("missing Docker should fail")?;
+        let message = format!("{error:#}");
+        assert!(message.contains("Docker is required"), "{message}");
+        assert!(message.contains("docker.exe"), "{message}");
+        Ok(())
+    }
+}
+
+#[cfg(unix)]
+const fn docker_program_names() -> &'static [&'static str] {
+    &["docker"]
+}
+
+#[cfg(windows)]
+const fn docker_program_names() -> &'static [&'static str] {
+    &["docker.exe", "docker.cmd"]
+}
+
+#[cfg(unix)]
+fn validate_local_endpoint(endpoint: &str) -> Result<String> {
+    validate_unix_endpoint(endpoint)
+}
+
+#[cfg(windows)]
+fn validate_local_endpoint(endpoint: &str) -> Result<String> {
+    const LOCAL_PIPE: &str = "npipe:////./pipe/";
+
+    let Some(pipe) = endpoint.strip_prefix(LOCAL_PIPE) else {
+        bail!("Docker endpoint must be a local Windows named pipe, got `{endpoint}`")
+    };
+    if pipe.is_empty()
+        || pipe.contains(['/', '?', '#'])
+        || endpoint.chars().any(|character| character.is_whitespace() || character.is_control())
+    {
+        bail!("Docker endpoint must be in the local Windows named-pipe namespace, got `{endpoint}`")
+    }
+    Ok(format!("{LOCAL_PIPE}{pipe}"))
+}
+
+#[cfg(unix)]
 fn validate_unix_endpoint(endpoint: &str) -> Result<String> {
     let Some(path) = endpoint.strip_prefix("unix://") else {
         bail!("Docker endpoint must be a local Unix socket, got `{endpoint}`")

@@ -27,7 +27,6 @@ pub(super) async fn current_remote_version() -> String {
         return String::from("unknown");
     };
     let version = transport.run_cmd("bonesremote version").await.ok();
-    let _ = transport.close().await;
 
     version
         .as_deref()
@@ -41,13 +40,31 @@ pub(super) fn update_local_from_crates_io(version: &str) -> Result<()> {
     let status = Command::new("cargo")
         .args(["install", "--locked", paths::BONESDEPLOY_BINARY, "--version", version, "--force"])
         .status()
-        .context("Failed to run cargo install for bonesdeploy from crates.io")?;
+        .context("Cargo is required for local updates; install Rust with rustup and ensure cargo.exe is on PATH")?;
 
     if !status.success() {
         bail!("Failed to install bonesdeploy {version} from crates.io");
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::{Context, Result};
+
+    use super::update_local_from_crates_io;
+    use crate::test_support::with_env;
+
+    #[test]
+    fn missing_cargo_names_the_windows_prerequisite_and_executable() -> Result<()> {
+        let result = with_env("PATH", Some("missing-cargo-path"), || update_local_from_crates_io("1.1.3"));
+        let error = result.err().context("missing Cargo should fail")?;
+        let message = format!("{error:#}");
+        assert!(message.contains("Cargo is required"), "{message}");
+        assert!(message.contains("cargo.exe"), "{message}");
+        Ok(())
+    }
 }
 
 pub(super) async fn update_remote_from_release(current_version: &str, target_version: &str) -> Result<()> {
@@ -71,8 +88,6 @@ pub(super) async fn update_remote_from_release(current_version: &str, target_ver
             root = paths::DEFAULT_PROJECT_ROOT_PARENT
         ))
         .await?;
-
-    transport.close().await?;
 
     let request = infra::provisioning_request(&cfg)?;
     bonesinfra::run_with_request(

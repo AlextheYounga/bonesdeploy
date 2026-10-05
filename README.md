@@ -48,6 +48,10 @@ And embeds a Python provisioning runtime:
 
 - **`bonesinfra`** — `crates/bonesinfra/python/`, embedded by the Rust `bonesinfra` crate
 
+The local CLI supports native `x86_64-pc-windows-msvc` workstations. Windows
+does not change the production contract: `bonesremote` remains a Linux-only
+server binary for the supported Debian and Ubuntu hosts.
+
 Each initialized project receives a committed versioned `infra/bonesinfra-<version>-py3-none-any.whl` and the
 managed templates under `infra/templates/`. Commands execute the wheel through a
 project-scoped dependency environment; `infra/custom/` remains project-owned
@@ -191,6 +195,29 @@ Laravel storage paths, and is restarted with the application after activation.
 
 ## Install
 
+### Windows Workstation
+
+Install Git, OpenSSH, Python 3.12 or newer, Cargo, curl, GnuPG, and an editor;
+each executable must be available on `PATH`. Enable Windows Developer Mode for
+the local symlink operations used by source export. Install Docker Desktop and
+configure it to use Linux containers with Compose enabled; Docker Desktop is
+required for native and Compose package builds.
+
+Build the Windows CLI from a checkout with the package selected explicitly:
+
+```powershell
+cargo build --locked --release --package bonesdeploy
+```
+
+Tagged Windows releases contain
+`bonesdeploy-x86_64-pc-windows-msvc.exe` and its
+`bonesdeploy-x86_64-pc-windows-msvc.exe.sha256` checksum. The existing Linux
+`bonesremote` release artifact remains unchanged.
+
+On Windows, BonesDeploy stores configuration under
+`%APPDATA%\bonesdeploy` and data, cache, and state under
+`%LOCALAPPDATA%\bonesdeploy`. Linux continues to use its existing XDG paths.
+
 Install the local CLI:
 
 ```sh
@@ -220,7 +247,8 @@ bonesdeploy init
 ```
 
 Native deployments always build the configured committed revision locally with
-Docker for `linux/amd64`, then upload the complete artifact. Compose deployments
+Docker for `linux/amd64`, then upload the complete artifact. On Windows, Docker
+Desktop must be running Linux containers with Compose enabled. Compose deployments
 perform their config, pull, and image-build steps locally and upload the release
 tree and exact service images. There is no server-side application build or
 pull fallback. Docker is a local build dependency for native builds and a

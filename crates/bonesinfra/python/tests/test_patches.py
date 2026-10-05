@@ -62,6 +62,20 @@ def test_local_patch_preserves_pre_materialized_framework(tmp_path, monkeypatch)
     assert (tmp_path / "data/bonesdeploy/patches/atlas/0003-project-infra").is_file()
 
 
+def test_local_patch_uses_projected_data_root(tmp_path, monkeypatch):
+    ctx = _context(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".bones/infra/runtime.py").parent.mkdir(parents=True)
+    (tmp_path / ".bones/infra/runtime.py").write_text("def deploy(_ctx):\n    pass\n")
+    monkeypatch.setenv("BONESDEPLOY_DATA_ROOT", str(tmp_path / "projected-data"))
+    monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "ignored-data"))
+
+    apply_local(ctx, "0.8.0")
+
+    assert (tmp_path / "projected-data/patches/atlas/0003-project-infra").is_file()
+    assert not (tmp_path / "ignored-data").exists()
+
+
 def test_local_patch_refuses_custom_collision_without_writing_marker(tmp_path, monkeypatch):
     ctx = _context(tmp_path)
     monkeypatch.chdir(tmp_path)

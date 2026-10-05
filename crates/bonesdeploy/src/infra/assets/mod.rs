@@ -3,12 +3,13 @@ pub mod kit;
 pub mod skill;
 
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use anyhow::{Context, Result};
 
 use bonesdeploy_core::paths;
+
+use crate::platform;
 
 fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()> {
     let dest = bones_dir.join(relative_path);
@@ -20,8 +21,10 @@ fn write_asset(bones_dir: &Path, relative_path: &str, bytes: &[u8]) -> Result<()
     fs::write(&dest, bytes).with_context(|| format!("Failed to write {}", dest.display()))?;
 
     if relative_path.starts_with(paths::KIT_DEPLOYMENT_DIR) {
-        fs::set_permissions(&dest, fs::Permissions::from_mode(0o755))
-            .with_context(|| format!("Failed to set permissions on {}", dest.display()))?;
+        #[cfg(unix)]
+        platform::set_mode(&dest, 0o755)?;
+        #[cfg(not(unix))]
+        platform::set_mode(&dest, 0o755);
     }
 
     Ok(())

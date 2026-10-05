@@ -49,3 +49,42 @@ jobs:
           files: |
             bonesremote-x86_64-unknown-linux-musl
             bonesremote-x86_64-unknown-linux-musl.sha256
+
+  windows-release:
+    needs: release
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Verify tag matches bonesdeploy version
+        shell: pwsh
+        run: |
+          $package = (cargo metadata --no-deps --format-version 1 | ConvertFrom-Json).packages |
+            Where-Object { $_.name -eq 'bonesdeploy' }
+          if ("v$($package.version)" -ne $env:GITHUB_REF_NAME) {
+            throw "tag $env:GITHUB_REF_NAME does not match bonesdeploy version $($package.version)"
+          }
+
+      - name: Build and verify bonesdeploy
+        shell: pwsh
+        run: |
+          cargo build --locked --release --package bonesdeploy --target x86_64-pc-windows-msvc
+          $artifact = 'bonesdeploy-x86_64-pc-windows-msvc.exe'
+          Copy-Item target/x86_64-pc-windows-msvc/release/bonesdeploy.exe $artifact
+          & ".\\$artifact" version
+          $hash = (Get-FileHash -Algorithm SHA256 $artifact).Hash.ToLowerInvariant()
+          "$hash  $artifact" | Set-Content -NoNewline "$artifact.sha256"
+
+      - name: Publish Windows release files
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bonesdeploy-x86_64-pc-windows-msvc.exe
+            bonesdeploy-x86_64-pc-windows-msvc.exe.sha256

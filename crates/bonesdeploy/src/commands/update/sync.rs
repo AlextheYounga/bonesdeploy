@@ -1,9 +1,10 @@
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
+
+use crate::platform;
 
 pub fn refresh_local_infrastructure(source_dir: &Path, project_root: &Path, template: Option<&str>) -> Result<()> {
     let infra_dir = project_root.join(paths::LOCAL_INFRA_DIR);
@@ -71,8 +72,10 @@ fn copy_file(source: &Path, dest: &Path, executable: bool) -> Result<()> {
     fs::copy(source, dest).with_context(|| format!("Failed to copy {} to {}", source.display(), dest.display()))?;
 
     if executable {
-        fs::set_permissions(dest, fs::Permissions::from_mode(0o755))
-            .with_context(|| format!("Failed to set permissions on {}", dest.display()))?;
+        #[cfg(unix)]
+        platform::set_mode(dest, 0o755)?;
+        #[cfg(not(unix))]
+        platform::set_mode(dest, 0o755);
     }
 
     Ok(())

@@ -28,6 +28,7 @@ struct TemplateAsset;
 
 const STAMP_FILE: &str = ".stamp";
 const PREVIOUS_FRAMEWORK_PATH: &str = "infra/.framework";
+const DATA_ROOT_ENV: &str = "BONESDEPLOY_DATA_ROOT";
 
 /// Writes the embedded wheel and managed templates into a project.
 ///
@@ -151,9 +152,10 @@ fn ensure_available(project_root: &Path) -> Result<PathBuf> {
         .with_context(|| format!("Failed to open BonesInfra lock at {}", lock_path.display()))?;
     lock.lock().with_context(|| format!("Failed to lock BonesInfra environment at {}", lock_path.display()))?;
 
-    let python = environment.join(".venv/bin/python");
+    let python = venv_python(&environment);
     let stamp = wheel_stamp(&wheel_bytes);
     if python.is_file() && materialized_stamp(&environment).as_deref() == Some(stamp.as_str()) {
+        validate_python(&python)?;
         return Ok(python);
     }
 
@@ -169,6 +171,7 @@ fn ensure_available(project_root: &Path) -> Result<PathBuf> {
 fn base_command(executable: &Path, project_root: &Path, args: &[&str]) -> Command {
     let mut command = Command::new(executable);
     command.current_dir(project_root).args(["-m", "bonesinfra"]).args(args);
+    command.env(DATA_ROOT_ENV, paths::bones_data_root());
     command
 }
 
@@ -251,18 +254,88 @@ fn remove_project_wheels(infra: &Path) -> Result<()> {
 }
 
 fn setup_venv(environment: &Path, wheel: &Path) -> Result<()> {
-    let python = environment.join(".venv/bin/python");
+    let python = venv_python(environment);
     if !python.is_file() {
-        let status = Command::new("python3").args(["-m", "venv", ".venv"]).current_dir(environment).status()?;
+        let host_python = host_python();
+        validate_python(&host_python)?;
+        let status = Command::new(&host_python)
+            .args(["-m", "venv", ".venv"])
+            .current_dir(environment)
+            .status()
+            .with_context(|| format!("Failed to run {} -m venv", host_python.display()))?;
         if !status.success() {
             bail!("Failed to create venv in {}.", environment.display());
         }
     }
-    let status = Command::new(&python).args(["-m", "pip", "install", "--force-reinstall"]).arg(wheel).status()?;
+    validate_python(&python)?;
+    let status = Command::new(&python)
+        .args(["-m", "pip", "install", "--force-reinstall"])
+        .arg(wheel)
+        .status()
+        .with_context(|| format!("Failed to run {} -m pip", python.display()))?;
     if !status.success() {
         bail!("Failed to install BonesInfra wheel from {}.", wheel.display());
     }
     Ok(())
+}
+
+#[cfg(windows)]
+fn host_python() -> PathBuf {
+    PathBuf::from("python.exe")
+}
+
+#[cfg(not(windows))]
+fn host_python() -> PathBuf {
+    PathBuf::from("python3")
+}
+
+fn venv_python(environment: &Path) -> PathBuf {
+    #[cfg(windows)]
+    return environment.join(".venv/Scripts/python.exe");
+
+    #[cfg(not(windows))]
+    environment.join(".venv/bin/python")
+}
+
+fn validate_python(python: &Path) -> Result<()> {
+    let output = Command::new(python).arg("--version").output().with_context(|| {
+        format!("Python 3.12 or newer is required; install Python and ensure {} is on PATH", python.display())
+    })?;
+    if !output.status.success() {
+        bail!("{} did not report a Python version (Python 3.12 or newer is required)", python.display());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let version = stdout.trim().strip_prefix("Python ").or_else(|| stderr.trim().strip_prefix("Python "));
+    let Some(version) = version else {
+        bail!("{} reported an invalid Python version", python.display());
+    };
+    let mut components = version.split('.');
+    let major = components.next().and_then(|value| value.parse::<u32>().ok());
+    let minor = components.next().and_then(|value| value.parse::<u32>().ok());
+    if major != Some(3) || minor.is_none_or(|value| value < 12) {
+        bail!("{} is Python {version}; Python 3.12 or newer is required", python.display());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use anyhow::{Context, Result};
+
+    use super::validate_python;
+
+    #[test]
+    fn missing_python_names_the_required_version_and_executable() -> Result<()> {
+        let result = validate_python(Path::new("missing/python.exe"));
+        let error = result.err().context("missing Python should fail")?;
+        let message = format!("{error:#}");
+        assert!(message.contains("Python 3.12 or newer is required"), "{message}");
+        assert!(message.contains("python.exe"), "{message}");
+        Ok(())
+    }
 }
 
 fn validate_wheel(bytes: &[u8]) -> Result<()> {

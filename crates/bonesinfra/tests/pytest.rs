@@ -25,7 +25,7 @@ fn python_test_suite_passes() -> Result<()> {
     let venv = venv_dir();
     ensure_venv(&python_dir, &venv)?;
 
-    let status = Command::new(venv.join("bin/python"))
+    let status = Command::new(venv_python(&venv))
         .current_dir(&python_dir)
         .args(["-m", "pytest"])
         .stdout(Stdio::inherit())
@@ -47,9 +47,12 @@ fn venv_dir() -> PathBuf {
 }
 
 fn ensure_venv(python_dir: &Path, venv: &Path) -> Result<()> {
+    let host_python = host_python();
+    validate_python(Path::new(host_python))?;
     let stamp_file = venv.join(".stamp");
     let stamp = dependency_stamp(python_dir);
     if fs::read_to_string(&stamp_file).is_ok_and(|existing| existing == stamp) {
+        validate_python(&venv_python(venv))?;
         return Ok(());
     }
 
@@ -57,17 +60,40 @@ fn ensure_venv(python_dir: &Path, venv: &Path) -> Result<()> {
         fs::remove_dir_all(venv).with_context(|| format!("Failed to reset the pytest venv at {}", venv.display()))?;
     }
 
-    let mut create = Command::new("python3");
+    let mut create = Command::new(&host_python);
     create.arg("-m").arg("venv").arg(venv);
-    run(create, "python3 -m venv (python3 >= 3.12 is required to test bonesinfra)")?;
+    run(create, "Python 3.12 or newer -m venv")?;
 
-    let mut install = Command::new(venv.join("bin/python"));
+    let mut install = Command::new(venv_python(venv));
     install.current_dir(python_dir).args(["-m", "pip", "install", "--quiet", "-e", ".", "pytest"]);
     run(install, "pip install of bonesinfra and pytest into the test venv")?;
 
     // Written last so an interrupted setup rebuilds from scratch on the next run.
     fs::write(&stamp_file, stamp)
         .with_context(|| format!("Failed to write the pytest venv stamp at {}", stamp_file.display()))?;
+    Ok(())
+}
+
+fn validate_python(python: &Path) -> Result<()> {
+    let output = Command::new(python)
+        .arg("--version")
+        .output()
+        .with_context(|| format!("Failed to run {} (Python 3.12 or newer is required)", python.display()))?;
+    if !output.status.success() {
+        bail!("{} did not report a Python version (Python 3.12 or newer is required)", python.display());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let version = stdout.trim().strip_prefix("Python ").or_else(|| stderr.trim().strip_prefix("Python "));
+    let Some(version) = version else {
+        bail!("{} reported an invalid Python version", python.display());
+    };
+    let mut components = version.split('.');
+    let major = components.next().and_then(|value| value.parse::<u32>().ok());
+    let minor = components.next().and_then(|value| value.parse::<u32>().ok());
+    if major != Some(3) || minor.is_none_or(|value| value < 12) {
+        bail!("{} is Python {version}; Python 3.12 or newer is required", python.display());
+    }
     Ok(())
 }
 
@@ -82,6 +108,24 @@ fn dependency_stamp(python_dir: &Path) -> String {
         }
     }
     format!("{:016x}", hasher.finish())
+}
+
+#[cfg(windows)]
+fn host_python() -> &'static str {
+    "python.exe"
+}
+
+#[cfg(not(windows))]
+fn host_python() -> &'static str {
+    "python3"
+}
+
+fn venv_python(venv: &Path) -> PathBuf {
+    #[cfg(windows)]
+    return venv.join("Scripts/python.exe");
+
+    #[cfg(not(windows))]
+    venv.join("bin/python")
 }
 
 fn run(mut command: Command, description: &str) -> Result<Output> {

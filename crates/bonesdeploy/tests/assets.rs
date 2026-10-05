@@ -1,6 +1,10 @@
-use std::env;
 use std::fs;
+
+#[cfg(unix)]
+use std::env;
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+#[cfg(unix)]
 use std::process::Command;
 
 use anyhow::Result;
@@ -32,7 +36,7 @@ fn framework_assets_include_expected_build_content() {
 }
 
 #[test]
-fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
+fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() -> Result<()> {
     let django = asset_text("django/deployment/build/02_run_build.sh");
     assert!(!django.contains("-m venv"));
     assert!(django.contains("python3 -m pip install"));
@@ -58,12 +62,15 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     assert!(!rails.contains("rm -rf node_modules tmp/cache vendor/bundle"));
 
     let rails_prepare = asset_text("rails/deployment/prepare/01_prepare_rails.sh");
-    let check = rails_prepare.find("/usr/bin/bundle check").expect("Rails prepare must check the packaged bundle");
-    let migration_skip =
-        rails_prepare.find("BONES_RAILS_SKIP_MIGRATIONS").expect("Rails prepare must support skipping migrations");
+    let check = rails_prepare
+        .find("/usr/bin/bundle check")
+        .ok_or_else(|| anyhow::anyhow!("Rails prepare must check the packaged bundle"))?;
+    let migration_skip = rails_prepare
+        .find("BONES_RAILS_SKIP_MIGRATIONS")
+        .ok_or_else(|| anyhow::anyhow!("Rails prepare must support skipping migrations"))?;
     let migrate = rails_prepare
         .find("/usr/bin/bundle exec rails db:migrate")
-        .expect("Rails prepare must run migrations through the target bundle");
+        .ok_or_else(|| anyhow::anyhow!("Rails prepare must run migrations through the target bundle"))?;
     assert!(check < migration_skip);
     assert!(check < migrate);
     assert!(!rails_prepare.contains("bundle install"));
@@ -91,10 +98,11 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() {
     assert!(angular.contains("[ ! -f \"dist/browser/index.html\" ]"));
     assert!(angular.contains("rm -rf .angular/cache node_modules deployment/build"));
     assert!(!angular.contains("rm -rf dist"));
+    Ok(())
 }
 
 #[test]
-fn django_artifact_contract_matches_the_production_runtime() {
+fn django_artifact_contract_matches_the_production_runtime() -> Result<()> {
     let build = asset_text("django/deployment/build/02_run_build.sh");
     assert!(build.contains("local packages_dir=\".python-packages\""));
     assert!(build.contains("local wrapper_dir=\".venv/bin\""));
@@ -105,15 +113,21 @@ fn django_artifact_contract_matches_the_production_runtime() {
     assert!(!build.contains("production_python"));
 
     let prepare = asset_text("django/deployment/prepare/01_prepare_django.sh");
-    let require_artifact = prepare.find("build the Django artifact first").expect("missing artifact validation");
-    let validate = prepare.find("manage.py check --deploy").expect("Django prepare must validate the application");
-    let migration_skip =
-        prepare.find("BONES_DJANGO_SKIP_MIGRATIONS").expect("Django prepare must support skipping migrations");
+    let require_artifact = prepare
+        .find("build the Django artifact first")
+        .ok_or_else(|| anyhow::anyhow!("missing artifact validation"))?;
+    let validate = prepare
+        .find("manage.py check --deploy")
+        .ok_or_else(|| anyhow::anyhow!("Django prepare must validate the application"))?;
+    let migration_skip = prepare
+        .find("BONES_DJANGO_SKIP_MIGRATIONS")
+        .ok_or_else(|| anyhow::anyhow!("Django prepare must support skipping migrations"))?;
     assert!(prepare.contains("readonly PYTHON_BIN=\"$VENV_DIR/bin/python\""));
     assert!(require_artifact < validate);
     assert!(require_artifact < migration_skip);
     assert!(!prepare.contains("pip install"));
     assert!(!prepare.contains("-m venv"));
+    Ok(())
 }
 
 #[test]
@@ -254,6 +268,7 @@ fn skill_doc_names_cover_the_expected_topics() {
     assert!(!names.contains(&"SKILL".to_string()), "SKILL.md must be excluded from `skill list`");
 }
 
+#[cfg(unix)]
 #[test]
 fn node_install_extracts_a_cold_cache_archive() -> Result<()> {
     let temp = tempfile::tempdir()?;

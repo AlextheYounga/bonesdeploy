@@ -1,3 +1,5 @@
+#![cfg(unix)]
+
 use std::env;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
@@ -199,6 +201,10 @@ if [ "$1" = info ]; then
 	exit 0
 fi
 if [ "$1" = image ] && [ "$2" = inspect ]; then
+	exit 0
+fi
+if [ "$1" = exec ] && [ "$8" = -printf ]; then
+	printf 'infra\000d\000755\000'
 	exit 0
 fi
 if [ "${BONESDEPLOY_NATIVE_SCENARIO:-}" = timeout ] && [ "$1" = exec ] && [ "$2" = -i ]; then

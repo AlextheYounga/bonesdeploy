@@ -1,0 +1,105 @@
+name: Local CLI validation
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-local-cli:
+    name: Windows local CLI
+    runs-on: windows-latest
+    env:
+      EDITOR: notepad.exe
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install workstation prerequisites
+        shell: pwsh
+        run: |
+          choco install --yes --no-progress git gpg4win docker-cli
+          $capability = Get-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+          if ($capability.State -ne "Installed") {
+            Add-WindowsCapability -Online -Name $capability.Name
+          }
+          git --version
+          gpg --version
+          docker --version
+          ssh.exe -V
+          curl.exe --version
+
+      - name: Test local Rust packages
+        shell: pwsh
+        run: |
+          cargo test --locked --package bonesdeploy-core
+          cargo test --locked --package bonesinfra
+          cargo test --locked --package bonesdeploy --tests
+
+      - name: Validate embedded Python package
+        shell: pwsh
+        working-directory: crates/bonesinfra/python
+        run: |
+          uv tool run ruff check .
+          uv tool run ruff format --check .
+          uv run --group dev pytest
+
+      - name: Lint and build the local CLI
+        shell: pwsh
+        run: |
+          cargo clippy --locked --package bonesdeploy-core --all-targets --all-features -- -D warnings
+          cargo clippy --locked --package bonesinfra --all-targets --all-features -- -D warnings
+          cargo clippy --locked --package bonesdeploy --all-targets --all-features -- -D warnings
+          cargo build --locked --release --package bonesdeploy --target x86_64-pc-windows-msvc
+          & .\target\x86_64-pc-windows-msvc\release\bonesdeploy.exe version
+
+  linux-non-e2e:
+    name: Linux non-E2E regression
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Install workstation prerequisites
+        run: sudo apt-get update && sudo apt-get install --yes curl docker.io git gnupg openssh-client shfmt
+
+      - name: Validate non-E2E workspace
+        run: |
+          cargo test --locked --workspace --exclude e2e
+          cargo clippy --locked --workspace --exclude e2e --all-targets --all-features -- -D warnings
+          cargo fmt --check
+          shfmt -d .
+
+      - name: Validate embedded Python package
+        working-directory: crates/bonesinfra/python
+        run: |
+          uv tool run ruff check .
+          uv tool run ruff format --check .
+          uv run --group dev pytest

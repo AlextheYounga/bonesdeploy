@@ -1,5 +1,3 @@
-use std::fs::{File as StdFile, Permissions};
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -14,6 +12,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::config;
 use crate::infra::ssh;
+use crate::platform;
 use crate::ui::output;
 
 pub async fn run(output_path: Option<&Path>) -> Result<()> {
@@ -23,10 +22,7 @@ pub async fn run(output_path: Option<&Path>) -> Result<()> {
     let transport = ssh::SshTransport::connect_privileged(&config).await?;
     let mut writer = export.writer()?;
     let command = archive_command(&config.project_name);
-    let transfer_result = transport.download_cmd(&command, &mut writer).await;
-    let close_result = transport.close().await;
-    transfer_result?;
-    close_result.context("Failed to close the SSH session")?;
+    transport.download_cmd(&command, &mut writer).await?;
     writer.flush().await.context("Failed to flush the shared export")?;
     writer.sync_all().await.context("Failed to sync the shared export")?;
     drop(writer);
@@ -75,10 +71,10 @@ impl ExportFile {
         }
 
         let staging = NamedTempFile::new_in(parent).context("Failed to create the temporary export file")?;
-        staging
-            .as_file()
-            .set_permissions(Permissions::from_mode(0o600))
-            .context("Failed to protect the temporary export file")?;
+        #[cfg(unix)]
+        platform::set_mode(staging.path(), 0o600)?;
+        #[cfg(not(unix))]
+        platform::set_mode(staging.path(), 0o600);
         Ok(Self { staging, destination })
     }
 
@@ -89,25 +85,25 @@ impl ExportFile {
 
     fn persist(self) -> Result<PathBuf> {
         let Self { staging, destination } = self;
-        let file = staging
+        staging.as_file().sync_all().context("Failed to sync the temporary export")?;
+        let temporary = staging.into_temp_path();
+        temporary
             .persist_noclobber(&destination)
             .map_err(|error| error.error)
             .with_context(|| format!("Failed to save shared export to {}", destination.display()))?;
-        file.sync_all().context("Failed to sync the saved shared export")?;
-        sync_parent(&destination)?;
+        #[cfg(unix)]
+        platform::sync_parent(&destination)?;
+        #[cfg(not(unix))]
+        platform::sync_parent(&destination);
         Ok(destination)
     }
-}
-
-fn sync_parent(path: &Path) -> Result<()> {
-    let parent = path.parent().filter(|path| !path.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
-    StdFile::open(parent)?.sync_all().context("Failed to sync the export destination directory")
 }
 
 #[cfg(test)]
 mod tests {
     use std::fs;
     use std::io::Write;
+    #[cfg(unix)]
     use std::os::unix::fs::PermissionsExt;
 
     use tempfile::tempdir;
@@ -143,11 +139,13 @@ mod tests {
         let directory = tempdir()?;
         let destination = directory.path().join("atlas.zip");
         let export = ExportFile::create(destination.clone())?;
+        #[cfg(unix)]
         assert_eq!(export.staging.as_file().metadata()?.permissions().mode() & 0o777, 0o600);
 
         export.staging.as_file().try_clone()?.write_all(b"archive")?;
         assert_eq!(export.persist()?, destination);
         assert_eq!(fs::read(&destination)?, b"archive");
+        #[cfg(unix)]
         assert_eq!(fs::metadata(destination)?.permissions().mode() & 0o777, 0o600);
         Ok(())
     }

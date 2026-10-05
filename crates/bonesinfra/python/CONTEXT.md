@@ -317,7 +317,7 @@ Deploy plan files should read like stories.
 Example:
 
 ```python
-def deploy_site_setup(ctx):     # ctx: DeployContext
+def deploy_site_setup(ctx):  # ctx: DeployContext
     ensure_users_and_groups(ctx)
     setup_project(ctx, ctx.paths_dict)
     seed(ctx, ctx.paths_dict)

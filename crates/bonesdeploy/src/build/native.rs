@@ -1,6 +1,5 @@
 use std::fs;
 use std::io::Write;
-use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -13,12 +12,19 @@ use bonesdeploy_core::config::{Bones, build_timeout_seconds, variables};
 use bonesdeploy_core::paths;
 use tempfile::NamedTempFile;
 
-use super::{command, docker::DockerClient, source::BuildContext};
+#[cfg(unix)]
+use super::native_platform::{MountOwnership, mount_ownership};
+use super::{
+    command,
+    docker::DockerClient,
+    native_platform::{bind_specification, set_private_environment_file_permissions},
+    source::BuildContext,
+};
 
 const WORKLOAD_STOP_TIMEOUT_SECONDS: u64 = 15;
 
 /// Runs numbered native build scripts against an already-exported commit.
-pub fn build(config: &Bones, context: &BuildContext, docker: &DockerClient) -> Result<()> {
+pub fn build(config: &Bones, context: &mut BuildContext, docker: &DockerClient) -> Result<()> {
     let source = context.path();
     let Some((deployment_dir, scripts)) = build_scripts(source)? else {
         return Ok(());
@@ -29,6 +35,7 @@ pub fn build(config: &Bones, context: &BuildContext, docker: &DockerClient) -> R
     let cache = local_cache_path(&config.project_name);
     fs::create_dir_all(&cache).with_context(|| format!("Failed to create local build cache {}", cache.display()))?;
     let environment = build_contract::environment(config, source)?;
+    #[cfg(unix)]
     let ownership = mount_ownership(source)?;
     let input = ContainerStart {
         source,
@@ -36,6 +43,7 @@ pub fn build(config: &Bones, context: &BuildContext, docker: &DockerClient) -> R
         cache: &cache,
         config,
         environment: &environment,
+        #[cfg(unix)]
         ownership,
     };
     let mut container = BuildContainer::start(&input, docker)?;
@@ -45,6 +53,12 @@ pub fn build(config: &Bones, context: &BuildContext, docker: &DockerClient) -> R
             println!("Running local build script {name}...");
             container.run_script(&script, timeout)?;
         }
+        context.replace_inventory(super::native_inventory::read(
+            container.docker,
+            &container.source,
+            &container.name,
+            container.timeout,
+        )?);
         Ok(())
     })();
     let cleanup_result = container.remove();
@@ -151,6 +165,7 @@ struct ContainerStart<'a> {
     cache: &'a Path,
     config: &'a Bones,
     environment: &'a [(String, String)],
+    #[cfg(unix)]
     ownership: MountOwnership,
 }
 
@@ -180,27 +195,23 @@ fn create_command(
         .args(["--env-file"])
         .arg(environment_file)
         .args(["--volume"])
-        .arg(format!("{}:{SOURCE_MOUNT}", input.source.display()))
+        .arg(bind_specification(input.source, SOURCE_MOUNT, ""))
         .args(["--volume"])
-        .arg(format!("{}:{WORKSPACE_ROOT}/deployment:ro", input.deployment.display()))
+        .arg(bind_specification(input.deployment, &format!("{WORKSPACE_ROOT}/deployment"), ":ro"))
         .args(["--volume"])
-        .arg(format!("{}:{CACHE_MOUNT}:rw", input.cache.display()))
+        .arg(bind_specification(input.cache, CACHE_MOUNT, ":rw"))
         .arg(BUILDER_IMAGE)
         .args(["sleep", "infinity"]);
     Ok(command)
 }
 
-#[derive(Clone, Copy)]
-struct MountOwnership {
-    uid: u32,
-    gid: u32,
-}
-
 struct BuildContainer<'a> {
     docker: &'a DockerClient,
     source: PathBuf,
+    #[cfg(unix)]
     cache: PathBuf,
     name: String,
+    #[cfg(unix)]
     ownership: MountOwnership,
     _environment_file: NamedTempFile,
     removed: bool,
@@ -223,8 +234,10 @@ impl<'a> BuildContainer<'a> {
         Ok(Self {
             docker,
             source: input.source.to_path_buf(),
+            #[cfg(unix)]
             cache: input.cache.to_path_buf(),
             name,
+            #[cfg(unix)]
             ownership: input.ownership,
             timeout: build_timeout_seconds(input.config),
             _environment_file: environment_file,
@@ -257,14 +270,25 @@ impl<'a> BuildContainer<'a> {
         if self.removed {
             return Ok(());
         }
+        #[cfg(unix)]
         let ownership_result = self.restore_mount_ownership();
+        #[cfg(windows)]
+        self.restore_mount_ownership();
         let removal_result = force_remove_container(self.docker, &self.source, &self.name, self.timeout);
         if removal_result.is_ok() {
             self.removed = true;
         }
-        finish_with_cleanup(ownership_result, removal_result)
+        #[cfg(unix)]
+        {
+            finish_with_cleanup(ownership_result, removal_result)
+        }
+        #[cfg(windows)]
+        {
+            removal_result
+        }
     }
 
+    #[cfg(unix)]
     fn restore_mount_ownership(&mut self) -> Result<()> {
         if !self.usable {
             return normalize_mount_ownership_in_cleanup_container(self, self.timeout);
@@ -278,12 +302,18 @@ impl<'a> BuildContainer<'a> {
             }
         }
     }
+
+    #[cfg(windows)]
+    fn restore_mount_ownership(&mut self) {}
 }
 
 impl Drop for BuildContainer<'_> {
     fn drop(&mut self) {
         if !self.removed {
+            #[cfg(unix)]
             let _ = self.restore_mount_ownership();
+            #[cfg(windows)]
+            self.restore_mount_ownership();
             let _ = force_remove_container(self.docker, &self.source, &self.name, self.timeout);
         }
     }
@@ -294,19 +324,17 @@ fn write_environment_file(environment: &[(String, String)]) -> Result<NamedTempF
         .prefix("bonesdeploy-build-env-")
         .tempfile()
         .context("Failed to create protected build environment file")?;
-    fs::set_permissions(file.path(), PermissionsExt::from_mode(0o600))?;
+    #[cfg(unix)]
+    set_private_environment_file_permissions(file.path())?;
+    #[cfg(windows)]
+    set_private_environment_file_permissions(file.path());
     for (key, value) in environment {
         writeln!(file, "{key}={value}").context("Failed to write protected build environment file")?;
     }
     Ok(file)
 }
 
-fn mount_ownership(path: &Path) -> Result<MountOwnership> {
-    let metadata = fs::symlink_metadata(path)
-        .with_context(|| format!("Failed to inspect local build mount {}", path.display()))?;
-    Ok(MountOwnership { uid: metadata.uid(), gid: metadata.gid() })
-}
-
+#[cfg(unix)]
 fn normalize_mount_ownership(
     docker: &DockerClient,
     name: &str,
@@ -330,6 +358,7 @@ fn normalize_mount_ownership(
     command::run(command, "restore local build mount ownership", timeout)
 }
 
+#[cfg(unix)]
 fn normalize_mount_ownership_in_cleanup_container(container: &BuildContainer<'_>, timeout: Option<u64>) -> Result<()> {
     let ownership = format!("{}:{}", container.ownership.uid, container.ownership.gid);
     let mut command = container.docker.command()?;
@@ -337,9 +366,9 @@ fn normalize_mount_ownership_in_cleanup_container(container: &BuildContainer<'_>
         .current_dir(&container.source)
         .args(["run", "--rm", "--pull=never", "--platform", TARGET_PLATFORM_NAME])
         .args(["--volume"])
-        .arg(format!("{}:{SOURCE_MOUNT}", container.source.display()))
+        .arg(bind_specification(&container.source, SOURCE_MOUNT, ""))
         .args(["--volume"])
-        .arg(format!("{}:{CACHE_MOUNT}:rw", container.cache.display()))
+        .arg(bind_specification(&container.cache, CACHE_MOUNT, ":rw"))
         .arg(BUILDER_IMAGE)
         .args(["find", "-P", SOURCE_MOUNT, CACHE_MOUNT, "-exec", "chown", "-h", &ownership, "{}", "+"]);
     command::run(command, "restore local build mount ownership in cleanup container", timeout)
@@ -356,12 +385,10 @@ fn force_remove_container(docker: &DockerClient, source: &Path, name: &str, time
     command.current_dir(source).args(["rm", "--force", name]);
     command::run(command, &format!("remove local build container {name}"), timeout)
 }
-
 fn unique_container_name(project: &str) -> String {
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
     format!("bonesdeploy-build-{project}-{}-{nonce}", process::id())
 }
-
 fn finish_with_cleanup(primary: Result<()>, cleanup: Result<()>) -> Result<()> {
     match (primary, cleanup) {
         (Ok(()), Ok(())) => Ok(()),

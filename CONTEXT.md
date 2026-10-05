@@ -1,8 +1,24 @@
 # BonesDeploy v3
 
-A remote release deployment tool for simple Linux servers. It produces two executables: `bonesdeploy` (local CLI for setup, provisioning, deployment, and management) and `bonesremote` (server-side release lifecycle executor, installed on the deployment host). BonesDeploy selects the configured local Git revision, builds a complete native or Compose artifact locally, and sends it over SSH for deployment. **We only handle Debian/Ubuntu machines.**
+A remote release deployment tool for simple Linux servers. It produces two executables: `bonesdeploy` (local CLI for setup, provisioning, deployment, and management) and `bonesremote` (server-side release lifecycle executor, installed on the deployment host). BonesDeploy selects the configured local Git revision, builds a complete native or Compose artifact locally, and sends it over SSH for deployment. **Production hosts and `bonesremote` remain Linux-only: we only handle Debian/Ubuntu machines.** The local `bonesdeploy` CLI also supports native `x86_64-pc-windows-msvc` workstations.
 
 The command behavior is documented in this file and in the command examples in `README.md`.
+
+### Local Platform Boundary
+
+Windows local CLI users need Git, OpenSSH (`ssh.exe`), Python 3.12 or newer
+(`python.exe`), Cargo, curl, GnuPG, and a configured editor on `PATH`. Windows
+Developer Mode is required for local symlink operations. Docker Desktop must be
+running Linux containers with Compose enabled for native and Compose package
+builds. Build the package explicitly with
+`cargo build --locked --release --package bonesdeploy`; the executable is
+`target\release\bonesdeploy.exe`.
+
+Windows configuration is rooted at `%APPDATA%\bonesdeploy`. Data, cache, and
+state are rooted at `%LOCALAPPDATA%\bonesdeploy`. Linux retains the existing
+XDG and home-relative roots. Tagged Windows releases publish
+`bonesdeploy-x86_64-pc-windows-msvc.exe` and its `.sha256` checksum; the Linux
+`bonesremote` release artifact and production-host contract are unchanged.
 
 ## Deployment Methodology
 We have an SSH deployment user named `deploy` that handles deployment concerns. This user has a home folder, restricted sudo ability, but no password login. We also have a per-project service user named after the project. This is not a shared `applications` user; it must be a dedicated user per project so isolation works on a shared server. This user has no home folder, no login, and no sudo ability. The project name `deploy` is reserved so the global deploy account cannot collide with a runtime identity.

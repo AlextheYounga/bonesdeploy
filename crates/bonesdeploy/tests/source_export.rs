@@ -1,4 +1,5 @@
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
 
 use bonesdeploy::build::source::sanitize_exported_context;
@@ -15,9 +16,12 @@ fn exported_context_removes_root_environment_files_but_keeps_public_build_config
     assert!(!context.path().join(paths::DOT_ENV).exists());
     assert_eq!(fs::read_to_string(context.path().join(paths::ENV_BUILD_FILE))?, "NODE_VERSION=24");
 
-    symlink(paths::ENV_BUILD_FILE, context.path().join(paths::DOT_ENV))?;
-    sanitize_exported_context(context.path())?;
-    assert!(!context.path().join(paths::DOT_ENV).exists());
-    assert_eq!(fs::read_to_string(context.path().join(paths::ENV_BUILD_FILE))?, "NODE_VERSION=24");
+    #[cfg(unix)]
+    {
+        symlink(paths::ENV_BUILD_FILE, context.path().join(paths::DOT_ENV))?;
+        sanitize_exported_context(context.path())?;
+        assert!(!context.path().join(paths::DOT_ENV).exists());
+        assert_eq!(fs::read_to_string(context.path().join(paths::ENV_BUILD_FILE))?, "NODE_VERSION=24");
+    }
     Ok(())
 }

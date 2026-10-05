@@ -205,7 +205,6 @@ async fn server_ready(cfg: &config::Bones) -> Result<bool> {
     let host_doctor_ok =
         if bonesremote_installed { session.run_cmd("bonesremote doctor >/dev/null 2>&1").await.is_ok() } else { false };
 
-    session.close().await?;
     Ok(host_doctor_ok)
 }
 
@@ -222,8 +221,6 @@ async fn site_ready(cfg: &config::Bones) -> Result<bool> {
     let current_ok =
         session.run_cmd(&format!("test -e {}", ssh::shell_quote(&current.display().to_string()))).await.is_ok();
 
-    session.close().await?;
-
     Ok(sync_ok && current_ok)
 }
 
@@ -239,8 +236,6 @@ pub(crate) async fn remote_ssl_enabled(cfg: &config::Bones) -> Result<bool> {
         certificate = ssh::shell_quote(&certificate_directory),
     );
     let enabled = session.run_cmd(&command).await.is_ok();
-    session.close().await?;
-
     Ok(enabled)
 }
 

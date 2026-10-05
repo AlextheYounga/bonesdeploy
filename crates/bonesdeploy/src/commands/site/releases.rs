@@ -77,15 +77,12 @@ pub async fn kill(release: &str) -> Result<()> {
         ssh::shell_quote(&cfg.project_name),
         ssh::shell_quote(release)
     );
-    let result = session.stream_cmd(&command).await;
-    session.close().await?;
-    result
+    session.stream_cmd(&command).await
 }
 
 async fn remote_report(cfg: &config::Bones) -> Result<Report> {
     let session = ssh::SshTransport::connect_privileged(cfg).await?;
     let command = format!("bonesremote release list --site {}", ssh::shell_quote(&cfg.project_name));
-    let output = session.run_cmd(&command).await;
-    session.close().await?;
-    serde_json::from_str(&output?).context("Failed to parse remote release report")
+    let output = session.run_cmd(&command).await?;
+    serde_json::from_str(&output).context("Failed to parse remote release report")
 }

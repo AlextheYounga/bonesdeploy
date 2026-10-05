@@ -1,6 +1,7 @@
 mod common;
 
 use std::fs;
+#[cfg(unix)]
 use std::os::unix::fs::symlink;
 
 use anyhow::Result;
@@ -31,6 +32,7 @@ fn valid_archive_reports_its_size_before_project_configuration_or_ssh() -> Resul
     Ok(())
 }
 
+#[cfg(unix)]
 #[test]
 fn directory_and_symlink_archives_are_rejected_before_ssh() -> Result<()> {
     let env = common::TestEnv::new()?;

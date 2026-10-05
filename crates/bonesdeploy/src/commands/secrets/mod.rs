@@ -1,7 +1,6 @@
 use std::env;
-use std::fs::{self, OpenOptions, Permissions};
+use std::fs::{self, OpenOptions};
 use std::io::ErrorKind;
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::process::Command;
@@ -16,6 +15,8 @@ use crate::ui::output;
 use bonesdeploy_core::config as shared_config;
 use bonesdeploy_core::config::parse_port;
 use bonesdeploy_core::paths;
+
+use crate::platform;
 
 mod environment;
 pub mod gpg;
@@ -63,7 +64,10 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     let temp_path = create_temp_edit_path()?;
     fs::write(&temp_path, plaintext)
         .with_context(|| format!("Failed to write default secrets to {}", temp_path.display()))?;
-    fs::set_permissions(&temp_path, Permissions::from_mode(0o600))?;
+    #[cfg(unix)]
+    platform::set_mode(&temp_path, 0o600)?;
+    #[cfg(not(unix))]
+    platform::set_mode(&temp_path, 0o600);
 
     let encrypted_result = gpg::run(&[
         "--batch",
@@ -78,7 +82,10 @@ pub fn initialize_defaults(cfg: &config::Bones) -> Result<()> {
     let cleanup_result = fs::remove_file(&temp_path);
     encrypted_result?;
     cleanup_result.with_context(|| format!("Failed to remove temporary secrets file {}", temp_path.display()))?;
-    fs::set_permissions(encrypted_path, Permissions::from_mode(0o640))?;
+    #[cfg(unix)]
+    platform::set_mode(encrypted_path, 0o640)?;
+    #[cfg(not(unix))]
+    platform::set_mode(encrypted_path, 0o640);
     Ok(())
 }
 
@@ -117,7 +124,7 @@ pub fn edit() -> Result<()> {
 
     let edit_result = open_editor(&temp_path);
     let encrypt_result = if edit_result.is_ok() {
-        gpg::run(&[
+        let result = gpg::run(&[
             "--batch",
             "--yes",
             "--output",
@@ -126,7 +133,14 @@ pub fn edit() -> Result<()> {
             "--recipient",
             &key_fingerprint,
             temp_path.to_str().ok_or_else(|| anyhow::anyhow!("Invalid temp path"))?,
-        ])
+        ]);
+        #[cfg(unix)]
+        let encrypt_result = result.and_then(|()| platform::set_mode(encrypted_path, 0o640));
+        #[cfg(not(unix))]
+        let encrypt_result = result.map(|()| {
+            platform::set_mode(encrypted_path, 0o640);
+        });
+        encrypt_result
     } else {
         Ok(())
     };
@@ -164,10 +178,7 @@ pub async fn push() -> Result<()> {
     let port = parse_port(&cfg.port)?;
     let session = ssh::SshTransport::connect_as(&ssh_user, &cfg.host, port).await?;
     let command = infra::shared_install_environment_command(&cfg.project_name);
-    let push_result = session.run_cmd_with_stdin(&command, environment.as_bytes()).await;
-    let close_result = session.close().await;
-    push_result?;
-    close_result.context("Failed to close the SSH session")?;
+    session.run_cmd_with_stdin(&command, environment.as_bytes()).await?;
     println!("{} Secrets pushed.", output::success_marker());
     Ok(())
 }
@@ -181,14 +192,15 @@ pub async fn production_secrets_exist(cfg: &config::Bones) -> Result<bool> {
         "if test -f {}; then printf present; else printf missing; fi",
         ssh::shell_quote(&target.display().to_string())
     );
-    let result = session.run_cmd(&command).await;
-    session.close().await?;
-    Ok(result?.trim() == "present")
+    Ok(session.run_cmd(&command).await?.trim() == "present")
 }
 
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
+    use anyhow::{Context, Result};
+    use std::path::Path;
+
+    use crate::test_support::with_env;
 
     use super::environment_to_push;
 
@@ -201,6 +213,17 @@ mod tests {
         assert_eq!(environment, secrets);
         Ok(())
     }
+
+    #[test]
+    fn missing_configured_editor_names_the_editor_and_windows_executable_contract() -> Result<()> {
+        let editor = if cfg!(windows) { "missing-editor.exe" } else { "missing-editor" };
+        let result = with_env("EDITOR", Some(editor), || super::open_editor(Path::new("secret file.txt")));
+        let error = result.err().context("missing configured editor should fail")?;
+        let message = format!("{error:#}");
+        assert!(message.contains("Configured editor"), "{message}");
+        assert!(message.contains(editor), "{message}");
+        Ok(())
+    }
 }
 
 fn open_editor(path: &Path) -> Result<()> {
@@ -209,20 +232,82 @@ fn open_editor(path: &Path) -> Result<()> {
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| anyhow::anyhow!("$EDITOR is not set. Set it before running `bonesdeploy secrets edit`."))?;
 
-    let status = Command::new("sh")
-        .arg("-c")
-        .arg("${EDITOR:?EDITOR is not set} \"$1\"")
-        .arg("sh")
-        .arg(path)
-        .env("EDITOR", editor)
-        .status()
-        .context("Failed to launch editor")?;
+    let status = {
+        #[cfg(windows)]
+        {
+            Command::new("cmd.exe")
+                .args(["/D", "/S", "/C"])
+                .arg(format!("\"{}\"", windows_editor_command_line(&editor, path)))
+                .status()
+        }
+        #[cfg(not(windows))]
+        {
+            Command::new("sh")
+                .arg("-c")
+                .arg("${EDITOR:?EDITOR is not set} \"$1\"")
+                .arg("sh")
+                .arg(path)
+                .env("EDITOR", &editor)
+                .status()
+        }
+    }
+    .with_context(|| {
+        format!("Failed to launch configured editor `{editor}`; install it and ensure its executable is available")
+    })?;
 
     if !status.success() {
-        bail!("Editor exited with status {status}");
+        bail!("Configured editor `{editor}` exited with status {status}");
     }
 
     Ok(())
+}
+
+#[cfg(any(windows, test))]
+fn windows_editor_command_line(editor: &str, path: &Path) -> String {
+    let (program, arguments) = if let Some(unquoted) = editor.strip_prefix('"') {
+        let end = unquoted.find('"').map_or(editor.len(), |index| index + 2);
+        (&editor[..end], editor[end..].trim())
+    } else if let Some(end) = editor.to_ascii_lowercase().find(".exe") {
+        let end = end + ".exe".len();
+        (&editor[..end], editor[end..].trim())
+    } else {
+        editor.split_once(char::is_whitespace).unwrap_or((editor, ""))
+    };
+    let program = if program.starts_with('"') || !program.chars().any(char::is_whitespace) {
+        program.to_string()
+    } else {
+        format!("\"{program}\"")
+    };
+    let arguments = arguments.trim();
+    if arguments.is_empty() {
+        format!("{program} \"{}\"", path.display())
+    } else {
+        format!("{program} {arguments} \"{}\"", path.display())
+    }
+}
+
+#[cfg(test)]
+mod editor_tests {
+    use std::path::Path;
+
+    use super::windows_editor_command_line;
+
+    #[test]
+    fn windows_editor_command_line_quotes_executable_and_file_paths_with_spaces() {
+        let command = windows_editor_command_line(
+            r#"C:\Program Files\Editor\editor.exe --wait"#,
+            Path::new(r#"C:\Users\Test User\secrets file.env"#),
+        );
+
+        assert_eq!(command, r#""C:\Program Files\Editor\editor.exe" --wait "C:\Users\Test User\secrets file.env""#);
+    }
+
+    #[test]
+    fn windows_editor_command_line_preserves_command_arguments() {
+        let command = windows_editor_command_line("code --wait", Path::new("secrets.env"));
+
+        assert_eq!(command, r#"code --wait "secrets.env""#);
+    }
 }
 
 fn create_temp_edit_path() -> Result<PathBuf> {
@@ -234,6 +319,10 @@ fn create_temp_edit_path() -> Result<PathBuf> {
         .create_new(true)
         .open(&path)
         .with_context(|| format!("Failed to create temp file {}", path.display()))?;
+    #[cfg(unix)]
+    platform::set_mode(&path, 0o600)?;
+    #[cfg(not(unix))]
+    platform::set_mode(&path, 0o600);
 
     Ok(path)
 }

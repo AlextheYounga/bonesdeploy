@@ -12,9 +12,7 @@ pub async fn run(verbose: bool) -> Result<()> {
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
     println!("{} Checking server baseline...", style("bonesdeploy server doctor").bold());
     let session = ssh::SshTransport::connect_privileged(&cfg).await?;
-    let result = session.run_cmd("bonesremote doctor").await;
-    let _ = session.close().await;
-    let report = result?;
+    let report = session.run_cmd("bonesremote doctor").await?;
     if verbose {
         print!("{report}");
         if !report.is_empty() && !report.ends_with('\n') {

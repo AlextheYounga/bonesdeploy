@@ -10,6 +10,7 @@ use bonesdeploy_core::paths;
 use crate::config;
 use crate::infra;
 use crate::infra::git;
+use crate::platform;
 use crate::ui::output;
 
 pub mod release;
@@ -93,7 +94,7 @@ pub async fn run(options: Options) -> Result<()> {
 }
 
 fn continue_with_installed_binary(options: Options) -> Result<()> {
-    let mut command = Command::new(paths::BONESDEPLOY_BINARY);
+    let mut command = Command::new(platform::installed_bonesdeploy_executable());
     command.arg("update");
     if options.skip_local {
         command.arg("--skip-local");
@@ -124,7 +125,7 @@ fn latest_release_version() -> Result<String> {
             "https://api.github.com/repos/AlextheYounga/bonesdeploy/releases/latest",
         ])
         .output()
-        .context("Failed to query the latest BonesDeploy GitHub release")?;
+        .context("curl is required to query updates; install curl and ensure curl.exe is on PATH")?;
     if !output.status.success() {
         bail!("Failed to query the latest BonesDeploy GitHub release");
     }
@@ -132,6 +133,24 @@ fn latest_release_version() -> Result<String> {
     let value: serde_json::Value =
         serde_json::from_slice(&output.stdout).context("GitHub returned an invalid release response")?;
     parse_release_tag(value.get("tag_name").and_then(serde_json::Value::as_str))
+}
+
+#[cfg(test)]
+mod tests {
+    use anyhow::{Context, Result};
+
+    use super::latest_release_version;
+    use crate::test_support::with_env;
+
+    #[test]
+    fn missing_curl_names_the_windows_prerequisite_and_executable() -> Result<()> {
+        let result = with_env("PATH", Some("missing-curl-path"), latest_release_version);
+        let error = result.err().context("missing curl should fail")?;
+        let message = format!("{error:#}");
+        assert!(message.contains("curl is required"), "{message}");
+        assert!(message.contains("curl.exe"), "{message}");
+        Ok(())
+    }
 }
 
 pub fn parse_release_tag(tag: Option<&str>) -> Result<String> {

@@ -1,6 +1,8 @@
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 
 use anyhow::Result;
 use bonesdeploy::commands::update::sync::refresh_local_infrastructure;
@@ -34,8 +36,11 @@ fn refresh_local_infrastructure_updates_managed_files_without_touching_custom() 
     assert_eq!(fs::read_to_string(infra_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
     assert_eq!(fs::read_to_string(infra_dir.join("deployment/functions.sh"))?, "shared functions");
     assert_eq!(fs::read_to_string(infra_dir.join("custom/runtime.py"))?, "def deploy(ctx):\n    custom(ctx)\n");
-    let mode = fs::metadata(infra_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
-    assert_eq!(mode, 0o755);
+    #[cfg(unix)]
+    {
+        let mode = fs::metadata(infra_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
+        assert_eq!(mode, 0o755);
+    }
     Ok(())
 }
 

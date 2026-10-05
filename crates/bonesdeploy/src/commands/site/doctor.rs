@@ -216,9 +216,11 @@ mod tests {
 
     use super::check_local_branch_at;
     use crate::config::Bones;
+    use crate::test_support::lock_env;
 
     #[test]
     fn local_doctor_requires_the_configured_branch_to_resolve_to_a_commit() -> anyhow::Result<()> {
+        let _env_lock = lock_env();
         let repo = tempfile::tempdir()?;
         run_git(repo.path(), ["init", "--initial-branch=main"])?;
         run_git(repo.path(), ["config", "user.email", "test@example.com"])?;
@@ -269,10 +271,7 @@ fn check_local_cache() -> Option<String> {
 
 async fn check_remote_ssh(cfg: &config::Bones) -> Option<String> {
     match ssh::SshTransport::connect(cfg).await {
-        Ok(session) => {
-            let _ = session.close().await;
-            None
-        }
+        Ok(_) => None,
         Err(error) => Some(format!("Cannot connect to remote\n  {error}")),
     }
 }
@@ -289,8 +288,6 @@ async fn check_remote_doctor(cfg: &config::Bones, verbose: bool) -> (Option<Stri
         }
         Err(error) => Err(error),
     };
-    let _ = session.close().await;
-
     match result {
         Ok(output) => {
             let pending = output::render_remote_doctor_output(&output, verbose);

@@ -53,10 +53,6 @@ pub async fn run(yes: bool) -> Result<()> {
         .run_cmd(&infra::remove_site_command(&cfg.project_name))
         .await
         .context("Site resources were removed, but BonesRemote registration cleanup failed; rerun the command")?;
-    session.close().await.context(
-        "Site resources and registration were removed, but the SSH session did not close cleanly; rerunning is safe",
-    )?;
-
     println!("{} Site deletion complete.", output::success_marker());
     Ok(())
 }

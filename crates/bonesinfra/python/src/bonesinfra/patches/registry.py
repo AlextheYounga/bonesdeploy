@@ -10,6 +10,7 @@ from bonesinfra.config.context import DeployContext
 from bonesinfra.patches import local, remote
 
 VERSION_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$")
+DATA_ROOT_ENV = "BONESDEPLOY_DATA_ROOT"
 
 
 @dataclass(frozen=True, order=True)
@@ -58,6 +59,9 @@ def select_patches(target_version: str) -> tuple[Patch, ...]:
 
 
 def _local_marker_dir(ctx: DeployContext) -> Path:
+    projected_root = os.environ.get(DATA_ROOT_ENV)
+    if projected_root:
+        return Path(projected_root) / "patches" / ctx.app.project_name
     data_home = os.environ.get("XDG_DATA_HOME")
     root = Path(data_home) / "bonesdeploy" if data_home else Path.home() / ".local/share/bonesdeploy"
     return root / "patches" / ctx.app.project_name
