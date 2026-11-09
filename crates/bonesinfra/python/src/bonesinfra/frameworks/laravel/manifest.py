@@ -20,18 +20,13 @@ def artifacts(ctx):
         ),
         ("PHP log directory", paths.site_log_dir, "directory", "framework"),
         ("current PHP web root", paths.current_web_root, "directory", "framework"),
-        ("nginx site configuration", paths.site_nginx_config, "file", "runtime"),
-        ("nginx site", paths.nginx_site_available, "file", "runtime"),
-        ("enabled nginx site", paths.nginx_site_enabled, "link", "runtime"),
     ]
     entries.append(("Laravel queue worker service", paths.systemd_service("worker"), "file", "framework"))
     return entries
 
 
 def services(_ctx):
-    entries = [("site nginx", "{project}-nginx.service", "runtime")]
-    entries.append(("Laravel queue worker", "{project}-worker.service", "framework"))
-    return entries
+    return [("Laravel queue worker", "{project}-worker.service", "framework")]
 
 
 def mode(_ctx):

@@ -19,7 +19,7 @@ def artifacts(ctx):
 
 
 def services(ctx):
-    services = [("site nginx", "{project}-nginx.service", "runtime")]
+    services = []
     if not ctx.runtime.data.get("is_static", True):
         services.append(("application service", "{project}-nuxt.service", "framework"))
     return services

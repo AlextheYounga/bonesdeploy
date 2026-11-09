@@ -1,10 +1,12 @@
+import json
 from shlex import quote
+from typing import Any
 
 from pyinfra.context import ctx_host
-from pyinfra.facts.server import LinuxDistribution
+from pyinfra.facts.server import Command, LinuxDistribution, Which
 from pyinfra.operations import apt, files, server, systemd
 
-from bonesinfra.config.context import template_data
+from bonesinfra.config.context import DeployContext, template_data
 from bonesinfra.config.paths import ASSETS_DIR
 from bonesinfra.services.linux import runtime, systemd as site_systemd
 from bonesinfra.services.linux.nginx import site as nginx_site
@@ -55,19 +57,10 @@ def deploy(ctx) -> None:
 
 
 def artifacts(ctx):
-    artifacts = [
+    return [
         ("Compose runtime service", ctx.paths.systemd_service("compose"), "file", "docker"),
         ("Compose runtime requirement", ctx.paths.systemd_service_requirement("compose"), "link", "docker"),
     ]
-    if ctx.runtime.compose_port is not None:
-        artifacts.extend(
-            [
-                ("Compose nginx configuration", ctx.paths.site_nginx_config, "file", "docker"),
-                ("Compose nginx site", ctx.paths.nginx_site_available, "file", "docker"),
-                ("Enabled Compose nginx site", ctx.paths.nginx_site_enabled, "link", "docker"),
-            ]
-        )
-    return artifacts
 
 
 def services(_ctx):
@@ -76,6 +69,24 @@ def services(_ctx):
 
 def mode(_ctx):
     return "compose"
+
+
+def inspect_runtime(ctx: DeployContext, host: Any) -> dict[str, Any]:
+    """Read engine availability and the stack status owned by BonesRemote."""
+    engine = host.get_fact(Which, command="docker")
+    plugin = host.get_fact(
+        Command,
+        command="docker compose version >/dev/null 2>&1 && printf available || printf unavailable",
+    )
+    status = host.get_fact(Command, command=f"bonesremote status --site {quote(ctx.app.project_name)}")
+    if not status:
+        stack = {"error": "bonesremote status is unavailable"}
+    else:
+        try:
+            stack = json.loads(status).get("compose") or {}
+        except (TypeError, json.JSONDecodeError):
+            stack = {"error": "bonesremote returned invalid Compose status"}
+    return {"engine_available": bool(engine), "plugin_available": plugin == "available", **stack}
 
 
 def _install_docker() -> None:

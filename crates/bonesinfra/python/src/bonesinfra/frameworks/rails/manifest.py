@@ -10,15 +10,11 @@ def artifacts(ctx):
         ("application log directory", paths.site_log_dir, "directory", "framework"),
         ("Rails placeholder Gemfile", f"{placeholder}/Gemfile", "file", "framework"),
         ("Rails placeholder Rack configuration", f"{placeholder}/config.ru", "file", "framework"),
-        ("nginx site configuration", paths.site_nginx_config, "file", "runtime"),
-        ("nginx site", paths.nginx_site_available, "file", "runtime"),
-        ("enabled nginx site", paths.nginx_site_enabled, "link", "runtime"),
     ]
 
 
 def services(_ctx):
     return [
-        ("site nginx", "{project}-nginx.service", "runtime"),
         ("application service", "{project}-puma.service", "framework"),
     ]
 

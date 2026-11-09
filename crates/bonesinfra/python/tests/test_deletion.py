@@ -105,7 +105,7 @@ def test_deletion_removes_unix_sockets_from_current_and_legacy_plans(
     assert calls[0]["commands"] == ["rm -f -- /run/example/app.sock"]
 
 
-def test_deletion_adds_shared_nginx_resources_when_resuming_a_legacy_plan(monkeypatch: pytest.MonkeyPatch):
+def test_deletion_executes_only_approved_artifacts_without_adding_nginx_resources(monkeypatch: pytest.MonkeyPatch):
     calls = []
     monkeypatch.setattr(delete.systemd, "service", lambda **kwargs: calls.append(("service", kwargs)))
     monkeypatch.setattr(delete.systemd, "daemon_reload", lambda **kwargs: calls.append(("daemon-reload", kwargs)))
@@ -135,7 +135,7 @@ def test_deletion_adds_shared_nginx_resources_when_resuming_a_legacy_plan(monkey
     tunnel_stop = next(kwargs for operation, kwargs in calls if operation == "shell")
     assert "systemctl cat" in tunnel_stop["commands"][0]
     assert "systemctl disable --now" in tunnel_stop["commands"][0]
-    assert any(
+    assert not any(
         operation == "shell" and kwargs.get("commands") == ["rm -f -- /etc/nginx/sites-enabled/example.conf"]
         for operation, kwargs in calls
     )
@@ -143,3 +143,24 @@ def test_deletion_adds_shared_nginx_resources_when_resuming_a_legacy_plan(monkey
         operation == "service" and kwargs.get("service") == "nginx" and kwargs.get("reloaded") is True
         for operation, kwargs in calls
     )
+
+
+def test_deletion_stops_backup_schedule_but_preserves_repository_and_key():
+    ctx = _context()
+    plan = resolve_deletion_plan(ctx, ProjectManifest())
+    paths = [entry.path for entry in plan.artifacts]
+
+    assert paths.count(ctx.paths.backup_cron_file) == 1
+    assert ctx.paths.backup_repository not in paths
+    assert ctx.paths.backup_passphrase_file not in paths
+    assert ctx.paths.site_root not in paths
+    assert ctx.backup.passphrase not in render_deletion_plan(plan)
+
+
+@pytest.mark.parametrize("path_key", ["backup_repository", "backup_passphrase_file", "site_root"])
+def test_custom_deletion_inventory_cannot_remove_retained_backups(path_key):
+    ctx = _context()
+    plan = DeletionPlan((DeletionArtifact("unsafe", getattr(ctx.paths, path_key), "directory", "custom"),), ())
+
+    with pytest.raises(ValueError, match="retained backup data"):
+        parse_deletion_plan(render_deletion_plan(plan), ctx)

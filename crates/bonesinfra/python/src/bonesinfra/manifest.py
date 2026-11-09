@@ -4,16 +4,16 @@ import json
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from shlex import quote
 from typing import Any, Literal
 
 from pyinfra.context import ctx_host
 from pyinfra.facts.files import Directory, File, Link, Socket
-from pyinfra.facts.server import Command, Which
 from pyinfra.facts.systemd import SystemdEnabled, SystemdStatus
 
 from bonesinfra.config.context import DeployContext
 from bonesinfra.pyinfra.operations import letsencrypt_cert_paths
+from bonesinfra.services.linux import backup, compose
+from bonesinfra.services.linux.nginx import manifest as nginx_manifest
 
 ArtifactKind = Literal["file", "directory", "link", "socket"]
 ArtifactState = Literal["present", "missing", "wrong-kind"]
@@ -96,16 +96,17 @@ COMMON_ARTIFACTS = (
     Artifact("placeholder web root", "placeholder_web_root", "directory", "setup"),
     Artifact("placeholder index", "placeholder_index", "file", "setup"),
     Artifact("project configuration directory", "conf_root", "directory", "runtime"),
+    Artifact("site systemd target", "systemd_site_target", "file", "runtime"),
+    Artifact("site systemd requirements", "systemd_site_target_requires", "directory", "runtime"),
+    Artifact("runtime socket directory", "runtime_socket_dir", "directory", "runtime"),
 )
 
 
 def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifact, ...]:
     """Return the artifacts expected for the context's deployment strategy."""
     artifacts = list(COMMON_ARTIFACTS)
-    artifacts.extend(
-        Artifact.at_path(artifact.name, artifact.path, artifact.kind, artifact.owner)
-        for artifact in runtime_deletion_artifacts(ctx)
-    )
+    artifacts.extend(Artifact.at_path(*spec) for spec in nginx_manifest.artifacts(ctx))
+    artifacts.extend(Artifact.at_path(*spec) for spec in backup.artifacts(ctx))
     artifacts.extend(Artifact.at_path(*spec) for spec in project_manifest.artifacts(ctx))
 
     if ctx.app.dns.domain:
@@ -117,45 +118,22 @@ def collect_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifa
     return _deduplicate(artifacts)
 
 
-def runtime_deletion_artifacts(ctx: DeployContext) -> tuple[DeletionArtifact, ...]:
-    """Return resources installed by the shared per-site nginx runtime."""
-    if ctx.runtime.backend == "docker" and ctx.runtime.compose_port is None:
-        return ()
-    paths = ctx.paths
-    return (
-        DeletionArtifact("nginx site configuration", paths.site_nginx_config, "file", "runtime"),
-        DeletionArtifact("nginx site", paths.nginx_site_available, "file", "runtime"),
-        DeletionArtifact("enabled nginx site", paths.nginx_site_enabled, "link", "runtime"),
-        DeletionArtifact("site systemd target", paths.systemd_site_target, "file", "runtime"),
-        DeletionArtifact("site systemd requirements", paths.systemd_site_target_requires, "directory", "runtime"),
-        DeletionArtifact("site nginx systemd service", paths.systemd_site_nginx_service, "file", "runtime"),
-        DeletionArtifact("site nginx systemd requirement", paths.systemd_site_nginx_requirement, "link", "runtime"),
-        DeletionArtifact("nginx AppArmor profile", paths.nginx_apparmor_profile, "file", "runtime"),
-        DeletionArtifact("runtime socket directory", paths.runtime_socket_dir, "directory", "runtime"),
-        DeletionArtifact("runtime nginx directory", paths.runtime_nginx_dir, "directory", "runtime"),
-        DeletionArtifact("runtime nginx socket", paths.runtime_nginx_socket, "socket", "runtime"),
-        DeletionArtifact("runtime nginx PID", paths.runtime_nginx_pid, "file", "runtime"),
-    )
-
-
 def collect_services(ctx: DeployContext, project_manifest: Any) -> tuple[ManagedService, ...]:
     """Return the project-specific systemd services managed by BonesInfra."""
-    services = []
-    if ctx.runtime.backend != "docker" or ctx.runtime.compose_port is not None:
-        services.append(ManagedService("site nginx", f"{ctx.app.project_name}-nginx.service", "runtime"))
-    services.extend(
+    services = [
         ManagedService(name, unit.format(project=ctx.app.project_name), owner)
-        for name, unit, owner in project_manifest.services(ctx)
-    )
+        for name, unit, owner in [*nginx_manifest.services(ctx), *project_manifest.services(ctx)]
+    ]
     return _deduplicate_services(services)
 
 
 def resolve_artifacts(ctx: DeployContext, project_manifest: Any) -> tuple[Artifact, ...]:
     """Validate and return declarations whose keys resolve through DeploymentPaths."""
     paths = ctx.paths
-    for artifact in collect_artifacts(ctx, project_manifest):
+    artifacts = collect_artifacts(ctx, project_manifest)
+    for artifact in artifacts:
         _artifact_path(paths, artifact)
-    return collect_artifacts(ctx, project_manifest)
+    return artifacts
 
 
 def resolve_deletion_plan(ctx: DeployContext, project_manifest: Any) -> DeletionPlan:
@@ -164,7 +142,14 @@ def resolve_deletion_plan(ctx: DeployContext, project_manifest: Any) -> Deletion
         *(
             DeletionArtifact(artifact.name, _artifact_path(ctx.paths, artifact), artifact.kind, artifact.owner)
             for artifact in collect_artifacts(ctx, project_manifest)
+            if _artifact_path(ctx.paths, artifact)
+            not in {
+                ctx.paths.backup_repository,
+                ctx.paths.backup_passphrase_file,
+                ctx.paths.backup_cron_file,
+            }
         ),
+        DeletionArtifact("scheduled backup cron entry", ctx.paths.backup_cron_file, "file", "backup"),
         DeletionArtifact("quick tunnel service", ctx.paths.systemd_cloudflared_service, "file", "tunnel"),
         DeletionArtifact("quick tunnel nginx route", ctx.paths.nginx_cloudflared_site_available, "file", "tunnel"),
         DeletionArtifact(
@@ -225,13 +210,11 @@ def report(
     project_manifest: Any,
     compose_runtime: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    template = ctx.runtime.data.get("template")
-
     ssl_entries = [entry for entry in entries if entry.owner == "ssl"]
     data = {
         "strategy": {
             "backend": ctx.runtime.backend,
-            "framework": template or "none",
+            "framework": ctx.template or "none",
             "mode": project_manifest.mode(ctx),
             "ssl": bool(ssl_entries) and all(entry.state == "present" for entry in ssl_entries),
         },
@@ -272,31 +255,8 @@ def inspect_for_runner(ctx: DeployContext, project_manifest: Any) -> dict[str, A
         inspect_artifacts(ctx, host, project_manifest),
         inspect_services(ctx, host, project_manifest),
         project_manifest,
-        _inspect_compose_runtime(ctx, host),
+        compose.inspect_runtime(ctx, host) if ctx.runtime.backend == "docker" else None,
     )
-
-
-def _inspect_compose_runtime(ctx: DeployContext, host: Any) -> dict[str, Any] | None:
-    if ctx.runtime.backend != "docker":
-        return None
-    engine = host.get_fact(Which, command="docker")
-    plugin = host.get_fact(
-        Command,
-        command="docker compose version >/dev/null 2>&1 && printf available || printf unavailable",
-    )
-    status = host.get_fact(Command, command=f"bonesremote status --site {quote(ctx.app.project_name)}")
-    if not status:
-        compose = {"error": "bonesremote status is unavailable"}
-    else:
-        try:
-            compose = json.loads(status).get("compose") or {}
-        except (TypeError, json.JSONDecodeError):
-            compose = {"error": "bonesremote returned invalid Compose status"}
-    return {
-        "engine_available": bool(engine),
-        "plugin_available": plugin == "available",
-        **compose,
-    }
 
 
 def _inspect_one(host: Any, artifact: Artifact, path: str) -> ResolvedArtifact:
@@ -338,6 +298,9 @@ def _validate_deletion_artifact(ctx: DeployContext, artifact: DeletionArtifact) 
     path = Path(artifact.path)
     if not path.is_absolute() or ".." in path.parts:
         raise ValueError(f"unsafe deletion artifact path: {artifact.path}")
+    for retained in (Path(ctx.paths.backup_repository), Path(ctx.paths.backup_passphrase_file)):
+        if _is_within(path, retained) or _is_within(retained, path):
+            raise ValueError(f"deletion artifact would remove retained backup data: {artifact.path}")
     if not any(_is_within(path, root) for root in _deletion_roots(ctx)) and not _is_derived_system_path(ctx, path):
         raise ValueError(f"deletion artifact is outside site-owned paths: {artifact.path}")
 

@@ -33,6 +33,17 @@ bonesinfra
 
 BonesInfra owns provisioning.
 
+Rust sends Node version as an explicit site request field. Python preserves it
+as `ctx.runtime.node_version`; framework identity is `ctx.template`. Neither is
+read from framework `data`, and request extras may not duplicate explicit fields.
+Test non-default values all the way through runtime selection and reporting.
+
+The shared nginx inventory lives in `services/linux/nginx/manifest.py` and backup
+inventory in `services/linux/backup.py`. Framework manifests declare only their
+own resources. Deletion executes the validated preflight without adding resources
+at execution time. It removes the backup schedule, retaining the repository and
+root-only key for recovery.
+
 BonesRemote owns deployment.
 
 BonesDeploy owns public UX.

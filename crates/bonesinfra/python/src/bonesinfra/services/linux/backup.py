@@ -10,6 +10,18 @@ from bonesinfra.config.paths import ASSETS_DIR, BACKUPS_ROOT
 from bonesinfra.pyinfra.operations import mkdir, render
 
 
+def artifacts(ctx):
+    """Inventory backups without exposing their contents or passphrase."""
+    if not ctx.backup.configured:
+        return []
+    paths = ctx.paths
+    return [
+        ("Borg backup repository", paths.backup_repository, "directory", "backup"),
+        ("Borg passphrase file", paths.backup_passphrase_file, "file", "backup"),
+        ("scheduled backup cron entry", paths.backup_cron_file, "file", "backup"),
+    ]
+
+
 def provision(ctx, paths):
     """Create the encrypted repository and install the cron schedule.
 

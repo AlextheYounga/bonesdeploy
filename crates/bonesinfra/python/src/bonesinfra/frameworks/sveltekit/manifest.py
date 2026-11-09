@@ -16,7 +16,6 @@ def artifacts(ctx):
 
 def services(_ctx):
     return [
-        ("site nginx", "{project}-nginx.service", "runtime"),
         ("application service", "{project}-sveltekit.service", "framework"),
     ]
 

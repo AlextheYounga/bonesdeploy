@@ -65,24 +65,24 @@ def test_shared_nginx_runtime_resources_are_included_once():
 
 def test_vue_declares_nginx_socket_as_socket(tmp_path: Path):
     ctx = _context()
-    socket = next(entry for entry in vue_manifest.artifacts(ctx) if entry[0] == "runtime nginx socket")
-    assert socket[2] == "socket"
+    socket = next(entry for entry in resolve_artifacts(ctx, vue_manifest) if entry.name == "runtime nginx socket")
+    assert socket.kind == "socket"
 
 
 def test_angular_declares_the_static_browser_artifact():
     ctx = _context()
-    artifacts = {entry[0]: entry for entry in angular_manifest.artifacts(ctx)}
+    artifacts = {entry.name: entry for entry in resolve_artifacts(ctx, angular_manifest)}
 
-    assert artifacts["static placeholder web root"][1].endswith("/dist/browser")
-    assert artifacts["static placeholder index"][1].endswith("/dist/browser/index.html")
-    assert artifacts["current static web root"][1].endswith("/dist/browser")
-    assert artifacts["runtime nginx socket"][2] == "socket"
+    assert artifacts["static placeholder web root"].path.endswith("/dist/browser")
+    assert artifacts["static placeholder index"].path.endswith("/dist/browser/index.html")
+    assert artifacts["current static web root"].path.endswith("/dist/browser")
+    assert artifacts["runtime nginx socket"].kind == "socket"
     assert angular_manifest.mode(ctx) == "static"
 
 
 @pytest.mark.parametrize(
     "project_manifest",
-    [django_manifest, next_manifest, nuxt_manifest, rails_manifest, sveltekit_manifest],
+    [django_manifest, nuxt_manifest, rails_manifest, sveltekit_manifest],
 )
 def test_server_frameworks_declare_application_runtime_socket_as_socket(project_manifest):
     ctx = _context()
@@ -91,6 +91,46 @@ def test_server_frameworks_declare_application_runtime_socket_as_socket(project_
     socket = next(entry for entry in project_manifest.artifacts(ctx) if entry[0] == "application runtime socket")
 
     assert socket[2] == "socket"
+
+
+def test_next_server_inventory_matches_tcp_provisioning_and_canonical_framework_identity():
+    ctx = DeployContext.from_request(make_site_request(template="next", extras={"is_static": False}))
+    artifacts = resolve_artifacts(ctx, next_manifest)
+
+    assert not any(entry.name == "application runtime socket" for entry in artifacts)
+    assert sum(entry.name == "runtime nginx socket" for entry in artifacts) == 1
+    assert report(ctx, [], [], next_manifest)["strategy"]["framework"] == "next"
+
+
+def test_framework_inventory_does_not_redeclare_shared_runtime_resources():
+    ctx = _context()
+    ctx.runtime.data["is_static"] = False
+    for framework in (
+        angular_manifest,
+        django_manifest,
+        next_manifest,
+        nuxt_manifest,
+        rails_manifest,
+        sveltekit_manifest,
+        vue_manifest,
+    ):
+        assert not any(entry[3] == "runtime" for entry in framework.artifacts(ctx))
+        assert not any(entry[2] == "runtime" for entry in framework.services(ctx))
+        assert sum(service.unit == "example-nginx.service" for service in collect_services(ctx, framework)) == 1
+
+
+def test_backup_inventory_contains_paths_but_never_the_passphrase():
+    ctx = _context()
+    artifacts = resolve_artifacts(ctx, ProjectManifest())
+    paths = {entry.path for entry in artifacts if entry.owner == "backup"}
+
+    assert paths == {ctx.paths.backup_repository, ctx.paths.backup_passphrase_file, ctx.paths.backup_cron_file}
+    entries = [
+        manifest.ResolvedArtifact(entry.name, entry.path, entry.kind, entry.owner, "present")
+        for entry in artifacts
+        if entry.path
+    ]
+    assert ctx.backup.passphrase not in render(report(ctx, entries, [], ProjectManifest()))
 
 
 def test_resolve_artifacts_rejects_unknown_path_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -279,5 +319,5 @@ def test_runner_inspection_uses_the_host_installed_by_pyinfra(tmp_path: Path):
     with ctx_host.use(FakeHost()):
         result = inspect_for_runner(ctx, ProjectManifest())
 
-    assert all("repository" not in entry["name"] for entry in result["entries"])
+    assert not any(entry["name"] == "bare repository" for entry in result["entries"])
     assert all(service["running"] and service["enabled"] for service in result["managed_services"])
