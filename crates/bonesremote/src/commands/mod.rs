@@ -20,8 +20,8 @@ use crate::release::SiteMutation;
 pub fn ensure_site_idle(mutation: &SiteMutation) -> Result<()> {
     let state = mutation.state()?;
 
-    // A pre-cut-over record (or a failed one being aborted) means a deployment
-    // is in flight or interrupted. A committed record (`activated` and later)
+    // An unverified record (or a failed one being aborted) means a deployment
+    // is in flight or interrupted. A committed record (`verified` and later)
     // is serving traffic and never blocks the next mutation.
     if let Some(active) = state.active() {
         if !active.phase().is_committed() {

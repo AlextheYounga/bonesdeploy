@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 /// Explicit, persisted deployment phases.
 ///
 /// `created` … `sealed` are the pre-cut-over phases: the new release is
-/// prepared and validated while the old release still serves. `activated` /
-/// `verified` are the cut-over (the commit point); once committed, a site is
+/// prepared and validated while the old release still serves. `activated` means
+/// the link switched but service verification is incomplete. `verified` is the
+/// commit point; once committed, a site is
 /// serialization-idle even while post-commit maintenance (`prune`, temp
 /// cleanup) is still pending. `cleanup_pending` records a post-commit
 /// maintenance failure without blocking the next deployment, and `failed` is a
@@ -34,7 +35,7 @@ impl DeploymentPhase {
     /// committed record is serialization-idle: a next deployment may proceed
     /// even while the record remains (e.g. `cleanup_pending`).
     pub fn is_committed(&self) -> bool {
-        matches!(self, Self::Activated | Self::Verified | Self::Completed | Self::CleanupPending)
+        matches!(self, Self::Verified | Self::Completed | Self::CleanupPending)
     }
 
     /// Whether prepare scripts or the cut-over may already have mutated runtime

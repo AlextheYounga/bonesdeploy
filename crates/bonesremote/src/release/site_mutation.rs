@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use bonesdeploy_core::config::{self, Bones};
 
+use crate::control_plane;
 use crate::release::state::{self, DeploymentLock, DeploymentRecord};
 
 /// A site-scoped mutation guard: the deployment lock plus the site configuration.
@@ -36,12 +37,11 @@ impl SiteMutation {
         Ok(Self::new(site, config, _lock))
     }
 
-    /// Acquires the serialization lock and applies a deployment descriptor
-    /// supplied by the local deploy command.
-    pub(crate) fn acquire_with_config(site: &str, config: Bones) -> Result<Self> {
-        config::validate_site_name(site)?;
-        let _lock = DeploymentLock::acquire(site)?;
-        Ok(Self::new(site, config, _lock))
+    /// Loads the synchronized descriptor only after holding the site lock.
+    pub(crate) fn acquire_for_deploy(site: &str) -> Result<Self> {
+        let mut mutation = Self::acquire(site)?;
+        mutation.config = control_plane::load(site)?.into_site_config(site);
+        Ok(mutation)
     }
 
     /// Adopts an already-held lock for cancellation, which must stop a live

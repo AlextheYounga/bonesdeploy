@@ -4,17 +4,15 @@ use bonesdeploy_core::config::RuntimeBackend;
 use std::io;
 
 use crate::commands::ensure_site_idle;
-use crate::control_plane;
 use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::lifecycle;
 
-use super::coordinator::DeploymentLifecycleCoordinator;
+use super::coordinator;
 
 pub fn run_artifact(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote artifact deploy")?;
-    let bones = control_plane::load(site)?.into_site_config(site);
-    let mutation = SiteMutation::acquire_with_config(site, bones)?;
+    let mutation = SiteMutation::acquire_for_deploy(site)?;
     ensure_site_idle(&mutation)?;
     let mut input = io::stdin().lock();
     let manifest = read_manifest(&mut input)?;
@@ -23,7 +21,7 @@ pub fn run_artifact(site: &str) -> Result<()> {
     }
     artifact_matches_backend(&manifest, mutation.config().runtime.backend)?;
     let snapshot = lifecycle::DeploymentSnapshot::new(&mutation, manifest.revision.clone());
-    DeploymentLifecycleCoordinator::new(&mutation, snapshot).run_with_artifact(&mut input, manifest)
+    coordinator::run_staged_deployment(&mutation, snapshot, &mut input, &manifest)
 }
 
 fn artifact_matches_backend(manifest: &ArtifactManifest, backend: RuntimeBackend) -> Result<()> {

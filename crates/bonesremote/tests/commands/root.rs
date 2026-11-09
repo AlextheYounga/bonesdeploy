@@ -55,6 +55,18 @@ fn committed_deployment_is_serialization_idle() -> Result<()> {
 }
 
 #[test]
+fn switched_but_unverified_release_blocks_the_next_site_mutation() -> Result<()> {
+    let root = temp_root("unverified")?;
+    let _guard = release_state::override_sites_root(root.clone());
+    let mutation =
+        SiteMutation::adopt("unitapp", Default::default(), release_state::DeploymentLock::acquire("unitapp")?)?;
+    release_state::write_active_deployment("unitapp", &record(DeploymentPhase::Activated))?;
+    assert!(ensure_site_idle(&mutation).is_err());
+    fs::remove_dir_all(root)?;
+    Ok(())
+}
+
+#[test]
 fn staged_release_without_committed_deployment_blocks_site_mutation() -> Result<()> {
     let root = temp_root("staged")?;
     let _guard = release_state::override_sites_root(root.clone());

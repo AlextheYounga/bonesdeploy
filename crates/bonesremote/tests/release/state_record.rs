@@ -6,7 +6,7 @@ use bonesremote::release::state::record::{DeploymentPhase, DeploymentRecord, Pro
 fn phases_after_commit_are_serialization_idle() {
     assert!(!DeploymentPhase::Created.is_committed());
     assert!(!DeploymentPhase::Sealed.is_committed());
-    assert!(DeploymentPhase::Activated.is_committed());
+    assert!(!DeploymentPhase::Activated.is_committed());
     assert!(DeploymentPhase::Verified.is_committed());
     assert!(DeploymentPhase::CleanupPending.is_committed());
 }

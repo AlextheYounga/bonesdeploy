@@ -12,6 +12,7 @@ use time::macros::format_description;
 use crate::commands::{drop_failed_release, release, service};
 use crate::release::SiteMutation;
 use crate::release::lifecycle;
+use crate::release::lifecycle::activate::{ActivationFailure, ReleaseActivation};
 use crate::release::lifecycle::preflight;
 use crate::release::state as release_state;
 use crate::runtime::docker;
@@ -24,42 +25,26 @@ struct PreparedDeployment {
     manifest_image_tags: Vec<String>,
 }
 
-pub struct DeploymentLifecycleCoordinator<'a> {
-    mutation: &'a SiteMutation,
-    snapshot: lifecycle::DeploymentSnapshot,
-}
-
-enum DeploymentInput<'a> {
-    Artifact(&'a mut dyn Read, ArtifactManifest),
-}
-
-impl<'a> DeploymentLifecycleCoordinator<'a> {
-    pub fn new(mutation: &'a SiteMutation, snapshot: lifecycle::DeploymentSnapshot) -> Self {
-        Self { mutation, snapshot }
-    }
-
-    pub fn run_with_artifact(self, reader: &mut dyn Read, manifest: ArtifactManifest) -> Result<()> {
-        run_staged_deployment(self.mutation, self.snapshot, DeploymentInput::Artifact(reader, manifest))
-    }
-}
-
-fn run_staged_deployment(
+pub(crate) fn run_staged_deployment(
     mutation: &SiteMutation,
     snapshot: lifecycle::DeploymentSnapshot,
-    input: DeploymentInput<'_>,
+    reader: &mut dyn Read,
+    manifest: &ArtifactManifest,
 ) -> Result<()> {
-    let prepared = prepare_deployment(mutation, snapshot, input)?;
+    let prepared = prepare_deployment(mutation, snapshot, reader, manifest)?;
     activate_deployment(mutation, &prepared)?;
-    complete_deployment(mutation, &prepared)
+    complete_deployment(mutation, &prepared);
+    Ok(())
 }
 
 fn prepare_deployment(
     mutation: &SiteMutation,
     snapshot: lifecycle::DeploymentSnapshot,
-    input: DeploymentInput<'_>,
+    reader: &mut dyn Read,
+    manifest: &ArtifactManifest,
 ) -> Result<PreparedDeployment> {
     let (mut deployment, snapshot, context_dir) = start_release(mutation, snapshot)?;
-    let manifest_image_tags = build_and_prepare(mutation, &snapshot, &context_dir, &mut deployment, input)?;
+    let manifest_image_tags = build_and_prepare(mutation, &snapshot, &context_dir, &mut deployment, reader, manifest)?;
 
     let site = mutation.site();
     stage("Verifying before cut-over");
@@ -80,6 +65,7 @@ fn start_release(
     mutation: &SiteMutation,
     snapshot: lifecycle::DeploymentSnapshot,
 ) -> Result<(release_state::DeploymentRecord, lifecycle::DeploymentSnapshot, PathBuf)> {
+    let identity = release_state::ProcessIdentity::new(process::id(), process_start_ticks()?, deployment_started_at()?);
     stage("Staging release");
     if let Err(error) = lifecycle::stage::run(mutation, &snapshot) {
         return finish_abort(mutation, None, &[], error);
@@ -89,7 +75,6 @@ fn start_release(
         Ok(release_name) => release_name,
         Err(error) => return finish_abort(mutation, None, &[], error),
     };
-    let identity = release_state::ProcessIdentity::new(process::id(), process_start_ticks()?, deployment_started_at()?);
     let mut deployment = release_state::DeploymentRecord::new(
         release_name,
         snapshot.revision.clone(),
@@ -115,27 +100,23 @@ fn start_release(
 
 #[expect(
     clippy::too_many_arguments,
-    reason = "each deployment input converges on the same shared lifecycle state at this boundary"
+    reason = "candidate context, persisted record and framed artifact meet at the preparation boundary"
 )]
 fn build_and_prepare(
     mutation: &SiteMutation,
     snapshot: &lifecycle::DeploymentSnapshot,
     context_dir: &Path,
     deployment: &mut release_state::DeploymentRecord,
-    input: DeploymentInput<'_>,
+    reader: &mut dyn Read,
+    manifest: &ArtifactManifest,
 ) -> Result<Vec<String>> {
     let mut manifest_image_tags = Vec::new();
-    let manifest = match input {
-        DeploymentInput::Artifact(reader, manifest) => {
-            if let Err(error) = lifecycle::artifact::receive_payload(reader, &manifest, &snapshot.site, context_dir) {
-                return finish_abort(mutation, Some(context_dir), &[], error);
-            }
-            if let ArtifactKind::ComposeImages { images } = &manifest.kind {
-                manifest_image_tags = images.iter().map(|image| image.tag.clone()).collect();
-            }
-            manifest
-        }
-    };
+    if let Err(error) = lifecycle::artifact::receive_payload(reader, manifest, &snapshot.site, context_dir) {
+        return finish_abort(mutation, Some(context_dir), &[], error);
+    }
+    if let ArtifactKind::ComposeImages { images } = &manifest.kind {
+        manifest_image_tags = images.iter().map(|image| image.tag.clone()).collect();
+    }
     if let Err(error) =
         advance_phase(mutation, deployment, Some(release_state::DeploymentPhase::Received), Some(context_dir))
     {
@@ -196,50 +177,47 @@ fn build_and_prepare(
 }
 
 fn activate_deployment(mutation: &SiteMutation, prepared: &PreparedDeployment) -> Result<()> {
-    // Phase B: cut-over — the commit point. Failure restores the previous
-    // release (transactional rollback), leaving the site idle.
+    // Only durable service verification commits the new release.
     stage("Activating release");
-    if let Err(error) = lifecycle::activate::run(mutation, &prepared.snapshot) {
-        return finish_abort(mutation, Some(&prepared.context_dir), &prepared.manifest_image_tags, error);
+    let candidate = mutation.release_dir(prepared.deployment.release());
+    let result = ReleaseActivation::new(&prepared.snapshot.project_root, &candidate, &prepared.previous_release).run(
+        |phase| advance_phase(mutation, &prepared.deployment, Some(phase), None),
+        || service::run_for_release(mutation),
+    );
+    match result {
+        Ok(()) => Ok(()),
+        Err(ActivationFailure::Aborted(error)) => {
+            finish_abort(mutation, Some(&prepared.context_dir), &prepared.manifest_image_tags, error)
+        }
+        Err(ActivationFailure::RecoveryRequired(error)) => {
+            let mut record = prepared.deployment.clone();
+            record.set_phase(release_state::DeploymentPhase::Failed);
+            record.set_error(format!("{error:#}"));
+            let error = match mutation.set_active(&record) {
+                Ok(()) => error,
+                Err(state_error) => error.context(format!("Failed to retain recovery state: {state_error:#}")),
+            };
+            Err(error.context("Release recovery is incomplete; candidate and deployment state were retained"))
+        }
     }
-    if let Err(error) = advance_phase(
-        mutation,
-        &prepared.deployment,
-        Some(release_state::DeploymentPhase::Activated),
-        Some(&prepared.context_dir),
-    ) {
-        return finish_abort(mutation, Some(&prepared.context_dir), &prepared.manifest_image_tags, error);
-    }
-
-    stage("Restarting services");
-    if let Err(error) = service::run_for_release(mutation) {
-        return finish_failed_activation(mutation, &prepared.previous_release, Some(&prepared.context_dir), error);
-    }
-    if let Err(error) = advance_phase(
-        mutation,
-        &prepared.deployment,
-        Some(release_state::DeploymentPhase::Verified),
-        Some(&prepared.context_dir),
-    ) {
-        return finish_abort_without_release_drop(mutation, Some(&prepared.context_dir), error);
-    }
-    Ok(())
 }
 
-fn complete_deployment(mutation: &SiteMutation, prepared: &PreparedDeployment) -> Result<()> {
+fn complete_deployment(mutation: &SiteMutation, prepared: &PreparedDeployment) {
     // Phase C: post-commit maintenance. The new release is serving; failures
     // here are recorded as `cleanup_pending` warnings, never deployment errors.
     if let Err(error) = run_maintenance(mutation, &prepared.context_dir) {
         finish_cleanup_pending(mutation, Some(&prepared.context_dir), &error);
-        return Ok(());
+        return;
     }
     if let Err(error) =
         advance_phase(mutation, &prepared.deployment, Some(release_state::DeploymentPhase::Completed), None)
     {
         finish_cleanup_pending(mutation, Some(&prepared.context_dir), &error);
-        return Ok(());
+        return;
     }
-    mutation.clear_active()
+    if let Err(error) = mutation.clear_active() {
+        finish_cleanup_pending(mutation, Some(&prepared.context_dir), &error);
+    }
 }
 
 /// Advances the persisted deployment phase and writes the record (with the
@@ -299,33 +277,6 @@ fn ansi(code: &str, value: &str) -> String {
     format!("\x1b[{code}m{value}\x1b[0m")
 }
 
-fn finish_failed_activation(
-    mutation: &SiteMutation,
-    previous_release: &Path,
-    context: Option<&Path>,
-    error: Error,
-) -> Result<()> {
-    let project_root = &mutation.config().project_root;
-    if let Err(restore_error) = restore_previous_release(Path::new(project_root), previous_release) {
-        return finish_abort_without_release_drop(
-            mutation,
-            context,
-            error.context(format!("Failed to restore previous release: {restore_error:#}")),
-        );
-    }
-
-    let error = match service::run_for_release(mutation) {
-        Ok(()) => error,
-        Err(restart_error) => error.context(format!("Failed to restart the restored release: {restart_error:#}")),
-    };
-    finish_abort(mutation, context, &[], error)
-}
-
-pub fn restore_previous_release(project_root: &Path, previous_release: &Path) -> Result<()> {
-    let current_link = PathBuf::from(project_root).join(paths::CURRENT_LINK);
-    release_state::point_symlink_atomically(&current_link, previous_release)
-}
-
 fn process_start_ticks() -> Result<u64> {
     release::list::current_process_start_ticks().context("Failed to read deployment process start time")
 }
@@ -365,11 +316,6 @@ fn finish_abort<T>(mutation: &SiteMutation, context: Option<&Path>, tags: &[Stri
         Ok(()) => Err(anyhow::anyhow!("Deployment abort unexpectedly succeeded")),
         Err(error) => Err(error),
     }
-}
-
-fn finish_abort_without_release_drop(mutation: &SiteMutation, context: Option<&Path>, error: Error) -> Result<()> {
-    let error = abort_context_only(mutation, context, error);
-    clear_active_after_result(mutation, Err(error))
 }
 
 fn clear_active_after_result(mutation: &SiteMutation, result: Result<()>) -> Result<()> {
