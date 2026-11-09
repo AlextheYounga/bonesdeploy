@@ -141,6 +141,12 @@ pub fn site_backup_repository_path(site: &str) -> PathBuf {
     Path::new(BACKUPS_ROOT).join(format!("{site}.borg"))
 }
 
+/// A deleted site's key remains outside its removable registration directory.
+#[must_use]
+pub fn retained_borg_passphrase_filename(site: &str) -> String {
+    format!(".{site}.borg-passphrase")
+}
+
 #[must_use]
 pub fn bonesremote_site_passphrase_path(site: &str) -> PathBuf {
     bonesremote_site_root(site).join(BORG_PASSPHRASE_FILE)

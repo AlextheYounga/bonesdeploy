@@ -2,7 +2,8 @@ use std::cell::RefCell;
 use std::fs;
 use std::fs::{File, OpenOptions, TryLockError};
 use std::io::ErrorKind;
-use std::path::PathBuf;
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
 use std::thread_local;
 
 use anyhow::{Context, Result, bail};
@@ -156,6 +157,36 @@ pub fn remove_site_registration(site: &str) -> Result<()> {
     if !metadata.is_dir() || metadata.file_type().is_symlink() {
         bail!("Refusing to recursively remove non-directory site registration {}", site_root.display());
     }
+    // Keep backup recovery material outside registration: doctor enumerates
+    // directories here as live sites. A sibling file is not a registered site.
+    let passphrase = site_root.join(paths::BORG_PASSPHRASE_FILE);
+    match fs::symlink_metadata(&passphrase) {
+        Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
+            retain_backup_key(&passphrase, &sites_root.join(paths::retained_borg_passphrase_filename(site)))?;
+        }
+        Ok(_) => bail!("Refusing to remove site registration with an invalid backup passphrase file"),
+        Err(error) if error.kind() == ErrorKind::NotFound => {}
+        Err(error) => return Err(error).context("Failed to inspect retained backup passphrase file"),
+    }
     fs::remove_dir_all(&site_root)
         .with_context(|| format!("Failed to remove site registration {}", site_root.display()))
+}
+
+fn retain_backup_key(source: &Path, destination: &Path) -> Result<()> {
+    // Hard linking is atomic and never overwrites an older retained key. If the
+    // filesystem cannot link it, fail before removing any registration data.
+    match fs::hard_link(source, destination) {
+        Ok(()) => {}
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+            let metadata = fs::symlink_metadata(destination)?;
+            if !metadata.is_file() || fs::read(source)? != fs::read(destination)? {
+                bail!("Retained backup key at {} differs; refusing to overwrite it", destination.display());
+            }
+        }
+        Err(error) => return Err(error).context("Failed to retain the backup key before removing registration"),
+    }
+    fs::set_permissions(destination, fs::Permissions::from_mode(0o600))?;
+    File::open(destination)?.sync_all()?;
+    let parent = destination.parent().context("Retained backup key has no parent")?;
+    File::open(parent)?.sync_all().context("Failed to sync retained backup key directory")
 }
