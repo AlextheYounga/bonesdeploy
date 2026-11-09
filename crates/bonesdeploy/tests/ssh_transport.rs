@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use bonesdeploy::infra::ssh::{SshTransport, TransportPolicy};
-use openssh::SessionBuilder;
+use openssh::{KnownHosts, SessionBuilder};
 use tempfile::TempDir;
 use tokio::io::{AsyncRead, ReadBuf, repeat};
 use tokio::sync::{Mutex, MutexGuard};
@@ -24,6 +24,7 @@ struct SshdFixture {
     _directory: TempDir,
     port: u16,
     private_key: PathBuf,
+    known_hosts: PathBuf,
     process: Child,
 }
 
@@ -39,6 +40,9 @@ impl SshdFixture {
         let host_key = directory.path().join("host_ed25519");
         run("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f"], Some(&host_key))?;
         let port = free_port()?;
+        let known_hosts = directory.path().join("known_hosts");
+        let host_public_key = fs::read_to_string(host_key.with_extension("pub"))?;
+        fs::write(&known_hosts, format!("[127.0.0.1]:{port} {host_public_key}"))?;
         let config = directory.path().join("sshd_config");
         fs::write(
             &config,
@@ -56,7 +60,7 @@ impl SshdFixture {
             .spawn()
             .context("failed to start fixture sshd")?;
         wait_for_port(port)?;
-        Ok(Self { _directory: directory, port, private_key, process })
+        Ok(Self { _directory: directory, port, private_key, known_hosts, process })
     }
 
     async fn transport(&self) -> Result<SshTransport> {
@@ -65,6 +69,8 @@ impl SshdFixture {
             .user(username()?)
             .port(self.port)
             .keyfile(&self.private_key)
+            .user_known_hosts_file(&self.known_hosts)
+            .known_hosts_check(KnownHosts::Strict)
             .connect("127.0.0.1")
             .await
             .context("failed to connect to fixture sshd")?;

@@ -434,6 +434,12 @@ caches, and shared host resources. The command removes the site's BonesRemote
 registration after teardown succeeds and can be rerun when resources or the
 registration are already absent.
 
+Scheduled backups are retained: deletion removes the cron entry, but preserves
+the Borg repository. Before removing registration, it retains the key as the
+root-only `/root/.config/bonesremote/sites/.<site>.borg-passphrase` file. A
+different previously retained key is never overwritten. Removing retained backups
+and keys is a separate, explicit administrative action.
+
 Embedded documentation for AI agents lives under the `skill` command:
 
 ```sh

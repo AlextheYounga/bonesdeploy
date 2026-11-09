@@ -194,8 +194,8 @@ Writing Python framework/service/patch code that needs config.
 Contract:
 DeployContext (bonesinfra/python/.../config/context.py)
 ├── app: AppConfig
-├── runtime: RuntimeConfig   # includes `data` dict for framework-specific keys
-└── services: ServicesConfig
+├── runtime: RuntimeConfig   # explicit Node version plus framework-specific `data`
+└── backup: BackupConfig
 
 template_data(ctx) flattens it for Jinja2 rendering.
 
@@ -211,6 +211,7 @@ crates/bonesinfra/python/src/bonesinfra/config/context.py
 Do not:
 - Re-parse `.env` inside framework or service code
 - Construct DeployContext manually outside the CLI entry points
+- Read explicit fields such as `runtime.node_version` or `ctx.template` from `data`
 ```
 
 ```text
@@ -384,15 +385,16 @@ Any bonesremote command that changes per-site state.
 Contract:
 SiteMutation (crates/bonesremote/src/release/site_mutation.rs)
 ├── site: String          # site identity
-├── config: Bones         # validated snapshot (confused-deputy check: project_name == site)
+├── config: Bones         # identity and paths derived from site
 └── _lock: DeploymentLock # per-site advisory file lock (flock)
 
 Constructors:
-- acquire(site)                  # standard: lock, then load config
+- acquire(site)                  # lock, then derive identity and paths
+- acquire_for_deploy(site)       # lock, then load the synchronized descriptor
 - adopt(site, cfg, lock)         # cancellation: adopt config loaded before terminating a deployment
 
 Existing implementations:
-- Single implementation; consumed by deploy, rollback, kill, drop-failed, prune, and service restart
+- Single implementation; consumed by config sync, deploy, rollback, kill, drop-failed, prune, and service restart
 
 To add another:
 Do not. Use the existing constructor that matches your context.
@@ -420,21 +422,27 @@ Created → Received → Materialized → Promoted → Prepared → Sealed
        → Activated → Verified → Completed
        → (CleanupPending on post-commit failure | Failed on pre-commit abort)
 
-Orchestrator (commands/deploy/lifecycle.rs):
-run_staged_deployment(mutation, revision)
+Orchestrator (commands/deploy/coordinator.rs):
+run_staged_deployment(mutation, snapshot, reader, manifest)
    ├─ stage::run()         → Created
    ├─ artifact::receive()  → Received / Materialized
    ├─ release::promote()   → Promoted
   ├─ wire_shared + prepare → Prepared
    ├─ release::finalize()  → Sealed
   ├─ preflight::validate  (nginx -t gate; no live mutation yet)
-  ├─ activate::run()      → Activated   *** cut-over ***
-  ├─ service::run()       → Verified
+   ├─ ReleaseActivation    → Activated   *** link switched, not yet committed ***
+   ├─ service verification → Verified    *** durable commit ***
   └─ prune + cleanup      → Completed
 
 Pre-activation failure: abort, drop failed release, clear state.
-Post-activation failure: restore previous release, restart, clear state.
+Post-switch failure (including phase persistence): restore and verify the previous
+release before dropping the candidate and clearing state. Failed restoration
+retains the candidate, context, restoration target, and failed deployment record.
 Post-commit maintenance failure: record as CleanupPending (non-blocking).
+
+The previous-release identity is persisted before switching current. Activated
+without Verified blocks subsequent site mutation. Deploy and explicit rollback
+share ReleaseActivation; do not independently reconstruct compensation logic.
 
 Each phase is persisted to SiteState. Crash detection via pid + process_start_ticks.
 
@@ -549,17 +557,35 @@ provisioning uses the installed BonesInfra wheel, managed `infra/templates`, and
 project-owned `infra/custom` packages composed together. Framework-specific config
 goes through `Runtime.extra`.
 
+**Configuration projection.** Explicit request fields stay explicit in Python;
+`extras` cannot shadow them. Test non-default values from request parsing through
+their runtime consumer, not just each side's defaults.
+
+**Resource inventory ownership.** Shared nginx declarations belong to
+`services/linux/nginx/manifest.py`; backup declarations belong to `backup.py`.
+Framework manifests add only framework-owned resources. Inspection and deletion
+compose these declarations once; teardown must not add resources absent from the
+validated preflight. Site deletion removes the backup schedule but retains the
+Borg repository. Registration removal retains its root-only key as a sibling
+file (`sites/.<site>.borg-passphrase`), not a directory that doctor would mistake
+for a live site. A different previously retained key must never be overwritten.
+
+**Transaction boundaries.** Atomic file replacement does not replace the site
+lock. Load deploy descriptors after locking; config sync uses that same guard.
+Test failures on both sides of current-link switching and service verification.
+
 **Binary communication.** `bonesdeploy` ↔ `bonesremote` via SSH command execution.
-`bonesdeploy` ↔ `bonesinfra` via the `bonesinfra::run()` subprocess boundary;
-BonesInfra reads the explicit root `.env` path.
+`bonesdeploy` ↔ `bonesinfra` via the subprocess boundary and typed JSON requests
+on stdin. Rust alone reads the root `.env`.
 `bonesremote` never calls `bonesinfra`.
 
 **Script naming.** Deployment scripts use `NN_name.sh` and run in lexical order.
 Other files in the script directories are ignored.
 
-**Error handling.** All functions return `anyhow::Result<T>`. CLI entry points
-print formatted error chains to stderr. Aborted deployments record the error in
-the deployment record.
+**Error handling.** Fallible boundaries use `anyhow::Result<T>`. Release activation
+additionally distinguishes safe abort from incomplete recovery so callers cannot
+discard recovery evidence. CLI entry points print formatted error chains to
+stderr; incomplete recovery records the error in the deployment record.
 
 ## 6. Dependency and Ownership Rules
 
@@ -570,8 +596,9 @@ the deployment record.
   `bonesinfra`.
 - **`bonesinfra`** depends on `bonesdeploy-core` (minimally, for cache path
   resolution).
-- Config is authored by `bonesdeploy` in the root `.env`, then read by both
-  binaries and the Python layer. The schema is owned by `bonesdeploy-core`.
+- Config is authored and read locally from the root `.env`. Python consumes a
+  provisioning request; BonesRemote consumes a narrow synchronized descriptor.
+  The transport models are owned by `bonesdeploy-core`.
 - Path constants are owned by `bonesdeploy-core::paths` (Rust) and mirrored by
   `DeploymentPaths` (Python). The two must agree.
 - Remote site state is owned exclusively by `bonesremote`. `bonesdeploy` never
@@ -603,6 +630,12 @@ stdin (`--request-stdin`), and BonesRemote config sync consumes the
 site-derived stored copy. This descriptor contains release retention and only
 the selected backend's remotely consumed runtime values. The layers share one
 schema defined in `bonesdeploy-core`.
+
+**Separate config-sync and deploy requests.** Both serialize against active site
+mutation, so a running deployment sees a stable descriptor. They are not one
+transaction: `sync A → sync B → deploy A` can still select B's descriptor. Do not
+claim per-request binding without an explicit artifact protocol change. Operators
+must serialize the complete sync/deploy sequence for a site.
 
 **Framework and deployment side doors.** Framework identity, defaults, and
 assets cross Rust and Python boundaries, while release commands can reach state

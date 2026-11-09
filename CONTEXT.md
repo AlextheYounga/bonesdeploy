@@ -65,7 +65,24 @@ Permissions are a **provisioning-time contract**, not a deployment-time repair. 
 
 BonesRemote holds one OS-backed deployment lock per site. Deploys, cancellations, and site imports use the same stable lock, which lives outside the replaceable site dataset. A deploy or import must not stage or overwrite state while a release is building, preparing, or interrupted. Before staging, BonesRemote validates and safely receives the artifact before any release state is created.
 
-Deployment state files (`active-deployment.json` and `staged-release`) are written atomically (temp file, fsync, rename, directory fsync) so a crash or disk-full condition never leaves truncated state that status, cancellation, or idle checks cannot parse. If malformed state is ever found, `bonesremote release recover --site <site>` quarantines it after proving no deployment is running.
+Config sync also acquires that lock and refuses interrupted, unverified state.
+Deploy loads its descriptor after locking. Separate sync and deploy SSH requests
+are not transactionally bound: operators must serialize the full sequence for a
+site. A second sync between the first sync and deploy can replace its settings.
+
+The previous release is recorded durably before switching `current`. `activated`
+means switched but not yet verified, and blocks further mutation; only `verified`
+commits the release. A post-switch state-write or service failure restores and
+verifies the previous release before cleanup. Failed restoration retains recovery
+evidence rather than clearing the active record.
+
+Deployment state (`deployment.json`, including the active deployment and staged
+release pointer) is written atomically (temp file, fsync, rename, directory fsync)
+so a crash or disk-full condition never leaves truncated state that status,
+cancellation, or idle checks cannot parse. Previous `active-deployment.json` and
+`staged-release` files are migrated on first read. If malformed state is found,
+`bonesremote release recover --site <site>` quarantines it after proving no
+deployment is running.
 
 ## Bones Scaffolding
 ```
@@ -294,7 +311,11 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 - **site delete**
   - Runs a local, read-only manifest preflight before any remote mutation and requires the exact configured project name unless `--yes` is supplied.
   - Passes that validated, secret-free inventory directly to BonesInfra, which idempotently stops declared services and removes declared artifacts. After teardown succeeds, BonesRemote removes the site's registration under the deployment lock; missing resources and registration are successful no-ops.
-  - Retains local project source, Git configuration, secrets, and caches. It does not remove shared host packages or daemons.
+   - Retains local project source, Git configuration, secrets, and caches. It does not remove shared host packages or daemons.
+   - Removes the scheduled-backup cron entry but preserves the Borg repository
+     and passphrase. Before removing registration, it retains the root-only key
+     as `/root/.config/bonesremote/sites/.<site>.borg-passphrase`, outside the
+     removable site directory. A different previously retained key is never overwritten.
 
 - **site export**
   - Uses the configured root SSH identity to run a fixed `zip -q -r -y - shared` command from the canonical site root and streams the result to the workstation.
