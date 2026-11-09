@@ -8,6 +8,7 @@ from typing import Any
 from bonesinfra.config.paths import DeploymentPaths
 
 DEPLOY_USER = "deploy"
+DEFAULT_NODE_VERSION = "24.19.0"
 
 
 @dataclass
@@ -51,6 +52,8 @@ def template_data(ctx: DeployContext, *, paths: dict[str, Any] | None = None, **
         "project_name": ctx.app.project_name,
         "project_root": paths["project_root"],
         "web_root": ctx.runtime.web_root,
+        "node_version": ctx.runtime.node_version,
+        "template": ctx.template,
         "deploy_user": DEPLOY_USER,
         "runtime_user": ctx.runtime.runtime_user,
         "runtime_group": ctx.runtime.runtime_group,
@@ -105,6 +108,7 @@ class RuntimeConfig:
     compose_port: int | None = None
     compose_wait_timeout: int = 120
     data: dict[str, Any] = field(default_factory=dict)
+    node_version: str = DEFAULT_NODE_VERSION
 
 
 @dataclass(frozen=True)

@@ -71,7 +71,7 @@ def make_site_request(**overrides):
             "template": "custom",
             "backend": "native",
             "web_root": "dist",
-            "node_version": "22",
+            "node_version": "24.19.0",
             "backup": {
                 "schedule": "0 0 * * *",
                 "retention_days": 30,

@@ -12,12 +12,15 @@ class LanguageRuntime(ABC):
         self.executable = ""
 
     def install(self, ctx) -> str:
-        version = str(ctx.runtime.data.get(self.config_key, self.default_version))
+        version = self.configured_version(ctx)
         if not self.version_pattern.fullmatch(version):
             raise ValueError(f"{self.config_key} has an invalid version: {version!r}")
         self.version = version
         self.executable = self.install_version(ctx)
         return self.executable
+
+    def configured_version(self, ctx) -> str:
+        return str(ctx.runtime.data.get(self.config_key, self.default_version))
 
     @abstractmethod
     def install_version(self, ctx) -> str:

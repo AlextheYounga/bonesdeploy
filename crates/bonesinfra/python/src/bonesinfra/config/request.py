@@ -7,6 +7,7 @@ from typing import Any
 # ValueError is part of the public boundary contract for malformed requests.
 # ruff: noqa: TRY004
 from bonesinfra.config.context import (
+    DEFAULT_NODE_VERSION,
     AppConfig,
     BackupConfig,
     DeployContext,
@@ -52,6 +53,19 @@ _MIN_DOMAIN_LABELS = 2
 _MAX_EMAIL_LENGTH = 254
 _MAX_PORT = 65535
 _MAX_COMPOSE_WAIT_TIMEOUT = 3600
+_SITE_FIELDS = {
+    "project_name",
+    "domain",
+    "email",
+    "template",
+    "backend",
+    "web_root",
+    "node_version",
+    "compose_port",
+    "compose_wait_timeout",
+    "backup",
+    "extras",
+}
 
 
 def reject_unknown(mapping: Mapping[str, Any], allowed: set[str], where: str) -> None:
@@ -70,7 +84,7 @@ def parse_server_connection(server: Mapping[str, Any]) -> ServerContext:
     return ServerContext(host=host, ssh_user=ssh_user, port=port)
 
 
-def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
+def parse_site(body: Mapping[str, Any]) -> DeployContext:
     reject_unknown(body, {"server", "site"}, "request")
     server = body.get("server")
     site = body.get("site")
@@ -78,23 +92,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
         raise ValueError("server is required")
     if not isinstance(site, Mapping):
         raise ValueError("site is required")
-    reject_unknown(
-        site,
-        {
-            "project_name",
-            "domain",
-            "email",
-            "template",
-            "backend",
-            "web_root",
-            "node_version",
-            "compose_port",
-            "compose_wait_timeout",
-            "backup",
-            "extras",
-        },
-        "site",
-    )
+    reject_unknown(site, _SITE_FIELDS, "site")
     name = _string(site.get("project_name", ""), "site.project_name")
     _validate_project_name(name)
     backend = site.get("backend", "native")
@@ -103,12 +101,7 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
     template = _string(site.get("template", "custom"), "site.template") or "custom"
     if template not in _FRAMEWORKS:
         raise ValueError(f"unknown framework infrastructure: {template}")
-    extras = site.get("extras", {})
-    if not isinstance(extras, Mapping):
-        raise ValueError("site.extras must be an object")
-    for key, value in extras.items():
-        if isinstance(value, (list, dict)):
-            raise ValueError(f"site.extras.{key} must be a scalar")
+    extras = _parse_extras(site.get("extras", {}))
     backup = _parse_backup(site.get("backup"))
     domain = _string(site.get("domain", ""), "site.domain")
     email = _string(site.get("email", ""), "site.email")
@@ -127,13 +120,14 @@ def parse_site(body: Mapping[str, Any]) -> DeployContext:  # noqa: C901
             DnsConfig(domain, email),
         ),
         runtime=RuntimeConfig(
-            backend,
-            _string(site.get("web_root", ""), "site.web_root") or DEFAULT_WEB_ROOT,
-            name,
-            name,
-            compose_port,
-            _compose_wait_timeout(site.get("compose_wait_timeout", 120)),
-            dict(extras),
+            backend=backend,
+            web_root=_string(site.get("web_root", ""), "site.web_root") or DEFAULT_WEB_ROOT,
+            runtime_user=name,
+            runtime_group=name,
+            compose_port=compose_port,
+            compose_wait_timeout=_compose_wait_timeout(site.get("compose_wait_timeout", 120)),
+            data=extras,
+            node_version=_string(site.get("node_version", DEFAULT_NODE_VERSION), "site.node_version"),
         ),
         backup=backup,
         template=template,
@@ -158,6 +152,17 @@ def _optional_port(value: Any) -> int | None:
     if not isinstance(value, int) or isinstance(value, bool) or not 1 <= value <= _MAX_PORT:
         raise ValueError("site.compose_port must be an integer from 1 through 65535")
     return value
+
+
+def _parse_extras(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise ValueError("site.extras must be an object")
+    for key, item in value.items():
+        if key in _SITE_FIELDS:
+            raise ValueError(f"site.extras.{key} duplicates an explicit site field")
+        if isinstance(item, (list, dict)):
+            raise ValueError(f"site.extras.{key} must be a scalar")
+    return dict(value)
 
 
 def _compose_wait_timeout(value: Any) -> int:

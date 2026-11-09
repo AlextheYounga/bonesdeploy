@@ -37,6 +37,18 @@ def test_extras_are_forwarded_with_json_types():
     assert template_data(ctx)["is_static"] is False
 
 
+@pytest.mark.parametrize("key", ["node_version", "template", "backend", "web_root", "compose_port"])
+def test_extras_cannot_duplicate_explicit_configuration(key):
+    with pytest.raises(ValueError, match="duplicates an explicit site field"):
+        DeployContext.from_request(make_site_request(extras={key: "ambiguous"}))
+
+
+@pytest.mark.parametrize("value", [None, True, 25])
+def test_node_version_must_be_a_string_at_the_request_boundary(value):
+    with pytest.raises(ValueError, match=r"site\.node_version must be a string"):
+        DeployContext.from_request(make_site_request(node_version=value))
+
+
 def test_docker_runtime_backend_is_preserved():
     ctx = DeployContext.from_request(make_site_request(backend="docker", compose_port=8080, compose_wait_timeout=60))
     assert ctx.runtime.backend == "docker"

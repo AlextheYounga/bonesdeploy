@@ -2,11 +2,14 @@ from types import SimpleNamespace
 
 import pytest
 
+from bonesinfra.config.context import DeployContext, template_data
 from bonesinfra.frameworks.rails.runtime import apparmor_exec_paths, bundler_binary, bundler_command
 from bonesinfra.services.languages import NODE, PYTHON, RUBY
 from bonesinfra.services.languages.php import PHPRuntime
 from bonesinfra.services.languages.python import PYTHON_PACKAGES, PythonRuntime
 from bonesinfra.services.languages.ruby import RUBY_PACKAGES, RubyRuntime
+
+from .helpers import make_site_request
 
 
 def _context(**runtime_data):
@@ -16,11 +19,13 @@ def _context(**runtime_data):
 def test_language_runtime_stores_selected_version_and_executable(monkeypatch):
     monkeypatch.setattr("bonesinfra.services.languages.node.server.script", lambda **_kwargs: None)
 
-    executable = NODE.install(_context(node_version="24.19.0"))
+    ctx = DeployContext.from_request(make_site_request(template="next", node_version="25.9.0"))
+    executable = NODE.install(ctx)
 
-    assert NODE.version == "24.19.0"
+    assert NODE.version == "25.9.0"
     assert NODE.executable == executable
-    assert executable.endswith("/v24.19.0/bin/node")
+    assert executable.endswith("/v25.9.0/bin/node")
+    assert template_data(ctx)["node_version"] == "25.9.0"
 
 
 @pytest.mark.parametrize(
