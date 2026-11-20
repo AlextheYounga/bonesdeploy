@@ -1,12 +1,9 @@
-use std::fs;
-use std::path::Path;
-use std::process;
-
 use anyhow::Result;
 use bonesdeploy_core::{config::validate_site_name, paths};
 use serde::Serialize;
 
 use crate::privileges;
+use crate::release::process;
 use crate::release::state::{self as release_state, DeploymentPhase, DeploymentRecord};
 
 #[derive(Serialize)]
@@ -49,7 +46,7 @@ fn release(name: &str, current: Option<&str>, active: Option<&DeploymentRecord>,
     }
 
     if let Some(active) = active.filter(|active| active.release() == name) {
-        let running = process_matches(active);
+        let running = process::matches(active);
         return Release {
             name: name.to_string(),
             status: if running { phase_status(active.phase()) } else { String::from("interrupted") },
@@ -79,22 +76,4 @@ fn phase_status(phase: &DeploymentPhase) -> String {
         DeploymentPhase::CleanupPending => String::from("cleanup_pending"),
         DeploymentPhase::Failed => String::from("failed"),
     }
-}
-
-pub fn process_matches(active: &DeploymentRecord) -> bool {
-    let stat = Path::new("/proc").join(active.pid().to_string()).join("stat");
-    fs::read_to_string(stat)
-        .ok()
-        .and_then(|content| process_start_ticks(&content))
-        .is_some_and(|ticks| ticks == active.process_start_ticks())
-}
-
-pub fn process_start_ticks(stat: &str) -> Option<u64> {
-    let (_, fields) = stat.rsplit_once(") ")?;
-    fields.split_whitespace().nth(19)?.parse().ok()
-}
-
-pub fn current_process_start_ticks() -> Option<u64> {
-    let stat = fs::read_to_string(Path::new("/proc").join(process::id().to_string()).join("stat")).ok()?;
-    process_start_ticks(&stat)
 }

@@ -6,7 +6,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 
-use bonesremote::commands::ensure_site_idle;
 use bonesremote::release::SiteMutation;
 use bonesremote::release::state::{self as release_state, DeploymentPhase, DeploymentRecord, ProcessIdentity};
 
@@ -35,7 +34,7 @@ fn pre_commit_active_deployment_blocks_site_mutation() -> Result<()> {
 
     release_state::write_active_deployment("unitapp", &record(DeploymentPhase::Prepared))?;
 
-    assert!(ensure_site_idle(&mutation).is_err());
+    assert!(mutation.ensure_idle().is_err());
     fs::remove_dir_all(root).ok();
     Ok(())
 }
@@ -49,7 +48,7 @@ fn committed_deployment_is_serialization_idle() -> Result<()> {
 
     release_state::write_active_deployment("unitapp", &record(DeploymentPhase::CleanupPending))?;
 
-    assert!(ensure_site_idle(&mutation).is_ok(), "cleanup_pending must never block the next deployment");
+    assert!(mutation.ensure_idle().is_ok(), "cleanup_pending must never block the next deployment");
     fs::remove_dir_all(root).ok();
     Ok(())
 }
@@ -61,7 +60,7 @@ fn switched_but_unverified_release_blocks_the_next_site_mutation() -> Result<()>
     let mutation =
         SiteMutation::adopt("unitapp", Default::default(), release_state::DeploymentLock::acquire("unitapp")?)?;
     release_state::write_active_deployment("unitapp", &record(DeploymentPhase::Activated))?;
-    assert!(ensure_site_idle(&mutation).is_err());
+    assert!(mutation.ensure_idle().is_err());
     fs::remove_dir_all(root)?;
     Ok(())
 }
@@ -75,7 +74,7 @@ fn staged_release_without_committed_deployment_blocks_site_mutation() -> Result<
 
     release_state::write_staged_release("unitapp", "20260804_190321-46a0b75c-a7f2")?;
 
-    assert!(ensure_site_idle(&mutation).is_err());
+    assert!(mutation.ensure_idle().is_err());
     fs::remove_dir_all(root).ok();
     Ok(())
 }

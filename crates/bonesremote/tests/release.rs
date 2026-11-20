@@ -1,3 +1,5 @@
+#[path = "release/failed.rs"]
+mod failed;
 #[path = "release/lifecycle.rs"]
 mod lifecycle;
 #[path = "release/lifecycle_build_ownership.rs"]
@@ -14,6 +16,12 @@ mod lifecycle_shared;
 mod lifecycle_stage;
 #[path = "release/output.rs"]
 mod output;
+#[path = "release/process.rs"]
+mod process;
+#[path = "release/prune.rs"]
+mod prune;
+#[path = "release/site_mutation.rs"]
+mod site_mutation;
 #[path = "release/state.rs"]
 mod state;
 #[path = "release/state_atomic.rs"]

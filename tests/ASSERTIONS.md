@@ -418,15 +418,15 @@
 - compose runtime findings classify health failures and ingress. (compose_runtime_findings_classify_health_failures_and_ingress)
 - compose runtime findings report missing containers and loopback ingress. (compose_runtime_findings_report_missing_containers_and_loopback_ingress)
 
-## `crates/bonesremote/tests/commands/drop_failed_release.rs`
+## `crates/bonesremote/tests/release/failed.rs`
 - active release cannot be dropped. (active_release_cannot_be_dropped)
 - cleanup requires a readable active release. (cleanup_requires_a_readable_active_release)
 
-## `crates/bonesremote/tests/commands/inspection_accounts.rs`
+## `crates/bonesremote/tests/inspection/accounts.rs`
 - parses group members and missing groups. (parses_group_members_and_missing_groups)
 - parses passwd accounts without prefix collisions. (parses_passwd_accounts_without_prefix_collisions)
 
-## `crates/bonesremote/tests/commands/inspection_systemd.rs`
+## `crates/bonesremote/tests/inspection/systemd.rs`
 - reads registered site services from target requires directory. (reads_registered_site_services_from_target_requires_directory)
 - rejects non site service registrations. (rejects_non_site_service_registrations)
 - rejects non symlink service registrations. (rejects_non_symlink_service_registrations)
@@ -435,10 +435,10 @@
 ## `crates/bonesremote/tests/commands/release_kill.rs`
 - wait returns when process is already gone. (wait_returns_when_process_is_already_gone)
 
-## `crates/bonesremote/tests/commands/release_list.rs`
+## `crates/bonesremote/tests/release/process.rs`
 - parses process start ticks after parenthesized name. (parses_process_start_ticks_after_parenthesized_name)
 
-## `crates/bonesremote/tests/commands/release_prune.rs`
+## `crates/bonesremote/tests/release/prune.rs`
 - prune old releases keeps active release when within keep limit. (prune_old_releases_keeps_active_release_when_within_keep_limit)
 - prune old releases removes oldest inactive releases up to keep limit. (prune_old_releases_removes_oldest_inactive_releases_up_to_keep_limit)
 - prune old releases terminates when active is the oldest release. (prune_old_releases_terminates_when_active_is_the_oldest_release)
@@ -449,7 +449,7 @@
 - recover quarantines malformed store state. (recover_quarantines_malformed_store_state)
 - recover refuses while a deployment holds the lock. (recover_refuses_while_a_deployment_holds_the_lock)
 
-## `crates/bonesremote/tests/commands/root.rs`
+## `crates/bonesremote/tests/release/site_mutation.rs`
 - committed deployment is serialization idle. (committed_deployment_is_serialization_idle)
 - pre commit active deployment blocks site mutation. (pre_commit_active_deployment_blocks_site_mutation)
 - staged release without committed deployment blocks site mutation. (staged_release_without_committed_deployment_blocks_site_mutation)

@@ -9,13 +9,15 @@ use time::OffsetDateTime;
 use time::format_description::FormatItem;
 use time::macros::format_description;
 
-use crate::commands::{drop_failed_release, release, service};
 use crate::release::SiteMutation;
+use crate::release::failed;
 use crate::release::lifecycle;
 use crate::release::lifecycle::activate::{ActivationFailure, ReleaseActivation};
 use crate::release::lifecycle::preflight;
 use crate::release::state as release_state;
+use crate::release::{process as release_process, prune};
 use crate::runtime::docker;
+use crate::runtime::service;
 
 struct PreparedDeployment {
     snapshot: lifecycle::DeploymentSnapshot,
@@ -245,7 +247,7 @@ fn advance_phase(
 fn run_maintenance(mutation: &SiteMutation, context_dir: &Path) -> Result<()> {
     stage("Pruning old releases");
     mutation.clear_staged_release()?;
-    release::prune::run_locked(mutation, mutation.config().releases_keep)?;
+    prune::run_locked(mutation, mutation.config().releases_keep)?;
     stage("Cleaning up");
     cleanup(mutation, Some(context_dir))
 }
@@ -278,7 +280,7 @@ fn ansi(code: &str, value: &str) -> String {
 }
 
 fn process_start_ticks() -> Result<u64> {
-    release::list::current_process_start_ticks().context("Failed to read deployment process start time")
+    release_process::current_start_ticks().context("Failed to read deployment process start time")
 }
 
 fn deployment_started_at() -> Result<String> {
@@ -299,12 +301,12 @@ fn abort(mutation: &SiteMutation, context: Option<&Path>, tags: &[String], error
     if !tags.is_empty() {
         let excluded_release = mutation.staged_release().ok().flatten();
         if let Err(cleanup_error) =
-            drop_failed_release::remove_unreferenced_manifest_images(mutation, tags, excluded_release.as_deref())
+            failed::remove_unreferenced_manifest_images(mutation, tags, excluded_release.as_deref())
         {
             error = error.context(format!("Failed to remove loaded Compose images: {cleanup_error:#}"));
         }
     }
-    if let Err(drop_error) = drop_failed_release::run_locked(mutation) {
+    if let Err(drop_error) = failed::run_locked(mutation) {
         error = error.context(format!("Failed to remove failed release: {drop_error:#}"));
     }
     Err(error)

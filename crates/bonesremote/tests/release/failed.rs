@@ -8,8 +8,8 @@ use anyhow::Result;
 use bonesdeploy_core::config::Bones;
 use bonesdeploy_core::paths;
 
-use bonesremote::commands::drop_failed_release::ensure_release_not_active;
 use bonesremote::release::SiteMutation;
+use bonesremote::release::failed::ensure_release_not_active;
 use bonesremote::release::state::{DeploymentLock, override_sites_root};
 
 #[test]

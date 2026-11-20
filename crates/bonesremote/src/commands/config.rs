@@ -1,7 +1,6 @@
 use anyhow::Result;
 use bonesdeploy_core::config::RemoteDeploymentConfig;
 
-use crate::commands::ensure_site_idle;
 use crate::release::SiteMutation;
 use crate::{control_plane, privileges};
 
@@ -13,7 +12,7 @@ pub fn sync(site: &str) -> Result<()> {
 
 fn sync_descriptor(site: &str, descriptor: &RemoteDeploymentConfig) -> Result<()> {
     let mutation = SiteMutation::acquire(site)?;
-    ensure_site_idle(&mutation)?;
+    mutation.ensure_idle()?;
     control_plane::store(site, descriptor)
 }
 

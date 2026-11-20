@@ -2,11 +2,11 @@ use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 
-use crate::commands::{ensure_site_idle, service};
 use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::lifecycle::activate::{ActivationFailure, ReleaseActivation};
 use crate::release::state as release_state;
+use crate::runtime::service;
 
 pub fn rollback(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote release rollback")?;
@@ -15,7 +15,7 @@ pub fn rollback(site: &str) -> Result<()> {
     // also runs against an idle site so it never repoints `current` under an
     // in-flight or interrupted deployment.
     let mutation = SiteMutation::acquire(site)?;
-    ensure_site_idle(&mutation)?;
+    mutation.ensure_idle()?;
 
     let cfg = mutation.config();
 

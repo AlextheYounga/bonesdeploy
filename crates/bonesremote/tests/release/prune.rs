@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use anyhow::Result;
 use bonesdeploy_core::paths;
 
-use bonesremote::commands::release::prune::prune_old_releases;
+use bonesremote::release::prune::prune_old_releases;
 
 fn temp_dir(prefix: &str) -> Result<PathBuf> {
     let nanos = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0_u128, |duration| duration.as_nanos());

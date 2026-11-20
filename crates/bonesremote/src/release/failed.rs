@@ -3,16 +3,9 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result, bail};
 
-use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::state as release_state;
 use crate::runtime::docker;
-
-pub fn run(site: &str) -> Result<()> {
-    privileges::ensure_root("bonesremote release drop-failed")?;
-    let mutation = SiteMutation::acquire(site)?;
-    run_locked(&mutation)
-}
 
 pub fn run_locked(mutation: &SiteMutation) -> Result<()> {
     let staged = mutation.staged_release()?;

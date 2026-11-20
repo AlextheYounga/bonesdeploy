@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use anyhow::Result;
+use anyhow::{Result, bail};
 use bonesdeploy_core::config::{self, Bones};
 
 use crate::control_plane;
@@ -12,10 +12,9 @@ use crate::release::state::{self, DeploymentLock, DeploymentRecord};
 /// locking or deriving config on its own, so the deployment serialization lock
 /// is always applied together with site validation.
 ///
-/// Acquiring a `SiteMutation` does **not** require the site to be idle:
-/// cancellation and drop-failed operate on sites that are deliberately
-/// non-idle. Callers that need to run against an idle site (deploy, rollback)
-/// call `ensure_site_idle` themselves after acquiring.
+/// Acquiring a `SiteMutation` does **not** require the site to be idle because
+/// cancellation and failed-release cleanup deliberately operate on non-idle
+/// sites. Operations that require an idle site call [`Self::ensure_idle`].
 ///
 /// Site identity, paths, users, and systemd targets are always derived from
 /// `--site` via `Bones::for_site(site)`. Runtime settings (branch, web root,
@@ -60,6 +59,28 @@ impl SiteMutation {
 
     pub fn config(&self) -> &Bones {
         &self.config
+    }
+
+    pub fn ensure_idle(&self) -> Result<()> {
+        let state = self.state()?;
+        if let Some(active) = state.active()
+            && !active.phase().is_committed()
+        {
+            bail!(
+                "Release {} is still active or interrupted. Run 'bonesdeploy site releases' and cancel it before changing site state.",
+                active.release()
+            );
+        }
+
+        let committed = state.active().is_some_and(|active| active.phase().is_committed());
+        if let Some(staged) = state.staged_release()
+            && !committed
+        {
+            bail!(
+                "Release {staged} is staged without an active deployment. Run 'bonesdeploy site releases' before changing site state."
+            );
+        }
+        Ok(())
     }
 
     pub(crate) fn active(&self) -> Result<Option<DeploymentRecord>> {

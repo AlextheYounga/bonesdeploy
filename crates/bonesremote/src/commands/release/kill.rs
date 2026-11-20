@@ -8,11 +8,12 @@ use anyhow::{Context, Result, bail};
 use bonesdeploy_core::config::validate_site_name;
 use bonesdeploy_core::paths;
 
-use crate::commands::{drop_failed_release, release::list};
 use crate::control_plane;
 use crate::privileges;
 use crate::release::SiteMutation;
+use crate::release::failed;
 use crate::release::lifecycle::context;
+use crate::release::process;
 use crate::release::state::{self as release_state, DeploymentLock, DeploymentRecord};
 use crate::runtime::docker::command::release_image_tags;
 
@@ -33,12 +34,12 @@ pub fn run(site: &str, release: &str) -> Result<()> {
                 "Release {release} is not the active deployment. Run 'bonesdeploy site releases' to inspect releases."
             );
         }
-        if active.phase().may_have_mutated_runtime() && list::process_matches(active) {
+        if active.phase().may_have_mutated_runtime() && process::matches(active) {
             bail!(
                 "Release {release} is preparing and cannot be cancelled because prepare scripts may change runtime state."
             );
         }
-        if list::process_matches(active) {
+        if process::matches(active) {
             terminate_deployment(active)?;
         }
     } else if release_state::read_staged_release(site).ok().as_deref() != Some(release) {
@@ -55,7 +56,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     if let Some(context) = current.as_ref().and_then(|deployment| deployment.context()) {
         let context = validate_build_context(site, &config.project_root, Path::new(context))?;
         let tags = release_image_tags(&context)?;
-        drop_failed_release::remove_unreferenced_manifest_images(&mutation, &tags, Some(release))?;
+        failed::remove_unreferenced_manifest_images(&mutation, &tags, Some(release))?;
         context::cleanup(site, &context)?;
     } else {
         cleanup_stale_contexts(site, &config.project_root, Some(&mutation))?;
@@ -63,7 +64,7 @@ pub fn run(site: &str, release: &str) -> Result<()> {
 
     let staged = mutation.staged_release()?;
     if staged.as_deref() == Some(release) {
-        drop_failed_release::run_locked(&mutation)?;
+        failed::run_locked(&mutation)?;
     }
     mutation.clear_active()?;
     println!("Cancelled release: {release}");
@@ -111,7 +112,7 @@ fn cleanup_stale_contexts(site: &str, project_root: &str, mutation: Option<&Site
         }
         if let Some(mutation) = mutation {
             let tags = release_image_tags(&canonical)?;
-            drop_failed_release::remove_unreferenced_manifest_images(mutation, &tags, None)?;
+            failed::remove_unreferenced_manifest_images(mutation, &tags, None)?;
         }
         context::cleanup(site, &canonical)?;
     }
@@ -146,12 +147,12 @@ fn signal(pid: u32, signal: &str) -> Result<()> {
 pub fn wait_for_process_exit(active: &DeploymentRecord, timeout: Duration) -> bool {
     let attempts = timeout.as_millis() / 100;
     for _ in 0..attempts {
-        if !list::process_matches(active) {
+        if !process::matches(active) {
             return true;
         }
         thread::sleep(Duration::from_millis(100));
     }
-    !list::process_matches(active)
+    !process::matches(active)
 }
 
 #[cfg(test)]

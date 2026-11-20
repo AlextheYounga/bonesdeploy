@@ -14,10 +14,10 @@ use super::filesystem::{
     chown_tree_without_following, create_transaction_directory, exchange_directories, real_directory_metadata,
     sync_parent, verify_exchange_support,
 };
-use crate::commands::{ensure_site_idle, service};
 use crate::release::SiteMutation;
 use crate::release::lifecycle::build::ownership;
 use crate::release::state;
+use crate::runtime::service;
 
 const MAX_ARCHIVE_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 const SPACE_RESERVE_BYTES: u64 = 512 * 1024 * 1024;
@@ -268,7 +268,7 @@ impl ImportTransaction {
 pub fn run(mutation: &SiteMutation, reader: &mut dyn Read) -> Result<()> {
     let mut lifecycle = SystemdLifecycle { mutation };
     recover_existing(mutation, &mut lifecycle)?;
-    ensure_site_idle(mutation)?;
+    mutation.ensure_idle()?;
 
     let project_root = PathBuf::from(&mutation.config().project_root);
     real_directory_metadata(&project_root)?;

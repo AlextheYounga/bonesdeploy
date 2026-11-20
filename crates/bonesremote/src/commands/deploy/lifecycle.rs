@@ -3,7 +3,6 @@ use bonesdeploy_core::artifact::{ArtifactKind, ArtifactManifest, read_manifest};
 use bonesdeploy_core::config::RuntimeBackend;
 use std::io;
 
-use crate::commands::ensure_site_idle;
 use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::lifecycle;
@@ -13,7 +12,7 @@ use super::coordinator;
 pub fn run_artifact(site: &str) -> Result<()> {
     privileges::ensure_root("bonesremote artifact deploy")?;
     let mutation = SiteMutation::acquire_for_deploy(site)?;
-    ensure_site_idle(&mutation)?;
+    mutation.ensure_idle()?;
     let mut input = io::stdin().lock();
     let manifest = read_manifest(&mut input)?;
     if manifest.site != site {

@@ -1,7 +1,6 @@
 pub mod cli;
 pub mod commands;
 pub mod control_plane;
-#[path = "commands/inspection/mod.rs"]
 pub mod inspection;
 pub mod privileges;
 pub mod release;
