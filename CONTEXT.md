@@ -239,23 +239,26 @@ bonesdeploy/
 │   ├── bonesdeploy/
 │   │   ├── kit/                # embedded scaffolding templates
 │   │   └── src/
+│   │       ├── assets/         # rust-embed asset collections
 │   │       ├── cli/            # clap args + dispatch
-│   │       ├── commands/       # CLI command implementations
-│   │       ├── infra/          # ssh, git, embedded assets, bonesinfra wrapper
+│   │       ├── commands/       # public workflow orchestration
+│   │       ├── infra/          # SSH, Git, and remote integration boundaries
 │   │       ├── ui/             # prompt helpers
 │   │       ├── config.rs
 │   │       └── main.rs
 │   ├── bonesremote/
 │   │   └── src/
 │   │       ├── cli/            # clap args + dispatch
-│   │       ├── commands/       # remote release lifecycle steps
-│   │       ├── config.rs
+│   │       ├── commands/       # remote command handlers
+│   │       ├── inspection/     # read-only operating-system queries
 │   │       ├── privileges.rs   # privilege checks for root-only commands
-│   │       ├── release/
-│   │       ├── release_state.rs
+│   │       ├── release/        # release lifecycle, cleanup, locking, and state
+│   │       ├── runtime/        # systemd and Compose runtime control
+│   │       ├── shared/         # shared-data transactions
+│   │       ├── control_plane.rs
 │   │       └── main.rs
 │   ├── bonesinfra/
-│   │   ├── python/             # Python package (pyinfra operations, core services, Jinja2 templates)
+│   │   ├── python/             # Python provisioning plans, services, and templates
 │   │   └── src/                # embeds python/, materializes it, runs `python -m bonesinfra`
 │   └── bonesdeploy-core/  # config schema + central paths
 └── docs/

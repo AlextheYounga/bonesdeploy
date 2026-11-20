@@ -337,7 +337,7 @@ Computes all server-side filesystem paths from the project name, repo path, root
 Two independent `rust-embed` systems embed non-Rust content into the binaries:
 
 **In `bonesdeploy`:**
-Three separate embedded asset collections under `src/infra/assets/`:
+Three separate embedded asset collections under `src/assets/`:
 - `kit.rs` — deployment shell functions, `.gitignore`
 - `skill.rs` — AI agent orientation and topic docs (SKILL.md, commands, workflows, methodology)
 - `frameworks.rs` — per-framework TOML defaults, deployment scripts, `.env.build` examples
@@ -491,8 +491,8 @@ Cli::Init
        │    ├─ infra/git.rs        # infer remote connection details from git remotes
        │    └─ frameworks/<fw>.rs  # framework-specific questions and validation
        ├─ init/scaffold.rs         # filesystem materialization
-        │    ├─ infra/assets/kit.rs # scaffold deployment functions, .gitignore
-        │    ├─ infra/assets/frameworks.rs  # scaffold per-framework .env defaults + scripts
+        │    ├─ assets/kit.rs # scaffold deployment functions, .gitignore
+        │    ├─ assets/frameworks.rs  # scaffold per-framework .env defaults + scripts
         │    ├─ config.rs::save()   # write the root .env
         │    └─ bonesinfra::run()   # execute wheel + templates + custom
        ├─ secrets/gpg.rs           # generate GPG key pair
@@ -506,7 +506,7 @@ Cli::Init
 Cli::Server::Setup
    └─ commands/server/setup.rs::run()
         ├─ bonesinfra::run_with_request(["server", "apply", "--request-stdin", ...], server_request)
-         │    └─ Python: cli/commands/server::deploy_server_setup()
+         │    └─ Python: provisioning/server::deploy_server_setup()
         │         ├─ packages.py and disable_algif_aead.py
         │         ├─ services/linux/etckeeper.py initialize  # idempotent /etc init after packages
         │         ├─ services/linux/image_store.py
@@ -525,7 +525,7 @@ Cli::Site::Setup
    └─ commands/site/setup.rs::run()
         ├─ SSH: bonesremote doctor     # stops before site mutation when unavailable
         ├─ bonesinfra::run_with_request(["site", "apply", "--request-stdin"], site_request)
-         │    └─ Python: cli/commands/site::deploy_site_setup()
+         │    └─ Python: provisioning/site::deploy_site_setup()
          │         ├─ users.py          # site runtime identity
          │         ├─ directories.py    # site layout and control-plane state
         │         ├─ placeholder.py    # initial current link only
@@ -660,12 +660,12 @@ runtime state and is not persisted in project configuration.
 | Add a language runtime | Python: `services/languages/<name>.py`, extend `LanguageRuntime` ABC | `php.py`, `python.py` | `crates/bonesinfra/python/src/bonesinfra/services/languages/` |
 | Add a CLI command (bonesdeploy) | Focused handler under the owning command group (`commands/server/<name>.rs`, `commands/site/<name>.rs`, or `commands/<name>.rs`) + variant in `cli/args.rs::Command` | `commands/site/status.rs` | `crates/bonesdeploy/src/commands/` |
 | Add a CLI command (bonesremote) | `commands/<name>.rs` + variant in `cli/args.rs::Command` enum | `commands/status.rs` | `crates/bonesremote/src/commands/` |
-| Add a provisioning step | Python: `cli/commands/server/` or `cli/commands/site/` + Typer command group | `cli/commands/site/` | `crates/bonesinfra/python/src/bonesinfra/cli/commands/` |
+| Add a provisioning step | Python: `provisioning/server/` or `provisioning/site/` + Typer command group | `provisioning/site/` | `crates/bonesinfra/python/src/bonesinfra/provisioning/` |
 | Add a migration patch | Python: `patches/registry.py` — `Patch(id, version, apply_fn)` | `0003-project-infra` | `crates/bonesinfra/python/src/bonesinfra/patches/` |
 | Add a doctor check | `commands/doctor/<category>.rs` in bonesremote | `doctor/site.rs` | `crates/bonesremote/src/commands/doctor/` |
 | Add a new config field | `Runtime.extra` for framework-specific values; add to `Bones` for global values | `php_version` in laravel | `crates/bonesdeploy-core/src/config.rs` |
 | Add a new shared constant/path | `paths` module in bonesdeploy-core | `DEFAULT_WEB_ROOT` | `crates/bonesdeploy-core/src/paths.rs` |
-| Embed new static assets | `rust-embed` derive in appropriate asset module | `KitAssets`, `FrameworkAssets` | `crates/bonesdeploy/src/infra/assets/` |
+| Embed new static assets | `rust-embed` derive in appropriate asset module | `KitAssets`, `FrameworkAssets` | `crates/bonesdeploy/src/assets/` |
 | Override framework provisioning | Edit project-owned `infra/custom/{runtime,manifest}.py` | `infra/custom/` | `infra/custom/` |
 | Add a deployment script | `NN_name.sh` in `deployment/build/` or `deployment/prepare/` | `01_install_deps.sh` | `deployment/{build,prepare}/` |
 
