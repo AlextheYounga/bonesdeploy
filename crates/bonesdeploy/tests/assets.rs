@@ -4,13 +4,13 @@ use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 
 use anyhow::{Context, Result};
-use bonesdeploy::frameworks::Framework;
-use bonesdeploy::infra::assets::frameworks::{
+use bonesdeploy::assets::frameworks::{
     base_framework_defaults, framework_asset, framework_asset_paths, framework_defaults, framework_names,
     scaffold_framework_env_build, scaffold_framework_project,
 };
-use bonesdeploy::infra::assets::kit::kit_asset;
-use bonesdeploy::infra::assets::skill::doc_names;
+use bonesdeploy::assets::kit::kit_asset;
+use bonesdeploy::assets::skill::doc_names;
+use bonesdeploy::frameworks::Framework;
 use bonesdeploy_core::config::Runtime;
 
 fn asset_text(path: &str) -> String {

@@ -4,9 +4,9 @@ use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
 use serde::Serialize;
 
+use crate::assets::skill;
 use crate::cli::args::{GuideFormat, SkillCommand};
 use crate::config;
-use crate::infra::assets::skill;
 use crate::infra::ssh;
 
 #[derive(Clone, Debug, Serialize)]

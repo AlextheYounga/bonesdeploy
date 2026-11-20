@@ -2,8 +2,8 @@ use anyhow::{Context, Result, anyhow};
 use serde_json::Value;
 
 use super::{Args, FrameworkSelection};
+use crate::assets::frameworks as framework_assets;
 use crate::frameworks;
-use crate::infra::assets::frameworks as framework_assets;
 use crate::ui::prompts;
 
 pub fn collect_framework_config(args: &Args) -> Result<FrameworkSelection> {

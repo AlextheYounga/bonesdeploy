@@ -5,9 +5,9 @@ use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
 
 use super::FrameworkSelection;
+use crate::assets::frameworks as framework_assets;
 use crate::config;
 use crate::frameworks;
-use crate::infra::assets::frameworks as framework_assets;
 use bonesdeploy_core::config::build_env;
 
 pub(super) fn materialize_project(cfg: &mut config::Bones, framework: FrameworkSelection) -> Result<()> {
