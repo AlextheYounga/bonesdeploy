@@ -1,6 +1,5 @@
 import pytest
 
-from bonesinfra.cli.commands.site import delete
 from bonesinfra.config.context import DeployContext
 from bonesinfra.manifest import (
     DeletionArtifact,
@@ -10,6 +9,7 @@ from bonesinfra.manifest import (
     render_deletion_plan,
     resolve_deletion_plan,
 )
+from bonesinfra.provisioning.site import delete
 
 from .helpers import make_site_request
 

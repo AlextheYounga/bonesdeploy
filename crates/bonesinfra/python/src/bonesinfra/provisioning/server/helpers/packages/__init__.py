@@ -1,7 +1,7 @@
 from pyinfra.operations import apt, server
 
-from bonesinfra.cli.commands.server.helpers.packages import neovim, rainfrog, starship
 from bonesinfra.config.paths import SCRIPTS_DIR
+from bonesinfra.provisioning.server.helpers.packages import neovim, rainfrog, starship
 
 HELPER_APT_PACKAGES: list[str] = [
     "age",

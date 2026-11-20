@@ -12,7 +12,7 @@ from types import SimpleNamespace
 import jinja2
 
 from bonesinfra.cli import app
-from bonesinfra.cli.commands.server.packages import BASE_SYSTEM_PACKAGES
+from bonesinfra.provisioning.server.packages import BASE_SYSTEM_PACKAGES
 from bonesinfra.services.linux import etckeeper
 
 from .helpers import SRC_DIR, assert_not_contains, make_site_request

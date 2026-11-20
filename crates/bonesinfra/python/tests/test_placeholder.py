@@ -1,5 +1,5 @@
-from bonesinfra.cli.commands.site import placeholder
 from bonesinfra.config.context import DeployContext
+from bonesinfra.provisioning.site import placeholder
 
 from .helpers import make_site_request
 

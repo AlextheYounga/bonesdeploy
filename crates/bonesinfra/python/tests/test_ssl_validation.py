@@ -1,7 +1,7 @@
 import pytest
 
-from bonesinfra.cli.commands.site.ssl import deploy_ssl, obtain_certificate
 from bonesinfra.config.request import parse_request
+from bonesinfra.provisioning.site.ssl import deploy_ssl, obtain_certificate
 
 from .helpers import make_site_request
 
@@ -16,7 +16,7 @@ def test_request_rejects_invalid_ssl_boundary_values(field):
 
 def test_certbot_arguments_are_shell_quoted(monkeypatch):
     calls = []
-    monkeypatch.setattr("bonesinfra.cli.commands.site.ssl.server.shell", lambda **kwargs: calls.append(kwargs))
+    monkeypatch.setattr("bonesinfra.provisioning.site.ssl.server.shell", lambda **kwargs: calls.append(kwargs))
     ctx = parse_request(make_site_request())
 
     obtain_certificate(ctx, {"acme_webroot": "/srv/acme/web root;unsafe"})
@@ -31,7 +31,7 @@ def test_ssl_flow_rejects_invalid_values_before_side_effects(monkeypatch):
     ctx = parse_request(make_site_request())
     ctx.app.dns.domain = "example.com; touch /tmp/pwned"
     mkdir_calls = []
-    monkeypatch.setattr("bonesinfra.cli.commands.site.ssl.mkdir", lambda **kwargs: mkdir_calls.append(kwargs))
+    monkeypatch.setattr("bonesinfra.provisioning.site.ssl.mkdir", lambda **kwargs: mkdir_calls.append(kwargs))
 
     with pytest.raises(ValueError, match=r"site\.domain"):
         deploy_ssl(ctx)
@@ -43,9 +43,9 @@ def test_ssl_flow_deploys_challenge_router_before_certificate_and_https_afterwar
     router_calls = []
     ctx = parse_request(make_site_request(domain="example.com"))
 
-    monkeypatch.setattr("bonesinfra.cli.commands.site.ssl.mkdir", lambda **_kwargs: calls.append("webroot"))
+    monkeypatch.setattr("bonesinfra.provisioning.site.ssl.mkdir", lambda **_kwargs: calls.append("webroot"))
     monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.nginx_router.install_default_deny_server",
+        "bonesinfra.provisioning.site.ssl.nginx_router.install_default_deny_server",
         lambda _paths: calls.append("default-deny"),
     )
 
@@ -54,14 +54,14 @@ def test_ssl_flow_deploys_challenge_router_before_certificate_and_https_afterwar
         calls.append(f"router-{kwargs['stage']}")
 
     monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.nginx_router.deploy_router_config",
+        "bonesinfra.provisioning.site.ssl.nginx_router.deploy_router_config",
         record_router_deployment,
     )
     monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.obtain_certificate", lambda *_args: calls.append("certificate")
+        "bonesinfra.provisioning.site.ssl.obtain_certificate", lambda *_args: calls.append("certificate")
     )
     monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.etckeeper.commit_changes",
+        "bonesinfra.provisioning.site.ssl.etckeeper.commit_changes",
         lambda *_args: calls.append("etckeeper-commit"),
     )
 
@@ -85,13 +85,13 @@ def test_ssl_failure_leaves_only_the_challenge_router_deployed(monkeypatch):
     calls = []
     ctx = parse_request(make_site_request(domain="example.com"))
 
-    monkeypatch.setattr("bonesinfra.cli.commands.site.ssl.mkdir", lambda **_kwargs: calls.append("webroot"))
+    monkeypatch.setattr("bonesinfra.provisioning.site.ssl.mkdir", lambda **_kwargs: calls.append("webroot"))
     monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.nginx_router.install_default_deny_server",
+        "bonesinfra.provisioning.site.ssl.nginx_router.install_default_deny_server",
         lambda _paths: calls.append("default-deny"),
     )
     monkeypatch.setattr(
-        "bonesinfra.cli.commands.site.ssl.nginx_router.deploy_router_config",
+        "bonesinfra.provisioning.site.ssl.nginx_router.deploy_router_config",
         lambda *_args, **kwargs: calls.append(f"router-{kwargs['stage']}"),
     )
 
@@ -99,7 +99,7 @@ def test_ssl_failure_leaves_only_the_challenge_router_deployed(monkeypatch):
         calls.append("certificate")
         raise RuntimeError("certbot failed")
 
-    monkeypatch.setattr("bonesinfra.cli.commands.site.ssl.obtain_certificate", fail_to_obtain_certificate)
+    monkeypatch.setattr("bonesinfra.provisioning.site.ssl.obtain_certificate", fail_to_obtain_certificate)
     with pytest.raises(RuntimeError, match="certbot failed"):
         deploy_ssl(ctx)
 

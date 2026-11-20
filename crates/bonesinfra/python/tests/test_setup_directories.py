@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from bonesinfra.cli.commands.site import directories
+from bonesinfra.provisioning.site import directories
 
 
 def test_setup_does_not_provision_the_shared_environment(monkeypatch):

@@ -169,7 +169,8 @@ crates/bonesinfra/
     └── src/bonesinfra/        # importable Python package
         ├── __init__.py
         ├── __main__.py
-        ├── cli/               # Typer command definitions
+        ├── cli/               # Typer command definitions and dispatch
+        ├── provisioning/      # server and site provisioning plans
         ├── config/            # DeployContext, paths, template_data
         ├── manifest.py        # artifact/service inspection and reporting
         ├── project.py         # project `infra/` loader
@@ -214,7 +215,7 @@ Allowed:
 
 - declare commands
 - declare arguments/options
-- load the deploy context and select a deploy plan
+- load the deploy context and select a provisioning plan
 - print JSON for query commands
 
 Not allowed:
@@ -222,7 +223,7 @@ Not allowed:
 - pyinfra operations
 - TOML parsing details
 - path derivation
-- direct deploy plan logic
+- provisioning plan logic
 - project infrastructure loading internals
 - server provisioning logic
 
@@ -233,14 +234,21 @@ Example shape:
 Commands read one typed JSON provisioning request from stdin with
 `--request-stdin`; the CLI does not read or parse the root `.env`.
 
+## `provisioning/`
+
+Owns the server and site provisioning plans selected by the private CLI.
+Plans compose focused operations from `services/` and may use PyInfra operations
+when an operation belongs only to that plan. They must not parse CLI input or
+depend on `cli/`.
+
 ## `cli/` and `pyinfra/`
 
-Command orchestration lives in `cli/app.py` and the pyinfra bridge in
-`pyinfra/runner.py`.
+Command dispatch lives in `cli/app.py`, provisioning workflows live in
+`provisioning/`, and the PyInfra bridge lives in `pyinfra/runner.py`.
 
 Server commands load `ServerContext.from_request()` and site commands load
 `DeployContext.from_request()`. They validate command-specific requirements,
-select a deploy plan, and pass it to `pyinfra.runner.run()`.
+select a provisioning plan, and pass it to `pyinfra.runner.run()`.
 The runner owns pyinfra connection and execution concerns. CLI code should
 not contain raw pyinfra operations, and the runner should not contain
 framework-specific provisioning logic.
@@ -292,12 +300,12 @@ Responsibilities:
 - run pyinfra programmatically
 - load TOML files
 - receive the typed request from the Rust subprocess boundary
-- bridge CLI-selected deploy plans to pyinfra
+- bridge CLI-selected provisioning plans to pyinfra
 
 Pyinfra code may import pyinfra.
 
-Config code should avoid direct pyinfra dependency; the runner and deploy
-plans are the pyinfra boundary.
+Config code should avoid direct PyInfra dependency; the runner and provisioning
+plans are the PyInfra boundary.
 
 ## `project.py` and `manifest.py`
 
@@ -323,7 +331,7 @@ services/
 └── runtime/      # database/data services (mysql, redis, valkey, ...)
 ```
 
-Deploy plan files should read like stories.
+Provisioning plan files should read like stories.
 
 Example:
 
@@ -336,7 +344,8 @@ def deploy_site_setup(ctx):     # ctx: DeployContext
 
 Sub-modules receive `(ctx, paths)` — no flat dict.
 
-Deploy plans use `ctx.paths_dict`, derived from `ctx.app` and `ctx.runtime.web_root`, and pass it to sub-modules along with `ctx`.
+Provisioning plans use `ctx.paths_dict`, derived from `ctx.app` and
+`ctx.runtime.web_root`, and pass it to sub-modules along with `ctx`.
 
 Raw pyinfra operations should live in focused modules.
 

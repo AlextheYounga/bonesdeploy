@@ -95,16 +95,16 @@ combine-as-imports = true
   "PLR0913", # deploy_router_config() accepts many keyword-only args naturally
 ]
 "src/bonesinfra/services/runtime/__init__.py" = ["T20"]
-"src/bonesinfra/cli/commands/server/bonesremote.py" = [
+"src/bonesinfra/provisioning/server/bonesremote.py" = [
   "S604",    # pyinfra.server.user with shell=True is standard
 ]
-"src/bonesinfra/cli/commands/server/users.py" = [
+"src/bonesinfra/provisioning/server/users.py" = [
   "S604",    # pyinfra.server.user with shell=True is standard
 ]
-"src/bonesinfra/cli/commands/site/users.py" = [
+"src/bonesinfra/provisioning/site/users.py" = [
   "S604",    # pyinfra.server.user with shell=True is standard
 ]
-"src/bonesinfra/cli/commands/ssl/__init__.py" = [
+"src/bonesinfra/provisioning/site/ssl.py" = [
   "A005",    # intentional module name matching project domain
   "T20",     # print to stderr on error
 ]

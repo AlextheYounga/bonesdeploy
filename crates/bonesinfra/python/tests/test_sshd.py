@@ -6,7 +6,7 @@ import types
 
 import jinja2
 
-from bonesinfra.cli.commands.server import sshd
+from bonesinfra.provisioning.server import sshd
 
 from .helpers import SRC_DIR
 

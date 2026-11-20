@@ -1,4 +1,6 @@
-from bonesinfra.cli.commands.server import (
+from bonesinfra.config.context import ServerContext
+from bonesinfra.config.paths import BONESREMOTE_CONFIG_DIR, BONESREMOTE_SITE_ROOT
+from bonesinfra.provisioning.server import (
     bonesremote,
     disable_algif_aead,
     packages,
@@ -6,9 +8,7 @@ from bonesinfra.cli.commands.server import (
     sudoers,
     users,
 )
-from bonesinfra.cli.commands.server.packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
-from bonesinfra.config.context import ServerContext
-from bonesinfra.config.paths import BONESREMOTE_CONFIG_DIR, BONESREMOTE_SITE_ROOT
+from bonesinfra.provisioning.server.packages import BASE_SYSTEM_PACKAGES, SUPPLEMENTARY_PACKAGES
 from bonesinfra.pyinfra.operations import mkdir
 from bonesinfra.services.linux import apparmor, etckeeper, fail2ban, firewall, unattended_upgrades
 

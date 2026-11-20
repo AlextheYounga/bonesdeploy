@@ -2,9 +2,9 @@ from types import SimpleNamespace
 
 from jinja2 import Environment, StrictUndefined
 
-from bonesinfra.cli.commands import server, site
-from bonesinfra.cli.commands.server import helpers as server_helpers, users as server_users
-from bonesinfra.cli.commands.site import ssl as site_ssl, tunnel as site_tunnel
+from bonesinfra.provisioning import server, site
+from bonesinfra.provisioning.server import helpers as server_helpers, users as server_users
+from bonesinfra.provisioning.site import ssl as site_ssl, tunnel as site_tunnel
 
 from . import helpers
 

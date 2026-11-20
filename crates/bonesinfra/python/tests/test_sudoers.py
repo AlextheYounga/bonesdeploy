@@ -5,7 +5,7 @@ import re
 import pytest
 from jinja2 import Environment, StrictUndefined
 
-from bonesinfra.cli.commands.server import sudoers
+from bonesinfra.provisioning.server import sudoers
 
 from . import helpers
 

@@ -4,12 +4,6 @@ from collections.abc import Mapping
 
 import typer
 
-from bonesinfra.cli.commands.server import deploy_server_setup
-from bonesinfra.cli.commands.server.helpers import deploy_helpers
-from bonesinfra.cli.commands.site import deploy_site_setup
-from bonesinfra.cli.commands.site.delete import deploy_site_delete
-from bonesinfra.cli.commands.site.ssl import deploy_ssl
-from bonesinfra.cli.commands.site.tunnel import deploy_tunnel_start, deploy_tunnel_stop
 from bonesinfra.config.context import DeployContext, ServerContext
 from bonesinfra.config.request import parse_request
 from bonesinfra.manifest import (
@@ -21,6 +15,12 @@ from bonesinfra.manifest import (
 )
 from bonesinfra.patches import apply_local, apply_remote
 from bonesinfra.project import load_manifest, load_runtime
+from bonesinfra.provisioning.server import deploy_server_setup
+from bonesinfra.provisioning.server.helpers import deploy_helpers
+from bonesinfra.provisioning.site import deploy_site_setup
+from bonesinfra.provisioning.site.delete import deploy_site_delete
+from bonesinfra.provisioning.site.ssl import deploy_ssl
+from bonesinfra.provisioning.site.tunnel import deploy_tunnel_start, deploy_tunnel_stop
 from bonesinfra.pyinfra.runner import run
 from bonesinfra.services.linux import etckeeper
 from bonesinfra.services.linux.cloudflared import validate_supported as validate_tunnel_request

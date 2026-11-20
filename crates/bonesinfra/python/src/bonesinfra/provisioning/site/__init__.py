@@ -1,5 +1,5 @@
-from bonesinfra.cli.commands.site import directories, placeholder, users
 from bonesinfra.config.context import DeployContext
+from bonesinfra.provisioning.site import directories, placeholder, users
 from bonesinfra.services.linux import backup, etckeeper
 
 
