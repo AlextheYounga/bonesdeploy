@@ -1,5 +1,6 @@
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
 
 use anyhow::Result;
 use bonesdeploy_core::config::{RemoteDeploymentConfig, RemoteRuntime, RuntimeBackend};
@@ -13,6 +14,11 @@ fn descriptor(backend: RuntimeBackend) -> RemoteDeploymentConfig {
         RuntimeBackend::Docker => RemoteRuntime::Docker { compose_port: None, compose_wait_timeout: 120 },
     };
     RemoteDeploymentConfig { releases_keep: 5, runtime }
+}
+
+#[test]
+fn snapshot_path_uses_the_site_derived_control_plane_location() {
+    assert_eq!(snapshot_path("atlas"), PathBuf::from("/srv/conf/atlas/bones.json"));
 }
 
 #[test]

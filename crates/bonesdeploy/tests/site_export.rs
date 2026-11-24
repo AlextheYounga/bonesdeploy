@@ -1,6 +1,7 @@
 mod common;
 
 use std::fs;
+use std::io;
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 
@@ -77,6 +78,22 @@ fn export_publishes_privately_and_preserves_destination_created_during_transfer(
     let root = paths::default_project_root_for("atlas");
     let remote = format!("cd {} && exec zip -q -r -y - shared", shell_quote(&root));
     assert_eq!(command, format!("bash -c {}", shell_quote(&remote)));
+
+    let directory = env.repo().join("exports");
+    fs::create_dir(&directory)?;
+    let output = fixture.run(&env, &["site", "export", "--output", "exports"])?;
+    ensure!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    let files = fs::read_dir(&directory)?.collect::<io::Result<Vec<_>>>()?;
+    assert_eq!(files.len(), 1);
+    let filename = files[0].file_name().to_string_lossy().into_owned();
+    let timestamp = filename
+        .strip_prefix("atlas-shared-")
+        .and_then(|name| name.strip_suffix(".zip"))
+        .ok_or_else(|| anyhow::anyhow!("unexpected export filename {filename}"))?;
+    assert_eq!(timestamp.len(), 15);
+    assert_eq!(timestamp.as_bytes()[8], b'_');
+    assert!(timestamp.bytes().enumerate().all(|(index, value)| index == 8 || value.is_ascii_digit()));
+    assert_eq!(fs::read(files[0].path())?, b"archive bytes");
 
     fs::write(env.repo().join("race-enabled"), "")?;
     let output = fixture.run(&env, &["site", "export", "--output", "race.zip"])?;
