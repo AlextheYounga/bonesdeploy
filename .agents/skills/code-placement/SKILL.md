@@ -15,7 +15,7 @@ Place code by the responsibility it owns, not by the caller that first needs it.
 4. Keep entry points thin: parse, validate, delegate, and present.
 5. Keep dependencies flowing from entry points toward behavior and adapters.
 6. Check coupled Rust/Python contracts when changing configuration, paths, or frameworks.
-7. Put tests in the owning crate or Python package's test directory and test public behavior.
+7. Put tests in the owning crate or Python package's test directory (see Test Placement) and test public behavior.
 
 Do not create a new architectural area when an existing owner fits. Create a focused module when the behavior represents a distinct responsibility and the current file would otherwise mix reasons to change.
 
@@ -86,6 +86,38 @@ Own remote deployment execution:
 `commands/` is an entry-point layer. Reusable release, runtime, shared-data, persistence, or inspection behavior must live in its owning module. Code under those modules must not import `crate::commands`.
 
 All site mutation must use `release::SiteMutation`. Deployment stages extend `release/lifecycle/`; do not create a second deployment flow.
+
+## Test Placement
+
+All Rust test code belongs in the owning crate's crate-root `tests/` directory.
+Production files under `src/` must not contain `#[cfg(test)]` modules, test
+functions, test fixtures, test assertions, or test-only seams.
+
+- Test library behavior through deliberate public APIs; test observable CLI
+  behavior by executing the compiled binary (`CARGO_BIN_EXE_<name>`).
+- Organize larger suites as modules below `tests/`; only files directly in
+  `tests/` compile as integration-test targets. Shared support belongs under
+  `tests/common/` or a focused support module below `tests/`.
+- The crate-root `tests/` directory is Cargo's integration-test directory, not
+  a workspace-level test package such as `tests/cleancode`.
+- Do not reproduce production algorithms in integration tests. When important
+  behavior has no existing boundary, restructure the production code around a
+  deliberate, cohesive library API. Do not expose an arbitrary internal helper
+  or promote a private item to `pub` solely so a test can call it.
+- Do not add a test-support feature or workspace-level test crate when the
+  standard integration-test boundary is sufficient.
+- Use fixtures and factories when they clarify setup; keep them focused and
+  isolate external state so tests stay repeatable and independent.
+- A test that cannot be written through a public boundary is evidence the
+  production boundary needs redesign, or that the assertion is coupled to an
+  implementation detail and should be removed.
+
+Command tests use a temporary working directory, isolated `HOME` and relevant
+XDG directories, and explicit Git repositories and remotes when needed. They
+capture status, output, and durable effects without mutating the test
+process's current directory or global environment.
+
+Full conventions: `docs/conventions/rust.md`.
 
 ## Dependency Direction
 
