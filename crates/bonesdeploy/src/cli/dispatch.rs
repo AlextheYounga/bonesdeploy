@@ -115,22 +115,3 @@ fn aggregate_doctor_results(server_result: Result<()>, site_result: Result<()>) 
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::aggregate_doctor_results;
-
-    #[test]
-    fn root_doctor_reports_both_failures() {
-        let result =
-            aggregate_doctor_results(Err(anyhow::anyhow!("server failed")), Err(anyhow::anyhow!("site failed")));
-        assert!(result.is_err(), "both doctor failures must fail the composed command");
-        let message = match result {
-            Err(error) => error.to_string(),
-            Ok(()) => String::new(),
-        };
-
-        assert!(message.contains("Server doctor failed: server failed"));
-        assert!(message.contains("Site doctor failed: site failed"));
-    }
-}

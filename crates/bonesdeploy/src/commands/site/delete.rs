@@ -73,31 +73,3 @@ fn artifact_kind(kind: ArtifactKind) -> &'static str {
         ArtifactKind::Socket => "socket",
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ui::output::strip_ansi;
-
-    #[test]
-    fn deletion_preflight_renders_resources_as_a_path_tree() -> Result<()> {
-        let plan: DeletionPlan = serde_json::from_str(
-            r#"{
-                "artifacts": [
-                    {"kind":"directory","name":"site root","owner":"setup","path":"/srv/sites/example"},
-                    {"kind":"socket","name":"application socket","owner":"framework","path":"/run/example/app.sock"}
-                ],
-                "services": [
-                    {"name":"application","owner":"framework","unit":"example-app.service"}
-                ]
-            }"#,
-        )?;
-        let output = strip_ansi(&render_preflight(&plan)?);
-
-        assert!(output.contains("Resources to remove\n/\n├── run/\n│   └── example/\n│       └── app.sock"));
-        assert!(output.contains("└── srv/\n    └── sites/\n        └── example/"));
-        assert!(output.contains("Services to stop\n• example-app.service"));
-        assert!(!output.contains("owner"));
-        Ok(())
-    }
-}

@@ -334,49 +334,5 @@ fn reload(host: &mut DeployHost<'_>, name: &str, service: &str) -> Result<(), De
     let mut input = ServiceInput::new(service);
     input.running = None;
     input.reloaded = true;
-    host.add_stateful(Service, input, named(name))?;
-    Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use std::error::Error;
-    use std::fs;
-    use std::os::unix::fs::symlink;
-
-    use rustinfra::connectors::{LocalConnector, RunOptions};
-    use rustinfra::facts::FactOptions;
-    use rustinfra::operations::{CommandExecutor, StatefulOperation};
-
-    use super::{CertificateAwareRouter, CertificateAwareRouterInput};
-    use rustinfra::operations::files::TemplateInput;
-
-    #[tokio::test]
-    async fn router_enables_tls_only_when_both_certificate_links_exist() -> Result<(), Box<dyn Error + Send + Sync>> {
-        let directory = tempfile::tempdir()?;
-        let source = directory.path().join("router.j2");
-        let destination = directory.path().join("router.conf");
-        let certificate = directory.path().join("fullchain.pem");
-        let key = directory.path().join("privkey.pem");
-        fs::write(&source, "{% if nginx_ssl_enabled %}tls{% else %}http{% endif %}\n")?;
-        let input = CertificateAwareRouterInput {
-            template: TemplateInput::new(&source, destination.to_string_lossy()),
-            certificate: certificate.to_string_lossy().into_owned(),
-            key: key.to_string_lossy().into_owned(),
-        };
-        let fact_options = FactOptions::default();
-
-        let commands = CertificateAwareRouter.commands(&input, &LocalConnector, &fact_options).await?;
-        CommandExecutor.execute(&LocalConnector, &commands, &RunOptions::default()).await?;
-        assert_eq!(fs::read_to_string(&destination)?, "http");
-
-        let target = directory.path().join("certificate-target");
-        fs::write(&target, "certificate\n")?;
-        symlink(&target, &certificate)?;
-        symlink(&target, &key)?;
-        let commands = CertificateAwareRouter.commands(&input, &LocalConnector, &fact_options).await?;
-        CommandExecutor.execute(&LocalConnector, &commands, &RunOptions::default()).await?;
-        assert_eq!(fs::read_to_string(destination)?, "tls");
-        Ok(())
-    }
+    add_service(host, name, input)
 }

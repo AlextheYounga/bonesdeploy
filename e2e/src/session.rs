@@ -115,26 +115,3 @@ impl Drop for Session {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn command_uses_a_short_isolated_state_home() -> Result<()> {
-        let session = Session::create()?;
-        let command = session.command("true");
-        let state_home = command
-            .get_envs()
-            .find_map(|(name, value)| (name == "XDG_STATE_HOME").then_some(value).flatten())
-            .context("XDG_STATE_HOME was not set")?;
-
-        assert_eq!(state_home, session.state_home);
-        assert_eq!(session.state_home.parent(), Some(Path::new("/tmp")));
-        assert!(
-            session.state_home.file_name().is_some_and(|name| name.to_string_lossy().starts_with("bones-e2e-state-"))
-        );
-        assert!(session.state_home.as_os_str().len() < 64);
-        Ok(())
-    }
-}

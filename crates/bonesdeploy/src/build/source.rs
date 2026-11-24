@@ -19,11 +19,6 @@ impl BuildContext {
     pub fn path(&self) -> &Path {
         self.context.path()
     }
-
-    #[cfg(test)]
-    pub(crate) fn from_tempdir(context: TempDir, revision: String) -> Self {
-        Self { context, revision }
-    }
 }
 
 /// Exports the configured committed source tree for either deployment backend.

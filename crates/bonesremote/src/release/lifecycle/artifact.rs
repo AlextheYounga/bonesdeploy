@@ -242,7 +242,3 @@ fn create_parent(path: &Path) -> Result<()> {
     let parent = path.parent().context("artifact path has no parent")?;
     fs::create_dir_all(parent).with_context(|| format!("failed to create artifact parent {}", parent.display()))
 }
-
-#[cfg(test)]
-#[path = "artifact_tests.rs"]
-mod tests;

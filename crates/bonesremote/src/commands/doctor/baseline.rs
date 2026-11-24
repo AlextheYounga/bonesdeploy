@@ -95,26 +95,3 @@ fn check_active_service(service: &str, issues: &mut Vec<String>) {
         Err(error) => issues.push(format!("could not inspect server baseline security service {service}: {error}")),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use std::env;
-    use std::fs;
-    use std::io::Result;
-    use std::process;
-
-    use super::root_owned_path_issue;
-
-    #[test]
-    fn baseline_paths_reject_missing_and_non_root_owned_artifacts() -> Result<()> {
-        let path = env::temp_dir().join(format!("bonesremote-baseline-{}", process::id()));
-        let _ = fs::remove_file(&path);
-
-        assert!(root_owned_path_issue(&path, false, false).is_some());
-
-        fs::write(&path, "baseline")?;
-        assert_eq!(root_owned_path_issue(&path, false, false).as_deref(), Some("must be owned by root:root"));
-        fs::remove_file(path)?;
-        Ok(())
-    }
-}

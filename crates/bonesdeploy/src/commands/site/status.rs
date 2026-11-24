@@ -154,36 +154,3 @@ fn compose_marker(condition: &str) -> String {
         _ => output::failure_marker(),
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::{RemotePreviewStatus, render_preview_status};
-
-    #[test]
-    fn renders_active_preview_url() {
-        let preview =
-            RemotePreviewStatus { active: true, url: Some(String::from("https://preview.trycloudflare.com")) };
-
-        assert_eq!(
-            render_preview_status(Some(&preview)).as_deref(),
-            Some("Preview: https://preview.trycloudflare.com")
-        );
-    }
-
-    #[test]
-    fn renders_starting_preview_without_url() {
-        let preview = RemotePreviewStatus { active: true, url: None };
-
-        assert_eq!(
-            render_preview_status(Some(&preview)).as_deref(),
-            Some("• Quick Tunnel is starting; run `bonesdeploy site status` for its URL.")
-        );
-    }
-
-    #[test]
-    fn does_not_render_inactive_preview() {
-        let preview = RemotePreviewStatus { active: false, url: None };
-
-        assert!(render_preview_status(Some(&preview)).is_none());
-    }
-}

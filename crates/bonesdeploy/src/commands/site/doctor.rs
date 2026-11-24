@@ -208,39 +208,6 @@ fn check_local_branch_at(repo: &Path, cfg: &config::Bones) -> Option<String> {
         .map(|error| format!("Unable to resolve local branch '{}' to an exact commit: {error}", cfg.branch))
 }
 
-#[cfg(test)]
-mod tests {
-    use std::fs;
-    use std::path::Path;
-    use std::process::Command;
-
-    use super::check_local_branch_at;
-    use crate::config::Bones;
-
-    #[test]
-    fn local_doctor_requires_the_configured_branch_to_resolve_to_a_commit() -> anyhow::Result<()> {
-        let repo = tempfile::tempdir()?;
-        run_git(repo.path(), ["init", "--initial-branch=main"])?;
-        run_git(repo.path(), ["config", "user.email", "test@example.com"])?;
-        run_git(repo.path(), ["config", "user.name", "Test"])?;
-        fs::write(repo.path().join("tracked"), "content")?;
-        run_git(repo.path(), ["add", "."])?;
-        run_git(repo.path(), ["commit", "-m", "initial"])?;
-        let mut config = Bones::default();
-        config.branch = String::from("main");
-        assert_eq!(check_local_branch_at(repo.path(), &config), None);
-        config.branch = String::from("missing");
-        assert!(check_local_branch_at(repo.path(), &config).is_some());
-        Ok(())
-    }
-
-    fn run_git<const N: usize>(repo: &Path, arguments: [&str; N]) -> anyhow::Result<()> {
-        let status = Command::new("git").arg("-C").arg(repo).args(arguments).status()?;
-        anyhow::ensure!(status.success(), "git command failed");
-        Ok(())
-    }
-}
-
 fn check_local_docker() -> Option<String> {
     native::docker_available_linux().err().map(|error| error.to_string())
 }

@@ -10,3 +10,5 @@ mod cleancode_no_legacy_terms;
 mod cleancode_no_literal_wrapped_fallback;
 #[cfg(test)]
 mod cleancode_no_manufactured_success;
+#[cfg(test)]
+mod cleancode_test_placement;

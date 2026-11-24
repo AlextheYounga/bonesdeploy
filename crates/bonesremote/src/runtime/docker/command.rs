@@ -11,8 +11,6 @@ use bonesdeploy_core::docker_env::{DOCKER_CERT_PATH, DOCKER_CONTEXT, DOCKER_HOST
 use bonesdeploy_core::paths;
 use serde::{Deserialize, Serialize};
 
-#[cfg(test)]
-pub(crate) use super::artifact_images::{ImageExecutor, remove_unreferenced_release_images_with};
 pub use super::artifact_images::{
     load_artifact_images, release_image_tags, remove_unreferenced_image_tags, remove_unreferenced_release_images,
     unreferenced_image_tags, unreferenced_release_image_tags, validate_artifact_images, validate_release_override,
@@ -340,7 +338,3 @@ fn existing_files(release_root: &Path, candidates: &[&str]) -> Result<Vec<PathBu
 fn display_files(files: &[PathBuf]) -> String {
     files.iter().map(|file| file.display().to_string()).collect::<Vec<_>>().join(", ")
 }
-
-#[cfg(test)]
-#[path = "command_tests.rs"]
-mod tests;

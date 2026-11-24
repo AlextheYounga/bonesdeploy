@@ -156,33 +156,3 @@ fn append_compose(compose: ComposeReport, lines: &mut Vec<String>) {
         lines.push(format!("{} {error}", style("✗").red().bold()));
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ui::output::strip_ansi;
-
-    #[test]
-    fn text_manifest_renders_a_status_only_path_tree() -> Result<()> {
-        let report = serde_json::from_str(
-            r#"{
-            "strategy":{"framework":"none","mode":"custom","backend":"native","ssl":false},
-            "entries":[
-                {"name":"current","owner":"deploy","path":"/srv/sites/example/current","kind":"link","state":"missing"},
-                {"name":"site","owner":"setup","path":"/srv/sites/example","kind":"directory","state":"present"},
-                {"name":"nginx","owner":"runtime","path":"/etc/nginx/example.conf","kind":"file","state":"wrong-kind"}
-            ],
-            "managed_services":[{"name":"app","owner":"runtime","unit":"example.service","running":true,"enabled":true}],
-            "compose":null
-        }"#,
-        )?;
-
-        let output = strip_ansi(&render_text(report)?);
-        assert!(output.contains("├── etc/\n│   └── nginx/\n│       └── ✗ example.conf"));
-        assert!(output.contains("└── srv/\n    └── sites/\n        └── ✓ example/\n            └── ! current"));
-        assert!(output.contains("Managed services\n✓ example.service"));
-        assert!(!output.contains("directory"));
-        assert!(!output.contains("setup"));
-        Ok(())
-    }
-}

@@ -34,23 +34,3 @@ fn artifact_matches_backend(manifest: &ArtifactManifest, backend: RuntimeBackend
     }
     Ok(())
 }
-
-#[cfg(test)]
-mod tests {
-    use bonesdeploy_core::artifact::{ArtifactManifest, ComposeImage};
-
-    use super::*;
-
-    const REVISION: &str = "0123456789abcdef0123456789abcdef01234567";
-
-    #[test]
-    fn artifact_kind_must_match_the_runtime_backend() -> Result<()> {
-        let native = ArtifactManifest::new_native_tree("atlas".into(), REVISION.into(), 1, &"a".repeat(64));
-        let compose = native.clone().with_compose_images(vec![ComposeImage::new("atlas", "web".into(), REVISION)?]);
-        assert!(artifact_matches_backend(&native, RuntimeBackend::Native).is_ok());
-        assert!(artifact_matches_backend(&compose, RuntimeBackend::Docker).is_ok());
-        assert!(artifact_matches_backend(&native, RuntimeBackend::Docker).is_err());
-        assert!(artifact_matches_backend(&compose, RuntimeBackend::Native).is_err());
-        Ok(())
-    }
-}

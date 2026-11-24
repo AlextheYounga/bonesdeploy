@@ -162,32 +162,3 @@ pub fn list_scripts(scripts_dir: &Path) -> Result<Vec<PathBuf>> {
     scripts.sort();
     Ok(scripts)
 }
-
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
-    use std::ffi::OsStr;
-
-    use super::*;
-
-    #[test]
-    fn prepare_command_projects_only_generic_runtime_context() {
-        let mut command = Command::new("runuser");
-        let env = PrepareScriptEnv {
-            project_name: "atlas",
-            project_root: "/srv/www/atlas",
-            runtime_user: "atlas",
-            web_root: "public",
-            shared_functions: Path::new("functions.sh"),
-        };
-
-        configure_prepare_command(&mut command, Path::new("/srv/www/atlas/releases/release"), &env);
-
-        let variables: BTreeMap<_, _> = command
-            .get_envs()
-            .filter_map(|(key, value)| value.map(|value| (key.to_owned(), value.to_owned())))
-            .collect();
-        assert!(!variables.contains_key(OsStr::new("BONES_RUNTIME_RUBY_VERSION")));
-        assert!(!variables.contains_key(OsStr::new("BONES_RUNTIME_PYTHON_VERSION")));
-    }
-}

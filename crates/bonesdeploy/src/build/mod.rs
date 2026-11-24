@@ -46,35 +46,3 @@ fn native_build_scripts(config: &Bones, source: &Path) -> Result<Option<(PathBuf
     }
     Ok(scripts)
 }
-
-#[cfg(test)]
-mod tests {
-    use bonesdeploy_core::config::Bones;
-
-    use super::native_build_scripts;
-
-    #[test]
-    fn built_in_native_framework_requires_committed_build_scripts() -> anyhow::Result<()> {
-        let source = tempfile::tempdir()?;
-        let mut config = Bones::default();
-        config.branch = String::from("master");
-        config.runtime.template = String::from("laravel");
-
-        let Err(error) = native_build_scripts(&config, source.path()) else {
-            anyhow::bail!("missing Laravel build scripts must fail");
-        };
-
-        assert!(error.to_string().contains("Committed deploy branch 'master' has no native build scripts"));
-        Ok(())
-    }
-
-    #[test]
-    fn custom_native_framework_may_package_without_build_scripts() -> anyhow::Result<()> {
-        let source = tempfile::tempdir()?;
-        let mut config = Bones::default();
-        config.runtime.template = String::from("custom");
-
-        assert!(native_build_scripts(&config, source.path())?.is_none());
-        Ok(())
-    }
-}

@@ -186,23 +186,6 @@ pub async fn production_secrets_exist(cfg: &config::Bones) -> Result<bool> {
     Ok(result?.trim() == "present")
 }
 
-#[cfg(test)]
-mod tests {
-    use anyhow::Result;
-
-    use super::environment_to_push;
-
-    #[test]
-    fn environment_push_uses_the_encrypted_file_without_modification() -> Result<()> {
-        let secrets = "APP_KEY=base64:abc123\nDATABASE_URL=postgres://localhost/app\n";
-
-        let environment = environment_to_push(secrets)?;
-
-        assert_eq!(environment, secrets);
-        Ok(())
-    }
-}
-
 fn open_editor(path: &Path) -> Result<()> {
     let editor = env::var("EDITOR")
         .ok()
