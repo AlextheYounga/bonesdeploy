@@ -4,6 +4,7 @@ pub mod build;
 pub mod context;
 pub mod preflight;
 pub mod prepare;
+pub mod request;
 pub mod stage;
 pub mod wire_shared;
 
