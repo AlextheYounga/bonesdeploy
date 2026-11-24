@@ -44,15 +44,15 @@ BonesDeploy builds two binaries:
 - **`bonesdeploy`** — the local CLI
 - **`bonesremote`** — the remote release runner
 
-And embeds a Python provisioning runtime:
+The workspace also includes **`bonesinfra`**, a native Rust provisioning
+library. `bonesdeploy` calls it directly; BonesInfra builds and executes typed
+RustInfra plans over SSH. Each initialized project receives inspectable managed
+templates under `infra/templates/`, refreshed by `bonesdeploy update` and
+rendered from those project-local copies.
 
-- **`bonesinfra`** — `crates/bonesinfra/python/`, embedded by the Rust `bonesinfra` crate
-
-Each initialized project receives a committed versioned `infra/bonesinfra-<version>-py3-none-any.whl` and the
-managed templates under `infra/templates/`. Commands execute the wheel through a
-project-scoped dependency environment; `infra/custom/` remains project-owned
-and is preserved by updates. Managed templates are refreshed wholesale by
-`bonesdeploy update`.
+Custom provisioning is temporarily unsupported. New projects do not receive
+`infra/custom/`; updates stop with an explanation if an existing project still
+has that directory, so its contents are never silently deleted or ignored.
 
 ## The Point
 
@@ -203,12 +203,6 @@ Install the remote runner on the server:
 sudo cargo install --locked --root /usr/local --git https://github.com/AlextheYounga/bonesdeploy.git bonesremote --force
 ```
 
-When building from a checkout, the Rust build verifies that the committed
-`crates/bonesinfra/assets/bonesinfra-<version>-py3-none-any.whl` matches the Python source. If Python
-source has changed, regenerate the wheel with `cargo build-wheel` before
-running `cargo build` or `cargo install --path`. The version script runs this
-command automatically after updating the Python version.
-
 Remote host provisioning, including sudoers policy, is handled by `bonesinfra` during `bonesdeploy server setup`.
 
 ## Start a Project
@@ -245,9 +239,7 @@ This creates:
 ├── .env.build              # committed, non-secret build inputs
 ├── deployment/             # committed build and prepare scripts
 └── infra/                  # committed project infrastructure
-    ├── bonesinfra-*.whl     # committed BonesInfra runtime
     ├── templates/           # committed managed templates
-    ├── custom/             # project-owned provisioning extensions
     └── secrets/             # encrypted project secrets
 ```
 
@@ -256,10 +248,9 @@ Edit them.
 Commit them.
 Read them when something breaks.
 
-The managed wheel is executed when you invoke `bonesdeploy site runtime`. The
-project-owned `infra/custom/` package is composed after the managed framework.
-Edit custom provisioning and templates as project infrastructure; use
-`bonesdeploy update` to refresh managed templates.
+`bonesdeploy site runtime` calls the Rust BonesInfra library directly. Edit and
+commit the project-local templates when the generated configuration needs to
+be inspectable; use `bonesdeploy update` to refresh the managed snapshot.
 
 Deployment scripts run in filename order:
 
@@ -302,12 +293,10 @@ bonesdeploy site setup --yes
 Do not run server setup concurrently from multiple projects. It mutates shared
 host resources such as package indexes and security configuration.
 
-This runs the provisioning from your project's versioned `infra/bonesinfra-*.whl`:
-framework services, per-site nginx, AppArmor, and your `infra/custom/` project
-extensions. Templates rendered by the managed framework come from
-`infra/templates/`. The wheel is the complete universal BonesInfra package;
-after materializing `infra/`, BonesDeploy removes template paths belonging to
-unselected frameworks.
+This applies native RustInfra provisioning for framework services, per-site
+nginx, AppArmor, systemd, and language runtimes. Templates rendered by the
+managed framework come from `infra/templates/`; BonesDeploy removes template
+paths belonging to unselected frameworks.
 
 Site setup and runtime provisioning do not install or start Cloudflare. To
 explicitly expose a site through an accountless Quick Tunnel, run:

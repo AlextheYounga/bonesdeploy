@@ -97,7 +97,7 @@ deployment/
     └── 01_prepare.sh
 ```
 
-Python infra code and templates live in the `bonesinfra` crate (`crates/bonesinfra/python/`). A generated pure-Python wheel is committed as `crates/bonesinfra/assets/bonesinfra-<version>-py3-none-any.whl`, checked against the Python source by `crates/bonesinfra/build.rs`, embedded into the `bonesdeploy` binary, and installed unchanged into each project's project-scoped cached venv. Regenerate it with `cargo build-wheel` after Python changes. Managed templates are fully materialized under `infra/templates/`, then framework paths declared in `crates/bonesinfra/src/framework_paths.rs` are pruned for the selected runtime. See `crates/bonesinfra/src/lib.rs`.
+BonesInfra is a native Rust provisioning library under `crates/bonesinfra/src/`. BonesDeploy calls its async entry points directly; BonesInfra derives typed context from `Bones`, builds RustInfra plans, and executes them over SSH. Managed sources under `crates/bonesinfra/templates/` are fully materialized under `infra/templates/`, then unselected framework paths declared in `crates/bonesinfra/src/framework_paths.rs` are pruned. No Python, wheel, subprocess request, pip environment, or virtualenv participates in provisioning. See `crates/bonesinfra/src/lib.rs`.
 
 ### Project Environment
 Rust is the sole parser of the project-root `.env`. It models two environments:
@@ -178,7 +178,7 @@ environment file. The remote environment is application runtime data, not
 BonesRemote control-plane configuration.
 
 ### Update Patches
-`bonesdeploy update` invokes the embedded `bonesinfra patches apply` command after each local or remote binary update. Python owns the ordered registry, version gates, local Git migrations, remote pyinfra operations, and per-project/per-scope completion markers. Completed patches are recorded per project and scope, so interrupted updates retry safely without rerunning successful patches. Local markers use the project data directory; remote markers use `/var/lib/bonesdeploy/patches/<site>/`. Remote patch plans connect as root through the local embedded BonesInfra runtime; Python is not installed on the deployment host. `--skip-local` and `--skip-remote` also skip their respective patches.
+`bonesdeploy update` calls the native `bonesinfra::patches` boundary after each local or remote binary update. Rust owns version gates, safe local migrations, remote RustInfra marker operations, and per-project/per-scope completion markers. Completed patches are recorded per project and scope, so interrupted updates retry safely without rerunning successful patches. Local markers use the project data directory; remote markers use `/var/lib/bonesdeploy/patches/<site>/`. `--skip-local` and `--skip-remote` also skip their respective patches.
 
 ### Scheduled Backups
 Newly initialized projects get one encrypted Borg repository per site at `/var/lib/bonesdeploy/backups/<site>.borg` (`repokey-blake2`). `bonesdeploy init` generates the Borg passphrase into the managed `.env` block as `BONES_BORG_PASSPHRASE`; re-initializing preserves the existing backup configuration and only generates a passphrase when absent. Server setup installs Borg. Site provisioning writes the passphrase to the root-only `/root/.config/bonesremote/sites/<site>/.borg_passphrase` (mode `0600`), creates the repository, and renders `/etc/cron.d/bonesdeploy-<site>-backup` from the configured schedule.
@@ -222,7 +222,7 @@ This folder stores build and prepare scripts. Build scripts live in `deployment/
 This Cargo workspace has four crates under `crates/`:
 - `bonesdeploy` for the local CLI binary
 - `bonesremote` for the server-side binary
-- `bonesinfra` for the embedded Python provisioning runtime (pyinfra operations, framework templates) and the Rust wrapper that materializes and runs it
+- `bonesinfra` for native RustInfra provisioning plans, framework runtimes, manifest/deletion safety, and managed templates
 - `bonesdeploy-core` for code that must be common to both binaries
 
 ### Path Centralization
@@ -258,8 +258,8 @@ bonesdeploy/
 │   │       ├── control_plane.rs
 │   │       └── main.rs
 │   ├── bonesinfra/
-│   │   ├── python/             # Python provisioning plans, services, and templates
-│   │   └── src/                # embeds python/, materializes it, runs `python -m bonesinfra`
+│   │   ├── src/                # native RustInfra provisioning library
+│   │   └── templates/          # embedded sources for project-local templates
 │   └── bonesdeploy-core/  # config schema + central paths
 └── docs/
 ```
@@ -280,9 +280,9 @@ Django site setup installs distribution Python, virtualenv support, development 
 
 Rails site setup installs Ruby, Bundler, development headers, and native gem build dependencies from the host's configured Debian or Ubuntu APT repositories. The exact `ruby_version` setting controls only the local build toolchain. The local build packages the production `vendor/bundle`; remote prepare checks that bundle and runs migrations without installing or compiling gems. Incompatible artifacts fail before activation, and deployment does not require production gem-source access.
 
-Templates inherit the same `bones.toml` schema and customize permissions paths, deployment scripts, and the runtime operations captured in the generated `infra/runtime.py` per project.
+Templates inherit the same typed framework settings and customize permissions, paths, deployment scripts, and project-local configuration rendering.
 
-Projects materialize the universal BonesInfra wheel and managed templates under `infra/`, prune unselected framework template paths, and preserve project-owned hooks under `infra/custom/`. `bonesinfra runtime apply` executes the complete installed wheel and composes its selected framework runtime with custom provisioning. Updates rematerialize the complete managed template tree before applying the same pruning rules.
+Projects materialize managed templates under `infra/templates/` and prune unselected framework paths. Rust BonesInfra resolves and renders only these project-local copies. Custom provisioning is temporarily unsupported: new projects do not create `infra/custom/`, and migration/update stops without changing it when legacy custom content exists.
 
 Static runtimes deploy from a `web_root` subdirectory of each release that nginx serves. Angular uses the current `@angular/build:application` builder with `dist` as its output base and serves `dist/browser/`. For `is_static = true`, Next.js must set `output: "export"` in `next.config.js`/`next.config.mjs`/`next.config.ts`; otherwise the first deploy fails with *"Static Next.js deployments require out/index.html"*.
 
@@ -294,7 +294,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Updates `.gitignore` to keep `.env` local while leaving `.env.build` trackable.
   - Prints next-step guidance to run `bonesdeploy server setup --yes` and `bonesdeploy site setup --yes` before first deploy.
   - Saves connection and site inputs to the root `.env`.
-  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs` (typed Rust, embedded in the binary). BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/`, the committed versioned BonesInfra wheel as `infra/bonesinfra-<version>-py3-none-any.whl`, and managed templates under `infra/templates/`.
+  - Framework template selection and per-template questions are sourced from `crates/bonesdeploy/src/frameworks/<fw>.rs`. BonesDeploy materializes deployment assets from `crates/bonesdeploy/assets/frameworks/<fw>/` and managed BonesInfra templates under `infra/templates/`.
   - `--template <name>` selects a framework template non-interactively. `--framework-var <key=value>` (repeated) overrides template variables; answers are validated against the template's question schema before writing `.env`.
 
 - **doctor**
@@ -307,8 +307,8 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
 
 - **site manifest**
   - Inspects every project-specific filesystem artifact and managed systemd service expected by the effective framework, service, and SSL strategy. Shared host-wide packages, daemons, and configuration are excluded.
-   - Delegates read-only inspection to the embedded BonesInfra runtime as `python -m bonesinfra manifest show --request-stdin`, then renders the returned JSON report in Rust as either the public text tree or unchanged JSON.
-  - Uses typed Python declarations inside BonesInfra, resolves path keys through `DeploymentPaths`, and performs read-only PyInfra fact checks.
+   - Calls native `bonesinfra::manifest::inspect`, then renders the typed report as the public text tree or stable JSON.
+  - Uses typed Rust declarations, canonical `DeploymentPaths`, and read-only RustInfra facts.
    - The text tree uses colored status markers for present, missing, and wrong-kind paths and for managed-service health. `--format json` retains complete artifact and service metadata for automation and never includes file contents or secrets.
 
 - **site delete**
@@ -337,7 +337,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Sends the artifact built from the configured local branch; production does not resolve a source branch.
 
 - **server setup**
-  - Delegates to `python -m bonesinfra server apply --request-stdin`, feeding a connection-only request (SSH host, user, port) on stdin.
+  - Calls native `bonesinfra::provisioning::server_setup`, which builds and executes a RustInfra plan directly from `Bones`.
   - Provisions shared packages, hardening (including an sshd drop-in that disables password login for root), firewall, deploy identity, BonesRemote roots and binary, and sudoers.
   - Installs etckeeper and initializes `/etc` as a Git-backed etckeeper repository using package defaults.
   - Every successful mutating BonesInfra provisioning flow (server, site, services, runtime, SSL, helpers) ends with an etckeeper commit of its resulting `/etc` changes; read-only `manifest` and patch flows do not commit.
@@ -359,14 +359,14 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 
 - **site runtime**:
   - Reapplies the configured runtime settings from the root `.env` to the host and provisions the selected framework's runtime.
-   - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra runtime apply --request-stdin` against the configured host as the configured `ssh_user`, feeding the typed site request on stdin.
+   - Calls native `bonesinfra::provisioning::provision_runtime` against the configured host as the configured `ssh_user`.
   - Native sites run project and framework provisioning. Compose sites configure Docker's official Debian/Ubuntu apt repository, install Docker Engine and the Compose plugin, render the generic Compose systemd unit, and optionally configure nginx for `BONES_COMPOSE_PORT`.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
   - Does not install, configure, or start Cloudflare Quick Tunnels. Temporary public ingress is an explicit `site tunnel` lifecycle.
   - Does not handle SSL; use `site ssl` for TLS configuration.
 
 - **site ssl**
-  - Delegates to the embedded `bonesinfra` runtime by running `python -m bonesinfra ssl apply --request-stdin` against the configured host as root, feeding the typed site request on stdin.
+  - Calls native `bonesinfra::provisioning::provision_ssl` and executes the RustInfra plan as root.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
   - Separate from `site runtime` to keep certificate management decoupled from app runtime concerns.
@@ -443,7 +443,7 @@ BonesInfra owns site service membership. BonesRemote restarts exactly `<project>
 
 ## Flow
 - User runs `bonesdeploy init`, and the procedures outlined above are executed.
-- User can make any changes to their deployment scripts in `deployment/` and project infrastructure in `infra/custom/`.
+- Users can change deployment scripts and project-local templates. Custom provisioning code under `infra/custom/` is temporarily unsupported and must be archived or removed deliberately before migration.
 - `bonesdeploy site doctor` checks the local and site environment, including whether the configured deploy branch resolves locally. Root `bonesdeploy doctor` composes server and site diagnostics.
 - Doctor uses exit status for actionable failures; site setup does not require a first Git push.
 - User runs `bonesdeploy deploy` to perform the actual remote release deployment.
