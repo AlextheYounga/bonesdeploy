@@ -9,6 +9,8 @@ use anyhow::{Context, Result, bail};
 use bonesdeploy_core::config::RemoteDeploymentConfig;
 use bonesdeploy_core::{config, paths};
 
+use crate::release::SiteMutation;
+
 use std::thread_local;
 
 thread_local! {
@@ -55,6 +57,15 @@ pub fn snapshot_path(site: &str) -> PathBuf {
         panic!("invalid site name for snapshot path: {error}");
     }
     resolved_conf_root().join(site).join("bones.json")
+}
+
+/// Synchronizes a site's deployment configuration while excluding concurrent
+/// mutations and refusing to replace the snapshot of an interrupted release.
+/// Callers must authorize the operation before invoking this function.
+pub fn sync(site: &str, descriptor: &RemoteDeploymentConfig) -> Result<()> {
+    let mutation = SiteMutation::acquire(site)?;
+    mutation.ensure_idle()?;
+    store(site, descriptor)
 }
 
 pub fn store(site: &str, descriptor: &RemoteDeploymentConfig) -> Result<()> {
