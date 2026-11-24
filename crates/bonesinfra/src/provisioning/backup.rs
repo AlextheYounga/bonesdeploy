@@ -109,9 +109,11 @@ fn commands(input: &BackupPassphraseInput, remote_hash: Option<&str>, remote_fil
         }));
     }
 
+    // RustInfra 0.2 reports parsed permission digits as decimal (600), while
+    // an octal value is also accepted if that representation is corrected.
     let metadata_matches = matches!(
         remote_file,
-        PathInfo::Present(info) if info.user == "root" && info.group == "root" && info.mode == 0o600
+        PathInfo::Present(info) if info.user == "root" && info.group == "root" && matches!(info.mode, 600 | 0o600)
     );
     if !metadata_matches {
         commands.push(shell(["chown".into(), "root:root".into(), CommandBit::quoted(input.destination.as_str())]));
