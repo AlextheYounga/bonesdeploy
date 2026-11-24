@@ -17,6 +17,13 @@ pub struct SshFixture {
 }
 
 impl SshFixture {
+    pub fn install_command(&self, name: &str, script: &str) -> Result<()> {
+        let path = self.directory.path().join(name);
+        fs::write(&path, script)?;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o755))?;
+        Ok(())
+    }
+
     pub fn start(script: &str) -> Result<Self> {
         let directory = tempfile::tempdir()?;
         let key = directory.path().join("identity");
