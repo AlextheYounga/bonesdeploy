@@ -7,8 +7,8 @@ use bonesdeploy_core::paths;
 use tokio::fs::File;
 
 use crate::config;
-use crate::infra::{self, ssh};
-use crate::ui::{output, progress::ProgressReader, prompts};
+use crate::infra::{self, progress::ProgressReader, ssh};
+use crate::ui::{output, prompts};
 
 pub async fn run(archive: &Path, yes: bool) -> Result<()> {
     let file = open_archive(archive)?;

@@ -10,8 +10,8 @@ use tokio::fs::File;
 use crate::build::{self, PackagedArtifact};
 use crate::commands::secrets;
 use crate::config::{self, Bones};
-use crate::infra::{self, ssh};
-use crate::ui::{output, progress::ProgressReader};
+use crate::infra::{self, progress::ProgressReader, ssh};
+use crate::ui::output;
 
 pub trait DeployOperations {
     fn package(&mut self, config: &Bones) -> Result<PackagedArtifact>;
