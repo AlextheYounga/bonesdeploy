@@ -8,6 +8,9 @@
 // some targets do not use would otherwise look like dead code.
 #![allow(dead_code)]
 
+#[path = "common/ssh.rs"]
+pub mod ssh;
+
 use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::{Path, PathBuf};
