@@ -1,13 +1,14 @@
 use anyhow::Result;
 use bonesdeploy_core::paths;
+use bonesinfra::provisioning::provision_helpers;
 use console::style;
 use std::path::Path;
 
+use crate::config;
 use crate::ui::output;
 use crate::ui::prompts;
-use crate::{config, infra};
 
-pub fn run(yes: bool) -> Result<()> {
+pub async fn run(yes: bool) -> Result<()> {
     if !yes && !prompts::confirm_server_helpers()? {
         println!("Skipped.");
         return Ok(());
@@ -15,8 +16,7 @@ pub fn run(yes: bool) -> Result<()> {
 
     println!("{}", style("Installing server helper tools").cyan().bold());
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    let request = infra::provisioning_request(&cfg)?;
-    bonesinfra::run_with_request(&["helpers", "apply", "--request-stdin"], &request)?;
+    provision_helpers(&cfg, Path::new(".")).await?;
     println!("{} Helper tools installed.", output::success_marker());
     Ok(())
 }

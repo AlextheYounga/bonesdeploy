@@ -1,3 +1,5 @@
+use bonesdeploy_core::state;
+
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::Path;
@@ -7,8 +9,8 @@ use bonesdeploy_core::paths;
 
 use crate::inspection::systemd;
 
-const APT_AUTO_UPGRADES: &str = "/etc/apt/apt.conf.d/20auto-upgrades";
-const APT_UNATTENDED_UPGRADES: &str = "/etc/apt/apt.conf.d/50unattended-upgrades";
+const APT_AUTO_UPGRADES: &str = state::APT_AUTO_UPGRADES;
+const APT_UNATTENDED_UPGRADES: &str = state::APT_UNATTENDED_UPGRADES;
 const ETCKEEPER_BIN: &str = "/usr/bin/etckeeper";
 
 pub(super) fn check(issues: &mut Vec<String>) {

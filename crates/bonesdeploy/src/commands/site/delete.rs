@@ -2,8 +2,10 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
+use bonesinfra::ProvisioningContext;
+use bonesinfra::manifest::{ArtifactKind, DeletionPlan};
+use bonesinfra::provisioning::delete_site;
 use console::style;
-use serde::Deserialize;
 
 use crate::config;
 use crate::infra::{self, ssh};
@@ -11,39 +13,24 @@ use crate::ui::{output, prompts};
 
 use super::manifest::{PathArtifact, render_path_tree};
 
-#[derive(Deserialize)]
-struct DeletionPlan {
-    artifacts: Vec<DeletionArtifact>,
-    services: Vec<DeletionService>,
-}
-
-#[derive(Deserialize)]
-struct DeletionArtifact {
-    path: String,
-    kind: String,
-}
-
-#[derive(Deserialize)]
-struct DeletionService {
-    unit: String,
-}
-
 pub async fn run(yes: bool) -> Result<()> {
     super::readiness::ensure_project_ready()?;
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    let request = infra::provisioning_request(&cfg)?;
-    let preflight = bonesinfra::run_with_request_output(&["site", "preflight", "--request-stdin"], &request)
+    let context = ProvisioningContext::from_bones(&cfg)
         .context("Site deletion preflight failed; no remote resources were changed")?;
+    let plan =
+        DeletionPlan::resolve(&context).context("Site deletion preflight failed; no remote resources were changed")?;
 
     println!("Remote site to delete: {}", cfg.project_name);
-    print!("{}", render_preflight(&preflight)?);
+    print!("{}", render_preflight(&plan)?);
     if !yes && !prompts::confirm_site_delete(&cfg.project_name)? {
         println!("Skipped.");
         return Ok(());
     }
 
-    let delete_args = ["site", "delete", "--request-stdin", "--plan-json", preflight.trim()];
-    bonesinfra::run_with_request(&delete_args, &request)
+    let persisted_plan = plan.to_json()?;
+    delete_site(&cfg, Path::new("."), &persisted_plan)
+        .await
         .context("Site deletion stopped before completion; rerun the command to resume")?;
 
     let session = ssh::SshTransport::connect_privileged(&cfg).await.context(
@@ -61,19 +48,30 @@ pub async fn run(yes: bool) -> Result<()> {
     Ok(())
 }
 
-fn render_preflight(preflight: &str) -> Result<String> {
-    let plan: DeletionPlan =
-        serde_json::from_str(preflight).context("BonesInfra returned an invalid deletion inventory")?;
+fn render_preflight(plan: &DeletionPlan) -> Result<String> {
     let mut lines = vec![String::new(), style("Resources to remove").cyan().bold().to_string()];
     lines.extend(render_path_tree(
         plan.artifacts
-            .into_iter()
-            .map(|artifact| PathArtifact { path: artifact.path, kind: artifact.kind, state: None })
+            .iter()
+            .map(|artifact| PathArtifact {
+                path: artifact.path.clone(),
+                kind: artifact_kind(artifact.kind).to_owned(),
+                state: None,
+            })
             .collect(),
     )?);
     lines.extend([String::new(), style("Services to stop").cyan().bold().to_string()]);
-    lines.extend(plan.services.into_iter().map(|service| format!("{} {}", style("•").cyan(), service.unit)));
+    lines.extend(plan.services.iter().map(|service| format!("{} {}", style("•").cyan(), service.unit)));
     Ok(format!("{}\n\n", lines.join("\n")))
+}
+
+fn artifact_kind(kind: ArtifactKind) -> &'static str {
+    match kind {
+        ArtifactKind::File => "file",
+        ArtifactKind::Directory => "directory",
+        ArtifactKind::Link => "link",
+        ArtifactKind::Socket => "socket",
+    }
 }
 
 #[cfg(test)]
@@ -83,7 +81,7 @@ mod tests {
 
     #[test]
     fn deletion_preflight_renders_resources_as_a_path_tree() -> Result<()> {
-        let output = strip_ansi(&render_preflight(
+        let plan: DeletionPlan = serde_json::from_str(
             r#"{
                 "artifacts": [
                     {"kind":"directory","name":"site root","owner":"setup","path":"/srv/sites/example"},
@@ -93,7 +91,8 @@ mod tests {
                     {"name":"application","owner":"framework","unit":"example-app.service"}
                 ]
             }"#,
-        )?);
+        )?;
+        let output = strip_ansi(&render_preflight(&plan)?);
 
         assert!(output.contains("Resources to remove\n/\n├── run/\n│   └── example/\n│       └── app.sock"));
         assert!(output.contains("└── srv/\n    └── sites/\n        └── example/"));

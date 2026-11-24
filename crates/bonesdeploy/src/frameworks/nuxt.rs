@@ -1,8 +1,10 @@
+use bonesdeploy_core::state;
+
 use super::{
     Bones, FrameworkDefaults, IS_STATIC_KEY, PermissionDefault, Question, QuestionKind, Runtime, directory, file,
 };
 
-const NUXT_STATIC_WEB_ROOT: &str = ".output/public";
+const NUXT_STATIC_WEB_ROOT: &str = state::NUXT_PUBLIC_DIR;
 const PERMISSIONS: [PermissionDefault; 4] =
     [directory("*", 750, false), file("*", 640), directory(".output", 770, true), directory(".nuxt", 770, true)];
 

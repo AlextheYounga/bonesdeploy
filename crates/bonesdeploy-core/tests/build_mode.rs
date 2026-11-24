@@ -1,7 +1,7 @@
 use anyhow::Result;
 use bonesdeploy_core::config;
 use bonesdeploy_core::config::Bones;
-use bonesdeploy_core::config::{ProvisioningRequest, RemoteDeploymentConfig};
+use bonesdeploy_core::config::RemoteDeploymentConfig;
 use std::fs;
 use tempfile::tempdir;
 
@@ -25,33 +25,13 @@ fn dotenv_rejects_removed_build_mode() -> Result<()> {
 }
 
 #[test]
-fn provisioning_and_remote_config_omit_build_settings() -> Result<()> {
+fn remote_config_omits_local_build_settings() -> Result<()> {
     let mut bones = Bones::for_site("atlas");
     bones.build.timeout_seconds = 90;
-
-    let request = ProvisioningRequest::from_bones(&bones)?;
-    assert!(request.site.is_some());
-    let json = serde_json::to_string(&request)?;
-    assert!(!json.contains("\"build_mode\""));
-    assert!(!json.contains("\"branch\""));
-    assert!(!json.contains("\"timeout_seconds\""));
-    assert!(!json.contains("\"build\""));
 
     let remote = RemoteDeploymentConfig::from_bones(&bones);
     let remote_json = serde_json::to_string(&remote)?;
     assert!(!remote_json.contains("\"branch\""));
     assert!(!remote_json.contains("\"build\""));
     Ok(())
-}
-
-#[test]
-fn provisioning_rejects_removed_build_mode() {
-    let json = r#"{"server":{"host":"h","ssh_user":"u","port":"22"},"site":{"project_name":"atlas","domain":"","email":"","template":"","backend":"native","web_root":"public","node_version":"24.19.0","compose_port":null,"compose_wait_timeout":120,"build_mode":"remote","backup":{"schedule":"0 0 * * *","retention_days":30,"passphrase":""},"extras":{}}}"#;
-    assert!(serde_json::from_str::<ProvisioningRequest>(json).is_err());
-}
-
-#[test]
-fn provisioning_rejects_repository_branch_context() {
-    let json = r#"{"server":{"host":"h","ssh_user":"u","port":"22"},"site":{"project_name":"atlas","domain":"","email":"","template":"","backend":"native","web_root":"public","branch":"main","node_version":"24.19.0","compose_port":null,"compose_wait_timeout":120,"backup":{"schedule":"0 0 * * *","retention_days":30,"passphrase":""},"extras":{}}}"#;
-    assert!(serde_json::from_str::<ProvisioningRequest>(json).is_err());
 }

@@ -2,12 +2,13 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use bonesdeploy_core::{config::RuntimeBackend, paths};
+use bonesinfra::provisioning::site_setup;
 
 use crate::build::native;
 use crate::commands::server;
+use crate::config;
 use crate::ui::output;
 use crate::ui::prompts;
-use crate::{config, infra};
 
 pub async fn run(yes: bool) -> Result<()> {
     if !yes && !prompts::confirm_site_setup()? {
@@ -22,9 +23,8 @@ pub async fn run(yes: bool) -> Result<()> {
         native::ensure_builder_image().context("Failed to prepare local builder")?;
     }
     println!("Provisioning site base...");
-    let request = infra::provisioning_request(&cfg)?;
-    bonesinfra::run_with_request(&["site", "apply", "--request-stdin"], &request)?;
-    super::runtime::apply()?;
+    site_setup(&cfg, Path::new(".")).await?;
+    super::runtime::apply().await?;
 
     super::doctor::run_with_pending(false, false).await.context("Site setup failed while checking site")?;
     println!();

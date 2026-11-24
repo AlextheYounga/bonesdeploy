@@ -1,11 +1,13 @@
 //! Public config parsing and defaults of the `bonesdeploy-core` library.
 
+use bonesdeploy_core::state;
+
 use anyhow::Result;
 use bonesdeploy_core::config;
 use bonesdeploy_core::config::BUILD_TIMEOUT_SECONDS_DEFAULT;
 use bonesdeploy_core::config::{
-    App, Bones, Build, ParsedDotEnv, ProvisioningRequest, Runtime, build_timeout_seconds, default_deploy_user,
-    parse_port, production_application_keys, validate_host, validate_runtime,
+    App, Bones, Build, ParsedDotEnv, Runtime, build_timeout_seconds, default_deploy_user, parse_port,
+    production_application_keys, validate_host, validate_runtime,
 };
 use std::collections::BTreeMap;
 use std::fs;
@@ -95,13 +97,13 @@ fn dotenv_round_trips_framework_values() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join(".env");
     let mut config = Bones::default();
-    config.runtime.extra.insert(String::from("is_static"), toml::Value::Boolean(true));
+    config.runtime.extra.insert(String::from(state::IS_STATIC), toml::Value::Boolean(true));
 
     config::write_local_environment(&config, &path)?;
     assert!(fs::read_to_string(&path)?.contains("BONES_IS_STATIC=true\n"));
     let loaded = config::load(&path)?;
 
-    assert_eq!(loaded.runtime.extra.get("is_static"), Some(&toml::Value::Boolean(true)));
+    assert_eq!(loaded.runtime.extra.get(state::IS_STATIC), Some(&toml::Value::Boolean(true)));
     Ok(())
 }
 
@@ -151,7 +153,7 @@ fn flat_configuration_absorbed_into_managed_block_on_load() -> Result<()> {
     assert_eq!(loaded.environment.project_name, "atlas");
     assert_eq!(loaded.environment.runtime.compose_port, Some(8080));
     assert_eq!(loaded.environment.runtime.compose_wait_timeout, 240);
-    assert!(loaded.environment.runtime.extra.contains_key("is_static"));
+    assert!(loaded.environment.runtime.extra.contains_key(state::IS_STATIC));
     let parsed = config::parse_dotenv(&fs::read_to_string(&path)?)?;
     assert!(parsed.needs_rewrite);
     config::write_local_environment(&loaded.environment, &path)?;
@@ -210,25 +212,6 @@ fn production_filter_excludes_every_managed_source_and_retains_applications() ->
 }
 
 #[test]
-fn provisioning_request_round_trips_through_json() -> Result<()> {
-    let mut bones = Bones::default();
-    bones.host = "example.com".into();
-    bones.runtime.extra.insert("php_version".into(), toml::Value::Boolean(true));
-    let request = ProvisioningRequest::from_bones(&bones)?;
-    let json = serde_json::to_string(&request)?;
-    let restored: ProvisioningRequest = serde_json::from_str(&json)?;
-    assert_eq!(request, restored);
-    assert!(serde_json::to_string(&ProvisioningRequest::server_only("h", "u", "22"))?.find("site").is_none());
-    assert!(
-        serde_json::from_str::<ProvisioningRequest>(
-            r#"{"server":{"host":"h","ssh_user":"u","port":"22","intruder":1}}"#
-        )
-        .is_err()
-    );
-    Ok(())
-}
-
-#[test]
 fn dotenv_round_trips_backup_configuration() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join(".env");
@@ -263,25 +246,6 @@ fn environment_without_backup_keys_loads_with_backup_defaults() -> Result<()> {
     assert_eq!((loaded.backup.schedule.as_str(), loaded.backup.retention_days), ("0 0 * * *", 30));
     assert!(loaded.backup.passphrase.is_empty());
     assert!(!loaded.backup.is_configured());
-    Ok(())
-}
-
-#[test]
-fn provisioning_request_carries_backup_fields_including_the_passphrase() -> Result<()> {
-    let mut bones = Bones::for_site("atlas");
-    bones.backup.schedule = "15 2 * * *".into();
-    bones.backup.retention_days = 21;
-    bones.backup.passphrase = "hex-passphrase".into();
-
-    let request = ProvisioningRequest::from_bones(&bones)?;
-    let json = serde_json::to_string(&request)?;
-
-    let site = request.site.expect("site request carries backup fields");
-    assert_eq!(
-        (site.backup.schedule.as_str(), site.backup.retention_days, site.backup.passphrase.as_str()),
-        ("15 2 * * *", 21, "hex-passphrase")
-    );
-    assert!(json.contains("passphrase"));
     Ok(())
 }
 

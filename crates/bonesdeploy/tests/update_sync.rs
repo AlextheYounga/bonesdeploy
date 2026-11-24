@@ -1,5 +1,4 @@
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 use anyhow::Result;
@@ -14,7 +13,7 @@ fn write(path: &Path, content: &str) -> Result<()> {
 }
 
 #[test]
-fn refresh_local_infrastructure_updates_managed_files_without_touching_custom() -> Result<()> {
+fn refresh_local_infrastructure_rejects_existing_custom_provisioning_without_touching_files() -> Result<()> {
     let temp = tempfile::tempdir()?;
     let source_dir = temp.path().join("source");
     let project_root = temp.path().join("project");
@@ -29,13 +28,13 @@ fn refresh_local_infrastructure_updates_managed_files_without_touching_custom() 
     write(&project_root.join(".env"), "TEMPLATE=laravel\n")?;
     write(&infra_dir.join("custom/runtime.py"), "def deploy(ctx):\n    custom(ctx)\n")?;
 
-    refresh_local_infrastructure(&source_dir, &project_root, Some("laravel"))?;
+    let Err(error) = refresh_local_infrastructure(&source_dir, &project_root, Some("laravel")) else {
+        return Err(anyhow::anyhow!("existing custom provisioning did not stop update"));
+    };
     assert_eq!(fs::read_to_string(project_root.join(".env"))?, "TEMPLATE=laravel\n");
-    assert_eq!(fs::read_to_string(infra_dir.join("deployment/build/01_build.sh"))?, "laravel deploy");
-    assert_eq!(fs::read_to_string(infra_dir.join("deployment/functions.sh"))?, "shared functions");
+    assert!(error.to_string().contains("temporarily unsupported"));
+    assert!(!infra_dir.join("deployment").exists());
     assert_eq!(fs::read_to_string(infra_dir.join("custom/runtime.py"))?, "def deploy(ctx):\n    custom(ctx)\n");
-    let mode = fs::metadata(infra_dir.join("deployment/build/01_build.sh"))?.permissions().mode() & 0o777;
-    assert_eq!(mode, 0o755);
     Ok(())
 }
 

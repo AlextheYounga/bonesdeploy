@@ -1,9 +1,16 @@
+use bonesdeploy_core::state;
+
 use super::{FrameworkDefaults, PermissionDefault, Question, directory, file};
 
 const PERMISSIONS: [PermissionDefault; 3] = [directory("*", 750, false), file("*", 640), directory("dist", 755, true)];
 
 pub(super) fn defaults() -> FrameworkDefaults {
-    FrameworkDefaults { template: "angular", web_root: "dist/browser", language: None, permissions: &PERMISSIONS }
+    FrameworkDefaults {
+        template: "angular",
+        web_root: state::ANGULAR_BROWSER_DIR,
+        language: None,
+        permissions: &PERMISSIONS,
+    }
 }
 
 /// `Angular` takes no framework configuration.

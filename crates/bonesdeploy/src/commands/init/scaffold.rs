@@ -31,25 +31,8 @@ pub(super) fn materialize_project(cfg: &mut config::Bones, framework: FrameworkS
 
     framework_assets::scaffold_framework_project(&selected_framework.to_string(), infra_dir)?;
     bonesinfra::materialize_project_artifacts(Path::new("."), &cfg.runtime)?;
-    scaffold_custom_provisioning(infra_dir)?;
     fs::create_dir_all(paths::LOCAL_INFRA_SECRETS_DIR)
         .with_context(|| format!("Failed to create {}", paths::LOCAL_INFRA_SECRETS_DIR))?;
-    Ok(())
-}
-
-fn scaffold_custom_provisioning(infra_dir: &Path) -> Result<()> {
-    let custom = infra_dir.join("custom");
-    fs::create_dir_all(&custom).with_context(|| format!("Failed to create {}", custom.display()))?;
-    fs::write(custom.join("__init__.py"), "\"\"\"Project-owned provisioning.\"\"\"\n")?;
-    fs::write(custom.join("runtime.py"), "def deploy(_ctx):\n    pass\n")?;
-    fs::write(
-        custom.join(paths::GITIGNORE_FILE),
-        include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/kit/.gitignore")),
-    )?;
-    fs::write(
-        custom.join("manifest.py"),
-        "def artifacts(_ctx):\n    return []\n\n\ndef services(_ctx):\n    return []\n\n\ndef mode(_ctx):\n    return None\n",
-    )?;
     Ok(())
 }
 

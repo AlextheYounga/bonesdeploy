@@ -1,3 +1,5 @@
+use bonesdeploy_core::state;
+
 use std::fs;
 
 use anyhow::{Result, bail};
@@ -20,7 +22,7 @@ fn bones_with_runtime(template: &str, extra: Map<String, Value>) -> Result<Bones
     config.project_name = String::from("atlas");
     let mut runtime_vars = Map::new();
     runtime_vars.insert("template".to_string(), Value::String(template.to_string()));
-    runtime_vars.insert("web_root".to_string(), Value::String("public".to_string()));
+    runtime_vars.insert(state::WEB_ROOT.to_string(), Value::String("public".to_string()));
     runtime_vars.extend(extra);
     config.runtime = serde_json::from_value(json!(runtime_vars))?;
     Ok(config)
@@ -107,11 +109,11 @@ fn custom_is_the_empty_framework_fallback() -> Result<()> {
 fn next_and_nuxt_default_to_node_25_without_changing_other_frameworks() -> Result<()> {
     for framework in [Framework::Next, Framework::Nuxt] {
         let defaults = framework.runtime_defaults()?.ok_or_else(|| anyhow::anyhow!("missing defaults"))?;
-        assert_eq!(defaults.get("node_version"), Some(&Value::String("25.9.0".into())));
+        assert_eq!(defaults.get(state::NODE_VERSION), Some(&Value::String("25.9.0".into())));
     }
 
     let defaults = Framework::SvelteKit.runtime_defaults()?.ok_or_else(|| anyhow::anyhow!("missing defaults"))?;
-    assert_eq!(defaults.get("node_version"), Some(&Value::String("24.19.0".into())));
+    assert_eq!(defaults.get(state::NODE_VERSION), Some(&Value::String("24.19.0".into())));
     Ok(())
 }
 
@@ -121,7 +123,7 @@ fn angular_defaults_to_the_static_browser_artifact() -> Result<()> {
     let defaults = Framework::Angular.runtime_defaults()?.ok_or_else(|| anyhow::anyhow!("missing defaults"))?;
 
     assert_eq!(defaults.get("template"), Some(&Value::String("angular".into())));
-    assert_eq!(defaults.get("web_root"), Some(&Value::String("dist/browser".into())));
+    assert_eq!(defaults.get(state::WEB_ROOT), Some(&Value::String(state::ANGULAR_BROWSER_DIR.into())));
     assert_eq!(
         defaults.get("permissions"),
         Some(&json!([
@@ -155,7 +157,7 @@ fn environment_examples_use_project_name_in_shared_paths() -> Result<()> {
 #[test]
 fn build_environments_use_selected_language_versions() -> Result<()> {
     for (framework, key, version, expected, old) in [
-        (Framework::Laravel, "php_version", "8.3", "PHP_VERSION=8.3", "PHP_VERSION=8.5"),
+        (Framework::Laravel, state::PHP_VERSION, "8.3", "PHP_VERSION=8.3", "PHP_VERSION=8.5"),
         (Framework::Rails, "ruby_version", "3.4.8", "RUBY_VERSION=3.4.8", "RUBY_VERSION=3.3.8"),
     ] {
         let runtime: Runtime = serde_json::from_value(Value::Object(
@@ -206,9 +208,9 @@ fn framework_answer_validation_preserves_all_cases() -> Result<()> {
     assert!(error.to_string().contains("php_verison"));
 
     answers.clear();
-    answers.insert("php_version".to_string(), Value::String("8.6".to_string()));
+    answers.insert(state::PHP_VERSION.to_string(), Value::String("8.6".to_string()));
     assert!(Framework::Laravel.validate_answers(&answers).is_err_and(|error| error.to_string().contains("not one of")));
-    answers.insert("php_version".to_string(), Value::Bool(true));
+    answers.insert(state::PHP_VERSION.to_string(), Value::Bool(true));
     assert!(Framework::Laravel.validate_answers(&answers).is_err_and(|error| error.to_string().contains("wrong type")));
 
     answers.clear();
@@ -221,13 +223,16 @@ fn framework_answer_validation_preserves_all_cases() -> Result<()> {
 
 #[test]
 fn static_framework_configuration_overrides_only_static_web_roots() -> Result<()> {
-    let mut next = bones_with_runtime("next", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
+    let mut next =
+        bones_with_runtime("next", [(state::IS_STATIC.to_string(), Value::Bool(true))].into_iter().collect())?;
     Framework::Next.configure(&mut next);
     assert_eq!(next.runtime.web_root, "out");
-    let mut nuxt = bones_with_runtime("nuxt", [("is_static".to_string(), Value::Bool(true))].into_iter().collect())?;
+    let mut nuxt =
+        bones_with_runtime("nuxt", [(state::IS_STATIC.to_string(), Value::Bool(true))].into_iter().collect())?;
     Framework::Nuxt.configure(&mut nuxt);
-    assert_eq!(nuxt.runtime.web_root, ".output/public");
-    let mut server = bones_with_runtime("next", [("is_static".to_string(), Value::Bool(false))].into_iter().collect())?;
+    assert_eq!(nuxt.runtime.web_root, state::NUXT_PUBLIC_DIR);
+    let mut server =
+        bones_with_runtime("next", [(state::IS_STATIC.to_string(), Value::Bool(false))].into_iter().collect())?;
     Framework::Next.configure(&mut server);
     if server.runtime.web_root != "public" {
         bail!("server web root changed")

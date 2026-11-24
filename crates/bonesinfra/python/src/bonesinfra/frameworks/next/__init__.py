@@ -1,1 +1,0 @@
-"""Generated Next.js infrastructure."""

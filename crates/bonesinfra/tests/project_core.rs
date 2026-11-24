@@ -9,10 +9,11 @@ const FRAMEWORKS: &[&str] = &["angular", "custom", "django", "laravel", "next", 
 fn native_materialization_keeps_only_the_selected_framework_paths() -> Result<()> {
     for framework in FRAMEWORKS {
         let project = tempfile::tempdir()?;
-        let wheel = bonesinfra::materialize_project_artifacts(project.path(), &native_runtime(framework))?;
+        let templates = bonesinfra::materialize_project_artifacts(project.path(), &native_runtime(framework))?;
         let infra = project.path().join("infra");
 
-        assert_eq!(fs::read(wheel)?, bonesinfra::embedded_wheel()?);
+        assert_eq!(templates, infra.join("templates"));
+        assert!(!infra.join("bonesinfra.whl").exists());
         assert!(infra.join("templates/shared/nginx/index.html.j2").is_file());
         for candidate in FRAMEWORKS {
             assert_eq!(
@@ -29,10 +30,10 @@ fn native_materialization_keeps_only_the_selected_framework_paths() -> Result<()
 fn docker_materialization_removes_every_framework_path() -> Result<()> {
     let project = tempfile::tempdir()?;
     let runtime = Runtime { backend: RuntimeBackend::Docker, ..Runtime::default() };
-    let wheel = bonesinfra::materialize_project_artifacts(project.path(), &runtime)?;
+    let templates = bonesinfra::materialize_project_artifacts(project.path(), &runtime)?;
     let infra = project.path().join("infra");
 
-    assert_eq!(fs::read(wheel)?, bonesinfra::embedded_wheel()?);
+    assert_eq!(templates, infra.join("templates"));
     assert!(infra.join("templates/shared/nginx/index.html.j2").is_file());
     for framework in FRAMEWORKS {
         assert!(!infra.join("templates/frameworks").join(framework).exists());
@@ -41,11 +42,25 @@ fn docker_materialization_removes_every_framework_path() -> Result<()> {
 }
 
 #[test]
-fn rematerialization_restores_newly_selected_paths_and_preserves_project_files() -> Result<()> {
+fn materialization_rejects_existing_custom_provisioning_without_changing_it() -> Result<()> {
     let project = tempfile::tempdir()?;
     let custom = project.path().join("infra/custom/runtime.py");
     fs::create_dir_all(custom.parent().ok_or_else(|| anyhow::anyhow!("custom runtime path has no parent"))?)?;
     fs::write(&custom, "project owned")?;
+
+    let Err(error) = bonesinfra::materialize_project_artifacts(project.path(), &native_runtime("laravel")) else {
+        return Err(anyhow::anyhow!("existing custom provisioning did not stop migration"));
+    };
+
+    assert!(error.to_string().contains("temporarily unsupported"));
+    assert_eq!(fs::read_to_string(custom)?, "project owned");
+    assert!(!project.path().join("infra/templates").exists());
+    Ok(())
+}
+
+#[test]
+fn rematerialization_restores_newly_selected_paths() -> Result<()> {
+    let project = tempfile::tempdir()?;
 
     bonesinfra::materialize_project_artifacts(project.path(), &native_runtime("laravel"))?;
     let frameworks = project.path().join("infra/templates/frameworks");
@@ -55,7 +70,6 @@ fn rematerialization_restores_newly_selected_paths_and_preserves_project_files()
     bonesinfra::materialize_project_artifacts(project.path(), &native_runtime("django"))?;
     assert!(frameworks.join("django").is_dir());
     assert!(!frameworks.join("laravel").exists());
-    assert_eq!(fs::read_to_string(custom)?, "project owned");
     Ok(())
 }
 
@@ -83,6 +97,19 @@ fn materialization_removes_the_obsolete_framework_directory() -> Result<()> {
     bonesinfra::materialize_project_artifacts(project.path(), &native_runtime("custom"))?;
 
     assert!(!obsolete.exists());
+    Ok(())
+}
+
+#[test]
+fn materialization_removes_existing_project_wheels() -> Result<()> {
+    let project = tempfile::tempdir()?;
+    let wheel = project.path().join("infra/bonesinfra-0.5.0-py3-none-any.whl");
+    fs::create_dir_all(wheel.parent().ok_or_else(|| anyhow::anyhow!("wheel has no parent"))?)?;
+    fs::write(&wheel, "existing")?;
+
+    bonesinfra::materialize_project_artifacts(project.path(), &native_runtime("custom"))?;
+
+    assert!(!wheel.exists());
     Ok(())
 }
 

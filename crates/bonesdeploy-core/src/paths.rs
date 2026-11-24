@@ -1,6 +1,12 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
+use crate::state::{HOME, LOCAL_DATA_DIR, XDG_DATA_HOME};
+
+mod deployment;
+
+pub use deployment::DeploymentPaths;
+
 pub const DEFAULT_PROJECT_ROOT_PARENT: &str = "/srv/sites";
 pub const DEFAULT_CONF_ROOT_PARENT: &str = "/srv/conf";
 pub const DEFAULT_WEB_ROOT: &str = "public";
@@ -13,13 +19,19 @@ pub const ETC_NGINX_SITES_ENABLED: &str = "/etc/nginx/sites-enabled";
 pub const ETC_SYSTEMD_SYSTEM: &str = "/etc/systemd/system";
 pub const ETC_APPARMOR_D: &str = "/etc/apparmor.d";
 pub const ETC_LETSENCRYPT_LIVE: &str = "/etc/letsencrypt/live";
+pub const ETC_SSL_CERTS: &str = "/etc/ssl/certs";
+pub const ETC_SSL_PRIVATE: &str = "/etc/ssl/private";
 pub const ETC_SUDOERS_D: &str = "/etc/sudoers.d";
+pub const ETC_SSH_SSHD_CONFIG_D: &str = "/etc/ssh/sshd_config.d";
 pub const ETC_OS_RELEASE: &str = "/etc/os-release";
 pub const ETC_PASSWD: &str = "/etc/passwd";
 pub const ETC_GROUP: &str = "/etc/group";
 pub const APPARMOR_ENABLED_PARAM: &str = "/sys/module/apparmor/parameters/enabled";
 pub const APPARMOR_PROFILES: &str = "/sys/kernel/security/apparmor/profiles";
 pub const USR_LOCAL_BIN: &str = "/usr/local/bin";
+pub const BONESDEPLOY_LOG_ROOT: &str = "/var/log/bonesdeploy";
+pub const PATCHES_ROOT: &str = "/var/lib/bonesdeploy/patches";
+pub const RUNTIME_SOCKET_PARENT: &str = "/run";
 
 pub const OLD_BONES_DIR: &str = ".bones";
 pub const LOCAL_INFRA_DIR: &str = "infra";
@@ -72,6 +84,9 @@ pub const NGINX_SOCKET: &str = "nginx.sock";
 pub const NGINX_PID: &str = "nginx.pid";
 pub const PHP_FPM_SOCKET: &str = "php-fpm.sock";
 pub const DEFAULT_NGINX_SITE: &str = "default";
+pub const BONESDEPLOY_NGINX_DEFAULT_DENY_SITE: &str = "00-bonesdeploy-default-deny.conf";
+pub const BONESDEPLOY_NGINX_DEFAULT_DENY_CERT: &str = "bonesdeploy-default-deny.crt";
+pub const BONESDEPLOY_NGINX_DEFAULT_DENY_KEY: &str = "bonesdeploy-default-deny.key";
 pub const SYSTEMD_TARGET_SUFFIX: &str = ".target";
 pub const SYSTEMD_SERVICE_SUFFIX: &str = ".service";
 
@@ -179,7 +194,7 @@ pub fn bonesremote_global_link() -> PathBuf {
 }
 
 fn home_dir() -> PathBuf {
-    env::var("HOME").map_or_else(|_| PathBuf::from("/root"), PathBuf::from)
+    env::var(HOME).map_or_else(|_| PathBuf::from("/root"), PathBuf::from)
 }
 
 #[must_use]
@@ -198,10 +213,10 @@ pub fn bones_projects_root() -> PathBuf {
 
 #[must_use]
 pub fn bones_data_root() -> PathBuf {
-    if let Some(dir) = env::var("XDG_DATA_HOME").ok().filter(|v| !v.is_empty()) {
+    if let Some(dir) = env::var(XDG_DATA_HOME).ok().filter(|v| !v.is_empty()) {
         return Path::new(&dir).join(BONESDEPLOY_DIR);
     }
-    home_dir().join(".local/share").join(BONESDEPLOY_DIR)
+    home_dir().join(LOCAL_DATA_DIR).join(BONESDEPLOY_DIR)
 }
 
 #[must_use]

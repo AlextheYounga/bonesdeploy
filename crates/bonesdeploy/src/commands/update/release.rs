@@ -5,9 +5,9 @@ use anyhow::{Context, Result, bail};
 use bonesdeploy_core::paths;
 
 use crate::config;
-use crate::infra;
 use crate::infra::ssh;
 use bonesdeploy_core::config::parse_port;
+use bonesinfra::patches::apply_remote;
 
 pub(super) fn current_local_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
@@ -74,11 +74,7 @@ pub(super) async fn update_remote_from_release(current_version: &str, target_ver
 
     transport.close().await?;
 
-    let request = infra::provisioning_request(&cfg)?;
-    bonesinfra::run_with_request(
-        &["patches", "apply", "--request-stdin", "--target-version", target_version, "--scope", "remote"],
-        &request,
-    )?;
+    apply_remote(&cfg, Path::new("."), target_version).await?;
 
     Ok(())
 }

@@ -7,10 +7,10 @@ cd "$repo_root"
 
 # Get new version from args
 new_rust_version=${1:-}
-new_python_version=${2:-}
+new_infra_version=${2:-}
 
-if [ -z "$new_rust_version" ] || [ -z "$new_python_version" ]; then
-	echo "Usage: $0 <new_rust_version> <new_python_version>"
+if [ -z "$new_rust_version" ] || [ -z "$new_infra_version" ]; then
+	echo "Usage: $0 <new_rust_version> <new_infra_version>"
 	exit 1
 fi
 
@@ -40,20 +40,13 @@ update_cargo() {
 	update_dependency_version crates/bonesinfra/Cargo.toml bonesdeploy-core "$new_rust_version"
 }
 
-update_python() {
+update_infra() {
 	infra_cargo_file=crates/bonesdeploy/Cargo.toml
-	pyproject_toml=crates/bonesinfra/python/pyproject.toml
-	echo "Updating $infra_cargo_file bonesinfra dependency to $new_python_version"
-	update_dependency_version "$infra_cargo_file" bonesinfra "$new_python_version"
-	echo "Updating crates/bonesinfra/Cargo.toml package version to $new_python_version"
-	update_package_version crates/bonesinfra/Cargo.toml "$new_python_version"
-
-	echo "Updating $pyproject_toml package version to $new_python_version"
-	update_package_version "$pyproject_toml" "$new_python_version"
-
-	uv lock --directory crates/bonesinfra/python
-	cargo build-wheel
+	echo "Updating $infra_cargo_file bonesinfra dependency to $new_infra_version"
+	update_dependency_version "$infra_cargo_file" bonesinfra "$new_infra_version"
+	echo "Updating crates/bonesinfra/Cargo.toml package version to $new_infra_version"
+	update_package_version crates/bonesinfra/Cargo.toml "$new_infra_version"
 }
 
 update_cargo
-update_python
+update_infra

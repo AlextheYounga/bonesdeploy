@@ -1,3 +1,5 @@
+use bonesdeploy_core::state;
+
 use bonesdeploy_core::config::{RUNTIME_RUBY_VERSION, Runtime};
 
 use super::{FrameworkDefaults, PermissionDefault, Question, QuestionKind, directory, file};
@@ -28,7 +30,11 @@ pub(super) fn questions() -> &'static [Question] {
             label: "Ruby version",
             kind: QuestionKind::Choice { choices: &["3.2.8", "3.3.8", "3.4.8"], default: DEFAULT_RUBY_VERSION },
         },
-        Question { key: "rails_env", label: "Rails environment", kind: QuestionKind::Text { default: "production" } },
+        Question {
+            key: state::RAILS_ENV,
+            label: "Rails environment",
+            kind: QuestionKind::Text { default: "production" },
+        },
     ]
 }
 

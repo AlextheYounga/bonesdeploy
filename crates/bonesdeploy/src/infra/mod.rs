@@ -1,17 +1,8 @@
 pub mod git;
 pub mod ssh;
 
-use anyhow::{Context, Result};
-use bonesdeploy_core::config::{Bones, ProvisioningRequest, RemoteDeploymentConfig};
-
-pub fn provisioning_request(config: &Bones) -> Result<String> {
-    serde_json::to_string(&ProvisioningRequest::from_bones(config)?).context("Failed to serialize provisioning request")
-}
-
-pub fn server_request(config: &Bones) -> Result<String> {
-    serde_json::to_string(&ProvisioningRequest::server_only(&config.host, &config.ssh_user, &config.port))
-        .context("Failed to serialize server provisioning request")
-}
+use anyhow::Result;
+use bonesdeploy_core::config::{Bones, RemoteDeploymentConfig};
 
 pub async fn sync_control_plane(transport: &ssh::SshTransport, config: &Bones) -> Result<()> {
     let body = format!("{}\n", serde_json::to_string_pretty(&RemoteDeploymentConfig::from_bones(config))?);

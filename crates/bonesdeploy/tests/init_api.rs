@@ -1,3 +1,5 @@
+use bonesdeploy_core::state;
+
 use anyhow::{Result, bail};
 use bonesdeploy::commands::init::Args;
 use bonesdeploy::commands::init::config::collect_non_interactive;
@@ -29,13 +31,13 @@ fn incomplete_existing(project_name: &str) -> Bones {
 
 #[test]
 fn framework_var_parser_preserves_bool_string_and_error_cases() -> Result<()> {
-    assert_eq!(parse_framework_var("is_static=true")?, (String::from("is_static"), Value::Bool(true)));
-    assert_eq!(parse_framework_var("is_static=FALSE")?, (String::from("is_static"), Value::Bool(false)));
+    assert_eq!(parse_framework_var("is_static=true")?, (String::from(state::IS_STATIC), Value::Bool(true)));
+    assert_eq!(parse_framework_var("is_static=FALSE")?, (String::from(state::IS_STATIC), Value::Bool(false)));
     assert_eq!(
         parse_framework_var("php_version=8.5")?,
-        (String::from("php_version"), Value::String(String::from("8.5")))
+        (String::from(state::PHP_VERSION), Value::String(String::from("8.5")))
     );
-    assert!(parse_framework_var("is_static").is_err_and(|error| error.to_string().contains("KEY=VALUE")));
+    assert!(parse_framework_var(state::IS_STATIC).is_err_and(|error| error.to_string().contains("KEY=VALUE")));
     assert!(parse_framework_var("=value").is_err_and(|error| error.to_string().contains("empty")));
     Ok(())
 }
@@ -44,7 +46,7 @@ fn framework_var_parser_preserves_bool_string_and_error_cases() -> Result<()> {
 fn framework_config_validates_vars_and_template_fallbacks() -> Result<()> {
     let selection = collect_framework_config(&args_non_interactive(Some("laravel"), &["php_version=8.5"]))?;
     assert_eq!(selection.template.as_deref(), Some("laravel"));
-    assert_eq!(selection.config.get("php_version"), Some(&Value::String("8.5".to_string())));
+    assert_eq!(selection.config.get(state::PHP_VERSION), Some(&Value::String("8.5".to_string())));
     let error = collect_framework_config(&args_non_interactive(Some("laravel"), &["php_verison=8.5"]))
         .err()
         .ok_or_else(|| anyhow::anyhow!("unknown framework var should fail"))?;
@@ -52,7 +54,7 @@ fn framework_config_validates_vars_and_template_fallbacks() -> Result<()> {
 
     let none = collect_framework_config(&args_non_interactive(Some("none"), &[]))?;
     assert!(none.template.is_none());
-    assert!(none.config.contains_key("web_root") || none.config.is_empty());
+    assert!(none.config.contains_key(state::WEB_ROOT) || none.config.is_empty());
     let custom = collect_framework_config(&args_non_interactive(Some("custom"), &[]))?;
     assert_eq!(custom.template.as_deref(), Some("custom"));
     assert_eq!(custom.config.get("template"), Some(&Value::String("custom".into())));

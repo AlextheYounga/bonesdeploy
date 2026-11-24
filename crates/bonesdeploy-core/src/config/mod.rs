@@ -21,5 +21,7 @@ pub use model::{
     default_deploy_user, default_node_version, parse_port, runtime_group_for, runtime_user_for, validate_host,
     validate_runtime,
 };
-pub use transport::{ProvisioningRequest, RemoteDeploymentConfig, RemoteRuntime, ServerConnection, SiteFields};
-pub use validation::{is_numbered_shell_script, validate_project_name, validate_site_name};
+pub use transport::{RemoteDeploymentConfig, RemoteRuntime};
+pub use validation::{
+    is_numbered_shell_script, validate_domain, validate_email, validate_project_name, validate_site_name,
+};

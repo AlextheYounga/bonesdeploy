@@ -1,3 +1,5 @@
+use bonesdeploy_core::state;
+
 use bonesdeploy_core::paths;
 use std::collections::BTreeMap;
 use std::env;
@@ -18,7 +20,7 @@ pub(super) fn check_supported_distribution(issues: &mut Vec<String>) {
 }
 
 fn supported_host(os_release: &str, architecture: &str) -> bool {
-    if architecture != "x86_64" {
+    if architecture != state::X86_64 {
         return false;
     }
 
@@ -44,7 +46,7 @@ fn parse_version(value: &str) -> Option<Vec<u16>> {
 
 #[cfg(test)]
 mod tests {
-    use super::supported_host;
+    use super::{state, supported_host};
 
     #[test]
     fn production_platform_policy_accepts_supported_version_boundaries() {
@@ -55,13 +57,13 @@ mod tests {
             "ID=ubuntu\nVERSION_ID=24.04.1",
             "ID=ubuntu\nVERSION_ID=25.10",
         ] {
-            assert!(supported_host(os_release, "x86_64"), "expected {os_release} to be accepted");
+            assert!(supported_host(os_release, state::X86_64), "expected {os_release} to be accepted");
         }
     }
 
     #[test]
     fn production_platform_policy_accepts_only_x86_64() {
-        assert!(supported_host("ID=debian\nVERSION_ID=12", "x86_64"));
+        assert!(supported_host("ID=debian\nVERSION_ID=12", state::X86_64));
     }
 
     #[test]
@@ -81,7 +83,7 @@ mod tests {
             "ID=Ubuntu\nVERSION_ID=24.04",
             "ID=debian\nVERSION_ID=12-bookworm",
         ] {
-            assert!(!supported_host(os_release, "x86_64"), "unexpectedly accepted {os_release}");
+            assert!(!supported_host(os_release, state::X86_64), "unexpectedly accepted {os_release}");
         }
     }
 }

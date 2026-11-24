@@ -1,12 +1,13 @@
 use anyhow::Result;
 use bonesdeploy_core::paths;
+use bonesinfra::provisioning::provision_runtime;
 use std::path::Path;
 
+use crate::config;
 use crate::ui::output;
 use crate::ui::prompts;
-use crate::{config, infra};
 
-pub fn run(yes: bool) -> Result<()> {
+pub async fn run(yes: bool) -> Result<()> {
     super::readiness::ensure_project_ready()?;
     if !yes && !prompts::confirm_site_runtime()? {
         println!("Skipped runtime setup.");
@@ -14,15 +15,14 @@ pub fn run(yes: bool) -> Result<()> {
         println!("{}", output::next_step_with_detail("bonesdeploy site runtime", "when ready"));
         return Ok(());
     }
-    apply()?;
+    apply().await?;
     println!("Runtime applied.");
     Ok(())
 }
 
-pub(super) fn apply() -> Result<()> {
+pub(super) async fn apply() -> Result<()> {
     println!("Applying runtime...");
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    let request = infra::provisioning_request(&cfg)?;
-    bonesinfra::run_with_request(&["runtime", "apply", "--request-stdin"], &request)?;
+    provision_runtime(&cfg, Path::new(".")).await?;
     Ok(())
 }

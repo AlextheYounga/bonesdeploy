@@ -10,6 +10,7 @@ pub fn refresh_local_infrastructure(source_dir: &Path, project_root: &Path, temp
     if !infra_dir.exists() {
         return Ok(());
     }
+    bonesinfra::reject_custom_provisioning(project_root)?;
 
     sync_kit_deployment_functions(source_dir, &infra_dir)?;
     sync_tree(&deployment_source_root(source_dir, template), &infra_dir.join("deployment"), true)?;

@@ -65,7 +65,7 @@ async fn dispatch_server(command: &ServerCommand) -> Result<()> {
     match command {
         ServerCommand::Setup { yes } => server::setup(*yes).await,
         ServerCommand::Doctor { verbose } => server::doctor(*verbose).await,
-        ServerCommand::Helpers { yes } => server::helpers(*yes),
+        ServerCommand::Helpers { yes } => server::helpers(*yes).await,
     }
 }
 
@@ -77,18 +77,21 @@ async fn dispatch_site(command: &SiteCommand) -> Result<()> {
         SiteCommand::Status => site::status().await,
         SiteCommand::Tunnel { command } => match command {
             TunnelCommand::Start { yes } => site::tunnel_start(*yes).await,
-            TunnelCommand::Stop { yes } => site::tunnel_stop(*yes),
+            TunnelCommand::Stop { yes } => site::tunnel_stop(*yes).await,
             TunnelCommand::Status => site::tunnel_status().await,
         },
         SiteCommand::Export { output } => site::export(output.as_deref()).await,
         SiteCommand::Import { archive, yes } => site::import(archive, *yes).await,
-        SiteCommand::Manifest { format } => site::manifest(match format {
-            ManifestFormat::Text => "text",
-            ManifestFormat::Json => "json",
-        }),
+        SiteCommand::Manifest { format } => {
+            site::manifest(match format {
+                ManifestFormat::Text => "text",
+                ManifestFormat::Json => "json",
+            })
+            .await
+        }
         SiteCommand::Releases { command } => dispatch_releases(command.as_ref()).await,
-        SiteCommand::Runtime { yes } => site::runtime(*yes),
-        SiteCommand::Ssl { yes, domain, email } => site::ssl(*yes, domain.clone(), email.clone()),
+        SiteCommand::Runtime { yes } => site::runtime(*yes).await,
+        SiteCommand::Ssl { yes, domain, email } => site::ssl(*yes, domain.clone(), email.clone()).await,
     }
 }
 

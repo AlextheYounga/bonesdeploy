@@ -1,3 +1,5 @@
+use bonesdeploy_core::state;
+
 use std::collections::BTreeSet;
 use std::env;
 use std::error::Error;
@@ -21,7 +23,7 @@ fn site(root: &Path) -> Site {
         name: "atlas".to_string(),
         uid: 1001,
         gid: 1001,
-        shell: "/usr/sbin/nologin".to_string(),
+        shell: state::NOLOGIN_SHELL.to_string(),
         groups: BTreeSet::from([1001]),
     };
     Site { name: "atlas".to_string(), project_root: root.to_path_buf(), runtime: account }

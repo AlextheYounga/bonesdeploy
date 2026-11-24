@@ -1,35 +1,12 @@
 use std::collections::BTreeMap;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 use bonesdeploy_core::paths;
+use bonesinfra::manifest::{ArtifactKind, ArtifactState, ComposeReport, ManifestReport, ResolvedArtifact, inspect};
 use console::style;
-use serde::Deserialize;
 
-use crate::{config, infra};
-
-#[derive(Deserialize)]
-struct ManifestReport {
-    strategy: Strategy,
-    entries: Vec<Artifact>,
-    managed_services: Vec<ManagedService>,
-    compose: Option<ComposeReport>,
-}
-
-#[derive(Deserialize)]
-struct Strategy {
-    framework: String,
-    mode: String,
-    backend: String,
-    ssl: bool,
-}
-
-#[derive(Deserialize)]
-struct Artifact {
-    path: String,
-    kind: String,
-    state: String,
-}
+use crate::config;
 
 pub(super) struct PathArtifact {
     pub(super) path: String,
@@ -37,34 +14,14 @@ pub(super) struct PathArtifact {
     pub(super) state: Option<String>,
 }
 
-impl From<Artifact> for PathArtifact {
-    fn from(artifact: Artifact) -> Self {
-        Self { path: artifact.path, kind: artifact.kind, state: Some(artifact.state) }
+impl From<ResolvedArtifact> for PathArtifact {
+    fn from(artifact: ResolvedArtifact) -> Self {
+        Self {
+            path: artifact.path,
+            kind: artifact_kind(artifact.kind).to_owned(),
+            state: Some(artifact_state(artifact.state).to_owned()),
+        }
     }
-}
-
-#[derive(Deserialize)]
-struct ManagedService {
-    unit: String,
-    running: bool,
-    enabled: bool,
-}
-
-#[derive(Deserialize)]
-struct ComposeReport {
-    project_name: String,
-    files: Vec<String>,
-    security_mode: String,
-    security_warning: String,
-    persistent_data: String,
-    services: Vec<ComposeService>,
-    error: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct ComposeService {
-    service: String,
-    condition: String,
 }
 
 #[derive(Default)]
@@ -73,20 +30,35 @@ struct TreeNode {
     artifact: Option<PathArtifact>,
 }
 
-pub fn run(format: &str) -> Result<()> {
+pub async fn run(format: &str) -> Result<()> {
     super::readiness::ensure_project_ready()?;
 
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    let request = infra::provisioning_request(&cfg)?;
-    let json = bonesinfra::run_with_request_output(&["manifest", "show", "--request-stdin"], &request)?;
+    let report = inspect(&cfg, Path::new(".")).await?;
     if format == "json" {
-        print!("{json}");
+        print!("{}", serde_json::to_string(&report)?);
         return Ok(());
     }
 
-    let report = serde_json::from_str(&json).context("BonesInfra returned an invalid manifest report")?;
     print!("{}", render_text(report)?);
     Ok(())
+}
+
+fn artifact_kind(kind: ArtifactKind) -> &'static str {
+    match kind {
+        ArtifactKind::File => "file",
+        ArtifactKind::Directory => "directory",
+        ArtifactKind::Link => "link",
+        ArtifactKind::Socket => "socket",
+    }
+}
+
+fn artifact_state(state: ArtifactState) -> &'static str {
+    match state {
+        ArtifactState::Present => "present",
+        ArtifactState::Missing => "missing",
+        ArtifactState::WrongKind => "wrong-kind",
+    }
 }
 
 fn render_text(report: ManifestReport) -> Result<String> {
@@ -196,11 +168,11 @@ mod tests {
             r#"{
             "strategy":{"framework":"none","mode":"custom","backend":"native","ssl":false},
             "entries":[
-                {"path":"/srv/sites/example/current","kind":"link","state":"missing"},
-                {"path":"/srv/sites/example","kind":"directory","state":"present"},
-                {"path":"/etc/nginx/example.conf","kind":"file","state":"wrong-kind"}
+                {"name":"current","owner":"deploy","path":"/srv/sites/example/current","kind":"link","state":"missing"},
+                {"name":"site","owner":"setup","path":"/srv/sites/example","kind":"directory","state":"present"},
+                {"name":"nginx","owner":"runtime","path":"/etc/nginx/example.conf","kind":"file","state":"wrong-kind"}
             ],
-            "managed_services":[{"unit":"example.service","running":true,"enabled":true}],
+            "managed_services":[{"name":"app","owner":"runtime","unit":"example.service","running":true,"enabled":true}],
             "compose":null
         }"#,
         )?;

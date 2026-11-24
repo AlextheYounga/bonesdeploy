@@ -1,3 +1,5 @@
+use bonesdeploy_core::state;
+
 use super::{FrameworkDefaults, PermissionDefault, Question, QuestionKind, directory, file};
 
 const PERMISSIONS: [PermissionDefault; 3] = [directory("*", 750, false), file("*", 640), directory("media", 770, true)];
@@ -8,7 +10,7 @@ pub(super) fn defaults() -> FrameworkDefaults {
 
 pub(super) fn questions() -> &'static [Question] {
     &[Question {
-        key: "wsgi_module",
+        key: state::WSGI_MODULE,
         label: "WSGI module",
         kind: QuestionKind::Text { default: "config.wsgi:application" },
     }]

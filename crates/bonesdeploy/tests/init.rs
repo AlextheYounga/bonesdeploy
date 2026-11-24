@@ -31,23 +31,14 @@ fn init_distinguishes_fresh_and_prepared_host_setup_commands() -> Result<()> {
 
 fn assert_project_infra(repo: &Path) -> Result<()> {
     let infra = repo.join("infra");
-    assert!(fs::read_dir(&infra)?.any(|entry| {
-        entry.ok().is_some_and(|entry| {
-            entry.path().file_name().is_some_and(|name| name.to_string_lossy().starts_with("bonesinfra-"))
-                && entry.path().extension().is_some_and(|extension| extension == "whl")
-        })
+    assert!(!fs::read_dir(&infra)?.any(|entry| {
+        entry.ok().is_some_and(|entry| entry.path().extension().is_some_and(|extension| extension == "whl"))
     }));
     assert!(infra.join("templates/shared/nginx/index.html.j2").is_file());
     assert!(infra.join("templates/frameworks/custom/app.service.j2").is_file());
     assert_only_framework_templates(&infra, Some("custom"));
     assert!(!infra.join(".framework").exists());
-    assert!(infra.join("custom/__init__.py").is_file());
-    assert!(infra.join("custom/runtime.py").is_file());
-    assert_eq!(
-        fs::read_to_string(infra.join("custom/.gitignore"))?,
-        fs::read_to_string(env!("CARGO_MANIFEST_DIR").to_owned() + "/assets/kit/.gitignore")?
-    );
-    assert!(infra.join("custom/manifest.py").is_file());
+    assert!(!infra.join("custom").exists());
     assert!(infra.join("secrets").is_dir());
     let deploy_dir = infra.join("deployment");
     assert!(deploy_dir.is_dir());
@@ -138,7 +129,7 @@ fn named_framework_materializes_project_template_snapshot() -> Result<()> {
         infra.join("templates/frameworks/laravel/queue-worker.service.j2").is_file(),
         "{framework} is missing framework templates"
     );
-    assert!(infra.join("custom/runtime.py").is_file(), "{framework} is missing custom runtime");
+    assert!(!infra.join("custom").exists(), "new projects must not receive custom provisioning");
     assert!(infra.join("deployment/functions.sh").is_file(), "{framework} is missing kit deployment functions");
     assert!(infra.join("templates/frameworks/laravel").is_dir(), "{framework} is missing infra templates");
     assert_only_framework_templates(&infra, Some("laravel"));
