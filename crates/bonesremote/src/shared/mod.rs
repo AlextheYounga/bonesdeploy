@@ -1,4 +1,5 @@
 mod archive;
+pub mod backup;
 mod environment;
 mod filesystem;
 mod transaction;
