@@ -12,12 +12,13 @@ use crate::privileges;
 use crate::release::SiteMutation;
 use crate::release::output;
 
-struct PrepareScriptEnv<'a> {
-    project_name: &'a str,
-    project_root: &'a str,
-    runtime_user: &'a str,
-    web_root: &'a str,
-    shared_functions: &'a Path,
+/// Executes a prepare script with its generic site runtime context.
+pub struct PrepareScript<'a> {
+    pub project_name: &'a str,
+    pub project_root: &'a str,
+    pub runtime_user: &'a str,
+    pub web_root: &'a str,
+    pub shared_functions: &'a Path,
 }
 
 pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Result<()> {
@@ -58,7 +59,7 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
     let logs_dir = paths::bonesremote_site_logs(&snapshot.site);
     fs::create_dir_all(&logs_dir).with_context(|| format!("Failed to create logs directory {}", logs_dir.display()))?;
 
-    let env = PrepareScriptEnv {
+    let prepare_script = PrepareScript {
         project_name: &cfg.project_name,
         project_root: &cfg.project_root,
         runtime_user: &runtime_user,
@@ -70,7 +71,8 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
         let script_name = script.file_name().and_then(|name| name.to_str()).unwrap_or("<unknown>");
         println!("Running prepare script {script_name}...");
 
-        let status = run_prepare_script(&script, &release_dir, &logs_dir.join(format!("{script_name}.log")), &env)
+        let status = prepare_script
+            .run(&script, &release_dir, &logs_dir.join(format!("{script_name}.log")))
             .with_context(|| format!("Failed to execute prepare script {}", script.display()))?;
 
         if !status.success() {
@@ -81,30 +83,29 @@ pub fn run(mutation: &SiteMutation, snapshot: &super::DeploymentSnapshot) -> Res
     Ok(())
 }
 
-fn run_prepare_script(
-    script: &Path,
-    release_root: &Path,
-    log_path: &Path,
-    env: &PrepareScriptEnv<'_>,
-) -> Result<ExitStatus> {
-    let functions_file = fs::File::open(env.shared_functions)
-        .with_context(|| format!("Failed to open shared prepare functions {}", env.shared_functions.display()))?;
-    let script_file =
-        fs::File::open(script).with_context(|| format!("Failed to open prepare script {}", script.display()))?;
+impl<'a> PrepareScript<'a> {
+    /// Runs the script as the runtime user, streaming output to the log.
+    /// The caller is responsible for authorizing the operation.
+    pub fn run(&self, script: &Path, release_root: &Path, log_path: &Path) -> Result<ExitStatus> {
+        let functions_file = fs::File::open(self.shared_functions)
+            .with_context(|| format!("Failed to open shared prepare functions {}", self.shared_functions.display()))?;
+        let script_file =
+            fs::File::open(script).with_context(|| format!("Failed to open prepare script {}", script.display()))?;
 
-    let mut command = Command::new("runuser");
-    configure_prepare_command(&mut command, release_root, env);
+        let mut command = Command::new("runuser");
+        configure_prepare_command(&mut command, release_root, self);
 
-    let mut child =
-        command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().with_context(|| {
-            format!("Failed to execute prepare script {} as {}", script.display(), env.runtime_user)
-        })?;
-    let stdin = child.stdin.take().context("Failed to capture prepare script stdin")?;
-    let input_handle = thread::spawn(move || stream_prepare_input(stdin, functions_file, script_file));
+        let mut child =
+            command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().with_context(|| {
+                format!("Failed to execute prepare script {} as {}", script.display(), self.runtime_user)
+            })?;
+        let stdin = child.stdin.take().context("Failed to capture prepare script stdin")?;
+        let input_handle = thread::spawn(move || stream_prepare_input(stdin, functions_file, script_file));
 
-    let status = output::stream_child_output(&mut child, log_path, &format!("prepare script {}", script.display()));
-    join_prepare_input(input_handle, env.shared_functions, script)?;
-    status
+        let status = output::stream_child_output(&mut child, log_path, &format!("prepare script {}", script.display()));
+        join_prepare_input(input_handle, self.shared_functions, script)?;
+        status
+    }
 }
 
 pub fn stream_prepare_input<W: Write>(
@@ -137,7 +138,7 @@ pub fn join_prepare_input(
     }
 }
 
-fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &PrepareScriptEnv<'_>) {
+fn configure_prepare_command(command: &mut Command, release_root: &Path, env: &PrepareScript<'_>) {
     command
         .args(["-u", env.runtime_user, "--", "bash", "-c", "umask 0002; exec bash -s"])
         .current_dir(release_root)
