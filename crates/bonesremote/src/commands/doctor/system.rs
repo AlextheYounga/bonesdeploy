@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use bonesdeploy_core::paths;
 use std::collections::BTreeMap;
@@ -20,7 +20,7 @@ pub(super) fn check_supported_distribution(issues: &mut Vec<String>) {
 }
 
 fn supported_host(os_release: &str, architecture: &str) -> bool {
-    if architecture != state::X86_64 {
+    if architecture != names::X86_64 {
         return false;
     }
 

@@ -1,17 +1,17 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
-use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use bonesdeploy_core::config::{Bones, validate_domain, validate_email};
 use bonesdeploy_core::paths;
-use rustinfra::operations::files::{Directory, DirectoryInput, Link, LinkInput, Template, TemplateInput};
-use rustinfra::operations::server::{Script, ScriptInput, ScriptTemplate, ScriptTemplateInput, Shell, ShellCommands};
-use rustinfra::operations::systemd::{Service, ServiceInput};
-use rustinfra::operations::{DeployError, DeployHost, OperationOptions, PreparedDeploy};
+use rustinfra::operations::files::{DirectoryInput, LinkInput, TemplateInput};
+use rustinfra::operations::server::{Script, ScriptInput, ScriptTemplate, ScriptTemplateInput};
+use rustinfra::operations::systemd::ServiceInput;
+use rustinfra::operations::{DeployError, DeployHost, PreparedDeploy};
 use serde_json::{Map, Value, json};
 
+use super::operations::{directory, escaped, link, named, service, shell, template};
 use crate::{
     ProvisioningContext, ProvisioningReport, ProvisioningRuntime, TemplateResolver, reject_custom_provisioning,
 };
@@ -44,17 +44,17 @@ pub fn prepare_ssl(
     validate_domain(&context.domain)?;
     validate_email(&context.email)?;
     let assets = SslAssets {
-        default_certificate: templates.resolve(state::DEFAULT_CERTIFICATE_TEMPLATE)?,
-        default_server: templates.resolve(state::DEFAULT_DENY_TEMPLATE)?,
-        router: templates.resolve(state::ROUTER_TEMPLATE)?,
-        nginx_validation: templates.resolve(state::NGINX_VALIDATION_SCRIPT)?,
-        etckeeper_record: templates.resolve(state::ETCKEEPER_TEMPLATE)?,
+        default_certificate: templates.resolve(names::DEFAULT_CERTIFICATE_TEMPLATE)?,
+        default_server: templates.resolve(names::DEFAULT_DENY_TEMPLATE)?,
+        router: templates.resolve(names::ROUTER_TEMPLATE)?,
+        nginx_validation: templates.resolve(names::NGINX_VALIDATION_SCRIPT)?,
+        etckeeper_record: templates.resolve(names::ETCKEEPER_TEMPLATE)?,
     };
     let template_data = context.template_data()?;
     runtime.prepare(|host| {
         let mut acme = DirectoryInput::new(&context.paths.acme_webroot);
         acme.mode = Some(0o755);
-        host.add_stateful(Directory, acme, named("Ensure ACME webroot exists"))?;
+        directory(host, "Ensure ACME webroot exists", acme)?;
         add_default_deny(host, context, &assets, &template_data)?;
         add_router(
             host,
@@ -79,7 +79,7 @@ pub fn prepare_ssl(
 /// # Errors
 /// Returns an error for existing custom provisioning, invalid configuration,
 /// missing templates, or failed operations.
-pub async fn provision_ssl(config: &Bones, project_root: &Path) -> Result<ProvisioningReport> {
+pub async fn apply_ssl(config: &Bones, project_root: &Path) -> Result<ProvisioningReport> {
     reject_custom_provisioning(project_root)?;
     let context = ProvisioningContext::from_bones(config)?;
     let runtime = ProvisioningRuntime::new(&context.server)?;
@@ -105,18 +105,18 @@ fn add_default_deny(
 
     let mut server = TemplateInput::new(&assets.default_server, &context.paths.nginx_default_deny_site_available);
     server.data = template_data.clone();
-    host.add_stateful(Template, server, named("Deploy nginx default-deny server"))?;
-    host.add_stateful(
-        Link,
+    template(host, "Deploy nginx default-deny server", server)?;
+    link(
+        host,
+        "Enable nginx default-deny server",
         LinkInput::new(
             &context.paths.nginx_default_deny_site_enabled,
             &context.paths.nginx_default_deny_site_available,
         ),
-        named("Enable nginx default-deny server"),
     )?;
     let mut disable_default = LinkInput::new(&context.paths.nginx_default_site_enabled, "");
     disable_default.present = false;
-    host.add_stateful(Link, disable_default, named("Disable Debian default nginx site"))?;
+    link(host, "Disable Debian default nginx site", disable_default)?;
     Ok(())
 }
 
@@ -127,42 +127,40 @@ fn add_router(
     spec: RouterSpec<'_>,
 ) -> Result<(), DeployError> {
     let mut data = spec.template_data.clone();
-    data.insert(state::NGINX_SERVER_NAME.to_owned(), json!(context.domain));
-    data.insert(state::NGINX_SSL_ENABLED.to_owned(), json!(spec.ssl_enabled));
-    data.insert(state::NGINX_SSL_CERTIFICATE_PATH.to_owned(), json!(paths::ssl_certificate_path(&context.domain)));
+    data.insert(names::NGINX_SERVER_NAME.to_owned(), json!(context.domain));
+    data.insert(names::NGINX_SSL_ENABLED.to_owned(), json!(spec.ssl_enabled));
+    data.insert(names::NGINX_SSL_CERTIFICATE_PATH.to_owned(), json!(paths::ssl_certificate_path(&context.domain)));
     data.insert(
-        state::NGINX_SSL_CERTIFICATE_KEY_PATH.to_owned(),
+        names::NGINX_SSL_CERTIFICATE_KEY_PATH.to_owned(),
         json!(paths::ssl_certificate_key_path(&context.domain)),
     );
     let label = format!(" ({})", spec.stage);
     let mut router = TemplateInput::new(&assets.router, &context.paths.nginx_site_available);
     router.data = data;
-    host.add_stateful(Template, router, named(&format!("Deploy router nginx config{label}")))?;
-    host.add_stateful(
-        Link,
+    template(host, &format!("Deploy router nginx config{label}"), router)?;
+    link(
+        host,
+        &format!("Enable router nginx site{label}"),
         LinkInput::new(&context.paths.nginx_site_enabled, &context.paths.nginx_site_available),
-        named(&format!("Enable router nginx site{label}")),
     )?;
     host.add_stateful(
         Script,
         ScriptInput { source: assets.nginx_validation.clone(), arguments: Vec::new() },
         named(&format!("Validate nginx configuration{label}")),
     )?;
-    let mut service = ServiceInput::new("nginx");
-    service.reloaded = true;
-    host.add_stateful(Service, service, named(&format!("Reload nginx{label}")))?;
-    Ok(())
+    let mut service_input = ServiceInput::new("nginx");
+    service_input.reloaded = true;
+    service(host, &format!("Reload nginx{label}"), service_input)
 }
 
 fn add_certificate(host: &mut DeployHost<'_>, context: &ProvisioningContext) -> Result<(), DeployError> {
-    let email = shell_escape::escape(Cow::Borrowed(&context.email));
-    let webroot = shell_escape::escape(Cow::Borrowed(&context.paths.acme_webroot));
-    let domain = shell_escape::escape(Cow::Borrowed(&context.domain));
+    let email = escaped(&context.email)?;
+    let webroot = escaped(&context.paths.acme_webroot)?;
+    let domain = escaped(&context.domain)?;
     let command = format!(
         "certbot certonly --non-interactive --agree-tos --email {email} --webroot -w {webroot} -d {domain} --keep-until-expiring"
     );
-    host.add_with_options(Shell, ShellCommands::from(command), named("Obtain or renew certificate"))?;
-    Ok(())
+    shell(host, "Obtain or renew certificate", &command)
 }
 
 fn add_etckeeper(host: &mut DeployHost<'_>, template: &Path) -> Result<(), DeployError> {
@@ -171,11 +169,7 @@ fn add_etckeeper(host: &mut DeployHost<'_>, template: &Path) -> Result<(), Deplo
     host.add_stateful(
         ScriptTemplate,
         ScriptTemplateInput { source: template.to_path_buf(), arguments: Vec::new(), data },
-        named(state::ETCKEEPER_RECORD_OPERATION),
+        named(names::ETCKEEPER_RECORD_OPERATION),
     )?;
     Ok(())
-}
-
-fn named(name: &str) -> OperationOptions {
-    OperationOptions { name: Some(name.to_owned()), ..OperationOptions::default() }
 }

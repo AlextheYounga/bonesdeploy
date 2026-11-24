@@ -4,7 +4,7 @@ use anyhow::{Context, Result};
 use bonesdeploy_core::paths;
 use bonesinfra::ProvisioningContext;
 use bonesinfra::manifest::{ArtifactKind, DeletionPlan};
-use bonesinfra::provisioning::delete_site;
+use bonesinfra::provisioning::apply_site_delete;
 use console::style;
 
 use crate::config;
@@ -29,7 +29,7 @@ pub async fn run(yes: bool) -> Result<()> {
     }
 
     let persisted_plan = plan.to_json()?;
-    delete_site(&cfg, Path::new("."), &persisted_plan)
+    apply_site_delete(&cfg, Path::new("."), &persisted_plan)
         .await
         .context("Site deletion stopped before completion; rerun the command to resume")?;
 

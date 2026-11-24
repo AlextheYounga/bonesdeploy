@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::io::Error;
 use std::path::{Path, PathBuf};
@@ -8,13 +8,13 @@ use rustinfra::connectors::Connector;
 use rustinfra::facts::server::LinuxDistribution;
 use rustinfra::facts::{FactExecutor, FactOptions};
 use rustinfra::operations::apt::{Packages, PackagesInput};
-use rustinfra::operations::files::{Directory, DirectoryInput, Download, DownloadInput, Template, TemplateInput};
-use rustinfra::operations::server::{Shell, ShellCommands};
-use rustinfra::operations::systemd::{DaemonReload, DaemonReloadInput, Service, ServiceInput};
+use rustinfra::operations::files::{DirectoryInput, Download, DownloadInput, Template, TemplateInput};
+use rustinfra::operations::systemd::{DaemonReload, DaemonReloadInput, ServiceInput};
 use rustinfra::operations::{DeployError, DeployHost, StatefulOperation, StatefulOperationFuture};
 use serde_json::{Map, Value, json};
 
-use super::common::{self, named, require_service};
+use super::super::operations::{directory, named, service, shell, template};
+use super::common::{self, require_service};
 use crate::{ProvisioningContext, TemplateResolver};
 
 pub(super) struct Assets {
@@ -127,17 +127,17 @@ pub(super) fn add(
     require_service(host, context, "compose")?;
     if let Some(port) = context.compose_port {
         let mut nginx_data = data.clone();
-        nginx_data.insert(state::APP_PROXY_TARGET.to_owned(), json!(state::tcp_proxy_target(port)));
+        nginx_data.insert(names::APP_PROXY_TARGET.to_owned(), json!(names::tcp_proxy_target(port)));
         let mut nginx = TemplateInput::new(&assets.nginx, &context.paths.site_nginx_config);
         nginx.data = nginx_data;
         nginx.user = Some("root".to_owned());
         nginx.group = Some(context.runtime_group.clone());
         nginx.mode = Some(0o640);
-        host.add_stateful(Template, nginx, named("Deploy per-site app nginx config"))?;
+        template(host, "Deploy per-site app nginx config", nginx)?;
     }
-    let mut service = ServiceInput::new(state::service_unit(&context.project_name, "compose"));
-    service.daemon_reload = true;
-    host.add_stateful(Service, service, named("Start compose service"))?;
+    let mut compose_service = ServiceInput::new(names::service_unit(&context.project_name, "compose"));
+    compose_service.daemon_reload = true;
+    service(host, "Start compose service", compose_service)?;
     if context.compose_port.is_some() {
         common::finish(host, context, &assets.common)?;
     }
@@ -148,11 +148,11 @@ fn install_docker(host: &mut DeployHost<'_>, docker_source: &Path) -> Result<(),
     let mut prerequisites = PackagesInput::new(["ca-certificates", "curl"]);
     prerequisites.update = true;
     host.add_stateful(Packages, prerequisites, named("Install Docker repository prerequisites"))?;
-    let mut keyring = DirectoryInput::new(state::APT_KEYRINGS);
+    let mut keyring = DirectoryInput::new(names::APT_KEYRINGS);
     keyring.user = Some("root".to_owned());
     keyring.group = Some("root".to_owned());
     keyring.mode = Some(0o755);
-    host.add_stateful(Directory, keyring, named("Ensure APT keyring directory exists"))?;
+    directory(host, "Ensure APT keyring directory exists", keyring)?;
     host.add_stateful(
         DockerRepository,
         DockerRepositoryInput { source: docker_source.to_path_buf() },
@@ -170,16 +170,16 @@ fn install_docker(host: &mut DeployHost<'_>, docker_source: &Path) -> Result<(),
     ]);
     docker.update = true;
     host.add_stateful(Packages, docker, named("Install Docker Engine and Compose plugin"))?;
-    let mut service = ServiceInput::new("docker");
-    service.enabled = Some(true);
-    host.add_stateful(Service, service, named("Enable Docker Engine"))?;
+    let mut docker_service = ServiceInput::new("docker");
+    docker_service.enabled = Some(true);
+    service(host, "Enable Docker Engine", docker_service)?;
     shell(host, "Verify Docker Compose plugin", "docker compose version >/dev/null")
 }
 
 fn remove_stale_runtime(host: &mut DeployHost<'_>, context: &ProvisioningContext) -> Result<(), DeployError> {
     let names =
         ["docker", "nginx", "worker", "django", "gunicorn", "next", "nuxt", "puma", "rails", "sveltekit", "vue"];
-    let units = names.iter().map(|name| state::service_unit(&context.project_name, name)).collect::<Vec<_>>().join(" ");
+    let units = names.iter().map(|name| names::service_unit(&context.project_name, name)).collect::<Vec<_>>().join(" ");
     shell(
         host,
         "Stop stale managed native runtime services",
@@ -214,11 +214,6 @@ fn remove_stale_runtime(host: &mut DeployHost<'_>, context: &ProvisioningContext
     let mut nginx = ServiceInput::new("nginx");
     nginx.running = None;
     nginx.reloaded = true;
-    host.add_stateful(Service, nginx, named("Reload nginx after stale ingress removal"))?;
-    Ok(())
-}
-
-fn shell(host: &mut DeployHost<'_>, name: &str, command: &str) -> Result<(), DeployError> {
-    host.add_with_options(Shell, ShellCommands::from(command), named(name))?;
+    service(host, "Reload nginx after stale ingress removal", nginx)?;
     Ok(())
 }

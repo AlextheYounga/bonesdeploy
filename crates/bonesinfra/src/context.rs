@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::collections::BTreeMap;
 
@@ -102,12 +102,12 @@ impl ProvisioningContext {
     pub fn template_data(&self) -> Result<Map<String, Value>> {
         let paths = serde_json::to_value(&self.paths)?;
         let mut data = Map::from_iter([
-            (state::PROJECT_NAME.to_owned(), json!(self.project_name)),
+            (names::PROJECT_NAME.to_owned(), json!(self.project_name)),
             ("project_root".to_owned(), json!(self.paths.project_root)),
-            (state::WEB_ROOT.to_owned(), json!(self.web_root)),
-            (state::NODE_VERSION.to_owned(), json!(self.node_version)),
+            (names::WEB_ROOT.to_owned(), json!(self.web_root)),
+            (names::NODE_VERSION.to_owned(), json!(self.node_version)),
             ("template".to_owned(), json!(self.framework)),
-            (state::DEPLOY_USER.to_owned(), json!(paths::DEPLOY_USER)),
+            (names::DEPLOY_USER.to_owned(), json!(paths::DEPLOY_USER)),
             ("runtime_user".to_owned(), json!(self.runtime_user)),
             ("runtime_group".to_owned(), json!(self.runtime_group)),
             (
@@ -118,7 +118,7 @@ impl ProvisioningContext {
                 }),
             ),
             ("project_root_parent".to_owned(), json!(self.paths.project_root_parent)),
-            (state::SSH_PORT.to_owned(), json!(self.server.port)),
+            (names::SSH_PORT.to_owned(), json!(self.server.port)),
             ("paths".to_owned(), paths),
             ("ssl_domain".to_owned(), json!(self.domain)),
             ("ssl_email".to_owned(), json!(self.email)),

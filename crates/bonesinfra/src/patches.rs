@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::cmp::Ordering;
 use std::env;
@@ -12,6 +12,7 @@ use bonesdeploy_core::paths;
 use rustinfra::operations::server::{Shell, ShellCommands};
 use rustinfra::operations::{OperationOptions, PreparedDeploy};
 
+use crate::shell_quote;
 use crate::{ProvisioningContext, ProvisioningReport, ProvisioningRuntime, reject_custom_provisioning};
 
 const PATCH_ID: &str = "0003-project-infra";
@@ -74,8 +75,8 @@ pub fn prepare_remote(
         .ok_or_else(|| anyhow::anyhow!("remote patch marker has no parent"))?;
     let command = format!(
         "if [ ! -e {marker} ]; then mkdir -p {parent}; tmp={marker}.tmp-$$; printf 'completed\\n' > \"$tmp\"; mv \"$tmp\" {marker}; fi",
-        marker = shell_escape::escape(marker.as_str().into()),
-        parent = shell_escape::escape(parent.into()),
+        marker = shell_quote::quote(&marker)?,
+        parent = shell_quote::quote(parent)?,
     );
     runtime.prepare(|host| {
         host.add_with_options(
@@ -117,11 +118,11 @@ fn parse_version(value: &str) -> Result<Version> {
 }
 
 fn local_marker(config: &Bones, patch: &str) -> Result<PathBuf> {
-    let root = env::var_os(state::XDG_DATA_HOME).map_or_else(
+    let root = env::var_os(names::XDG_DATA_HOME).map_or_else(
         || {
-            env::var_os(state::HOME)
+            env::var_os(names::HOME)
                 .map(PathBuf::from)
-                .map(|home| home.join(state::LOCAL_DATA_DIR))
+                .map(|home| home.join(names::LOCAL_DATA_DIR))
                 .ok_or_else(|| anyhow::anyhow!("HOME is required to locate local patch markers"))
         },
         |path| Ok(PathBuf::from(path)),

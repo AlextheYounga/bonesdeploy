@@ -13,6 +13,7 @@ use rustinfra::operations::{OperationOptions, StatefulOperation, StatefulOperati
 use serde::{Deserialize, Serialize};
 
 use super::{Artifact, ArtifactKind, ManagedService, declarations};
+use crate::shell_quote;
 use crate::{ProvisioningContext, ProvisioningRuntime, reject_custom_provisioning};
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -191,10 +192,7 @@ async fn inspect_artifacts(
                 facts
                     .get(
                         &Command,
-                        &format!(
-                            "test -S {} && echo true || echo false",
-                            shell_escape::escape(artifact.path.as_str().into())
-                        ),
+                        &format!("test -S {} && echo true || echo false", shell_quote::quote(&artifact.path)?),
                     )
                     .await?
                     .as_deref()
@@ -251,8 +249,7 @@ async fn inspect_compose(
         .await?
         .as_deref()
         == Some("available");
-    let status_command =
-        format!("bonesremote status --site {}", shell_escape::escape(context.project_name.as_str().into()));
+    let status_command = format!("bonesremote status --site {}", shell_quote::quote(&context.project_name)?);
     let status = facts.get(&Command, &status_command).await?;
     let (files, services, error) = compose_status(status.as_deref());
     Ok(ComposeReport {

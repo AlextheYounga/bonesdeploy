@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use super::{FrameworkDefaults, PermissionDefault, Question, QuestionKind, directory, file};
 
@@ -10,7 +10,7 @@ pub(super) fn defaults() -> FrameworkDefaults {
 
 pub(super) fn questions() -> &'static [Question] {
     &[Question {
-        key: state::WSGI_MODULE,
+        key: names::WSGI_MODULE,
         label: "WSGI module",
         kind: QuestionKind::Text { default: "config.wsgi:application" },
     }]

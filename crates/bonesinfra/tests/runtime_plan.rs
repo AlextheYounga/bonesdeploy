@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use anyhow::Result;
 use bonesdeploy_core::config::{Bones, RuntimeBackend};
@@ -40,7 +40,7 @@ fn built_in_frameworks_register_native_runtime_operations() -> Result<()> {
         let runtime = ProvisioningRuntime::new(&context.server)?;
         let operations = names(&prepare_runtime(&context, &runtime, &TemplateResolver::new(project.path()))?);
         assert!(operations.iter().any(|name| name == expected), "{framework} omitted {expected}");
-        assert_eq!(operations.last().map(String::as_str), Some(state::ETCKEEPER_RECORD_OPERATION));
+        assert_eq!(operations.last().map(String::as_str), Some(names::ETCKEEPER_RECORD_OPERATION));
     }
     Ok(())
 }
@@ -51,7 +51,7 @@ fn next_and_nuxt_select_static_or_server_plans_from_typed_config() -> Result<()>
         for is_static in [true, false] {
             let project = tempfile::tempdir()?;
             let mut config = config(framework);
-            config.runtime.extra.insert(state::IS_STATIC.to_owned(), toml::Value::Boolean(is_static));
+            config.runtime.extra.insert(names::IS_STATIC.to_owned(), toml::Value::Boolean(is_static));
             bonesinfra::materialize_project_artifacts(project.path(), &config.runtime)?;
             let context = ProvisioningContext::from_bones(&config)?;
             let runtime = ProvisioningRuntime::new(&context.server)?;

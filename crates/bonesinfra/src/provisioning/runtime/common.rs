@@ -3,9 +3,8 @@
     reason = "provisioning registrars keep security-sensitive ownership, modes, and destinations explicit"
 )]
 
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
-use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
@@ -13,12 +12,16 @@ use bonesdeploy_core::paths;
 use rustinfra::connectors::Connector;
 use rustinfra::facts::files::{Link as LinkFact, PathInfo, PathInput};
 use rustinfra::facts::{FactExecutor, FactOptions};
-use rustinfra::operations::files::{Directory, DirectoryInput, Link, LinkInput, Template, TemplateInput};
-use rustinfra::operations::server::{Script, ScriptInput, ScriptTemplate, ScriptTemplateInput, Shell, ShellCommands};
-use rustinfra::operations::systemd::{DaemonReload, DaemonReloadInput, Service, ServiceInput};
-use rustinfra::operations::{DeployError, DeployHost, OperationOptions, StatefulOperation, StatefulOperationFuture};
+use rustinfra::operations::files::{DirectoryInput, LinkInput, Template, TemplateInput};
+use rustinfra::operations::server::{Script, ScriptInput, ScriptTemplate, ScriptTemplateInput};
+use rustinfra::operations::systemd::{DaemonReload, DaemonReloadInput, ServiceInput};
+use rustinfra::operations::{DeployError, DeployHost, StatefulOperation, StatefulOperationFuture};
 use serde_json::{Map, Value, json};
 
+use super::super::operations::{
+    directory as add_directory, escaped, link as add_link, named, service as add_service, shell,
+    template as add_template,
+};
 use crate::{ProvisioningContext, TemplateResolver};
 
 pub(super) struct Assets {
@@ -65,7 +68,7 @@ impl StatefulOperation for CertificateAwareRouter {
             let key = facts.get(&LinkFact, &PathInput::from(input.key.clone())).await?;
             let mut template = input.template.clone();
             template.data.insert(
-                state::NGINX_SSL_ENABLED.to_owned(),
+                names::NGINX_SSL_ENABLED.to_owned(),
                 json!(matches!(certificate, PathInfo::Present(_)) && matches!(key, PathInfo::Present(_))),
             );
             Template.commands(&template, connector, fact_options).await
@@ -79,11 +82,11 @@ impl Assets {
             nginx_profile: templates.resolve("shared/apparmor/project-nginx-profile.j2")?,
             site_target: templates.resolve("shared/systemd/site.target.j2")?,
             nginx_service: templates.resolve("shared/nginx/site-nginx.service.j2")?,
-            default_certificate: templates.resolve(state::DEFAULT_CERTIFICATE_TEMPLATE)?,
-            default_site: templates.resolve(state::DEFAULT_DENY_TEMPLATE)?,
-            router: templates.resolve(state::ROUTER_TEMPLATE)?,
-            validate_nginx: templates.resolve(state::NGINX_VALIDATION_SCRIPT)?,
-            etckeeper: templates.resolve(state::ETCKEEPER_TEMPLATE)?,
+            default_certificate: templates.resolve(names::DEFAULT_CERTIFICATE_TEMPLATE)?,
+            default_site: templates.resolve(names::DEFAULT_DENY_TEMPLATE)?,
+            router: templates.resolve(names::ROUTER_TEMPLATE)?,
+            validate_nginx: templates.resolve(names::NGINX_VALIDATION_SCRIPT)?,
+            etckeeper: templates.resolve(names::ETCKEEPER_TEMPLATE)?,
         })
     }
 }
@@ -100,8 +103,8 @@ pub(super) fn setup(
         "nginx_apparmor_network".to_owned(),
         json!(if uses_tcp { "network inet stream," } else { "network unix stream," }),
     );
-    data.insert(state::APPARMOR_PROFILE_NAME.to_owned(), json!(format!("bonesdeploy-{}-nginx", context.project_name)));
-    shell(host, "Verify apparmor kernel enabled", &format!("cat {}", escaped(&context.paths.apparmor_enabled_param)))?;
+    data.insert(names::APPARMOR_PROFILE_NAME.to_owned(), json!(format!("bonesdeploy-{}-nginx", context.project_name)));
+    shell(host, "Verify apparmor kernel enabled", &format!("cat {}", escaped(&context.paths.apparmor_enabled_param)?))?;
     template(
         host,
         "Deploy per-project nginx AppArmor profile",
@@ -113,12 +116,12 @@ pub(super) fn setup(
     shell(
         host,
         "Load updated nginx AppArmor profile",
-        &format!("apparmor_parser -r {}", escaped(&context.paths.nginx_apparmor_profile)),
+        &format!("apparmor_parser -r {}", escaped(&context.paths.nginx_apparmor_profile)?),
     )?;
     shell(
         host,
         "Ensure nginx profile is in enforce mode",
-        &format!("aa-enforce {}", escaped(&context.paths.nginx_apparmor_profile)),
+        &format!("aa-enforce {}", escaped(&context.paths.nginx_apparmor_profile)?),
     )?;
 
     template(
@@ -134,7 +137,7 @@ pub(super) fn setup(
         "Reconcile site systemd target memberships",
         &format!(
             "rm -rf -- {0}; install -d -o root -g root -m 0755 -- {0}",
-            escaped(&context.paths.systemd_site_target_requires)
+            escaped(&context.paths.systemd_site_target_requires)?
         ),
     )?;
     directory(host, "Ensure socket directory exists", &context.paths.runtime_socket_dir, context, 0o711)?;
@@ -142,7 +145,7 @@ pub(super) fn setup(
     directory(host, "Ensure conf directory exists", &context.paths.conf_root, context, 0o750)?;
     data.insert(
         "nginx_address_families".to_owned(),
-        json!(if uses_tcp { state::AF_UNIX_INET } else { state::AF_UNIX }),
+        json!(if uses_tcp { names::AF_UNIX_INET } else { names::AF_UNIX }),
     );
     data.insert("nginx_ip_loopback_only".to_owned(), json!(uses_tcp));
     template(
@@ -191,9 +194,9 @@ pub(super) fn setup(
         let certificate = paths::ssl_certificate_path(&context.domain);
         let key = paths::ssl_certificate_key_path(&context.domain);
         router.extend([
-            (state::NGINX_SERVER_NAME.to_owned(), json!(context.domain)),
-            (state::NGINX_SSL_CERTIFICATE_PATH.to_owned(), json!(certificate)),
-            (state::NGINX_SSL_CERTIFICATE_KEY_PATH.to_owned(), json!(key)),
+            (names::NGINX_SERVER_NAME.to_owned(), json!(context.domain)),
+            (names::NGINX_SSL_CERTIFICATE_PATH.to_owned(), json!(certificate)),
+            (names::NGINX_SSL_CERTIFICATE_KEY_PATH.to_owned(), json!(key)),
         ]);
         let mut template = TemplateInput::new(&assets.router, &context.paths.nginx_site_available);
         template.data = router;
@@ -227,14 +230,14 @@ pub(super) fn finish(
         shell(
             host,
             "Remove project nginx router config",
-            &format!("rm -f -- {}", escaped(&context.paths.nginx_site_available)),
+            &format!("rm -f -- {}", escaped(&context.paths.nginx_site_available)?),
         )?;
         script(host, "Validate nginx configuration after router removal", &assets.validate_nginx)?;
         reload(host, "Reload nginx after router removal", "nginx")?;
     }
     let mut nginx = ServiceInput::new("nginx");
     nginx.enabled = Some(true);
-    host.add_stateful(Service, nginx, named("Ensure nginx service is enabled and started"))?;
+    add_service(host, "Ensure nginx service is enabled and started", nginx)?;
     shell(
         host,
         "Remove nginx service from direct multi-user boot",
@@ -244,14 +247,14 @@ pub(super) fn finish(
     target.enabled = Some(true);
     target.restarted = true;
     target.daemon_reload = true;
-    host.add_stateful(Service, target, named("Enable and restart site systemd target"))?;
+    add_service(host, "Enable and restart site systemd target", target)?;
     shell(host, "Reload nginx to apply site config changes", "systemctl reload nginx")?;
     let mut data = Map::new();
     data.insert("message".to_owned(), json!("BonesInfra runtime apply"));
     host.add_stateful(
         ScriptTemplate,
         ScriptTemplateInput { source: assets.etckeeper.clone(), arguments: Vec::new(), data },
-        named(state::ETCKEEPER_RECORD_OPERATION),
+        named(names::ETCKEEPER_RECORD_OPERATION),
     )?;
     Ok(())
 }
@@ -267,8 +270,8 @@ pub(super) fn require_service(
         &format!("Require {unit} from site target"),
         &format!(
             "install -d -o root -g root -m 0755 -- {requires} && ln -sfn -- {source} {requires}/{unit}",
-            requires = escaped(&context.paths.systemd_site_target_requires),
-            source = escaped(&context.paths.systemd_service(service))
+            requires = escaped(&context.paths.systemd_site_target_requires)?,
+            source = escaped(&context.paths.systemd_service(service))?
         ),
     )
 }
@@ -286,21 +289,7 @@ pub(super) fn template(
     input.user = Some("root".to_owned());
     input.group = Some("root".to_owned());
     input.mode = mode;
-    host.add_stateful(Template, input, named(name))?;
-    Ok(())
-}
-
-pub(super) fn shell(host: &mut DeployHost<'_>, name: &str, command: &str) -> Result<(), DeployError> {
-    host.add_with_options(Shell, ShellCommands::from(command), named(name))?;
-    Ok(())
-}
-
-pub(super) fn named(name: &str) -> OperationOptions {
-    OperationOptions { name: Some(name.to_owned()), ..OperationOptions::default() }
-}
-
-pub(super) fn escaped(value: &str) -> String {
-    shell_escape::escape(Cow::Borrowed(value)).into_owned()
+    add_template(host, name, input)
 }
 
 fn directory(
@@ -314,15 +303,13 @@ fn directory(
     input.user = Some(context.runtime_user.clone());
     input.group = Some(context.runtime_group.clone());
     input.mode = Some(mode);
-    host.add_stateful(Directory, input, named(name))?;
-    Ok(())
+    add_directory(host, name, input)
 }
 
 fn link(host: &mut DeployHost<'_>, name: &str, path: &str, target: &str, present: bool) -> Result<(), DeployError> {
     let mut input = LinkInput::new(path, target);
     input.present = present;
-    host.add_stateful(Link, input, named(name))?;
-    Ok(())
+    add_link(host, name, input)
 }
 
 fn script(host: &mut DeployHost<'_>, name: &str, source: &Path) -> Result<(), DeployError> {

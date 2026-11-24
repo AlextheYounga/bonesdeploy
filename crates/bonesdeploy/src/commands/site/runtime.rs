@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bonesdeploy_core::paths;
-use bonesinfra::provisioning::provision_runtime;
+use bonesinfra::provisioning::apply_runtime;
 use std::path::Path;
 
 use crate::config;
@@ -23,6 +23,6 @@ pub async fn run(yes: bool) -> Result<()> {
 pub(super) async fn apply() -> Result<()> {
     println!("Applying runtime...");
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    provision_runtime(&cfg, Path::new(".")).await?;
+    apply_runtime(&cfg, Path::new(".")).await?;
     Ok(())
 }

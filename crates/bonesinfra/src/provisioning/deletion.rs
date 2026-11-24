@@ -1,14 +1,13 @@
-use std::borrow::Cow;
 use std::cmp::Reverse;
 use std::path::Path;
 
 use anyhow::Result;
 use bonesdeploy_core::config::Bones;
-use rustinfra::operations::files::{Directory, DirectoryInput};
-use rustinfra::operations::server::{Shell, ShellCommands};
-use rustinfra::operations::systemd::{DaemonReload, DaemonReloadInput, Service, ServiceInput};
-use rustinfra::operations::{DeployError, DeployHost, OperationOptions, PreparedDeploy};
+use rustinfra::operations::files::DirectoryInput;
+use rustinfra::operations::systemd::{DaemonReload, DaemonReloadInput, ServiceInput};
+use rustinfra::operations::{DeployError, DeployHost, PreparedDeploy};
 
+use super::operations::{directory, escaped, named, service as register_service, shell};
 use crate::manifest::{ArtifactKind, DeletionPlan};
 use crate::{ProvisioningContext, ProvisioningReport, ProvisioningRuntime, reject_custom_provisioning};
 
@@ -29,7 +28,7 @@ pub fn prepare_site_delete(runtime: &ProvisioningRuntime, plan: &DeletionPlan) -
             let mut nginx = ServiceInput::new("nginx");
             nginx.running = None;
             nginx.reloaded = true;
-            host.add_stateful(Service, nginx, named("Reload nginx after Quick Tunnel removal"))?;
+            register_service(host, "Reload nginx after Quick Tunnel removal", nginx)?;
         }
         Ok(())
     })
@@ -41,7 +40,11 @@ pub fn prepare_site_delete(runtime: &ProvisioningRuntime, plan: &DeletionPlan) -
 /// # Errors
 /// Returns an error for custom provisioning, an unsafe or malformed plan, or a
 /// failed RustInfra operation.
-pub async fn delete_site(config: &Bones, project_root: &Path, persisted_plan: &str) -> Result<ProvisioningReport> {
+pub async fn apply_site_delete(
+    config: &Bones,
+    project_root: &Path,
+    persisted_plan: &str,
+) -> Result<ProvisioningReport> {
     reject_custom_provisioning(project_root)?;
     let context = ProvisioningContext::from_bones(config)?;
     let plan = DeletionPlan::parse(persisted_plan, &context)?;
@@ -53,7 +56,7 @@ pub async fn delete_site(config: &Bones, project_root: &Path, persisted_plan: &s
 fn stop_services(host: &mut DeployHost<'_>, plan: &DeletionPlan) -> Result<(), DeployError> {
     for service in &plan.services {
         if service.owner == "tunnel" {
-            let unit = escaped(&service.unit);
+            let unit = escaped(&service.unit)?;
             shell(
                 host,
                 &format!("Stop and disable {} when installed", service.name),
@@ -64,7 +67,7 @@ fn stop_services(host: &mut DeployHost<'_>, plan: &DeletionPlan) -> Result<(), D
         let mut input = ServiceInput::new(&service.unit);
         input.running = Some(false);
         input.enabled = Some(false);
-        host.add_stateful(Service, input, named(&format!("Stop and disable {}", service.name)))?;
+        register_service(host, &format!("Stop and disable {}", service.name), input)?;
     }
     Ok(())
 }
@@ -78,23 +81,10 @@ fn remove_artifacts(host: &mut DeployHost<'_>, plan: &DeletionPlan) -> Result<()
             let mut input = DirectoryInput::new(&artifact.path);
             input.present = false;
             input.recursive = true;
-            host.add_stateful(Directory, input, named(&name))?;
+            directory(host, &name, input)?;
         } else {
-            shell(host, &name, &format!("rm -f -- {}", escaped(&artifact.path)))?;
+            shell(host, &name, &format!("rm -f -- {}", escaped(&artifact.path)?))?;
         }
     }
     Ok(())
-}
-
-fn shell(host: &mut DeployHost<'_>, name: &str, command: &str) -> Result<(), DeployError> {
-    host.add_with_options(Shell, ShellCommands::from(command), named(name))?;
-    Ok(())
-}
-
-fn escaped(value: &str) -> String {
-    shell_escape::escape(Cow::Borrowed(value)).into_owned()
-}
-
-fn named(name: &str) -> OperationOptions {
-    OperationOptions { name: Some(name.to_owned()), ..OperationOptions::default() }
 }

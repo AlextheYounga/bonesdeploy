@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::{Result, bail};
 use bonesdeploy_core::paths;
-use bonesinfra::provisioning::provision_ssl;
+use bonesinfra::provisioning::apply_ssl;
 use console::style;
 
 use crate::config;
@@ -36,7 +36,7 @@ pub async fn run(yes: bool, domain: Option<String>, email: Option<String>) -> Re
         return Ok(());
     }
     println!("{} {}", style("Configuring HTTPS for").cyan().bold(), style(&cfg.domain).bold());
-    provision_ssl(&cfg, Path::new(".")).await?;
+    apply_ssl(&cfg, Path::new(".")).await?;
     config::write_local_environment(&cfg, env_file)?;
     println!("{} HTTPS configured.", output::success_marker());
     println!();

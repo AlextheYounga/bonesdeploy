@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::time::Duration;
 
@@ -23,8 +23,8 @@ impl ProvisioningRuntime {
     /// Returns an error when the inventory cannot be constructed.
     pub fn new(server: &ServerContext) -> Result<Self> {
         let mut data = Data::new();
-        data.insert(state::SSH_USER.to_owned(), json!(server.ssh_user));
-        data.insert(state::SSH_PORT.to_owned(), json!(server.port));
+        data.insert(names::SSH_USER.to_owned(), json!(server.ssh_user));
+        data.insert(names::SSH_PORT.to_owned(), json!(server.port));
         let inventory = Inventory::from_spec(InventorySpec {
             hosts: vec![HostSpec::ssh(&server.host).with_data(data)],
             ..InventorySpec::default()

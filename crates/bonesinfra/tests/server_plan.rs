@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::fs;
 use std::path::Path;
@@ -17,7 +17,7 @@ const TEMPLATES: &[&str] = &[
     "shared/scripts/install-bonesremote.sh.j2",
     "shared/sshd/99-bonesdeploy-root-login.conf.j2",
     "shared/sudoers/bonesdeploy.j2",
-    state::ETCKEEPER_TEMPLATE,
+    names::ETCKEEPER_TEMPLATE,
 ];
 
 fn write_templates(project: &Path) -> Result<()> {
@@ -62,6 +62,6 @@ fn server_setup_plan_covers_the_baseline_and_finishes_with_etckeeper() -> Result
     ] {
         assert!(names.iter().any(|name| name == expected), "missing {expected}");
     }
-    assert_eq!(names.last().map(String::as_str), Some(state::ETCKEEPER_RECORD_OPERATION));
+    assert_eq!(names.last().map(String::as_str), Some(names::ETCKEEPER_RECORD_OPERATION));
     Ok(())
 }

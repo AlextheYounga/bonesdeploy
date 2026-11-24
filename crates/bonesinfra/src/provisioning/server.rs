@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -10,13 +10,16 @@ use rustinfra::connectors::Connector;
 use rustinfra::facts::server::{Arch, LinuxDistribution, LinuxDistributionInfo};
 use rustinfra::facts::{FactExecutor, FactOptions};
 use rustinfra::operations::apt::{Packages, PackagesInput};
-use rustinfra::operations::files::{Directory, DirectoryInput, Template, TemplateInput};
-use rustinfra::operations::server::{ScriptTemplate, ScriptTemplateInput, Shell, ShellCommands, User, UserInput};
-use rustinfra::operations::systemd::{Service, ServiceInput};
-use rustinfra::operations::{DeployError, DeployHost, OperationOptions, PreparedDeploy};
+use rustinfra::operations::files::{DirectoryInput, TemplateInput};
+use rustinfra::operations::server::{ScriptTemplate, ScriptTemplateInput, User, UserInput};
+use rustinfra::operations::systemd::ServiceInput;
+use rustinfra::operations::{DeployError, DeployHost, PreparedDeploy};
 use rustinfra::operations::{StatefulOperation, StatefulOperationFuture};
 use serde_json::{Map, Value, json};
 
+use super::operations::{
+    directory as add_directory, named, service as register_service, shell, template as register_template,
+};
 use crate::{ProvisioningReport, ProvisioningRuntime, ServerContext, TemplateResolver, reject_custom_provisioning};
 
 const BASE_PACKAGES: &[&str] = &[
@@ -77,14 +80,14 @@ pub fn prepare_server_setup(
         install_bonesremote: templates.resolve("shared/scripts/install-bonesremote.sh.j2")?,
         sshd: templates.resolve("shared/sshd/99-bonesdeploy-root-login.conf.j2")?,
         sudoers: templates.resolve("shared/sudoers/bonesdeploy.j2")?,
-        etckeeper_record: templates.resolve(state::ETCKEEPER_TEMPLATE)?,
+        etckeeper_record: templates.resolve(names::ETCKEEPER_TEMPLATE)?,
     };
     runtime.prepare(|host| {
         host.add_stateful(SupportedHost, (), named("Validate supported production host"))?;
         add_packages(host)?;
         shell(host, "Initialize etckeeper in /etc", "etckeeper init")?;
         add_service(host, "Ensure apparmor service is enabled and started", "apparmor")?;
-        add_template(
+        register_template(
             host,
             "Disable the vulnerable algif_aead module",
             template_input(
@@ -145,7 +148,7 @@ fn validate_supported_host(
     distribution: &LinuxDistributionInfo,
     architecture: Option<&str>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let supported = architecture == Some(state::X86_64)
+    let supported = architecture == Some(names::X86_64)
         && match distribution.release_meta.get("ID").map(String::as_str) {
             Some("debian") => distribution.major.is_some_and(|major| major >= 12),
             Some("ubuntu") => distribution.major.zip(distribution.minor).is_some_and(|version| version >= (24, 4)),
@@ -159,7 +162,7 @@ fn validate_supported_host(
 /// # Errors
 /// Returns an error for unsupported custom provisioning, invalid connection
 /// data, missing templates, or failed provisioning operations.
-pub async fn server_setup(
+pub async fn apply_server_setup(
     config: &Bones,
     project_root: &Path,
     bonesremote_version: &str,
@@ -181,8 +184,7 @@ fn add_packages(host: &mut DeployHost<'_>) -> Result<(), DeployError> {
 fn add_service(host: &mut DeployHost<'_>, name: &str, service: &str) -> Result<(), DeployError> {
     let mut input = ServiceInput::new(service);
     input.enabled = Some(true);
-    host.add_stateful(Service, input, named(name))?;
-    Ok(())
+    register_service(host, name, input)
 }
 
 fn add_firewall(host: &mut DeployHost<'_>, ssh_port: u16) -> Result<(), DeployError> {
@@ -201,8 +203,8 @@ fn add_firewall(host: &mut DeployHost<'_>, ssh_port: u16) -> Result<(), DeployEr
 
 fn add_fail2ban(host: &mut DeployHost<'_>, ssh_port: u16, template: &Path) -> Result<(), DeployError> {
     let mut data = Map::new();
-    data.insert(state::SSH_PORT.to_owned(), json!(ssh_port));
-    add_template(
+    data.insert(names::SSH_PORT.to_owned(), json!(ssh_port));
+    register_template(
         host,
         "Install fail2ban jail.local",
         template_input(template, "/etc/fail2ban/jail.local", data, None),
@@ -211,15 +213,15 @@ fn add_fail2ban(host: &mut DeployHost<'_>, ssh_port: u16, template: &Path) -> Re
 }
 
 fn add_unattended_upgrades(host: &mut DeployHost<'_>, templates: &ServerTemplates) -> Result<(), DeployError> {
-    add_template(
+    register_template(
         host,
         "Install apt auto-upgrades config",
-        template_input(&templates.auto_upgrades, state::APT_AUTO_UPGRADES, Map::new(), None),
+        template_input(&templates.auto_upgrades, names::APT_AUTO_UPGRADES, Map::new(), None),
     )?;
-    add_template(
+    register_template(
         host,
         "Install unattended-upgrades config",
-        template_input(&templates.unattended_upgrades, state::APT_UNATTENDED_UPGRADES, Map::new(), None),
+        template_input(&templates.unattended_upgrades, names::APT_UNATTENDED_UPGRADES, Map::new(), None),
     )
 }
 
@@ -231,8 +233,8 @@ fn add_deploy_user(host: &mut DeployHost<'_>, server: &ServerContext, template: 
     host.add_stateful(User, user, named("Ensure deploy user exists"))?;
 
     let data = Map::from_iter([
-        (state::DEPLOY_USER.to_owned(), json!(paths::DEPLOY_USER)),
-        (state::SSH_USER.to_owned(), json!(server.ssh_user)),
+        (names::DEPLOY_USER.to_owned(), json!(paths::DEPLOY_USER)),
+        (names::SSH_USER.to_owned(), json!(server.ssh_user)),
     ]);
     host.add_stateful(
         ScriptTemplate,
@@ -244,7 +246,7 @@ fn add_deploy_user(host: &mut DeployHost<'_>, server: &ServerContext, template: 
 
 fn add_sshd_hardening(host: &mut DeployHost<'_>, template: &Path) -> Result<(), DeployError> {
     let path = format!("{}/99-bonesdeploy-root-login.conf", paths::ETC_SSH_SSHD_CONFIG_D);
-    add_template(host, "Disable password login for root", template_input(template, &path, Map::new(), None))?;
+    register_template(host, "Disable password login for root", template_input(template, &path, Map::new(), None))?;
     shell(host, "Validate sshd configuration", &format!("sshd -t || {{ rm -f '{path}'; exit 1; }}"))?;
     shell(host, "Reload ssh to apply root login hardening", "systemctl reload ssh")
 }
@@ -258,7 +260,7 @@ fn add_bonesremote(host: &mut DeployHost<'_>, template: &Path, version: &str) ->
         directory.user = Some("root".to_owned());
         directory.group = Some("root".to_owned());
         directory.mode = Some(0o700);
-        host.add_stateful(Directory, directory, named(name))?;
+        add_directory(host, name, directory)?;
     }
     let mut data = Map::new();
     data.insert("bonesremote_version".to_owned(), json!(version));
@@ -272,13 +274,13 @@ fn add_bonesremote(host: &mut DeployHost<'_>, template: &Path, version: &str) ->
 
 fn add_sudoers(host: &mut DeployHost<'_>, template: &Path) -> Result<(), DeployError> {
     let data = Map::from_iter([
-        (state::DEPLOY_USER.to_owned(), json!(paths::DEPLOY_USER)),
+        (names::DEPLOY_USER.to_owned(), json!(paths::DEPLOY_USER)),
         (
-            state::BONESREMOTE_PATH.to_owned(),
+            names::BONESREMOTE_PATH.to_owned(),
             json!(Path::new(paths::USR_LOCAL_BIN).join(paths::BONESREMOTE_BINARY).display().to_string()),
         ),
     ]);
-    add_template(
+    register_template(
         host,
         "Install BonesDeploy sudoers drop-in",
         template_input(template, paths::SUDOERS_PATH, data, Some(0o440)),
@@ -296,13 +298,8 @@ fn add_etckeeper_record(host: &mut DeployHost<'_>, template: &Path) -> Result<()
     host.add_stateful(
         ScriptTemplate,
         ScriptTemplateInput { source: template.to_path_buf(), arguments: Vec::new(), data },
-        named(state::ETCKEEPER_RECORD_OPERATION),
+        named(names::ETCKEEPER_RECORD_OPERATION),
     )?;
-    Ok(())
-}
-
-fn add_template(host: &mut DeployHost<'_>, name: &str, input: TemplateInput) -> Result<(), DeployError> {
-    host.add_stateful(Template, input, named(name))?;
     Ok(())
 }
 
@@ -311,13 +308,4 @@ fn template_input(source: &Path, destination: &str, data: Map<String, Value>, mo
     input.data = data;
     input.mode = mode;
     input
-}
-
-fn shell(host: &mut DeployHost<'_>, name: &str, command: &str) -> Result<(), DeployError> {
-    host.add_with_options(Shell, ShellCommands::from(command), named(name))?;
-    Ok(())
-}
-
-fn named(name: &str) -> OperationOptions {
-    OperationOptions { name: Some(name.to_owned()), ..OperationOptions::default() }
 }

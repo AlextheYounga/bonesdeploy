@@ -15,6 +15,7 @@ pub mod frameworks;
 pub mod manifest;
 pub mod patches;
 pub mod provisioning;
+mod shell_quote;
 mod templates;
 
 pub use context::{ProvisioningContext, ServerContext};

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bonesdeploy_core::paths;
-use bonesinfra::provisioning::server_setup;
+use bonesinfra::provisioning::apply_server_setup;
 use std::path::Path;
 
 use crate::commands::server::doctor;
@@ -16,7 +16,7 @@ pub async fn run(yes: bool) -> Result<()> {
 
     println!("Setting up server baseline...");
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    server_setup(&cfg, Path::new("."), env!("CARGO_PKG_VERSION")).await?;
+    apply_server_setup(&cfg, Path::new("."), env!("CARGO_PKG_VERSION")).await?;
     doctor(false).await?;
     println!("{} Server baseline is ready.", output::success_marker());
     Ok(())

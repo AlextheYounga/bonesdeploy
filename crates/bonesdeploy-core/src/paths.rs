@@ -1,7 +1,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
 
-use crate::state::{HOME, LOCAL_DATA_DIR, XDG_DATA_HOME};
+use crate::names::{HOME, LOCAL_DATA_DIR, XDG_DATA_HOME};
 
 mod deployment;
 
@@ -89,6 +89,11 @@ pub const BONESDEPLOY_NGINX_DEFAULT_DENY_CERT: &str = "bonesdeploy-default-deny.
 pub const BONESDEPLOY_NGINX_DEFAULT_DENY_KEY: &str = "bonesdeploy-default-deny.key";
 pub const SYSTEMD_TARGET_SUFFIX: &str = ".target";
 pub const SYSTEMD_SERVICE_SUFFIX: &str = ".service";
+
+#[must_use]
+pub fn joined(root: &str, child: &str) -> String {
+    Path::new(root).join(child).display().to_string()
+}
 
 pub const HOOKS_DIR: &str = "hooks";
 pub const KIT_DEPLOYMENT_DIR: &str = "deployment/";

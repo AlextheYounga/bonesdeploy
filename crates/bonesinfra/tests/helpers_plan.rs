@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::fs;
 
@@ -16,7 +16,7 @@ fn helper_plan_installs_packages_tools_and_records_etc() -> Result<()> {
         "shared/scripts/install-neovim-config.sh",
         "shared/starship.toml",
         "shared/profile.d/bonesinfra-shell.sh",
-        state::ETCKEEPER_TEMPLATE,
+        names::ETCKEEPER_TEMPLATE,
     ] {
         let target = project.path().join("infra/templates").join(path);
         fs::create_dir_all(target.parent().ok_or_else(|| anyhow::anyhow!("asset has no parent"))?)?;
@@ -40,6 +40,6 @@ fn helper_plan_installs_packages_tools_and_records_etc() -> Result<()> {
     assert!(names.iter().any(|name| name == "Install starship prompt"));
     assert!(names.iter().any(|name| name == "Install Neovim > 0.11 from official release"));
     assert!(names.iter().any(|name| name == "Install rainfrog binary"));
-    assert_eq!(names.last().map(String::as_str), Some(state::ETCKEEPER_RECORD_OPERATION));
+    assert_eq!(names.last().map(String::as_str), Some(names::ETCKEEPER_RECORD_OPERATION));
     Ok(())
 }

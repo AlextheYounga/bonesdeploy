@@ -51,7 +51,7 @@ pub fn prepare_runtime(
 /// # Errors
 /// Returns an error for existing custom provisioning, invalid configuration,
 /// missing templates, or failed RustInfra operations.
-pub async fn provision_runtime(config: &Bones, project_root: &Path) -> Result<ProvisioningReport> {
+pub async fn apply_runtime(config: &Bones, project_root: &Path) -> Result<ProvisioningReport> {
     reject_custom_provisioning(project_root)?;
     let context = ProvisioningContext::from_bones(config)?;
     let runtime = ProvisioningRuntime::new(&context.server)?;

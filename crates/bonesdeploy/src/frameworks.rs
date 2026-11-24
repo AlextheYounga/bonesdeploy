@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::fmt;
 use std::str::FromStr;
@@ -9,7 +9,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 /// Shared question keys used by more than one template.
-pub(crate) const IS_STATIC_KEY: &str = state::IS_STATIC;
+pub(crate) const IS_STATIC_KEY: &str = names::IS_STATIC;
 const NEXT_NUXT_NODE_VERSION: &str = "25.9.0";
 mod angular;
 mod django;
@@ -118,8 +118,8 @@ impl Framework {
         };
         let mut values = serde_json::Map::new();
         values.insert("template".into(), Value::String(defaults.template.into()));
-        values.insert(state::WEB_ROOT.into(), Value::String(defaults.web_root.into()));
-        values.insert(state::NODE_VERSION.into(), Value::String(self.default_node_version()));
+        values.insert(names::WEB_ROOT.into(), Value::String(defaults.web_root.into()));
+        values.insert(names::NODE_VERSION.into(), Value::String(self.default_node_version()));
         if let Some((name, version)) = defaults.language {
             values.insert(name.into(), Value::String(version.into()));
         }

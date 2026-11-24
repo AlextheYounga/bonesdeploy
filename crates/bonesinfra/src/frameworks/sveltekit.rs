@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use anyhow::Result;
 
@@ -6,8 +6,8 @@ use super::{Language, Placeholder, RuntimePlan, ServerPlan, numeric_version};
 use crate::ProvisioningContext;
 
 pub(super) fn plan(context: &ProvisioningContext) -> Result<RuntimePlan> {
-    numeric_version(&context.node_version, 3, state::NODE_VERSION)?;
-    let node = state::node_binary(&context.node_version);
+    numeric_version(&context.node_version, 3, names::NODE_VERSION)?;
+    let node = names::node_binary(&context.node_version);
     let socket = format!("{}/sveltekit/sveltekit.sock", context.paths.runtime_socket_dir);
     let origin =
         if context.domain.is_empty() { "https://localhost".to_owned() } else { format!("https://{}", context.domain) };

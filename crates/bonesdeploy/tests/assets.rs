@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::env;
 use std::fs;
@@ -76,7 +76,7 @@ fn framework_builds_keep_runtime_outputs_and_prune_build_only_content() -> Resul
     assert!(!rails_prepare.contains("--without"));
 
     let next = asset_text("next/deployment/build/02_run_build.sh");
-    assert!(next.contains(state::NEXT_STANDALONE_DIR));
+    assert!(next.contains(names::NEXT_STANDALONE_DIR));
     assert!(next.contains("rm -rf .next/cache .next/static node_modules"));
     assert!(next.contains("rm -rf .next node_modules"));
 
@@ -224,7 +224,7 @@ fn framework_defaults_match_runtime_and_canonical_names() -> Result<()> {
     }
     let custom = framework_defaults("custom")?;
     assert_eq!(custom.get("template"), Some(&serde_json::Value::String("custom".into())));
-    assert_eq!(custom.get(state::WEB_ROOT), base_framework_defaults()?.get(state::WEB_ROOT));
+    assert_eq!(custom.get(names::WEB_ROOT), base_framework_defaults()?.get(names::WEB_ROOT));
 
     for framework in Framework::ALL {
         let name = framework.to_string();

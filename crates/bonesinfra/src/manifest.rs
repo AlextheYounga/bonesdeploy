@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::collections::BTreeSet;
 use std::path::{Component, Path};
@@ -110,7 +110,7 @@ impl DeletionPlan {
             .collect::<Vec<_>>();
         services.push(DeletionService {
             name: "quick tunnel".to_owned(),
-            unit: state::service_unit(&context.project_name, "cloudflared"),
+            unit: names::service_unit(&context.project_name, "cloudflared"),
             owner: "tunnel".to_owned(),
         });
         deduplicate_deletion_services(&mut services);

@@ -61,7 +61,6 @@ When you are done working, please run and address all warnings/errors:
 
 And finally, please update any related documentation **if necessary, use your best judgement**:
 - `CONTEXT.md`
-- `crates/bonesinfra/python/CONTEXT.md`
 - `README.md`
 
 Useful documents

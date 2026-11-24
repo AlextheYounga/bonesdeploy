@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use bonesdeploy_core::{config::RuntimeBackend, paths};
-use bonesinfra::provisioning::site_setup;
+use bonesinfra::provisioning::apply_site_setup;
 
 use crate::build::native;
 use crate::commands::server;
@@ -23,7 +23,7 @@ pub async fn run(yes: bool) -> Result<()> {
         native::ensure_builder_image().context("Failed to prepare local builder")?;
     }
     println!("Provisioning site base...");
-    site_setup(&cfg, Path::new(".")).await?;
+    apply_site_setup(&cfg, Path::new(".")).await?;
     super::runtime::apply().await?;
 
     super::doctor::run_with_pending(false, false).await.context("Site setup failed while checking site")?;

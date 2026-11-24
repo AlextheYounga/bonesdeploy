@@ -27,7 +27,8 @@ Own shared vocabulary and contracts used across processes:
 
 - canonical configuration and validation: `src/config/`
 - typed provisioning and remote transport models: `src/config/transport.rs`
-- product-owned paths: `src/paths.rs`
+- product-owned paths and path composition: `src/paths.rs`
+- shared config keys, resource names, and template input names: `src/names.rs`
 - artifact and build contracts: `src/artifact.rs`, `src/build_contract.rs`
 
 It must not depend on another workspace crate. Do not put workstation UX, provisioning operations, or remote execution here.
@@ -48,21 +49,25 @@ Command modules may coordinate these areas but must not become alternate SSH, Gi
 
 ### `crates/bonesinfra`
 
-The Rust crate owns wheel embedding, project materialization, the project-scoped Python environment, and subprocess invocation. Python owns provisioning.
+Own native provisioning, template materialization, manifest inspection, and
+infrastructure migrations. BonesDeploy invokes the Rust library directly; there
+is no Python package, subprocess request, or project-scoped environment.
 
-Within `python/src/bonesinfra/`:
+- typed provisioning input derived from canonical `Bones`: `src/context.rs`
+- RustInfra inventory and SSH execution: `src/execution.rs`
+- declarative framework runtime plans: `src/frameworks/<name>.rs`
+- server/site/SSL/tunnel/deletion workflows: `src/provisioning/`
+- shared operation registration and shell quoting: `src/provisioning/operations.rs`
+- native and Compose runtime plan interpretation: `src/provisioning/runtime/`
+- backup repository, schedule, and passphrase provisioning: `src/provisioning/backup.rs`
+- resource inventory and deletion validation: `src/manifest/`
+- version-gated migrations: `src/patches.rs`
+- embedded templates: `templates/`; project snapshots: `infra/templates/`
 
-- private Typer entry points and dispatch: `cli/`
-- server and site provisioning plans: `provisioning/`
-- typed request, context, and path data: `config/`
-- PyInfra connection and execution mechanics: `pyinfra/`
-- reusable Linux and language operations: `services/`
-- framework-specific runtime and resource declarations: `frameworks/<name>/`
-- project framework/custom loading: `project.py`
-- resource inventory and inspection: `manifest.py`
-- version-gated migrations: `patches/`
-
-Do not put provisioning operations under `cli/`. The CLI selects a provisioning plan and passes it to the runner.
+Keep framework-specific facts declarative in `frameworks/`; put behavior
+shared by provisioning workflows in `provisioning/operations.rs` or the focused
+runtime module that owns it. Keep entry points as `prepare_*` plan builders and
+`apply_*` executors.
 
 ### `crates/bonesremote`
 
@@ -88,9 +93,9 @@ Use these directions:
 
 ```text
 CLI -> commands -> release/runtime/shared/inspection/integrations
-BonesDeploy commands -> bonesinfra subprocess boundary
+BonesDeploy commands -> bonesinfra library
 BonesDeploy commands -> BonesRemote over SSH
-BonesInfra CLI -> provisioning plans -> services/PyInfra
+BonesDeploy commands -> bonesinfra provisioning plans -> RustInfra
 ```
 
 Avoid these directions:
@@ -98,7 +103,7 @@ Avoid these directions:
 ```text
 release/runtime/shared -> commands
 provisioning -> CLI
-config models -> PyInfra
+config models -> RustInfra
 bonesremote -> bonesinfra
 bonesdeploy-core -> another workspace crate
 ```
@@ -117,8 +122,9 @@ Sibling domain modules may collaborate when the workflow genuinely spans them, b
 | Embedded files | `bonesdeploy/src/assets/` |
 | Shared config, validation, path, or wire contract | `bonesdeploy-core/src/` |
 | Server or site provisioning workflow | `bonesinfra/provisioning/` |
-| Reusable provisioning operation | `bonesinfra/services/` |
-| PyInfra connection/execution behavior | `bonesinfra/pyinfra/` |
+| Shared operation registration and shell quoting | `bonesinfra/src/provisioning/operations.rs` |
+| Framework runtime plan | `bonesinfra/src/frameworks/<name>.rs` |
+| Runtime plan interpretation | `bonesinfra/src/provisioning/runtime/` |
 | Release transition or cleanup rule | `bonesremote/src/release/` |
 | Service or Compose runtime control | `bonesremote/src/runtime/` |
 | Shared import/environment transaction | `bonesremote/src/shared/` |
@@ -127,9 +133,12 @@ Sibling domain modules may collaborate when the workflow genuinely spans them, b
 
 ## Coupled Changes
 
-- Keep `bonesdeploy-core/src/paths.rs` and Python `config/paths.py` aligned.
-- Framework support commonly touches Rust framework definitions, Python framework provisioning, and embedded assets.
-- Rust alone parses the root `.env`; Python receives `ProvisioningRequest`, and BonesRemote receives `RemoteDeploymentConfig`.
+- Keep shared path composition in `bonesdeploy-core/src/paths.rs` and shared
+  config/resource names in `bonesdeploy-core/src/names.rs`.
+- Framework support commonly touches BonesDeploy framework selection,
+  BonesInfra declarative plans, and project-local template assets.
+- BonesDeploy parses the root `.env` and passes canonical `Bones` directly to
+  BonesInfra; BonesRemote receives `RemoteDeploymentConfig`.
 - Provisioning belongs to BonesInfra. Release receipt, activation, rollback, and pruning belong to BonesRemote.
 
 ## Avoid

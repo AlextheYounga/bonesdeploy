@@ -1,12 +1,13 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use anyhow::{Result, bail};
+use bonesdeploy_core::paths;
 
 use super::{Language, Placeholder, RuntimePlan, ServerPlan, string_value};
 use crate::ProvisioningContext;
 
 pub(super) fn plan(context: &ProvisioningContext) -> Result<RuntimePlan> {
-    let environment = string_value(context, state::RAILS_ENV, "production")?;
+    let environment = string_value(context, names::RAILS_ENV, "production")?;
     if !environment.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-')) {
         bail!("rails_env may contain only letters, digits, underscores, and hyphens");
     }
@@ -31,7 +32,7 @@ pub(super) fn plan(context: &ProvisioningContext) -> Result<RuntimePlan> {
             bundle.to_owned(),
             format!("{}/\u{2a}/vendor/bundle/ruby/\u{2a}/bin/puma", context.paths.releases),
         ],
-        writable_paths: ["tmp", "log", "storage"].map(|path| state::joined(&context.paths.shared, path)).to_vec(),
+        writable_paths: ["tmp", "log", "storage"].map(|path| paths::joined(&context.paths.shared, path)).to_vec(),
         shared_directories: &["tmp", "log", "storage"],
         tcp_port: None,
         apparmor_network: "network unix stream,",

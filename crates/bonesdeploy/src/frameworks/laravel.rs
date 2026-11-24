@@ -1,9 +1,9 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use super::{FrameworkDefaults, PermissionDefault, Question, QuestionKind, directory, file, non_recursive_file};
 use bonesdeploy_core::config::Runtime;
 
-const PHP_VERSION_KEY: &str = state::PHP_VERSION;
+const PHP_VERSION_KEY: &str = names::PHP_VERSION;
 const DEFAULT_PHP_VERSION: &str = "8.5";
 
 const PERMISSIONS: [PermissionDefault; 6] = [

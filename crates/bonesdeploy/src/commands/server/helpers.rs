@@ -1,6 +1,6 @@
 use anyhow::Result;
 use bonesdeploy_core::paths;
-use bonesinfra::provisioning::provision_helpers;
+use bonesinfra::provisioning::apply_helpers;
 use console::style;
 use std::path::Path;
 
@@ -16,7 +16,7 @@ pub async fn run(yes: bool) -> Result<()> {
 
     println!("{}", style("Installing server helper tools").cyan().bold());
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    provision_helpers(&cfg, Path::new(".")).await?;
+    apply_helpers(&cfg, Path::new(".")).await?;
     println!("{} Helper tools installed.", output::success_marker());
     Ok(())
 }

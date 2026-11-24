@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::fs;
 
@@ -11,11 +11,11 @@ use bonesinfra::{ProvisioningContext, ProvisioningRuntime, TemplateResolver};
 fn ssl_plan_stages_the_challenge_before_enabling_tls() -> Result<()> {
     let project = tempfile::tempdir()?;
     for path in [
-        state::DEFAULT_CERTIFICATE_TEMPLATE,
-        state::DEFAULT_DENY_TEMPLATE,
-        state::ROUTER_TEMPLATE,
-        state::NGINX_VALIDATION_SCRIPT,
-        state::ETCKEEPER_TEMPLATE,
+        names::DEFAULT_CERTIFICATE_TEMPLATE,
+        names::DEFAULT_DENY_TEMPLATE,
+        names::ROUTER_TEMPLATE,
+        names::NGINX_VALIDATION_SCRIPT,
+        names::ETCKEEPER_TEMPLATE,
     ] {
         let target = project.path().join("infra/templates").join(path);
         fs::create_dir_all(target.parent().ok_or_else(|| anyhow::anyhow!("asset has no parent"))?)?;
@@ -41,7 +41,7 @@ fn ssl_plan_stages_the_challenge_before_enabling_tls() -> Result<()> {
     let certificate = names.iter().position(|name| name == "Obtain or renew certificate");
     let enable = names.iter().position(|name| name == "Deploy router nginx config (SSL enable)");
     assert!(matches!((challenge, certificate, enable), (Some(a), Some(b), Some(c)) if a < b && b < c));
-    assert_eq!(names.last().map(String::as_str), Some(state::ETCKEEPER_RECORD_OPERATION));
+    assert_eq!(names.last().map(String::as_str), Some(names::ETCKEEPER_RECORD_OPERATION));
     Ok(())
 }
 

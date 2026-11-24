@@ -1,12 +1,13 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use anyhow::{Result, bail};
 
 use super::{Language, Placeholder, RuntimePlan, ServerPlan, string_value};
 use crate::ProvisioningContext;
+use crate::shell_quote;
 
 pub(super) fn plan(context: &ProvisioningContext) -> Result<RuntimePlan> {
-    let module = string_value(context, state::WSGI_MODULE, "config.wsgi:application")?;
+    let module = string_value(context, names::WSGI_MODULE, "config.wsgi:application")?;
     let Some((import, callable)) = module.split_once(':') else {
         bail!("wsgi_module must use the form package.module:callable");
     };
@@ -24,14 +25,14 @@ pub(super) fn plan(context: &ProvisioningContext) -> Result<RuntimePlan> {
         placeholder: Placeholder::Django { module_path },
         command: format!(
             "{gunicorn} {} --bind unix:{}/gunicorn/gunicorn.sock --worker-tmp-dir {}/gunicorn",
-            shell_escape::escape(module.as_str().into()),
+            shell_quote::quote(&module)?,
             context.paths.runtime_socket_dir,
             context.paths.runtime_socket_dir,
         ),
         validation_command: Some(format!(
             "{}/.venv/bin/gunicorn --check-config {}",
             context.paths.current,
-            shell_escape::escape(module.as_str().into())
+            shell_quote::quote(&module)?
         )),
         exec_paths: vec![gunicorn],
         writable_paths: vec![format!("{}/media", context.paths.shared)],

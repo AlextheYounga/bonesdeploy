@@ -1,6 +1,4 @@
-//! Shared vocabulary for configuration, managed paths, and template inputs.
-
-use std::path::Path;
+//! Shared names for configuration inputs, system resources, and managed files.
 
 pub const APP_PROXY_TARGET: &str = "app_proxy_target";
 pub const APPARMOR_PROFILE_NAME: &str = "apparmor_profile_name";
@@ -67,9 +65,4 @@ pub fn php_socket(project: &str, version: &str) -> String {
 #[must_use]
 pub fn node_binary(version: &str) -> String {
     format!("/opt/bonesdeploy/node/v{version}/bin/node")
-}
-
-#[must_use]
-pub fn joined(root: &str, child: &str) -> String {
-    Path::new(root).join(child).display().to_string()
 }

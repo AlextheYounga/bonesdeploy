@@ -2,7 +2,7 @@ use std::path::Path;
 
 use serde::Serialize;
 
-use crate::state::service_unit;
+use crate::names::service_unit;
 
 use super::{
     APPARMOR_ENABLED_PARAM, APPARMOR_PROFILES, BACKUPS_ROOT, BONESDEPLOY_LOG_ROOT, BONESDEPLOY_NGINX_DEFAULT_DENY_CERT,

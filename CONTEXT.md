@@ -337,7 +337,7 @@ Static runtimes deploy from a `web_root` subdirectory of each release that nginx
   - Sends the artifact built from the configured local branch; production does not resolve a source branch.
 
 - **server setup**
-  - Calls native `bonesinfra::provisioning::server_setup`, which builds and executes a RustInfra plan directly from `Bones`.
+  - Calls native `bonesinfra::provisioning::apply_server_setup`, which builds and executes a RustInfra plan directly from `Bones`.
   - Provisions shared packages, hardening (including an sshd drop-in that disables password login for root), firewall, deploy identity, BonesRemote roots and binary, and sudoers.
   - Installs etckeeper and initializes `/etc` as a Git-backed etckeeper repository using package defaults.
   - Every successful mutating BonesInfra provisioning flow (server, site, services, runtime, SSL, helpers) ends with an etckeeper commit of its resulting `/etc` changes; read-only `manifest` and patch flows do not commit.
@@ -359,14 +359,14 @@ clearly because release binaries currently support only `x86_64` Debian/Ubuntu.
 
 - **site runtime**:
   - Reapplies the configured runtime settings from the root `.env` to the host and provisions the selected framework's runtime.
-   - Calls native `bonesinfra::provisioning::provision_runtime` against the configured host as the configured `ssh_user`.
+    - Calls native `bonesinfra::provisioning::apply_runtime` against the configured host as the configured `ssh_user`.
   - Native sites run project and framework provisioning. Compose sites configure Docker's official Debian/Ubuntu apt repository, install Docker Engine and the Compose plugin, render the generic Compose systemd unit, and optionally configure nginx for `BONES_COMPOSE_PORT`.
   - Configures per-site runtime assets: AppArmor profile, nginx router + per-site config + systemd service, and runs `bonesremote doctor`.
   - Does not install, configure, or start Cloudflare Quick Tunnels. Temporary public ingress is an explicit `site tunnel` lifecycle.
   - Does not handle SSL; use `site ssl` for TLS configuration.
 
 - **site ssl**
-  - Calls native `bonesinfra::provisioning::provision_ssl` and executes the RustInfra plan as root.
+  - Calls native `bonesinfra::provisioning::apply_ssl` and executes the RustInfra plan as root.
   - Uses certbot with a webroot challenge to obtain/renew certificates for the configured domain.
   - Re-renders the per-site runtime nginx router with TLS enabled, listening on 443 and redirecting HTTP to HTTPS.
   - Separate from `site runtime` to keep certificate management decoupled from app runtime concerns.

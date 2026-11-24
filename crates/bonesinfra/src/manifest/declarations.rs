@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -43,7 +43,7 @@ pub fn declarations(context: &ProvisioningContext) -> Result<(Vec<Artifact>, Vec
                 "docker",
             ),
         ]);
-        services.push(service("Compose stack", state::service_unit(&context.project_name, "compose"), "docker"));
+        services.push(service("Compose stack", names::service_unit(&context.project_name, "compose"), "docker"));
         add_nginx(context, &mut artifacts, &mut services);
         add_backup(context, &mut artifacts);
         add_ssl(context, &mut artifacts);
@@ -147,7 +147,7 @@ fn add_static(context: &ProvisioningContext, artifacts: &mut Vec<Artifact>, root
     artifacts.extend([
         artifact(
             "static placeholder web root",
-            state::joined(&p.placeholder_release, root),
+            paths::joined(&p.placeholder_release, root),
             ArtifactKind::Directory,
             "framework",
         ),
@@ -157,7 +157,7 @@ fn add_static(context: &ProvisioningContext, artifacts: &mut Vec<Artifact>, root
             ArtifactKind::File,
             "framework",
         ),
-        artifact("current static web root", state::joined(&p.current, root), ArtifactKind::Directory, "framework"),
+        artifact("current static web root", paths::joined(&p.current, root), ArtifactKind::Directory, "framework"),
     ]);
 }
 
@@ -196,17 +196,17 @@ fn add_server(
 }
 
 fn add_laravel(context: &ProvisioningContext, artifacts: &mut Vec<Artifact>, services: &mut Vec<ManagedService>) {
-    let version = context.extra.get(state::PHP_VERSION).and_then(serde_json::Value::as_str).unwrap_or("8.5");
+    let version = context.extra.get(names::PHP_VERSION).and_then(serde_json::Value::as_str).unwrap_or("8.5");
     artifacts.extend([
         artifact(
             "PHP-FPM pool configuration",
-            state::php_pool(&context.project_name, version),
+            names::php_pool(&context.project_name, version),
             ArtifactKind::File,
             "framework",
         ),
         artifact(
             "PHP-FPM socket",
-            state::php_socket(&context.project_name, version),
+            names::php_socket(&context.project_name, version),
             ArtifactKind::Socket,
             "framework",
         ),
@@ -236,13 +236,13 @@ fn placeholder_artifacts(placeholder: &Placeholder) -> Vec<(&'static str, String
         Placeholder::Next => vec![
             (
                 "Next.js placeholder standalone directory",
-                state::NEXT_STANDALONE_DIR.to_owned(),
+                names::NEXT_STANDALONE_DIR.to_owned(),
                 ArtifactKind::Directory,
             ),
             ("Next.js placeholder standalone server", ".next/standalone/server.js".to_owned(), ArtifactKind::File),
         ],
         Placeholder::Nuxt => vec![
-            ("Nuxt placeholder server directory", state::NUXT_SERVER_DIR.to_owned(), ArtifactKind::Directory),
+            ("Nuxt placeholder server directory", names::NUXT_SERVER_DIR.to_owned(), ArtifactKind::Directory),
             ("Nuxt placeholder server", ".output/server/index.mjs".to_owned(), ArtifactKind::File),
         ],
         Placeholder::Rails => vec![

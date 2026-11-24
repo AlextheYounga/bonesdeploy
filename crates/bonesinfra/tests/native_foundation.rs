@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::fs;
 
@@ -16,7 +16,7 @@ fn config() -> Bones {
     config.email = "ops@example.com".to_owned();
     config.runtime.template = "laravel".to_owned();
     config.runtime.backend = RuntimeBackend::Native;
-    config.runtime.extra.insert(state::PHP_VERSION.to_owned(), toml::Value::String("8.4".to_owned()));
+    config.runtime.extra.insert(names::PHP_VERSION.to_owned(), toml::Value::String("8.4".to_owned()));
     config
 }
 
@@ -28,7 +28,7 @@ fn context_is_derived_directly_from_bones() -> Result<()> {
     assert_eq!(context.server.port, 2222);
     assert_eq!(context.paths.project_root, "/srv/sites/example");
     let template_data = context.template_data()?;
-    assert_eq!(template_data[state::PHP_VERSION], "8.4");
+    assert_eq!(template_data[names::PHP_VERSION], "8.4");
     assert_eq!(template_data["paths"]["runtime_nginx_socket"], "/run/example/nginx/nginx.sock");
     Ok(())
 }
@@ -71,8 +71,8 @@ fn runtime_builds_ssh_inventory_and_prepares_typed_operations() -> Result<()> {
 
     let host = runtime.inventory().get_host("server.example.com")?;
     let data = runtime.inventory().resolved_host_data(host.name())?;
-    assert_eq!(data[state::SSH_USER], "root");
-    assert_eq!(data[state::SSH_PORT], 2222);
+    assert_eq!(data[names::SSH_USER], "root");
+    assert_eq!(data[names::SSH_PORT], 2222);
     assert_eq!(deploy.plan().operations.len(), 1);
     Ok(())
 }

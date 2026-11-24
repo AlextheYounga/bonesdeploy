@@ -1,9 +1,20 @@
+use std::path::Path;
+
+use bonesdeploy_core::names;
+use bonesdeploy_core::paths;
+use rustinfra::operations::files::{DirectoryInput, TemplateInput};
+use rustinfra::operations::{DeployError, DeployHost};
+use serde_json::{Map, json};
+
 use rustinfra::api::{Command, CommandBit, ContentUploadCommand, StringCommand};
 use rustinfra::connectors::Connector;
 use rustinfra::facts::files::{File, PathInfo, PathInput, Sha256File};
 use rustinfra::facts::{FactExecutor, FactOptions};
 use rustinfra::operations::{StatefulOperation, StatefulOperationFuture};
 use sha2::{Digest, Sha256};
+
+use super::operations::{directory, escaped, named, shell as add_shell, template};
+use crate::ProvisioningContext;
 
 /// Installs the in-memory Borg passphrase without placing it in argv or a
 /// workstation file.
@@ -43,6 +54,51 @@ impl StatefulOperation for BackupPassphraseFile {
     }
 }
 
+pub(super) fn add(
+    host: &mut DeployHost<'_>,
+    context: &ProvisioningContext,
+    cron_template: &Path,
+) -> Result<(), DeployError> {
+    for (name, path, mode) in [
+        ("Ensure backup repository root exists", paths::BACKUPS_ROOT, 0o700),
+        ("Ensure BonesRemote site state directory exists", context.paths.site_root.as_str(), 0o700),
+    ] {
+        let mut input = DirectoryInput::new(path);
+        input.mode = Some(mode);
+        directory(host, name, input)?;
+    }
+    host.add_stateful(
+        BackupPassphraseFile,
+        BackupPassphraseInput {
+            content: context.backup.passphrase.clone(),
+            destination: context.paths.backup_passphrase_file.clone(),
+        },
+        named("Install root-only Borg passphrase file"),
+    )?;
+    let repository = escaped(&context.paths.backup_repository)?;
+    let passphrase_file = escaped(&context.paths.backup_passphrase_file)?;
+    add_shell(
+        host,
+        "Create encrypted Borg repository",
+        &format!(
+            "if [ ! -d {repository} ]; then BORG_PASSPHRASE=\"$(cat {passphrase_file})\" borg init --encryption repokey-blake2 {repository}; fi"
+        ),
+    )?;
+
+    let mut data = Map::new();
+    data.insert(names::PROJECT_NAME.to_owned(), json!(context.project_name));
+    data.insert("backup_schedule".to_owned(), json!(context.backup.schedule));
+    data.insert("backup_keep_days".to_owned(), json!(context.backup.retention_days));
+    data.insert(names::BONESREMOTE_PATH.to_owned(), json!(context.paths.bonesremote_global_link));
+    let mut cron = TemplateInput::new(cron_template, &context.paths.backup_cron_file);
+    cron.data = data;
+    cron.user = Some("root".to_owned());
+    cron.group = Some("root".to_owned());
+    cron.mode = Some(0o644);
+    template(host, "Install scheduled backup cron entry", cron)?;
+    Ok(())
+}
+
 fn commands(input: &BackupPassphraseInput, remote_hash: Option<&str>, remote_file: &PathInfo) -> Vec<Command> {
     let mut commands = Vec::new();
     if remote_hash != Some(sha256_hex(input.content.as_bytes()).as_str()) {
@@ -71,45 +127,4 @@ fn sha256_hex(value: &[u8]) -> String {
 
 fn shell(bits: impl IntoIterator<Item = CommandBit>) -> Command {
     Command::Shell(StringCommand::new(bits))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{BackupPassphraseInput, commands, sha256_hex};
-    use rustinfra::api::Command;
-    use rustinfra::facts::files::{FileInfo, PathInfo};
-
-    #[test]
-    fn matching_secret_and_metadata_are_a_noop() {
-        let input = BackupPassphraseInput { content: "secret".to_owned(), destination: "/run/secret".to_owned() };
-        let info = PathInfo::Present(FileInfo {
-            user: "root".to_owned(),
-            group: "root".to_owned(),
-            mode: 0o600,
-            accessed_at: None,
-            modified_at: None,
-            changed_at: None,
-            size: 6,
-            link_target: None,
-        });
-
-        assert!(commands(&input, Some(&sha256_hex(b"secret")), &info).is_empty());
-    }
-
-    #[test]
-    fn changed_secret_is_uploaded_without_entering_a_shell_command() {
-        let input = BackupPassphraseInput { content: "new secret".to_owned(), destination: "/run/secret".to_owned() };
-        let commands = commands(&input, Some(&sha256_hex(b"old secret")), &PathInfo::Missing);
-
-        assert!(matches!(&commands[0], Command::UploadContent(upload) if upload.content == b"new secret"));
-        assert!(
-            commands
-                .iter()
-                .filter_map(|command| match command {
-                    Command::Shell(command) => Some(command.raw_value()),
-                    _ => None,
-                })
-                .all(|command| !command.contains("new secret"))
-        );
-    }
 }

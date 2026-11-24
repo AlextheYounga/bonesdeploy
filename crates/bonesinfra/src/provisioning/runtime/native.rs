@@ -6,18 +6,20 @@
 mod laravel;
 mod server;
 
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use bonesdeploy_core::paths;
-use rustinfra::operations::files::{Directory, DirectoryInput, Template, TemplateInput};
-use rustinfra::operations::systemd::{Service, ServiceInput};
+use rustinfra::operations::files::{DirectoryInput, TemplateInput};
+use rustinfra::operations::systemd::ServiceInput;
 use rustinfra::operations::{DeployError, DeployHost, OperationId};
 use serde_json::{Map, Value, json};
 
-use super::common::{escaped, named, shell};
+use super::super::operations::{
+    directory as add_directory, escaped, service as add_service, shell, template as add_template,
+};
 use crate::frameworks::{Language, Placeholder, RuntimePlan};
 use crate::{ProvisioningContext, TemplateResolver};
 
@@ -112,7 +114,7 @@ fn add_static(
     placeholder: &Path,
 ) -> Result<(), DeployError> {
     runtime_directory(host, context)?;
-    let placeholder_root = state::joined(&context.paths.placeholder_release, root);
+    let placeholder_root = paths::joined(&context.paths.placeholder_release, root);
     directory(host, "Ensure static placeholder directory exists", &placeholder_root, context, 0o750)?;
     framework_template(
         host,
@@ -139,7 +141,7 @@ fn add_static(
         host,
         context,
         "Validate nginx configuration with static config",
-        &format!("nginx -t -c {}", escaped(&context.paths.site_nginx_config)),
+        &format!("nginx -t -c {}", escaped(&context.paths.site_nginx_config)?),
     )
 }
 
@@ -154,21 +156,21 @@ fn start_application(
         &format!("Remove {name} service from direct multi-user boot"),
         &format!(
             "rm -f -- /etc/systemd/system/multi-user.target.wants/{}",
-            state::service_unit(&context.project_name, name)
+            names::service_unit(&context.project_name, name)
         ),
     )?;
-    let unit = state::service_unit(&context.project_name, name);
+    let unit = names::service_unit(&context.project_name, name);
     let mut service = ServiceInput::new(&unit);
     service.daemon_reload = true;
-    host.add_stateful(Service, service, named(&format!("Start {name} service")))?;
+    add_service(host, &format!("Start {name} service"), service)?;
     if !profile.is_empty() {
         shell(
             host,
             &format!("Verify {unit} attached to {profile}"),
             &format!(
                 "attempt=0; while [ \"$attempt\" -lt 20 ]; do pid=$(systemctl show -p MainPID --value {}); if [ \"$pid\" != 0 ] && grep -qF -- {} /proc/$pid/attr/current; then exit 0; fi; attempt=$((attempt + 1)); sleep 0.1; done; false",
-                escaped(&unit),
-                escaped(profile)
+                escaped(&unit)?,
+                escaped(profile)?
             ),
         )?;
     }
@@ -184,7 +186,7 @@ fn log_directories(host: &mut DeployHost<'_>, context: &ProvisioningContext) -> 
     root.user = Some("root".to_owned());
     root.group = Some("root".to_owned());
     root.mode = Some(0o755);
-    host.add_stateful(Directory, root, named("Ensure BonesDeploy log root exists"))?;
+    add_directory(host, "Ensure BonesDeploy log root exists", root)?;
     directory(host, "Ensure per-project log directory exists", &context.paths.site_log_dir, context, 0o750)
 }
 
@@ -197,7 +199,7 @@ fn shared_directories(
         directory(
             host,
             &format!("Ensure shared directory {path}"),
-            &state::joined(&context.paths.shared, path),
+            &paths::joined(&context.paths.shared, path),
             context,
             0o770,
         )?;
@@ -233,8 +235,7 @@ fn directory(
     input.user = Some(context.runtime_user.clone());
     input.group = Some(context.runtime_group.clone());
     input.mode = Some(mode);
-    host.add_stateful(Directory, input, named(name))?;
-    Ok(())
+    add_directory(host, name, input)
 }
 
 fn framework_template(
@@ -251,8 +252,7 @@ fn framework_template(
     input.user = Some("root".to_owned());
     input.group = Some(context.runtime_group.clone());
     input.mode = Some(mode);
-    host.add_stateful(Template, input, named(name))?;
-    Ok(())
+    add_template(host, name, input)
 }
 
 fn run_as_runtime(
@@ -266,11 +266,11 @@ fn run_as_runtime(
         name,
         &format!(
             "runuser -u {} -- sh -lc {}",
-            escaped(&context.runtime_user),
+            escaped(&context.runtime_user)?,
             escaped(&format!(
                 "cd {} && HOME=$(getent passwd {} | cut -d: -f6) XDG_CONFIG_HOME=$HOME/.config {command}",
                 context.paths.current, context.runtime_user
-            ))
+            ))?
         ),
     )
 }

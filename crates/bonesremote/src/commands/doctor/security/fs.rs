@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::path::Path;
 
@@ -71,5 +71,5 @@ fn permission_class(node: &FileNode, account: &Account) -> u32 {
 }
 
 pub fn has_login_shell(shell: &str) -> bool {
-    !matches!(shell, state::NOLOGIN_SHELL | "/sbin/nologin" | "/bin/false")
+    !matches!(shell, names::NOLOGIN_SHELL | "/sbin/nologin" | "/bin/false")
 }

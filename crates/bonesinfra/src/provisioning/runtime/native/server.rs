@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::path::Path;
 
@@ -14,7 +14,8 @@ use super::{
 };
 use crate::ProvisioningContext;
 use crate::frameworks::{Language, Placeholder, ServerPlan};
-use crate::provisioning::runtime::common::{escaped, named, require_service, shell, template};
+use crate::provisioning::operations::{escaped, named, shell};
+use crate::provisioning::runtime::common::{require_service, template};
 
 #[derive(Clone, Copy)]
 pub(super) struct Assets<'a> {
@@ -40,7 +41,7 @@ pub(super) fn add(
     let profile_name = format!("bonesdeploy-{}-{}", context.project_name, plan.name);
     let mut profile_data = data.clone();
     profile_data.extend([
-        (state::APPARMOR_PROFILE_NAME.to_owned(), json!(profile_name)),
+        (names::APPARMOR_PROFILE_NAME.to_owned(), json!(profile_name)),
         ("apparmor_runtime".to_owned(), json!(plan.name)),
         ("apparmor_exec_paths".to_owned(), json!(plan.exec_paths)),
         ("apparmor_writable_paths".to_owned(), json!(plan.writable_paths)),
@@ -58,9 +59,13 @@ pub(super) fn add(
     shell(
         host,
         &format!("Load {} AppArmor profile", plan.name),
-        &format!("apparmor_parser -r -T -W {}", escaped(&profile_path)),
+        &format!("apparmor_parser -r -T -W {}", escaped(&profile_path)?),
     )?;
-    shell(host, &format!("Enforce {} AppArmor profile", plan.name), &format!("aa-enforce {}", escaped(&profile_name)))?;
+    shell(
+        host,
+        &format!("Enforce {} AppArmor profile", plan.name),
+        &format!("aa-enforce {}", escaped(&profile_name)?),
+    )?;
     seed_placeholder(host, context, data, plan, assets.placeholder)?;
     validate_placeholder(host, context, plan)?;
 
@@ -69,11 +74,11 @@ pub(super) fn add(
         ("runtime_name".to_owned(), json!(plan.name)),
         ("runtime_label".to_owned(), json!(plan.label)),
         ("runtime_exec".to_owned(), json!(plan.command)),
-        (state::APPARMOR_PROFILE_NAME.to_owned(), json!(profile_name)),
+        (names::APPARMOR_PROFILE_NAME.to_owned(), json!(profile_name)),
         ("runtime_write_paths".to_owned(), json!(plan.writable_paths.join(" "))),
         (
             "runtime_address_families".to_owned(),
-            json!(if plan.tcp_port.is_some() { state::AF_UNIX_INET } else { state::AF_UNIX }),
+            json!(if plan.tcp_port.is_some() { names::AF_UNIX_INET } else { names::AF_UNIX }),
         ),
     ]);
     template(
@@ -88,10 +93,10 @@ pub(super) fn add(
 
     let proxy = plan.tcp_port.map_or_else(
         || format!("http://unix:{}/{}/{}.sock:", context.paths.runtime_socket_dir, plan.name, plan.name),
-        state::tcp_proxy_target,
+        names::tcp_proxy_target,
     );
     let mut nginx_data = data.clone();
-    nginx_data.insert(state::APP_PROXY_TARGET.to_owned(), json!(proxy));
+    nginx_data.insert(names::APP_PROXY_TARGET.to_owned(), json!(proxy));
     framework_template(
         host,
         "Deploy per-site app nginx config",
@@ -106,7 +111,7 @@ pub(super) fn add(
         host,
         context,
         "Validate nginx configuration with app config",
-        &format!("nginx -t -c {}", escaped(&context.paths.site_nginx_config)),
+        &format!("nginx -t -c {}", escaped(&context.paths.site_nginx_config)?),
     )?;
     start_application(host, context, plan.name, &profile_name)
 }
@@ -185,7 +190,7 @@ fn seed_placeholder(
             shell(
                 host,
                 "Create placeholder venv with gunicorn",
-                &format!("cd {} && /usr/bin/python3 -m venv .venv && .venv/bin/pip install gunicorn", escaped(root)),
+                &format!("cd {} && /usr/bin/python3 -m venv .venv && .venv/bin/pip install gunicorn", escaped(root)?),
             )?;
             let parent = Path::new(module_path).parent().and_then(Path::to_str).unwrap_or_default();
             directory(host, "Ensure placeholder config directory exists", &format!("{root}/{parent}"), context, 0o750)?;
@@ -204,12 +209,12 @@ fn seed_placeholder(
             context,
             data,
             source,
-            state::NEXT_STANDALONE_DIR,
+            names::NEXT_STANDALONE_DIR,
             "server.js",
             "Next.js standalone server",
         )?,
         Placeholder::Nuxt => {
-            seed_file(host, context, data, source, state::NUXT_SERVER_DIR, "index.mjs", "Nuxt nitro server")?;
+            seed_file(host, context, data, source, names::NUXT_SERVER_DIR, "index.mjs", "Nuxt nitro server")?;
         }
         Placeholder::Rails => {
             framework_template(
@@ -226,7 +231,7 @@ fn seed_placeholder(
                 "Install placeholder gems",
                 &format!(
                     "cd {} && BUNDLE_DISABLE_VERSION_CHECK=true BUNDLE_PATH=vendor/bundle BUNDLE_VERSION=system /usr/bin/bundle install",
-                    escaped(root)
+                    escaped(root)?
                 ),
             )?;
             let rack = source.with_file_name("placeholder-config.ru.j2");

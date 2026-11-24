@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::fs;
 use std::path::Path;
@@ -19,9 +19,9 @@ fn config() -> Bones {
 
 fn write_templates(project: &Path) -> Result<()> {
     for (path, content) in [
-        (state::INDEX_TEMPLATE, "{{ project_name }}"),
+        (names::INDEX_TEMPLATE, "{{ project_name }}"),
         ("shared/cron/backup.cron.j2", "{{ backup_schedule }} root {{ bonesremote_path }}"),
-        (state::ETCKEEPER_TEMPLATE, "#!/bin/sh\netckeeper commit '{{ message }}' || true\n"),
+        (names::ETCKEEPER_TEMPLATE, "#!/bin/sh\netckeeper commit '{{ message }}' || true\n"),
     ] {
         let target = project.join("infra/templates").join(path);
         fs::create_dir_all(target.parent().ok_or_else(|| anyhow::anyhow!("template has no parent"))?)?;
@@ -50,7 +50,7 @@ fn site_setup_plan_registers_the_complete_base_site_sequence() -> Result<()> {
     assert!(names.iter().any(|name| name == "Seed placeholder index page"));
     assert!(names.iter().any(|name| name == "Install root-only Borg passphrase file"));
     assert!(names.iter().any(|name| name == "Install scheduled backup cron entry"));
-    assert_eq!(names.last().map(String::as_str), Some(state::ETCKEEPER_RECORD_OPERATION));
+    assert_eq!(names.last().map(String::as_str), Some(names::ETCKEEPER_RECORD_OPERATION));
     assert!(names.iter().all(|name| !name.contains(&config().backup.passphrase)));
     Ok(())
 }

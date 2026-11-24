@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -13,7 +13,7 @@ fn account() -> Account {
         name: "atlas".to_string(),
         uid: 1001,
         gid: 1001,
-        shell: state::NOLOGIN_SHELL.to_string(),
+        shell: names::NOLOGIN_SHELL.to_string(),
         groups: BTreeSet::from([1001]),
     }
 }

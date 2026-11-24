@@ -35,6 +35,8 @@ There is no provisioning request JSON or child process.
 
 - `context.rs`: validated `ServerContext` and `ProvisioningContext` derived
   directly from `Bones`, plus structured template data.
+- `frameworks/<name>.rs`: validated declarative runtime plans for built-in
+  frameworks.
 - `execution.rs`: RustInfra inventory construction, SSH execution, and stable
   provisioning reports.
 - `templates.rs`: traversal-safe resolution against project-local
@@ -60,8 +62,12 @@ framework provisioning and uses the Compose plan.
   etckeeper, AppArmor, firewall, fail2ban, unattended upgrades, deploy identity,
   SSH hardening, BonesRemote installation, and sudoers.
 - `provisioning/helpers.rs`: optional administrator helper packages.
-- `provisioning/site.rs`: runtime identity, canonical directories,
-  placeholder release, encrypted Borg repository/passphrase, and backup cron.
+- `provisioning/site.rs`: runtime identity, canonical directories, and
+  placeholder release.
+- `provisioning/backup.rs`: encrypted Borg repository, passphrase, and backup
+  cron provisioning.
+- `provisioning/operations.rs`: shared named operation registration, shell
+  registration, and argument quoting.
 - `provisioning/runtime/`: native framework and Compose orchestration, language
   runtimes, AppArmor, nginx, systemd targets/services, placeholders, and
   validation.
@@ -73,7 +79,12 @@ framework provisioning and uses the Compose plan.
 Every mutating plan uses RustInfra operations and finishes with etckeeper where
 the previous provisioning behavior did. The backup passphrase uses a
 domain-specific stateful operation that uploads in-memory content without
-placing the secret in a workstation file or shell argument.
+  placing the secret in a workstation file or shell argument.
+
+Public provisioning APIs use `prepare_*` for offline plan construction and
+`apply_*` for execution. Shared path composition belongs to
+`bonesdeploy-core::paths`; cross-process config/resource names belong to
+`bonesdeploy-core::names`.
 
 ### Manifest
 
@@ -95,8 +106,9 @@ the current configuration before execution.
 - `templates/frameworks/<name>/`: framework-owned templates.
 
 Materialization copies these sources to `infra/templates/` atomically and
-removes legacy project wheel files. No Python source, wheel, pip environment,
-or virtualenv exists in the provisioning path.
+removes legacy project wheel files. No Python-based BonesInfra process, wheel,
+pip environment, or subprocess participates in provisioning. Framework
+applications may still use distribution Python or another framework runtime.
 
 ## `bonesremote`
 
@@ -118,7 +130,7 @@ provisioning-time desired state. BonesRemote never invokes BonesInfra.
 ```text
 bonesdeploy server setup
   → load Bones
-  → bonesinfra::provisioning::server_setup
+  → bonesinfra::provisioning::apply_server_setup
   → validate host facts
   → RustInfra plan + SSH execution
   → server doctor
@@ -129,8 +141,8 @@ bonesdeploy server setup
 ```text
 bonesdeploy site setup
   → server readiness
-  → bonesinfra::site_setup
-  → bonesinfra::provision_runtime
+  → bonesinfra::provisioning::apply_site_setup
+  → bonesinfra::provisioning::apply_runtime
   → site doctor
 ```
 
@@ -146,7 +158,7 @@ site delete
   → resolve and display typed DeletionPlan
   → confirmation
   → serialize, parse, and revalidate plan
-  → bonesinfra::delete_site
+  → bonesinfra::provisioning::apply_site_delete
   → BonesRemote registration cleanup
 ```
 

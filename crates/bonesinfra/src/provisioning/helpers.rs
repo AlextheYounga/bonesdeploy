@@ -1,15 +1,16 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use bonesdeploy_core::config::Bones;
 use rustinfra::operations::apt::{Packages, PackagesInput};
-use rustinfra::operations::files::{Directory, DirectoryInput, Put, PutInput};
-use rustinfra::operations::server::{Script, ScriptInput, ScriptTemplate, ScriptTemplateInput, Shell, ShellCommands};
-use rustinfra::operations::{DeployError, DeployHost, OperationOptions, PreparedDeploy};
+use rustinfra::operations::files::{DirectoryInput, Put, PutInput};
+use rustinfra::operations::server::{Script, ScriptInput, ScriptTemplate, ScriptTemplateInput};
+use rustinfra::operations::{DeployError, DeployHost, PreparedDeploy};
 use serde_json::{Map, json};
 
+use super::operations::{directory, named, shell};
 use crate::{ProvisioningReport, ProvisioningRuntime, ServerContext, TemplateResolver, reject_custom_provisioning};
 
 const HELPER_PACKAGES: &[&str] = &[
@@ -68,7 +69,7 @@ pub fn prepare_helpers(runtime: &ProvisioningRuntime, templates: &TemplateResolv
         neovim_config_installer: templates.resolve("shared/scripts/install-neovim-config.sh")?,
         starship_config: templates.resolve("shared/starship.toml")?,
         shell_profile: templates.resolve("shared/profile.d/bonesinfra-shell.sh")?,
-        etckeeper_record: templates.resolve(state::ETCKEEPER_TEMPLATE)?,
+        etckeeper_record: templates.resolve(names::ETCKEEPER_TEMPLATE)?,
     };
     runtime.prepare(|host| {
         add_packages(host)?;
@@ -85,7 +86,7 @@ pub fn prepare_helpers(runtime: &ProvisioningRuntime, templates: &TemplateResolv
         host.add_stateful(
             ScriptTemplate,
             ScriptTemplateInput { source: assets.etckeeper_record.clone(), arguments: Vec::new(), data },
-            named(state::ETCKEEPER_RECORD_OPERATION),
+            named(names::ETCKEEPER_RECORD_OPERATION),
         )?;
         Ok(())
     })
@@ -96,7 +97,7 @@ pub fn prepare_helpers(runtime: &ProvisioningRuntime, templates: &TemplateResolv
 /// # Errors
 /// Returns an error for unsupported custom provisioning, invalid connection
 /// data, missing assets, or failed operations.
-pub async fn provision_helpers(config: &Bones, project_root: &Path) -> Result<ProvisioningReport> {
+pub async fn apply_helpers(config: &Bones, project_root: &Path) -> Result<ProvisioningReport> {
     reject_custom_provisioning(project_root)?;
     let server = ServerContext::from_bones(config)?;
     let runtime = ProvisioningRuntime::new(&server)?;
@@ -133,11 +134,11 @@ fn add_neovim(host: &mut DeployHost<'_>, assets: &HelperAssets) -> Result<(), De
     )?;
     shell(host, "Install Neovim > 0.11 from official release", "/usr/local/lib/bonesinfra/install-neovim.sh")?;
     add_script(host, "Install shared Neovim config repo", &assets.neovim_config_installer)?;
-    let mut directory = DirectoryInput::new("/etc/xdg/nvim");
-    directory.user = Some("root".to_owned());
-    directory.group = Some("root".to_owned());
-    directory.mode = Some(0o755);
-    host.add_stateful(Directory, directory, named("Ensure shared Neovim config permissions"))?;
+    let mut permissions = DirectoryInput::new("/etc/xdg/nvim");
+    permissions.user = Some("root".to_owned());
+    permissions.group = Some("root".to_owned());
+    permissions.mode = Some(0o755);
+    directory(host, "Ensure shared Neovim config permissions", permissions)?;
     Ok(())
 }
 
@@ -157,13 +158,4 @@ fn root_put(source: &Path, destination: &str, mode: u16) -> PutInput {
 fn add_script(host: &mut DeployHost<'_>, name: &str, source: &Path) -> Result<(), DeployError> {
     host.add_stateful(Script, ScriptInput { source: source.to_path_buf(), arguments: Vec::new() }, named(name))?;
     Ok(())
-}
-
-fn shell(host: &mut DeployHost<'_>, name: &str, command: &str) -> Result<(), DeployError> {
-    host.add_with_options(Shell, ShellCommands::from(command), named(name))?;
-    Ok(())
-}
-
-fn named(name: &str) -> OperationOptions {
-    OperationOptions { name: Some(name.to_owned()), ..OperationOptions::default() }
 }

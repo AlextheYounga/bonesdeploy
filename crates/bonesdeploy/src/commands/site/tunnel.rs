@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use bonesdeploy_core::paths;
-use bonesinfra::provisioning::{provision_tunnel_start, provision_tunnel_stop};
+use bonesinfra::provisioning::{apply_tunnel_start, apply_tunnel_stop};
 
 use crate::config;
 use crate::ui::{output, prompts};
@@ -16,7 +16,7 @@ pub async fn start(yes: bool) -> Result<()> {
 
     println!("Starting Quick Tunnel...");
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    provision_tunnel_start(&cfg, Path::new(".")).await?;
+    apply_tunnel_start(&cfg, Path::new(".")).await?;
     print_status(&cfg).await;
     Ok(())
 }
@@ -30,7 +30,7 @@ pub async fn stop(yes: bool) -> Result<()> {
 
     println!("Stopping Quick Tunnel...");
     let cfg = config::load(Path::new(paths::DOT_ENV))?;
-    provision_tunnel_stop(&cfg, Path::new(".")).await?;
+    apply_tunnel_stop(&cfg, Path::new(".")).await?;
     println!("{} Quick Tunnel stopped and removed.", output::success_marker());
     Ok(())
 }

@@ -58,6 +58,8 @@ behavior such as installing a backup passphrase or resolving a site manifest.
 | Provisioning inventory and execution | `crates/bonesinfra/src/execution.rs` |
 | Built-in framework runtime selection | `crates/bonesinfra/src/frameworks/` |
 | Server/site/runtime/SSL/tunnel plans | `crates/bonesinfra/src/provisioning/` |
+| Shared operation registration and quoting | `crates/bonesinfra/src/provisioning/operations.rs` |
+| Cross-process config/resource names | `crates/bonesdeploy-core/src/names.rs` |
 | Manifest declarations, inspection, deletion safety | `crates/bonesinfra/src/manifest/` |
 | Version-gated infrastructure migrations | `crates/bonesinfra/src/patches.rs` |
 | Release lifecycle and site mutation locks | `crates/bonesremote/src/release` |
@@ -90,6 +92,11 @@ its validated runtime plan: mode, runtime service, language, placeholder,
 network shape, writable paths, and project-local template names. Shared Linux
 behavior stays in provisioning modules rather than being copied into each
 framework.
+
+Framework modules describe runtime plans; `provisioning/runtime/` interprets
+those plans. Repeated operation registration belongs in the provisioning
+operations module, while path joining remains in `bonesdeploy-core::paths` and
+shared configuration/resource names live in `bonesdeploy-core::names`.
 
 Native frameworks use host systemd, nginx, and AppArmor. Docker-backed sites
 install Docker Engine and the Compose plugin, run the project stack through a

@@ -1,6 +1,6 @@
 //! Public config parsing and defaults of the `bonesdeploy-core` library.
 
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use anyhow::Result;
 use bonesdeploy_core::config;
@@ -97,13 +97,13 @@ fn dotenv_round_trips_framework_values() -> Result<()> {
     let dir = tempdir()?;
     let path = dir.path().join(".env");
     let mut config = Bones::default();
-    config.runtime.extra.insert(String::from(state::IS_STATIC), toml::Value::Boolean(true));
+    config.runtime.extra.insert(String::from(names::IS_STATIC), toml::Value::Boolean(true));
 
     config::write_local_environment(&config, &path)?;
     assert!(fs::read_to_string(&path)?.contains("BONES_IS_STATIC=true\n"));
     let loaded = config::load(&path)?;
 
-    assert_eq!(loaded.runtime.extra.get(state::IS_STATIC), Some(&toml::Value::Boolean(true)));
+    assert_eq!(loaded.runtime.extra.get(names::IS_STATIC), Some(&toml::Value::Boolean(true)));
     Ok(())
 }
 
@@ -153,7 +153,7 @@ fn flat_configuration_absorbed_into_managed_block_on_load() -> Result<()> {
     assert_eq!(loaded.environment.project_name, "atlas");
     assert_eq!(loaded.environment.runtime.compose_port, Some(8080));
     assert_eq!(loaded.environment.runtime.compose_wait_timeout, 240);
-    assert!(loaded.environment.runtime.extra.contains_key(state::IS_STATIC));
+    assert!(loaded.environment.runtime.extra.contains_key(names::IS_STATIC));
     let parsed = config::parse_dotenv(&fs::read_to_string(&path)?)?;
     assert!(parsed.needs_rewrite);
     config::write_local_environment(&loaded.environment, &path)?;

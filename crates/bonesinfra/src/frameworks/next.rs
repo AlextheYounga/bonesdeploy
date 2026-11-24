@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use anyhow::Result;
 
@@ -6,8 +6,8 @@ use super::{Language, Placeholder, RuntimePlan, ServerPlan, bool_value, numeric_
 use crate::ProvisioningContext;
 
 pub(super) fn plan(context: &ProvisioningContext) -> Result<RuntimePlan> {
-    numeric_version(&context.node_version, 3, state::NODE_VERSION)?;
-    if bool_value(context, state::IS_STATIC, true)? {
+    numeric_version(&context.node_version, 3, names::NODE_VERSION)?;
+    if bool_value(context, names::IS_STATIC, true)? {
         return Ok(RuntimePlan::Static {
             root: "out",
             nginx_template: "frameworks/next/nginx/static-site-nginx.conf.j2",
@@ -15,7 +15,7 @@ pub(super) fn plan(context: &ProvisioningContext) -> Result<RuntimePlan> {
         });
     }
     let port = port_value(context, "internal_port", 3100)?;
-    let node = state::node_binary(&context.node_version);
+    let node = names::node_binary(&context.node_version);
     Ok(RuntimePlan::Server(ServerPlan {
         name: "next",
         label: "Next.js app server",

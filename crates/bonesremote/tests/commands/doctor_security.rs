@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -8,12 +8,12 @@ use bonesremote::commands::doctor::security::fs::has_login_shell;
 use bonesremote::commands::doctor::security::types::{Account, Site, Status};
 
 fn account(name: &str, uid: u32, gid: u32) -> Account {
-    Account { name: name.to_string(), uid, gid, shell: state::NOLOGIN_SHELL.to_string(), groups: BTreeSet::from([gid]) }
+    Account { name: name.to_string(), uid, gid, shell: names::NOLOGIN_SHELL.to_string(), groups: BTreeSet::from([gid]) }
 }
 
 #[test]
 fn nologin_shells_are_not_interactive() {
-    assert!(!has_login_shell(state::NOLOGIN_SHELL));
+    assert!(!has_login_shell(names::NOLOGIN_SHELL));
     assert!(!has_login_shell("/bin/false"));
     assert!(has_login_shell("/bin/bash"));
 }

@@ -1,4 +1,4 @@
-use bonesdeploy_core::state;
+use bonesdeploy_core::names;
 
 use std::fs;
 use std::path::Path;
@@ -15,8 +15,8 @@ fn write_assets(project: &Path) -> Result<()> {
         "shared/nginx/cloudflared.conf.j2",
         "shared/scripts/enable-nginx-site.sh",
         "shared/systemd/cloudflared.service.j2",
-        state::NGINX_VALIDATION_SCRIPT,
-        state::ETCKEEPER_TEMPLATE,
+        names::NGINX_VALIDATION_SCRIPT,
+        names::ETCKEEPER_TEMPLATE,
     ] {
         let target = project.join("infra/templates").join(path);
         fs::create_dir_all(target.parent().ok_or_else(|| anyhow::anyhow!("asset has no parent"))?)?;
@@ -53,12 +53,12 @@ fn tunnel_plans_install_start_and_fully_remove_project_resources() -> Result<()>
     assert!(start.iter().any(|name| name == "Install Cloudflare package signing key"));
     assert!(start.iter().any(|name| name == "Deploy project quick tunnel service"));
     assert!(start.iter().any(|name| name == "Enable and start project quick tunnel"));
-    assert_eq!(start.last().map(String::as_str), Some(state::ETCKEEPER_RECORD_OPERATION));
+    assert_eq!(start.last().map(String::as_str), Some(names::ETCKEEPER_RECORD_OPERATION));
 
     let stop = names(&prepare_tunnel_stop(&context, &runtime, &resolver)?);
     assert_eq!(stop.first().map(String::as_str), Some("Stop and remove project quick tunnel"));
     assert!(stop.iter().any(|name| name == "Validate nginx configuration after Cloudflared removal"));
-    assert_eq!(stop.last().map(String::as_str), Some(state::ETCKEEPER_RECORD_OPERATION));
+    assert_eq!(stop.last().map(String::as_str), Some(names::ETCKEEPER_RECORD_OPERATION));
     Ok(())
 }
 
