@@ -35,6 +35,31 @@ fn deployment_script_check_accepts_nested_build_and_prepare_layout() -> Result<(
 }
 
 #[test]
+fn local_doctor_rejects_a_configured_branch_that_has_no_commit() -> Result<()> {
+    let env = TestEnv::new()?;
+    let init = env.run(&[
+        "init",
+        "--non-interactive",
+        "--project-name",
+        "atlas",
+        "--host",
+        "deploy.example.com",
+        "--branch",
+        "missing-branch",
+        "--runtime-backend",
+        "docker",
+    ])?;
+    assert!(init.status.success(), "init failed: {}", String::from_utf8_lossy(&init.stderr));
+    common::commit_initial(env.repo())?;
+
+    let doctor = env.run(&["site", "doctor", "--local"])?;
+    assert!(!doctor.status.success());
+    let stdout = String::from_utf8_lossy(&doctor.stdout);
+    assert!(stdout.contains("Unable to resolve local branch 'missing-branch' to an exact commit"), "{stdout}");
+    Ok(())
+}
+
+#[test]
 fn root_doctor_runs_site_diagnostics_after_a_server_failure() -> Result<()> {
     let env = TestEnv::new()?;
     let output = env.run(&["doctor"])?;
