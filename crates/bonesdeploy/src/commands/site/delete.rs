@@ -11,7 +11,7 @@ use crate::config;
 use crate::infra::{self, ssh};
 use crate::ui::{output, prompts};
 
-use super::manifest::{PathArtifact, render_path_tree};
+use crate::ui::manifest::{PathArtifact, render_path_tree};
 
 pub async fn run(yes: bool) -> Result<()> {
     super::readiness::ensure_project_ready()?;

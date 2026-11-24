@@ -6,7 +6,7 @@ pub mod config;
 pub mod frameworks;
 pub mod infra;
 
-mod ui;
+pub mod ui;
 
 use std::process::ExitCode;
 

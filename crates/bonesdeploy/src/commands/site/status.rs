@@ -5,7 +5,7 @@ use serde::Deserialize;
 use crate::commands::skill;
 use crate::config;
 use crate::infra::ssh;
-use crate::ui::output;
+use crate::ui::{SSL_LABEL, output};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct RemoteReport {
@@ -66,7 +66,7 @@ pub async fn run() -> Result<()> {
         match remote_status(cfg).await {
             Ok(remote) => {
                 println!("{} {}", style("Release").dim(), style(&remote.current_release).bold());
-                println!("{} {}", style(super::SSL_LABEL).dim(), ssl_state(&remote.ssl));
+                println!("{} {}", style(SSL_LABEL).dim(), ssl_state(&remote.ssl));
                 if let Some(preview) = render_preview_status(remote.preview.as_ref()) {
                     println!("{preview}");
                 }
