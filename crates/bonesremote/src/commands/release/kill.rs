@@ -1,21 +1,16 @@
-use std::fs;
-use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
 use anyhow::{Context, Result, bail};
 use bonesdeploy_core::config::validate_site_name;
-use bonesdeploy_core::paths;
 
 use crate::control_plane;
 use crate::privileges;
 use crate::release::SiteMutation;
-use crate::release::failed;
-use crate::release::lifecycle::context;
+use crate::release::cancellation;
 use crate::release::process;
 use crate::release::state::{self as release_state, DeploymentLock, DeploymentRecord};
-use crate::runtime::docker::command::release_image_tags;
 
 const PROCESS_STOP_TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -47,75 +42,9 @@ pub fn run(site: &str, release: &str) -> Result<()> {
     }
 
     let lock = DeploymentLock::acquire(site)?;
-    let mutation = SiteMutation::adopt(site, config.clone(), lock)?;
-    let current = mutation.active()?;
-    if current.as_ref().is_some_and(|deployment| deployment.release() != release) {
-        bail!("Active deployment changed while cancelling {release}; no cleanup was performed.");
-    }
-
-    if let Some(context) = current.as_ref().and_then(|deployment| deployment.context()) {
-        let context = validate_build_context(site, &config.project_root, Path::new(context))?;
-        let tags = release_image_tags(&context)?;
-        failed::remove_unreferenced_manifest_images(&mutation, &tags, Some(release))?;
-        context::cleanup(site, &context)?;
-    } else {
-        cleanup_stale_contexts(site, &config.project_root, Some(&mutation))?;
-    }
-
-    let staged = mutation.staged_release()?;
-    if staged.as_deref() == Some(release) {
-        failed::run_locked(&mutation)?;
-    }
-    mutation.clear_active()?;
+    let mutation = SiteMutation::adopt(site, config, lock)?;
+    cancellation::finish_locked(&mutation, release)?;
     println!("Cancelled release: {release}");
-    Ok(())
-}
-
-fn validate_build_context(site: &str, project_root: &str, context: &Path) -> Result<PathBuf> {
-    let tmp_root = fs::canonicalize(Path::new(project_root).join(paths::TMP_BUILDS_DIR))
-        .with_context(|| format!("Failed to resolve build context root for release {site}"))?;
-    let metadata = fs::symlink_metadata(context)
-        .with_context(|| format!("Failed to inspect recorded build context {}", context.display()))?;
-    if metadata.file_type().is_symlink() || !metadata.is_dir() {
-        bail!("Refusing to remove invalid build context recorded for release {site}: {}", context.display());
-    }
-    let canonical = fs::canonicalize(context)
-        .with_context(|| format!("Failed to resolve recorded build context {}", context.display()))?;
-    if canonical != context
-        || !canonical.starts_with(&tmp_root)
-        || !canonical.file_name().is_some_and(|name| name.to_string_lossy().starts_with(&format!("build-{site}-")))
-    {
-        bail!("Refusing to remove invalid build context recorded for release {site}: {}", context.display());
-    }
-    Ok(canonical)
-}
-
-fn cleanup_stale_contexts(site: &str, project_root: &str, mutation: Option<&SiteMutation>) -> Result<()> {
-    let tmp_root = Path::new(project_root).join(paths::TMP_BUILDS_DIR);
-    if !tmp_root.is_dir() {
-        return Ok(());
-    }
-    let tmp_root = fs::canonicalize(&tmp_root)
-        .with_context(|| format!("Failed to resolve build context root for release {site}"))?;
-    for entry in fs::read_dir(&tmp_root).with_context(|| format!("Failed to read {}", tmp_root.display()))? {
-        let path = entry?.path();
-        if !path.file_name().is_some_and(|name| name.to_string_lossy().starts_with(&format!("build-{site}-"))) {
-            continue;
-        }
-        let metadata = fs::symlink_metadata(&path)?;
-        if !metadata.is_dir() || metadata.file_type().is_symlink() {
-            continue;
-        }
-        let canonical = fs::canonicalize(&path)?;
-        if canonical != path || !canonical.starts_with(&tmp_root) {
-            continue;
-        }
-        if let Some(mutation) = mutation {
-            let tags = release_image_tags(&canonical)?;
-            failed::remove_unreferenced_manifest_images(mutation, &tags, None)?;
-        }
-        context::cleanup(site, &canonical)?;
-    }
     Ok(())
 }
 
